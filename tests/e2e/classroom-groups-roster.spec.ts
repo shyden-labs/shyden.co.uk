@@ -1959,11 +1959,12 @@ test.describe('the roster dropdowns are still reachable by thumb (#249)', () => 
         const controls = page.locator(
           '#cg-roster tbody tr select, #cg-roster tbody tr input',
         );
-        // Liveness first: three rows carry controls, so an empty set below
-        // would be a broken selector rather than a page that passes.
-        expect(await controls.count()).toBeGreaterThan(0);
-
-        const small = await controls.evaluateAll((els) =>
+        // Liveness is the controls MEASURED, which is the rendered ones. A
+        // `controls.count()` beside it counted every match, hidden ones too,
+        // so a roster whose controls all stopped rendering measured nothing
+        // and passed (#446). Three rows carry controls, so an empty set here
+        // is a broken selector or a page that hides them.
+        const measured = await controls.evaluateAll((els) =>
           els
             // `getClientRects()`, never the element's own computed display: a
             // `display: none` ANCESTOR leaves a descendant's computed display
@@ -1988,14 +1989,14 @@ test.describe('the roster dropdowns are still reachable by thumb (#249)', () => 
                 height:
                   Math.round(target.getBoundingClientRect().height * 10) / 10,
               };
-            })
-            .filter((c) => c.height < 44),
+            }),
         );
+        const small = measured.filter((c) => c.height < 44);
 
         expect(
           searched(small, {
-            of: await controls.count(),
-            what: 'roster controls',
+            of: measured,
+            what: 'rendered roster controls',
           }),
           small.map((c) => `${c.what} is ${c.height}px`).join('\n'),
         ).toEqual([]);

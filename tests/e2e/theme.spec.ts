@@ -563,7 +563,7 @@ test.describe('nothing moves when the theme changes (#386)', () => {
               );
             expect(
               searched(moved, {
-                of: compared.length,
+                of: compared,
                 what: 'rendered elements',
               }),
             ).toEqual([]);

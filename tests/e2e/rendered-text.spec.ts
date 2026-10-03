@@ -375,7 +375,10 @@ test.describe('rendered text — no sentence may lose a space to the formatter',
         return `${why} -> …${context}…`;
       });
       expect(
-        searched(findings, { of: text.length, what: `characters of ${path}` }),
+        // Its words, not its characters: whitespace is characters, so a page
+        // rendered blank would have counted as searched (#446). `searched`
+        // drops the empty strings a split leaves at either end.
+        searched(findings, { of: text.split(/\s+/), what: `words of ${path}` }),
         findings.join('\n'),
       ).toEqual([]);
     });
@@ -438,7 +441,10 @@ test.describe('rendered text — no sentence may lose a space to the formatter',
         (m) => m[0],
       );
       expect(
-        searched(findings, { of: text.length, what: `characters of ${path}` }),
+        // Its words, not its characters: whitespace is characters, so a page
+        // rendered blank would have counted as searched (#446). `searched`
+        // drops the empty strings a split leaves at either end.
+        searched(findings, { of: text.split(/\s+/), what: `words of ${path}` }),
         findings.join('\n'),
       ).toEqual([]);
     });

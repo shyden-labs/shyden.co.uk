@@ -152,7 +152,7 @@ for (const path of PAGES) {
 
       expect(
         searched(offPalette, {
-          of: readings.length,
+          of: readings,
           what: `controls measured on ${path}`,
         }),
         `${theme}: off-palette control colours on ${path}; the palette resolved to ${allowed.length} values`,

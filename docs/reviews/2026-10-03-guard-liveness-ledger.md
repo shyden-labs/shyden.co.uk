@@ -187,12 +187,39 @@ each turned a guard RED. Eight of those prove a cross-check alone, with its
 floor switched off. The two workflow floors count #459's probe workflows, and
 say so. Appendices A and B below remain the census at `6d07d37`.
 
-## Group 3: plain counts, next
+## Group 3: plain counts, done
 
-9 `searched` calls pass a number (`text.length`, `result.scanned`,
-`readings.length` …), which `searched` takes on trust. Each is read for
+9 `searched` calls passed a number (`text.length`, `result.scanned`,
+`readings.length` …), which `searched` takes on trust. Each was read for
 whether the count is of the judged unit, and whether an array could be
-passed instead so the control content-checks it.
+passed instead so the control content-checks it (#446 Group 3, plan
+`docs/superpowers/plans/2026-10-03-guard-audit-group-3.md`).
+
+| Site | Reading | Now |
+| --- | --- | --- |
+| `absence-liveness` verdict | Its floor sat at 398 under a real 421: Groups 2a and 2b grew the suite the same day, and growth never fails a floor. No cross-check. `expect.soft(x).toEqual([])` was not read, and any root but `expect(` was skipped rather than refused. | The list of sites; floor 420; `expect.soft` read; any other root refused by name, except a polled value; a raw-text cross-check that each of 113 files writing an absence was read. |
+| `pipeline-wiring` step summary | Judged per step, so a step that tees one line and appends the next with `>>` passed. No floor. | Judged per write (2 measured), floor 1, cross-checked against the `visual` job's raw YAML. |
+| `classroom-groups-roster` touch targets | `controls.count()` counted hidden controls too, while the measurement judged rendered ones: a roster whose controls all stopped rendering passed. | The measured list. |
+| `rendered-text`, both page scans | Characters include whitespace, so a page rendered blank counted as searched. | The page's words. |
+| `palette-controls`, `theme` | The count of the very array. | The array: form only. |
+| `anchored-presence` | Count of the judged unit; floor 75 under a measured 76, tight. | Unchanged. Its population is defined by dataflow, which no raw-text reading reproduces, so it still has no cross-check. |
+| `evidence-page` deletions | `toHaveLength(1)` on the population itself, exact. | Unchanged: sound. |
+
+Fail-closed reading found one site at once: `evidence-page.spec.ts:234`
+spells `expect` and `.poll(` on two lines, which a one-line search for
+`expect.poll(` cannot see. It polls an in-flight counter to 0, a value, so it
+is exempt by the same rule that exempts `expect(k).toBe(0)`.
+
+Review pass 1 found the cross-check blind to a count held to 0
+(`expect(x.length).toBe(0)`), which the reader reads; it now reads that too,
+its spellings are planted, and each new branch has a matrix row. The matrix
+ran 22 rows, all as predicted: 6 on `develop`, where each stayed GREEN, and
+16 on the new tree, where 15 turned a guard RED and one, a shell comment
+naming the summary, stayed GREEN as the exclusion intends. Two prove a
+cross-check alone, with its floor switched off. Removing a `tee` from
+`ci.yml` was not a gap: on `develop` a sibling test ('prints the container
+architecture into the job summary') already catches it, so the matrix blinds
+the guard's reader instead.
 
 ## Group 4: loop-built findings, next
 
@@ -235,7 +262,7 @@ on macOS is not the one CI reads.
 | `e2e/classroom-groups-privacy.spec.ts:288` | submitting cannot put a class list in the URL | `keys` | `keys.filter((key) => !NON_PERSONAL_NAME…` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/classroom-groups-projector.spec.ts:708` | (module level) | `seen.cards` | `seen.unreachable` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/classroom-groups-roster.spec.ts:1904` | no dropdown ever truncates its own column name -- ${path} at ${width}… | `boxes.map((box) => box.label)` | `findings` | findings drawn from it | sound at one hop: findings are built from the population |
-| `e2e/classroom-groups-roster.spec.ts:1996` | every roster control meets the 44px touch target with a placeholder s… | `await controls.count()` | `small` | count | to read |
+| `e2e/classroom-groups-roster.spec.ts:1996` | every roster control meets the 44px touch target with a placeholder s… | `await controls.count()` | `small` | count | fixed (Group 3): the measured, rendered list |
 | `e2e/copy-reaches-a-page.spec.ts:291` | ${locale}: no defined copy renders nowhere | `defined` | `missing` | loop-built | to read |
 | `e2e/copy-reaches-a-page.spec.ts:295` | ${locale}: no defined copy renders nowhere | `defined` | `wronglyAllowed` | loop-built | to read |
 | `e2e/copy-reaches-a-page.spec.ts:305` | ${locale}: no defined copy renders nowhere | `[...seen]` | `phantom` | findings drawn from it | sound at one hop: findings are built from the population |
@@ -252,26 +279,26 @@ on macOS is not the one CI reads.
 | `e2e/header-room.spec.ts:225` | (module level) | `rows` | `findings` | loop-built | to read |
 | `e2e/locale-beta.spec.ts:174` | ${locale}: the badge's spoken label keeps the page's language, even i… | `voices` | `misvoiced` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/not-found-report.spec.ts:175` | ${locale}: every control is at least 44px and every text meets AA | `read` | `failing` | loop-built | to read |
-| `e2e/palette-controls.spec.ts:154` | ${path}, ${theme}: every control it paints uses a palette colour | `readings.length` | `offPalette` | count | to read |
+| `e2e/palette-controls.spec.ts:154` | ${path}, ${theme}: every control it paints uses a palette colour | `readings.length` | `offPalette` | count | fixed (Group 3): the array, form only |
 | `e2e/print-legibility.spec.ts:156` | ${path}, ${saved ? `${saved} saved over a ${device} device` : `a ${de… | `inks` | `illegible` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/print-legibility.spec.ts:226` | ${theme}: a disabled control never depends on its fill reaching paper | `painted.rendered` | `painted.found` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/recorders.ts:159` | (module level) | `seen` | `[...consoleErrors, ...uncaught]` | loop-built | to read |
 | `e2e/recorders.ts:172` | (module level) | `seen` | `uncaught` | loop-built | to read |
-| `e2e/rendered-text.spec.ts:378` | ${path}: no sentence loses a space | `text.length` | `findings` | count | to read |
+| `e2e/rendered-text.spec.ts:378` | ${path}: no sentence loses a space | `text.length` | `findings` | count | fixed (Group 3): the page's words |
 | `e2e/rendered-text.spec.ts:420` | ${path}: no two words are rendered touching | `width` | `findings` | loop-built | to read |
-| `e2e/rendered-text.spec.ts:441` | ${path}: no unfilled [[placeholder]] reaches the page | `text.length` | `findings` | count | to read |
+| `e2e/rendered-text.spec.ts:441` | ${path}: no unfilled [[placeholder]] reaches the page | `text.length` | `findings` | count | fixed (Group 3): the page's words |
 | `e2e/report-completeness.spec.ts:112` | ${pagePath(pageId, locale)}: every catalogue string on the page is re… | `found` | `missing` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/report-form.spec.ts:82` | ${locale}: every control is at least 44px, every text meets AA, every… | `read` | `failing` | loop-built | to read |
 | `e2e/report-presence.spec.ts:44` | a built page with a footer carries the form exactly when its locale i… | `footed.map(({ file }) => file)` | `findings` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/text-over-ribbon.spec.ts:231` | ${theme} at ${width}px: every text run over the ribbon clears AA -- $… | `scan.seen` | `failing` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/thai-typography.spec.ts:135` | no Thai glyph draws beyond its line box -- ${route} at ${width}px, ${… | `examined` | `offenders` | findings drawn from it | sound at one hop: findings are built from the population |
 | `e2e/theme-script.spec.ts:122` | ${path}: runs it before the first paint: inline, classic, in <head>, … | `sheets` | `theme.sheetsBefore` | file-level | sound: judges the unit it counts |
-| `e2e/theme.spec.ts:565` | ${path} at ${width}px: no element moves between dark and light | `compared.length` | `moved` | count | to read |
+| `e2e/theme.spec.ts:565` | ${path} at ${width}px: no element moves between dark and light | `compared.length` | `moved` | count | fixed (Group 3): the array, form only |
 | `e2e/visual.spec.ts:134` | (module level) | `held` | `stillSticky` | loop-built | to read |
 | `e2e/zoom-on-focus.spec.ts:56` | ${path}: every typed field computes to at least ${IOS_ZOOM_FLOOR_PX}px | `controls` | `controls.filter((c) => !(c.fontSize >= …` | findings drawn from it | sound at one hop: findings are built from the population |
 | `shytalk-links.ts:45` | (module level) | `hosts` | `wrongHost` | findings drawn from it | sound at one hop: findings are built from the population |
-| `unit/absence-liveness.test.ts:234` | finds none whose population could be empty without saying so | `result.absences` | `result.findings` | count | to read |
-| `unit/anchored-presence.test.ts:307` | finds none reading raw source with an unanchored matcher | `result.scanned` | `result.findings` | count | to read |
+| `unit/absence-liveness.test.ts:234` | finds none whose population could be empty without saying so | `result.absences` | `result.findings` | count | fixed (Group 3): the site list, floor 420, cross-check, fail-closed |
+| `unit/anchored-presence.test.ts:307` | finds none reading raw source with an unanchored matcher | `result.scanned` | `result.findings` | count | sound (Group 3): judged unit, floor tight; no cross-check |
 | `unit/astro-css-strip.test.ts:121` | scans no comment that the per-style read removes | `comments` | `survivors` | loop-built | to read |
 | `unit/back-translate.test.ts:934` | reads every locale back into English and writes the review | `engine.sent` | `engine.sent.filter((text) => /[{}]/.tes…` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/back-translate.test.ts:1076` | fails loudly without an engine, before writing or sending anything | `engine.log` | `translateRequests(engine)` | findings drawn from it | sound at one hop: findings are built from the population |
@@ -328,7 +355,7 @@ on macOS is not the one CI reads.
 | `unit/duplication.test.ts:126` | finds no cross-file duplicate that has not been given a verdict | `DECLARATIONS` | `findings` | loop-built | to read |
 | `unit/duplication.test.ts:139` | carries no verdict for a pair that no longer exists | `recorded` | `recorded.filter((key) => !live.has(key))` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/event-collectors.test.ts:499` | every .all() loop proves its locator is not empty first | `SCANNED` | `unproved` | file-level | done in Group 2a: judged unit, floor, cross-check |
-| `unit/evidence-page.test.ts:1064` | never deletes a directory the operator was asked to keep | `deletions.length` | `deletions` | count | to read |
+| `unit/evidence-page.test.ts:1064` | never deletes a directory the operator was asked to keep | `deletions.length` | `deletions` | count | sound (Group 3): exact toHaveLength(1) |
 | `unit/evidence-page.test.ts:1247` | has no consumer spelling an evidence filename for itself | `consumers` | `respellings` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/evidence-page.test.ts:1586` | emits only media references the artifact serves | `srcs` | `unservable` | file-level | sound: judges the unit it counts |
 | `unit/evidence-page.test.ts:1663` | references every recording it was given | `keys` | `unreferenced` | findings drawn from it | sound at one hop: findings are built from the population |
@@ -393,7 +420,7 @@ on macOS is not the one CI reads.
 | `unit/pipeline-wiring.test.ts:1783` | pins an image rather than a label that migrates under it | `all.map(({ label }) => label)` | `floating` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/pipeline-wiring.test.ts:1820` | prints the container architecture into the job summary | `visualRuns()` | `recording` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/pipeline-wiring.test.ts:1942` | lets a fallback test the status of the command producing its text | `lines.map(({ line }) => line)` | `findings` | findings drawn from it | sound at one hop: findings are built from the population |
-| `unit/pipeline-wiring.test.ts:1961` | writes its numbers where they can be read back, not only to the summa… | `summaryWriters.length` | `unreadable` | count | to read |
+| `unit/pipeline-wiring.test.ts:1961` | writes its numbers where they can be read back, not only to the summa… | `summaryWriters.length` | `unreadable` | count | fixed (Group 3): judged per write, floor, cross-check |
 | `unit/pipeline-wiring.test.ts:2029` | uploads the gate diff and the measurement diff together (#311) | `paths` | `unreadable` | file-level | sound: judges the unit it counts |
 | `unit/pipeline-wiring.test.ts:2149` | clears every per-group report before a run, now that nothing wipes th… | `reports` | `uncleared` | findings drawn from it | sound at one hop: findings are built from the population |
 | `unit/pipeline-wiring.test.ts:2161` | nests none inside another, which a parent wipe would take with it | `dirs` | `nested` | findings drawn from it | sound at one hop: findings are built from the population |
