@@ -1,0 +1,76 @@
+name: Operator review
+# The trusted half of the operator-review lock (#459, decision 4). Design:
+# docs/superpowers/specs/2026-10-03-visual-rebaseline-design.md, Unit 4.
+#
+# A required check on develop that holds a pull request carrying an
+# automatic rebaseline (a commit by github-actions[bot] on a screenshot)
+# until the operator has approved it at its current head. Both triggers run
+# the DEFAULT branch's copy of this file, so a pull request cannot change the
+# verdict. A review fires no pull_request_target, so the relay completes on
+# every review and its completion starts this, whatever its conclusion: the
+# verdict reads everything it needs itself.
+#
+# It checks out only the default branch, keeping no token, installs nothing
+# (the script uses Node's own fetch), and runs scripts/operator-review.mjs
+# and `gh api`, which posts each status: `pending` on the event's head before
+# any read, `pending` on the current head when a push has moved it, then the
+# verdict there. A run that stops leaves `pending`, which blocks the merge.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ['Operator review relay']
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verdict:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+      EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.event.workflow_run.pull_requests[0].head.sha }}
+    steps:
+      - name: Refuse an event that names no pull request
+        run: |
+          if [ -z "$PR_NUMBER" ] || [ -z "$EVENT_HEAD" ]; then
+            echo "::error::the event names no pull request, so there is no head to hold"
+            exit 1
+          fi
+      - name: Hold the check on the event's head
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$EVENT_HEAD" -f state=pending -f context=operator-review -f "description=Deciding"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Read the current head
+        id: head
+        run: node scripts/operator-review.mjs head
+      - name: Hold the check on the current head too
+        if: steps.head.outputs.sha != env.EVENT_HEAD
+        env:
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=pending -f context=operator-review -f "description=Deciding"
+      - name: Decide
+        id: verdict
+        env:
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+        run: node scripts/operator-review.mjs verdict
+      - name: Post the verdict
+        env:
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
+          STATE: ${{ steps.verdict.outputs.state }}
+          DESCRIPTION: ${{ steps.verdict.outputs.description }}
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f "state=$STATE" -f context=operator-review -f "description=$DESCRIPTION" -f "target_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

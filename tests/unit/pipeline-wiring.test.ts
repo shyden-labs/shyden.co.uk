@@ -317,10 +317,12 @@ describe('the deploy pipeline runs what it claims to', () => {
     const ci = parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
       on?: Record<string, unknown>;
     };
-    // The whole trigger set, exactly: callable, and still nothing else.
+    // The whole trigger set, exactly: callable, dispatchable for the visual
+    // rebaseline's commit (#459), and still nothing else.
     expect(Object.keys(ci.on ?? {}).sort()).toEqual([
       'pull_request',
       'workflow_call',
+      'workflow_dispatch',
     ]);
     expect(jobNamed('deploy-dev.yml', 'test').uses).toBe(CI_WORKFLOW);
   });
@@ -983,12 +985,14 @@ describe('the deploy pipeline runs what it claims to', () => {
     // empty key is one group for every run: a second trigger would let a run
     // on one branch cancel a run on another. So a trigger other than a pull
     // request is allowed only because the key falls back to the run's own id,
-    // a group of one that cancels nothing. The one such trigger is
-    // `workflow_call`, the dispatch path running this suite (#163).
+    // a group of one that cancels nothing. There are two such triggers:
+    // `workflow_call`, the dispatch path running this suite (#163), and
+    // `workflow_dispatch`, which the visual rebaseline's commit uses to run CI
+    // on the head it wrote (#459).
     expect(
       Object.keys(ci.on ?? {}).sort(),
       'a trigger besides pull_request needs a key no other run shares',
-    ).toEqual(['pull_request', 'workflow_call']);
+    ).toEqual(['pull_request', 'workflow_call', 'workflow_dispatch']);
 
     // Exactly these two, in any order. Every workflow in the repo shares one
     // namespace of groups, so the key names this workflow; it names the pull
@@ -1189,16 +1193,21 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
  * fail this guard on the sentence promising the thing it checks for.
  */
 describe('the visual-regression job cannot rewrite what it checks', () => {
-  it('never passes --update-snapshots, in any workflow', () => {
-    // `workflowFileNames` refuses an empty read (#84), so this loop cannot
-    // run over nothing and report success.
-    for (const name of workflowFileNames()) {
-      if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
-      expect(
-        withoutCommentLines(workflow(name), '#'),
-        `${name} can rewrite the baseline it is checking against`,
-      ).not.toContain('--update-snapshots');
-    }
+  it('passes --update-snapshots in no workflow but the rebaseline capture (#459)', () => {
+    // The capture recaptures in a throwaway checkout, and what it writes
+    // reaches the repository only as a commit the operator reviews. Every
+    // other workflow, the gate included, must never rewrite a baseline.
+    const read = workflowYamlNames();
+    // Measured 2026-10-03: 12 workflow files once #459 lands (the two lock
+    // workflows added, the #460 probe's two deleted). 11 also holds through
+    // Task 6 alone, where the capture is the eleventh.
+    expect(read.length).toBeGreaterThanOrEqual(11);
+    const rewriting = read.filter((name) =>
+      withoutCommentLines(workflow(name), '#').includes('--update-snapshots'),
+    );
+    expect(searched(rewriting, { of: read, what: 'workflow files' })).toEqual([
+      'visual-rebaseline.yml',
+    ]);
   });
 
   it('takes the image the baselines are captured in from one selector', async () => {
@@ -2629,5 +2638,485 @@ describe('the waiting-reports count (#349)', () => {
       NOTICE_ISSUE: '360',
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
     });
+  });
+});
+
+// ---- the visual rebaseline (#459) -----------------------------------------
+//
+// Two workflows split the privilege. The capture runs pull-request code, so
+// it holds a read-only token and no secret; the commit writes, so it runs
+// only the default branch's code. Read from the parsed workflows, so a
+// comment cannot satisfy any of these.
+
+const CAPTURE = 'visual-rebaseline.yml';
+const COMMIT = 'visual-rebaseline-commit.yml';
+
+interface ParsedStep {
+  readonly job: string;
+  readonly uses?: string;
+  readonly run?: string;
+  readonly with?: Record<string, unknown>;
+  readonly env?: Record<string, unknown>;
+}
+
+/** Every step of a workflow, with its job, as the YAML parser reads it. */
+const stepsOf = (file: string): ParsedStep[] => {
+  const { jobs } = parseCleanYaml(workflow(file), file) as {
+    jobs: Record<string, { steps?: Omit<ParsedStep, 'job'>[] }>;
+  };
+  return Object.entries(jobs).flatMap(([job, body]) =>
+    (body.steps ?? []).map((step) => ({ job, ...step })),
+  );
+};
+
+/** Each shell line a workflow runs, comment-stripped, with its job. */
+const runLinesOf = (file: string) =>
+  stepsOf(file).flatMap(({ job, run }) =>
+    withoutCommentLines(run ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+      .map((line) => ({ job, line })),
+  );
+
+describe('the rebaseline capture runs pull-request code with nothing to write with (#459)', () => {
+  const root = () =>
+    parseCleanYaml(workflow(CAPTURE), CAPTURE) as {
+      name?: unknown;
+      on?: Record<string, unknown>;
+      permissions?: unknown;
+    };
+
+  it('is named as the commit workflow names it', () => {
+    expect(root().name).toBe('Visual rebaseline capture');
+  });
+
+  it('runs on pull_request alone', () => {
+    expect(Object.keys(root().on ?? {})).toEqual(['pull_request']);
+  });
+
+  it('reads the checkout and the pull request, and writes nothing', () => {
+    expect(root().permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+  });
+
+  it('gives no job permissions of its own', () => {
+    const { jobs } = parseCleanYaml(workflow(CAPTURE), CAPTURE) as {
+      jobs: Record<string, { permissions?: unknown }>;
+    };
+    const ids = Object.keys(jobs);
+    // Measured: 3 jobs (qualify, image, capture).
+    expect(ids.length).toBeGreaterThanOrEqual(2);
+    const own = ids.filter((id) => jobs[id].permissions !== undefined);
+    expect(searched(own, { of: ids, what: 'capture jobs' })).toEqual([]);
+  });
+
+  it('reads no secret', () => {
+    const jobs = workflowJobs(workflow(CAPTURE), CAPTURE);
+    const reading = jobs.filter(({ secrets }) => secrets.length > 0);
+    expect(
+      searched(
+        reading.map(({ id }) => id),
+        { of: jobs.map(({ id }) => id), what: 'capture jobs' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('leaves no token in any checkout', () => {
+    const checkouts = checkoutSteps(workflow(CAPTURE), CAPTURE);
+    // Measured: 3 checkouts, one per job.
+    expect(checkouts.length).toBeGreaterThanOrEqual(2);
+    const persisting = checkouts.filter((step) => step.persistsCredentials);
+    expect(
+      searched(
+        persisting.map(({ where }) => where),
+        { of: checkouts.map(({ where }) => where), what: 'checkout steps' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('acts only for Dependabot, decided before anything else runs', () => {
+    expect(jobNamed(CAPTURE, 'qualify').condition).toBe(
+      "github.event.pull_request.user.login == 'dependabot[bot]'",
+    );
+    expect(jobNamed(CAPTURE, 'image').needs).toEqual(['qualify']);
+    // Each states its own condition, with the upstream result spelled out:
+    // a bare implicit success() is judged over every upstream job (#157).
+    expect(jobNamed(CAPTURE, 'image').condition).toBe(
+      "!cancelled() && needs.qualify.result == 'success' && " +
+        "needs.qualify.outputs.qualifies == 'true'",
+    );
+    expect(jobNamed(CAPTURE, 'capture').needs).toEqual(['image']);
+    expect(jobNamed(CAPTURE, 'capture').condition).toBe(
+      "!cancelled() && needs.image.result == 'success'",
+    );
+  });
+
+  it('captures on the head the commit lands on, not the merge ref', () => {
+    const checkouts = stepsOf(CAPTURE).filter(
+      ({ job, uses }) =>
+        job === 'capture' && uses?.startsWith('actions/checkout@'),
+    );
+    expect(checkouts.map((step) => step.with?.ref)).toEqual([
+      '${{ github.event.pull_request.head.sha }}',
+    ]);
+  });
+
+  it('passes --update-snapshots in its capture job alone, after the gate ran', () => {
+    const lines = runLinesOf(CAPTURE);
+    const rewriting = lines.filter(({ line }) =>
+      line.includes('--update-snapshots'),
+    );
+    expect(rewriting.map(({ job }) => job)).toEqual(['capture']);
+    const gate = lines.findIndex(
+      ({ line }) =>
+        /npx playwright test --project=visual\b/.test(line) &&
+        !line.includes('--update-snapshots') &&
+        !line.includes('--list'),
+    );
+    expect(gate, 'the gate run').toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(lines.indexOf(rewriting[0]));
+  });
+
+  it('declares the visual project wherever it runs Playwright', () => {
+    const playwright = stepsOf(CAPTURE).filter(({ run }) =>
+      /npx playwright test/.test(withoutCommentLines(run ?? '')),
+    );
+    // Measured: 3 steps (gate, list, recapture).
+    expect(playwright.length).toBeGreaterThanOrEqual(2);
+    const undeclared = playwright.filter((step) => step.env?.VISUAL !== '1');
+    expect(
+      searched(
+        undeclared.map(({ run }) => run),
+        { of: playwright.map(({ run }) => run), what: 'Playwright steps' },
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('the rebaseline commit runs only the default branch code (#459)', () => {
+  const root = () =>
+    parseCleanYaml(workflow(COMMIT), COMMIT) as {
+      on?: { workflow_run?: { workflows?: unknown; types?: unknown } };
+      permissions?: unknown;
+      jobs?: Record<string, { permissions?: unknown }>;
+    };
+
+  it('is started by the capture finishing, and by nothing else', () => {
+    expect(Object.keys(root().on ?? {})).toEqual(['workflow_run']);
+    expect(root().on?.workflow_run?.workflows).toEqual([workflowName(CAPTURE)]);
+    expect(root().on?.workflow_run?.types).toEqual(['completed']);
+  });
+
+  it('proceeds only after a successful capture of a pull request', () => {
+    expect(jobNamed(COMMIT, 'commit').condition).toBe(
+      "github.event.workflow_run.conclusion == 'success' && " +
+        "github.event.workflow_run.event == 'pull_request'",
+    );
+  });
+
+  it('writes in one job, with the three scopes it needs', () => {
+    expect(root().permissions).toEqual({ contents: 'read' });
+    expect(root().jobs?.commit?.permissions).toEqual({
+      contents: 'write',
+      actions: 'write',
+      'pull-requests': 'write',
+    });
+    expect(Object.keys(root().jobs ?? {})).toEqual(['commit']);
+  });
+
+  it('checks out the default branch and nothing else, keeping no token', () => {
+    const checkouts = stepsOf(COMMIT).filter(({ uses }) =>
+      uses?.startsWith('actions/checkout@'),
+    );
+    const astray = checkouts.filter(
+      (step) =>
+        step.with?.ref !== undefined ||
+        step.with?.repository !== undefined ||
+        step.with?.['persist-credentials'] !== false,
+    );
+    expect(
+      searched(
+        astray.map(({ job }) => job),
+        { of: checkouts.map(({ job }) => job), what: 'checkout steps' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('installs only with npm ci --ignore-scripts', () => {
+    const installs = runLinesOf(COMMIT).filter(({ line }) =>
+      /\b(npm|npx|yarn|pnpm)\b/.test(line),
+    );
+    expect(installs.map(({ line }) => line)).toEqual([
+      'npm ci --ignore-scripts',
+    ]);
+  });
+
+  it("runs node only on its own checkout's scripts", () => {
+    const nodes = runLinesOf(COMMIT).filter(({ line }) =>
+      /\bnode\b/.test(line),
+    );
+    // Measured: 3 (find, locked, commit).
+    expect(nodes.length).toBeGreaterThanOrEqual(2);
+    const astray = nodes.filter(({ line }) => {
+      const match = /^node (scripts\/[\w.-]+\.mjs)( [a-z]+)*$/.exec(line);
+      return !match || !existsSync(match[1]);
+    });
+    expect(
+      searched(
+        astray.map(({ line }) => line),
+        { of: nodes.map(({ line }) => line), what: 'node invocations' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('downloads the triggering run’s artifact, into the runner’s own temp', () => {
+    const downloads = stepsOf(COMMIT).filter(({ uses }) =>
+      uses?.startsWith('actions/download-artifact@'),
+    );
+    expect(downloads.map((step) => step.with)).toEqual([
+      {
+        name: 'visual-rebaseline',
+        path: '${{ runner.temp }}/rebaseline',
+        'run-id': '${{ github.event.workflow_run.id }}',
+        'github-token': '${{ github.token }}',
+      },
+    ]);
+  });
+});
+
+/** Run lines per rebaseline workflow, measured; each floor is that less one. */
+const RUN_LINES_MEASURED: Record<string, number> = {
+  [CAPTURE]: 9,
+  [COMMIT]: 4,
+};
+
+describe('neither rebaseline workflow retries (operator rule, 2026-10-02)', () => {
+  for (const file of [CAPTURE, COMMIT])
+    it(`${file} retries nothing`, () => {
+      const lines = runLinesOf(file);
+      expect(lines.length).toBeGreaterThanOrEqual(RUN_LINES_MEASURED[file] - 1);
+      const retrying = lines.filter(({ line }) =>
+        /\bretr(?:y|ies)\b|--repeat-each|\buntil\b|\bwhile\b/i.test(line),
+      );
+      expect(
+        searched(
+          retrying.map(({ line }) => line),
+          { of: lines.map(({ line }) => line), what: `${file} run lines` },
+        ),
+      ).toEqual([]);
+      const actions = stepsOf(file).flatMap(({ uses }) => (uses ? [uses] : []));
+      expect(
+        searched(
+          actions.filter((uses) => /retry/i.test(uses)),
+          { of: actions, what: `${file} actions` },
+        ),
+      ).toEqual([]);
+    });
+});
+
+// ---- the operator-review lock (#459, decision 4) ---------------------------
+//
+// A commit status that holds an automatic rebaseline's merge until the
+// operator approves it. The trusted half runs the default branch's copy on
+// every push to a pull request and after every review; the relay, holding
+// nothing, exists only so that a review starts it.
+
+const REVIEW = 'operator-review.yml';
+const RELAY = 'operator-review-relay.yml';
+
+/** A step as the YAML parser reads it, with the keys these guards judge. */
+type JudgedStep = ParsedStep & {
+  readonly name?: string;
+  readonly if?: unknown;
+  readonly 'continue-on-error'?: unknown;
+};
+
+describe('operator-review decides from the default branch alone (#459)', () => {
+  const root = () =>
+    parseCleanYaml(workflow(REVIEW), REVIEW) as {
+      on?: {
+        pull_request_target?: { types?: unknown };
+        workflow_run?: { workflows?: unknown; types?: unknown };
+      };
+      permissions?: unknown;
+      jobs?: Record<
+        string,
+        { permissions?: unknown; 'continue-on-error'?: unknown }
+      >;
+    };
+
+  it('is started by a pull request event and by the relay, and by nothing else', () => {
+    expect(Object.keys(root().on ?? {})).toEqual([
+      'pull_request_target',
+      'workflow_run',
+    ]);
+    expect(root().on?.pull_request_target?.types).toEqual([
+      'opened',
+      'synchronize',
+      'reopened',
+    ]);
+    expect(root().on?.workflow_run?.workflows).toEqual([workflowName(RELAY)]);
+    expect(root().on?.workflow_run?.types).toEqual(['completed']);
+  });
+
+  it('holds exactly its three scopes, in one job that widens nothing', () => {
+    expect(root().permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+      statuses: 'write',
+    });
+    expect(Object.keys(root().jobs ?? {})).toEqual(['verdict']);
+    expect(root().jobs?.verdict?.permissions).toBeUndefined();
+    expect(root().jobs?.verdict?.['continue-on-error']).toBeUndefined();
+  });
+
+  it('checks out the default branch only, keeping no token', () => {
+    const checkouts = stepsOf(REVIEW).filter(({ uses }) =>
+      uses?.startsWith('actions/checkout@'),
+    );
+    // Measured: 1.
+    expect(checkouts).toHaveLength(1);
+    expect(checkouts[0].with).toEqual({ 'persist-credentials': false });
+  });
+
+  it('runs exactly the event check, its two commands and three status posts', () => {
+    // First an independent count of the run steps in the raw text, so a
+    // reader blind to one form of `run:` is caught by the step it missed
+    // before the list below is read through it.
+    const raw =
+      withoutCommentLines(workflow(REVIEW), '#').match(/^\s+(?:- )?run:/gm) ??
+      [];
+    const parsed = stepsOf(REVIEW).filter(({ run }) => run !== undefined);
+    expect(parsed.length, 'the parser read fewer run steps than the text').toBe(
+      raw.length,
+    );
+    // Measured: 6 run steps.
+    expect(raw).toHaveLength(6);
+    // The whole list is the allow-list, in order: an install, another
+    // script, a retry, or a status under another name is a line it does not
+    // hold, and `pending` is posted before the first read.
+    expect(runLinesOf(REVIEW).map(({ line }) => line)).toEqual([
+      'if [ -z "$PR_NUMBER" ] || [ -z "$EVENT_HEAD" ]; then',
+      'echo "::error::the event names no pull request, so there is no head to hold"',
+      'exit 1',
+      'fi',
+      'gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$EVENT_HEAD" -f state=pending -f context=operator-review -f "description=Deciding"',
+      'node scripts/operator-review.mjs head',
+      'gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=pending -f context=operator-review -f "description=Deciding"',
+      'node scripts/operator-review.mjs verdict',
+      'gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f "state=$STATE" -f context=operator-review -f "description=$DESCRIPTION" -f "target_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"',
+    ]);
+  });
+
+  it('stops at the first failure, so a refusal leaves pending', () => {
+    const steps = stepsOf(REVIEW) as JudgedStep[];
+    // Measured: 8 steps.
+    expect(steps.length).toBeGreaterThanOrEqual(7);
+    const carrying = steps.filter(
+      (step) =>
+        step['continue-on-error'] !== undefined ||
+        /\b(?:always|failure|cancelled)\(/.test(String(step.if ?? '')),
+    );
+    expect(
+      searched(
+        carrying.map((step) => step.name ?? step.uses ?? String(step.run)),
+        {
+          of: steps.map((step) => step.name ?? step.uses ?? String(step.run)),
+          what: 'operator-review steps',
+        },
+      ),
+    ).toEqual([]);
+  });
+
+  it('is reported only as a status, never as a check run a job earns by finishing', () => {
+    // A job's check run passes when the job does, so a job named for the lock
+    // would satisfy it with no verdict at all. Every workflow, so a job added
+    // anywhere later is covered.
+    const jobs = workflowYamlNames().flatMap((file) => {
+      const { jobs: parsed } = parseCleanYaml(workflow(file), file) as {
+        jobs: Record<string, { name?: unknown }>;
+      };
+      return Object.entries(parsed).map(([id, body]) => ({
+        at: `${file}: ${id}`,
+        check: typeof body.name === 'string' ? body.name : id,
+      }));
+    });
+    // Measured: 24 jobs across the 12 workflows once #459 lands.
+    expect(jobs.length).toBeGreaterThanOrEqual(23);
+    expect(
+      searched(
+        jobs
+          .filter(({ check }) => check === 'operator-review')
+          .map(({ at }) => at),
+        { of: jobs.map(({ at }) => at), what: 'jobs in every workflow' },
+      ),
+    ).toEqual([]);
+    expect(
+      producibleContexts(workflow(REVIEW), REVIEW).filter(
+        (context) => context === 'operator-review',
+      ),
+    ).toHaveLength(3);
+  });
+});
+
+describe('the review relay decides nothing and holds nothing (#459)', () => {
+  const root = () =>
+    parseCleanYaml(workflow(RELAY), RELAY) as {
+      on?: { pull_request_review?: { types?: unknown } };
+      permissions?: unknown;
+      jobs?: Record<string, { permissions?: unknown }>;
+    };
+
+  it('is started by a review submitted or dismissed, and by nothing else', () => {
+    // Without `dismissed`, a dismissed approval would keep its success.
+    expect(Object.keys(root().on ?? {})).toEqual(['pull_request_review']);
+    expect(root().on?.pull_request_review?.types).toEqual([
+      'submitted',
+      'dismissed',
+    ]);
+  });
+
+  it('holds no permission, in the workflow or its job', () => {
+    expect(root().permissions).toEqual({});
+    expect(Object.keys(root().jobs ?? {})).toEqual(['relay']);
+    expect(root().jobs?.relay?.permissions).toBeUndefined();
+  });
+
+  it('runs one line and no action', () => {
+    expect(stepsOf(RELAY).map(({ uses }) => uses)).toEqual([undefined]);
+    expect(runLinesOf(RELAY).map(({ line }) => line)).toEqual([
+      'echo "Review on pull request $PR_NUMBER; operator-review.yml decides."',
+    ]);
+  });
+});
+
+describe('the rebaseline commit refuses until develop requires the lock (#459)', () => {
+  const steps = () => stepsOf(COMMIT) as JudgedStep[];
+  const running = (command: string) =>
+    steps().findIndex(
+      ({ run }) =>
+        withoutCommentLines(run ?? '', '#').trim() ===
+        `node scripts/visual-rebaseline.mjs ${command}`,
+    );
+
+  it('asks before the download and before the commit', () => {
+    const locked = running('locked');
+    expect(locked, 'no step runs the locked command alone').toBeGreaterThan(0);
+    const download = steps().findIndex(({ uses }) =>
+      uses?.startsWith('actions/download-artifact@'),
+    );
+    expect(download).toBeGreaterThan(locked);
+    expect(running('commit')).toBeGreaterThan(locked);
+  });
+
+  it('runs whenever the commit runs, and stops the job when it refuses', () => {
+    const locked = steps()[running('locked')];
+    const commit = steps()[running('commit')];
+    expect(locked?.if).toBe(commit?.if);
+    expect(String(locked?.if)).not.toMatch(/\b(?:always|failure|cancelled)\(/);
+    expect(locked?.['continue-on-error']).toBeUndefined();
   });
 });

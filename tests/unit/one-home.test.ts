@@ -165,6 +165,11 @@ describe('walking a directory tree has exactly one home', () => {
         definesADirectoryWalker(readFileSync(path, 'utf8')),
       ),
     ).toEqual([
+      // The commit job's walk of a downloaded artifact (#459). filesUnder
+      // skips dotfiles and node_modules and refuses an empty walk, which
+      // would blind a validator to exactly what it exists to refuse; this
+      // one reads every entry with lstat and follows no symlink.
+      'scripts/visual-rebaseline.mjs',
       // The shared home. Every scan in the suite recurses through here.
       'tests/source-files.ts',
       // The detector itself: the one other file that must name the syntax,
@@ -399,6 +404,9 @@ describe('a directory read cannot reach a guard unproved', () => {
         readsADirectoryUnproved(readFileSync(path, 'utf8')),
       ),
     ).toEqual([
+      // The artifact walk (#459): an empty artifact is input for
+      // validateArtifact to refuse by name, never an exception here.
+      'scripts/visual-rebaseline.mjs',
       // The recursion. An empty sub-result is ordinary here and must stay
       // that way, so the proof belongs to the exported top-level form.
       'tests/source-files.ts',

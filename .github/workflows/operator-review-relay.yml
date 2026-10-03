@@ -1,0 +1,20 @@
+name: Operator review relay
+# Completes on every review so that operator-review.yml, the trusted half of
+# the operator-review lock (#459), runs: a review fires no
+# pull_request_target. This file runs the pull request's own copy, which is
+# why it decides nothing, reads nothing and holds no permission.
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions: {}
+
+jobs:
+  relay:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 1
+    steps:
+      - name: Name the pull request
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "Review on pull request $PR_NUMBER; operator-review.yml decides."

@@ -1,0 +1,78 @@
+name: Visual rebaseline commit
+# The PRIVILEGED half of the visual rebaseline (#459). Design:
+# docs/superpowers/specs/2026-10-03-visual-rebaseline-design.md.
+#
+# `workflow_run` always runs the DEFAULT branch's copy of this file, so a pull
+# request cannot change what it does, and GitHub's read-only rule for runs
+# Dependabot triggers covers push and pull_request events, not this one, so
+# the job gets exactly the scopes it declares. It checks out only the
+# default branch, installs only that lockfile with --ignore-scripts (the
+# dispatch check parses YAML with the repository's `yaml` package), and runs
+# only scripts/visual-rebaseline.mjs from that checkout. Nothing from the pull
+# request is checked out, installed or run. The artifact is data: walked with
+# lstat, validated down to each PNG's bytes, and refused whole on any doubt.
+#
+# Then it commits the PNGs through the Git Data API (fast-forward only),
+# dispatches ci.yml on the branch, since a push made with this token starts
+# no workflow, and labels the pull request. It commits nothing until develop
+# requires operator-review, which then holds the merge until the operator
+# approves the PNG diff at the new head (operator-review.yml).
+on:
+  workflow_run:
+    workflows: ['Visual rebaseline capture']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  commit:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No npm cache in a job that can write: a cache is shared state.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci --ignore-scripts
+      - name: Find the capture's upload
+        id: find
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: node scripts/visual-rebaseline.mjs find
+      # Until develop requires operator-review, a rebaseline is captured and
+      # uploaded but never committed: only the lock holds its merge (#459).
+      - name: Refuse unless develop requires operator-review
+        if: steps.find.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/visual-rebaseline.mjs locked
+      - name: Download it into an empty directory
+        if: steps.find.outputs.present == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: visual-rebaseline
+          path: ${{ runner.temp }}/rebaseline
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Validate, commit, start CI, ask for review
+        if: steps.find.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ARTIFACT_DIR: ${{ runner.temp }}/rebaseline
+          RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/visual-rebaseline.mjs commit

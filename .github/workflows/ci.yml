@@ -23,12 +23,20 @@ name: CI
 #
 # `pull_request`, never `pull_request_target`: a fork PR must not see secrets.
 #
-# `workflow_call` is the one other trigger, and it is not a push: it is how
-# deploy-dev.yml's dispatch path runs THIS suite on a branch that has no pull
-# request, rather than a copy of it that could drift (#163).
+# `workflow_call` is not a push either: it is how deploy-dev.yml's dispatch
+# path runs THIS suite on a branch that has no pull request, rather than a
+# copy of it that could drift (#163).
+#
+# `workflow_dispatch` is how the visual rebaseline's commit runs CI on the
+# head it wrote (#459). A push made with a job's own GITHUB_TOKEN starts no
+# workflow, and a dispatch is one of the two events GitHub exempts. The
+# dispatched run has no pull request number, so its concurrency key falls
+# back to its run id, and the checks it posts land on the branch head by
+# name, which is what branch protection and scripts/deploy-gate.mjs read.
 on:
   pull_request:
   workflow_call:
+  workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
 # that could no longer merge. The key names this workflow, because every

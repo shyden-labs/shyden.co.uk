@@ -1,0 +1,135 @@
+name: Visual rebaseline capture
+# The UNPRIVILEGED half of the visual rebaseline (#459). Design:
+# docs/superpowers/specs/2026-10-03-visual-rebaseline-design.md.
+#
+# A Playwright release ships new browsers, and new browsers can move pixels
+# while the site is unchanged. For a pull request Dependabot opened that
+# updates Playwright and nothing else, this reruns the visual gate in the
+# gate's own image, recaptures exactly the screenshots it failed on pixels
+# alone, and uploads them. visual-rebaseline-commit.yml, which runs only the
+# default branch's code, decides whether they reach the branch.
+#
+# It runs pull-request code (a new Playwright is third-party code), so it
+# holds a read-only token and no secret, and no checkout keeps a token. It is
+# not a required check: on any other pull request every job is skipped, and a
+# pull request that does not qualify ends green with its reason in the
+# summary. A red `visual` on such a pull request stays red for a person to
+# diagnose (operator, 2026-10-03: "we cannot afford to allow any visual bugs
+# go unnoticed and unfixed").
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Opened by Dependabot, from this repository, level with its base, and
+  # touching Playwright alone: scripts/visual-rebaseline.mjs decides, and
+  # tests/unit/visual-rebaseline.test.ts holds the rule.
+  qualify:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      qualifies: ${{ steps.decide.outputs.qualifies }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - id: decide
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/visual-rebaseline.mjs qualify
+
+  # The gate's image, picked exactly as ci.yml picks it (#454). Each job below
+  # states its upstream result itself: an implicit success() is judged over
+  # every upstream job, and a skip there skips silently (#157).
+  image:
+    needs: qualify
+    if: ${{ !cancelled() && needs.qualify.result == 'success' && needs.qualify.outputs.qualifies == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
+  capture:
+    needs: image
+    if: ${{ !cancelled() && needs.image.result == 'success' }}
+    runs-on: ubuntu-26.04
+    # The gate's last twelve green runs took at most 91 s (#431); a
+    # recapture doubles that, and a stalled image pull is bounded too.
+    timeout-minutes: 15
+    container:
+      image: ${{ needs.image.outputs.ref }}
+    steps:
+      # The HEAD, not the merge ref a pull_request checkout defaults to: the
+      # commit lands on the head. qualify required the head to be level with
+      # its base, so the two hold the same tree.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The gate exactly as ci.yml runs it, keeping its JSON report. It is
+      # allowed to fail: its exit and its report are read together next.
+      - name: Run the visual gate, keeping its report
+        id: gate
+        env:
+          VISUAL: '1'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: gate.json
+        run: |
+          set +e
+          npx playwright test --project=visual --reporter=list,json
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+      - name: List the visual tests the report must account for
+        env:
+          VISUAL: '1'
+        run: npx playwright test --project=visual --list --reporter=json > list.json
+      - name: Classify the gate's failures
+        id: classify
+        env:
+          GATE_EXIT: ${{ steps.gate.outputs.exit }}
+        run: node scripts/visual-rebaseline.mjs classify gate.json list.json
+      # Recaptures every screenshot (measured deterministic, #134); stage
+      # keeps only the ones the gate failed.
+      - name: Recapture
+        if: steps.classify.outputs.failed != '0'
+        env:
+          VISUAL: '1'
+        run: npx playwright test --project=visual --update-snapshots=all --reporter=list
+      - name: Stage the baselines the gate failed
+        if: steps.classify.outputs.failed != '0'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/visual-rebaseline.mjs stage rebaseline
+      - name: Upload them for the commit workflow
+        if: steps.classify.outputs.failed != '0'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-rebaseline
+          path: rebaseline/
+          retention-days: 7
+          if-no-files-found: error
