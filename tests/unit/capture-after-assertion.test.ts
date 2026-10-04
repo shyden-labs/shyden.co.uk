@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { callsIn } from '../playwright-declarations';
 import { parseSource } from './ast';
 import { blankCommentLines } from './source-text';
-import { expectNothingFound, type Analyze } from './spec-scan';
+import { expectNothingFound, type Analyze, type Liveness } from './spec-scan';
 
 /**
  * An evidence capture belongs AFTER the assertion it documents (#261).
@@ -79,17 +79,24 @@ const capturesBeforeAssertion: Analyze = (file, source) => {
 };
 
 /**
- * True where the file calls `shoot`, read from the parse tree: independent of
- * the line scan above, so a scan gone blind to a capture's spelling is caught
- * by the file it judged none in (#446).
+ * How many times the file calls `shoot`, read from the parse tree:
+ * independent of the line scan above, so a scan gone blind to a capture's
+ * spelling is caught by the file it judged too few in (#446, per file #477).
  */
-const callsShoot = (file: string, source: string): boolean =>
-  callsIn(parseSource(source, file)).some(({ expression }) =>
+const shootCalls = (file: string, source: string): number =>
+  callsIn(parseSource(source, file)).filter(({ expression }) =>
     ts.isIdentifier(expression)
       ? expression.text === 'shoot'
       : ts.isPropertyAccessExpression(expression) &&
         expression.name.text === 'shoot',
-  );
+  ).length;
+
+const captures: Liveness = {
+  what: 'evidence captures',
+  floor: 'capture-after-assertion/captures',
+  carries: (file, source) => shootCalls(file, source) > 0,
+  count: shootCalls,
+};
 
 describe('capturesBeforeAssertion -- the scan proven on synthetic input', () => {
   const scan = (...lines: string[]) =>
@@ -170,10 +177,17 @@ describe('capturesBeforeAssertion -- the scan proven on synthetic input', () => 
 
 describe('an evidence capture documents an assertion that already passed', () => {
   it('never runs before the assertion it claims to document', () => {
-    expectNothingFound(capturesBeforeAssertion, {
-      what: 'evidence captures',
-      floor: 'capture-after-assertion/captures',
-      carries: callsShoot,
-    });
+    expectNothingFound(capturesBeforeAssertion, captures);
+  });
+
+  it('refuses a file where the scan and the tree count differently', () => {
+    // The per-file count's own liveness (#477): one capture more than the
+    // scan judged, in every file, as a scan blind to a spelling leaves it.
+    expect(() =>
+      expectNothingFound(capturesBeforeAssertion, {
+        ...captures,
+        count: (file, source) => shootCalls(file, source) + 1,
+      }),
+    ).toThrow(/\.spec\.ts: judged \d+, counted another way \d+/);
   });
 });

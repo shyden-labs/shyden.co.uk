@@ -64,6 +64,13 @@ export type Liveness = {
    * a form the reader is blind to.
    */
   readonly carries: (file: string, source: string) => boolean;
+  /**
+   * The same file's units counted another way, where they can be. Given,
+   * every file's `judged` must number exactly this (#477): a reader blind to
+   * one unit in a file that holds two others still judges something there,
+   * which `carries` cannot see.
+   */
+  readonly count?: (file: string, source: string) => number;
 };
 
 /**
@@ -112,7 +119,29 @@ export const expectNothingFound = (
     }),
     `files holding ${liveness.what} where the reader judged none`,
   ).toEqual([]);
-  // After both verdicts, so a population that grew never hides a finding.
+  const { count } = liveness;
+  if (count) {
+    const disagree = readings
+      .map(({ file, source, judged }) => ({
+        file,
+        judged: judged.length,
+        counted: count(file, source),
+      }))
+      .filter(({ judged, counted }) => judged !== counted)
+      .map(
+        ({ file, judged, counted }) =>
+          `${file}: judged ${judged}, counted another way ${counted}`,
+      );
+    expect(
+      searched(disagree, {
+        of: readings,
+        what: 'files under the spec directories',
+      }),
+      `${liveness.what}, judged and counted another way, per file:\n` +
+        disagree.join('\n'),
+    ).toEqual([]);
+  }
+  // After every verdict, so a population that grew never hides a finding.
   expect(
     floorBreach(liveness.floor, judged.length),
     `${liveness.what}: not the recorded figure`,
