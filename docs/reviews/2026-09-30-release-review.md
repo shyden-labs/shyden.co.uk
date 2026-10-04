@@ -278,27 +278,27 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 263 | test | A | `tests/unit/git-hooks.test.ts` | +135/-0 | read in full at 33e84cd (tranche 19) | none new; the shape loop inside one test computes only, #462 scope | n/a |
 | 264 | test | M | `tests/unit/gloryPoints.test.ts` | +85/-2 | diff read whole, a3a5adb..33e84cd (tranche 19) | none | n/a |
 | 265 | test | M | `tests/unit/grouping.test.ts` | +83/-41 | diff read whole, a3a5adb..33e84cd (tranche 19) | F176 P4 copy, fixed forward: since #390's list join, three messages say 'Student 1 and Student 5 all need to be kept apart' and 'are not all the same sex' over two names; #505 | filed: #505 |
-| 266 | test | M | `tests/unit/i18n.test.ts` | +400/-391 | — |  |  |
-| 267 | test | A | `tests/unit/install-scripts.test.ts` | +142/-0 | — |  |  |
-| 268 | test | A | `tests/unit/is-record.test.ts` | +19/-0 | — |  |  |
-| 269 | test | M | `tests/unit/isolated-context-tagging.test.ts` | +281/-255 | — |  |  |
-| 270 | test | A | `tests/unit/label-check.test.ts` | +426/-0 | — |  |  |
-| 271 | test | A | `tests/unit/layout-widths.test.ts` | +114/-0 | — |  |  |
-| 272 | test | A | `tests/unit/literal-grounds.test.ts` | +363/-0 | — |  |  |
-| 273 | test | A | `tests/unit/locale-beta.test.ts` | +104/-0 | — |  |  |
-| 274 | test | A | `tests/unit/locale-fallbacks.test.ts` | +141/-0 | — |  |  |
+| 266 | test | M | `tests/unit/i18n.test.ts` | +400/-391 | diff read whole, a3a5adb..33e84cd (tranche 20) | none new; its 'not all the same sex' over two names is F176 (#505); the kinds loop inside one test computes only, #462 scope | n/a |
+| 267 | test | A | `tests/unit/install-scripts.test.ts` | +142/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
+| 268 | test | A | `tests/unit/is-record.test.ts` | +19/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
+| 269 | test | M | `tests/unit/isolated-context-tagging.test.ts` | +281/-255 | read in full at 33e84cd (tranche 20; +281/-255 rewrote most of it, so the whole file covers the diff) | none new; opensAContext judges a test's own body, as its docblock says, and the one real newContext() call is in a body (theme.spec.ts:244) | n/a |
+| 270 | test | A | `tests/unit/label-check.test.ts` | +426/-0 | read in full at 33e84cd (tranche 20) | none new; #398 holds its one-character CJK gap | n/a |
+| 271 | test | A | `tests/unit/layout-widths.test.ts` | +114/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
+| 272 | test | A | `tests/unit/literal-grounds.test.ts` | +363/-0 | read in full at 33e84cd (tranche 20) | none new; line 210 counts grounds while judging the rules inside them, already #471 | n/a |
+| 273 | test | A | `tests/unit/locale-beta.test.ts` | +104/-0 | read in full at 33e84cd (tranche 20) | none new; the locale loops inside tests compute only, #462 scope | n/a |
+| 274 | test | A | `tests/unit/locale-fallbacks.test.ts` | +141/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
 | 275 | test | A | `tests/unit/locale-metadata.test.ts` | +226/-0 | CHANGED since read (+22/-2 after c48ed44); before: read in full (tranche 3) | F28; F25 | via metadata.ts |
-| 276 | test | A | `tests/unit/locale-routing.test.ts` | +104/-0 | — |  |  |
-| 277 | test | A | `tests/unit/locale-switcher.test.ts` | +187/-0 | — |  |  |
-| 278 | test | M | `tests/unit/lockdown.test.ts` | +8/-5 | — |  |  |
+| 276 | test | A | `tests/unit/locale-routing.test.ts` | +104/-0 | read in full at 33e84cd (tranche 20) | none new; the loops compute only, over sitePaths(), which nonEmpty refuses empty; #462 scope | n/a |
+| 277 | test | A | `tests/unit/locale-switcher.test.ts` | +187/-0 | read in full at 33e84cd (tranche 20) | none new; tripwire 2's source checks are spelling-specific (`[0]`, a bare `nativeName`) and backed by the rendered per-language test at classroom-groups-io.spec.ts:855 | n/a |
+| 278 | test | M | `tests/unit/lockdown.test.ts` | +8/-5 | diff read whole, a3a5adb..33e84cd (tranche 20) | none | n/a |
 | 279 | test | A | `tests/unit/marquee.test.ts` | +65/-0 | read in full | F26 staged-locale case | via metadata.ts |
-| 280 | test | A | `tests/unit/message-catalogue.test.ts` | +77/-0 | — |  |  |
-| 281 | test | A | `tests/unit/message-characterisation.test.ts` | +144/-0 | — |  |  |
-| 282 | test | A | `tests/unit/message-parity.test.ts` | +243/-0 | — |  |  |
+| 280 | test | A | `tests/unit/message-catalogue.test.ts` | +77/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
+| 281 | test | A | `tests/unit/message-characterisation.test.ts` | +144/-0 | read in full at 33e84cd (tranche 20) | none new; the per-case loop computes only, #462 scope; measured: 58 messages, 1-27 cases each, none empty | n/a |
+| 282 | test | A | `tests/unit/message-parity.test.ts` | +243/-0 | read in full at 33e84cd (tranche 20) | F181 P3 latent, fixed forward: the English-import detector reads `'./en'` and `'./en.ts'` only, so a value import from `'./en.js'` passes; #507 | filed: #507; 2/2 as predicted (plant GREEN, control RED) |
 | 283 | test | A | `tests/unit/message.test.ts` | +326/-0 | read in full (tranche 3) | F21 reasons and positions pinned; 7 edge cases | via message.ts |
-| 284 | test | A | `tests/unit/nav-timings.test.ts` | +413/-0 | — |  |  |
-| 285 | test | A | `tests/unit/no-dated-render.test.ts` | +129/-0 | — |  |  |
-| 286 | test | A | `tests/unit/node-contract.test.ts` | +157/-0 | — |  |  |
+| 284 | test | A | `tests/unit/nav-timings.test.ts` | +413/-0 | read in full at 33e84cd (tranche 20) | none; its liveness verdict cross-checks its own walk against the report's stats | n/a |
+| 285 | test | A | `tests/unit/no-dated-render.test.ts` | +129/-0 | read in full at 33e84cd (tranche 20) | F178 P3 latent, fixed forward: CLOCK misses `Date()` without `new`, `new Date` without parentheses and `Temporal.Now`; #507 (#482 holds only its floor) | filed: #507; 2/2 as predicted (plant GREEN, control RED) |
+| 286 | test | A | `tests/unit/node-contract.test.ts` | +157/-0 | read in full at 33e84cd (tranche 20) | F179 P3 fixed forward: the floor regex reads a ceiling (`<=24.2.0`) as a floor; F180 P3 latent: setup-node steps are counted per file only, so a quoted `uses:` reads 0 = 0; #507 | filed: #507; 3/3 as predicted (two plants GREEN, one control RED) |
 | 287 | test | A | `tests/unit/numberSets.test.ts` | +517/-0 | — |  |  |
 | 288 | test | A | `tests/unit/one-home.test.ts` | +517/-0 | — |  |  |
 | 289 | test | A | `tests/unit/palette.test.ts` | +235/-0 | — |  |  |
