@@ -1,6 +1,6 @@
 {
   "absence-liveness/plain-files": 117,
-  "absence-liveness/sites": 444,
+  "absence-liveness/sites": 447,
   "absence-liveness/ts-files": 268,
   "anchored-presence/scanned": 76,
   "anchored-presence/text-sites": 74,
@@ -13,8 +13,8 @@
   "deprecated-css/declarations": 1170,
   "device-tool-homes/files": 301,
   "download-readers/byte-reads": 8,
-  "duplicate-imports/imports": 1583,
-  "duplication/declarations": 5391,
+  "duplicate-imports/imports": 1582,
+  "duplication/declarations": 5395,
   "duplication/files": 345,
   "event-collectors/locator-loops": 8,
   "event-collectors/specs": 65,

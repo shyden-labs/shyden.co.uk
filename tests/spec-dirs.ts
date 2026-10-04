@@ -1,5 +1,5 @@
 import { dirname } from 'node:path';
-import { specFilesUnder } from './source-files';
+import { committableFiles, specFilesUnder } from './source-files';
 
 const TESTS_DIR = 'tests';
 
@@ -16,3 +16,20 @@ const TESTS_DIR = 'tests';
  */
 export const specDirs = (): string[] =>
   [...new Set(specFilesUnder(TESTS_DIR).map((path) => dirname(path)))].sort();
+
+/**
+ * Every TypeScript file git has in a directory that holds a spec, the
+ * directories read from git's list as well: what
+ * `specDirs().flatMap(tsFilesUnder)` walks, read without the disk walk, so a
+ * guard can check its walk against it (#477). Untracked files count, as in
+ * `committableFiles`.
+ */
+export const specDirFilesGitHas = (): string[] => {
+  const known = committableFiles(
+    (path) => path.startsWith(`${TESTS_DIR}/`) && /\.tsx?$/.test(path),
+  );
+  const dirs = [
+    ...new Set(known.filter((path) => path.endsWith('.spec.ts')).map(dirname)),
+  ];
+  return known.filter((path) => dirs.some((dir) => path.startsWith(`${dir}/`)));
+};

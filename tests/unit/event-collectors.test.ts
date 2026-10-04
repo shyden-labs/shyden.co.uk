@@ -7,14 +7,8 @@ import {
   enclosingDeclaration,
   type Declaration,
 } from '../playwright-declarations';
-import { specDirs } from '../spec-dirs';
-import { dirname } from 'node:path';
-import {
-  committableFiles,
-  searched,
-  tsFilesUnder,
-  walkDisagreements,
-} from '../source-files';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
+import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
 import { parseSource } from './ast';
 import { withoutTsComments } from './source-text';
 import { floorBreach } from '../floors';
@@ -77,17 +71,8 @@ describe('browser-event collectors have exactly one home', () => {
     // Independent of the walk (#477): spec directories and their files both
     // derived from git's list, so a walk that drops a directory or a suffix
     // names what it dropped.
-    const known = committableFiles(
-      (path) => path.startsWith('tests/') && /\.tsx?$/.test(path),
-    );
-    const dirs = new Set(
-      known.filter((path) => path.endsWith('.spec.ts')).map(dirname),
-    );
-    const inSpecDirs = known.filter((path) =>
-      [...dirs].some((dir) => path.startsWith(`${dir}/`)),
-    );
     expect(
-      searched(walkDisagreements(SCANNED, inSpecDirs), {
+      searched(walkDisagreements(SCANNED, specDirFilesGitHas()), {
         of: SCANNED,
         what: 'files in spec directories',
       }),

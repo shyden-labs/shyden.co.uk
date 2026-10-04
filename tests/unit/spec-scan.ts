@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { expect } from 'vitest';
-import { specDirs } from '../spec-dirs';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { declaresTests } from '../playwright-declarations';
 import { floorBreach } from '../floors';
-import { searched, tsFilesUnder } from '../source-files';
+import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
 
 /**
  * The body every source-scanning guard in this repo ends with, once (#277).
@@ -118,6 +118,18 @@ export const expectNothingFound = (
       what: 'files under the spec directories',
     }),
     `files holding ${liveness.what} where the reader judged none`,
+  ).toEqual([]);
+  // The walk against git's list (#477): the per-file checks above are
+  // computed over the walk, so a walk that dropped a file drops it from
+  // both sides of them.
+  expect(
+    searched(
+      walkDisagreements(
+        readings.map(({ file }) => file),
+        specDirFilesGitHas(),
+      ),
+      { of: readings, what: 'files under the spec directories' },
+    ),
   ).toEqual([]);
   const { count } = liveness;
   if (count) {

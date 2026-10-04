@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseSource } from './ast';
-import { filesUnder, searched, tsFilesUnder } from '../source-files';
-import { specDirs } from '../spec-dirs';
+import {
+  filesUnder,
+  searched,
+  tsFilesUnder,
+  walkDisagreements,
+} from '../source-files';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import {
   loopedCases,
   statefulHelpers,
@@ -303,6 +308,14 @@ describe('the suite', () => {
     ).toEqual([]);
     expect(
       searched(miscounted, { of: specs, what: 'files in spec directories' }),
+    ).toEqual([]);
+    // Both checks above count over the walk, so it is checked against git's
+    // own list too (#477): a walk that drops a file drops it from both sides.
+    expect(
+      searched(walkDisagreements(specs, specDirFilesGitHas()), {
+        of: specs,
+        what: 'files in spec directories',
+      }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(

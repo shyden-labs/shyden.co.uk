@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { specDirs } from '../spec-dirs';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { floorBreach } from '../floors';
 
 describe('the directories guards scan are derived, not listed', () => {
@@ -21,5 +21,17 @@ describe('the directories guards scan are derived, not listed', () => {
     // tests/unit holds *.test.ts, not *.spec.ts — scanning it would make the
     // guards assert against themselves.
     expect(specDirs()).not.toContain('tests/unit');
+  });
+});
+
+describe('specDirFilesGitHas -- the spec directories, read from git (#477)', () => {
+  it('holds a spec and a helper beside it', () => {
+    const files = specDirFilesGitHas();
+    expect(files).toContain('tests/e2e/classroom-groups.spec.ts');
+    expect(files).toContain('tests/e2e/recorders.ts');
+  });
+
+  it('holds nothing from a directory with no spec', () => {
+    expect(specDirFilesGitHas()).not.toContain('tests/unit/ast.ts');
   });
 });

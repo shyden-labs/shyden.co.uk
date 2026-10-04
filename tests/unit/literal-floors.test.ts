@@ -3,7 +3,12 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { floorBreach, readFloors } from '../floors';
 import { floorSitesIn } from '../literal-floors';
-import { searched, tsFilesUnder } from '../source-files';
+import {
+  committableFiles,
+  searched,
+  tsFilesUnder,
+  walkDisagreements,
+} from '../source-files';
 import { parseFile, parseSource, stringTextsIn } from './ast';
 import { withoutTsComments } from './source-text';
 
@@ -336,6 +341,20 @@ describe('the floor reader proves what it read (#468)', () => {
     }).map(({ file }) => file);
     expect(
       searched(misread, { of: FILES, what: 'TypeScript files under tests/' }),
+    ).toEqual([]);
+  });
+
+  it('reads every TypeScript file git has under tests/', () => {
+    // Its per-file cross-check counts over this walk, so the walk is checked
+    // against git's own list (#477).
+    const known = committableFiles(
+      (path) => path.startsWith('tests/') && /\.tsx?$/.test(path),
+    );
+    expect(
+      searched(walkDisagreements(FILES, known), {
+        of: FILES,
+        what: 'files under tests/',
+      }),
     ).toEqual([]);
   });
 
