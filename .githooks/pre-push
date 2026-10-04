@@ -26,7 +26,7 @@ unset $(git rev-parse --local-env-vars)
 fail() {
   printf '\npre-push blocked: %s\n' "$1"
   printf '  fix:  %s\n' "$2"
-  printf '  skip: git push --no-verify   (CI still runs both)\n\n'
+  printf '  skip: git push --no-verify   (CI still runs all three)\n\n'
   exit 1
 }
 

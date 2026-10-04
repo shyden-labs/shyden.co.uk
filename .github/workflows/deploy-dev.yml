@@ -167,11 +167,11 @@ jobs:
       !cancelled() && needs.deploy-dev.result == 'success'
     runs-on: ubuntu-26.04
     timeout-minutes: 15
-    # It reads DEV_BASIC_AUTH_PASSWORD, so it names the environment meant to
-    # hold it. A job naming none reads repository secrets, and those reach a
-    # workflow on any branch (#241). Read 2026-10-01: `dev` holds no secret
-    # yet, so the repository copy is what this reads until #241 lands. The url repeats deploy-dev's, because the environment
-    # links to its latest deployment, and that is this job's.
+    # It reads DEV_BASIC_AUTH_PASSWORD, so it names `dev`, the environment
+    # holding it: the repository holds no secrets (read 2026-10-04, #390
+    # F163), and a repository secret would reach a workflow on any branch
+    # (#241). The url repeats deploy-dev's, because the environment links to
+    # its latest deployment, and that is this job's.
     environment:
       name: dev
       url: https://dev.shyden.co.uk
