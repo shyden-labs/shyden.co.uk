@@ -335,24 +335,24 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
 | 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | read in full at 33e84cd (tranche 23) | F198 P4 latent, fixed forward: 'skips dotfiles and node_modules' walks tests/, which holds neither, so a walk that never skips passes all 23; the skip is held only by supply-chain's walk from `.`; #512 | filed: #512; 2/2 as predicted (source-files GREEN, supply-chain RED) |
 | 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | read in full at 33e84cd (tranche 23) | none new; its few compute-only loops are #462 scope | n/a |
-| 323 | test | A | `tests/unit/source-text.ts` | +689/-0 | — |  |  |
+| 323 | test | A | `tests/unit/source-text.ts` | +689/-0 | read in full at 33e84cd (tranche 24) | F199 P3, fixed forward: `codeWithoutComments` runs the CSS scanner over .ts/.mjs/.js, which reads no template or regex literal, so a `/*` inside one deletes code to the next `*/`: 10 of the 380 tracked code files read short (playwright.dev.config.ts keeps 5 of 34 lines); nothing hidden or depending on it today (its 10 callers 358/358 without it); swept, line 686 is the only non-CSS use. F200 P4 latent: `startsRegex` tests keywords on a whitespace-free tail with no boundary, so `margin / 2; // it's` opens a regex and then a string; 0 of 380 files read differently; #514 | filed: #514; F199 2/2 as predicted (shytalk-brand GREEN, control RED); F200 probe: positive seen, 0/380 differ |
 | 324 | test | A | `tests/unit/spec-dirs.test.ts` | +37/-0 | CHANGED since read (+15/-2 after c48ed44); before: read whole (tranche 9) | none: anti-vacuity length, the two deploy-gate directories by name, tests/unit excluded. | see SD1 |
-| 325 | test | A | `tests/unit/spec-scan.ts` | +163/-0 | — |  |  |
-| 326 | test | M | `tests/unit/staleness.test.ts` | +9/-5 | — |  |  |
-| 327 | test | A | `tests/unit/stranded-docblocks.test.ts` | +372/-0 | — |  |  |
-| 328 | test | A | `tests/unit/supply-chain.test.ts` | +451/-0 | — |  |  |
-| 329 | test | A | `tests/unit/tokens.test.ts` | +156/-0 | — |  |  |
-| 330 | test | A | `tests/unit/tracked-paths.test.ts` | +68/-0 | — |  |  |
+| 325 | test | A | `tests/unit/spec-scan.ts` | +163/-0 | read in full at 33e84cd (tranche 24) | none; a guard without a per-file `count` is #478 scope | n/a |
+| 326 | test | M | `tests/unit/staleness.test.ts` | +9/-5 | diff read whole at 33e84cd (tranche 24) | none; the four reasons compared with `not.toBe` are strings at runtime (probed), so no two distinct closures pass it trivially | n/a |
+| 327 | test | A | `tests/unit/stranded-docblocks.test.ts` | +372/-0 | read in full at 33e84cd (tranche 24) | F201 P4, fixed forward: no recorded floor and only a per-kind cross-check, so a reader blind to every file over 120 kB passes with a stranded pair planted in pipeline-wiring.test.ts; #514. Swept: 70 of the 96 files calling `searched(` check no floor (161 calls, a per-file lower bound); #515 | filed: #514, #515; 2/2 as predicted (blinded GREEN, control RED) |
+| 328 | test | A | `tests/unit/supply-chain.test.ts` | +451/-0 | read in full at 33e84cd (tranche 24) | F202 P4 dormant, fixed forward: "grouped" is a substring of the whole config body, so an `ignore` naming `actions/cache*` passes with no group; the ordering test compares offsets into two different strings; #514. Its compute-only loop over six ranges is #462 scope | filed: #514; 2/2 as predicted (ignore GREEN, control RED) |
+| 329 | test | A | `tests/unit/tokens.test.ts` | +156/-0 | read in full at 33e84cd (tranche 24) | none; its "nothing reads" scan goes through `codeWithoutComments` (F199), whose deletions can only turn it red, never green | n/a |
+| 330 | test | A | `tests/unit/tracked-paths.test.ts` | +68/-0 | read in full at 33e84cd (tranche 24) | none new; a floorless `searched` (#515) | n/a |
 | 331 | test | A | `tests/unit/translate-messages.test.ts` | +362/-0 | CHANGED since read (+1/-1 after c48ed44); before: read in full (tranche 3) | F22 (TR35 TR36 TR47 TR48; /=0/ matched the template) | via translate.ts |
 | 332 | test | A | `tests/unit/translate.test.ts` | +759/-0 | CHANGED since read (+13/-2 after c48ed44); before: read in full (tranche 3) | F22 F24 F25 | via translate.ts |
-| 333 | test | A | `tests/unit/typecheck-scope.test.ts` | +135/-0 | — |  |  |
-| 334 | test | A | `tests/unit/unit-budget.test.ts` | +24/-0 | — |  |  |
-| 335 | test | A | `tests/unit/upload-assets.test.ts` | +419/-0 | — |  |  |
-| 336 | test | A | `tests/unit/verified-labels.test.ts` | +454/-0 | — |  |  |
-| 337 | test | M | `tests/unit/viewport-tagging.test.ts` | +338/-287 | — |  |  |
-| 338 | test | A | `tests/unit/visual-runner.test.ts` | +187/-0 | — |  |  |
-| 339 | test | A | `tests/unit/wait-for.test.ts` | +154/-0 | — |  |  |
-| 340 | test | A | `tests/unit/waiting-reports-script.test.ts` | +414/-0 | — |  |  |
+| 333 | test | A | `tests/unit/typecheck-scope.test.ts` | +135/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
+| 334 | test | A | `tests/unit/unit-budget.test.ts` | +24/-0 | read in full at 33e84cd (tranche 24) | none; the budget is pinned as a literal | n/a |
+| 335 | test | A | `tests/unit/upload-assets.test.ts` | +419/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
+| 336 | test | A | `tests/unit/verified-labels.test.ts` | +454/-0 | read in full at 33e84cd (tranche 24) | none new; floorless `searched` (#515); its pins are #473 scope | n/a |
+| 337 | test | M | `tests/unit/viewport-tagging.test.ts` | +338/-287 | read in full at 33e84cd (tranche 24) | none; `browser.newContext({ viewport })` is not read as a resize, but no spec writes one and a new context is held off the phone by isolated-context-tagging; its per-file count is #478 scope | n/a |
+| 338 | test | A | `tests/unit/visual-runner.test.ts` | +187/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
+| 339 | test | A | `tests/unit/wait-for.test.ts` | +154/-0 | read in full at 33e84cd (tranche 24) | none; its timing bounds leave 700 ms over a 300 ms wait | n/a |
+| 340 | test | A | `tests/unit/waiting-reports-script.test.ts` | +414/-0 | read in full at 33e84cd (tranche 24) | none; each `every` over requests follows an assertion that they exist | n/a |
 | 341 | test | A | `tests/unit/waiting-reports.test.ts` | +334/-0 | — |  |  |
 | 342 | test | A | `tests/unit/wcag.test.ts` | +241/-0 | — |  |  |
 | 344 | test | A | `tests/unit/workflow-jobs.test.ts` | +568/-0 | — |  |  |
