@@ -480,8 +480,8 @@ export function callGraph(files: readonly string[]): CallGraph {
    * (null for a default or namespace import, which stands for the module).
    * Resolved through this, an import reaches what its own module declares,
    * never a same-named function elsewhere (#477): `browser-matrix.test.ts`'s
-   * `config`, imported from `playwright.config.ts`, inherited a `config`
-   * that reads a file three directories away.
+   * `config`, imported from `playwright.config.ts`, inherited
+   * `dependabot-labels.test.ts`'s, which reads a file.
    */
   const imports = new Map<
     string,

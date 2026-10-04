@@ -86,9 +86,11 @@ export const declarationsRead = (what: string, floor: string): Liveness => ({
 
 /**
  * Run `analyze` over every file in the spec directories and assert it found
- * nothing, over a population of the units it judged, at least as many as
- * measured, with none missed in a file that plainly holds one. The failure
- * message is every finding, one per line.
+ * nothing, over a population of the units it judged; that no file which
+ * plainly holds one was judged empty; that the walk read exactly the files
+ * git has there; where the liveness gives a `count`, that every file was
+ * judged exactly that many (#477); and that the total is the recorded
+ * figure (#468). The failure message is every finding, one per line.
  */
 export const expectNothingFound = (
   analyze: Analyze,
