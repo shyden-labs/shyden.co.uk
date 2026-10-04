@@ -287,6 +287,80 @@ gone. The CI refusal is mutated in its words, not removed, because a
 recorder that ran under the probe would run the suite and could rewrite the
 real `tests/floors.json`.
 
+## Cross-checks A (#477): the meta-guards that read test code, done
+
+A floor alone accepts a change that adds five units while its reader loses
+three, as +2. #469 gives every floor a second reading of the same
+population that carries no literal number; #477 does it for the six guards
+that read test code. Scope re-derived from `tests/floors.json` on develop's
+head at the start, `7948355`: the ten ids the ticket names, none added or
+gone.
+
+| Floor id | What its guard reads | Its cross-check before | Now, on the branch |
+| --- | --- | --- | --- |
+| `absence-liveness/sites` | absence matchers, from the AST (`absenceSubject`) | file level: a file whose raw text matched `PLAIN_ABSENCE` was read at all; blind to a split matcher, to a message argument, and fooled by a string spelling one | per file, the AST count equals the count in code with its literals and comments removed (`absence-liveness.test.ts:463`) |
+| `absence-liveness/plain-files` | that text reading's files | the AST `perFile` keys, one direction | the files whose text writes one, under the same per-file check |
+| `absence-liveness/ts-files` | `filesUnder('tests', .ts)` | none | the walk equals git's list, both ways (`absence-liveness.test.ts:328`) |
+| `anchored-presence/scanned` | `toContain`/`toMatch` over raw file text, by dataflow (`scanPresence`) | none | per file, the reader judged exactly what a text reading counts (`anchored-presence.test.ts:327`, `presenceOverRawText`); 76 became 74, see below |
+| `anchored-presence/ts-files` | `filesUnder('tests', .ts)` | none | the walk equals git's list (`anchored-presence.test.ts:320`) |
+| `capture-after-assertion/captures` | `shoot(` by line scan | file level: a file whose parse tree calls `shoot` was judged at all | per file, judged equals the parse tree's `shoot` calls (`spec-scan.ts:135`, the optional `count`); the walk equals git's list (`spec-scan.ts:127`) |
+| `event-collectors/locator-loops` | the `locatorLoops` tree | per unit already: every `.all()` followed or named (`event-collectors.test.ts:322`), text against tree per file (`:339`) | unchanged; its walk is `event-collectors/specs`' |
+| `event-collectors/specs` | `specDirs().flatMap(tsFilesUnder)` | none | the walk equals git's list of the files in spec directories (`event-collectors.test.ts:75`) |
+| `literal-floors/sites` | `floorSitesIn` | per unit already: the matcher count per file in stripped text less literals (`literal-floors.test.ts:324`) | unchanged, and its walk equals git's list (`literal-floors.test.ts:347`) |
+| `one-test-per-case/tests` | `testsRead` | file level: a spec whose text declares a test read as at least one | per file, `testsRead` equals `testsWritten`, the text count (`one-test-per-case.test.ts:310`); the walk equals git's list (`:315`); the file-level check stays |
+
+Three homes carry the readings: `codeWithoutLiterals` (`tests/unit/ast.ts`)
+blanks every string, template and regex the parse tree finds, then strips
+comments, so a fixture spelling a construct is not one; `committableFiles`
+and `walkDisagreements` (`tests/source-files.ts`) list what git has,
+untracked files included so a test written before its `git add` is no false
+red, and compare a walk with it both ways; `specDirFilesGitHas`
+(`tests/spec-dirs.ts`) reads the spec directories from that list.
+
+Building it found the hole the ticket is about in the work itself: the
+per-file counts for captures and for tests run over the guard's own walk,
+so a walk that dropped a file dropped it from both sides and only the floor
+saw it. Those walks, and literal-floors', are now checked against git too.
+
+**What the cross-check found, and AC4.** `anchored-presence`'s population
+is defined by dataflow, and the design took the text reading for a lower
+bound: it counted 74 of the reader's 76, and the two looked like reads
+through helpers in another module. Probed, neither was a read.
+`browser-matrix.test.ts:294` asserts on `config`, the default import from
+`playwright.config.ts`; `source-text.test.ts:733` on text built from
+`source`, a `for...of` variable over string literals. `callGraph` bound
+neither name, so each fell through to the union of every same-named
+function in `tests/`, and a `config` and a `source` there read a file:
+#118's collision, through two doors it had left. It now binds a
+destructured name locally and resolves an import through the module it
+names (nothing, outside the graph). Every site both meta-guards judge was
+logged before and after: only those two left, all 447 absence verdicts
+held, no presence finding appeared. The text reading now equals the reader
+in every file, so the check is an equality, and catches a reader that
+counts too many as well as one blind to a form. The one form it cannot
+follow is a subject read through a helper another file exports; none does
+today, and if one appears the check names its file, and the text reading
+then has to follow imports.
+
+**AC5, the matrix** (`.superpowers/sdd/477/m477.py`, 38 rows, predictions
+written first, all as predicted). On `develop`, ten mutations that lose one
+unit and add one, so every total holds, stayed GREEN against the floor
+alone: one absence, one presence, one capture and one test lost at a site
+in a file the branch never touches and appended back to it, and six walks
+dropping a file with no unit in it while an empty file appeared. On the
+branch the same ten turned the new cross-check RED. With every floor
+switched off, each cross-check alone went RED against a reader blind to one
+form (`toHaveLength(0)`, `toMatch`, a capture call split over lines, a
+template-titled test) and against each walk skipping `tests/device`. Eight
+more went RED against the machinery itself: the text reading blind,
+spec-scan ignoring a per-file count, `codeWithoutLiterals` keeping the
+literals, git's list without untracked files, a walk compared one way only,
+the spec directories read from git keeping every directory, an import
+resolved by bare name again, and a destructured name left unbound. Two
+forms the design proposed were dead in the corpus and replaced before any
+run: no spec calls `.shoot(`, and every `test.skip(`/`test.fail(` is a
+runtime call, so no modifier declaration exists to blind.
+
 ## Group 4: loop-built findings, next
 
 41 `searched` calls build their findings by pushing inside a loop, which
