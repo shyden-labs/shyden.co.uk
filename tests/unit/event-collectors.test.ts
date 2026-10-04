@@ -8,7 +8,13 @@ import {
   type Declaration,
 } from '../playwright-declarations';
 import { specDirs } from '../spec-dirs';
-import { searched, tsFilesUnder } from '../source-files';
+import { dirname } from 'node:path';
+import {
+  committableFiles,
+  searched,
+  tsFilesUnder,
+  walkDisagreements,
+} from '../source-files';
 import { parseSource } from './ast';
 import { withoutTsComments } from './source-text';
 import { floorBreach } from '../floors';
@@ -65,6 +71,27 @@ describe('browser-event collectors have exactly one home', () => {
     ).toBeUndefined();
     expect(SCANNED).toContain('tests/e2e/classroom-groups.spec.ts');
     expect(SCANNED).toContain(RECORDERS);
+  });
+
+  it('scans every file git has in a directory that holds a spec', () => {
+    // Independent of the walk (#477): spec directories and their files both
+    // derived from git's list, so a walk that drops a directory or a suffix
+    // names what it dropped.
+    const known = committableFiles(
+      (path) => path.startsWith('tests/') && /\.tsx?$/.test(path),
+    );
+    const dirs = new Set(
+      known.filter((path) => path.endsWith('.spec.ts')).map(dirname),
+    );
+    const inSpecDirs = known.filter((path) =>
+      [...dirs].some((dir) => path.startsWith(`${dir}/`)),
+    );
+    expect(
+      searched(walkDisagreements(SCANNED, inSpecDirs), {
+        of: SCANNED,
+        what: 'files in spec directories',
+      }),
+    ).toEqual([]);
   });
 
   it('is subscribed to only in recorders.ts', () => {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { filesUnder, searched } from '../source-files';
+import {
+  committableFiles,
+  filesUnder,
+  isTsUnderTests,
+  searched,
+  walkDisagreements,
+} from '../source-files';
 import { bind, bindFiles, callGraph, type Closure } from './ast';
 import { scanPresence, type PresenceClosures } from './presence-detector';
 import { floorBreach } from '../floors';
@@ -302,6 +308,17 @@ describe('presence assertions over source text are stripped or anchored', () => 
     expect(
       floorBreach('anchored-presence/ts-files', tsFiles.length),
     ).toBeUndefined();
+  });
+
+  it('walks every .ts file git has under tests/', () => {
+    // Independent of the walk (#477): git's list, not the disk, so a walk
+    // that narrows (skips a directory, a suffix) names what it dropped.
+    expect(
+      searched(walkDisagreements(tsFiles, committableFiles(isTsUnderTests)), {
+        of: tsFiles,
+        what: 'files under tests/',
+      }),
+    ).toEqual([]);
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {

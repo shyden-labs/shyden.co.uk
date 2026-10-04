@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { filesUnder, nonEmpty, searched } from '../source-files';
+import { existsSync } from 'node:fs';
+import {
+  committableFiles,
+  filesUnder,
+  nonEmpty,
+  searched,
+  trackedFiles,
+  walkDisagreements,
+} from '../source-files';
 import { floorBreach } from '../floors';
 
 /**
@@ -156,5 +164,50 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: [], what: 'built pages' })).toThrow(
       /built pages/,
     );
+  });
+});
+
+describe('committableFiles -- what git tracks or would (#477)', () => {
+  // The list a walk is checked against. Untracked files count, so a test
+  // file written before its `git add` is not a false red mid-cycle; ignored
+  // files do not, so a build output on one machine is not a finding.
+  it('holds every file git tracks', () => {
+    const tracked = trackedFiles((path) => path.startsWith('tests/'));
+    const listed = new Set(
+      committableFiles((path) => path.startsWith('tests/')),
+    );
+    const dropped = tracked.filter((path) => !listed.has(path));
+    expect(searched(dropped, { of: tracked, what: 'tracked files' })).toEqual(
+      [],
+    );
+  });
+
+  it('holds no file git ignores, though it is on disk', () => {
+    const ignored = 'node_modules/typescript/package.json';
+    expect(existsSync(ignored)).toBe(true);
+    const listed = committableFiles(
+      (path) => path === 'package.json' || path.startsWith('node_modules/'),
+    );
+    // The known positive: the same filter does list what git tracks.
+    expect(listed).toContain('package.json');
+    expect(listed).not.toContain(ignored);
+  });
+});
+
+describe('walkDisagreements -- a walk against the list git keeps (#477)', () => {
+  it('names a file git has and the walk missed', () => {
+    expect(walkDisagreements(['a.ts'], ['a.ts', 'b.ts'])).toEqual([
+      'b.ts: git has it, the walk did not read it',
+    ]);
+  });
+
+  it('names a file the walk read that git does not have', () => {
+    expect(walkDisagreements(['a.ts', 'c.ts'], ['a.ts'])).toEqual([
+      'c.ts: the walk read it, git does not have it',
+    ]);
+  });
+
+  it('names nothing when the two agree, in any order', () => {
+    expect(walkDisagreements(['b.ts', 'a.ts'], ['a.ts', 'b.ts'])).toEqual([]);
   });
 });

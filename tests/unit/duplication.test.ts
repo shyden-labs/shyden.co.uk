@@ -62,6 +62,14 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
   'outside `specDirs()`, where `viewport-tagging.test.ts` cannot read them ' +
   '-- measured: four untagged viewport tests, whole unit suite green.';
 
+const CROSS_CHECK_STAYS_IN_ITS_GUARD =
+  'Each guard checks its own walk against git beside the floor it ratchets ' +
+  '(#477), and these two guards walk one population. A helper that returns ' +
+  'the verdict hides `searched` from absence-liveness, which reads it only ' +
+  'at the call site -- measured: three findings "derives from the ' +
+  'filesystem". One shared walk would leave each guard checking a list it ' +
+  'no longer owns.';
+
 /**
  * Pairs read and deliberately left separate, each with the reason a reader
  * needs before deciding to collapse it after all.
@@ -71,6 +79,10 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
  * code it excuses and quietly start excusing something else.
  */
 const SEPARATE: ReadonlyMap<string, string> = new Map([
+  [
+    'tests/unit/absence-liveness.test.ts:anonymous  <->  tests/unit/anchored-presence.test.ts:anonymous',
+    CROSS_CHECK_STAYS_IN_ITS_GUARD,
+  ],
   [
     'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/classroom-groups-roster.spec.ts:anonymous',
     TEST_BODY_STAYS_IN_THE_SPEC,

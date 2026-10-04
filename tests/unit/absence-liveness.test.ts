@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import ts from 'typescript';
 import { floorBreach } from '../floors';
-import { filesUnder, searched } from '../source-files';
+import {
+  committableFiles,
+  filesUnder,
+  isTsUnderTests,
+  searched,
+  walkDisagreements,
+} from '../source-files';
 import {
   bindFiles,
   callGraph,
@@ -313,6 +319,17 @@ describe('absence assertions prove the population they searched', () => {
       floorBreach('absence-liveness/sites', result.sites.length),
     ).toBeUndefined();
     expect(result.proved).toBeGreaterThan(0);
+  });
+
+  it('walks every .ts file git has under tests/', () => {
+    // Independent of the walk (#477): git's list, not the disk, so a walk
+    // that narrows (skips a directory, a suffix) names what it dropped.
+    expect(
+      searched(walkDisagreements(tsFiles, committableFiles(isTsUnderTests)), {
+        of: tsFiles,
+        what: 'files under tests/',
+      }),
+    ).toEqual([]);
   });
 
   it('reads an absence however it is spelled, and never its inverse', () => {
