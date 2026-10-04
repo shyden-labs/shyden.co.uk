@@ -110,13 +110,15 @@ const DECLARING: ReadonlyMap<string, readonly [Kind, Modifier]> = new Map([
   ['describe.parallel.only', ['describe', 'only']],
 ]);
 
-type Callback = ts.ArrowFunction | ts.FunctionExpression;
+export type Callback = ts.ArrowFunction | ts.FunctionExpression;
 
-const isCallback = (node: ts.Node | undefined): node is Callback =>
+/** A function written in place: what a test, hook or group runs. */
+export const isCallback = (node: ts.Node | undefined): node is Callback =>
   node !== undefined &&
   (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
 
-const isLiteral = (
+/** A string with no substitution: a title or tag read as written. */
+export const isLiteral = (
   node: ts.Node | undefined,
 ): node is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral =>
   node !== undefined &&
