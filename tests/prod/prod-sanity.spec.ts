@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import { deployedRoutes } from '../site-pages';
-import { expectHomepageShyTalkLinksAt } from '../shytalk-links';
+import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectNoHorizontalScroll } from '../viewport';
 import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
@@ -143,18 +143,22 @@ for (const { locale, path, heading, englishHeading } of ROUTES)
     }
   });
 
-test('the outbound ShyTalk link points at PROD ShyTalk, never dev', async ({
-  page,
-}) => {
-  // The mirror of dev-sanity's cross-env check. The URL is env-derived
-  // (PUBLIC_SHYTALK_URL) precisely so the two environments never cross, and a
-  // production page sending visitors to a dev host is a leak, not a typo.
-  //
-  // Every outbound link is checked, by the host it resolves to. This took the
-  // first `a[href*="shytalk"]`, which became the header's in-page `/#shytalk`
-  // anchor and failed before any outbound link was read (#338).
-  await expectHomepageShyTalkLinksAt(page, 'shytalk.shyden.co.uk');
-});
+// The mirror of dev-sanity's cross-env check. Each URL is env-derived
+// (PUBLIC_SHYTALK_URL, PUBLIC_WORDFARER_URL) precisely so the two environments
+// never cross, and a production page sending visitors to a dev host is a leak,
+// not a typo.
+//
+// Every outbound link is checked, by the host it resolves to. This took the
+// first `a[href*="shytalk"]`, which became the header's in-page `/#shytalk`
+// anchor and failed before any outbound link was read (#338). The production
+// Wordfarer host has no DNS record yet, by the operator's choice (#403); its
+// links are read here, never followed. One test per product.
+for (const product of PRODUCTS)
+  test(`the outbound ${product.name} link points at PROD ${product.name}, never dev`, async ({
+    page,
+  }) => {
+    await expectHomepageLinksAt(page, product, product.prod);
+  });
 
 // The switch is a rendering fact, so the deployed site's browser run proves
 // it (#142 §6.2): it changes the page, and the choice survives a reload.

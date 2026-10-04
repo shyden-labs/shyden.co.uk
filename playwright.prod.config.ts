@@ -33,14 +33,16 @@ import { onBuild } from './tests/sanity-on-build';
 //
 // With SANITY_ON_BUILD=1 it measures this tree's own production build instead
 // (#335). A build inherits the whole environment, and a config cannot unset a
-// variable for it, so a PUBLIC_SHYTALK_URL left in the shell would build the
-// DEV ShyTalk links into what this run calls production. It is refused.
+// variable for it, so a PUBLIC_SHYTALK_URL or PUBLIC_WORDFARER_URL left in
+// the shell would build DEV product links into what this run calls
+// production. Either is refused.
 const build = onBuild(4399, {});
-if (build && process.env.PUBLIC_SHYTALK_URL !== undefined)
-  throw new Error(
-    `SANITY_ON_BUILD: PUBLIC_SHYTALK_URL is set (${process.env.PUBLIC_SHYTALK_URL}), ` +
-      'so this build would not be production. Unset it and run again.',
-  );
+for (const variable of ['PUBLIC_SHYTALK_URL', 'PUBLIC_WORDFARER_URL'])
+  if (build && process.env[variable] !== undefined)
+    throw new Error(
+      `SANITY_ON_BUILD: ${variable} is set (${process.env[variable]}), ` +
+        'so this build would not be production. Unset it and run again.',
+    );
 
 export default defineConfig({
   testDir: './tests/prod',

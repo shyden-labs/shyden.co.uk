@@ -10,7 +10,7 @@ import {
 import { expectReportsBound } from '../report-health';
 import { expectedBadges } from '../beta-badges';
 import { deployedRoutes } from '../site-pages';
-import { expectHomepageShyTalkLinksAt } from '../shytalk-links';
+import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectTheSwitchPersists } from '../themes';
 import { robotsDirectives } from '../robots-directives';
 import { expectNotFoundServed } from '../not-found-served';
@@ -151,14 +151,17 @@ test(
   },
 );
 
-test('every outbound ShyTalk link points at DEV ShyTalk, never prod (no cross-env leak)', async ({
-  page,
-}) => {
-  // The dev build injects PUBLIC_SHYTALK_URL=dev, so EVERY outbound ShyTalk
-  // link must resolve to the dev host. The mirror of prod-sanity's check; the
-  // selection and the liveness control live in `tests/shytalk-links.ts`.
-  await expectHomepageShyTalkLinksAt(page, 'dev.shytalk.shyden.co.uk');
-});
+// The dev build sets each product's variable (PUBLIC_SHYTALK_URL,
+// PUBLIC_WORDFARER_URL) to its dev host, so EVERY outbound link to that
+// product must resolve there. The mirror of prod-sanity's check; the selection
+// and the liveness control live in `tests/product-links.ts`. One test per
+// product (#403).
+for (const product of PRODUCTS)
+  test(`every outbound ${product.name} link points at DEV ${product.name}, never prod (no cross-env leak)`, async ({
+    page,
+  }) => {
+    await expectHomepageLinksAt(page, product, product.dev);
+  });
 
 /**
  * The v2 surfaces, on the deployed dev site.

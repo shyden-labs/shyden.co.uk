@@ -21,6 +21,7 @@ const home = localisePath('/', lang);
 const base = home === '/' ? '' : home.replace(/\/$/, '');
 const links = [
   { href: `${base}/#shytalk`, label: t.nav.shytalk },
+  { href: `${base}/#wordfarer`, label: t.nav.wordfarer },
   { href: `${base}/#tools`, label: t.nav.tools },
   { href: `${base}/#contact`, label: t.nav.contact },
 ];
@@ -42,7 +43,7 @@ const links = [
         rather than sit beside the language switcher. Both live in the BAR,
         not in <nav>, for two reasons, both learned from a failing test.
         <nav> means "the site's sections" and is pinned to exactly those
-        three links; these controls are a different kind of thing. And on
+        links; these controls are a different kind of thing. And on
         mobile <nav> collapses behind the menu button, which would hide them
         from exactly the visitors most likely to want them. */}
     <div class="controls">

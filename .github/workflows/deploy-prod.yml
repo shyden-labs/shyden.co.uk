@@ -46,7 +46,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Build (prod defaults — outbound ShyTalk link → PROD)
+      - name: Build (prod defaults — outbound ShyTalk and Wordfarer links → PROD)
         run: npm run build
       - name: Guard — fail if a [[placeholder]] leaked into shipped text
         # -I: skip binary files. woff/woff2 fonts contain the bytes `[[`; a

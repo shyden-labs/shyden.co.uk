@@ -127,9 +127,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Build (dev — outbound ShyTalk link → DEV, never prod)
+      - name: Build (dev — outbound ShyTalk and Wordfarer links → DEV, never prod)
         env:
           PUBLIC_SHYTALK_URL: https://dev.shytalk.shyden.co.uk
+          PUBLIC_WORDFARER_URL: https://dev.wordfarer.shyden.co.uk
         run: npm run build
       # Before anything is deployed, the dev token proves it reaches the dev
       # account and nothing else (#415): a token that could reach production

@@ -9,11 +9,13 @@ import { onBuild } from './tests/sanity-on-build';
 // `npm run test:e2e` never picks these remote specs up.
 //
 // With SANITY_ON_BUILD=1 (`npm run test:sanity`, CI's `sanity-on-build` job) it
-// measures this tree's own build instead, built with the dev ShyTalk URL as
-// deploy-dev.yml builds it, and leaves out the @deployed-only tests (#335).
+// measures this tree's own build instead, built with the dev ShyTalk and
+// Wordfarer URLs as deploy-dev.yml builds it, and leaves out the
+// @deployed-only tests (#335).
 const password = process.env.DEV_BASIC_AUTH_PASSWORD;
 const build = onBuild(4398, {
   PUBLIC_SHYTALK_URL: 'https://dev.shytalk.shyden.co.uk',
+  PUBLIC_WORDFARER_URL: 'https://dev.wordfarer.shyden.co.uk',
 });
 
 export default defineConfig({

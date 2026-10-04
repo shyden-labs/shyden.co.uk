@@ -4,6 +4,7 @@ import Button from '../Button.astro';
 import Marquee from '../Marquee.astro';
 import WorkCard from '../WorkCard.astro';
 import PhoneFrame from '../PhoneFrame.astro';
+import StatusBadge from '../StatusBadge.astro';
 import { localisePath, type Locale, getSiteStrings } from '../../lib/i18n';
 import { SHYTALK_MARK, asRgba } from '../../lib/shytalk-brand';
 
@@ -19,9 +20,21 @@ const t = getSiteStrings(lang).home;
 const shytalkUrl =
   import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.shyden.co.uk';
 
-// Shown beside the hero CTA so the visitor knows the link leaves the site, and
-// WHERE to. Derived from the URL above, so it cannot name the wrong host.
-const shytalkHost = new URL(shytalkUrl).host;
+// The same rule for Wordfarer (#403): deploy-dev.yml sets
+// PUBLIC_WORDFARER_URL=https://dev.wordfarer.shyden.co.uk before the dev build.
+// The production host had no DNS record when this shipped; the operator chose
+// to link it from release day anyway (2026-10-04).
+const wordfarerUrl =
+  import.meta.env.PUBLIC_WORDFARER_URL ?? 'https://wordfarer.shyden.co.uk';
+
+// The hero offers both products with equal weight, ShyTalk then Wordfarer.
+// Each button carries its own "opens <host>" line so the visitor knows the
+// link leaves the site, and WHERE to. The host is derived from the URL, so it
+// cannot name the wrong one.
+const heroLinks = [
+  { href: shytalkUrl, label: t.exploreShytalk },
+  { href: wordfarerUrl, label: t.exploreWordfarer },
+].map((link) => ({ ...link, host: new URL(link.href).host }));
 
 // Internal links stay inside the visitor's language.
 const glory = localisePath('/glory-points', lang);
@@ -33,32 +46,45 @@ const features = [
   t.shytalkFeature3,
   t.shytalkFeature4,
 ];
+const wordfarerFeatures = [
+  t.wordfarerFeature1,
+  t.wordfarerFeature2,
+  t.wordfarerFeature3,
+  t.wordfarerFeature4,
+];
 ---
 
 <BaseLayout title={t.title} description={t.description} lang={lang}>
   <section class="hero wrap">
     <h1>{t.heroHeading}</h1>
     <p class="lead">{t.heroLead}</p>
-    <p class="cta">
-      <Button href={shytalkUrl} external>
-        {t.exploreShytalk}
-      </Button>
-      <span class="opens">
-        {t.opensAt} {shytalkHost}
-      </span>
-    </p>
+    <div class="cta">
+      {heroLinks.map((link) => (
+        <p class="cta-item">
+          <Button href={link.href} external>
+            {link.label}
+          </Button>
+          <span class="opens">
+            {t.opensAt} {link.host}
+          </span>
+        </p>
+      ))}
+    </div>
   </section>
 
   <Marquee />
 
   <section id="shytalk" class="wrap showcase">
     <div class="showcase-copy">
-      <p class="kicker">{t.flagshipKicker}</p>
-      <h2>
-        <span class="shytalk-wordmark">
-          Shy<span>Talk</span>
-        </span>
-      </h2>
+      <p class="kicker">{t.shytalkKicker}</p>
+      <div class="showcase-head">
+        <h2>
+          <span class="shytalk-wordmark">
+            Shy<span>Talk</span>
+          </span>
+        </h2>
+        <StatusBadge label={t.comingSoon} />
+      </div>
       <p class="lead">{t.shytalkBody}</p>
       <ul class="features">
         {features.map((feature) => (
@@ -72,6 +98,29 @@ const features = [
       </p>
     </div>
     <PhoneFrame lang={lang} alt={t.shytalkShotAlt} />
+  </section>
+
+  {/* Text-only: Wordfarer is pre-alpha and has no art yet, so none is
+      invented here, and its name is set as text, never translated. */}
+  <section id="wordfarer" class="wrap showcase">
+    <div class="showcase-copy">
+      <p class="kicker">{t.wordfarerKicker}</p>
+      <div class="showcase-head">
+        <h2 class="product-name">Wordfarer</h2>
+        <StatusBadge label={t.comingSoon} />
+      </div>
+      <p class="lead">{t.wordfarerBody}</p>
+      <ul class="features">
+        {wordfarerFeatures.map((feature) => (
+          <li>{feature}</li>
+        ))}
+      </ul>
+      <p>
+        <Button href={wordfarerUrl} variant="secondary" external>
+          {t.visitWordfarer}
+        </Button>
+      </p>
+    </div>
   </section>
 
   <section id="tools" class="wrap">
@@ -150,11 +199,20 @@ const features = [
     color: var(--ink-soft);
     max-width: var(--measure);
   }
+  /* The two products side by side where they fit, stacked where they do
+     not; each button keeps its own host line beneath it. */
   .cta {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem;
+    gap: 1.25rem 2rem;
+    margin: 1rem 0;
+  }
+  .cta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
   }
   /* Not a link, so it needs no focus treatment — it annotates the button it
      sits beside. --ink-soft on --bg clears AA at this size. */
@@ -193,6 +251,29 @@ const features = [
     border-radius: 50%;
     background: var(--accent);
     box-shadow: 0 0 12px var(--accent-glow);
+  }
+  /* A product's name with its status beside it, wrapping under it where the
+     row runs out. The badge's own bottom margin spaces it inside a card; here
+     the row's gap does, so the badge centres on the name. */
+  .showcase-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+  .showcase-head h2 {
+    margin: 0;
+  }
+  .showcase-head > :global(.status-badge) {
+    margin: 0;
+  }
+  /* Wordfarer's name, set as text at the wordmark's size and weight so the
+     two products carry equal weight (#403). */
+  .product-name {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--ink);
   }
   .grid-2 {
     display: grid;

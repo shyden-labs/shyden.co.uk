@@ -19,6 +19,7 @@ test.describe('header + footer', () => {
       const nav = page.locator('header nav');
       await expect(nav.locator('a')).toHaveText([
         'ShyTalk',
+        'Wordfarer',
         'Tools',
         'Contact',
       ]);
@@ -57,7 +58,7 @@ test.describe('header + footer', () => {
   test('nav links are root-relative so they work from every page, not just /', async ({
     page,
   }) => {
-    // The Header renders on every page via BaseLayout, but #shytalk/#tools/#contact
+    // The Header renders on every page via BaseLayout, but its section anchors
     // exist only on the homepage — so the nav hrefs must be root-relative (/#…) or
     // they dead-link on sub-pages. Regression guard for the cross-task defect the
     // whole-branch review caught (nav was #shytalk → /glory-points#shytalk = dead).
@@ -65,7 +66,7 @@ test.describe('header + footer', () => {
     const hrefs = await page
       .locator('header nav a')
       .evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-    expect(hrefs).toEqual(['/#shytalk', '/#tools', '/#contact']);
+    expect(hrefs).toEqual(['/#shytalk', '/#wordfarer', '/#tools', '/#contact']);
   });
 
   // Shyden Ltd is dissolved (operator, 2026-09-27, #370): the footer names no
@@ -184,7 +185,7 @@ test.describe('header + footer', () => {
       await page.keyboard.press('Tab');
       await expect(languages).toBeFocused();
 
-      for (const label of ['ShyTalk', 'Tools', 'Contact']) {
+      for (const label of ['ShyTalk', 'Wordfarer', 'Tools', 'Contact']) {
         await page.keyboard.press('Tab');
         await expect(
           page.locator('header nav a', { hasText: label }),

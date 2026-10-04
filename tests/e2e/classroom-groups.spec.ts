@@ -1679,9 +1679,11 @@ test.describe('site-wide language switching', () => {
     // The hrefs were asserted; the WORDS were not. An entirely English nav
     // bar on every Indonesian page passed the whole suite.
     await expect(page.locator('nav a')).toHaveText([
-      // "ShyTalk" is a proper noun, identical in all five locales by design;
-      // 'Alat' and 'Kontak' are what prove this nav is Indonesian.
+      // "ShyTalk" and "Wordfarer" are proper nouns, identical in all five
+      // locales by design; 'Alat' and 'Kontak' are what prove this nav is
+      // Indonesian.
       'ShyTalk',
+      'Wordfarer',
       'Alat',
       'Kontak',
     ]);

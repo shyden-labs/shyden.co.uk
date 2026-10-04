@@ -1,4 +1,6 @@
 ---
+import StatusBadge from './StatusBadge.astro';
+
 interface Props {
   title: string;
   href: string;
@@ -18,7 +20,7 @@ const target = external ? '_blank' : undefined;
   <h3>
     <slot name="logo">{title}</slot>
   </h3>
-  {badge && <p class="work-card-badge">{badge}</p>}
+  {badge && <StatusBadge label={badge} />}
   <p>
     <slot />
   </p>
@@ -48,21 +50,5 @@ const target = external ? '_blank' : undefined;
     margin: 0.75rem 0 0;
     color: var(--accent);
     font-weight: 600;
-  }
-  /* Status pill: --accent on its --glass fill over the card's --surface, in
-     both themes (mint on dark, deep green on light). The pair is scored in
-     tests/unit/contrast.test.ts, so no ratio or colour name is claimed here. */
-  .work-card-badge {
-    display: inline-block;
-    margin: 0 0 0.75rem;
-    padding: 0.15rem 0.6rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--glass);
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 </style>
