@@ -303,11 +303,11 @@ gone.
 | `absence-liveness/ts-files` | `filesUnder('tests', .ts)` | none | the walk equals git's list, both ways (`absence-liveness.test.ts:328`) |
 | `anchored-presence/scanned` | `toContain`/`toMatch` over raw file text, by dataflow (`scanPresence`) | none | per file, the reader judged exactly what a text reading counts (`anchored-presence.test.ts:327`, `presenceOverRawText`); 76 became 74, see below |
 | `anchored-presence/ts-files` | `filesUnder('tests', .ts)` | none | the walk equals git's list (`anchored-presence.test.ts:320`) |
-| `capture-after-assertion/captures` | `shoot(` by line scan | file level: a file whose parse tree calls `shoot` was judged at all | per file, judged equals the parse tree's `shoot` calls (`spec-scan.ts:135`, the optional `count`); the walk equals git's list (`spec-scan.ts:127`) |
+| `capture-after-assertion/captures` | `shoot(` by line scan | file level: a file whose parse tree calls `shoot` was judged at all | per file, judged equals the parse tree's `shoot` calls (`spec-scan.ts:137`, the optional `count`); the walk equals git's list (`spec-scan.ts:129`) |
 | `event-collectors/locator-loops` | the `locatorLoops` tree | per unit already: every `.all()` followed or named (`event-collectors.test.ts:322`), text against tree per file (`:339`) | unchanged; its walk is `event-collectors/specs`' |
 | `event-collectors/specs` | `specDirs().flatMap(tsFilesUnder)` | none | the walk equals git's list of the files in spec directories (`event-collectors.test.ts:75`) |
 | `literal-floors/sites` | `floorSitesIn` | per unit already: the matcher count per file in stripped text less literals (`literal-floors.test.ts:324`) | unchanged, and its walk equals git's list (`literal-floors.test.ts:347`) |
-| `one-test-per-case/tests` | `testsRead` | file level: a spec whose text declares a test read as at least one | per file, `testsRead` equals `testsWritten`, the text count (`one-test-per-case.test.ts:310`); the walk equals git's list (`:315`); the file-level check stays |
+| `one-test-per-case/tests` | `testsRead` | file level: a spec whose text declares a test read as at least one | per file, `testsRead` equals `testsWritten`, the text count (`one-test-per-case.test.ts:307`); the walk equals git's list (`:312`); the file-level check stays |
 
 Three homes carry the readings: `codeWithoutLiterals` (`tests/unit/ast.ts`)
 blanks every string, template and regex the parse tree finds, then strips
