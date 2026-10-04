@@ -6,7 +6,8 @@ import {
   searched,
   walkDisagreements,
 } from '../source-files';
-import { bind, bindFiles, callGraph, type Closure } from './ast';
+import { bind, bindFiles, callGraph, parseFile, type Closure } from './ast';
+import { presenceOverRawText } from './presence-text';
 import { scanPresence, type PresenceClosures } from './presence-detector';
 import { floorBreach } from '../floors';
 /**
@@ -201,6 +202,7 @@ describe('the detector counts only a real anchor (#183)', () => {
 
     expect(scanOf('fixture.test.ts', overRaw("toContain('foo')"))).toEqual({
       scanned: 1,
+      perFile: new Map([['fixture.test.ts', 1]]),
       findings: [expect.stringMatching(/^fixture\.test\.ts:2 /)],
     });
     expect(scanOf('helper.ts', overRaw("toContain('foo')")).scanned).toBe(0);
@@ -263,6 +265,7 @@ describe('the detector exempts a read only where JSON.parse stands between it an
       scanPresence(bind(new Map([['fixture.test.ts', source]])), closures),
     ).toEqual({
       scanned: 1,
+      perFile: new Map([['fixture.test.ts', 1]]),
       findings: [expect.stringMatching(/^fixture\.test\.ts:8 /)],
     });
   });
@@ -319,6 +322,38 @@ describe('presence assertions over source text are stripped or anchored', () => 
         what: 'files under tests/',
       }),
     ).toEqual([]);
+  });
+
+  it('scans every presence its text plainly writes over raw file text', () => {
+    // Independent of the dataflow reader (#477): per file, the reader judged
+    // at least what plain text shows, so one blind to a form judges fewer
+    // there than the text counts. A lower bound only: the text follows no
+    // import, so the two read through helpers source-text.ts exports
+    // (browser-matrix.test.ts, source-text.test.ts) are the reader's alone.
+    const testFiles = tsFiles.filter((file) => /\.(test|spec)\.ts$/.test(file));
+    const written = new Map(
+      testFiles.map((file) => [file, presenceOverRawText(parseFile(file))]),
+    );
+    const underRead = testFiles
+      .filter(
+        (file) => (written.get(file) ?? 0) > (result.perFile.get(file) ?? 0),
+      )
+      .map(
+        (file) =>
+          `${file}: the reader judged ${result.perFile.get(file) ?? 0}, ` +
+          `its text plainly writes ${written.get(file)}`,
+      );
+    expect(searched(underRead, { of: testFiles, what: 'test files' })).toEqual(
+      [],
+    );
+    // Ratcheted after the verdict (#468): without it, "at least" holds
+    // trivially once the text reading goes blind.
+    expect(
+      floorBreach(
+        'anchored-presence/text-sites',
+        [...written.values()].reduce((sum, n) => sum + n, 0),
+      ),
+    ).toBeUndefined();
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {
