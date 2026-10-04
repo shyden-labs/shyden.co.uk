@@ -314,7 +314,12 @@ test.describe('homepage content', () => {
       await page.goto(localisePath('/', locale));
       const tools = page.locator('#tools');
       await expect(tools.locator('.work-card')).toHaveCount(2);
-      await expect(tools.locator('.status-badge')).toHaveCount(2);
+      // Each card's badge says so, in this locale: #403 moved the words into
+      // StatusBadge, and an emptied badge left every count here green.
+      const live = getSiteStrings(locale).home.toolBadge;
+      const badges = tools.locator('.status-badge');
+      await expect(badges).toHaveText([live, live]);
+      for (const n of [0, 1]) await expect(badges.nth(n)).toBeVisible();
       // The exact set: each tool once, in this locale, and nothing else.
       const hrefs = await tools
         .locator('a[href]')

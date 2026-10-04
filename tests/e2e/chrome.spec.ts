@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
-import { LOCALES, localisePath } from '../../src/lib/i18n';
+import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { searched } from '../source-files';
 
@@ -283,7 +283,12 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
         // claims to check. Proven, not assumed: pointing this locator at a
         // non-existent class left the test passing. The desktop case alongside
         // has always guarded this; the mobile one did not.
-        await expect(links).toHaveCount(3);
+        // Counted from the locale's own nav labels, then read in order: a
+        // literal 3 went stale when #403 added a fourth link, and failed
+        // before measuring it.
+        const labels = Object.values(getSiteStrings(locale).nav);
+        await expect(links).toHaveCount(labels.length);
+        await expect(links).toHaveText(labels);
         for (const a of await links.all())
           await atLeast44(a, `"${await a.textContent()}"`);
         await atLeast44(
@@ -300,7 +305,12 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto(localisePath('/', locale));
         const links = page.locator('header nav a');
-        await expect(links).toHaveCount(3);
+        // Counted from the locale's own nav labels, then read in order: a
+        // literal 3 went stale when #403 added a fourth link, and failed
+        // before measuring it.
+        const labels = Object.values(getSiteStrings(locale).nav);
+        await expect(links).toHaveCount(labels.length);
+        await expect(links).toHaveText(labels);
         for (const a of await links.all()) {
           // Guards the all-browser desktop-nav regression: a collapsed wrapper
           // made these links render off-screen / non-visible on every engine.
