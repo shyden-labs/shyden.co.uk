@@ -13,7 +13,7 @@
   "device-tool-homes/files": 302,
   "download-readers/byte-reads": 8,
   "duplicate-imports/imports": 1588,
-  "duplication/declarations": 5412,
+  "duplication/declarations": 5413,
   "duplication/files": 346,
   "event-collectors/locator-loops": 8,
   "event-collectors/specs": 65,
