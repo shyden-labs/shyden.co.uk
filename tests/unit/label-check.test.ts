@@ -301,6 +301,26 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
     expect(checkNamedLabels([list, common], 'zh')).toEqual([]);
   });
 
+  // #403. English capitalises a language's name wherever it stands, so the
+  // capital that marks a label marks nothing there: "the Indonesian
+  // archipelago" names a place, not the CSV option reading "Indonesian". A
+  // control is held beside it, so a reader blind to every one-word label
+  // cannot pass this.
+  it("a language's name is grammar, not a label, while a control is still named", () => {
+    const indonesian = unit('csvLanguageVersion.id', 'Indonesian', '印尼语');
+    const calculate = unit('site.glory.calculate', 'Calculate', '计算');
+    const journey = unit(
+      'site.home.wordfarerBody',
+      'Journey across the Indonesian archipelago, then select Calculate.',
+      '穿越印度尼西亚群岛，然后选择“计算”。',
+    );
+    expect(
+      checkNamedLabels([indonesian, calculate, journey], 'zh').map(
+        ({ labels }) => labels.map(({ key }) => key),
+      ),
+    ).toEqual([['site.glory.calculate']]);
+  });
+
   it('a one-word label is named mid-sentence, never by the capital that starts one', () => {
     const calculate = unit('site.glory.calculate', 'Calculate', '计算');
     const named = unit(

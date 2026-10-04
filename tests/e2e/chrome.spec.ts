@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
-import { LOCALES, localisePath } from '../../src/lib/i18n';
+import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { searched } from '../source-files';
 
@@ -19,6 +19,7 @@ test.describe('header + footer', () => {
       const nav = page.locator('header nav');
       await expect(nav.locator('a')).toHaveText([
         'ShyTalk',
+        'Wordfarer',
         'Tools',
         'Contact',
       ]);
@@ -57,7 +58,7 @@ test.describe('header + footer', () => {
   test('nav links are root-relative so they work from every page, not just /', async ({
     page,
   }) => {
-    // The Header renders on every page via BaseLayout, but #shytalk/#tools/#contact
+    // The Header renders on every page via BaseLayout, but its section anchors
     // exist only on the homepage — so the nav hrefs must be root-relative (/#…) or
     // they dead-link on sub-pages. Regression guard for the cross-task defect the
     // whole-branch review caught (nav was #shytalk → /glory-points#shytalk = dead).
@@ -65,7 +66,7 @@ test.describe('header + footer', () => {
     const hrefs = await page
       .locator('header nav a')
       .evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-    expect(hrefs).toEqual(['/#shytalk', '/#tools', '/#contact']);
+    expect(hrefs).toEqual(['/#shytalk', '/#wordfarer', '/#tools', '/#contact']);
   });
 
   // Shyden Ltd is dissolved (operator, 2026-09-27, #370): the footer names no
@@ -184,7 +185,7 @@ test.describe('header + footer', () => {
       await page.keyboard.press('Tab');
       await expect(languages).toBeFocused();
 
-      for (const label of ['ShyTalk', 'Tools', 'Contact']) {
+      for (const label of ['ShyTalk', 'Wordfarer', 'Tools', 'Contact']) {
         await page.keyboard.press('Tab');
         await expect(
           page.locator('header nav a', { hasText: label }),
@@ -282,7 +283,12 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
         // claims to check. Proven, not assumed: pointing this locator at a
         // non-existent class left the test passing. The desktop case alongside
         // has always guarded this; the mobile one did not.
-        await expect(links).toHaveCount(3);
+        // Counted from the locale's own nav labels, then read in order: a
+        // literal 3 went stale when #403 added a fourth link, and failed
+        // before measuring it.
+        const labels = Object.values(getSiteStrings(locale).nav);
+        await expect(links).toHaveCount(labels.length);
+        await expect(links).toHaveText(labels);
         for (const a of await links.all())
           await atLeast44(a, `"${await a.textContent()}"`);
         await atLeast44(
@@ -299,7 +305,12 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto(localisePath('/', locale));
         const links = page.locator('header nav a');
-        await expect(links).toHaveCount(3);
+        // Counted from the locale's own nav labels, then read in order: a
+        // literal 3 went stale when #403 added a fourth link, and failed
+        // before measuring it.
+        const labels = Object.values(getSiteStrings(locale).nav);
+        await expect(links).toHaveCount(labels.length);
+        await expect(links).toHaveText(labels);
         for (const a of await links.all()) {
           // Guards the all-browser desktop-nav regression: a collapsed wrapper
           // made these links render off-screen / non-visible on every engine.

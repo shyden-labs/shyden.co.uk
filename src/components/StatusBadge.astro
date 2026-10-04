@@ -1,0 +1,34 @@
+---
+/**
+ * A status pill: the tools' "Live now" and the products' "Coming soon" (#403).
+ *
+ * One home for both, so the two statuses cannot drift apart in shape or in
+ * colour. The words carry the meaning, never the colour alone: the badge is a
+ * real text node in every locale's catalogue.
+ */
+interface Props {
+  label: string;
+}
+const { label } = Astro.props;
+---
+
+<p class="status-badge">{label}</p>
+<style>
+  /* --accent on its --glass fill. Drawn over a card's opaque --surface (the
+     tools) and straight over the page atmosphere (the products); both stacks
+     are scored in tests/unit/contrast.test.ts, so no ratio or colour name is
+     claimed here. */
+  .status-badge {
+    display: inline-block;
+    margin: 0 0 0.75rem;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--glass);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+</style>

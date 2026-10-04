@@ -12,6 +12,7 @@
 export const siteEn = {
   nav: {
     shytalk: 'ShyTalk',
+    wordfarer: 'Wordfarer',
     tools: 'Tools',
     contact: 'Contact',
   },
@@ -22,13 +23,15 @@ export const siteEn = {
   home: {
     title: 'Shyden — small software, made with care',
     description:
-      'We make small software, with care. ShyTalk is our first product — live rooms where you learn a language by speaking it with someone learning yours.',
+      'Small software, made with care. Coming soon: ShyTalk, live rooms for learning a language by speaking it, and Wordfarer, an idle game for learning one.',
     heroHeading: 'Shyden makes small software, with care.',
     heroLead:
-      'ShyTalk is the first out of the door — live rooms where you learn a language by speaking it with someone learning yours. Somewhere to actually talk.',
+      "Coming soon: two new ways to learn a language. Talk it out in ShyTalk's live rooms, or play your way through Wordfarer, an idle game where every word you learn carries you further.",
     exploreShytalk: 'Explore ShyTalk',
+    exploreWordfarer: 'Explore Wordfarer',
     opensAt: 'opens',
-    flagshipKicker: 'The flagship',
+    comingSoon: 'Coming soon',
+    shytalkKicker: 'Learn by talking',
     shytalkBody:
       'Take a seat in a live room and talk — with people learning your language, or in a free lesson with a real teacher when you want the structure.',
     shytalkFeature1: 'Live audio rooms with up to eight seats',
@@ -38,6 +41,16 @@ export const siteEn = {
     shytalkShotAlt:
       'The ShyTalk app on a phone, showing a live audio room with people on its seats and the room chat below them.',
     visitShytalk: 'Visit the ShyTalk site',
+    wordfarerKicker: 'Learn by playing',
+    wordfarerBody:
+      'An idle game for learning a real language. Journey across the Indonesian archipelago, or across the English-speaking world, and the words you pick up power the game.',
+    wordfarerFeature1:
+      'Learn Indonesian from English, or English from Indonesian',
+    wordfarerFeature2: 'Review a word and it grows stronger',
+    wordfarerFeature3: 'No ads, no energy timers, no paid progress',
+    wordfarerFeature4:
+      'Miss a day and lose nothing. Nobody is forced to study.',
+    visitWordfarer: 'Visit the Wordfarer site',
     toolsHeading: "While you're waiting, try these.",
     toolsLead:
       "Two tools we've already built. Free, no sign-up, and working right now.",
@@ -135,6 +148,7 @@ export type SiteStrings = typeof siteEn;
 export const siteId: SiteStrings = {
   nav: {
     shytalk: 'ShyTalk',
+    wordfarer: 'Wordfarer',
     tools: 'Alat',
     contact: 'Kontak',
   },
@@ -145,13 +159,15 @@ export const siteId: SiteStrings = {
   home: {
     title: 'Shyden — perangkat lunak kecil, dibuat dengan cermat',
     description:
-      'Kami membuat perangkat lunak kecil, dengan cermat. ShyTalk adalah produk pertama kami — ruang langsung tempat Anda belajar bahasa dengan berbicara bersama orang yang sedang belajar bahasa Anda.',
+      'Perangkat lunak kecil, dibuat dengan cermat. Segera hadir: ShyTalk, ruang langsung untuk belajar bahasa dengan berbicara, dan Wordfarer, gim idle untuk belajar bahasa.',
     heroHeading: 'Shyden membuat perangkat lunak kecil, dengan cermat.',
     heroLead:
-      'ShyTalk adalah yang pertama kami luncurkan — ruang langsung tempat Anda belajar bahasa dengan berbicara bersama orang yang sedang belajar bahasa Anda. Tempat untuk benar-benar berbicara.',
+      'Segera hadir: dua cara baru untuk belajar bahasa. Berbicaralah langsung di ruang ShyTalk, atau bermainlah bersama Wordfarer, gim idle yang membawa Anda makin jauh dengan setiap kata yang Anda pelajari.',
     exploreShytalk: 'Jelajahi ShyTalk',
+    exploreWordfarer: 'Jelajahi Wordfarer',
     opensAt: 'membuka',
-    flagshipKicker: 'Produk unggulan',
+    comingSoon: 'Segera hadir',
+    shytalkKicker: 'Belajar dengan berbicara',
     shytalkBody:
       'Ambil kursi di ruang langsung dan mulailah berbicara — dengan orang yang sedang belajar bahasa Anda, atau dalam pelajaran gratis bersama guru sungguhan bila Anda menginginkan yang lebih terstruktur.',
     shytalkFeature1: 'Ruang audio langsung dengan hingga delapan kursi',
@@ -162,6 +178,17 @@ export const siteId: SiteStrings = {
     shytalkShotAlt:
       'Aplikasi ShyTalk di ponsel, menampilkan ruang audio langsung dengan orang-orang di kursinya dan obrolan ruangan di bawahnya.',
     visitShytalk: 'Kunjungi situs ShyTalk',
+    wordfarerKicker: 'Belajar dengan bermain',
+    wordfarerBody:
+      'Gim idle untuk mempelajari bahasa sungguhan. Jelajahi kepulauan Indonesia, atau dunia berbahasa Inggris, dan kata-kata yang Anda pelajari menggerakkan permainan.',
+    wordfarerFeature1:
+      'Belajar bahasa Indonesia dari bahasa Inggris, atau bahasa Inggris dari bahasa Indonesia',
+    wordfarerFeature2: 'Ulangi sebuah kata dan kata itu makin kuat',
+    wordfarerFeature3:
+      'Tanpa iklan, tanpa batas energi, tanpa kemajuan berbayar',
+    wordfarerFeature4:
+      'Lewatkan sehari dan Anda tidak kehilangan apa pun. Tidak ada yang dipaksa belajar.',
+    visitWordfarer: 'Kunjungi situs Wordfarer',
     toolsHeading: 'Sambil menunggu, coba ini.',
     toolsLead:
       'Dua alat yang sudah kami buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
@@ -249,6 +276,7 @@ export const siteId: SiteStrings = {
 export const siteZh: SiteStrings = {
   nav: {
     shytalk: 'ShyTalk',
+    wordfarer: 'Wordfarer',
     tools: '工具',
     contact: '联系我们',
   },
@@ -258,13 +286,15 @@ export const siteZh: SiteStrings = {
   home: {
     title: 'Shyden — 精心制作的小巧软件',
     description:
-      '我们用心打造小型软件。ShyTalk 是我们的第一款产品——在实时房间里，你通过开口说来学习一门语言，对方也正在学你的语言。',
+      '精心打造的小巧软件。即将推出：ShyTalk——通过口语练习学习语言的实时房间，以及 Wordfarer——一款用于学习语言的放置类游戏。',
     heroHeading: 'Shyden 精心开发小型软件。',
     heroLead:
-      'ShyTalk 是我们推出的第一款产品——在实时房间里，你通过开口说来学习一门语言，对方也正在学你的语言。一个真正可以开口的地方。',
+      '即将推出：两种全新的语言学习方式。你可以在 ShyTalk 的实时房间里畅所欲言，或者通过 Wordfarer 这款放置类游戏边玩边学——在这款游戏中，你学会的每一个单词都能让你走得更远。',
     exploreShytalk: '了解 ShyTalk',
+    exploreWordfarer: '了解 Wordfarer',
     opensAt: '打开',
-    flagshipKicker: '旗舰产品',
+    comingSoon: '即将推出',
+    shytalkKicker: '通过交谈学习',
     shytalkBody:
       '在实时房间里坐下来开口说——和正在学你语言的人交流，或者在想要更有条理时，参加由真人老师带的免费课程。',
     shytalkFeature1: '实时语音房间，最多八个座位',
@@ -274,6 +304,14 @@ export const siteZh: SiteStrings = {
     shytalkShotAlt:
       'ShyTalk 应用在手机上显示一个实时语音房间，座位上有人，下面是房间聊天。',
     visitShytalk: '访问 ShyTalk 网站',
+    wordfarerKicker: '通过游戏学习',
+    wordfarerBody:
+      '一款学习真实语言的放置类游戏。穿越印度尼西亚群岛，或踏遍英语世界，你学到的单词会为游戏提供动力。',
+    wordfarerFeature1: '从英语学习印尼语，或从印尼语学习英语',
+    wordfarerFeature2: '复习一个单词，它就会变得更牢固',
+    wordfarerFeature3: '无广告、无能量计时器、无付费解锁',
+    wordfarerFeature4: '哪怕错过一天，也不会有什么损失。没人会被强迫学习。',
+    visitWordfarer: '访问 Wordfarer 网站',
     toolsHeading: '等待期间，先试试这些。',
     toolsLead: '我们已经做好的两款工具。免费，无需注册，现在就能用。',
     toolBadge: '已上线',
@@ -353,6 +391,7 @@ export const siteZh: SiteStrings = {
 export const siteVi: SiteStrings = {
   nav: {
     shytalk: 'ShyTalk',
+    wordfarer: 'Wordfarer',
     tools: 'Công cụ',
     contact: 'Liên hệ',
   },
@@ -362,13 +401,15 @@ export const siteVi: SiteStrings = {
   home: {
     title: 'Shyden — phần mềm nhỏ, được phát triển với sự tận tâm',
     description:
-      'Chúng tôi phát triển các phần mềm nhỏ với sự tận tâm. ShyTalk là sản phẩm đầu tiên của chúng tôi — những phòng trực tuyến nơi bạn học một ngôn ngữ bằng cách nói nó với người đang học ngôn ngữ của bạn.',
+      'Phần mềm nhỏ, được phát triển với sự tận tâm. Sắp ra mắt: ShyTalk – các phòng trực tuyến giúp bạn học ngôn ngữ thông qua việc thực hành nói, và Wordfarer – một trò chơi nhàn rỗi giúp bạn học ngôn ngữ.',
     heroHeading: 'Shyden phát triển các phần mềm nhỏ với sự tận tâm.',
     heroLead:
-      'ShyTalk là sản phẩm đầu tiên chúng tôi ra mắt — những phòng trực tuyến nơi bạn học một ngôn ngữ bằng cách nói nó với người đang học ngôn ngữ của bạn. Một nơi để thực sự trò chuyện.',
+      'Sắp ra mắt: hai phương pháp học ngoại ngữ hoàn toàn mới. Hãy tham gia trò chuyện trong các phòng trò chuyện trực tiếp của ShyTalk, hoặc vừa chơi vừa học với Wordfarer – một trò chơi nhàn rỗi, nơi mỗi từ vựng bạn học được sẽ giúp bạn tiến xa hơn.',
     exploreShytalk: 'Khám phá ShyTalk',
+    exploreWordfarer: 'Khám phá Wordfarer',
     opensAt: 'mở',
-    flagshipKicker: 'Sản phẩm chủ lực',
+    comingSoon: 'Sắp ra mắt',
+    shytalkKicker: 'Học qua giao tiếp',
     shytalkBody:
       'Nhận một chỗ ngồi trong phòng trực tuyến và bắt đầu nói — với những người đang học ngôn ngữ của bạn, hoặc trong một buổi học miễn phí cùng giáo viên thật khi bạn muốn có cấu trúc hơn.',
     shytalkFeature1: 'Phòng âm thanh trực tuyến với tối đa tám chỗ ngồi',
@@ -379,6 +420,17 @@ export const siteVi: SiteStrings = {
     shytalkShotAlt:
       'Ứng dụng ShyTalk trên điện thoại, hiển thị một phòng âm thanh trực tuyến với những người trên các chỗ ngồi và khung trò chuyện của phòng ở bên dưới.',
     visitShytalk: 'Truy cập trang ShyTalk',
+    wordfarerKicker: 'Học qua trò chơi',
+    wordfarerBody:
+      'Một trò chơi nhàn rỗi giúp học ngôn ngữ thực tế. Hãy bắt đầu hành trình khám phá quần đảo Indonesia hoặc thế giới nói tiếng Anh, và chính những từ vựng bạn thu thập được sẽ là động lực cho trò chơi.',
+    wordfarerFeature1:
+      'Học tiếng Indonesia từ tiếng Anh, hoặc học tiếng Anh từ tiếng Indonesia',
+    wordfarerFeature2: 'Hãy ôn lại một từ và nó sẽ trở nên vững chắc hơn',
+    wordfarerFeature3:
+      'Không có quảng cáo, không có bộ hẹn giờ năng lượng, không có tiến trình phải trả phí',
+    wordfarerFeature4:
+      'Bỏ lỡ một ngày cũng chẳng mất mát gì. Không ai bị ép buộc phải học cả.',
+    visitWordfarer: 'Truy cập trang Wordfarer',
     toolsHeading: 'Trong lúc chờ, hãy thử những công cụ này.',
     toolsLead:
       'Hai công cụ chúng tôi đã xây dựng. Miễn phí, không cần đăng ký, và dùng được ngay bây giờ.',
@@ -463,6 +515,7 @@ export const siteVi: SiteStrings = {
 export const siteTh: SiteStrings = {
   nav: {
     shytalk: 'ShyTalk',
+    wordfarer: 'Wordfarer',
     tools: 'เครื่องมือ',
     contact: 'ติดต่อ',
   },
@@ -472,13 +525,15 @@ export const siteTh: SiteStrings = {
   home: {
     title: 'Shyden — ซอฟต์แวร์ขนาดเล็ก ที่พัฒนาด้วยความใส่ใจ',
     description:
-      'เราพัฒนาซอฟต์แวร์ขนาดเล็ก ด้วยความใส่ใจ ShyTalk คือผลิตภัณฑ์แรกของเรา — ห้องสนทนาสดที่คุณเรียนภาษาด้วยการพูดกับคนที่กำลังเรียนภาษาของคุณ',
+      'ซอฟต์แวร์ขนาดเล็ก ที่พัฒนาด้วยความใส่ใจ เร็วๆ นี้: ShyTalk — ห้องสนทนาสดเพื่อเรียนรู้ภาษาผ่านการพูด — และ Wordfarer — เกมแบบ idle สำหรับการเรียนรู้ภาษา',
     heroHeading: 'Shyden พัฒนาซอฟต์แวร์ขนาดเล็ก ด้วยความใส่ใจ',
     heroLead:
-      'ShyTalk คือสิ่งแรกที่เราปล่อยออกมา — ห้องสนทนาสดที่คุณเรียนภาษาด้วยการพูดกับคนที่กำลังเรียนภาษาของคุณ ที่ที่ได้พูดจริง ๆ',
+      'เร็วๆ นี้: สองวิธีใหม่ในการเรียนภาษา พูดคุยกันในห้องสนทนาสดของ ShyTalk หรือเล่นเกม Wordfarer ซึ่งเป็นเกมแบบ idle ที่ทุกคำที่คุณเรียนรู้จะพาคุณก้าวไปข้างหน้า',
     exploreShytalk: 'สำรวจ ShyTalk',
+    exploreWordfarer: 'สำรวจ Wordfarer',
     opensAt: 'เปิด',
-    flagshipKicker: 'ผลิตภัณฑ์หลัก',
+    comingSoon: 'เร็วๆ นี้',
+    shytalkKicker: 'เรียนรู้ผ่านการพูดคุย',
     shytalkBody:
       'นั่งลงในห้องสนทนาสดแล้วเริ่มพูดคุย — กับคนที่กำลังเรียนภาษาของคุณ หรือในบทเรียนฟรีกับครูตัวจริงเมื่อคุณอยากได้ความเป็นระบบมากขึ้น',
     shytalkFeature1: 'ห้องเสียงสดรองรับได้สูงสุดแปดที่นั่ง',
@@ -488,6 +543,17 @@ export const siteTh: SiteStrings = {
     shytalkShotAlt:
       'แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง',
     visitShytalk: 'เยี่ยมชมเว็บไซต์ ShyTalk',
+    wordfarerKicker: 'เรียนรู้ผ่านการเล่น',
+    wordfarerBody:
+      'เกมแบบ idle สำหรับการเรียนรู้ภาษาจริง เดินทางผ่านหมู่เกาะอินโดนีเซีย หรือทั่วโลกที่ใช้ภาษาอังกฤษ และคำศัพท์ที่คุณเก็บรวบรวมได้จะช่วยให้เกมดำเนินไป',
+    wordfarerFeature1:
+      'เรียนภาษาอินโดนีเซียจากภาษาอังกฤษ หรือเรียนภาษาอังกฤษจากภาษาอินโดนีเซีย',
+    wordfarerFeature2: 'ทบทวนคำหนึ่ง และคำนั้นจะยิ่งแข็งแกร่งขึ้น',
+    wordfarerFeature3:
+      'ไม่มีโฆษณา ไม่มีตัวจับเวลาพลังงาน ไม่มีความคืบหน้าที่ต้องจ่ายเงิน',
+    wordfarerFeature4:
+      'พลาดไปหนึ่งวัน ก็ไม่เสียอะไรเลย ไม่มีใครถูกบังคับให้เรียน',
+    visitWordfarer: 'เยี่ยมชมเว็บไซต์ Wordfarer',
     toolsHeading: 'ระหว่างที่รอ ลองสิ่งเหล่านี้ดู',
     toolsLead:
       'เครื่องมือสองอย่างที่เราทำไว้แล้ว ฟรี ไม่ต้องสมัคร และใช้ได้ทันที',

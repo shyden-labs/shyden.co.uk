@@ -1,6 +1,6 @@
 import { isLabel, type BackTranslationUnit } from './back-translate.ts';
 import { escapeForRegExp } from './translate.ts';
-import type { Locale } from './locales.ts';
+import { LOCALES, type Locale } from './locales.ts';
 import type { SiteStrings } from './site.ts';
 
 /**
@@ -180,6 +180,19 @@ const namesLabel = (sentence: string, label: string): boolean =>
 const isSentence = (english: string): boolean => /[.!?]$/.test(english.trim());
 
 /**
+ * The English names of the site's languages, from the platform rather than a
+ * list (#403). English capitalises a language's name wherever it stands, so
+ * the capital that marks a label marks nothing there: "the Indonesian
+ * archipelago" names a place, not the CSV option reading "Indonesian".
+ */
+const LANGUAGE_NAMES: ReadonlySet<string> = new Set(
+  LOCALES.map(
+    (locale) =>
+      new Intl.DisplayNames('en', { type: 'language' }).of(locale) ?? locale,
+  ),
+);
+
+/**
  * Every sentence in `units` that names a label, and whether its rendering
  * carries that label's (#390). Pass one locale's units, from
  * `backTranslationUnits`.
@@ -198,8 +211,10 @@ const isSentence = (english: string): boolean => /[.!?]$/.test(english.trim());
  * their renderings is enough.
  *
  * What it cannot see: a label named in lower case, which reads as the common
- * words ("the class list"), and a rendering that carries the label's words
- * inside a different phrase.
+ * words ("the class list"), a rendering that carries the label's words inside
+ * a different phrase, and a label that is a language's English name, whose
+ * capital is grammar (#403): a sentence telling a teacher to choose
+ * "Indonesian" is not held to that option's words.
  */
 export function checkNamedLabels(
   units: readonly BackTranslationUnit[],
@@ -211,7 +226,8 @@ export function checkNamedLabels(
       isLabel(one.english) &&
       !isSentence(one.english) &&
       /^\p{Lu}/u.test(one.english) &&
-      !/[{}]/.test(one.english)
+      !/[{}]/.test(one.english) &&
+      !LANGUAGE_NAMES.has(one.english)
     )
       labels.set(one.english, [...(labels.get(one.english) ?? []), one]);
   return units

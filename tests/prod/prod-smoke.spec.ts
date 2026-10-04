@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { deployedRoutes } from '../site-pages';
 import { expectNotFoundServed } from '../not-found-served';
+import { PRODUCTS } from '../product-links';
 import { withoutMarkupComments } from '../unit/source-text';
 
 /**
@@ -56,20 +57,30 @@ test.describe('the production smoke', () => {
     await expectNotFoundServed(request);
   });
 
-  test('the homepage is this site, linking to prod ShyTalk and fetching no script', async ({
-    request,
-  }) => {
+  test('the homepage is this site, fetching no script', async ({ request }) => {
     const home = await served(request, '/');
     expect(home.status).toBe(200);
     expect(home.body).toMatch(/shyden/i);
-    expect(home.body).toContain('https://shytalk.shyden.co.uk');
-    expect(home.body, 'a DEV ShyTalk link leaked into prod').not.toContain(
-      'https://dev.shytalk.shyden.co.uk',
-    );
     // Its one script, the theme script, is inline (#142), and a bundler
     // change could add a fetched one silently.
     expect(home.body).not.toMatch(FETCHED_SCRIPT);
   });
+
+  // One test per product (#403). The production Wordfarer host has no DNS
+  // record yet, by the operator's choice: its URL is read in the served HTML,
+  // never fetched.
+  for (const product of PRODUCTS)
+    test(`the homepage links prod ${product.name}, never dev`, async ({
+      request,
+    }) => {
+      const home = await served(request, '/');
+      expect(home.status).toBe(200);
+      expect(home.body).toContain(`https://${product.prod}`);
+      expect(
+        home.body,
+        `a DEV ${product.name} link leaked into prod`,
+      ).not.toContain(`https://${product.dev}`);
+    });
 
   test('the calculator still explains itself', async ({ request }) => {
     const page = await served(request, '/glory-points');

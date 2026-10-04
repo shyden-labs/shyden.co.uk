@@ -113,7 +113,14 @@ const PAIRS: Pair[] = [
     bg: ['--glass', '--surface'],
     level: 'body',
     where:
-      'the work-card badge: accent text on its glass fill, inside a card whose own background is the opaque --surface (WorkCard.astro). --glass is drawn nowhere else, and never under --ink or --ink-soft',
+      "a tool's status badge: accent text on its glass fill, inside a card whose own background is the opaque --surface (StatusBadge.astro in WorkCard.astro). --glass is drawn only by that badge, and never under --ink or --ink-soft",
+  },
+  {
+    fg: ['--accent'],
+    bg: ['--glass', ATMOSPHERE, '--bg'],
+    level: 'body',
+    where:
+      'a product\'s "Coming soon" badge: the same glass fill straight over the page atmosphere, beside its heading on the homepage (#403)',
   },
   {
     fg: ['--accent-ink'],
@@ -497,7 +504,7 @@ const CONTROL_SELECTORS = [
 const DECORATIVE_SELECTORS = [
   'components/PhoneFrame.astro :: .frame',
   'components/WorkCard.astro :: .work-card',
-  'components/WorkCard.astro :: .work-card-badge',
+  'components/StatusBadge.astro :: .status-badge',
   'components/pages/HomePage.astro :: .contact',
   'components/Footer.astro :: footer',
   'components/Header.astro :: header',
