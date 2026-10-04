@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseSource } from './ast';
-import { filesUnder, searched, tsFilesUnder } from '../source-files';
-import { specDirs } from '../spec-dirs';
+import {
+  filesUnder,
+  searched,
+  tsFilesUnder,
+  walkDisagreements,
+} from '../source-files';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import {
   loopedCases,
   statefulHelpers,
   testsRead,
   type LoopedCase,
 } from '../one-test-per-case';
-import { declaresTests } from '../playwright-declarations';
+import { declaresTests, testsWritten } from '../playwright-declarations';
 import { floorBreach } from '../floors';
 
 /**
@@ -244,6 +249,7 @@ const scan = (): {
   tests: string[];
   sites: string[];
   unread: string[];
+  miscounted: string[];
 } => {
   // Every TypeScript file in a directory that holds specs, not only the
   // `*.spec.ts` ones: the Android preflight (`*.setup.ts`) and the iOS
@@ -264,7 +270,17 @@ const scan = (): {
       declaresTests(readFileSync(file, 'utf8')) &&
       testsRead(parsed(file)).length === 0,
   );
-  return { specs, tests, sites, unread };
+  // Per file (#477): the reader's count against the text's, so a reader
+  // blind to one form in a file that writes two others is caught.
+  const miscounted = specs.flatMap((file) => {
+    const sf = parsed(file);
+    const read = testsRead(sf).length;
+    const written = testsWritten(sf);
+    return read === written
+      ? []
+      : [`${file}: read ${read} tests, its text writes ${written}`];
+  });
+  return { specs, tests, sites, unread, miscounted };
 };
 
 describe('the suite', () => {
@@ -283,10 +299,18 @@ describe('the suite', () => {
     // absence-liveness sat at 153 under a real 391 (#390 F161). And no spec
     // whose text declares a test may read as none: a reader blind to one
     // form (`test.fail.only` was) is caught by the file it missed.
-    const { tests, unread } = scan();
+    const { specs, tests, unread, miscounted } = scan();
     expect(
-      searched(unread, {
-        of: specDirs().flatMap(tsFilesUnder),
+      searched(unread, { of: specs, what: 'files in spec directories' }),
+    ).toEqual([]);
+    expect(
+      searched(miscounted, { of: specs, what: 'files in spec directories' }),
+    ).toEqual([]);
+    // Both checks above count over the walk, so it is checked against git's
+    // own list too (#477): a walk that drops a file drops it from both sides.
+    expect(
+      searched(walkDisagreements(specs, specDirFilesGitHas()), {
+        of: specs,
         what: 'files in spec directories',
       }),
     ).toEqual([]);

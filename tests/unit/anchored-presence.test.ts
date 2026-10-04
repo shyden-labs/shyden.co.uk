@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { filesUnder, searched } from '../source-files';
-import { bind, bindFiles, callGraph, type Closure } from './ast';
+import {
+  committableFiles,
+  filesUnder,
+  isTsUnderTests,
+  searched,
+  walkDisagreements,
+} from '../source-files';
+import { bind, bindFiles, callGraph, parseFile, type Closure } from './ast';
+import { presenceOverRawText } from './presence-text';
 import { scanPresence, type PresenceClosures } from './presence-detector';
 import { floorBreach } from '../floors';
 /**
@@ -195,6 +202,7 @@ describe('the detector counts only a real anchor (#183)', () => {
 
     expect(scanOf('fixture.test.ts', overRaw("toContain('foo')"))).toEqual({
       scanned: 1,
+      perFile: new Map([['fixture.test.ts', 1]]),
       findings: [expect.stringMatching(/^fixture\.test\.ts:2 /)],
     });
     expect(scanOf('helper.ts', overRaw("toContain('foo')")).scanned).toBe(0);
@@ -257,6 +265,7 @@ describe('the detector exempts a read only where JSON.parse stands between it an
       scanPresence(bind(new Map([['fixture.test.ts', source]])), closures),
     ).toEqual({
       scanned: 1,
+      perFile: new Map([['fixture.test.ts', 1]]),
       findings: [expect.stringMatching(/^fixture\.test\.ts:8 /)],
     });
   });
@@ -302,6 +311,42 @@ describe('presence assertions over source text are stripped or anchored', () => 
     expect(
       floorBreach('anchored-presence/ts-files', tsFiles.length),
     ).toBeUndefined();
+  });
+
+  it('walks every .ts file git has under tests/', () => {
+    // Independent of the walk (#477): git's list, not the disk, so a walk
+    // that narrows (skips a directory, a suffix) names what it dropped.
+    expect(
+      searched(walkDisagreements(tsFiles, committableFiles(isTsUnderTests)), {
+        of: tsFiles,
+        what: 'files under tests/',
+      }),
+    ).toEqual([]);
+  });
+
+  it('scans, in each file, the presence its text writes over raw file text', () => {
+    // Independent of the dataflow reader (#477): per file, the reader judged
+    // exactly what a text reading counts. Fewer is a reader blind to a form;
+    // more is a reader counting a read that is not one, which is how two
+    // names resolved across modules by bare name were found (a `config` from
+    // playwright.config.ts, a destructured `source`). The text follows no
+    // import, so a subject read through an imported helper would disagree
+    // here by name: then the text reading learns to follow imports.
+    const testFiles = tsFiles.filter((file) => /\.(test|spec)\.ts$/.test(file));
+    const disagree = testFiles
+      .map((file) => ({
+        file,
+        judged: result.perFile.get(file) ?? 0,
+        written: presenceOverRawText(parseFile(file)),
+      }))
+      .filter(({ judged, written }) => judged !== written)
+      .map(
+        ({ file, judged, written }) =>
+          `${file}: the reader judged ${judged}, its text writes ${written}`,
+      );
+    expect(searched(disagree, { of: testFiles, what: 'test files' })).toEqual(
+      [],
+    );
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {

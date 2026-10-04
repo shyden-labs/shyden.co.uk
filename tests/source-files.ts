@@ -198,7 +198,32 @@ export function searched<T>(
  * file deleted in the working tree is tracked until the deletion is staged.
  */
 export function trackedFiles(keep: (path: string) => boolean): string[] {
-  const run = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' });
+  return gitListed([], keep, 'tracked files');
+}
+
+/**
+ * Every path git tracks, or would track at the next `git add -A`: tracked,
+ * plus untracked and not ignored. The list a walk is checked against (#477):
+ * a test file written before its `git add` is in it, so a TDD cycle is not
+ * red for the wrong reason, and `dist/` or a test report is not, so one
+ * machine's build output is not a finding on another.
+ */
+export function committableFiles(keep: (path: string) => boolean): string[] {
+  return gitListed(
+    ['--others', '--exclude-standard', '--cached'],
+    keep,
+    'committable files',
+  );
+}
+
+function gitListed(
+  options: readonly string[],
+  keep: (path: string) => boolean,
+  what: string,
+): string[] {
+  const run = spawnSync('git', ['ls-files', '-z', ...options], {
+    encoding: 'utf8',
+  });
   if (run.status !== 0)
     throw new Error(
       `git ls-files failed (${run.status}): ${run.error ?? run.stderr}`,
@@ -207,5 +232,30 @@ export function trackedFiles(keep: (path: string) => boolean): string[] {
     .split('\0')
     .filter((path) => keep(path) && existsSync(path))
     .sort();
-  return nonEmpty(paths, 'tracked files');
+  return nonEmpty(paths, what);
 }
+
+/**
+ * Where a walk and git's list of the same population disagree, one line per
+ * file, both directions (#477). Compared as sets: the walk's order and
+ * repeats are its own business.
+ */
+export function walkDisagreements(
+  walked: readonly string[],
+  known: readonly string[],
+): string[] {
+  const read = new Set(walked);
+  const listed = new Set(known);
+  return [
+    ...[...listed]
+      .filter((path) => !read.has(path))
+      .map((path) => `${path}: git has it, the walk did not read it`),
+    ...[...read]
+      .filter((path) => !listed.has(path))
+      .map((path) => `${path}: the walk read it, git does not have it`),
+  ];
+}
+
+/** A TypeScript file under `tests/`, as git spells its path. */
+export const isTsUnderTests = (path: string): boolean =>
+  path.startsWith('tests/') && path.endsWith('.ts');

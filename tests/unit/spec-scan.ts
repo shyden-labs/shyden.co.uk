@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { expect } from 'vitest';
-import { specDirs } from '../spec-dirs';
+import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { declaresTests } from '../playwright-declarations';
 import { floorBreach } from '../floors';
-import { searched, tsFilesUnder } from '../source-files';
+import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
 
 /**
  * The body every source-scanning guard in this repo ends with, once (#277).
@@ -64,6 +64,13 @@ export type Liveness = {
    * a form the reader is blind to.
    */
   readonly carries: (file: string, source: string) => boolean;
+  /**
+   * The same file's units counted another way, where they can be. Given,
+   * every file's `judged` must number exactly this (#477): a reader blind to
+   * one unit in a file that holds two others still judges something there,
+   * which `carries` cannot see.
+   */
+  readonly count?: (file: string, source: string) => number;
 };
 
 /**
@@ -79,9 +86,11 @@ export const declarationsRead = (what: string, floor: string): Liveness => ({
 
 /**
  * Run `analyze` over every file in the spec directories and assert it found
- * nothing, over a population of the units it judged, at least as many as
- * measured, with none missed in a file that plainly holds one. The failure
- * message is every finding, one per line.
+ * nothing, over a population of the units it judged; that no file which
+ * plainly holds one was judged empty; that the walk read exactly the files
+ * git has there; where the liveness gives a `count`, that every file was
+ * judged exactly that many (#477); and that the total is the recorded
+ * figure (#468). The failure message is every finding, one per line.
  */
 export const expectNothingFound = (
   analyze: Analyze,
@@ -112,7 +121,41 @@ export const expectNothingFound = (
     }),
     `files holding ${liveness.what} where the reader judged none`,
   ).toEqual([]);
-  // After both verdicts, so a population that grew never hides a finding.
+  // The walk against git's list (#477): the per-file checks above are
+  // computed over the walk, so a walk that dropped a file drops it from
+  // both sides of them.
+  expect(
+    searched(
+      walkDisagreements(
+        readings.map(({ file }) => file),
+        specDirFilesGitHas(),
+      ),
+      { of: readings, what: 'files under the spec directories' },
+    ),
+  ).toEqual([]);
+  const { count } = liveness;
+  if (count) {
+    const disagree = readings
+      .map(({ file, source, judged }) => ({
+        file,
+        judged: judged.length,
+        counted: count(file, source),
+      }))
+      .filter(({ judged, counted }) => judged !== counted)
+      .map(
+        ({ file, judged, counted }) =>
+          `${file}: judged ${judged}, counted another way ${counted}`,
+      );
+    expect(
+      searched(disagree, {
+        of: readings,
+        what: 'files under the spec directories',
+      }),
+      `${liveness.what}, judged and counted another way, per file:\n` +
+        disagree.join('\n'),
+    ).toEqual([]);
+  }
+  // After every verdict, so a population that grew never hides a finding.
   expect(
     floorBreach(liveness.floor, judged.length),
     `${liveness.what}: not the recorded figure`,

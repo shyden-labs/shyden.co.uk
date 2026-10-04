@@ -6,6 +6,7 @@ import {
   callsIn,
   declarationsIn,
   enclosingDeclaration,
+  testsWritten,
   useCallsIn,
 } from '../playwright-declarations';
 
@@ -286,6 +287,52 @@ describe('useCallsIn() reads what a test.use() sets', () => {
       ['recorded', undefined],
       [undefined, undefined],
     ]);
+  });
+});
+
+describe('testsWritten() counts the tests a file writes, as text (#477)', () => {
+  // The per-file cross-check on the parse tree's reader. Written out by
+  // hand, never generated from a reader's list (#446).
+  const counted = [
+    "test('a', async ({ page }) => {});",
+    'test("a", () => {});',
+    'test(`a ${b}`, async () => {});',
+    'test(title, async () => {});',
+    "test('a', { tag: '@x' }, async () => {});",
+    "test('a', function () {});",
+    "test('a', page => {});",
+    "test.only('a', async () => {});",
+    "test.skip('a', async () => {});",
+    "test.fixme('a', async () => {});",
+    "test.fail.only('a', async () => {});",
+    "test(\n  'a',\n  async () => {},\n);",
+  ];
+  const notCounted = [
+    "test.skip(isMobile, 'a reason');",
+    "test.describe('g', () => {});",
+    'test.beforeEach(async ({ page }) => {});',
+    'test.use({ viewport: { width: 320, height: 640 } });',
+    "await test.step('s', async () => {});",
+    'const s = "test(\'a\', async () => {})";',
+    "// test('a', async () => {});",
+    "it('a', () => {});",
+    "latest('a', () => {});",
+  ];
+
+  it('counts every way a spec writes a test', () => {
+    const missed = counted.filter((line) => testsWritten(source(line)) !== 1);
+    expect(searched(missed, { of: counted, what: 'planted tests' })).toEqual(
+      [],
+    );
+  });
+
+  it('counts nothing that is not a test', () => {
+    const misread = notCounted.filter(
+      (line) => testsWritten(source(line)) !== 0,
+    );
+    expect(
+      searched(misread, { of: notCounted, what: 'planted non-tests' }),
+    ).toEqual([]);
   });
 });
 

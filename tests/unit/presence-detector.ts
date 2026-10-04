@@ -39,6 +39,8 @@ export interface PresenceClosures {
 
 export interface PresenceScan {
   readonly scanned: number;
+  /** `scanned`, per file, for a cross-check that counts per file (#477). */
+  readonly perFile: ReadonlyMap<string, number>;
   readonly findings: readonly string[];
 }
 
@@ -103,6 +105,7 @@ export function scanPresence(
 ): PresenceScan {
   const findings: string[] = [];
   let scanned = 0;
+  const perFile = new Map<string, number>();
   for (const [file, sf] of bound.files) {
     if (!/\.(test|spec)\.ts$/.test(file)) continue;
 
@@ -133,6 +136,7 @@ export function scanPresence(
             const readsRaw = opaque.some((n) => readers.reaches(file, n));
             if (readsRaw) {
               scanned += 1;
+              perFile.set(file, (perFile.get(file) ?? 0) + 1);
               const arg = node.arguments[0];
               const anchored =
                 arg !== undefined &&
@@ -156,5 +160,5 @@ export function scanPresence(
     };
     check(sf);
   }
-  return { scanned, findings };
+  return { scanned, perFile, findings };
 }

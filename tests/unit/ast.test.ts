@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { bind, callGraph, derivationOf, type Bound } from './ast';
+import {
+  bind,
+  callGraph,
+  codeWithoutLiterals,
+  derivationOf,
+  parseSource,
+  type Bound,
+} from './ast';
 import { scratchDir } from '../scratch-dir';
 
 /**
@@ -454,5 +461,136 @@ describe('a parameter binds its name, like any other local (#277)', () => {
     // at all would satisfy the `false` for a reason of its own.
     expect(reached.reaches(reader, 'lines')).toBe(true);
     expect(reached.reaches(user, 'lines')).toBe(false);
+  });
+});
+
+describe('a name resolves through the import that binds it, or the binding that makes it (#477)', () => {
+  /**
+   * `anchored-presence` counted two assertions over raw file text that read
+   * none, found by #477's text reading of the same population: a `config`
+   * imported from `playwright.config.ts`, outside the graph, and a `source`
+   * destructured in a `for...of` over string literals. Neither is declared
+   * locally, so each fell through to the union of every same-named function
+   * in the suite, and some `config` and some `source` there read a file.
+   */
+  const corpus = () => {
+    const dir = scratchDir('ast-import-');
+    const file = (name: string, text: string) => {
+      const path = join(dir, name);
+      writeFileSync(path, text);
+      return path;
+    };
+    return {
+      reader: file(
+        'reader.ts',
+        "export const load = (f: string) => readFileSync(f, 'utf8');\n" +
+          "export function config() { return readFileSync('c', 'utf8'); }\n" +
+          "export function source() { return readFileSync('s', 'utf8'); }\n",
+      ),
+      pure: file('pure.ts', 'export const load = (s: string) => s.trim();\n'),
+      fromReader: file(
+        'from-reader.ts',
+        "import { load } from './reader';\nexport const a = load('x');\n",
+      ),
+      fromPure: file(
+        'from-pure.ts',
+        "import { load } from './pure';\nexport const b = load('x');\n",
+      ),
+      aliased: file(
+        'aliased.ts',
+        "import { load as fetchText } from './reader';\nexport const c = fetchText('x');\n",
+      ),
+      outside: file(
+        'outside.ts',
+        "import config from '../not-in-the-graph';\nexport const d = config.x;\n",
+      ),
+      destructured: file(
+        'destructured.ts',
+        "for (const [source] of [['a']]) use(source);\n",
+      ),
+    };
+  };
+  const reached = (files: Record<string, string>) =>
+    callGraph(Object.values(files)).close(new Set(['readFileSync']));
+
+  it('follows an import to the module it names', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.fromReader, 'load')).toBe(true);
+  });
+
+  it('does not follow an import to a same-named function elsewhere', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.fromPure, 'load')).toBe(false);
+  });
+
+  it('follows an aliased import under its local name', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.aliased, 'fetchText')).toBe(true);
+  });
+
+  it('gives an import from outside the graph nothing inside it', () => {
+    const files = corpus();
+    // The positive control: the same name, declared in the graph, reads.
+    expect(reached(files).reaches(files.reader, 'config')).toBe(true);
+    expect(reached(files).reaches(files.outside, 'config')).toBe(false);
+  });
+
+  it('binds a destructured name locally', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.reader, 'source')).toBe(true);
+    expect(reached(files).reaches(files.destructured, 'source')).toBe(false);
+  });
+});
+
+describe('code without its literals is what a text cross-check reads (#477)', () => {
+  // A cross-check counting a construct in raw text is satisfied by a string,
+  // a template or a regex that spells it: the guards' own fixtures do. The
+  // parse tree, not a quote-tracking scanner, decides what a literal is.
+  const blanked = (source: string): string =>
+    codeWithoutLiterals(parseSource(source));
+
+  it('keeps code that is not a literal as it is written', () => {
+    expect(blanked('expect(a).toEqual([]);')).toBe('expect(a).toEqual([]);');
+  });
+
+  it('blanks a string literal that spells a matcher', () => {
+    expect(blanked("const s = 'expect(a).toEqual([])';")).toBe('const s = "";');
+  });
+
+  it('blanks a template with no substitution', () => {
+    expect(blanked('const s = `expect(a).toHaveLength(0)`;')).toBe(
+      'const s = "";',
+    );
+  });
+
+  it('blanks a template whole, its substitutions with it', () => {
+    expect(blanked('const s = `a ${"b"} ${c.toHaveLength(0)} d`; go();')).toBe(
+      'const s = ""; go();',
+    );
+  });
+
+  it('blanks a regular expression literal', () => {
+    expect(blanked(String.raw`const r = /\.toEqual\(\[\]\)/g;`)).toBe(
+      'const r = "";',
+    );
+  });
+
+  it('removes a comment that spells a matcher', () => {
+    const out = blanked('// expect(a).toEqual([])\nconst b = 1;');
+    expect(out).toContain('const b = 1;');
+    expect(out).not.toContain('toEqual');
+  });
+
+  it('keeps code after a string a scanner would read as a comment', () => {
+    expect(blanked("const s = '// x'; expect(b).toHaveLength(0);")).toBe(
+      'const s = ""; expect(b).toHaveLength(0);',
+    );
+  });
+
+  it('keeps code after a regex holding a quote', () => {
+    const out = blanked(`const r = /['"]/g; // gone\nexpect(c).toEqual([]);`);
+    expect(out).toContain('const r = "";');
+    expect(out).toContain('expect(c).toEqual([]);');
+    expect(out).not.toContain('gone');
   });
 });

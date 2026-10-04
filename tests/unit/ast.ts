@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+import { withoutTsComments } from './source-text';
 
 /**
  * The TypeScript-AST machinery the meta-guards share (#118).
@@ -473,6 +474,29 @@ export function callGraph(files: readonly string[]): CallGraph {
    * #118 exists about.
    */
   const bound = new Map<string, Set<string>>();
+  /**
+   * Every name a file imports, by local name: the graph file it comes from
+   * (null when the module lies outside the graph) and the name it has there
+   * (null for a default or namespace import, which stands for the module).
+   * Resolved through this, an import reaches what its own module declares,
+   * never a same-named function elsewhere (#477): `browser-matrix.test.ts`'s
+   * `config`, imported from `playwright.config.ts`, inherited
+   * `dependabot-labels.test.ts`'s, which reads a file.
+   */
+  const imports = new Map<
+    string,
+    Map<string, { from: string | null; name: string | null }>
+  >();
+  const inGraph = new Set(files);
+  const moduleFile = (file: string, specifier: string): string | null => {
+    if (!specifier.startsWith('.')) return null;
+    const base = join(dirname(file), specifier);
+    return (
+      [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts')].find((path) =>
+        inGraph.has(path),
+      ) ?? null
+    );
+  };
 
   for (const file of files) {
     const visit = (node: ts.Node, owner: string | null) => {
@@ -492,11 +516,35 @@ export function callGraph(files: readonly string[]): CallGraph {
           }
         }
       }
+      // A destructured name binds like any other (#477): `source` in
+      // `for (const [source] of ...)` is a string, not a reader elsewhere.
       if (
-        (ts.isVariableDeclaration(node) || ts.isParameter(node)) &&
+        (ts.isVariableDeclaration(node) ||
+          ts.isParameter(node) ||
+          ts.isBindingElement(node)) &&
         ts.isIdentifier(node.name)
       )
         bound.set(file, (bound.get(file) ?? new Set()).add(node.name.text));
+      if (
+        ts.isImportDeclaration(node) &&
+        ts.isStringLiteral(node.moduleSpecifier) &&
+        node.importClause
+      ) {
+        const from = moduleFile(file, node.moduleSpecifier.text);
+        const own = imports.get(file) ?? new Map();
+        const clause = node.importClause;
+        if (clause.name) own.set(clause.name.text, { from, name: null });
+        const named = clause.namedBindings;
+        if (named && ts.isNamespaceImport(named))
+          own.set(named.name.text, { from, name: null });
+        if (named && ts.isNamedImports(named))
+          for (const element of named.elements)
+            own.set(element.name.text, {
+              from,
+              name: (element.propertyName ?? element.name).text,
+            });
+        imports.set(file, own);
+      }
       if (mine && ts.isCallExpression(node) && ts.isIdentifier(node.expression))
         calls.get(mine)?.add(node.expression.text);
       ts.forEachChild(node, (child) => visit(child, mine));
@@ -504,10 +552,27 @@ export function callGraph(files: readonly string[]): CallGraph {
     visit(parseFile(file), null);
   }
 
-  const resolve = (file: string, name: string): string[] => {
+  const resolve = (
+    file: string,
+    name: string,
+    seen = new Set<string>(),
+  ): string[] => {
     const local = keyOf(file, name);
     if (calls.has(local)) return [local];
     if (bound.get(file)?.has(name)) return [];
+    const imported = imports.get(file)?.get(name);
+    if (imported) {
+      // Outside the graph, nothing in it is what was imported.
+      if (imported.from === null) return [];
+      // A default or namespace import stands for the whole module.
+      if (imported.name === null)
+        return [...calls.keys()].filter(
+          (key) => fileOf.get(key) === imported.from,
+        );
+      if (seen.has(local)) return [];
+      return resolve(imported.from, imported.name, seen.add(local));
+    }
+    // Declared nowhere this file can see: a global, or a re-export.
     return keysByName.get(name) ?? [];
   };
 
@@ -620,4 +685,37 @@ export function stringTextsIn(sf: ts.SourceFile): string[] {
   };
   visit(sf);
   return texts;
+}
+
+/**
+ * `sf`'s code with every literal replaced by `""` and every comment removed:
+ * what a text cross-check counts in, so that a fixture string, a template or
+ * a regex spelling the construct it counts cannot satisfy it (#477). The
+ * parse tree says what is a literal, outermost only, so a template is blanked
+ * whole with its substitutions; `withoutTsComments` then removes comments
+ * from text that holds no literal it could misread.
+ *
+ * The visitor returns nothing: `ts.forEachChild` stops at the first child
+ * whose callback returns a truthy value.
+ */
+export function codeWithoutLiterals(sf: ts.SourceFile): string {
+  const ranges: [number, number][] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateExpression(node) ||
+      ts.isRegularExpressionLiteral(node)
+    ) {
+      ranges.push([node.getStart(sf), node.end]);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  let code = sf.getFullText();
+  // End first, so each replacement leaves the earlier ranges where they were.
+  for (const [from, to] of ranges.reverse())
+    code = code.slice(0, from) + '""' + code.slice(to);
+  return withoutTsComments(code);
 }

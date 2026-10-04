@@ -62,6 +62,14 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
   'outside `specDirs()`, where `viewport-tagging.test.ts` cannot read them ' +
   '-- measured: four untagged viewport tests, whole unit suite green.';
 
+const CROSS_CHECK_STAYS_IN_ITS_GUARD =
+  'Each guard checks its own walk against git beside the floor it ratchets ' +
+  '(#477), and these two guards walk one population. A helper that returns ' +
+  'the verdict hides `searched` from absence-liveness, which reads it only ' +
+  'at the call site -- measured: three findings "derives from the ' +
+  'filesystem". One shared walk would leave each guard checking a list it ' +
+  'no longer owns.';
+
 /**
  * Pairs read and deliberately left separate, each with the reason a reader
  * needs before deciding to collapse it after all.
@@ -72,35 +80,39 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
  */
 const SEPARATE: ReadonlyMap<string, string> = new Map([
   [
-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/classroom-groups-roster.spec.ts:anonymous',
+    "tests/unit/absence-liveness.test.ts:it('walks every .ts file git has under tests/')  <->  tests/unit/anchored-presence.test.ts:it('walks every .ts file git has under tests/')",
+    CROSS_CHECK_STAYS_IN_ITS_GUARD,
+  ],
+  [
+    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/glory-points.spec.ts:anonymous',
+    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/site-meta.spec.ts:anonymous',
+    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/site-meta.spec.ts:test(`no horizontal scroll at ${width}px`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
+    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-roster.spec.ts:anonymous  <->  tests/e2e/glory-points.spec.ts:anonymous',
+    'tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)  <->  tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-roster.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
+    'tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/glory-points.spec.ts:anonymous  <->  tests/e2e/site-meta.spec.ts:anonymous',
+    'tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)  <->  tests/e2e/site-meta.spec.ts:test(`no horizontal scroll at ${width}px`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/glory-points.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
+    'tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
 ]);
@@ -137,6 +149,24 @@ describe('a function body has one home across files', () => {
     expect(
       searched(
         recorded.filter((key) => !live.has(key)),
+        { of: recorded, what: 'recorded verdicts' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('records each verdict against one pair, which no copy can inherit', () => {
+    // A key describing two live pairs excuses the second unread: measured,
+    // the walk check copied once more between the same two guards passed
+    // under `anonymous <-> anonymous` (#477). Names alone cannot rule that
+    // out, since two tests may share a title, so the count is checked here.
+    const pairsPerKey = new Map<string, number>();
+    for (const key of PAIRS.map(keyOf))
+      pairsPerKey.set(key, (pairsPerKey.get(key) ?? 0) + 1);
+    const recorded = [...SEPARATE.keys()];
+    const shared = recorded.filter((key) => (pairsPerKey.get(key) ?? 0) > 1);
+    expect(
+      searched(
+        shared.map((key) => `${key}: ${pairsPerKey.get(key)} live pairs`),
         { of: recorded, what: 'recorded verdicts' },
       ),
     ).toEqual([]);
@@ -210,6 +240,26 @@ describe('the scan itself', () => {
     const names = functionBodiesOf(nested, 'a.ts').map((d) => d.name);
     expect(names).toContain('inner');
     expect(names).toContain('outer');
+  });
+
+  // A callback has no name of its own, and `anonymous` for every one let a
+  // verdict recorded for one pair excuse any other between the same two
+  // files (#477). The call and its title are the name a reader knows it by.
+  it.each([
+    ["it('reads a title',", "it('reads a title')"],
+    [
+      'test(`no scroll at ${width}px`, { tag: "@x" },',
+      'test(`no scroll at ${width}px`)',
+    ],
+    ["test.skip('a skipped case',", "test.skip('a skipped case')"],
+    ['items.forEach(', 'anonymous'],
+  ])('names the callback passed to %s as %s', (open, name) => {
+    const source = `
+      ${open} async ({ page }) => {
+        const title = await page.title();
+        expect(title.length + title.length + title.length).toBeGreaterThan(0);
+      });`;
+    expect(functionBodiesOf(source, 'a.ts').map((d) => d.name)).toEqual([name]);
   });
 
   it('reports a duplicated region once, at its outermost match', () => {

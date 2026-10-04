@@ -89,10 +89,15 @@ const isComparableFunction = (node: ts.Node): boolean =>
   ts.isMethodDeclaration(node);
 
 /**
- * The name a function is known by — declared, assigned, or the property it
- * is the value of. `declaredName` in `ast.ts` answers the first two for a
- * call graph; a scan that collects callbacks needs the third and a fallback,
- * because an argument to `evaluate` has no name at all.
+ * The name a function is known by — declared, assigned, the property it is
+ * the value of, or the titled call it is passed to. `declaredName` in
+ * `ast.ts` answers the first two for a call graph; a scan that collects
+ * callbacks needs the rest and a fallback, because an argument to `evaluate`
+ * has no name at all.
+ *
+ * A test's callback is known by its title, `it('…')`: as `anonymous`, every
+ * test in a file shared one name, so a verdict keyed by name excused any
+ * copy between the same two files (#477).
  */
 const nameOfBody = (node: ts.Node): string => {
   if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
@@ -107,8 +112,19 @@ const nameOfBody = (node: ts.Node): string => {
     return parent.name.text;
   if (parent && ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name))
     return parent.name.text;
+  if (parent && ts.isCallExpression(parent)) {
+    const [title] = parent.arguments;
+    if (title && title !== node && isTitle(title))
+      return `${parent.expression.getText()}(${title.getText()})`;
+  }
   return 'anonymous';
 };
+
+/** A string, written in any quote, that a call takes as its title. */
+const isTitle = (node: ts.Node): boolean =>
+  ts.isStringLiteral(node) ||
+  ts.isNoSubstitutionTemplateLiteral(node) ||
+  ts.isTemplateExpression(node);
 
 /**
  * Every function-like node in `source`, at any depth.
