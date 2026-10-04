@@ -225,21 +225,21 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 210 | test | A | `tests/themes.ts` | +62/-0 | read whole (tranche 15) | clean: both saveTheme callers save the opposite of the device's theme, so neither assertion can pass on the device's own | — |
 | 211 | test | A | `tests/unit/absence-liveness.test.ts` | +497/-0 | CHANGED since read (+342/-31 after c48ed44); before: read whole (tranche 15) | F159 only toEqual([]) and toHaveLength(0) were read, so an absence spelled expect(x.length).toBe(0), .size, or toStrictEqual([]) was never judged (AL1b green); now every spelling, with a fixture test. F161 its liveness floor sat at 153 under a real 391, so a dead toHaveLength(0) branch stayed green (AL2 green); now 394, floor 393. A subject bound by destructuring is still not traced (AL3 green), filed as #446 AC6 | AL1b-before GREEN; AL1b RED (1 of 3). AL2-before GREEN; AL2b RED (2 of 3) |
 | 212 | test | A | `tests/unit/anchored-presence.test.ts` | +361/-0 | CHANGED since read (+77/-19 after c48ed44); before: read whole (tranche 15) | F160 an anchor is not a stripper: report-endpoint stripped only `--` with a private replace, and its anchored check passed a block comment below the table holding the old quote line while the column allowed 100000 characters (RE1 green); now withoutSqlComments in source-text.ts, quote-aware, and the doc no longer calls an anchor stronger than stripping. Its floor sat at 47 under a real 77, now 76 (AP2 red before: its fixtures cover toMatch, so the slack had no proven cost) | RE1-before GREEN; RE1 RED (1 of 3364) |
-| 213 | test | A | `tests/unit/ast.test.ts` | +596/-0 | — |  |  |
-| 214 | test | A | `tests/unit/ast.ts` | +721/-0 | — |  |  |
-| 215 | test | A | `tests/unit/astro-css-strip.test.ts` | +150/-0 | — |  |  |
-| 216 | test | M | `tests/unit/avatars.test.ts` | +1/-1 | — |  |  |
+| 213 | test | A | `tests/unit/ast.test.ts` | +596/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 214 | test | A | `tests/unit/ast.ts` | +721/-0 | read in full at 33e84cd (tranche 16) | F167 P3 latent, fixed forward: callGraph records only bare-identifier callees and identifiersIn skips element-access callees, so fs.readFileSync(...) or readers[k](...) never reach a seed; 0 live sites; #503 | filed with its plants: #503 |
+| 215 | test | A | `tests/unit/astro-css-strip.test.ts` | +150/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 216 | test | M | `tests/unit/avatars.test.ts` | +1/-1 | read in full at 33e84cd (tranche 16) | none new; loops over AVATAR_SEXES inside tests compute only, #462 scope | n/a |
 | 217 | test | A | `tests/unit/back-translate.test.ts` | +1149/-0 | CHANGED since read (+180/-6 after c48ed44); before: read in full (tranche 3) | F30 | via back-translate.ts |
-| 218 | test | A | `tests/unit/base-url-calls.test.ts` | +441/-0 | — |  |  |
-| 219 | test | A | `tests/unit/board-geometry.test.ts` | +91/-0 | — |  |  |
-| 220 | test | A | `tests/unit/browser-matrix.test.ts` | +662/-0 | — |  |  |
-| 221 | test | A | `tests/unit/build-release-content.test.ts` | +203/-0 | — |  |  |
-| 222 | test | A | `tests/unit/capture-after-assertion.test.ts` | +193/-0 | — |  |  |
-| 223 | test | A | `tests/unit/catalogue-leaves.test.ts` | +41/-0 | — |  |  |
-| 224 | test | A | `tests/unit/classroom-groups-placement.test.ts` | +49/-0 | — |  |  |
-| 225 | test | A | `tests/unit/cli-only.test.ts` | +93/-0 | — |  |  |
-| 226 | test | A | `tests/unit/closing-keywords.test.ts` | +423/-0 | — |  |  |
-| 227 | test | A | `tests/unit/collection-needs-no-build.test.ts` | +384/-0 | — |  |  |
+| 218 | test | A | `tests/unit/base-url-calls.test.ts` | +441/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 219 | test | A | `tests/unit/board-geometry.test.ts` | +91/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 220 | test | A | `tests/unit/browser-matrix.test.ts` | +662/-0 | read in full at 33e84cd (tranche 16) | F168 P3 fixed forward: the retries guard loads configs under CI=true only, so a CI-conditional retry passes and the local-only device config is never judged without CI; #502. Loops over configs inside one test are #462 scope | filed: #502 |
+| 221 | test | A | `tests/unit/build-release-content.test.ts` | +203/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 222 | test | A | `tests/unit/capture-after-assertion.test.ts` | +193/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 223 | test | A | `tests/unit/catalogue-leaves.test.ts` | +41/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 224 | test | A | `tests/unit/classroom-groups-placement.test.ts` | +49/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 225 | test | A | `tests/unit/cli-only.test.ts` | +93/-0 | read in full at 33e84cd (tranche 16) | none new; the existsSync loop inside one test computes only, #462 scope | n/a |
+| 226 | test | A | `tests/unit/closing-keywords.test.ts` | +423/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
+| 227 | test | A | `tests/unit/collection-needs-no-build.test.ts` | +384/-0 | read in full at 33e84cd (tranche 16) | F169 P3 latent, fixed forward: BUILT sees only dist and ./dist, so '../../dist/x' read at module scope is invisible; 0 live sites; #503 | filed with its plants: #503 |
 | 228 | test | A | `tests/unit/colour-literals.test.ts` | +263/-0 | — |  |  |
 | 229 | test | A | `tests/unit/commit-msg-hook.test.ts` | +81/-0 | — |  |  |
 | 230 | test | A | `tests/unit/contrast.test.ts` | +633/-0 | — |  |  |
