@@ -342,7 +342,20 @@ follow is a subject read through a helper another file exports; none does
 today, and if one appears the check names its file, and the text reading
 then has to follow imports.
 
-**AC5, the matrix** (`.superpowers/sdd/477/m477.py`, 38 rows, predictions
+**A verdict that excused more than its pair.** The two walk checks above
+are identical in `absence-liveness` and `anchored-presence`, so
+`duplication` needed a verdict for them, and it keyed verdicts by
+`file:name`, where every test callback was named `anonymous`. One verdict
+therefore excused every anonymous copy between its two files: with the
+floor off, the walk check copied once more between the two guards, under a
+new title and under its own, left `duplication` green on `806303a`. The
+eight verdicts for the no-horizontal-scroll family had the same breadth on
+`develop` before #477. A test callback is now known by its call and title
+(`nameOfBody`), each verdict names its pair's titles, and a verdict whose
+key describes more than one live pair is refused
+(`duplication.test.ts:157`), since two tests may share a title.
+
+**AC5, the matrix** (`.superpowers/sdd/477/m477.py`, 44 rows, predictions
 written first, all as predicted). On `develop`, ten mutations that lose one
 unit and add one, so every total holds, stayed GREEN against the floor
 alone: one absence, one presence, one capture and one test lost at a site
@@ -356,7 +369,12 @@ more went RED against the machinery itself: the text reading blind,
 spec-scan ignoring a per-file count, `codeWithoutLiterals` keeping the
 literals, git's list without untracked files, a walk compared one way only,
 the spec directories read from git keeping every directory, an import
-resolved by bare name again, and a destructured name left unbound. Two
+resolved by bare name again, and a destructured name left unbound. Six
+rows hold the verdict key: a test copied between two e2e specs stayed
+GREEN on `develop` and went RED on the branch; the walk check copied under
+a new title went RED, and under its own title went RED through the
+one-pair check alone, which stayed GREEN with that check off; a test
+callback named `anonymous` again went RED. Two
 forms the design proposed were dead in the corpus and replaced before any
 run: no spec calls `.shoot(`, and every `test.skip(`/`test.fail(` is a
 runtime call, so no modifier declaration exists to blind.
