@@ -301,10 +301,7 @@ describe('the suite', () => {
     // form (`test.fail.only` was) is caught by the file it missed.
     const { specs, tests, unread, miscounted } = scan();
     expect(
-      searched(unread, {
-        of: specDirs().flatMap(tsFilesUnder),
-        what: 'files in spec directories',
-      }),
+      searched(unread, { of: specs, what: 'files in spec directories' }),
     ).toEqual([]);
     expect(
       searched(miscounted, { of: specs, what: 'files in spec directories' }),
