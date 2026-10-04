@@ -2205,6 +2205,224 @@ index 1cf2052..ef90e5f 100644
  blanks every string, template and regex the parse tree finds, then strips
 ~~~~
 
+## Task 12: From the side finding after pass 5: a duplication verdict names one pair
+
+Fix-first against the defect itself: H1/H2 (a copy of the walk check under a new title, and under its own) left all 12 duplication tests GREEN on `806303a` with the floor off. The three titled naming cases ran RED (each named `anonymous`) before `nameOfBody` learned titles; the untitled control passed. The one-pair check passed on the corpus before any mutation, as it must, and was first seen RED in K4. Floors: `duplication/declarations` +3 (count-bodies: +2, +1), `absence-liveness/sites` +1. The eight e2e verdicts predate #477 and are narrowed with it (K1 GREEN on develop).
+
+~~~~diff
+diff --git a/docs/reviews/2026-10-03-guard-liveness-ledger.md b/docs/reviews/2026-10-03-guard-liveness-ledger.md
+index ef90e5f..bfa50d6 100644
+--- a/docs/reviews/2026-10-03-guard-liveness-ledger.md
++++ b/docs/reviews/2026-10-03-guard-liveness-ledger.md
+@@ -342,7 +342,20 @@ follow is a subject read through a helper another file exports; none does
+ today, and if one appears the check names its file, and the text reading
+ then has to follow imports.
+ 
+-**AC5, the matrix** (`.superpowers/sdd/477/m477.py`, 38 rows, predictions
++**A verdict that excused more than its pair.** The two walk checks above
++are identical in `absence-liveness` and `anchored-presence`, so
++`duplication` needed a verdict for them, and it keyed verdicts by
++`file:name`, where every test callback was named `anonymous`. One verdict
++therefore excused every anonymous copy between its two files: with the
++floor off, the walk check copied once more between the two guards, under a
++new title and under its own, left `duplication` green on `806303a`. The
++eight verdicts for the no-horizontal-scroll family had the same breadth on
++`develop` before #477. A test callback is now known by its call and title
++(`nameOfBody`), each verdict names its pair's titles, and a verdict whose
++key describes more than one live pair is refused
++(`duplication.test.ts:157`), since two tests may share a title.
++
++**AC5, the matrix** (`.superpowers/sdd/477/m477.py`, 44 rows, predictions
+ written first, all as predicted). On `develop`, ten mutations that lose one
+ unit and add one, so every total holds, stayed GREEN against the floor
+ alone: one absence, one presence, one capture and one test lost at a site
+@@ -356,7 +369,12 @@ more went RED against the machinery itself: the text reading blind,
+ spec-scan ignoring a per-file count, `codeWithoutLiterals` keeping the
+ literals, git's list without untracked files, a walk compared one way only,
+ the spec directories read from git keeping every directory, an import
+-resolved by bare name again, and a destructured name left unbound. Two
++resolved by bare name again, and a destructured name left unbound. Six
++rows hold the verdict key: a test copied between two e2e specs stayed
++GREEN on `develop` and went RED on the branch; the walk check copied under
++a new title went RED, and under its own title went RED through the
++one-pair check alone, which stayed GREEN with that check off; a test
++callback named `anonymous` again went RED. Two
+ forms the design proposed were dead in the corpus and replaced before any
+ run: no spec calls `.shoot(`, and every `test.skip(`/`test.fail(` is a
+ runtime call, so no modifier declaration exists to blind.
+diff --git a/tests/floors.json b/tests/floors.json
+index a724afb..f089065 100644
+--- a/tests/floors.json
++++ b/tests/floors.json
+@@ -1,6 +1,6 @@
+ {
+   "absence-liveness/plain-files": 117,
+-  "absence-liveness/sites": 447,
++  "absence-liveness/sites": 448,
+   "absence-liveness/ts-files": 268,
+   "anchored-presence/scanned": 74,
+   "anchored-presence/ts-files": 268,
+@@ -13,7 +13,7 @@
+   "device-tool-homes/files": 301,
+   "download-readers/byte-reads": 8,
+   "duplicate-imports/imports": 1582,
+-  "duplication/declarations": 5399,
++  "duplication/declarations": 5402,
+   "duplication/files": 345,
+   "event-collectors/locator-loops": 8,
+   "event-collectors/specs": 65,
+diff --git a/tests/unit/duplication.test.ts b/tests/unit/duplication.test.ts
+index 68c06ee..8d739c0 100644
+--- a/tests/unit/duplication.test.ts
++++ b/tests/unit/duplication.test.ts
+@@ -80,39 +80,39 @@ const CROSS_CHECK_STAYS_IN_ITS_GUARD =
+  */
+ const SEPARATE: ReadonlyMap<string, string> = new Map([
+   [
+-    'tests/unit/absence-liveness.test.ts:anonymous  <->  tests/unit/anchored-presence.test.ts:anonymous',
++    "tests/unit/absence-liveness.test.ts:it('walks every .ts file git has under tests/')  <->  tests/unit/anchored-presence.test.ts:it('walks every .ts file git has under tests/')",
+     CROSS_CHECK_STAYS_IN_ITS_GUARD,
+   ],
+   [
+-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/classroom-groups-roster.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/glory-points.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/e2e/site-meta.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/site-meta.spec.ts:test(`no horizontal scroll at ${width}px`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/classroom-groups-controls.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/classroom-groups-roster.spec.ts:anonymous  <->  tests/e2e/glory-points.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)  <->  tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/classroom-groups-roster.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
++    'tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/glory-points.spec.ts:anonymous  <->  tests/e2e/site-meta.spec.ts:anonymous',
++    'tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)  <->  tests/e2e/site-meta.spec.ts:test(`no horizontal scroll at ${width}px`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+   [
+-    'tests/e2e/glory-points.spec.ts:anonymous  <->  tests/prod/prod-sanity.spec.ts:anonymous',
++    'tests/e2e/glory-points.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
+     TEST_BODY_STAYS_IN_THE_SPEC,
+   ],
+ ]);
+@@ -153,6 +153,24 @@ describe('a function body has one home across files', () => {
+       ),
+     ).toEqual([]);
+   });
++
++  it('records each verdict against one pair, which no copy can inherit', () => {
++    // A key describing two live pairs excuses the second unread: measured,
++    // the walk check copied once more between the same two guards passed
++    // under `anonymous <-> anonymous` (#477). Names alone cannot rule that
++    // out, since two tests may share a title, so the count is checked here.
++    const pairsPerKey = new Map<string, number>();
++    for (const key of PAIRS.map(keyOf))
++      pairsPerKey.set(key, (pairsPerKey.get(key) ?? 0) + 1);
++    const recorded = [...SEPARATE.keys()];
++    const shared = recorded.filter((key) => (pairsPerKey.get(key) ?? 0) > 1);
++    expect(
++      searched(
++        shared.map((key) => `${key}: ${pairsPerKey.get(key)} live pairs`),
++        { of: recorded, what: 'recorded verdicts' },
++      ),
++    ).toEqual([]);
++  });
+ });
+ 
+ describe('the scan itself', () => {
+@@ -224,6 +242,26 @@ describe('the scan itself', () => {
+     expect(names).toContain('outer');
+   });
+ 
++  // A callback has no name of its own, and `anonymous` for every one let a
++  // verdict recorded for one pair excuse any other between the same two
++  // files (#477). The call and its title are the name a reader knows it by.
++  it.each([
++    ["it('reads a title',", "it('reads a title')"],
++    [
++      'test(`no scroll at ${width}px`, { tag: "@x" },',
++      'test(`no scroll at ${width}px`)',
++    ],
++    ["test.skip('a skipped case',", "test.skip('a skipped case')"],
++    ['items.forEach(', 'anonymous'],
++  ])('names the callback passed to %s as %s', (open, name) => {
++    const source = `
++      ${open} async ({ page }) => {
++        const title = await page.title();
++        expect(title.length + title.length + title.length).toBeGreaterThan(0);
++      });`;
++    expect(functionBodiesOf(source, 'a.ts').map((d) => d.name)).toEqual([name]);
++  });
++
+   it('reports a duplicated region once, at its outermost match', () => {
+     const source = `
+       const outer = async (value: number) => {
+diff --git a/tests/unit/duplication.ts b/tests/unit/duplication.ts
+index 0949de6..807cf63 100644
+--- a/tests/unit/duplication.ts
++++ b/tests/unit/duplication.ts
+@@ -89,10 +89,15 @@ const isComparableFunction = (node: ts.Node): boolean =>
+   ts.isMethodDeclaration(node);
+ 
+ /**
+- * The name a function is known by — declared, assigned, or the property it
+- * is the value of. `declaredName` in `ast.ts` answers the first two for a
+- * call graph; a scan that collects callbacks needs the third and a fallback,
+- * because an argument to `evaluate` has no name at all.
++ * The name a function is known by — declared, assigned, the property it is
++ * the value of, or the titled call it is passed to. `declaredName` in
++ * `ast.ts` answers the first two for a call graph; a scan that collects
++ * callbacks needs the rest and a fallback, because an argument to `evaluate`
++ * has no name at all.
++ *
++ * A test's callback is known by its title, `it('…')`: as `anonymous`, every
++ * test in a file shared one name, so a verdict keyed by name excused any
++ * copy between the same two files (#477).
+  */
+ const nameOfBody = (node: ts.Node): string => {
+   if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
+@@ -107,9 +112,20 @@ const nameOfBody = (node: ts.Node): string => {
+     return parent.name.text;
+   if (parent && ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name))
+     return parent.name.text;
++  if (parent && ts.isCallExpression(parent)) {
++    const [title] = parent.arguments;
++    if (title && title !== node && isTitle(title))
++      return `${parent.expression.getText()}(${title.getText()})`;
++  }
+   return 'anonymous';
+ };
+ 
++/** A string, written in any quote, that a call takes as its title. */
++const isTitle = (node: ts.Node): boolean =>
++  ts.isStringLiteral(node) ||
++  ts.isNoSubstitutionTemplateLiteral(node) ||
++  ts.isTemplateExpression(node);
++
+ /**
+  * Every function-like node in `source`, at any depth.
+  *
+~~~~
+
 ## Mutation matrix
 
 `.superpowers/sdd/477/m477.py`, copied from #468's runner, vitest only.
@@ -2253,8 +2471,16 @@ cross-check alone against a reader blind to one form, or a narrowed walk.
 | X6 | the spec directories read from git keep every directory | — | RED |
 | X7 | an import resolves by bare name again | — | RED |
 | X8 | a destructured name is left unbound | — | RED |
+| K1 / K2 | duplication: a test copied between two e2e specs | GREEN | RED |
+| K3 | duplication: the walk check copied under a new title | — | RED |
+| K4 | duplication: the walk check copied under its own title | — | RED (the one-pair check) |
+| K5 | K4 with the one-pair check off | — | GREEN |
+| K6 | a test callback is named `anonymous` again | — | RED |
 
-38 rows: 10 on `develop`, 28 on the branch. Two forms the design proposed
+44 rows: 11 on `develop`, 33 on the branch. The K rows (Task 12) plant at
+top level, with the floors off: a `describe` around the copy is an identical
+outer body itself, which the scan reports at its outermost match, so the
+first plants went RED for the wrapper and were rewritten before these runs. Two forms the design proposed
 were dead in the corpus and were replaced before any run: no spec calls
 `.shoot(`, and the one `test.fail(` is a runtime call (as are all seven
 `test.skip(`), so no modifier declaration exists to blind.
