@@ -240,22 +240,22 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 225 | test | A | `tests/unit/cli-only.test.ts` | +93/-0 | read in full at 33e84cd (tranche 16) | none new; the existsSync loop inside one test computes only, #462 scope | n/a |
 | 226 | test | A | `tests/unit/closing-keywords.test.ts` | +423/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
 | 227 | test | A | `tests/unit/collection-needs-no-build.test.ts` | +384/-0 | read in full at 33e84cd (tranche 16) | F169 P3 latent, fixed forward: BUILT sees only dist and ./dist, so '../../dist/x' read at module scope is invisible; 0 live sites; #503 | filed with its plants: #503 |
-| 228 | test | A | `tests/unit/colour-literals.test.ts` | +263/-0 | — |  |  |
-| 229 | test | A | `tests/unit/commit-msg-hook.test.ts` | +81/-0 | — |  |  |
-| 230 | test | A | `tests/unit/contrast.test.ts` | +633/-0 | — |  |  |
-| 231 | test | A | `tests/unit/css-rules.test.ts` | +213/-0 | — |  |  |
-| 232 | test | A | `tests/unit/css-rules.ts` | +319/-0 | — |  |  |
-| 233 | test | M | `tests/unit/csv.test.ts` | +549/-60 | — |  |  |
-| 234 | test | A | `tests/unit/dashboard-jsonl.test.ts` | +141/-0 | — |  |  |
-| 235 | test | M | `tests/unit/dead-copy.test.ts` | +50/-22 | — |  |  |
-| 236 | test | A | `tests/unit/dependabot-labels.test.ts` | +153/-0 | — |  |  |
-| 237 | test | A | `tests/unit/deploy-gate.test.ts` | +235/-0 | — |  |  |
-| 238 | test | A | `tests/unit/deprecated-css.test.ts` | +169/-0 | — |  |  |
-| 239 | test | A | `tests/unit/device-downloads.test.ts` | +104/-0 | — |  |  |
-| 240 | test | A | `tests/unit/device-evidence.test.ts` | +296/-0 | — |  |  |
-| 241 | test | A | `tests/unit/download-readers.test.ts` | +144/-0 | — |  |  |
-| 242 | test | D | `tests/unit/download-tagging.test.ts` | +0/-156 | — |  |  |
-| 243 | test | A | `tests/unit/duplication.test.ts` | +303/-0 | — |  |  |
+| 228 | test | A | `tests/unit/colour-literals.test.ts` | +263/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 229 | test | A | `tests/unit/commit-msg-hook.test.ts` | +81/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 230 | test | A | `tests/unit/contrast.test.ts` | +633/-0 | read in full at 33e84cd (tranche 17) | F170 P3 latent, fixed forward: subjectIsDisabled reads a disabled subject only as a trailing :disabled, so [disabled] or :disabled:hover in a component pass; 0 live sites; #503 | filed with its plants: #503 |
+| 231 | test | A | `tests/unit/css-rules.test.ts` | +213/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 232 | test | A | `tests/unit/css-rules.ts` | +319/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 233 | test | M | `tests/unit/csv.test.ts` | +549/-60 | diff read whole, a3a5adb..33e84cd (tranche 17) | none new; loops over LOCALES inside several tests compute only, #462 scope | n/a |
+| 234 | test | A | `tests/unit/dashboard-jsonl.test.ts` | +141/-0 | read in full at 33e84cd (tranche 17) | none new; the outcome loop inside one test computes only, #462 scope | n/a |
+| 235 | test | M | `tests/unit/dead-copy.test.ts` | +50/-22 | diff read whole, a3a5adb..33e84cd (tranche 17) | F171 P3 fixed forward: isReferenced is any `.key` property access anywhere under src/, so a dead key named like document.title or row.name looks rendered; the site-copy liveness counts groups while it judges keys; #504 | filed: #504 |
+| 236 | test | A | `tests/unit/dependabot-labels.test.ts` | +153/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 237 | test | A | `tests/unit/deploy-gate.test.ts` | +235/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 238 | test | A | `tests/unit/deprecated-css.test.ts` | +169/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 239 | test | A | `tests/unit/device-downloads.test.ts` | +104/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 240 | test | A | `tests/unit/device-evidence.test.ts` | +296/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 241 | test | A | `tests/unit/download-readers.test.ts` | +144/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
+| 242 | test | D | `tests/unit/download-tagging.test.ts` | +0/-156 | deletion confirmed (tranche 17) | F172 deletion confirmed (#308 replaced it with download-readers.test.ts); tests/playwright-declarations.ts still listed it among the guards reading calls there: corrected | n/a: comment only |
+| 243 | test | A | `tests/unit/duplication.test.ts` | +303/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
 | 244 | test | A | `tests/unit/duplication.ts` | +336/-0 | — |  |  |
 | 245 | test | A | `tests/unit/e2e-reconciliation.test.ts` | +408/-0 | — |  |  |
 | 246 | test | A | `tests/unit/e2e-shards.test.ts` | +468/-0 | — |  |  |
