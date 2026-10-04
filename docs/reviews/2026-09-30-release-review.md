@@ -317,7 +317,7 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 302 | test | M | `tests/unit/roster.test.ts` | +8/-3 | diff read whole at 33e84cd (tranche 22) | none (`LETTERS` is used outside its module, by numberSets.ts) | n/a |
 | 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
 | 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | read in full at 33e84cd (tranche 22) | none (`CONFIGS` is hand-written but complete: only the dev and prod configs read SANITY_ON_BUILD) | n/a |
-| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | read in full at 33e84cd (tranche 22) | F194 P4 latent, fixed forward: `astroTemplate`'s `<!-- -->` removal is never exercised (the dead-class guard plants only `{/* */}`), so removing it leaves 3648/3648 GREEN; no src `.astro` file holds an HTML comment today; #511 | filed: #511; 3/3 as predicted (whole suite GREEN, control RED in scoped-classes) |
+| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | read in full at 33e84cd (tranche 22) | none; F194 withdrawn: its mutation (`astroTemplate` losing its `<!-- -->` removal) was equivalent, because `astroParts` (`source-text.ts:489`) blanks every markup comment first, and `source-text.test.ts:456` plants one; recorded on #511 | n/a (F194t GREEN explained as equivalent) |
 | 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | — |  |  |
 | 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | — |  |  |
 | 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | — |  |  |
