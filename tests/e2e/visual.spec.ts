@@ -57,7 +57,10 @@ const WIDTHS = [
   { label: 'mobile', viewport: { width: 390, height: 844 } },
 ] as const;
 
-/** Wait until `page` has stopped changing on its own: script, then fonts. */
+/**
+ * Wait until `page` has stopped changing on its own: script, then fonts,
+ * then images.
+ */
 async function settle(page: Page): Promise<void> {
   // The heading is the last thing to settle on the two tool pages, whose
   // scripts rewrite the DOM after load. On the homepage, whose one script is
@@ -70,6 +73,20 @@ async function settle(page: Page): Promise<void> {
   // marshal a live object back to Node.
   await page.evaluate(async () => {
     await document.fonts.ready;
+  });
+  // Every image loaded and decoded before any capture (#519). The ShyTalk
+  // phone screenshot is `loading="lazy"`, and at 390px it sits below the
+  // fold, so it began loading only when a full-page capture enlarged the
+  // view: the first capture of the mobile homepage lacked it (153k px, in
+  // exactly the phone's box) and only the capture-until-stable loop hid that,
+  // until a slow run spent its whole budget there. The page keeps `lazy` for
+  // visitors; only the capture asks for every image up front. `decode()`
+  // rejects for an image that cannot load, so a broken one fails the test
+  // rather than being pictured broken.
+  await page.evaluate(async () => {
+    const images = [...document.images];
+    for (const image of images) image.loading = 'eager';
+    await Promise.all(images.map((image) => image.decode()));
   });
 }
 
