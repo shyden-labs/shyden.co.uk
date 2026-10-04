@@ -304,20 +304,20 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 289 | test | A | `tests/unit/palette.test.ts` | +235/-0 | read in full at 33e84cd (tranche 21) | none new; the field loop inside one test checks refusals only, #462 scope | n/a |
 | 290 | test | A | `tests/unit/parked-tests.test.ts` | +261/-0 | read in full at 33e84cd (tranche 21) | F183 P3 latent, fixed forward: `#\d+` takes a hex colour (`#0a7d66`) in a parked test's title or the comment above as an issue reference; #508 | filed: #508; 2/2 as predicted (plant GREEN, control RED) |
 | 291 | test | M | `tests/unit/pipeline-wiring.test.ts` | +2925/-46 | read in full at 33e84cd (tranche 21; +2925/-46 is nearly the whole file, so the file covers the diff) | F188 P2 fixed forward: the PR-startable-workflow write guard knows `pull_request` only, and probe-459.yml (pull_request_target, statuses: write) passes it today; F185 P3: the dev-verified guard reads a 900-char window with `if:.*`, so a widened condition passes; F186 P3: prod-verified ordering read by text position, not job dependency; F187 P4: upload-artifact reader misses `- uses:` and quoted forms; F184 P3: push-branch checks are whole-file lazy regexes, and prod pushing on develop passes all 143 tests; F189 P4: importClosure skips `export … from`; #508 | filed: #508; 8/8 as predicted (F184, F185, F187 plants GREEN with same-spot controls RED; the F188 GREEN is the live tree, its control RED); F186 and F189 predicted, not run |
-| 292 | test | A | `tests/unit/playwright-declarations.test.ts` | +401/-0 | — |  |  |
-| 293 | test | A | `tests/unit/presence-detector.ts` | +164/-0 | — |  |  |
-| 294 | test | A | `tests/unit/release-inventory.test.ts` | +456/-0 | — |  |  |
-| 295 | test | A | `tests/unit/release-map.test.ts` | +335/-0 | — |  |  |
-| 296 | test | A | `tests/unit/release-prose.test.ts` | +32/-0 | — |  |  |
-| 297 | test | A | `tests/unit/report-copy.test.ts` | +33/-0 | — |  |  |
-| 298 | test | A | `tests/unit/report-endpoint.test.ts` | +621/-0 | — |  |  |
-| 299 | test | A | `tests/unit/report-form.test.ts` | +42/-0 | — |  |  |
-| 300 | test | A | `tests/unit/report-review.test.ts` | +624/-0 | — |  |  |
-| 301 | test | A | `tests/unit/report.test.ts` | +488/-0 | — |  |  |
-| 302 | test | M | `tests/unit/roster.test.ts` | +8/-3 | — |  |  |
-| 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | — |  |  |
-| 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | — |  |  |
-| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | — |  |  |
+| 292 | test | A | `tests/unit/playwright-declarations.test.ts` | +401/-0 | read in full at 33e84cd (tranche 22) | F190 P3 latent, fixed forward: the `recorded` home check is a regex over the raw spec, so a commented-out `import { recorded } from './evidence'` satisfies it while the binding comes from elsewhere; #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 293 | test | A | `tests/unit/presence-detector.ts` | +164/-0 | read in full at 33e84cd (tranche 22) | F191 P3 latent, fixed forward: `isAnchored` accepts `^.*`, which a comment line satisfies as easily as code; live case row 298 (AC5's runbook regex); #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 294 | test | A | `tests/unit/release-inventory.test.ts` | +456/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 295 | test | A | `tests/unit/release-map.test.ts` | +335/-0 | read in full at 33e84cd (tranche 22) | none; the docs/releases loop reads one file today | n/a |
+| 296 | test | A | `tests/unit/release-prose.test.ts` | +32/-0 | read in full at 33e84cd (tranche 22) | F192 P4 latent, fixed forward: `SCRIPTS` is hand-written (complete today: both readers of a release file are listed), so a later renderer is never scanned; #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 297 | test | A | `tests/unit/report-copy.test.ts` | +33/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 298 | test | A | `tests/unit/report-endpoint.test.ts` | +621/-0 | read in full at 33e84cd (tranche 22) | F191's live case at :618 (`^.*` over the raw runbook: the line inside `<!-- -->` passes); F193 P3 latent, fixed forward: `MAX_BODY_BYTES` has no literal pin, so `131072` passes all 45 (the chunked read's `pulled < 10` stops a cap near 144 KiB); the origin and control-character loops are compute-only, #462 scope; #511 | filed: #511; F191 2/2, F193 2/2 as predicted (plant GREEN, control RED) |
+| 299 | test | A | `tests/unit/report-form.test.ts` | +42/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 300 | test | A | `tests/unit/report-review.test.ts` | +624/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 301 | test | A | `tests/unit/report.test.ts` | +488/-0 | read in full at 33e84cd (tranche 22) | none new; the locale-by-page nonsense loop is compute-only, #462 scope | n/a |
+| 302 | test | M | `tests/unit/roster.test.ts` | +8/-3 | diff read whole at 33e84cd (tranche 22) | none (`LETTERS` is used outside its module, by numberSets.ts) | n/a |
+| 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | read in full at 33e84cd (tranche 22) | none (`CONFIGS` is hand-written but complete: only the dev and prod configs read SANITY_ON_BUILD) | n/a |
+| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | read in full at 33e84cd (tranche 22) | F194 P4 latent, fixed forward: `astroTemplate`'s `<!-- -->` removal is never exercised (the dead-class guard plants only `{/* */}`), so removing it leaves 3648/3648 GREEN; no src `.astro` file holds an HTML comment today; #511 | filed: #511; 3/3 as predicted (whole suite GREEN, control RED in scoped-classes) |
 | 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | — |  |  |
 | 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | — |  |  |
 | 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | — |  |  |
