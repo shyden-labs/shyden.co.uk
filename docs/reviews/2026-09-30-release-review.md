@@ -256,21 +256,21 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 241 | test | A | `tests/unit/download-readers.test.ts` | +144/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
 | 242 | test | D | `tests/unit/download-tagging.test.ts` | +0/-156 | deletion confirmed (tranche 17) | F172 deletion confirmed (#308 replaced it with download-readers.test.ts); tests/playwright-declarations.ts still listed it among the guards reading calls there: corrected | n/a: comment only |
 | 243 | test | A | `tests/unit/duplication.test.ts` | +303/-0 | read in full at 33e84cd (tranche 17) | none | n/a |
-| 244 | test | A | `tests/unit/duplication.ts` | +336/-0 | — |  |  |
-| 245 | test | A | `tests/unit/e2e-reconciliation.test.ts` | +408/-0 | — |  |  |
-| 246 | test | A | `tests/unit/e2e-shards.test.ts` | +468/-0 | — |  |  |
-| 247 | test | A | `tests/unit/e2e-timings.test.ts` | +190/-0 | — |  |  |
-| 248 | test | A | `tests/unit/engine-dependence.test.ts` | +204/-0 | — |  |  |
-| 249 | test | A | `tests/unit/engine-dependence.ts` | +151/-0 | — |  |  |
-| 250 | test | A | `tests/unit/event-collectors.test.ts` | +598/-0 | — |  |  |
-| 251 | test | A | `tests/unit/evidence-checks.test.ts` | +110/-0 | — |  |  |
-| 252 | test | A | `tests/unit/evidence-fixture.test.ts` | +124/-0 | — |  |  |
+| 244 | test | A | `tests/unit/duplication.ts` | +336/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 245 | test | A | `tests/unit/e2e-reconciliation.test.ts` | +408/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 246 | test | A | `tests/unit/e2e-shards.test.ts` | +468/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 247 | test | A | `tests/unit/e2e-timings.test.ts` | +190/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 248 | test | A | `tests/unit/engine-dependence.test.ts` | +204/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 249 | test | A | `tests/unit/engine-dependence.ts` | +151/-0 | read in full at 33e84cd (tranche 18) | F173 P3 latent, fixed forward: ENGINE_DEPENDENT_NAMES lacks toHaveCSS, scrollTo/scrollY and screenshot; no content-only spec uses them; the set is the operator's (2026-09-18), so widening is asked first; #503 | filed: #503 |
+| 250 | test | A | `tests/unit/event-collectors.test.ts` | +598/-0 | read in full at 33e84cd (tranche 18) | F174 P3 latent: SUBSCRIBES sees only .on(<event>, so .once(/.addListener( or a variable event name escapes; F175 P3 latent: toHaveCount(0) counts as proof the list is not empty; 0 live sites each; #503 | filed with their plants: #503 |
+| 251 | test | A | `tests/unit/evidence-checks.test.ts` | +110/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 252 | test | A | `tests/unit/evidence-fixture.test.ts` | +124/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
 | 253 | test | A | `tests/unit/evidence-page.test.ts` | +2540/-0 | CHANGED since read (+243/-1 after c48ed44); before: diff read (tranche 10) | F119's three tests: the refusals matched by what they name, the allowances, and main() asking before it lists (from the stripped source). | see test-e2e.mjs |
-| 254 | test | A | `tests/unit/evidence-recording.test.ts` | +447/-0 | — |  |  |
-| 255 | test | A | `tests/unit/evidence-signoff.test.ts` | +240/-0 | — |  |  |
-| 256 | test | A | `tests/unit/excluded-by-design.test.ts` | +105/-0 | — |  |  |
-| 257 | test | M | `tests/unit/factories.ts` | +12/-7 | — |  |  |
-| 258 | test | A | `tests/unit/feature-terms.test.ts` | +487/-0 | — |  |  |
+| 254 | test | A | `tests/unit/evidence-recording.test.ts` | +447/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 255 | test | A | `tests/unit/evidence-signoff.test.ts` | +240/-0 | read in full at 33e84cd (tranche 18) | none new; loops over fixtures inside tests compute only, #462 scope | n/a |
+| 256 | test | A | `tests/unit/excluded-by-design.test.ts` | +105/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
+| 257 | test | M | `tests/unit/factories.ts` | +12/-7 | diff read whole, a3a5adb..33e84cd (tranche 18) | none | n/a |
+| 258 | test | A | `tests/unit/feature-terms.test.ts` | +487/-0 | read in full at 33e84cd (tranche 18) | none new; the per-feature nonEmpty loop inside one test stops at the first gap, #462 scope | n/a |
 | 259 | test | M | `tests/unit/fit.test.ts` | +92/-1 | — |  |  |
 | 260 | test | A | `tests/unit/fixtures/messages-before-136.json` | +2675/-0 | — |  |  |
 | 261 | test | A | `tests/unit/flags.test.ts` | +114/-0 | — |  |  |
