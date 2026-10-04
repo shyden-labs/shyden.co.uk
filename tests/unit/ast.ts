@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
+import { withoutTsComments } from './source-text';
 
 /**
  * The TypeScript-AST machinery the meta-guards share (#118).
@@ -620,4 +621,37 @@ export function stringTextsIn(sf: ts.SourceFile): string[] {
   };
   visit(sf);
   return texts;
+}
+
+/**
+ * `sf`'s code with every literal replaced by `""` and every comment removed:
+ * what a text cross-check counts in, so that a fixture string, a template or
+ * a regex spelling the construct it counts cannot satisfy it (#477). The
+ * parse tree says what is a literal, outermost only, so a template is blanked
+ * whole with its substitutions; `withoutTsComments` then removes comments
+ * from text that holds no literal it could misread.
+ *
+ * The visitor returns nothing: `ts.forEachChild` stops at the first child
+ * whose callback returns a truthy value.
+ */
+export function codeWithoutLiterals(sf: ts.SourceFile): string {
+  const ranges: [number, number][] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateExpression(node) ||
+      ts.isRegularExpressionLiteral(node)
+    ) {
+      ranges.push([node.getStart(sf), node.end]);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  let code = sf.getFullText();
+  // End first, so each replacement leaves the earlier ranges where they were.
+  for (const [from, to] of ranges.reverse())
+    code = code.slice(0, from) + '""' + code.slice(to);
+  return withoutTsComments(code);
 }

@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import ts from 'typescript';
-import { readFileSync } from 'node:fs';
 import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
-import { withoutTsComments } from './source-text';
-import { bindFiles, callGraph, derivationOf, where } from './ast';
+import {
+  bindFiles,
+  callGraph,
+  codeWithoutLiterals,
+  derivationOf,
+  parseFile,
+  parseSource,
+  where,
+} from './ast';
 
 /**
  * An absence assertion must prove its POPULATION was live (#118).
@@ -219,19 +225,32 @@ function countsAPopulation(root: ts.Expression): boolean {
 }
 
 /**
- * An absence matcher as text, for the cross-check: no AST, so a reader blind
- * to one file or one spelling disagrees with it. A count held to 0 is read
- * only on a `.length` or `.size`, as `absenceSubject` reads it: on a bare
- * value it is plainly not an absence. A `.not` anywhere before the matcher
- * inverts it.
+ * An absence matcher as text, for the cross-check: no AST walk, so a reader
+ * blind to one file or one spelling disagrees with it. Matched in code with
+ * its literals and comments removed (`codeWithoutLiterals`), then with all
+ * whitespace and every trailing comma gone, so a matcher prettier split over
+ * lines reads as one. A count held to 0 is read only on a `.length` or
+ * `.size` written inside `expect(`, as `absenceSubject` reads it: on a bare
+ * value, or on arithmetic, it is plainly not an absence. A `.not` directly
+ * before the matcher inverts it.
  */
-const PLAIN_ABSENCE = new RegExp(
+const ABSENCE_TEXT = new RegExp(
   [
     String.raw`(?<!\.not)\.(?:toEqual|toStrictEqual)\(\[\]\)`,
     String.raw`(?<!\.not)\.toHaveLength\(0\)`,
-    String.raw`\.(?:length|size)\)\.(?:toBe|toEqual|toStrictEqual)\(0\)`,
+    String.raw`expect(?:\.soft)?\([\w$.()[\]]+?\.(?:length|size)(?:,"")?\)\.(?:toBe|toEqual|toStrictEqual)\(0\)`,
   ].join('|'),
+  'g',
 );
+
+/** How many absence matchers `sf` writes, counted as text (#477). */
+function absencesWritten(sf: ts.SourceFile): number {
+  const code = codeWithoutLiterals(sf)
+    .replace(/\s+/g, '')
+    .replace(/,\)/g, ')')
+    .replace(/,\]/g, ']');
+  return code.match(ABSENCE_TEXT)?.length ?? 0;
+}
 
 function scan() {
   const findings: string[] = [];
@@ -389,36 +408,64 @@ describe('absence assertions prove the population they searched', () => {
       'expect(g.length).toStrictEqual(0);',
       'expect.soft(l).toEqual([]);',
       'expect.soft(m.length).toBe(0);',
+      // Split by prettier, and with a message: the forms a line-by-line
+      // reading of raw text could not see (#477).
+      'expect(\n  n,\n).toEqual(\n  [],\n);',
+      'expect(o.length, "why").toBe(0);',
+      'expect(\n  p.size,\n  `why`,\n).toBe(0);',
+      'expect(q)\n  .toHaveLength(0);',
     ];
     const inverse = [
       'expect(h).not.toEqual([]);',
       'expect(i.length).not.toBe(0);',
       'expect(j.length).toBe(1);',
       'expect(k).toBe(0);',
+      'expect(r)\n  .not\n  .toHaveLength(0);',
+      // A value, not a population: the AST reads no subject here either.
+      'expect(s.length - t.length, "why").toBe(0);',
+      // A fixture that spells an absence holds none (#477).
+      "const u = 'expect(a).toEqual([])';",
+      'const v = `expect(${w}).toHaveLength(0)`;',
+      String.raw`const x = /expect\(y\)\.toEqual\(\[\]\)/;`,
+      '// expect(z).toEqual([]);',
     ];
-    const missed = read.filter((line) => !PLAIN_ABSENCE.test(line));
+    const missed = read.filter(
+      (line) => absencesWritten(parseSource(line)) !== 1,
+    );
     expect(searched(missed, { of: read, what: 'planted absences' })).toEqual(
       [],
     );
-    const misread = inverse.filter((line) => PLAIN_ABSENCE.test(line));
+    const misread = inverse.filter(
+      (line) => absencesWritten(parseSource(line)) !== 0,
+    );
     expect(
       searched(misread, { of: inverse, what: 'planted non-absences' }),
     ).toEqual([]);
   });
 
-  it('reads an absence in every file whose text plainly writes one', () => {
-    // Independent of the AST walk (#446, control c). The floor above catches
-    // a reader that goes blind everywhere; this catches one blind to a single
-    // file, or to the one spelling that file uses. Matched on the stripped
-    // text, so a comment naming the matcher cannot satisfy it.
-    const plain = tsFiles.filter((file) =>
-      PLAIN_ABSENCE.test(withoutTsComments(readFileSync(file, 'utf8'))),
+  it('reads as many absences in each file as its text writes', () => {
+    // Independent of the AST walk (#446, control c), and per unit (#477): a
+    // reader blind to one spelling in a file that writes two others was
+    // invisible to a file-level check. Counted in code with every literal
+    // and comment removed, so neither a fixture string nor a comment naming
+    // the matcher can satisfy it.
+    const written = new Map(
+      tsFiles.map((file) => [file, absencesWritten(parseFile(file))]),
     );
-    const unread = plain.filter((file) => !result.perFile.has(file));
-    expect(searched(unread, { of: plain, what: 'files' })).toEqual([]);
+    const disagree = tsFiles
+      .filter((file) => (result.perFile.get(file) ?? 0) !== written.get(file))
+      .map(
+        (file) =>
+          `${file}: the reader found ${result.perFile.get(file) ?? 0}, ` +
+          `its text writes ${written.get(file)}`,
+      );
+    expect(searched(disagree, { of: tsFiles, what: 'files' })).toEqual([]);
     // Ratcheted after the verdict (#468), so growth never hides a finding.
     expect(
-      floorBreach('absence-liveness/plain-files', plain.length),
+      floorBreach(
+        'absence-liveness/plain-files',
+        tsFiles.filter((file) => (written.get(file) ?? 0) > 0).length,
+      ),
     ).toBeUndefined();
   });
 

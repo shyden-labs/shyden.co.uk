@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { bind, callGraph, derivationOf, type Bound } from './ast';
+import {
+  bind,
+  callGraph,
+  codeWithoutLiterals,
+  derivationOf,
+  parseSource,
+  type Bound,
+} from './ast';
 import { scratchDir } from '../scratch-dir';
 
 /**
@@ -454,5 +461,58 @@ describe('a parameter binds its name, like any other local (#277)', () => {
     // at all would satisfy the `false` for a reason of its own.
     expect(reached.reaches(reader, 'lines')).toBe(true);
     expect(reached.reaches(user, 'lines')).toBe(false);
+  });
+});
+
+describe('code without its literals is what a text cross-check reads (#477)', () => {
+  // A cross-check counting a construct in raw text is satisfied by a string,
+  // a template or a regex that spells it: the guards' own fixtures do. The
+  // parse tree, not a quote-tracking scanner, decides what a literal is.
+  const blanked = (source: string): string =>
+    codeWithoutLiterals(parseSource(source));
+
+  it('keeps code that is not a literal as it is written', () => {
+    expect(blanked('expect(a).toEqual([]);')).toBe('expect(a).toEqual([]);');
+  });
+
+  it('blanks a string literal that spells a matcher', () => {
+    expect(blanked("const s = 'expect(a).toEqual([])';")).toBe('const s = "";');
+  });
+
+  it('blanks a template with no substitution', () => {
+    expect(blanked('const s = `expect(a).toHaveLength(0)`;')).toBe(
+      'const s = "";',
+    );
+  });
+
+  it('blanks a template whole, its substitutions with it', () => {
+    expect(blanked('const s = `a ${"b"} ${c.toHaveLength(0)} d`; go();')).toBe(
+      'const s = ""; go();',
+    );
+  });
+
+  it('blanks a regular expression literal', () => {
+    expect(blanked(String.raw`const r = /\.toEqual\(\[\]\)/g;`)).toBe(
+      'const r = "";',
+    );
+  });
+
+  it('removes a comment that spells a matcher', () => {
+    const out = blanked('// expect(a).toEqual([])\nconst b = 1;');
+    expect(out).toContain('const b = 1;');
+    expect(out).not.toContain('toEqual');
+  });
+
+  it('keeps code after a string a scanner would read as a comment', () => {
+    expect(blanked("const s = '// x'; expect(b).toHaveLength(0);")).toBe(
+      'const s = ""; expect(b).toHaveLength(0);',
+    );
+  });
+
+  it('keeps code after a regex holding a quote', () => {
+    const out = blanked(`const r = /['"]/g; // gone\nexpect(c).toEqual([]);`);
+    expect(out).toContain('const r = "";');
+    expect(out).toContain('expect(c).toEqual([]);');
+    expect(out).not.toContain('gone');
   });
 });
