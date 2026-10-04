@@ -68,9 +68,6 @@ permissions:
   contents: read
 
 jobs:
-  # Everything the merge gate ran before the e2e suite, in the same order, as a
-  # job of its own so it runs BESIDE the shards rather than ahead of them. It
-  # gates because build-and-test stands for it (#163).
   # Which Playwright image this run's browser jobs use (#454): the digest
   # docker/playwright/Dockerfile pins when it names the installed
   # @playwright/test, otherwise that version's, resolved now with a warning.
@@ -91,6 +88,10 @@ jobs:
       - id: pick
         run: node scripts/playwright-image.mjs
 
+  # Everything the merge gate ran before the e2e suite, in the same order, as a
+  # job of its own so it runs BESIDE the shards rather than ahead of them. It
+  # gates because build-and-test stands for it (#163). (This sat above `image`
+  # from #454 until #390 F164.)
   checks:
     runs-on: ubuntu-26.04
     # Bounded, as every job is (#157); not the e2e policy, because this job
