@@ -464,6 +464,84 @@ describe('a parameter binds its name, like any other local (#277)', () => {
   });
 });
 
+describe('a name resolves through the import that binds it, or the binding that makes it (#477)', () => {
+  /**
+   * `anchored-presence` counted two assertions over raw file text that read
+   * none, found by #477's text reading of the same population: a `config`
+   * imported from `playwright.config.ts`, outside the graph, and a `source`
+   * destructured in a `for...of` over string literals. Neither is declared
+   * locally, so each fell through to the union of every same-named function
+   * in the suite, and some `config` and some `source` there read a file.
+   */
+  const corpus = () => {
+    const dir = scratchDir('ast-import-');
+    const file = (name: string, text: string) => {
+      const path = join(dir, name);
+      writeFileSync(path, text);
+      return path;
+    };
+    return {
+      reader: file(
+        'reader.ts',
+        "export const load = (f: string) => readFileSync(f, 'utf8');\n" +
+          "export function config() { return readFileSync('c', 'utf8'); }\n" +
+          "export function source() { return readFileSync('s', 'utf8'); }\n",
+      ),
+      pure: file('pure.ts', 'export const load = (s: string) => s.trim();\n'),
+      fromReader: file(
+        'from-reader.ts',
+        "import { load } from './reader';\nexport const a = load('x');\n",
+      ),
+      fromPure: file(
+        'from-pure.ts',
+        "import { load } from './pure';\nexport const b = load('x');\n",
+      ),
+      aliased: file(
+        'aliased.ts',
+        "import { load as fetchText } from './reader';\nexport const c = fetchText('x');\n",
+      ),
+      outside: file(
+        'outside.ts',
+        "import config from '../not-in-the-graph';\nexport const d = config.x;\n",
+      ),
+      destructured: file(
+        'destructured.ts',
+        "for (const [source] of [['a']]) use(source);\n",
+      ),
+    };
+  };
+  const reached = (files: Record<string, string>) =>
+    callGraph(Object.values(files)).close(new Set(['readFileSync']));
+
+  it('follows an import to the module it names', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.fromReader, 'load')).toBe(true);
+  });
+
+  it('does not follow an import to a same-named function elsewhere', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.fromPure, 'load')).toBe(false);
+  });
+
+  it('follows an aliased import under its local name', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.aliased, 'fetchText')).toBe(true);
+  });
+
+  it('gives an import from outside the graph nothing inside it', () => {
+    const files = corpus();
+    // The positive control: the same name, declared in the graph, reads.
+    expect(reached(files).reaches(files.reader, 'config')).toBe(true);
+    expect(reached(files).reaches(files.outside, 'config')).toBe(false);
+  });
+
+  it('binds a destructured name locally', () => {
+    const files = corpus();
+    expect(reached(files).reaches(files.reader, 'source')).toBe(true);
+    expect(reached(files).reaches(files.destructured, 'source')).toBe(false);
+  });
+});
+
 describe('code without its literals is what a text cross-check reads (#477)', () => {
   // A cross-check counting a construct in raw text is satisfied by a string,
   // a template or a regex that spells it: the guards' own fixtures do. The

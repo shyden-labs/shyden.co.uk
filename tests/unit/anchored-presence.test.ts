@@ -324,36 +324,29 @@ describe('presence assertions over source text are stripped or anchored', () => 
     ).toEqual([]);
   });
 
-  it('scans every presence its text plainly writes over raw file text', () => {
+  it('scans, in each file, the presence its text writes over raw file text', () => {
     // Independent of the dataflow reader (#477): per file, the reader judged
-    // at least what plain text shows, so one blind to a form judges fewer
-    // there than the text counts. A lower bound only: the text follows no
-    // import, so the two read through helpers source-text.ts exports
-    // (browser-matrix.test.ts, source-text.test.ts) are the reader's alone.
+    // exactly what a text reading counts. Fewer is a reader blind to a form;
+    // more is a reader counting a read that is not one, which is how two
+    // names resolved across modules by bare name were found (a `config` from
+    // playwright.config.ts, a destructured `source`). The text follows no
+    // import, so a subject read through an imported helper would disagree
+    // here by name: then the text reading learns to follow imports.
     const testFiles = tsFiles.filter((file) => /\.(test|spec)\.ts$/.test(file));
-    const written = new Map(
-      testFiles.map((file) => [file, presenceOverRawText(parseFile(file))]),
-    );
-    const underRead = testFiles
-      .filter(
-        (file) => (written.get(file) ?? 0) > (result.perFile.get(file) ?? 0),
-      )
+    const disagree = testFiles
+      .map((file) => ({
+        file,
+        judged: result.perFile.get(file) ?? 0,
+        written: presenceOverRawText(parseFile(file)),
+      }))
+      .filter(({ judged, written }) => judged !== written)
       .map(
-        (file) =>
-          `${file}: the reader judged ${result.perFile.get(file) ?? 0}, ` +
-          `its text plainly writes ${written.get(file)}`,
+        ({ file, judged, written }) =>
+          `${file}: the reader judged ${judged}, its text writes ${written}`,
       );
-    expect(searched(underRead, { of: testFiles, what: 'test files' })).toEqual(
+    expect(searched(disagree, { of: testFiles, what: 'test files' })).toEqual(
       [],
     );
-    // Ratcheted after the verdict (#468): without it, "at least" holds
-    // trivially once the text reading goes blind.
-    expect(
-      floorBreach(
-        'anchored-presence/text-sites',
-        [...written.values()].reduce((sum, n) => sum + n, 0),
-      ),
-    ).toBeUndefined();
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {

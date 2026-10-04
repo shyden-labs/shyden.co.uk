@@ -8,14 +8,15 @@ import { codeWithoutLiterals } from './ast';
  * subject derives, through the program's bindings and its call graph, from a
  * `readFileSync` no `JSON.parse` stands on. This reads the same thing with
  * none of that machinery, so anchored-presence can check, per file, that its
- * reader judged at least what plain text shows: a reader blind to one form
- * judges fewer in that file than this counts.
+ * reader judged exactly what plain text shows: a reader blind to one form
+ * judges fewer in that file, and one counting a read that is not one judges
+ * more.
  *
- * It is a lower bound, never the population. It follows bindings only inside
- * one file, and only `const`/`let`/`var` and `function` declarations, each
- * visible in the innermost `describe`/`it`/`test` callback that makes it, or
- * the module. A subject read through a helper another file exports is the
- * reader's alone to see (anchored-presence says which, by name).
+ * It follows bindings only inside one file, and only `const`/`let`/`var` and
+ * `function` declarations, each visible in the innermost `describe`/`it`/
+ * `test` callback that makes it, or the module. A subject read through a
+ * helper another file exports is beyond it: none does today, and
+ * anchored-presence names the file if one appears.
  *
  * Read in code with every literal and comment removed (`codeWithoutLiterals`),
  * so a bracket inside a string never unbalances the walk below, and a fixture
