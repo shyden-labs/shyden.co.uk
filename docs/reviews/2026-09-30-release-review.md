@@ -304,37 +304,37 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 289 | test | A | `tests/unit/palette.test.ts` | +235/-0 | read in full at 33e84cd (tranche 21) | none new; the field loop inside one test checks refusals only, #462 scope | n/a |
 | 290 | test | A | `tests/unit/parked-tests.test.ts` | +261/-0 | read in full at 33e84cd (tranche 21) | F183 P3 latent, fixed forward: `#\d+` takes a hex colour (`#0a7d66`) in a parked test's title or the comment above as an issue reference; #508 | filed: #508; 2/2 as predicted (plant GREEN, control RED) |
 | 291 | test | M | `tests/unit/pipeline-wiring.test.ts` | +2925/-46 | read in full at 33e84cd (tranche 21; +2925/-46 is nearly the whole file, so the file covers the diff) | F188 P2 fixed forward: the PR-startable-workflow write guard knows `pull_request` only, and probe-459.yml (pull_request_target, statuses: write) passes it today; F185 P3: the dev-verified guard reads a 900-char window with `if:.*`, so a widened condition passes; F186 P3: prod-verified ordering read by text position, not job dependency; F187 P4: upload-artifact reader misses `- uses:` and quoted forms; F184 P3: push-branch checks are whole-file lazy regexes, and prod pushing on develop passes all 143 tests; F189 P4: importClosure skips `export … from`; #508 | filed: #508; 8/8 as predicted (F184, F185, F187 plants GREEN with same-spot controls RED; the F188 GREEN is the live tree, its control RED); F186 and F189 predicted, not run |
-| 292 | test | A | `tests/unit/playwright-declarations.test.ts` | +401/-0 | — |  |  |
-| 293 | test | A | `tests/unit/presence-detector.ts` | +164/-0 | — |  |  |
-| 294 | test | A | `tests/unit/release-inventory.test.ts` | +456/-0 | — |  |  |
-| 295 | test | A | `tests/unit/release-map.test.ts` | +335/-0 | — |  |  |
-| 296 | test | A | `tests/unit/release-prose.test.ts` | +32/-0 | — |  |  |
-| 297 | test | A | `tests/unit/report-copy.test.ts` | +33/-0 | — |  |  |
-| 298 | test | A | `tests/unit/report-endpoint.test.ts` | +621/-0 | — |  |  |
-| 299 | test | A | `tests/unit/report-form.test.ts` | +42/-0 | — |  |  |
-| 300 | test | A | `tests/unit/report-review.test.ts` | +624/-0 | — |  |  |
-| 301 | test | A | `tests/unit/report.test.ts` | +488/-0 | — |  |  |
-| 302 | test | M | `tests/unit/roster.test.ts` | +8/-3 | — |  |  |
-| 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | — |  |  |
-| 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | — |  |  |
-| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | — |  |  |
-| 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | — |  |  |
-| 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | — |  |  |
-| 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | — |  |  |
-| 309 | test | A | `tests/unit/script-entry.test.ts` | +944/-0 | — |  |  |
-| 310 | test | M | `tests/unit/sections.test.ts` | +6/-2 | — |  |  |
-| 311 | test | A | `tests/unit/server-process.test.ts` | +284/-0 | — |  |  |
-| 312 | test | M | `tests/unit/sexOptions.test.ts` | +10/-6 | — |  |  |
-| 313 | test | M | `tests/unit/sfx.test.ts` | +74/-0 | — |  |  |
-| 314 | test | M | `tests/unit/sfxAssets.test.ts` | +40/-4 | — |  |  |
-| 315 | test | A | `tests/unit/shipped-defaults.test.ts` | +516/-0 | — |  |  |
-| 316 | test | A | `tests/unit/shytalk-brand.test.ts` | +234/-0 | — |  |  |
-| 317 | test | A | `tests/unit/shytalk-showcase.test.ts` | +149/-0 | — |  |  |
-| 318 | test | A | `tests/unit/signoff-status.test.ts` | +234/-0 | — |  |  |
+| 292 | test | A | `tests/unit/playwright-declarations.test.ts` | +401/-0 | read in full at 33e84cd (tranche 22) | F190 P3 latent, fixed forward: the `recorded` home check is a regex over the raw spec, so a commented-out `import { recorded } from './evidence'` satisfies it while the binding comes from elsewhere; #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 293 | test | A | `tests/unit/presence-detector.ts` | +164/-0 | read in full at 33e84cd (tranche 22) | F191 P3 latent, fixed forward: `isAnchored` accepts `^.*`, which a comment line satisfies as easily as code; live case row 298 (AC5's runbook regex); #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 294 | test | A | `tests/unit/release-inventory.test.ts` | +456/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 295 | test | A | `tests/unit/release-map.test.ts` | +335/-0 | read in full at 33e84cd (tranche 22) | none; the docs/releases loop reads one file today | n/a |
+| 296 | test | A | `tests/unit/release-prose.test.ts` | +32/-0 | read in full at 33e84cd (tranche 22) | F192 P4 latent, fixed forward: `SCRIPTS` is hand-written (complete today: both readers of a release file are listed), so a later renderer is never scanned; #511 | filed: #511; 2/2 as predicted (plant GREEN, control RED) |
+| 297 | test | A | `tests/unit/report-copy.test.ts` | +33/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 298 | test | A | `tests/unit/report-endpoint.test.ts` | +621/-0 | read in full at 33e84cd (tranche 22) | F191's live case at :618 (`^.*` over the raw runbook: the line inside `<!-- -->` passes); F193 P3 latent, fixed forward: `MAX_BODY_BYTES` has no literal pin, so `131072` passes all 45 (the chunked read's `pulled < 10` stops a cap near 144 KiB); the origin and control-character loops are compute-only, #462 scope; #511 | filed: #511; F191 2/2, F193 2/2 as predicted (plant GREEN, control RED) |
+| 299 | test | A | `tests/unit/report-form.test.ts` | +42/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 300 | test | A | `tests/unit/report-review.test.ts` | +624/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 301 | test | A | `tests/unit/report.test.ts` | +488/-0 | read in full at 33e84cd (tranche 22) | none new; the locale-by-page nonsense loop is compute-only, #462 scope | n/a |
+| 302 | test | M | `tests/unit/roster.test.ts` | +8/-3 | diff read whole at 33e84cd (tranche 22) | none (`LETTERS` is used outside its module, by numberSets.ts) | n/a |
+| 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
+| 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | read in full at 33e84cd (tranche 22) | none (`CONFIGS` is hand-written but complete: only the dev and prod configs read SANITY_ON_BUILD) | n/a |
+| 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | read in full at 33e84cd (tranche 22) | none; F194 withdrawn: its mutation (`astroTemplate` losing its `<!-- -->` removal) was equivalent, because `astroParts` (`source-text.ts:489`) blanks every markup comment first, and `source-text.test.ts:456` plants one; recorded on #511 | n/a (F194t GREEN explained as equivalent) |
+| 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | read in full at 33e84cd (tranche 23) | none; its residuals are named in its own docblock, and markup comments are blanked upstream by `astroParts` | n/a |
+| 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | read in full at 33e84cd (tranche 23) | F195 P4 latent, fixed forward: `startsGit` knows git only as a literal first argument and has no fixture of its own, so `spawnSync(GIT, …, { cwd })` with `const GIT = 'git'` passes; mitigated by git-env-setup.ts, and no such call exists (swept); #512 | filed: #512; 2/2 as predicted (plant GREEN, control RED) |
+| 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 309 | test | A | `tests/unit/script-entry.test.ts` | +944/-0 | read in full at 33e84cd (tranche 23) | F196 P4 comment, fixed forward: the `BACK_TRANSLATE_URL` comment at :655 belongs to the i18n-back-translate.mjs probe and sits above reports-review.mjs's; #512 | filed: #512; a comment, no mutation pair |
+| 310 | test | M | `tests/unit/sections.test.ts` | +6/-2 | diff read whole at 33e84cd (tranche 23) | none | n/a |
+| 311 | test | A | `tests/unit/server-process.test.ts` | +284/-0 | read in full at 33e84cd (tranche 23) | none; its timing bounds measured against Node's start-up: 20-30 ms at load 10, against 500 ms and 2 s | n/a |
+| 312 | test | M | `tests/unit/sexOptions.test.ts` | +10/-6 | diff read whole at 33e84cd (tranche 23) | none (a prettier reflow left one short comment line) | n/a |
+| 313 | test | M | `tests/unit/sfx.test.ts` | +74/-0 | diff read whole at 33e84cd (tranche 23) | none; adds the literal pins on the three peak gains | n/a |
+| 314 | test | M | `tests/unit/sfxAssets.test.ts` | +40/-4 | diff read whole at 33e84cd (tranche 23) | none | n/a |
+| 315 | test | A | `tests/unit/shipped-defaults.test.ts` | +516/-0 | read in full at 33e84cd (tranche 23) | F197 P3, fixed forward: the box is known only by `#cg-count` or its English label and a roster only by the English seed, while the roster spec drives the Indonesian page by `Jumlah siswa` and `Tambah siswa`; #512 | filed: #512; 3/3 as predicted (two plants GREEN, control RED) |
+| 316 | test | A | `tests/unit/shytalk-brand.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none; outside src/ and tests/ the mark's colours appear only in docs/ | n/a |
+| 317 | test | A | `tests/unit/shytalk-showcase.test.ts` | +149/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 318 | test | A | `tests/unit/signoff-status.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none new; the eight spawned refusals in one test are #462 scope | n/a |
 | 319 | test | A | `tests/unit/site-pages.test.ts` | +74/-0 | CHANGED since read (+10/-5 after c48ed44); before: read whole (tranche 12) | F130 asserts TITLE_FOR covers sitePaths(); red before the export existed | red-first |
-| 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | — |  |  |
-| 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | — |  |  |
-| 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | — |  |  |
+| 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | read in full at 33e84cd (tranche 23) | F198 P4 latent, fixed forward: 'skips dotfiles and node_modules' walks tests/, which holds neither, so a walk that never skips passes all 23; the skip is held only by supply-chain's walk from `.`; #512 | filed: #512; 2/2 as predicted (source-files GREEN, supply-chain RED) |
+| 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | read in full at 33e84cd (tranche 23) | none new; its few compute-only loops are #462 scope | n/a |
 | 323 | test | A | `tests/unit/source-text.ts` | +689/-0 | — |  |  |
 | 324 | test | A | `tests/unit/spec-dirs.test.ts` | +37/-0 | CHANGED since read (+15/-2 after c48ed44); before: read whole (tranche 9) | none: anti-vacuity length, the two deploy-gate directories by name, tests/unit excluded. | see SD1 |
 | 325 | test | A | `tests/unit/spec-scan.ts` | +163/-0 | — |  |  |
