@@ -2570,3 +2570,21 @@ Reading: every task heading and note against its commit, the head, the
 matrix and review sections as rendered. Nothing found. **The loop ends
 here; the plan is approved** (operator rule 2026-09-24: reviewed to zero,
 then self-approved).
+
+### Pass 6 (2026-10-04, 09:02Z, tree `9be98bb`), after a side finding
+
+A side review asked whether `duplication`'s verdict for the two walk checks
+was keyed so broadly that it would excuse any later copy between those
+files. It was: every test callback was named `anonymous`, so the key was
+the file pair alone (H1/H2 GREEN on `806303a`, floors off). Fixed as Task
+12, with six K rows in the matrix; two first plants went RED for their own
+scaffolding (a `describe` wrapper, `false && a || b`) and were rewritten
+before the recorded runs.
+
+Mechanical, by `p477-pass.sh 6`: applied plan (12 tasks) equals the branch;
+the ledger's 14 citations each land on a check; `astro check` 0/0/0;
+prettier clean; unit 3648/3648; the recorder matches every floor and leaves
+the tree clean; matrix 11 + 33 as predicted. CLEAN.
+
+Reading: Task 12's diff in full, its note, the ledger paragraph and the K
+rows. Nothing found. **Approved again.**
