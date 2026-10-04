@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { codeWithoutLiterals } from './unit/ast';
 import { withoutTsComments } from './unit/source-text';
 
 /**
@@ -239,6 +240,22 @@ const DECLARES_TESTS = /(?<![\w.])test(?:\.(?:only|skip|fixme|fail))*\s*\(/;
  */
 export const declaresTests = (text: string): boolean =>
   DECLARES_TESTS.test(withoutTsComments(text));
+
+/**
+ * A test as text: `test(` or a `test.<modifier>(` form, then a title (blanked
+ * to `""`, or a name) and a body or details. A runtime `test.skip(cond, why)`
+ * passes no body, so it is not one.
+ */
+const WRITES_A_TEST =
+  /(?<![\w.$])test(?:\.(?:only|skip|fixme|fail))*\s*\(\s*(?:""|[A-Za-z_$][\w$.]*)\s*,\s*(?:async\b|function\b|\(|\{|[A-Za-z_$][\w$]*\s*=>)/g;
+
+/**
+ * How many tests `sf` writes, counted as text in its code with every literal
+ * and comment removed: the per-file cross-check on `declarationsIn`'s tests
+ * (#477), independent of the parse tree's reading of calls.
+ */
+export const testsWritten = (sf: ts.SourceFile): number =>
+  codeWithoutLiterals(sf).match(WRITES_A_TEST)?.length ?? 0;
 
 /** Every test and group `sf` declares, in source order. */
 export function declarationsIn(sf: ts.SourceFile): Declaration[] {
