@@ -318,23 +318,23 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 303 | test | A | `tests/unit/route-coverage.test.ts` | +224/-0 | read in full at 33e84cd (tranche 22) | none | n/a |
 | 304 | test | A | `tests/unit/sanity-on-build.test.ts` | +217/-0 | read in full at 33e84cd (tranche 22) | none (`CONFIGS` is hand-written but complete: only the dev and prod configs read SANITY_ON_BUILD) | n/a |
 | 305 | test | A | `tests/unit/scoped-classes.test.ts` | +272/-0 | read in full at 33e84cd (tranche 22) | none; F194 withdrawn: its mutation (`astroTemplate` losing its `<!-- -->` removal) was equivalent, because `astroParts` (`source-text.ts:489`) blanks every markup comment first, and `source-text.test.ts:456` plants one; recorded on #511 | n/a (F194t GREEN explained as equivalent) |
-| 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | — |  |  |
-| 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | — |  |  |
-| 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | — |  |  |
-| 309 | test | A | `tests/unit/script-entry.test.ts` | +944/-0 | — |  |  |
-| 310 | test | M | `tests/unit/sections.test.ts` | +6/-2 | — |  |  |
-| 311 | test | A | `tests/unit/server-process.test.ts` | +284/-0 | — |  |  |
-| 312 | test | M | `tests/unit/sexOptions.test.ts` | +10/-6 | — |  |  |
-| 313 | test | M | `tests/unit/sfx.test.ts` | +74/-0 | — |  |  |
-| 314 | test | M | `tests/unit/sfxAssets.test.ts` | +40/-4 | — |  |  |
-| 315 | test | A | `tests/unit/shipped-defaults.test.ts` | +516/-0 | — |  |  |
-| 316 | test | A | `tests/unit/shytalk-brand.test.ts` | +234/-0 | — |  |  |
-| 317 | test | A | `tests/unit/shytalk-showcase.test.ts` | +149/-0 | — |  |  |
-| 318 | test | A | `tests/unit/signoff-status.test.ts` | +234/-0 | — |  |  |
+| 306 | test | A | `tests/unit/scoped-classes.ts` | +515/-0 | read in full at 33e84cd (tranche 23) | none; its residuals are named in its own docblock, and markup comments are blanked upstream by `astroParts` | n/a |
+| 307 | test | A | `tests/unit/scratch-git-home.test.ts` | +87/-0 | read in full at 33e84cd (tranche 23) | F195 P4 latent, fixed forward: `startsGit` knows git only as a literal first argument and has no fixture of its own, so `spawnSync(GIT, …, { cwd })` with `const GIT = 'git'` passes; mitigated by git-env-setup.ts, and no such call exists (swept); #512 | filed: #512; 2/2 as predicted (plant GREEN, control RED) |
+| 308 | test | A | `tests/unit/script-checkout.ts` | +62/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 309 | test | A | `tests/unit/script-entry.test.ts` | +944/-0 | read in full at 33e84cd (tranche 23) | F196 P4 comment, fixed forward: the `BACK_TRANSLATE_URL` comment at :655 belongs to the i18n-back-translate.mjs probe and sits above reports-review.mjs's; #512 | filed: #512; a comment, no mutation pair |
+| 310 | test | M | `tests/unit/sections.test.ts` | +6/-2 | diff read whole at 33e84cd (tranche 23) | none | n/a |
+| 311 | test | A | `tests/unit/server-process.test.ts` | +284/-0 | read in full at 33e84cd (tranche 23) | none; its timing bounds measured against Node's start-up: 20-30 ms at load 10, against 500 ms and 2 s | n/a |
+| 312 | test | M | `tests/unit/sexOptions.test.ts` | +10/-6 | diff read whole at 33e84cd (tranche 23) | none (a prettier reflow left one short comment line) | n/a |
+| 313 | test | M | `tests/unit/sfx.test.ts` | +74/-0 | diff read whole at 33e84cd (tranche 23) | none; adds the literal pins on the three peak gains | n/a |
+| 314 | test | M | `tests/unit/sfxAssets.test.ts` | +40/-4 | diff read whole at 33e84cd (tranche 23) | none | n/a |
+| 315 | test | A | `tests/unit/shipped-defaults.test.ts` | +516/-0 | read in full at 33e84cd (tranche 23) | F197 P3, fixed forward: the box is known only by `#cg-count` or its English label and a roster only by the English seed, while the roster spec drives the Indonesian page by `Jumlah siswa` and `Tambah siswa`; #512 | filed: #512; 3/3 as predicted (two plants GREEN, control RED) |
+| 316 | test | A | `tests/unit/shytalk-brand.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none; outside src/ and tests/ the mark's colours appear only in docs/ | n/a |
+| 317 | test | A | `tests/unit/shytalk-showcase.test.ts` | +149/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 318 | test | A | `tests/unit/signoff-status.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none new; the eight spawned refusals in one test are #462 scope | n/a |
 | 319 | test | A | `tests/unit/site-pages.test.ts` | +74/-0 | CHANGED since read (+10/-5 after c48ed44); before: read whole (tranche 12) | F130 asserts TITLE_FOR covers sitePaths(); red before the export existed | red-first |
-| 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | — |  |  |
-| 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | — |  |  |
-| 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | — |  |  |
+| 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
+| 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | read in full at 33e84cd (tranche 23) | F198 P4 latent, fixed forward: 'skips dotfiles and node_modules' walks tests/, which holds neither, so a walk that never skips passes all 23; the skip is held only by supply-chain's walk from `.`; #512 | filed: #512; 2/2 as predicted (source-files GREEN, supply-chain RED) |
+| 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | read in full at 33e84cd (tranche 23) | none new; its few compute-only loops are #462 scope | n/a |
 | 323 | test | A | `tests/unit/source-text.ts` | +689/-0 | — |  |  |
 | 324 | test | A | `tests/unit/spec-dirs.test.ts` | +37/-0 | CHANGED since read (+15/-2 after c48ed44); before: read whole (tranche 9) | none: anti-vacuity length, the two deploy-gate directories by name, tests/unit excluded. | see SD1 |
 | 325 | test | A | `tests/unit/spec-scan.ts` | +163/-0 | — |  |  |
