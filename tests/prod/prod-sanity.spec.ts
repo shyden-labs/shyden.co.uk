@@ -144,14 +144,14 @@ for (const { locale, path, heading, englishHeading } of ROUTES)
   });
 
 // The mirror of dev-sanity's cross-env check. Each URL is env-derived
-// (PUBLIC_SHYTALK_URL, PUBLIC_WORDFARER_URL) precisely so the two environments
+// (PUBLIC_SHYTALK_URL, PUBLIC_YAWELO_IDLE_URL) precisely so the two environments
 // never cross, and a production page sending visitors to a dev host is a leak,
 // not a typo.
 //
 // Every outbound link is checked, by the host it resolves to. This took the
 // first `a[href*="shytalk"]`, which became the header's in-page `/#shytalk`
 // anchor and failed before any outbound link was read (#338). The production
-// Wordfarer host has no DNS record yet, by the operator's choice (#403); its
+// Yawelo Idle host has no DNS record yet, by the operator's choice (#403); its
 // links are read here, never followed. One test per product.
 for (const product of PRODUCTS)
   test(`the outbound ${product.name} link points at PROD ${product.name}, never dev`, async ({

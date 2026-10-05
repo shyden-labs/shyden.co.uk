@@ -20,12 +20,12 @@ test.use(recorded);
 // dev deploy sets PUBLIC_SHYTALK_URL and is covered by the deploy-gate specs.
 const SHYTALK_URL = 'https://shytalk.shyden.co.uk';
 const SHYTALK_HOST = 'shytalk.shyden.co.uk';
-// The same rule for Wordfarer (#403): PUBLIC_WORDFARER_URL is unset here, so
+// The same rule for Yawelo Idle (#403): PUBLIC_YAWELO_IDLE_URL is unset here, so
 // the page links the production host. That host has no DNS record yet, by the
 // operator's choice (2026-10-04), which no assertion here depends on: these
 // read the href, they never follow it.
-const WORDFARER_URL = 'https://wordfarer.shyden.co.uk';
-const WORDFARER_HOST = 'wordfarer.shyden.co.uk';
+const YAWELO_IDLE_URL = 'https://yawelo-idle.shyden.co.uk';
+const YAWELO_IDLE_HOST = 'yawelo-idle.shyden.co.uk';
 
 test.describe('homepage content', () => {
   // #370: the hero names no company. The label above the heading is gone in
@@ -62,7 +62,7 @@ test.describe('homepage content', () => {
     // to ours, noreferrer withholds the referrer.
     await expect(cta).toHaveAttribute('rel', 'noopener noreferrer');
     await expect(cta).toHaveAttribute('target', '_blank');
-    for (const id of ['shytalk', 'wordfarer', 'tools', 'contact']) {
+    for (const id of ['shytalk', 'yawelo-idle', 'tools', 'contact']) {
       await expect(page.locator(`#${id}`)).toBeVisible();
     }
     await shoot(
@@ -369,7 +369,7 @@ test.describe('homepage content', () => {
       await page.goto(localisePath('/', locale));
       await expect(page.locator('.hero .opens')).toHaveText([
         `${OPENS[locale]} ${SHYTALK_HOST}`,
-        `${OPENS[locale]} ${WORDFARER_HOST}`,
+        `${OPENS[locale]} ${YAWELO_IDLE_HOST}`,
       ]);
     });
   }
@@ -401,18 +401,18 @@ test.describe('homepage content', () => {
   );
 });
 
-// #403: ShyTalk and Wordfarer, both coming soon, with equal weight. Every
+// #403: ShyTalk and Yawelo Idle, both coming soon, with equal weight. Every
 // expected string is read from the locale's own catalogue, whose English
 // tests/unit/home-copy.test.ts pins to the operator's approved copy; one test
 // per locale, so a language that drops a part names itself.
 test.describe('two products, both coming soon (#403)', () => {
   for (const locale of LOCALES)
-    test(`${locale}: the Wordfarer showcase follows ShyTalk's, with its badge, four features and link`, async ({
+    test(`${locale}: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link`, async ({
       page,
     }) => {
       const t = getSiteStrings(locale).home;
       await page.goto(localisePath('/', locale));
-      const section = page.locator('#wordfarer');
+      const section = page.locator('#yawelo-idle');
       await expect(section).toBeVisible();
       // Straight after ShyTalk's showcase. ShyTalk's position is asserted
       // first, so a page missing it cannot pass on -1 + 1 = 0.
@@ -420,31 +420,31 @@ test.describe('two products, both coming soon (#403)', () => {
         .locator('section[id]')
         .evaluateAll((sections) => sections.map((s) => s.id));
       expect(ids, 'the sections, in page order').toContain('shytalk');
-      expect(ids.indexOf('wordfarer'), 'Wordfarer follows ShyTalk').toBe(
+      expect(ids.indexOf('yawelo-idle'), 'Yawelo Idle follows ShyTalk').toBe(
         ids.indexOf('shytalk') + 1,
       );
       await expect(section.locator('.kicker')).toBeVisible();
-      await expect(section.locator('.kicker')).toHaveText(t.wordfarerKicker);
+      await expect(section.locator('.kicker')).toHaveText(t.yaweloIdleKicker);
       await expect(section.locator('h2')).toBeVisible();
-      await expect(section.locator('h2')).toHaveText('Wordfarer');
+      await expect(section.locator('h2')).toHaveText('Yawelo Idle');
       const badge = section.locator('.showcase-head .status-badge');
       await expect(badge).toBeVisible();
       await expect(badge).toHaveText(t.comingSoon);
       await expect(section.locator('.features li')).toHaveText([
-        t.wordfarerFeature1,
-        t.wordfarerFeature2,
-        t.wordfarerFeature3,
-        t.wordfarerFeature4,
+        t.yaweloIdleFeature1,
+        t.yaweloIdleFeature2,
+        t.yaweloIdleFeature3,
+        t.yaweloIdleFeature4,
       ]);
-      const link = section.getByRole('link', { name: t.visitWordfarer });
-      await expect(link).toHaveAttribute('href', WORDFARER_URL);
+      const link = section.getByRole('link', { name: t.visitYaweloIdle });
+      await expect(link).toHaveAttribute('href', YAWELO_IDLE_URL);
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       await expect(link).toHaveAttribute('target', '_blank');
-      // Text-only: Wordfarer has no art yet, and none is invented here.
+      // Text-only: Yawelo Idle has no art yet, and none is invented here.
       await expect(section.locator('img, svg, picture')).toHaveCount(0);
       await shoot(
         page,
-        `${locale}: the Wordfarer showcase, coming soon`,
+        `${locale}: the Yawelo Idle showcase, coming soon`,
         section,
       );
     });
@@ -467,15 +467,15 @@ test.describe('two products, both coming soon (#403)', () => {
     });
 
   for (const locale of LOCALES)
-    test(`${locale}: the hero offers both products, ShyTalk then Wordfarer`, async ({
+    test(`${locale}: the hero offers both products, ShyTalk then Yawelo Idle`, async ({
       page,
     }) => {
       const t = getSiteStrings(locale).home;
       await page.goto(localisePath('/', locale));
       const links = page.locator('.hero .cta-item a');
-      await expect(links).toHaveText([t.exploreShytalk, t.exploreWordfarer]);
+      await expect(links).toHaveText([t.exploreShytalk, t.exploreYaweloIdle]);
       await expect(links.nth(0)).toHaveAttribute('href', SHYTALK_URL);
-      await expect(links.nth(1)).toHaveAttribute('href', WORDFARER_URL);
+      await expect(links.nth(1)).toHaveAttribute('href', YAWELO_IDLE_URL);
       for (const n of [0, 1]) {
         await expect(links.nth(n)).toHaveAttribute(
           'rel',
@@ -491,15 +491,15 @@ test.describe('two products, both coming soon (#403)', () => {
     });
 
   for (const locale of LOCALES)
-    test(`${locale}: the header links to Wordfarer, in this locale`, async ({
+    test(`${locale}: the header links to Yawelo Idle, in this locale`, async ({
       page,
     }) => {
       const home = localisePath('/', locale);
       const base = home === '/' ? '' : home.replace(/\/$/, '');
       await page.goto(home);
-      const link = page.locator(`header nav a[href="${base}/#wordfarer"]`);
+      const link = page.locator(`header nav a[href="${base}/#yawelo-idle"]`);
       await expect(link).toHaveCount(1);
-      await expect(link).toHaveText(getSiteStrings(locale).nav.wordfarer);
+      await expect(link).toHaveText(getSiteStrings(locale).nav.yaweloIdle);
     });
 });
 

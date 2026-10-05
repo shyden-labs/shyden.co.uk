@@ -66,7 +66,7 @@ test.describe('the production smoke', () => {
     expect(home.body).not.toMatch(FETCHED_SCRIPT);
   });
 
-  // One test per product (#403). The production Wordfarer host has no DNS
+  // One test per product (#403). The production Yawelo Idle host has no DNS
   // record yet, by the operator's choice: its URL is read in the served HTML,
   // never fetched.
   for (const product of PRODUCTS)

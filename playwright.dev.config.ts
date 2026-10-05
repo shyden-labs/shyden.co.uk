@@ -10,12 +10,12 @@ import { onBuild } from './tests/sanity-on-build';
 //
 // With SANITY_ON_BUILD=1 (`npm run test:sanity`, CI's `sanity-on-build` job) it
 // measures this tree's own build instead, built with the dev ShyTalk and
-// Wordfarer URLs as deploy-dev.yml builds it, and leaves out the
+// Yawelo Idle URLs as deploy-dev.yml builds it, and leaves out the
 // @deployed-only tests (#335).
 const password = process.env.DEV_BASIC_AUTH_PASSWORD;
 const build = onBuild(4398, {
   PUBLIC_SHYTALK_URL: 'https://dev.shytalk.shyden.co.uk',
-  PUBLIC_WORDFARER_URL: 'https://dev.wordfarer.shyden.co.uk',
+  PUBLIC_YAWELO_IDLE_URL: 'https://dev.yawelo-idle.shyden.co.uk',
 });
 
 export default defineConfig({

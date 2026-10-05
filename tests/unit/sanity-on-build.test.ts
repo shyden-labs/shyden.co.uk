@@ -93,7 +93,7 @@ const listings = new Map<string, Listing>();
 
 /**
  * The config's test list, with the switch on or off. `PUBLIC_SHYTALK_URL`
- * and `PUBLIC_WORDFARER_URL` are removed so the answer does not depend on the
+ * and `PUBLIC_YAWELO_IDLE_URL` are removed so the answer does not depend on the
  * shell that runs the unit suite: the prod config refuses either when the
  * switch is on, by design.
  */
@@ -104,7 +104,7 @@ function listing(config: SanityConfig, onBuild: boolean): Listing {
 
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.PUBLIC_SHYTALK_URL;
-  delete env.PUBLIC_WORDFARER_URL;
+  delete env.PUBLIC_YAWELO_IDLE_URL;
   delete env.SANITY_ON_BUILD;
   if (onBuild) env.SANITY_ON_BUILD = '1';
 

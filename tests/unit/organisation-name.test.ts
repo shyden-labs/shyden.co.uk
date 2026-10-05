@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { floorBreach } from '../floors';
 import { searched, trackedFiles } from '../source-files';
 
 /**
@@ -63,5 +64,34 @@ describe("no live file names the org's old GitHub handle (#413)", () => {
         { of: files, what: 'tracked files outside the dated docs' },
       ),
     ).toEqual([]);
+  });
+});
+
+/**
+ * The game is Yawelo Idle (operator, 2026-10-05, #552); its old name is
+ * retired from the copy, the links, the workflows and the tests alike, so no
+ * live file may carry it in any case. Dated plans and specs are history. The
+ * name is assembled, never spelt, so this file cannot find itself.
+ */
+const RETIRED_GAME_NAME = ['word', 'farer'].join('');
+
+describe('no live file names the game by its retired name (#552)', () => {
+  it('no tracked file outside the dated docs carries it, in any case', () => {
+    const files = trackedFiles((path) => !path.startsWith(HISTORY));
+    const hits = files.flatMap((path) =>
+      readFileSync(path, 'latin1')
+        .split('\n')
+        .filter((line) => line.toLowerCase().includes(RETIRED_GAME_NAME))
+        .map((line) => `${path}:${line.trim()}`),
+    );
+    expect(
+      searched(hits, {
+        of: files,
+        what: 'tracked files outside the dated docs',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('organisation-name/retired-game-name-files', files.length),
+    ).toBeUndefined();
   });
 });

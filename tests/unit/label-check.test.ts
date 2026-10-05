@@ -310,7 +310,7 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
     const indonesian = unit('csvLanguageVersion.id', 'Indonesian', '印尼语');
     const calculate = unit('site.glory.calculate', 'Calculate', '计算');
     const journey = unit(
-      'site.home.wordfarerBody',
+      'site.home.yaweloIdleBody',
       'Journey across the Indonesian archipelago, then select Calculate.',
       '穿越印度尼西亚群岛，然后选择“计算”。',
     );

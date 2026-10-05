@@ -20,20 +20,20 @@ const t = getSiteStrings(lang).home;
 const shytalkUrl =
   import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.shyden.co.uk';
 
-// The same rule for Wordfarer (#403): deploy-dev.yml sets
-// PUBLIC_WORDFARER_URL=https://dev.wordfarer.shyden.co.uk before the dev build.
+// The same rule for Yawelo Idle (#403): deploy-dev.yml sets
+// PUBLIC_YAWELO_IDLE_URL=https://dev.yawelo-idle.shyden.co.uk before the dev build.
 // The production host had no DNS record when this shipped; the operator chose
 // to link it from release day anyway (2026-10-04).
-const wordfarerUrl =
-  import.meta.env.PUBLIC_WORDFARER_URL ?? 'https://wordfarer.shyden.co.uk';
+const yaweloIdleUrl =
+  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yawelo-idle.shyden.co.uk';
 
-// The hero offers both products with equal weight, ShyTalk then Wordfarer.
+// The hero offers both products with equal weight, ShyTalk then Yawelo Idle.
 // Each button carries its own "opens <host>" line so the visitor knows the
 // link leaves the site, and WHERE to. The host is derived from the URL, so it
 // cannot name the wrong one.
 const heroLinks = [
   { href: shytalkUrl, label: t.exploreShytalk },
-  { href: wordfarerUrl, label: t.exploreWordfarer },
+  { href: yaweloIdleUrl, label: t.exploreYaweloIdle },
 ].map((link) => ({ ...link, host: new URL(link.href).host }));
 
 // Internal links stay inside the visitor's language.
@@ -46,11 +46,11 @@ const features = [
   t.shytalkFeature3,
   t.shytalkFeature4,
 ];
-const wordfarerFeatures = [
-  t.wordfarerFeature1,
-  t.wordfarerFeature2,
-  t.wordfarerFeature3,
-  t.wordfarerFeature4,
+const yaweloIdleFeatures = [
+  t.yaweloIdleFeature1,
+  t.yaweloIdleFeature2,
+  t.yaweloIdleFeature3,
+  t.yaweloIdleFeature4,
 ];
 ---
 
@@ -100,24 +100,24 @@ const wordfarerFeatures = [
     <PhoneFrame lang={lang} alt={t.shytalkShotAlt} />
   </section>
 
-  {/* Text-only: Wordfarer is pre-alpha and has no art yet, so none is
+  {/* Text-only: Yawelo Idle is pre-alpha and has no art yet, so none is
       invented here, and its name is set as text, never translated. */}
-  <section id="wordfarer" class="wrap showcase">
+  <section id="yawelo-idle" class="wrap showcase">
     <div class="showcase-copy">
-      <p class="kicker">{t.wordfarerKicker}</p>
+      <p class="kicker">{t.yaweloIdleKicker}</p>
       <div class="showcase-head">
-        <h2 class="product-name">Wordfarer</h2>
+        <h2 class="product-name">Yawelo Idle</h2>
         <StatusBadge label={t.comingSoon} />
       </div>
-      <p class="lead">{t.wordfarerBody}</p>
+      <p class="lead">{t.yaweloIdleBody}</p>
       <ul class="features">
-        {wordfarerFeatures.map((feature) => (
+        {yaweloIdleFeatures.map((feature) => (
           <li>{feature}</li>
         ))}
       </ul>
       <p>
-        <Button href={wordfarerUrl} variant="secondary" external>
-          {t.visitWordfarer}
+        <Button href={yaweloIdleUrl} variant="secondary" external>
+          {t.visitYaweloIdle}
         </Button>
       </p>
     </div>
@@ -267,7 +267,7 @@ const wordfarerFeatures = [
   .showcase-head > :global(.status-badge) {
     margin: 0;
   }
-  /* Wordfarer's name, set as text at the wordmark's size and weight so the
+  /* Yawelo Idle's name, set as text at the wordmark's size and weight so the
      two products carry equal weight (#403). */
   .product-name {
     font-size: 2.6rem;

@@ -140,14 +140,17 @@ describe('every MVP language has a DeepL code', () => {
 });
 
 describe('what must never be sent to a translator', () => {
-  it('holds the names', () => {
-    for (const term of ['Shyden', 'ShyTalk', 'Glory Points']) {
+  // Yawelo Idle since #552: "Idle" is an English word a translator would
+  // otherwise turn into the local word for it.
+  it.each(['Shyden', 'ShyTalk', 'Glory Points', 'Yawelo Idle'])(
+    'holds the name %s',
+    (term) => {
       expect(
         DO_NOT_TRANSLATE.some((t) => t === term),
         `${term} is translatable — a name is not copy`,
       ).toBe(true);
-    }
-  });
+    },
+  );
 
   it('holds only terms the site still ships', () => {
     // #370 removed the company's legal facts from every page. A term no
