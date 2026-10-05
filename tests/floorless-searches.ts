@@ -15,11 +15,14 @@ import { codeWithoutLiterals } from './unit/ast';
  * everything. It cannot catch a reader blind to PART of its population: one
  * unit still read keeps it green. A floor recorded in `tests/floors.json` and
  * checked for equality (#468) can, so a test that searches a population also
- * checks a floor (`floorBreach`, or `expectNothingFound`, which checks one),
- * or says in code why it need not: `behavioural: '<reason>'` in the
- * population, for a search over input the test writes itself (#118's
- * behavioural species). The reason is a property, never a comment, so a
- * file's documentation cannot satisfy the guard (#23).
+ * checks a floor on THAT population: `floorBreach(id, <of>.length)`, with
+ * `<of>` the expression its `of:` names (#534). A floor on something else in
+ * the same test is a token, not a check of this search.
+ * There is no exemption: #515 let a search say `behavioural: '<why>'`, and a
+ * label the guard could not verify could have emptied the list without a
+ * floor recorded, so the operator retired it ("Floors everywhere", #534). A
+ * floor on a table the test writes also catches a case quietly deleted from
+ * it. Any `behavioural` property is refused by line.
  *
  * A call's scope is the innermost test body around it -- vitest's `it` and
  * `it.each(table)`, or a Playwright declaration read by `declarationsIn` --
@@ -35,10 +38,8 @@ export interface SearchSite {
   readonly scope: ScopeKind;
   /** The test's title as written, or the function's name. */
   readonly label: string;
-  /** The scope also calls `floorBreach` or `expectNothingFound`. */
+  /** The scope checks `floorBreach` on the population `of:` names (#534). */
   readonly floored: boolean;
-  /** The reason written as `behavioural: '…'` in the population, if any. */
-  readonly behavioural?: string;
 }
 
 export interface SearchReading {
@@ -51,8 +52,8 @@ export interface SearchReading {
 
 const SEARCHED = 'searched';
 
-/** The calls that check a recorded floor. */
-const FLOORS = new Set(['floorBreach', 'expectNothingFound']);
+/** The call that checks a recorded floor, and the argument it counts. */
+const FLOOR = 'floorBreach';
 
 /** A title as written: a literal's text, anything else its source. */
 const titleOf = (sf: ts.SourceFile, title: ts.Expression): string =>
@@ -109,43 +110,75 @@ function nameOf(node: ts.Node): string | undefined {
   return undefined;
 }
 
-/** True where `node` holds a call to a floor check, at any depth. */
-function checksAFloor(node: ts.Node): boolean {
+/** The population a search names in `of:`, as written, or undefined. */
+function populationOf(call: ts.CallExpression): ts.Expression | undefined {
+  const population = call.arguments[1];
+  if (!population || !ts.isObjectLiteralExpression(population))
+    return undefined;
+  const of = population.properties.find(
+    (member) =>
+      member.name !== undefined &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === 'of',
+  );
+  if (of === undefined) return undefined;
+  if (ts.isPropertyAssignment(of)) return of.initializer;
+  if (ts.isShorthandPropertyAssignment(of)) return of.name;
+  return undefined;
+}
+
+/** Source text with every space dropped: `a .b` and `a.b` are one name. */
+const spelled = (sf: ts.SourceFile, node: ts.Node): string =>
+  node.getText(sf).replace(/\s+/g, '');
+
+/**
+ * True where `scope` checks a floor on the very population `call` searches:
+ * `floorBreach(id, <of>.length)`, `<of>.size`, or `<of>` itself for a count,
+ * `<of>` spelled as the search spells it (#534). A floor on anything else,
+ * and a wrapper that floors its own population, check nothing about this
+ * search.
+ */
+function floorsPopulation(
+  sf: ts.SourceFile,
+  scope: ts.Node,
+  call: ts.CallExpression,
+): boolean {
+  const population = populationOf(call);
+  if (population === undefined) return false;
+  const of = spelled(sf, population);
+  const counts = new Set([of, `${of}.length`, `${of}.size`]);
   let found = false;
   const visit = (child: ts.Node): void => {
     if (
       ts.isCallExpression(child) &&
       ts.isIdentifier(child.expression) &&
-      FLOORS.has(child.expression.text)
+      child.expression.text === FLOOR &&
+      child.arguments[1] !== undefined &&
+      counts.has(spelled(sf, child.arguments[1]))
     )
       found = true;
     if (!found) ts.forEachChild(child, visit);
   };
-  visit(node);
+  visit(scope);
   return found;
 }
 
 /**
- * The reason a call's population gives, `undefined` where it gives none, or
- * a refusal where it gives one this reader cannot read as a reason.
+ * True where a call's population carries a `behavioural` property, in any
+ * form: the exemption #534 retired.
  */
-function reasonOf(call: ts.CallExpression): {
-  reason?: string;
-  refusal?: string;
-} {
+function labelled(call: ts.CallExpression): boolean {
   const population = call.arguments[1];
-  if (!population || !ts.isObjectLiteralExpression(population)) return {};
-  const property = population.properties.find(
-    (member) =>
-      member.name !== undefined &&
-      ts.isIdentifier(member.name) &&
-      member.name.text === 'behavioural',
+  return (
+    population !== undefined &&
+    ts.isObjectLiteralExpression(population) &&
+    population.properties.some(
+      (member) =>
+        member.name !== undefined &&
+        ts.isIdentifier(member.name) &&
+        member.name.text === 'behavioural',
+    )
   );
-  if (property === undefined) return {};
-  if (!ts.isPropertyAssignment(property) || !isLiteral(property.initializer))
-    return { refusal: 'a behavioural reason that is not a string literal' };
-  const reason = property.initializer.text.trim();
-  return reason === '' ? { refusal: 'a blank behavioural reason' } : { reason };
 }
 
 export function searchSitesIn(sf: ts.SourceFile): SearchReading {
@@ -161,14 +194,16 @@ export function searchSitesIn(sf: ts.SourceFile): SearchReading {
       const title = bodies.get(at);
       const name = title === undefined ? nameOf(at) : undefined;
       if (title === undefined && name === undefined) continue;
-      const { reason, refusal } = reasonOf(call);
-      if (refusal !== undefined) return refuse(call, refusal);
+      if (labelled(call))
+        return refuse(
+          call,
+          'a behavioural label, retired: every search checks a recorded floor (#534)',
+        );
       sites.push({
         line: lineOf(sf, call),
         scope: title === undefined ? 'function' : 'test',
         label: title ?? (name as string),
-        floored: checksAFloor(at),
-        ...(reason === undefined ? {} : { behavioural: reason }),
+        floored: floorsPopulation(sf, at, call),
       });
       return;
     }
