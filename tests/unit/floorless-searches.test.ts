@@ -67,11 +67,26 @@ describe('searchSitesIn', () => {
     ]);
   });
 
+  // The floor counts THE SAME population the search names in `of:` (#534,
+  // operator: "do what the agent says"): a floor on anything else is a
+  // token, not a check of this search.
   it.each([
-    ['floorBreach', `it('t', () => {\n${SEARCH}\n${FLOOR}\n});`],
+    ['a floor on its length', `it('t', () => {\n${SEARCH}\n${FLOOR}\n});`],
     [
-      'expectNothingFound',
-      `it('t', () => {\n${SEARCH}\nexpectNothingFound(analyze, liveness);\n});`,
+      'a floor on its size',
+      "it('t', () => {\n  searched(f, { of: s, what: 'w' });\n  floorBreach('x/y', s.size);\n});",
+    ],
+    [
+      'a floor on a count it searched',
+      "it('t', () => {\n  searched(f, { of: n, what: 'w' });\n  floorBreach('x/y', n);\n});",
+    ],
+    [
+      'a floor on a property path, spaced differently',
+      "it('t', () => {\n  searched(f, { of: a.b, what: 'w' });\n  floorBreach('x/y', a .b.length);\n});",
+    ],
+    [
+      'a floor on a population written in shorthand',
+      "it('t', () => {\n  searched(f, { of, what: 'w' });\n  floorBreach('x/y', of.length);\n});",
     ],
     [
       'a floor in a callback of the same test',
@@ -80,6 +95,29 @@ describe('searchSitesIn', () => {
   ])('reads a site whose test checks %s as floored', (_, source) => {
     expect(read(source).sites).toEqual([
       expect.objectContaining({ scope: 'test', label: 't', floored: true }),
+    ]);
+  });
+
+  it.each([
+    [
+      'a floor on another population',
+      "it('t', () => {\n  searched(f, { of: files, what: 'w' });\n  floorBreach('x/y', tests.length);\n});",
+    ],
+    [
+      'a floor on a population that only starts with the same name',
+      "it('t', () => {\n  searched(f, { of: files, what: 'w' });\n  floorBreach('x/y', files.flat().length);\n});",
+    ],
+    [
+      'a wrapper that floors its own population',
+      `it('t', () => {\n${SEARCH}\nexpectNothingFound(analyze, liveness);\n});`,
+    ],
+    [
+      'a search with no `of:`',
+      "it('t', () => {\n  searched(f, { what: 'w' });\n  floorBreach('x/y', of.length);\n});",
+    ],
+  ])('reads a site whose test checks %s as floorless', (_, source) => {
+    expect(read(source).sites).toEqual([
+      expect.objectContaining({ scope: 'test', label: 't', floored: false }),
     ]);
   });
 
@@ -138,25 +176,6 @@ describe('searchSitesIn', () => {
     ]);
   });
 
-  it('reads a behavioural reason written in the population', () => {
-    const { sites, refused } = read(
-      "it('t', () => {\n  expect(searched(f, { of: p, what: 'w', behavioural: 'the input is written above' })).toEqual([]);\n});",
-    );
-    expect(refused).toEqual([]);
-    expect(sites).toEqual([
-      expect.objectContaining({
-        floored: false,
-        behavioural: 'the input is written above',
-      }),
-    ]);
-  });
-
-  it('reads no reason where none is written', () => {
-    expect(read(`it('t', () => {\n${SEARCH}\n});`).sites[0]).not.toHaveProperty(
-      'behavioural',
-    );
-  });
-
   it('reads every test body, with or without a site', () => {
     expect(
       read(
@@ -166,15 +185,23 @@ describe('searchSitesIn', () => {
   });
 
   it.each([
+    // The behavioural route is retired (#534, operator: "Floors
+    // everywhere"): a label is refused whatever it says, even over a
+    // population the test writes itself, which is what it once excused.
     [
-      'with a blank behavioural reason',
-      "it('t', () => {\n  searched(f, { of: p, what: 'w', behavioural: '  ' });\n});",
-      'blank',
+      'with a behavioural label over a population written in the test',
+      "it('t', () => {\n  searched(f, { of: ['x'], what: 'w', behavioural: 'written here' });\n});",
+      'a behavioural label',
     ],
     [
-      'with a behavioural reason that is not a string literal',
-      "it('t', () => {\n  searched(f, { of: p, what: 'w', behavioural: why });\n});",
-      'literal',
+      'with a blank behavioural label',
+      "it('t', () => {\n  searched(f, { of: ['x'], what: 'w', behavioural: '  ' });\n});",
+      'a behavioural label',
+    ],
+    [
+      'with a behavioural label held in a name',
+      "it('t', () => {\n  searched(f, { of: ['x'], what: 'w', behavioural });\n});",
+      'a behavioural label',
     ],
     ['in a hook', `beforeAll(() => {\n${SEARCH}\n});`, 'no test'],
     ['at module level', `const x = 1;\n${SEARCH}`, 'no test'],
@@ -276,14 +303,14 @@ const TESTS = READINGS.flatMap(({ file, tests }) =>
 const floorlessNow = (): Map<string, number> => {
   const counts = new Map<string, number>();
   for (const site of SITES)
-    if (!site.floored && site.behavioural === undefined) {
+    if (!site.floored) {
       const key = `${site.file} › ${site.label}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   return counts;
 };
 
-describe('every search checks a floor, says it is behavioural, or is listed (#515)', () => {
+describe('every search checks a floor, or is listed (#515, #534)', () => {
   it('finds every scope holding exactly the floorless searches listed', () => {
     const now = floorlessNow();
     const keys = new Set([...now.keys(), ...Object.keys(FLOORLESS)]);
@@ -292,7 +319,7 @@ describe('every search checks a floor, says it is behavioural, or is listed (#51
       .map((key) => {
         const [listed, read] = [FLOORLESS[key] ?? 0, now.get(key) ?? 0];
         return read > listed
-          ? `${key}: ${read} searched with no floor and no behavioural reason, ${listed} listed. Check a floor in the same test, or say why it need not.`
+          ? `${key}: ${read} searched with no floor, ${listed} listed. Check a recorded floor in the same test.`
           : `${key}: ${read} floorless, ${listed} listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.`;
       });
     const refused = READINGS.flatMap(({ refused }) => refused);
@@ -310,11 +337,13 @@ describe('every search checks a floor, says it is behavioural, or is listed (#51
   });
 
   it('only shrinks the burn-down list', () => {
-    // Measured the day the meta-guard landed. A conversion lowers these with
-    // the list; nothing raises them.
+    // Measured when the meta-guard landed (274, 263), and raised once, by
+    // the operator's own rule change, when #534 bound each floor to its
+    // search's population (17 token-floored sites in 12 scopes). A
+    // conversion lowers these with the list; nothing else raises them.
     const counts = Object.values(FLOORLESS);
-    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(274);
-    expect(counts.length).toBeLessThanOrEqual(263);
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(291);
+    expect(counts.length).toBeLessThanOrEqual(275);
     expect(counts.filter((n) => !Number.isInteger(n) || n < 1)).toEqual([]);
   });
 });
@@ -361,8 +390,11 @@ describe('the search reader proves what it read (#515)', () => {
       ({ file, sf, tests }) =>
         `${file}: ${testsWritten(sf) + vitestTestsWritten(sf)} written, ${tests.length} read`,
     );
+    // Judged over the tests read, which is what the floor below counts: a
+    // floor on one population and a search over another check nothing
+    // together (#534).
     expect(
-      searched(misread, { of: FILES, what: 'TypeScript files under tests/' }),
+      searched(misread, { of: TESTS, what: 'tests read under tests/' }),
       misread.join('\n'),
     ).toEqual([]);
     expect(

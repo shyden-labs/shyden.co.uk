@@ -170,19 +170,13 @@ function isSubstantive(member: unknown): boolean {
  * trust; an array is content-checked by `isSubstantive` above, which is the
  * only form that closes #112.
  *
- * A search over a population discovered at run time also checks a recorded
- * floor in the same test, because one unit still read keeps this green
- * (#515). A search over input the test writes itself says so instead, as
- * `behavioural: '<why>'`, which `floorless-searches.test.ts` reads. The reason
- * changes nothing here: an empty population is refused all the same.
+ * Every search also checks its population's recorded floor in the same test,
+ * because one unit still read keeps this green (#515); there is no exemption
+ * (#534). `floorless-searches.test.ts` holds that.
  */
 export function searched<T>(
   findings: readonly T[],
-  population: {
-    of: number | readonly unknown[];
-    what: string;
-    behavioural?: string;
-  },
+  population: { of: number | readonly unknown[]; what: string },
 ): readonly T[] {
   const { of, what } = population;
   const live = typeof of === 'number' ? of : of.filter(isSubstantive).length;

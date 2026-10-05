@@ -1,8 +1,9 @@
 /**
- * Every `searched` site that checks no floor and gives no behavioural
- * reason, by `file › test title as written` (or function name), with how
- * many such sites that scope holds (#515). Measured by `searchSitesIn` on the
- * day the meta-guard landed: 274 sites in 263 scopes.
+ * Every `searched` site whose test checks no floor on the population it
+ * searched, by `file › test title as written` (or function name), with how
+ * many such sites that scope holds (#515). Measured by `searchSitesIn` when
+ * the meta-guard landed (274 sites in 263 scopes) and again when #534 bound
+ * each floor to its search's own population: 291 sites in 275 scopes.
  *
  * It may only shrink. A converted site makes its count too high, and
  * `floorless-searches.test.ts` is red until the count is lowered or the
@@ -56,6 +57,7 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/e2e/zoom-on-focus.spec.ts › `${path}: every typed field computes to at least ${IOS_ZOOM_FLOOR_PX}px`': 1,
   'tests/product-links.ts › expectHomepageLinksAt': 1,
   'tests/unit/absence-liveness.test.ts › finds none whose population could be empty without saying so': 1,
+  'tests/unit/absence-liveness.test.ts › reads as many absences in each file as its text writes': 1,
   'tests/unit/absence-liveness.test.ts › reads as text every spelling the reader reads, and no inverse': 2,
   'tests/unit/absence-liveness.test.ts › walks every .ts file git has under tests/': 1,
   'tests/unit/anchored-presence.test.ts › finds none reading raw source with an unanchored matcher': 1,
@@ -110,8 +112,10 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/dependabot-labels.test.ts › `runs inside ${REQUIRED_JOB} or a job it stands for, the context branch protection requires`': 1,
   'tests/unit/dependabot-labels.test.ts › come from the parsed document, so a comment cannot add one': 1,
   'tests/unit/deprecated-css.test.ts › finds none in any stylesheet under src/': 1,
+  'tests/unit/deprecated-css.test.ts › reads every declaration the stylesheets hold, and as many as there are': 1,
   'tests/unit/device-tool-homes.test.ts › only scripts/adb.mjs decides which listed device is ready': 1,
   'tests/unit/device-tool-homes.test.ts › reads every call site through the one home': 1,
+  'tests/unit/duplicate-imports.test.ts › reads every import the sources declare, and as many as there are': 1,
   'tests/unit/duplicate-imports.test.ts › src, scripts and tests each import a module once': 1,
   'tests/unit/duplication.test.ts › carries no verdict for a pair that no longer exists': 1,
   'tests/unit/duplication.test.ts › finds no cross-file duplicate that has not been given a verdict': 1,
@@ -129,6 +133,7 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/evidence-recording.test.ts › keeps video in one home: no spec spells it itself': 1,
   'tests/unit/evidence-recording.test.ts › no journey in a recording spec records blank frames (#292)': 1,
   'tests/unit/evidence-recording.test.ts › no spec declares test.use(recorded) without acting': 1,
+  'tests/unit/excluded-by-design.test.ts › never spells a --grep pattern out as a literal again': 1,
   'tests/unit/feature-terms.test.ts › %s: every approved word is in use, so none is a typo or a stale approval': 1,
   'tests/unit/feature-terms.test.ts › %s: every piece of copy that names a feature carries an approved word for it': 1,
   'tests/unit/floors.test.ts › reads the recorded figures as whole numbers keyed by id': 1,
@@ -163,7 +168,9 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/message-parity.test.ts › every plural offers exactly the forms its language has': 1,
   'tests/unit/no-dated-render.test.ts › is not tripped by a date named in a comment': 1,
   'tests/unit/no-dated-render.test.ts › no .astro source reads the date, in its code or its markup': 1,
+  'tests/unit/no-dated-render.test.ts › reads every view the sources hold, and as many as there are': 2,
   'tests/unit/one-test-per-case.test.ts › loops no known population inside a test': 1,
+  'tests/unit/one-test-per-case.test.ts › reads the tests every spec declares, and as many as there are': 3,
   'tests/unit/organisation-name.test.ts › only the one historic fixture outside the dated docs': 1,
   'tests/unit/pipeline-wiring.test.ts › a Cloudflare secret is read only in the environment of what its job does (#241, #349)': 1,
   'tests/unit/pipeline-wiring.test.ts › can go red: nothing in it continues on error': 1,
@@ -195,6 +202,8 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/pipeline-wiring.test.ts › pins an image rather than a label that migrates under it': 1,
   'tests/unit/pipeline-wiring.test.ts › prints the container architecture into the job summary': 1,
   'tests/unit/pipeline-wiring.test.ts › reads every job running the suite, and as many as there are': 1,
+  'tests/unit/pipeline-wiring.test.ts › reads every workflow file reference, and as many as there are': 1,
+  'tests/unit/pipeline-wiring.test.ts › reads every workflow for an install, and as many as there are': 1,
   'tests/unit/pipeline-wiring.test.ts › runs every other Playwright job in the image the `image` job picks': 1,
   'tests/unit/pipeline-wiring.test.ts › runs neither npm run floors:record nor its script': 1,
   'tests/unit/pipeline-wiring.test.ts › takes the image the baselines are captured in from one selector': 1,
@@ -217,11 +226,14 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/scoped-classes.test.ts › holds for every .astro file under src/': 1,
   'tests/unit/scratch-git-home.test.ts › no call anywhere else hands git a cwd': 1,
   'tests/unit/script-entry.test.ts › decides on import.meta.main alone': 1,
+  'tests/unit/script-entry.test.ts › judges every load-time statement the scripts hold, and as many as there are': 1,
+  'tests/unit/script-entry.test.ts › judges every read of process.argv the scripts make, and as many as there are': 1,
   'tests/unit/script-entry.test.ts › leaves every effect to an import.meta.main decision': 1,
   'tests/unit/script-entry.test.ts › never reads process.argv[1]': 1,
   'tests/unit/script-entry.test.ts › reads every file under scripts/': 1,
   'tests/unit/shipped-defaults.test.ts › refuses an expectation a roster-building test could not have written': 1,
   'tests/unit/shytalk-brand.test.ts › is spelled out nowhere else in the repo': 1,
+  'tests/unit/shytalk-brand.test.ts › reads every source file, and as many as there are': 1,
   'tests/unit/shytalk-showcase.test.ts › authors every capture at exactly the 2x frame size, and no larger': 1,
   'tests/unit/shytalk-showcase.test.ts › gives every locale its OWN capture, not one file under five names': 1,
   'tests/unit/shytalk-showcase.test.ts › has a capture for every locale the site serves': 1,
@@ -238,6 +250,7 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/unit/source-files.test.ts › refuses a population that is empty': 1,
   'tests/unit/source-files.test.ts › returns the findings untouched, so the caller still owns the verdict': 1,
   'tests/unit/source-files.test.ts › skips dotfiles and node_modules, which only four of the nine did': 2,
+  'tests/unit/spec-scan.ts › expectNothingFound': 3,
   'tests/unit/stranded-docblocks.test.ts › finds a docblock in every kind of source that holds one': 1,
   'tests/unit/stranded-docblocks.test.ts › finds none sitting directly on another': 1,
   'tests/unit/stranded-docblocks.test.ts › reads every source file git tracks': 1,

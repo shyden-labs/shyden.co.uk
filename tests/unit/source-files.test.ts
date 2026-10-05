@@ -165,28 +165,6 @@ describe('searched -- the population a finding list was drawn from', () => {
       /built pages/,
     );
   });
-
-  // A behavioural reason excuses a search from checking a floor (#515); it
-  // never excuses it from searching something.
-  it('still refuses an empty population when the search says it is behavioural', () => {
-    expect(() =>
-      searched([], {
-        of: [],
-        what: 'fixtures',
-        behavioural: 'the fixtures are written in this test',
-      }),
-    ).toThrow(/no fixtures/);
-  });
-
-  it('returns the findings of a behavioural search untouched', () => {
-    expect(
-      searched(['finding'], {
-        of: ['fixture'],
-        what: 'fixtures',
-        behavioural: 'the fixture is written in this test',
-      }),
-    ).toEqual(['finding']);
-  });
 });
 
 describe('committableFiles -- what git tracks or would (#477)', () => {
