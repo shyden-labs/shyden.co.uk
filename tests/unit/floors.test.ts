@@ -16,6 +16,7 @@ import { parseFile } from './ast';
 import {
   decideRecord,
   describeMoves,
+  carriedIds,
   floorSpecs,
   floorsText,
   playwrightRecordArgs,
@@ -196,6 +197,28 @@ describe('decideRecord', () => {
     });
   });
 
+  it('carries an id it was told to, unasserted, at its recorded figure (#548)', () => {
+    expect(
+      decideRecord({ 'a/b': 4, 'e/x': 7 }, [at('a/b', 4)], ['e/x']),
+    ).toEqual({ next: { 'a/b': 4, 'e/x': 7 }, refusals: [] });
+  });
+
+  it('still refuses an unasserted id it was not told to carry (#548)', () => {
+    const { refusals } = decideRecord(
+      { 'a/b': 4, 'e/x': 7, 'gone/x': 1 },
+      [at('a/b', 4)],
+      ['e/x'],
+    );
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('gone/x');
+  });
+
+  it('judges a carried id the run did assert, falls included (#548)', () => {
+    const { refusals } = decideRecord({ 'e/x': 7 }, [at('e/x', 6)], ['e/x']);
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('would fall from 7 to 6');
+  });
+
   it('reports every refusal at once, not the first', () => {
     const { refusals } = decideRecord({ 'a/b': 4, 'gone/x': 1 }, [
       at('a/b', 3),
@@ -258,16 +281,23 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       `exit ${status}`,
     ].join('\n') + '\n';
 
-  const recordWith = (bin: Readonly<Record<string, string>>) => {
+  const recordWith = (
+    bin: Readonly<Record<string, string>>,
+    args: readonly string[] = [],
+  ) => {
     const dir = mkdtempSync(join(tmpdir(), 'floors-path-'));
     const before = readFileSync(FLOORS_FILE);
     try {
       for (const [name, script] of Object.entries(bin))
         writeFileSync(join(dir, name), script, { mode: 0o755 });
-      const run = spawnSync(process.execPath, ['scripts/record-floors.mjs'], {
-        encoding: 'utf8',
-        env: { ...process.env, CI: '', PATH: dir },
-      });
+      const run = spawnSync(
+        process.execPath,
+        ['scripts/record-floors.mjs', ...args],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, CI: '', PATH: dir },
+        },
+      );
       expect(readFileSync(FLOORS_FILE).equals(before), FLOORS_FILE).toBe(true);
       const handed = join(dir, 'record-path');
       const recordPath = existsSync(handed)
@@ -330,6 +360,25 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       RECORD_DIR_PREFIX,
     );
     expect(existsSync(dirname(handed)), 'the scratch directory').toBe(false);
+  });
+
+  it('with --unit, never asks for Docker: the unit suite is all it runs (#548)', () => {
+    // No docker on PATH: had it been asked for, this would be its refusal.
+    const run = recordWith({ npx: '#!/bin/sh\nexit 3\n' }, ['--unit']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the unit suite failed in record mode (exit 3): nothing recorded\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('refuses an argument it does not know, before running anything (#548)', () => {
+    const run = recordWith({}, ['--units']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ usage: npm run floors:record [-- --unit] (got --units)\n',
+    );
+    expect(run.stdout).toBe('');
   });
 
   it('judges what the Playwright run saw together with the unit run', () => {
@@ -435,6 +484,31 @@ describe('the Playwright record run (#475)', () => {
     ]);
     expect(argv[at + 3]).toMatch(/ && npx playwright test --workers=1 "\$@"$/);
     expect(argv.slice(at + 4)).toEqual(['sh', ...specs]);
+  });
+});
+
+describe('carriedIds (#548)', () => {
+  const SPECS = [
+    "expect(floorBreach('e2e/pages', pages.length)).toBeUndefined();",
+    'const FLOOR = { zh: "e2e/zh-rows" };',
+  ];
+
+  it('carries a recorded id a Playwright floor spec spells, in either quote', () => {
+    expect(
+      carriedIds(['e2e/pages', 'e2e/zh-rows', 'unit/files'], SPECS, new Set()),
+    ).toEqual(['e2e/pages', 'e2e/zh-rows']);
+  });
+
+  it('never carries an id the unit run asserted', () => {
+    expect(carriedIds(['e2e/pages'], SPECS, new Set(['e2e/pages']))).toEqual(
+      [],
+    );
+  });
+
+  it('never carries an id no spec spells whole, a prefix of one included', () => {
+    expect(carriedIds(['e2e/page', 'unit/files'], SPECS, new Set())).toEqual(
+      [],
+    );
   });
 });
 

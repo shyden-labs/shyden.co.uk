@@ -17,6 +17,10 @@
  *   sharing a figure would let either go blind behind the other;
  * - either run failed or did not start, Docker included.
  *
+ * `npm run floors:record -- --unit` runs the unit suite alone (#548) and
+ * carries every Playwright floor unchanged, naming them: for a change that
+ * moves no browser floor, which CI then judges as it judges every floor.
+ *
  * One id read two different values when its figure differs by engine, so
  * that refusal is also where a floor that needs one id per engine shows.
  *
@@ -33,13 +37,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { isAbsolute, join, posix, relative, sep } from 'node:path';
-import { env } from 'node:process';
+import { argv, env } from 'node:process';
 
 import { die, messageOf, nonEmpty } from './errors.mjs';
 import { containerArgs, localImage } from './playwright-image.mjs';
 
 const UNIT = 'unit suite';
 const PLAYWRIGHT = 'Playwright run';
+const UNIT_ONLY = '--unit';
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -139,6 +144,27 @@ export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
 };
 
 /**
+ * The recorded ids a unit-only record (`--unit`, #548) carries unchanged:
+ * those a Playwright floor spec spells as a string, in either quote, that the
+ * unit run did not assert. Every id is a string literal in exactly one place
+ * under `tests/` (`literal-floors.test.ts`), so where it is spelled is where
+ * it is checked. A carried figure is not measured; CI judges it.
+ *
+ * @param {readonly string[]} ids the recorded ids
+ * @param {readonly string[]} specTexts the specs `floorSpecs()` names, read
+ * @param {ReadonlySet<string>} asserted the ids the unit run asserted
+ * @returns {string[]}
+ */
+export const carriedIds = (ids, specTexts, asserted) =>
+  ids.filter(
+    (id) =>
+      !asserted.has(id) &&
+      specTexts.some(
+        (text) => text.includes(`'${id}'`) || text.includes(`"${id}"`),
+      ),
+  );
+
+/**
  * What a record run wrote, one observation per line; nothing when it wrote
  * no file.
  *
@@ -157,11 +183,16 @@ const observationsIn = (file) =>
  * The next figures, and every reason not to write them. The caller writes
  * `next` only when `refusals` is empty.
  *
+ * `carried` names recorded ids the run was not asked to measure (`--unit`
+ * leaves the Playwright ones out, #548): each keeps its figure instead of
+ * being refused as unasserted. One the run did assert is judged as any other.
+ *
  * @param {Readonly<Record<string, number>>} recorded
  * @param {readonly Observation[]} seen
+ * @param {readonly string[]} [carried]
  * @returns {{ next: Record<string, number>, refusals: string[] }}
  */
-export const decideRecord = (recorded, seen) => {
+export const decideRecord = (recorded, seen, carried = []) => {
   /** @type {Map<string, Observation[]>} */
   const byId = new Map();
   for (const observation of seen)
@@ -198,7 +229,7 @@ export const decideRecord = (recorded, seen) => {
     next[id] = actual;
   }
   for (const id of Object.keys(recorded))
-    if (!byId.has(id))
+    if (!byId.has(id) && !carried.includes(id))
       refusals.push(
         `${id} is recorded but no test asserted it: remove it from ` +
           `${FLOORS_FILE} with the floor that used it, or run the whole suite`,
@@ -253,6 +284,14 @@ export const floorsText = (floors) =>
  */
 const main = () => {
   if (env.CI) die('CI never records floors: run npm run floors:record locally');
+  const args = argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== UNIT_ONLY))
+    die(
+      `usage: npm run floors:record [-- ${UNIT_ONLY}] (got ${args.join(' ')})`,
+    );
+  // The unit floors alone (#548): a change that moves no Playwright floor
+  // need not pay for the container, about five minutes a record.
+  const unitOnly = args[0] === UNIT_ONLY;
 
   /** @type {Readonly<Record<string, number>>} */
   const recorded = existsSync(FLOORS_FILE)
@@ -261,12 +300,13 @@ const main = () => {
 
   // Asked first, before minutes of unit suite: without Docker the Playwright
   // floors cannot be recorded, and they are never recorded on this machine.
-  const docker = runRefusal(
-    PLAYWRIGHT,
-    spawnSync('docker', ['--version'], { stdio: 'ignore' }),
-  );
+  const docker = unitOnly
+    ? undefined
+    : runRefusal(
+        PLAYWRIGHT,
+        spawnSync('docker', ['--version'], { stdio: 'ignore' }),
+      );
   if (docker !== undefined) die(docker);
-  const image = localImage();
   const specs = floorSpecs();
   if (specs.length === 0)
     die('no Playwright spec calls floorBreach: nothing to record there');
@@ -289,7 +329,8 @@ const main = () => {
         env: { ...env, [RECORD_ENV]: unit },
       }),
     );
-    if (refusal === undefined) {
+    if (refusal === undefined && !unitOnly) {
+      const image = localImage();
       console.log(
         `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
       );
@@ -308,8 +349,20 @@ const main = () => {
   }
 
   if (refusal !== undefined) die(refusal);
-  const { next, refusals } = decideRecord(recorded, seen);
+  const carried = unitOnly
+    ? carriedIds(
+        Object.keys(recorded),
+        specs.map((spec) => readFileSync(spec, 'utf8')),
+        new Set(seen.map(({ id }) => id)),
+      )
+    : [];
+  const { next, refusals } = decideRecord(recorded, seen, carried);
   if (refusals.length > 0) die(`nothing recorded:\n  ${refusals.join('\n  ')}`);
+  if (carried.length > 0)
+    console.log(
+      `${UNIT_ONLY}: not measured, carried unchanged for CI to judge: ` +
+        carried.join(', '),
+    );
 
   const moves = describeMoves(recorded, next);
   writeFileSync(FLOORS_FILE, floorsText(next));
