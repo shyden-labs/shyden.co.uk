@@ -41,6 +41,7 @@ export const CONTENT_ONLY_SPECS = [
   'locale-parity.spec.ts',
   'copy-reaches-a-page.spec.ts',
   'theme-script.spec.ts',
+  'floors-under-playwright.spec.ts',
 ];
 
 const contentOnly = new RegExp(

@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
+import { floorBreach } from '../floors';
 import { getStrings, renderError, type Locale } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { CSV_LOCALES } from '../../src/lib/csv-locale';
@@ -299,7 +300,9 @@ test.describe('the sentences corrected on #319', () => {
       const problems = parsed.ok
         ? []
         : parsed.problems.map(({ message }) => message);
-      expect(problems.length).toBeGreaterThan(3);
+      // One problem for each faulty row: a second reading of the faults this
+      // file plants, with no number in it (#469).
+      expect(problems).toHaveLength(faulty.split('\n').slice(1).length);
       await upload(tool, 'faulty.csv', faulty);
       await expect(listed).toHaveText(problems);
       for (const problem of problems)
@@ -307,6 +310,11 @@ test.describe('the sentences corrected on #319', () => {
           tool.getByText(problem, { exact: true }),
           problem,
         );
+      // Recorded in tests/floors.json and checked for equality (#475): one
+      // figure for every language and engine, measured on all five.
+      expect(
+        floorBreach('feature-words/import-problems', problems.length),
+      ).toBeUndefined();
       await shoot(
         tool,
         `${locale}: a faulty class list names every problem`,

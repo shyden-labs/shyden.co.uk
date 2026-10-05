@@ -2,8 +2,10 @@
  * Record the guards' liveness floors (#468): `npm run floors:record`.
  *
  * Runs the unit suite with `FLOORS_RECORD` set, so every `floorBreach` call
- * writes the count it saw instead of judging it (`tests/floors.ts`), then
- * raises `tests/floors.json` to match. It checks EVERYTHING before writing
+ * writes the count it saw instead of judging it (`tests/floors.ts`), then the
+ * Playwright specs that call it, on every project, in the pinned image CI
+ * runs them in (#475). It judges both runs' counts together and raises
+ * `tests/floors.json` to match. It checks EVERYTHING before writing
  * anything, and refuses the whole record when:
  *
  * - a figure would FALL. A falling count is what a blind reader looks like,
@@ -13,7 +15,10 @@
  *   longer exists (or a run that did not reach it);
  * - one id was asserted from two places, or read two values: two guards
  *   sharing a figure would let either go blind behind the other;
- * - the run itself failed.
+ * - either run failed or did not start, Docker included.
+ *
+ * One id read two different values when its figure differs by engine, so
+ * that refusal is also where a floor that needs one id per engine shows.
  *
  * CI never records, for the reason CI never passes `--update-snapshots`: a
  * run that can rewrite the figure it checks against asserts nothing.
@@ -22,15 +27,19 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import { env } from 'node:process';
 
-import { die, messageOf } from './errors.mjs';
+import { die, messageOf, nonEmpty } from './errors.mjs';
+import { containerArgs, localImage } from './playwright-image.mjs';
+
+const UNIT = 'unit suite';
+const PLAYWRIGHT = 'Playwright run';
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -44,6 +53,105 @@ export const RECORD_ENV = 'FLOORS_RECORD';
 /**
  * @typedef {{ id: string, actual: number, site: string }} Observation
  */
+
+/**
+ * The record run's scratch directory is made in the checkout, git-ignored,
+ * because the container mounts the checkout and nothing else: a record file
+ * in the host's temporary directory is one the Playwright run cannot reach,
+ * and `test-results/` is emptied by Playwright as it starts.
+ */
+export const RECORD_DIR_PREFIX = '.floors-record-';
+
+const E2E_DIR = 'tests/e2e';
+
+/**
+ * The Playwright specs that call `floorBreach`, which the record run is
+ * limited to: every other spec would cost minutes and record nothing. Read
+ * from each spec's text, so one that names the function only in a comment
+ * runs for nothing; `tests/unit/floors.test.ts` holds this list equal to the
+ * specs whose parse tree calls it.
+ *
+ * @param {string} [dir]
+ * @returns {string[]}
+ */
+export const floorSpecs = (dir = E2E_DIR) =>
+  nonEmpty(
+    readdirSync(dir).filter((name) => name.endsWith('.spec.ts')),
+    `Playwright specs in ${dir}`,
+  )
+    .map((name) => join(dir, name))
+    .filter((file) => /\bfloorBreach\(/.test(readFileSync(file, 'utf8')))
+    .sort();
+
+/**
+ * Why a suite's record run cannot be trusted, or nothing. One judge for the
+ * unit suite and the Playwright run, so a Playwright run is refused exactly
+ * as a unit run is (#475): one that never started has no exit status and its
+ * error names why; one that exited non-zero, or was killed, is a failed run.
+ *
+ * @param {string} suite
+ * @param {{ status: number | null, error?: Error }} run
+ * @returns {string | undefined}
+ */
+export const runRefusal = (suite, { status, error }) =>
+  error !== undefined
+    ? `the ${suite} did not start: ${messageOf(error)}`
+    : status !== 0
+      ? `the ${suite} failed in record mode (exit ${status}): nothing recorded`
+      : undefined;
+
+/**
+ * The argument vector for `docker` that records the Playwright floors: every
+ * project over `specs`, in the image CI runs the e2e suite in, with
+ * `RECORD_ENV` naming `record` as the container sees it. A layout count
+ * measured on macOS is not the one CI reads, so the e2e floors are measured
+ * where CI measures them (#475).
+ *
+ * @param {object} options
+ * @param {string} options.image the pinned Playwright image
+ * @param {string} options.cwd the repo root, mounted at /work
+ * @param {string} options.record the record file, inside `cwd`
+ * @param {readonly string[]} options.specs the specs that call floorBreach
+ * @returns {string[]}
+ */
+export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
+  const inside = relative(cwd, record);
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside))
+    throw new Error(
+      `${record} is outside ${cwd}, where the container cannot write it`,
+    );
+  // Never empty: Playwright reads no file filter as every spec.
+  if (specs.length === 0)
+    throw new Error('no Playwright spec calls floorBreach');
+  return containerArgs({
+    image,
+    cwd,
+    env: { [RECORD_ENV]: posix.join('/work', ...inside.split(sep)) },
+    // One worker. Each browser is emulated on Apple Silicon, and two at once
+    // took the feature-words journeys to 40-52s against their 30s budget:
+    // 11 of 35 failed on four engines in the first record run, all timing
+    // out early in the journey. One at a time, WebKit's four passed in 1.5
+    // minutes (measured 2026-10-05). The default count, derived from the
+    // CPUs, has frozen this laptop before.
+    command: 'npx playwright test --workers=1 "$@"',
+    operands: specs,
+  });
+};
+
+/**
+ * What a record run wrote, one observation per line; nothing when it wrote
+ * no file.
+ *
+ * @param {string} file
+ * @returns {Observation[]}
+ */
+const observationsIn = (file) =>
+  existsSync(file)
+    ? readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((line) => line !== '')
+        .map((line) => JSON.parse(line))
+    : [];
 
 /**
  * The next figures, and every reason not to write them. The caller writes
@@ -151,36 +259,55 @@ const main = () => {
     ? JSON.parse(readFileSync(FLOORS_FILE, 'utf8'))
     : {};
 
+  // Asked first, before minutes of unit suite: without Docker the Playwright
+  // floors cannot be recorded, and they are never recorded on this machine.
+  const docker = runRefusal(
+    PLAYWRIGHT,
+    spawnSync('docker', ['--version'], { stdio: 'ignore' }),
+  );
+  if (docker !== undefined) die(docker);
+  const image = localImage();
+  const specs = floorSpecs();
+  if (specs.length === 0)
+    die('no Playwright spec calls floorBreach: nothing to record there');
+
   // Collected inside the try and judged after it: `die` exits at once, which
   // skips any `finally` still pending, and the scratch directory would leak.
-  const dir = mkdtempSync(join(tmpdir(), 'floors-record-'));
-  /** @type {number | null} */
-  let status;
-  /** @type {Error | undefined} */
-  let error;
+  const cwd = process.cwd();
+  const dir = mkdtempSync(join(cwd, RECORD_DIR_PREFIX));
+  /** @type {string | undefined} */
+  let refusal;
   /** @type {Observation[]} */
   let seen = [];
   try {
-    const record = join(dir, 'seen.jsonl');
-    ({ status, error } = spawnSync('npx', ['vitest', 'run'], {
-      stdio: 'inherit',
-      env: { ...env, [RECORD_ENV]: record },
-    }));
-    if (existsSync(record))
-      seen = readFileSync(record, 'utf8')
-        .split('\n')
-        .filter((line) => line !== '')
-        .map((line) => JSON.parse(line));
+    const unit = join(dir, 'unit.jsonl');
+    const e2e = join(dir, 'e2e.jsonl');
+    refusal = runRefusal(
+      UNIT,
+      spawnSync('npx', ['vitest', 'run'], {
+        stdio: 'inherit',
+        env: { ...env, [RECORD_ENV]: unit },
+      }),
+    );
+    if (refusal === undefined) {
+      console.log(
+        `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
+      );
+      refusal = runRefusal(
+        PLAYWRIGHT,
+        spawnSync(
+          'docker',
+          playwrightRecordArgs({ image, cwd, record: e2e, specs }),
+          { stdio: 'inherit' },
+        ),
+      );
+    }
+    seen = [...observationsIn(unit), ...observationsIn(e2e)];
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  // A run that never started has no exit status; its error names why.
-  if (error) die(`the unit suite did not start: ${messageOf(error)}`);
-  if (status !== 0)
-    die(
-      `the unit suite failed in record mode (exit ${status}): nothing recorded`,
-    );
+  if (refusal !== undefined) die(refusal);
   const { next, refusals } = decideRecord(recorded, seen);
   if (refusals.length > 0) die(`nothing recorded:\n  ${refusals.join('\n  ')}`);
 
