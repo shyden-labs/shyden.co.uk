@@ -36,4 +36,6 @@ dashboard-state/
 .vscode/
 .idea/
 .superpowers/
+# npm run floors:record's scratch directories, on the container's mount (#475)
+/.floors-record-*/
 .remember/

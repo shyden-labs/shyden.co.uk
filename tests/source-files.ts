@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { nonEmpty } from '../scripts/errors.mjs';
 
 /**
  * The one directory walk in the suite.
@@ -62,28 +63,8 @@ function walk(dir: string, keep: (path: string) => boolean): string[] {
   return out;
 }
 
-/**
- * A derived set, proved non-empty before a guard is allowed to scan it.
- *
- * #79 settled this shape for browser events and put the control INSIDE
- * `recorders.ts`, because a call site cannot forget what it never writes.
- * The filesystem collectors kept it as a convention instead: eleven guards
- * hand-wrote `expect(files.length).toBeGreaterThan(0)`, five of them copying
- * a comment that cites a sibling, and **four forgot** — twelve tests passed
- * while scanning zero files (#84).
- *
- * A plain `throw`, not `expect`: this module is imported by both Vitest and
- * Playwright specs, and a failed assertion belonging to neither runner is
- * still a loud, correctly-attributed failure in both.
- */
-export function nonEmpty<T>(items: T[], what: string): T[] {
-  if (items.length === 0)
-    throw new Error(
-      `found no ${what} — the walk is broken, not the subject clean. ` +
-        'A guard handed an empty list asserts nothing at all (#84).',
-    );
-  return items;
-}
+/** One home in `scripts/errors.mjs`, where a script can reach it too (#475). */
+export { nonEmpty };
 
 /**
  * Every TypeScript source at or below `dir`.

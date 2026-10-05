@@ -1,5 +1,8 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { floorBreach } from '../floors';
+import { deployedRoutes } from '../site-pages';
 import {
   LOCALES,
   PREFIXED_LOCALES,
@@ -345,16 +348,26 @@ test.describe('no built page names the dissolved company (#370)', () => {
   });
 
   test('reads every built page, and as many as there are', () => {
-    // Measured 16 built pages on 2026-10-03 (#446): five locales of three
-    // pages, and the 404. Stated tight, so a build or a walk that comes back
-    // one short fails.
     const pages = read();
-    expect(pages.length).toBeGreaterThan(15);
     // A page whose HTML has a body and whose text read as nothing is a page
     // the reader is blind to.
     const blank = pages
       .filter(({ html, text }) => /<body\b/i.test(html) && text.trim() === '')
       .map(({ path }) => path);
     expect(searched(blank, { of: pages, what: 'built pages' })).toEqual([]);
+    // A second reading of the same pages, from the routes the site declares
+    // in every locale and the 404, with no number in it (#469): a build or a
+    // walk that comes back one short, or with one extra, fails by name.
+    expect(pages.map(({ path }) => path).sort()).toEqual(
+      [
+        ...deployedRoutes().map(({ path }) => join('dist', path, 'index.html')),
+        join('dist', '404.html'),
+      ].sort(),
+    );
+    // Recorded in tests/floors.json and checked for equality (#475), so a
+    // site that grows a page moves the figure on purpose.
+    expect(
+      floorBreach('copy-reaches-a-page/built-pages', pages.length),
+    ).toBeUndefined();
   });
 });

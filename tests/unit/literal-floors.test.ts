@@ -297,9 +297,6 @@ const GROUP_5: Readonly<Record<string, string>> = {
     'controls measured for the touch target',
   'tests/e2e/classroom-groups-print.spec.ts: hairs.length':
     'hairlines measured on paper',
-  'tests/e2e/copy-reaches-a-page.spec.ts: pages.length': 'built pages scanned',
-  'tests/e2e/feature-words.spec.ts: problems.length':
-    'planted problems the scan must find',
 };
 
 describe('every floor demanding two or more is ratcheted (#468)', () => {
@@ -379,9 +376,9 @@ describe('the floor reader proves what it read (#468)', () => {
   });
 
   it('only shrinks the Group 5 list', () => {
-    // Seven Playwright liveness floors wait for #446 Group 5; a new one is
-    // ratcheted from the start, never added here.
-    expect(Object.keys(GROUP_5).length).toBeLessThanOrEqual(7);
+    // Five Playwright liveness floors wait for #446 Group 5 (#475 ratcheted
+    // two); a new one is ratcheted from the start, never added here.
+    expect(Object.keys(GROUP_5).length).toBeLessThanOrEqual(5);
   });
 
   it('spells every recorded id exactly once under tests/', () => {

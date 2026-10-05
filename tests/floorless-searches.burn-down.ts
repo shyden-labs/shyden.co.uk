@@ -3,7 +3,7 @@
  * searched, by `file › test title as written` (or function name), with how
  * many such sites that scope holds (#515). Measured by `searchSitesIn` when
  * the meta-guard landed (274 sites in 263 scopes) and again when #534 bound
- * each floor to its search's own population: 291 sites in 275 scopes.
+ * each floor to its search's own population: 290 sites in 274 scopes.
  *
  * It may only shrink. A converted site makes its count too high, and
  * `floorless-searches.test.ts` is red until the count is lowered or the
@@ -26,7 +26,6 @@ export const FLOORLESS: Readonly<Record<string, number>> = {
   'tests/e2e/classroom-groups-roster.spec.ts › `no dropdown ever truncates its own column name -- ${path} at ${width}px`': 1,
   'tests/e2e/copy-reaches-a-page.spec.ts › `${locale}: no defined copy renders nowhere`': 3,
   'tests/e2e/copy-reaches-a-page.spec.ts › every page in every locale': 1,
-  'tests/e2e/copy-reaches-a-page.spec.ts › reads every built page, and as many as there are': 1,
   'tests/e2e/disabled-controls.spec.ts › `${theme}: the disabled placeholder option is excluded deliberately, and it exists`': 1,
   'tests/e2e/disabled-controls.spec.ts › `at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${path}`': 1,
   'tests/e2e/disabled-controls.spec.ts › default state — every disabled control shows the no-entry cursor': 1,

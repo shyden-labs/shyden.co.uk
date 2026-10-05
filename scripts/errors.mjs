@@ -71,3 +71,33 @@ export const die = (message) => {
   console.error(`✗ ${message}`);
   exit(1);
 };
+
+/**
+ * A derived set, proved non-empty before a guard is allowed to scan it.
+ *
+ * #79 settled this shape for browser events and put the control INSIDE
+ * `recorders.ts`, because a call site cannot forget what it never writes.
+ * The filesystem collectors kept it as a convention instead: eleven guards
+ * hand-wrote `expect(files.length).toBeGreaterThan(0)`, five of them copying
+ * a comment that cites a sibling, and **four forgot** — twelve tests passed
+ * while scanning zero files (#84).
+ *
+ * A plain `throw`, not `expect`: this module is imported by both Vitest and
+ * Playwright specs, and a failed assertion belonging to neither runner is
+ * still a loud, correctly-attributed failure in both. Here rather than in
+ * `tests/source-files.ts`, which re-exports it, so a script that reads a
+ * directory proves it too (`record-floors.mjs`, #475).
+ *
+ * @template T
+ * @param {T[]} items
+ * @param {string} what
+ * @returns {T[]}
+ */
+export function nonEmpty(items, what) {
+  if (items.length === 0)
+    throw new Error(
+      `found no ${what} — the walk is broken, not the subject clean. ` +
+        'A guard handed an empty list asserts nothing at all (#84).',
+    );
+  return items;
+}

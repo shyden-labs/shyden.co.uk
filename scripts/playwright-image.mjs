@@ -114,6 +114,77 @@ export function localImage() {
     : `${REPOSITORY}:${choice.tag}`;
 }
 
+/**
+ * The argument vector for `docker` that runs a Playwright command in `image`
+ * over this checkout, built without running anything so a test can read it
+ * (`tests/unit/visual-runner.test.ts`, `tests/unit/floors.test.ts`). One home
+ * for the container both local runs use: the visual suite (`visual.mjs`) and
+ * the floor recorder (`record-floors.mjs`, #475).
+ *
+ * @param {object} options
+ * @param {string} options.image the pinned Playwright image
+ * @param {string} options.cwd the repo root, mounted at /work
+ * @param {Readonly<Record<string, string>>} options.env set in the container
+ * @param {string} options.command the Playwright command, which reads its
+ *   operands as `"$@"`
+ * @param {readonly string[]} options.operands handed to `command` as `"$@"`
+ * @returns {string[]}
+ */
+export function containerArgs({ image, cwd, env, command, operands }) {
+  return [
+    'run',
+    '--rm',
+    // THE ARCHITECTURE CI COMPARES ON, not the host's (#224). The baselines
+    // were captured on an arm64 Mac and are compared on CI's `x86_64` runner,
+    // and every one of the ten differed on 25-48% of its pixels at zero
+    // tolerance (measured, run 35657436585). `threshold: 0.1` hid all of it,
+    // so the tolerance was really buying a whole architecture's worth of text
+    // rasterisation and a smaller real regression would have shipped green.
+    //
+    // On Apple Silicon this is emulated and therefore slow; that cost was put
+    // to the operator with the measurement and accepted. It sits before the
+    // image deliberately: `docker run [OPTIONS] IMAGE [COMMAND]`, so the same
+    // flag after the image is handed to the entrypoint and does nothing at
+    // all, silently. Pinned by `tests/unit/visual-runner.test.ts`.
+    '--platform',
+    'linux/amd64',
+    // Chromium exhausts the default 64MB /dev/shm and crashes mid-run.
+    '--ipc=host',
+    '-v',
+    `${cwd}:/work`,
+    // An ANONYMOUS volume over node_modules, so `npm ci` inside the container
+    // installs Linux binaries into the container's own layer instead of
+    // overwriting the macOS ones on the host. Without this the next local
+    // `npm test` fails on a native module built for the wrong platform.
+    '-v',
+    '/work/node_modules',
+    '-w',
+    '/work',
+    ...Object.entries(env).flatMap(([name, value]) => [
+      '-e',
+      `${name}=${value}`,
+    ]),
+    image,
+    'sh',
+    '-c',
+    [
+      // `astro preview` writes `.astro/preview.json` naming its PID, and that
+      // file lives on the mounted repo -- so the NEXT container inherits a
+      // lock held by a process that no longer exists anywhere, refuses to
+      // start the server, and reports a stack trace about `astro preview
+      // stop` instead of anything to do with the site. CI never sees this
+      // (a fresh checkout each run); a second local run always would.
+      'rm -f .astro/preview.json',
+      'npm ci --no-audit --no-fund',
+      command,
+    ].join(' && '),
+    // `sh -c SCRIPT NAME ARG...`: NAME becomes `$0`, and the ARGs become
+    // `"$@"` exactly as Docker received them from this array.
+    'sh',
+    ...operands,
+  ];
+}
+
 /** @param {string} tag @returns {Promise<string>} */
 async function resolveDigest(tag) {
   const response = await fetch(

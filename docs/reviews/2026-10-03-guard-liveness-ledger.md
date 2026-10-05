@@ -394,6 +394,22 @@ They are measured per page in the container, since a layout count measured
 on macOS is not the one CI reads, and ratcheted with `floorBreach` like the
 unit floors (#468), which needs the recorder to read a Playwright run.
 
+**Group 5a, #475 (2026-10-05).** `npm run floors:record` now runs every spec
+that calls `floorBreach` on all six projects in the pinned image, one worker
+(two emulated browsers at once timed out 11 of 35 journeys), and judges its
+counts with the unit run's. Two floors left `GROUP_5`, which now holds five:
+
+| Floor | Measured | Engines | Cross-check, no literal number |
+| --- | --- | --- | --- |
+| `copy-reaches-a-page/built-pages` | 16 | `content` only (it reads `dist/`) | the built paths equal `deployedRoutes()` in every locale plus the 404 |
+| `feature-words/import-problems` | 4 | all five, every locale, one value | one problem for each faulty row the file plants |
+
+Both first figures were read against an independent count: `find dist -name
+'*.html'` gave 16, and `importFile` returned one problem per data row in en,
+id, zh, vi and th (four rows, four problems). The `problems.length` row in the
+remaining-floors table below calls it "not a liveness floor"; it is ratcheted
+now, and its `> 3` is gone.
+
 ## Side findings
 
 - **#465**: `scripts/release-inventory.mjs` selects a test as capturing only
