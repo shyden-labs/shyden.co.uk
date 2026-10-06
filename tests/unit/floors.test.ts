@@ -20,6 +20,7 @@ import {
   floorSpecs,
   floorsText,
   playwrightRecordArgs,
+  recordUntilSettled,
   RECORD_DIR_PREFIX,
   runRefusal,
 } from '../../scripts/record-floors.mjs';
@@ -133,13 +134,13 @@ describe('floorBreach', () => {
   });
 });
 
-describe('decideRecord', () => {
-  const at = (id: string, actual: number, site = 'tests/unit/a.test.ts:1') => ({
-    id,
-    actual,
-    site,
-  });
+const at = (id: string, actual: number, site = 'tests/unit/a.test.ts:1') => ({
+  id,
+  actual,
+  site,
+});
 
+describe('decideRecord', () => {
   it('keeps every figure the run saw unchanged', () => {
     expect(decideRecord({ 'a/b': 4 }, [at('a/b', 4)])).toEqual({
       next: { 'a/b': 4 },
@@ -229,6 +230,143 @@ describe('decideRecord', () => {
   });
 });
 
+describe('recordUntilSettled', () => {
+  // literal-floors' `recorded-ids` floors the ids the record itself holds, so
+  // one pass that adds ids records the count from before them (#525: read
+  // 90, recorded 76). The recorder measures again until the ids hold still.
+  /** A suite whose `self` floor counts the ids the record holds as it runs. */
+  const suite = (
+    figures: (pass: number) => Readonly<Record<string, number>>,
+  ) => {
+    const handed: Readonly<Record<string, number>>[] = [];
+    const measure = (
+      floors: Readonly<Record<string, number>>,
+      pass: number,
+    ) => {
+      handed.push(floors);
+      return [
+        ...Object.entries(figures(pass)).map(([id, n]) => at(id, n)),
+        at('self', Object.keys(floors).length, 'tests/unit/s.test.ts:1'),
+      ];
+    };
+    return { handed, measure };
+  };
+
+  it('takes one pass when no id is added', () => {
+    const { handed, measure } = suite(() => ({ a: 5 }));
+    expect(
+      recordUntilSettled({ recorded: { a: 4, self: 2 }, measure }),
+    ).toEqual({
+      next: { a: 5, self: 2 },
+      refusals: [],
+      failure: undefined,
+      passes: 1,
+    });
+    expect(handed).toHaveLength(1);
+  });
+
+  it('measures again over the ids a pass added, and records what that pass saw', () => {
+    const { handed, measure } = suite(() => ({ a: 4, b: 1 }));
+    expect(
+      recordUntilSettled({ recorded: { a: 4, self: 2 }, measure }),
+    ).toEqual({
+      next: { a: 4, b: 1, self: 3 },
+      refusals: [],
+      failure: undefined,
+      passes: 2,
+    });
+    expect(handed).toEqual([
+      { a: 4, self: 2 },
+      { a: 4, b: 1, self: 2 },
+    ]);
+  });
+
+  it('stops at the first refusal, measuring nothing more', () => {
+    const { handed, measure } = suite(() => ({ a: 3, b: 1 }));
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, self: 2 },
+      measure,
+    });
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('a would fall from 4 to 3');
+    expect(passes).toBe(1);
+    expect(handed).toHaveLength(1);
+  });
+
+  it('judges a later pass against the figures the pass before it wrote', () => {
+    const { measure } = suite((pass) =>
+      pass === 1 ? { a: 6, b: 1 } : { a: 5, b: 1 },
+    );
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, self: 2 },
+      measure,
+    });
+    expect(passes).toBe(2);
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('a would fall from 6 to 5');
+  });
+
+  it('returns a suite that could not run, naming why, and measures nothing more', () => {
+    const handed: unknown[] = [];
+    const result = recordUntilSettled({
+      recorded: { a: 4 },
+      measure: (floors) => {
+        handed.push(floors);
+        return 'the unit suite failed in record mode (exit 3): nothing recorded';
+      },
+    });
+    expect(result).toEqual({
+      next: { a: 4 },
+      refusals: [],
+      failure:
+        'the unit suite failed in record mode (exit 3): nothing recorded',
+      passes: 1,
+    });
+    expect(handed).toHaveLength(1);
+  });
+
+  it('refuses ids that never hold still, naming how many passes it took', () => {
+    // Each pass asserts every id the passes before it added, and one more.
+    const { handed, measure } = suite((pass) => ({
+      a: 4,
+      ...Object.fromEntries(
+        Array.from({ length: pass }, (_, i) => [`new/${i + 1}`, 1]),
+      ),
+    }));
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, self: 1 },
+      measure,
+      maxPasses: 3,
+    });
+    expect(refusals).toEqual([
+      'the recorded ids never held still in 3 passes: each added some, so ' +
+        'no floor counting them can be trusted',
+    ]);
+    expect(passes).toBe(3);
+    expect(handed).toHaveLength(3);
+  });
+
+  it('carries what the pass it judges says to carry', () => {
+    const seenBy: string[][] = [];
+    expect(
+      recordUntilSettled({
+        recorded: { a: 4, 'e/x': 7 },
+        measure: () => [at('a', 4)],
+        carry: (seen) => {
+          seenBy.push(seen.map(({ id }) => id));
+          return ['e/x'];
+        },
+      }),
+    ).toEqual({
+      next: { a: 4, 'e/x': 7 },
+      refusals: [],
+      failure: undefined,
+      passes: 1,
+    });
+    expect(seenBy).toEqual([['a']]);
+  });
+});
+
 describe('describeMoves', () => {
   it('says nothing when no figure moved', () => {
     expect(describeMoves({ 'a/b': 4 }, { 'a/b': 4 })).toEqual([]);
@@ -306,6 +444,10 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       return { ...run, recordPath };
     } finally {
       rmSync(dir, { recursive: true, force: true });
+      // The assertion above names a write; this undoes it, or a recorder
+      // gone wrong leaves its figures in the checkout's record (#525).
+      if (!readFileSync(FLOORS_FILE).equals(before))
+        writeFileSync(FLOORS_FILE, before);
     }
   };
 
@@ -379,6 +521,40 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       '✗ usage: npm run floors:record [-- --unit] (got --units)\n',
     );
     expect(run.stdout).toBe('');
+  });
+
+  it('restores the record when a later pass is refused, having written it for that pass', () => {
+    // A stand-in suite in node. Pass 1 asserts every recorded id at its
+    // figure and adds one, so the recorder writes the record and measures
+    // again; pass 2 reads the record and asserts that id at 0. "Would fall"
+    // proves the record held it when pass 2 ran ("no test asserted it" would
+    // mean it was never written), and recordWith proves it was put back.
+    const npx =
+      [
+        `#!${process.execPath}`,
+        "const { appendFileSync, existsSync, readFileSync, writeFileSync } = require('node:fs');",
+        "const marker = __dirname + '/passes';",
+        'const pass = existsSync(marker) ? 2 : 1;',
+        'writeFileSync(marker, String(pass));',
+        "const floors = JSON.parse(readFileSync('tests/floors.json', 'utf8'));",
+        "const site = 'tests/unit/a.test.ts:1';",
+        'const rows = Object.entries(floors).map(([id, actual]) => ({ id, actual, site }));',
+        "if (pass === 1) rows.push({ id: 'probe/added', actual: 1, site });",
+        "for (const row of rows) if (pass === 2 && row.id === 'probe/added') row.actual = 0;",
+        "appendFileSync(process.env.FLOORS_RECORD, rows.map((row) => JSON.stringify(row)).join('\\n') + '\\n');",
+      ].join('\n') + '\n';
+    const run = recordWith({ npx }, ['--unit']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n' +
+        '  probe/added would fall from 1 to 0: a blind reader looks like this. ' +
+        `If the corpus really shrank, lower it in ${FLOORS_FILE} by hand and ` +
+        'say why in the commit.\n',
+    );
+    expect(run.stdout).toBe(
+      `${FLOORS_FILE}: ids were added, so the unit suite runs ` +
+        'again (pass 2): a floor may count the ids the record holds\n',
+    );
   });
 
   it('judges what the Playwright run saw together with the unit run', () => {
