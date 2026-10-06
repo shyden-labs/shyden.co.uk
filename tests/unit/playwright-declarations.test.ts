@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseFile, parseSource, where } from './ast';
 import { specDirs } from '../spec-dirs';
 import { searched, tsFilesUnder } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   callsIn,
   declarationsIn,
@@ -324,6 +325,10 @@ describe('testsWritten() counts the tests a file writes, as text (#477)', () => 
     expect(searched(missed, { of: counted, what: 'planted tests' })).toEqual(
       [],
     );
+    // A planted form deleted from the table would go unread with this green.
+    expect(
+      floorBreach('playwright-declarations/planted-tests', counted.length),
+    ).toBeUndefined();
   });
 
   it('counts nothing that is not a test', () => {
@@ -333,6 +338,12 @@ describe('testsWritten() counts the tests a file writes, as text (#477)', () => 
     expect(
       searched(misread, { of: notCounted, what: 'planted non-tests' }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'playwright-declarations/planted-non-tests',
+        notCounted.length,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -355,13 +366,17 @@ describe('every declaration and test.use() in the spec corpus can be read', () =
           : [],
       ),
     ];
+    const titles = declarations.map(({ title }) => title);
     expect(
       searched(unreadable, {
-        of: declarations.map(({ title }) => title),
+        of: titles,
         what: 'declarations',
       }),
       unreadable.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('playwright-declarations/declarations', titles.length),
+    ).toBeUndefined();
   });
 
   it('the only shared options object is the recording opt-in, from its home', () => {
@@ -397,5 +412,8 @@ describe('every declaration and test.use() in the spec corpus can be read', () =
       searched(wrong, { of: sharedUses, what: 'shared options objects' }),
       wrong.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('playwright-declarations/shared-uses', sharedUses.length),
+    ).toBeUndefined();
   });
 });

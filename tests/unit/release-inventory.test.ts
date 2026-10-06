@@ -406,6 +406,9 @@ describe('release-inventory.mjs as a command (#362)', () => {
     expect(
       searched(capturing, { of: modules, what: 'test helper modules' }),
     ).toEqual([]);
+    expect(
+      floorBreach('release-inventory/capture-scanned-modules', modules.length),
+    ).toBeUndefined();
   });
 
   it('reads every helper module, and as many as there are', () => {
