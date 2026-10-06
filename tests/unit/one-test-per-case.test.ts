@@ -290,6 +290,9 @@ describe('the suite', () => {
     // and pass. `searched` refuses an empty population (#390).
     const { tests, sites } = scan();
     expect(searched(sites, { of: tests, what: 'tests read' })).toEqual([]);
+    expect(
+      floorBreach('one-test-per-case/loop-checked-tests', tests.length),
+    ).toBeUndefined();
   });
 
   it('reads the tests every spec declares, and as many as there are', () => {
@@ -315,6 +318,9 @@ describe('the suite', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach('one-test-per-case/walked-specs', specs.length),
+    ).toBeUndefined();
     expect(
       floorBreach('one-test-per-case/tests', tests.length),
     ).toBeUndefined();

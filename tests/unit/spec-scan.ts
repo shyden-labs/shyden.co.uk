@@ -157,6 +157,9 @@ export const expectNothingFound = (
   }
   // After every verdict, so a population that grew never hides a finding.
   expect(
+    floorBreach('spec-scan/spec-dir-files', readings.length),
+  ).toBeUndefined();
+  expect(
     floorBreach(liveness.floor, judged.length),
     `${liveness.what}: not the recorded figure`,
   ).toBeUndefined();

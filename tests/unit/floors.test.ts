@@ -125,12 +125,14 @@ describe('floorBreach', () => {
           measured < 0,
       )
       .map(([id]) => id);
+    const ids = recorded.map(([id]) => id);
     expect(
       searched(malformed, {
-        of: recorded.map(([id]) => id),
+        of: ids,
         what: `ids in ${FLOORS_FILE}`,
       }),
     ).toEqual([]);
+    expect(floorBreach('floors/recorded-figures', ids.length)).toBeUndefined();
   });
 });
 

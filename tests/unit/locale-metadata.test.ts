@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { LOCALES, type Locale, getSiteStrings } from '../../src/lib/i18n';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   MVP_LOCALES,
   LOCALE_METADATA,
@@ -48,6 +49,9 @@ describe('the locale metadata table', () => {
       'a routed locale with no metadata falls back to English defaults ' +
         'without failing anything',
     ).toEqual([]);
+    expect(
+      floorBreach('locale-metadata/described-locales', LOCALES.length),
+    ).toBeUndefined();
   });
 
   it('names each language in that language, never in English', () => {
@@ -201,6 +205,9 @@ describe('resolving a locale to its site copy', () => {
       searched(wrong, { of: LOCALES, what: 'routed locales' }),
       'a non-English locale receiving the English table is the ternary bug',
     ).toEqual([]);
+    expect(
+      floorBreach('locale-metadata/site-string-locales', LOCALES.length),
+    ).toBeUndefined();
   });
 });
 

@@ -266,6 +266,9 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
     expect(
       searched(spelled, { of: SPECS, what: 'specs read for an inline video' }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-recording/video-checked-specs', SPECS.length),
+    ).toBeUndefined();
     // The home really does hold it, so the assertion above is about a rule
     // being kept rather than about the string having vanished from the repo.
     expect(withoutTsComments(readFileSync(HOME, 'utf8'))).toContain('video:');
@@ -280,6 +283,9 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
     expect(
       searched(missing, { of: SPECS, what: 'specs checked for a declaration' }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-recording/declaration-checked-specs', SPECS.length),
+    ).toBeUndefined();
   });
 
   it('no spec declares test.use(recorded) without acting', () => {
@@ -292,6 +298,9 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
     expect(
       searched(idle, { of: SPECS, what: 'specs checked for an idle opt-in' }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-recording/idle-checked-specs', SPECS.length),
+    ).toBeUndefined();
   });
 
   it('reads every spec, and as many declarations as there are', () => {
@@ -358,6 +367,9 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
         { of: ACTIONS, what: 'action constructs' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-recording/action-constructs', ACTIONS.length),
+    ).toBeUndefined();
   });
 
   it('some specs really do act, and some really do not', () => {
@@ -389,13 +401,17 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
       'journeys in recording specs',
     );
     const blank = journeys.filter((journey) => journey.blank);
+    const judged = journeys.map((journey) => journey.where);
     expect(
       searched(
         blank.map((journey) => journey.where),
-        { of: journeys.map((journey) => journey.where), what: 'journeys' },
+        { of: judged, what: 'journeys' },
       ),
       blank.map((journey) => journey.where).join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-recording/recording-journeys', judged.length),
+    ).toBeUndefined();
   });
 
   it('the detector tells a journey that renders from one that does not', () => {

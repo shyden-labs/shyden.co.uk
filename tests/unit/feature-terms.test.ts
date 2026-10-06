@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   backTranslationUnits,
   TRANSLATED_LOCALES,
@@ -339,18 +340,33 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
 describe('on the live catalogues', () => {
   const naming = (units: readonly BackTranslationUnit[]) =>
     units.filter(({ english }) => featuresNamed(english).length > 0);
+  // One id per locale: each case runs the same line over its own catalogue.
+  const NAMING_FLOOR: Readonly<Record<string, string>> = {
+    id: 'feature-terms/naming-units-id',
+    zh: 'feature-terms/naming-units-zh',
+    vi: 'feature-terms/naming-units-vi',
+    th: 'feature-terms/naming-units-th',
+  };
+  const APPROVED_FLOOR: Readonly<Record<string, string>> = {
+    id: 'feature-terms/approved-words-id',
+    zh: 'feature-terms/approved-words-zh',
+    vi: 'feature-terms/approved-words-vi',
+    th: 'feature-terms/approved-words-th',
+  };
 
   it.each(TRANSLATED_LOCALES)(
     '%s: every piece of copy that names a feature carries an approved word for it',
     (locale) => {
       const units = backTranslationUnits(locale);
       const misses = checkFeatureTerms(units, locale, glossaryOf(locale));
+      const named = naming(units);
       expect(
         searched(
           misses.map(({ key, missing }) => `${key}: ${missing.join(', ')}`),
-          { of: naming(units), what: `${locale} copy naming a feature` },
+          { of: named, what: `${locale} copy naming a feature` },
         ),
       ).toEqual([]);
+      expect(floorBreach(NAMING_FLOOR[locale], named.length)).toBeUndefined();
     },
   );
 
@@ -382,12 +398,18 @@ describe('on the live catalogues', () => {
           );
         }),
       );
+      const approved = FEATURES.flatMap(
+        (feature) => glossaryOf(locale)[feature],
+      );
       expect(
         searched(unused, {
-          of: FEATURES.flatMap((feature) => glossaryOf(locale)[feature]),
+          of: approved,
           what: `${locale} approved words`,
         }),
       ).toEqual([]);
+      expect(
+        floorBreach(APPROVED_FLOOR[locale], approved.length),
+      ).toBeUndefined();
     },
   );
 
