@@ -322,6 +322,10 @@ describe('presence assertions over source text are stripped or anchored', () => 
         what: 'files under tests/',
       }),
     ).toEqual([]);
+    // The walk and git's list can narrow together, and agree over less (#522).
+    expect(
+      floorBreach('anchored-presence/walked-files', tsFiles.length),
+    ).toBeUndefined();
   });
 
   it('scans, in each file, the presence its text writes over raw file text', () => {
@@ -347,6 +351,9 @@ describe('presence assertions over source text are stripped or anchored', () => 
     expect(searched(disagree, { of: testFiles, what: 'test files' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('anchored-presence/compared-test-files', testFiles.length),
+    ).toBeUndefined();
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {
@@ -357,5 +364,8 @@ describe('presence assertions over source text are stripped or anchored', () => 
       }),
       result.findings.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('anchored-presence/judged-scanned', result.scanned),
+    ).toBeUndefined();
   });
 });
