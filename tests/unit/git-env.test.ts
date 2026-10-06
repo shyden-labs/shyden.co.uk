@@ -84,6 +84,7 @@ describe('the variables that point git at one repository (#377)', () => {
         { of: vars, what: 'variables that point git at a repository' },
       ),
     ).toEqual([]);
+    expect(floorBreach('git-env/local-git-vars', vars.length)).toBeUndefined();
   });
 });
 

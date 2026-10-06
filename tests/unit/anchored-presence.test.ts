@@ -80,7 +80,8 @@ const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
  * so a second meta-guard could reason the same way without a second copy.
  */
 const graph = callGraph(tsFiles);
-const readers = graph.close(READS_CONTENT);
+// Raw text is a read no JSON.parse stands on, here as in the detector (#570).
+const readers = graph.close(READS_CONTENT, { parsedIsData: true });
 const strippers = graph.close(STRIPPERS);
 const commentReaders = graph.close(COMMENT_READERS);
 
@@ -354,6 +355,16 @@ describe('presence assertions over source text are stripped or anchored', () => 
     expect(
       floorBreach('anchored-presence/compared-test-files', testFiles.length),
     ).toBeUndefined();
+  });
+
+  it('counts a read JSON.parse stands on as data, as its own definition does (#570)', () => {
+    // floorBreach reads floors.json through JSON.parse. Counted as a reader,
+    // any helper checking a floor made what it returned read as raw source.
+    expect(readers.reaches('tests/floors.ts', 'floorBreach')).toBe(false);
+    // A raw reader the suite really has, so the closure is not merely empty.
+    expect(
+      readers.reaches('tests/unit/literal-grounds.test.ts', 'groundsUnderSrc'),
+    ).toBe(true);
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {

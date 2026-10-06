@@ -594,3 +594,50 @@ describe('code without its literals is what a text cross-check reads (#477)', ()
     expect(out).not.toContain('gone');
   });
 });
+
+describe('a read JSON.parse stands on is data, when the closure asks (#570)', () => {
+  /**
+   * anchored-presence calls raw text "a readFileSync no JSON.parse stands
+   * on", and its closure counted the parsed read too. `floorBreach` reads
+   * floors.json through JSON.parse, so a helper checking a floor made what it
+   * returned read as raw source: six `toContain`s over a child process's
+   * output in waiting-reports-script.test.ts. absence-liveness still wants
+   * the parsed read, since a population read from JSON is a discovered one,
+   * so the default is unchanged and the option is asked for.
+   */
+  const corpus = () => {
+    const file = join(scratchDir('ast-parsed-'), 'readers.ts');
+    writeFileSync(
+      file,
+      "const parsed = (f: string) => JSON.parse(readFileSync(f, 'utf8'));\n" +
+        'export const usesParsed = (f: string) => parsed(f).length;\n' +
+        "const raw = (f: string) => readFileSync(f, 'utf8');\n" +
+        'export const usesRaw = (f: string) => raw(f).length;\n' +
+        'const both = (f: string) =>\n' +
+        "  JSON.parse(readFileSync(f, 'utf8')) + readFileSync(f, 'utf8');\n",
+    );
+    return file;
+  };
+
+  it.each([
+    ['parsed', true, false],
+    ['usesParsed', true, false],
+    ['parsed', false, true],
+    ['usesParsed', false, true],
+    ['raw', true, true],
+    ['usesRaw', true, true],
+    ['raw', false, true],
+    ['usesRaw', false, true],
+    ['both', true, true],
+    ['both', false, true],
+  ] as const)(
+    '%s, with parsedIsData %s, reaches readFileSync: %s',
+    (name, parsedIsData, reaches) => {
+      const file = corpus();
+      const closure = callGraph([file]).close(new Set(['readFileSync']), {
+        parsedIsData,
+      });
+      expect(closure.reaches(file, name)).toBe(reaches);
+    },
+  );
+});

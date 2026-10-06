@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import {
   calculateGlory,
@@ -162,13 +163,32 @@ describe('the result line reads in the page’s own language (#390)', () => {
     const functions = (table: unknown) =>
       catalogueLeaves(table).filter(([, value]) => typeof value === 'function');
     const english = new Map(functions(siteEn));
-    const reused = [siteId, siteZh, siteVi, siteTh].flatMap((site, index) =>
-      functions(site)
-        .filter(([path, fn]) => english.get(path) === fn)
-        .map(([path]) => `${['id', 'zh', 'vi', 'th'][index]}: ${path}`),
+    // The population is every translated function judged, not English's
+    // own: a reader blind to one locale's functions still sees every
+    // English one.
+    const judged = (
+      [
+        ['id', siteId],
+        ['zh', siteZh],
+        ['vi', siteVi],
+        ['th', siteTh],
+      ] as const
+    ).flatMap(([locale, site]) =>
+      functions(site).map(([path, fn]) => ({
+        where: `${locale}: ${path}`,
+        path,
+        fn,
+      })),
     );
+    const reused = judged
+      .filter(({ path, fn }) => english.get(path) === fn)
+      .map(({ where }) => where);
+    const translated = judged.map(({ where }) => where);
     expect(
-      searched(reused, { of: [...english], what: 'English functions' }),
+      searched(reused, { of: translated, what: 'translated functions' }),
     ).toEqual([]);
+    expect(
+      floorBreach('glory-points/translated-functions', translated.length),
+    ).toBeUndefined();
   });
 });
