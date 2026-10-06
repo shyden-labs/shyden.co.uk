@@ -10,7 +10,10 @@
  * config authorises (`image.domains`, `image.remotePatterns`), so the config
  * is the control these readers make mechanical.
  */
+import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 import ts from 'typescript';
+import { filesUnder } from './source-files';
 import { parseSource } from './unit/ast';
 
 /** What the config reader saw: every authorising construct, and how much it read. */
@@ -101,4 +104,41 @@ export function maxStaleBranch(source: string): 'gated' | 'ungated' {
   };
   look(found[0]);
   return gated ? 'gated' : 'ungated';
+}
+
+const DEPENDENCY_KINDS = [
+  'dependencies',
+  'optionalDependencies',
+  'peerDependencies',
+] as const;
+type DependencyKind = (typeof DEPENDENCY_KINDS)[number];
+
+/** Every package the lockfile says depends on `name`, by its lockfile path. */
+export function dependentsOf(lock: string, name: string): string[] {
+  const { packages } = JSON.parse(lock) as {
+    packages?: Record<
+      string,
+      Partial<Record<DependencyKind, Record<string, string>>>
+    >;
+  };
+  if (!packages) throw new Error('the lockfile has no packages map to read');
+  return Object.entries(packages)
+    .filter(([, entry]) =>
+      DEPENDENCY_KINDS.some((kind) => name in (entry[kind] ?? {})),
+    )
+    .map(([path]) => path)
+    .sort();
+}
+
+/** Every script under `dir` that names `name` as a module specifier, relative to `dir`, sorted. */
+export function importersIn(dir: string, name: string): string[] {
+  // Any quoted specifier, so a dynamic import or a require counts as surely
+  // as a static import; a comment naming it over-reports, which fails safe.
+  const specifier = new RegExp(
+    `['"\`]${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`,
+  );
+  // The one walk home, which also refuses an empty walk (one-home.test.ts).
+  return filesUnder(dir, (path) => /\.(m|c)?js$/.test(path))
+    .filter((path) => specifier.test(readFileSync(path, 'utf8')))
+    .map((path) => relative(dir, path));
 }

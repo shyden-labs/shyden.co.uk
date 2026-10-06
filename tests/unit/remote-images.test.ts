@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { floorBreach } from '../floors';
-import { maxStaleBranch, remoteImageAllowances } from '../remote-images';
+import {
+  dependentsOf,
+  importersIn,
+  maxStaleBranch,
+  remoteImageAllowances,
+} from '../remote-images';
 import { searched } from '../source-files';
 
 /**
@@ -160,5 +165,47 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
       '#457',
     ).toBe('4.2.0');
     expect(maxStaleBranch(readFileSync(CACHE, 'utf8'))).toBe('ungated');
+  });
+});
+
+/**
+ * The config guard rests on how Astro reaches http-cache-semantics, read in
+ * astro 7.3.5 (2026-10-06, #457): the build loads a remote image
+ * (assets/build/generate.js -> loadRemoteImage in assets/build/remote.js, the
+ * library's only importer) only when isRemoteAllowed passes, which is true
+ * only for a URL matching image.domains or image.remotePatterns. Two facts are
+ * checked on every version; the third, that the gate still stands, needs a
+ * reader, so a new version fails here until someone has re-read it.
+ */
+const ASTRO_READ = '7.3.5';
+
+describe('the path into http-cache-semantics is the one #457 read', () => {
+  it('only astro depends on http-cache-semantics', () => {
+    expect(
+      dependentsOf(
+        readFileSync('package-lock.json', 'utf8'),
+        'http-cache-semantics',
+      ),
+    ).toEqual(['node_modules/astro']);
+  });
+
+  it("inside astro, only the build's remote-image cache imports it", () => {
+    expect(
+      importersIn('node_modules/astro/dist', 'http-cache-semantics'),
+    ).toEqual(['assets/build/remote.js']);
+  });
+
+  it('fails on any Astro version whose remote-image path nobody has re-read', () => {
+    const { version } = JSON.parse(
+      readFileSync('node_modules/astro/package.json', 'utf8'),
+    ) as { version: string };
+    expect(
+      version,
+      `astro is ${version}, but its remote-image path was read on ${ASTRO_READ} (#457). ` +
+        'Before moving ASTRO_READ, re-read that the build still loads a remote image ' +
+        '(assets/build/generate.js, loadRemoteImage) only when isRemoteAllowed passes, ' +
+        'and that this is still true only for image.domains and image.remotePatterns. ' +
+        'If it is not, the config guard no longer covers the path: say so on #457.',
+    ).toBe(ASTRO_READ);
   });
 });
