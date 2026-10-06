@@ -434,6 +434,17 @@ export interface Closure {
   reaches(file: string, name: string): boolean;
 }
 
+export interface CloseOptions {
+  /**
+   * Count a call that is the first argument of `JSON.parse(...)` as data, not
+   * as a call: `JSON.parse(readFileSync(f))` then reaches nothing. Asked for by
+   * anchored-presence, whose definition of raw text is a `readFileSync` no
+   * `JSON.parse` stands on (#570); absence-liveness leaves it off, since a
+   * population read from JSON is still a discovered one.
+   */
+  readonly parsedIsData?: boolean;
+}
+
 export interface CallGraph {
   /**
    * Every function reaching any of `seed`, at any depth.
@@ -443,7 +454,7 @@ export interface CallGraph {
    * three and four hops of helper -- #98's first derivation looked only a few
    * lines around a `readFileSync` and missed six sites for exactly that.
    */
-  close(seed: Iterable<string>): Closure;
+  close(seed: Iterable<string>, options?: CloseOptions): Closure;
 }
 
 /** Index every named function across `files` and how they call each other. */
@@ -451,6 +462,10 @@ export function callGraph(files: readonly string[]): CallGraph {
   const keyOf = (file: string, name: string) => `${file}::${name}`;
   /** `file::name` to the bare names it calls. */
   const calls = new Map<string, Set<string>>();
+  /** The same, less every call that is `JSON.parse(...)`'s first argument (#570). */
+  const rawCalls = new Map<string, Set<string>>();
+  /** Calls seen as `JSON.parse(...)`'s first argument; the parent is visited first. */
+  const parsed = new Set<ts.Node>();
   const fileOf = new Map<string, string>();
   const keysByName = new Map<string, string[]>();
   /**
@@ -511,6 +526,7 @@ export function callGraph(files: readonly string[]): CallGraph {
           mine = keyOf(file, name);
           if (!calls.has(mine)) {
             calls.set(mine, new Set());
+            rawCalls.set(mine, new Set());
             fileOf.set(mine, file);
             keysByName.set(name, [...(keysByName.get(name) ?? []), mine]);
           }
@@ -545,8 +561,23 @@ export function callGraph(files: readonly string[]): CallGraph {
             });
         imports.set(file, own);
       }
-      if (mine && ts.isCallExpression(node) && ts.isIdentifier(node.expression))
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === 'JSON' &&
+        node.expression.name.text === 'parse' &&
+        node.arguments[0]
+      )
+        parsed.add(node.arguments[0]);
+      if (
+        mine &&
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression)
+      ) {
         calls.get(mine)?.add(node.expression.text);
+        if (!parsed.has(node)) rawCalls.get(mine)?.add(node.expression.text);
+      }
       ts.forEachChild(node, (child) => visit(child, mine));
     };
     visit(parseFile(file), null);
@@ -577,8 +608,9 @@ export function callGraph(files: readonly string[]): CallGraph {
   };
 
   return {
-    close(seed) {
+    close(seed, options = {}) {
       const seeds = new Set(seed);
+      const edges = options.parsedIsData ? rawCalls : calls;
       const reached = new Set<string>();
       // Fixed point rather than a fixed pass count: a chain longer than the
       // passes would silently truncate, and a truncated closure reports a
@@ -587,7 +619,7 @@ export function callGraph(files: readonly string[]): CallGraph {
       let grew = true;
       while (grew) {
         grew = false;
-        for (const [key, callees] of calls) {
+        for (const [key, callees] of edges) {
           if (reached.has(key)) continue;
           const file = fileOf.get(key) ?? '';
           for (const callee of callees)
