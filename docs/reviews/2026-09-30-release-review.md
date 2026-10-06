@@ -220,16 +220,16 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 205 | test | A | `tests/sanity-on-build.ts` | +70/-0 | read whole (tranche 15) | clean | — |
 | 206 | test | A | `tests/shytalk-links.ts` | +60/-0 | read whole (tranche 15) | clean: links are selected by resolved host, and the absence goes through searched over the hosts found | — |
 | 207 | test | A | `tests/site-pages.ts` | +115/-0 | read whole (tranche 12); later diff read whole at 2f40db6 (tranche 27) | F130 TITLE_FOR added beside HEADING_FOR, keyed by page for the same reason Tranche 27: none. | LP1 RED |
-| 208 | test | A | `tests/source-files.ts` | +261/-0 | CHANGED since read (+52/-2 after c48ed44); before: read whole (tranche 15) | clean: its git spawns throw on any status but 0 (and 1 for check-ignore), so a null status from a buffer overflow (#438's class) fails closed | — |
-| 209 | test | A | `tests/spec-dirs.ts` | +35/-0 | CHANGED since read (+18/-3 after c48ed44); before: read whole (tranche 9) | F106 a docblock for a function taking dir was left behind when specFilesUnder moved to tests/source-files.ts (which carries its own), stacked above specDirs' real docblock: removed. | SD1: 1/1 RED |
+| 208 | test | A | `tests/source-files.ts` | +261/-0 | read whole (tranche 15); later diff read whole at c117042 (tranche 28) | clean: its git spawns throw on any status but 0 (and 1 for check-ignore), so a null status from a buffer overflow (#438's class) fails closed Tranche 28: none. | — |
+| 209 | test | A | `tests/spec-dirs.ts` | +35/-0 | read whole (tranche 9); later diff read whole at c117042 (tranche 28) | F106 a docblock for a function taking dir was left behind when specFilesUnder moved to tests/source-files.ts (which carries its own), stacked above specDirs' real docblock: removed. Tranche 28: none. | SD1: 1/1 RED |
 | 210 | test | A | `tests/themes.ts` | +62/-0 | read whole (tranche 15) | clean: both saveTheme callers save the opposite of the device's theme, so neither assertion can pass on the device's own | — |
-| 211 | test | A | `tests/unit/absence-liveness.test.ts` | +497/-0 | CHANGED since read (+342/-31 after c48ed44); before: read whole (tranche 15) | F159 only toEqual([]) and toHaveLength(0) were read, so an absence spelled expect(x.length).toBe(0), .size, or toStrictEqual([]) was never judged (AL1b green); now every spelling, with a fixture test. F161 its liveness floor sat at 153 under a real 391, so a dead toHaveLength(0) branch stayed green (AL2 green); now 394, floor 393. A subject bound by destructuring is still not traced (AL3 green), filed as #446 AC6 | AL1b-before GREEN; AL1b RED (1 of 3). AL2-before GREEN; AL2b RED (2 of 3) |
-| 212 | test | A | `tests/unit/anchored-presence.test.ts` | +361/-0 | CHANGED since read (+77/-19 after c48ed44); before: read whole (tranche 15) | F160 an anchor is not a stripper: report-endpoint stripped only `--` with a private replace, and its anchored check passed a block comment below the table holding the old quote line while the column allowed 100000 characters (RE1 green); now withoutSqlComments in source-text.ts, quote-aware, and the doc no longer calls an anchor stronger than stripping. Its floor sat at 47 under a real 77, now 76 (AP2 red before: its fixtures cover toMatch, so the slack had no proven cost) | RE1-before GREEN; RE1 RED (1 of 3364) |
+| 211 | test | A | `tests/unit/absence-liveness.test.ts` | +497/-0 | read whole (tranche 15); later diff read whole at c117042 (tranche 28) | F159 only toEqual([]) and toHaveLength(0) were read, so an absence spelled expect(x.length).toBe(0), .size, or toStrictEqual([]) was never judged (AL1b green); now every spelling, with a fixture test. F161 its liveness floor sat at 153 under a real 391, so a dead toHaveLength(0) branch stayed green (AL2 green); now 394, floor 393. A subject bound by destructuring is still not traced (AL3 green), filed as #446 AC6 Tranche 28: F214 P4, fixed forward (#589): Playwright's own absence, toHaveCount(0), is read by no meta-guard (not this one, not floorless-searches): 50 sites under tests/, a text sweep finds 39 with no other assertion on the same subject text in their file (an upper bound). Not F208 (JavaScript collectors) or F175. | AL1b-before GREEN; AL1b RED (1 of 3). AL2-before GREEN; AL2b RED (2 of 3); Z1 GREEN, Z2 RED (as predicted) |
+| 212 | test | A | `tests/unit/anchored-presence.test.ts` | +361/-0 | read whole (tranche 15); later diff read whole at c117042 (tranche 28) | F160 an anchor is not a stripper: report-endpoint stripped only `--` with a private replace, and its anchored check passed a block comment below the table holding the old quote line while the column allowed 100000 characters (RE1 green); now withoutSqlComments in source-text.ts, quote-aware, and the doc no longer calls an anchor stronger than stripping. Its floor sat at 47 under a real 77, now 76 (AP2 red before: its fixtures cover toMatch, so the slack had no proven cost) Tranche 28: none. | RE1-before GREEN; RE1 RED (1 of 3364) |
 | 213 | test | A | `tests/unit/ast.test.ts` | +596/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
 | 214 | test | A | `tests/unit/ast.ts` | +721/-0 | read in full at 33e84cd (tranche 16) | F167 P3 latent, fixed forward: callGraph records only bare-identifier callees and identifiersIn skips element-access callees, so fs.readFileSync(...) or readers[k](...) never reach a seed; 0 live sites; #503 | filed with its plants: #503 |
 | 215 | test | A | `tests/unit/astro-css-strip.test.ts` | +150/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
 | 216 | test | M | `tests/unit/avatars.test.ts` | +1/-1 | read in full at 33e84cd (tranche 16) | none new; loops over AVATAR_SEXES inside tests compute only, #462 scope | n/a |
-| 217 | test | A | `tests/unit/back-translate.test.ts` | +1149/-0 | CHANGED since read (+180/-6 after c48ed44); before: read in full (tranche 3) | F30 | via back-translate.ts |
+| 217 | test | A | `tests/unit/back-translate.test.ts` | +1149/-0 | read in full (tranche 3); later diff read whole at c117042 (tranche 28) | F30 Tranche 28: none in its diff beyond F213: 'says how many it compared per locale, and as what' loops TRANSLATED in one Vitest body, one of F213's 31 sites. | via back-translate.ts |
 | 218 | test | A | `tests/unit/base-url-calls.test.ts` | +441/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
 | 219 | test | A | `tests/unit/board-geometry.test.ts` | +91/-0 | read in full at 33e84cd (tranche 16) | none | n/a |
 | 220 | test | A | `tests/unit/browser-matrix.test.ts` | +662/-0 | read in full at 33e84cd (tranche 16) | F168 P3 fixed forward: the retries guard loads configs under CI=true only, so a CI-conditional retry passes and the local-only device config is never judged without CI; #502. Loops over configs inside one test are #462 scope | filed: #502 |
@@ -265,7 +265,7 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 250 | test | A | `tests/unit/event-collectors.test.ts` | +598/-0 | read in full at 33e84cd (tranche 18) | F174 P3 latent: SUBSCRIBES sees only .on(<event>, so .once(/.addListener( or a variable event name escapes; F175 P3 latent: toHaveCount(0) counts as proof the list is not empty; 0 live sites each; #503 | filed with their plants: #503 |
 | 251 | test | A | `tests/unit/evidence-checks.test.ts` | +110/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
 | 252 | test | A | `tests/unit/evidence-fixture.test.ts` | +124/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
-| 253 | test | A | `tests/unit/evidence-page.test.ts` | +2540/-0 | CHANGED since read (+243/-1 after c48ed44); before: diff read (tranche 10) | F119's three tests: the refusals matched by what they name, the allowances, and main() asking before it lists (from the stripped source). | see test-e2e.mjs |
+| 253 | test | A | `tests/unit/evidence-page.test.ts` | +2540/-0 | diff read (tranche 10); later diff read whole at c117042 (tranche 28) | F119's three tests: the refusals matched by what they name, the allowances, and main() asking before it lists (from the stripped source). Tranche 28: none. Observed, not a finding: 'is asked before the suite is listed or run' anchors on the text `listSuite(argv)`, which a definition moved below main() would also satisfy; today it is defined above (test-e2e.mjs main at 462, call at 472). | see test-e2e.mjs |
 | 254 | test | A | `tests/unit/evidence-recording.test.ts` | +447/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
 | 255 | test | A | `tests/unit/evidence-signoff.test.ts` | +240/-0 | read in full at 33e84cd (tranche 18) | none new; loops over fixtures inside tests compute only, #462 scope | n/a |
 | 256 | test | A | `tests/unit/excluded-by-design.test.ts` | +105/-0 | read in full at 33e84cd (tranche 18) | none | n/a |
@@ -287,7 +287,7 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 272 | test | A | `tests/unit/literal-grounds.test.ts` | +363/-0 | read in full at 33e84cd (tranche 20) | none new; line 210 counts grounds while judging the rules inside them, already #471 | n/a |
 | 273 | test | A | `tests/unit/locale-beta.test.ts` | +104/-0 | read in full at 33e84cd (tranche 20) | none new; the locale loops inside tests compute only, #462 scope | n/a |
 | 274 | test | A | `tests/unit/locale-fallbacks.test.ts` | +141/-0 | read in full at 33e84cd (tranche 20) | none | n/a |
-| 275 | test | A | `tests/unit/locale-metadata.test.ts` | +226/-0 | CHANGED since read (+22/-2 after c48ed44); before: read in full (tranche 3) | F28; F25 | via metadata.ts |
+| 275 | test | A | `tests/unit/locale-metadata.test.ts` | +226/-0 | read in full (tranche 3); later diff read whole at c117042 (tranche 28) | F28; F25 Tranche 28: none. | via metadata.ts |
 | 276 | test | A | `tests/unit/locale-routing.test.ts` | +104/-0 | read in full at 33e84cd (tranche 20) | none new; the loops compute only, over sitePaths(), which nonEmpty refuses empty; #462 scope | n/a |
 | 277 | test | A | `tests/unit/locale-switcher.test.ts` | +187/-0 | read in full at 33e84cd (tranche 20) | none new; tripwire 2's source checks are spelling-specific (`[0]`, a bare `nativeName`) and backed by the rendered per-language test at classroom-groups-io.spec.ts:855 | n/a |
 | 278 | test | M | `tests/unit/lockdown.test.ts` | +8/-5 | diff read whole, a3a5adb..33e84cd (tranche 20) | none | n/a |
@@ -331,20 +331,20 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 316 | test | A | `tests/unit/shytalk-brand.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none; outside src/ and tests/ the mark's colours appear only in docs/ | n/a |
 | 317 | test | A | `tests/unit/shytalk-showcase.test.ts` | +149/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
 | 318 | test | A | `tests/unit/signoff-status.test.ts` | +234/-0 | read in full at 33e84cd (tranche 23) | none new; the eight spawned refusals in one test are #462 scope | n/a |
-| 319 | test | A | `tests/unit/site-pages.test.ts` | +74/-0 | CHANGED since read (+10/-5 after c48ed44); before: read whole (tranche 12) | F130 asserts TITLE_FOR covers sitePaths(); red before the export existed | red-first |
+| 319 | test | A | `tests/unit/site-pages.test.ts` | +74/-0 | read whole (tranche 12); later diff read whole at c117042 (tranche 28) | F130 asserts TITLE_FOR covers sitePaths(); red before the export existed Tranche 28: none. | red-first |
 | 320 | test | A | `tests/unit/sitemap-config.test.ts` | +79/-0 | read in full at 33e84cd (tranche 23) | none | n/a |
 | 321 | test | A | `tests/unit/source-files.test.ts` | +213/-0 | read in full at 33e84cd (tranche 23) | F198 P4 latent, fixed forward: 'skips dotfiles and node_modules' walks tests/, which holds neither, so a walk that never skips passes all 23; the skip is held only by supply-chain's walk from `.`; #512 | filed: #512; 2/2 as predicted (source-files GREEN, supply-chain RED) |
 | 322 | test | A | `tests/unit/source-text.test.ts` | +745/-0 | read in full at 33e84cd (tranche 23) | none new; its few compute-only loops are #462 scope | n/a |
 | 323 | test | A | `tests/unit/source-text.ts` | +689/-0 | read in full at 33e84cd (tranche 24) | F199 P3, fixed forward: `codeWithoutComments` runs the CSS scanner over .ts/.mjs/.js, which reads no template or regex literal, so a `/*` inside one deletes code to the next `*/`: 10 of the 380 tracked code files read short (playwright.dev.config.ts keeps 5 of 34 lines); nothing hidden or depending on it today (its 10 callers 358/358 without it); swept, line 686 is the only non-CSS use. F200 P4 latent: `startsRegex` tests keywords on a whitespace-free tail with no boundary, so `margin / 2; // it's` opens a regex and then a string; 0 of 380 files read differently; #514 | filed: #514; F199 2/2 as predicted (shytalk-brand GREEN, control RED); F200 probe: positive seen, 0/380 differ |
-| 324 | test | A | `tests/unit/spec-dirs.test.ts` | +37/-0 | CHANGED since read (+15/-2 after c48ed44); before: read whole (tranche 9) | none: anti-vacuity length, the two deploy-gate directories by name, tests/unit excluded. | see SD1 |
+| 324 | test | A | `tests/unit/spec-dirs.test.ts` | +37/-0 | read whole (tranche 9); later diff read whole at c117042 (tranche 28) | none: anti-vacuity length, the two deploy-gate directories by name, tests/unit excluded. Tranche 28: none. | see SD1 |
 | 325 | test | A | `tests/unit/spec-scan.ts` | +163/-0 | read in full at 33e84cd (tranche 24) | none; a guard without a per-file `count` is #478 scope | n/a |
 | 326 | test | M | `tests/unit/staleness.test.ts` | +9/-5 | diff read whole at 33e84cd (tranche 24) | none; the four reasons compared with `not.toBe` are strings at runtime (probed), so no two distinct closures pass it trivially | n/a |
 | 327 | test | A | `tests/unit/stranded-docblocks.test.ts` | +372/-0 | read in full at 33e84cd (tranche 24) | F201 P4, fixed forward: no recorded floor and only a per-kind cross-check, so a reader blind to every file over 120 kB passes with a stranded pair planted in pipeline-wiring.test.ts; #514. Swept: 70 of the 96 files calling `searched(` check no floor (161 calls, a per-file lower bound); #515 | filed: #514, #515; 2/2 as predicted (blinded GREEN, control RED) |
 | 328 | test | A | `tests/unit/supply-chain.test.ts` | +451/-0 | read in full at 33e84cd (tranche 24) | F202 P4 dormant, fixed forward: "grouped" is a substring of the whole config body, so an `ignore` naming `actions/cache*` passes with no group; the ordering test compares offsets into two different strings; #514. Its compute-only loop over six ranges is #462 scope | filed: #514; 2/2 as predicted (ignore GREEN, control RED) |
 | 329 | test | A | `tests/unit/tokens.test.ts` | +156/-0 | read in full at 33e84cd (tranche 24) | none; its "nothing reads" scan goes through `codeWithoutComments` (F199), whose deletions can only turn it red, never green | n/a |
 | 330 | test | A | `tests/unit/tracked-paths.test.ts` | +68/-0 | read in full at 33e84cd (tranche 24) | none new; a floorless `searched` (#515) | n/a |
-| 331 | test | A | `tests/unit/translate-messages.test.ts` | +362/-0 | CHANGED since read (+1/-1 after c48ed44); before: read in full (tranche 3) | F22 (TR35 TR36 TR47 TR48; /=0/ matched the template) | via translate.ts |
-| 332 | test | A | `tests/unit/translate.test.ts` | +759/-0 | CHANGED since read (+13/-2 after c48ed44); before: read in full (tranche 3) | F22 F24 F25 | via translate.ts |
+| 331 | test | A | `tests/unit/translate-messages.test.ts` | +362/-0 | read in full (tranche 3); later diff read whole at c117042 (tranche 28) | F22 (TR35 TR36 TR47 TR48; /=0/ matched the template) Tranche 28: none. | via translate.ts |
+| 332 | test | A | `tests/unit/translate.test.ts` | +759/-0 | read in full (tranche 3); later diff read whole at c117042 (tranche 28) | F22 F24 F25 Tranche 28: none. | via translate.ts |
 | 333 | test | A | `tests/unit/typecheck-scope.test.ts` | +135/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
 | 334 | test | A | `tests/unit/unit-budget.test.ts` | +24/-0 | read in full at 33e84cd (tranche 24) | none; the budget is pinned as a literal | n/a |
 | 335 | test | A | `tests/unit/upload-assets.test.ts` | +419/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
@@ -423,31 +423,31 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 409 | workflow | A | `.github/workflows/probe-459.yml` | +42/-0 | read in full (tranche 26) | none |  |
 | 410 | config | M | `LICENSE` | +1/-1 | read in full (tranche 26) | none |  |
 | 411 | config | A | `docker/playwright/Dockerfile` | +5/-0 | read in full (tranche 26) | none |  |
-| 412 | test | A | `tests/device/init-script-disposals.ts` | +36/-0 | — |  |  |
-| 413 | test | A | `tests/dissolved-company.ts` | +61/-0 | — |  |  |
-| 414 | test | A | `tests/e2e/recorders.spec.ts` | +48/-0 | — |  |  |
-| 415 | test | A | `tests/floors.json` | +58/-0 | — |  |  |
-| 416 | test | A | `tests/floors.ts` | +115/-0 | — |  |  |
-| 417 | test | A | `tests/gh-stand-in.ts` | +20/-0 | — |  |  |
-| 418 | test | A | `tests/html-text.ts` | +36/-0 | — |  |  |
-| 419 | test | A | `tests/http-stand-in.ts` | +26/-0 | — |  |  |
-| 420 | test | A | `tests/literal-floors.ts` | +298/-0 | — |  |  |
-| 421 | test | A | `tests/not-found-served.ts` | +26/-0 | — |  |  |
-| 422 | test | A | `tests/one-test-per-case.ts` | +212/-0 | — |  |  |
-| 423 | test | A | `tests/path-stand-in.ts` | +26/-0 | — |  |  |
-| 424 | test | A | `tests/prod/prod-smoke.spec.ts` | +90/-0 | — |  |  |
-| 425 | test | A | `tests/robots-directives.ts` | +13/-0 | — |  |  |
-| 426 | test | A | `tests/scratch-dir.ts` | +20/-0 | — |  |  |
-| 427 | test | A | `tests/temporary-files-setup.ts` | +16/-0 | — |  |  |
-| 428 | test | A | `tests/temporary-files.ts` | +80/-0 | — |  |  |
-| 429 | test | A | `tests/typed-fields.ts` | +62/-0 | — |  |  |
-| 430 | test | A | `tests/unit/adb.test.ts` | +151/-0 | — |  |  |
-| 431 | test | A | `tests/unit/build-release-content-script.test.ts` | +237/-0 | — |  |  |
-| 432 | test | A | `tests/unit/closes-over-nothing.ts` | +37/-0 | — |  |  |
-| 433 | test | A | `tests/unit/custom-properties.test.ts` | +133/-0 | — |  |  |
-| 434 | test | A | `tests/unit/dashboard-paths.test.ts` | +76/-0 | — |  |  |
-| 435 | test | A | `tests/unit/dependabot-labels-script.test.ts` | +170/-0 | — |  |  |
-| 436 | test | A | `tests/unit/deploy-gate-script.test.ts` | +258/-0 | — |  |  |
+| 412 | test | A | `tests/device/init-script-disposals.ts` | +36/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 413 | test | A | `tests/dissolved-company.ts` | +61/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 414 | test | A | `tests/e2e/recorders.spec.ts` | +48/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 415 | test | A | `tests/floors.json` | +58/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 416 | test | A | `tests/floors.ts` | +115/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 417 | test | A | `tests/gh-stand-in.ts` | +20/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 418 | test | A | `tests/html-text.ts` | +36/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 419 | test | A | `tests/http-stand-in.ts` | +26/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 420 | test | A | `tests/literal-floors.ts` | +298/-0 | read whole at c117042 (tranche 28) | Tranche 28: F211 P4 latent, fixed forward (#589): a bound held in a local const (or an `as` cast, or arithmetic) reads `compared`, which the ratchet never judges, so a literal floor written through a name is never ratcheted; 'reads a local bound as a comparison, not forwarded' pins the gap. Swept: 30 identifier-bound sites under tests/, none a liveness floor today. | L1 GREEN, L2 RED (as predicted) |
+| 421 | test | A | `tests/not-found-served.ts` | +26/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 422 | test | A | `tests/one-test-per-case.ts` | +212/-0 | read whole at c117042 (tranche 28) | Tranche 28: F212 P4 latent, fixed forward (#589): loopParts reads for, for-of, for-in and forEach only, so a while/do loop or a .map under Promise.all that reloads per pass is never read (swept: 1 while, 1 .map(async), neither navigating). F213 P4, fixed forward (#589): the walk is specDirs(), so no Vitest body is ever read, though the global rule names Vitest too; swept: 31 loops over a locale table in 11 unit files. | W1 GREEN, W2 RED; U1 GREEN, U2 RED (all as predicted) |
+| 423 | test | A | `tests/path-stand-in.ts` | +26/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 424 | test | A | `tests/prod/prod-smoke.spec.ts` | +90/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 425 | test | A | `tests/robots-directives.ts` | +13/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 426 | test | A | `tests/scratch-dir.ts` | +20/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 427 | test | A | `tests/temporary-files-setup.ts` | +16/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 428 | test | A | `tests/temporary-files.ts` | +80/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 429 | test | A | `tests/typed-fields.ts` | +62/-0 | read whole at c117042 (tranche 28) | Tranche 28: its 'closes over nothing' test is F215's subject (see closes-over-nothing.ts). |  |
+| 430 | test | A | `tests/unit/adb.test.ts` | +151/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 431 | test | A | `tests/unit/build-release-content-script.test.ts` | +237/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 432 | test | A | `tests/unit/closes-over-nothing.ts` | +37/-0 | read whole at c117042 (tranche 28) | Tranche 28: F215 P4, fixed forward (#589): 'closes over nothing' checks for import lines only, so a module-scope binding the shipped measurement calls passes the unit guard and is undefined in the page and over WebDriver. | K1 GREEN, K2 RED (as predicted); K1e RED in Chromium on /classroom-groups, fieldLabel is not defined (as predicted; first aimed at /, GREEN because the homepage has no field) |
+| 433 | test | A | `tests/unit/custom-properties.test.ts` | +133/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 434 | test | A | `tests/unit/dashboard-paths.test.ts` | +76/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 435 | test | A | `tests/unit/dependabot-labels-script.test.ts` | +170/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
+| 436 | test | A | `tests/unit/deploy-gate-script.test.ts` | +258/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
 | 437 | test | A | `tests/unit/device-runner.test.ts` | +468/-0 | — |  |  |
 | 438 | test | A | `tests/unit/device-tool-homes.test.ts` | +110/-0 | — |  |  |
 | 439 | test | A | `tests/unit/devicectl.test.ts` | +141/-0 | — |  |  |
