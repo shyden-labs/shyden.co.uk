@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { codeWithoutComments } from './source-text';
 import { filesUnder, searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * Modules for the CLI that nothing the site ships may import.
@@ -80,14 +81,16 @@ describe('a CLI-only module stays out of everything the site ships', () => {
 
   it('is imported by nothing the site ships', () => {
     const forbidden = new Set(CLI_ONLY.map(stem));
-    const offenders = shipped().flatMap((file) =>
+    const files = shipped();
+    const offenders = files.flatMap((file) =>
       importsOf(file)
         .filter((target) => forbidden.has(stem(target)))
         .map((target) => `${file} imports ${target}`),
     );
     expect(
-      searched(offenders, { of: shipped(), what: 'shipped source files' }),
+      searched(offenders, { of: files, what: 'shipped source files' }),
       'this would put a CLI module in the browser bundle',
     ).toEqual([]);
+    expect(floorBreach('cli-only/shipped-files', files.length)).toBeUndefined();
   });
 });

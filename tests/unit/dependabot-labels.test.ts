@@ -9,6 +9,7 @@ import {
 } from '../../scripts/dependabot-labels.mjs';
 import { workflowJobs } from '../workflow-jobs';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * `.github/dependabot.yml` names labels; the repository either has them or it
@@ -54,12 +55,16 @@ describe('the labels dependabot.yml asks for', () => {
     // `absence-liveness.test.ts` recognises: a population bound to a variable
     // first is invisible to it, and widening that detector to see my spelling
     // is how a mandatory control acquires an escape hatch (#118).
+    const declared = declaredLabels(withComment);
     expect(
       searched(
-        declaredLabels(withComment).filter((name) => name === invented),
-        { of: declaredLabels(withComment), what: 'declared labels' },
+        declared.filter((name) => name === invented),
+        { of: declared, what: 'declared labels' },
       ),
     ).toHaveLength(0);
+    expect(
+      floorBreach('dependabot-labels/declared-labels', declared.length),
+    ).toBeUndefined();
   });
 
   it('are deduplicated and sorted, so the refusal reads the same every run', () => {
@@ -149,5 +154,8 @@ describe('the check that reads repository state', () => {
     );
 
     expect(invocations).toHaveLength(1);
+    expect(
+      floorBreach('dependabot-labels/gating-run-steps', runs.length),
+    ).toBeUndefined();
   });
 });

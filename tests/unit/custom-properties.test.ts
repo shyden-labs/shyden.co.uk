@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { codeWithoutComments } from './source-text';
 
 /**
@@ -123,11 +124,15 @@ describe('no custom property is read without a definition (#390 F62)', () => {
     const properties = propertiesOf(
       new Map(paths.map((path) => [path, readFileSync(path, 'utf8')])),
     );
+    const read = [...properties.read.keys()];
     expect(
       searched(undefinedReads(properties), {
-        of: [...properties.read.keys()],
+        of: read,
         what: 'custom properties read',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('custom-properties/read-properties', read.length),
+    ).toBeUndefined();
   });
 });

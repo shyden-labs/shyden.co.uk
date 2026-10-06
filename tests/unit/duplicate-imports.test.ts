@@ -184,12 +184,16 @@ describe('no source imports one module twice (#390 F59)', () => {
     const repeated = sources.flatMap(({ path, repeated }) =>
       repeated.map((specifier) => `${path}: ${specifier}`),
     );
+    const imports = sources.flatMap(({ read }) => read);
     expect(
       searched(repeated, {
-        of: sources.flatMap(({ read }) => read),
+        of: imports,
         what: 'imports read',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/judged-imports', imports.length),
+    ).toBeUndefined();
   });
 
   it('reads every import the sources declare, and as many as there are', () => {
