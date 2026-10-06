@@ -175,17 +175,19 @@ describe("ShyTalk's brand mark has one home", () => {
     // its one token exactly once, so a reader gone blind to a script or to a
     // stylesheet is caught by the file it missed.
     const home = readCode(HOME);
-    const unread = Object.values(SHYTALK_MARK).filter(
-      (hex) => !spells(home, hex.toLowerCase()),
-    );
+    const hexes = Object.values(SHYTALK_MARK);
+    const unread = hexes.filter((hex) => !spells(home, hex.toLowerCase()));
     expect(
       searched(unread, {
-        of: Object.values(SHYTALK_MARK),
+        of: hexes,
         what: 'brand hexes',
       }),
     ).toEqual([]);
     expect(readCode(TOKEN_HOME).split(TOKEN_FORM).length - 1).toBe(1);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach('shytalk-brand/home-checked-hexes', hexes.length),
+    ).toBeUndefined();
     expect(floorBreach('shytalk-brand/files', files.length)).toBeUndefined();
   });
 

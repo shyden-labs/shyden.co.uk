@@ -319,6 +319,9 @@ describe('the suite', () => {
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('one-test-per-case/walked-specs', specs.length),
+    ).toBeUndefined();
+    expect(
       floorBreach('one-test-per-case/tests', tests.length),
     ).toBeUndefined();
   });

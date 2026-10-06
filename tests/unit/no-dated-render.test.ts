@@ -92,6 +92,9 @@ describe('no page is rendered from the clock (#370)', () => {
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('no-dated-render/read-sources', sources.length),
+    ).toBeUndefined();
+    expect(
       floorBreach(
         'no-dated-render/views',
         sources.flatMap(({ views }) => views).length,
