@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { en, type Catalogue } from '../../src/lib/i18n/en';
 import { id } from '../../src/lib/i18n/id';
 import { zh } from '../../src/lib/i18n/zh';
@@ -375,6 +376,9 @@ describe('the copy the operator read and approved', () => {
     expect(
       searched(unpinned, { of: rosterColumnKeys, what: 'roster columns' }),
     ).toEqual([]);
+    expect(
+      floorBreach('verified-labels/roster-columns', rosterColumnKeys.length),
+    ).toBeUndefined();
 
     const values = LOCALES.flatMap((locale) => Object.values(VERIFIED[locale]));
     expect(
@@ -383,6 +387,9 @@ describe('the copy the operator read and approved', () => {
         { of: values, what: 'pinned values' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('verified-labels/pinned-values', values.length),
+    ).toBeUndefined();
   });
 });
 
@@ -414,6 +421,14 @@ const AWAITING_READ: Record<Locale, readonly string[]> = {
   th: [],
 };
 
+// One id per locale: the search below runs once per locale over its own labels.
+const WITNESSED_FLOOR: Readonly<Record<string, string>> = {
+  id: 'verified-labels/witnessed-labels-id',
+  zh: 'verified-labels/witnessed-labels-zh',
+  vi: 'verified-labels/witnessed-labels-vi',
+  th: 'verified-labels/witnessed-labels-th',
+};
+
 describe('short labels that disagree with their own locale', () => {
   it("every one is pinned or awaiting the operator's read", () => {
     const unread = Object.fromEntries(
@@ -431,17 +446,17 @@ describe('short labels that disagree with their own locale', () => {
         const witnessed = labels
           .filter(({ status }) => status !== 'unchecked')
           .map(({ key }) => key);
-        return [
-          locale,
-          locale === DEFAULT_LOCALE
-            ? flagged
-            : [
-                ...searched(flagged, {
-                  of: witnessed,
-                  what: `${locale} labels with a witness`,
-                }),
-              ].sort(),
-        ];
+        if (locale === DEFAULT_LOCALE) return [locale, flagged];
+        const awaiting = [
+          ...searched(flagged, {
+            of: witnessed,
+            what: `${locale} labels with a witness`,
+          }),
+        ].sort();
+        expect(
+          floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
+        ).toBeUndefined();
+        return [locale, awaiting];
       }),
     );
 

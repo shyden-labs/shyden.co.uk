@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { FAILURE_NOTICE } from '../../src/lib/waiting-reports';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * `scripts/waiting-reports.mjs` as a real process (#349, spec 15.5), against
@@ -98,12 +99,16 @@ const standIn = (side: string) => {
       await fetch(`${url}${SENTINEL}`);
       const all = [...received];
       expect(all.at(-1)?.url, 'the stand-in is recording').toBe(SENTINEL);
+      const before = all.slice(0, -1);
       expect(
-        searched(all.slice(0, -1), {
+        searched(before, {
           of: all,
           what: `requests the ${side} stand-in recorded, the sentinel included`,
         }),
       ).toEqual([]);
+      expect(
+        floorBreach('waiting-reports-script/stand-in-requests', all.length),
+      ).toBeUndefined();
     },
   };
 };
