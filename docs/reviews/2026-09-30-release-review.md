@@ -353,12 +353,12 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 338 | test | A | `tests/unit/visual-runner.test.ts` | +187/-0 | read in full at 33e84cd (tranche 24) | none | n/a |
 | 339 | test | A | `tests/unit/wait-for.test.ts` | +154/-0 | read in full at 33e84cd (tranche 24) | none; its timing bounds leave 700 ms over a 300 ms wait | n/a |
 | 340 | test | A | `tests/unit/waiting-reports-script.test.ts` | +414/-0 | read in full at 33e84cd (tranche 24) | none; each `every` over requests follows an assertion that they exist | n/a |
-| 341 | test | A | `tests/unit/waiting-reports.test.ts` | +334/-0 | — |  |  |
-| 342 | test | A | `tests/unit/wcag.test.ts` | +241/-0 | — |  |  |
-| 344 | test | A | `tests/unit/workflow-jobs.test.ts` | +568/-0 | — |  |  |
-| 345 | test | A | `tests/viewport.ts` | +153/-0 | — |  |  |
-| 346 | test | A | `tests/wcag.ts` | +101/-0 | — |  |  |
-| 347 | test | A | `tests/workflow-jobs.ts` | +530/-0 | — |  |  |
+| 341 | test | A | `tests/unit/waiting-reports.test.ts` | +334/-0 | read in full at 388897e (tranche 25) | none; every malformed answer is held to a throw, and `postedToday` is pinned at midnight UTC and one second before it | n/a |
+| 342 | test | A | `tests/unit/wcag.test.ts` | +241/-0 | read in full at 388897e (tranche 25), with its diff since c48ed44 | F203 P4, fixed forward: every plant for `curvesIn` is an arrow function, so a reader narrowed to `ts.isArrowFunction` passes all 15 with the curve planted as `export function lin` in tests/viewport.ts; its liveness counts files where it judges functions; #576. Its compute-only loop over five unreadable colours is #462 scope | filed: #576; 2/2 as predicted (V1 GREEN, V2 RED) |
+| 344 | test | A | `tests/unit/workflow-jobs.test.ts` | +568/-0 | read in full at 388897e (tranche 25) | none; each absence is judged over a fixture population pinned beside it (`['deploy', 'verify']`), and the reader's checkout case is F205 (row 347) | n/a |
+| 345 | test | A | `tests/viewport.ts` | +153/-0 | read in full at 388897e (tranche 25), with its diff since c48ed44 | F204 P4 latent, fixed forward: `spillPastCard` reports `over: 0` for a card with no rendered descendants, and neither caller proves it measured anything (`toHaveCount(4)` counts DOM nodes); measured on Chromium, a measurement reading no element leaves both callers GREEN; #576. Swept: no other max-over-`querySelectorAll('*')` helper (theme.spec.ts:503 maps every element, no maximum) | filed: #576; 2/2 as predicted (P1 GREEN, P2 RED) |
+| 346 | test | A | `tests/wcag.ts` | +101/-0 | read in full at 388897e (tranche 25), with its diff since c48ed44 | none; `parseColour` refuses what it cannot read, and the copy count in its docblock is held by wcag.test.ts (F203 is that guard's reader) | n/a |
+| 347 | test | A | `tests/workflow-jobs.ts` | +530/-0 | read in full at 388897e (tranche 25), with its diff since c48ed44 | F205 P4 dormant, fixed forward: `checkoutSteps` matches `actions/checkout@` case-sensitively while GitHub resolves names without regard to case (measured on the API, assumed for the runner), so `Actions/Checkout@<sha>` planted in ci.yml leaves the #395 guard GREEN (188/188); #576. Swept: all 16 checkouts are lower case; the same prefix shape matches `actions/upload-artifact@` three times in pipeline-wiring.test.ts | filed: #576; 2/2 as predicted (V3 GREEN, V4 RED) |
 | 348 | doc | M | `CLAUDE.md` | +19/-5 | not code: prose, read for claims the code contradicts |  |  |
 | 349 | doc | A | `HANDOVER.md` | +83/-0 | not code: prose, read for claims the code contradicts |  |  |
 | 350 | doc | M | `README.md` | +134/-17 | not code: prose, read for claims the code contradicts |  |  |
