@@ -9,6 +9,7 @@ import {
   type WorkflowJob,
 } from '../workflow-jobs';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * The rule behind the pipeline guard, proved on fixtures before it is trusted
@@ -113,6 +114,12 @@ describe('a job downstream of a conditional job states its own condition (#157)'
         what: 'fixture jobs downstream of a conditional job',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'workflow-jobs/deploy-dev-downstream-jobs',
+        downstream.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('follows a skip through every hop, not only the nearest need', () => {
@@ -160,6 +167,9 @@ jobs:
         what: 'fixture jobs',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/unconditional-graph-jobs', jobs.length),
+    ).toBeUndefined();
   });
 
   it('refuses a need naming a job the workflow does not define', () => {
@@ -332,6 +342,9 @@ describe('no job runs on the runner default budget (#157)', () => {
     expect(
       searched(unboundedJobFindings(jobs), { of: jobs, what: 'fixture jobs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/whole-minute-jobs', jobs.length),
+    ).toBeUndefined();
   });
 
   // GitHub refuses `timeout-minutes` on a job that calls a reusable workflow.
@@ -361,6 +374,9 @@ describe('no job runs on the runner default budget (#157)', () => {
     expect(
       searched(unboundedJobFindings(jobs), { of: jobs, what: 'fixture jobs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/local-caller-jobs', jobs.length),
+    ).toBeUndefined();
   });
 
   it('flags a job calling a workflow in another repository, whose budgets no guard here can read', () => {

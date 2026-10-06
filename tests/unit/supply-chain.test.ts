@@ -113,10 +113,14 @@ describe('the CI supply chain is pinned', () => {
       .filter(({ text }) => !/@[0-9a-f]{40}(?=\s|$)/.test(text))
       .map(({ where, text }) => `${where} ${text}`);
 
+    const actions = externalUses();
     expect(
-      searched(unpinned, { of: externalUses(), what: 'third-party actions' }),
+      searched(unpinned, { of: actions, what: 'third-party actions' }),
       'a mutable tag can be repointed under us',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/sha-checked-actions', actions.length),
+    ).toBeUndefined();
   });
 
   it('every pinned action names the version its SHA resolves to', () => {
@@ -124,10 +128,14 @@ describe('the CI supply chain is pinned', () => {
       .filter(({ text }) => !/@[0-9a-f]{40}\s+#\s*v\d/.test(text))
       .map(({ where, text }) => `${where} ${text}`);
 
+    const actions = externalUses();
     expect(
-      searched(opaque, { of: externalUses(), what: 'third-party actions' }),
+      searched(opaque, { of: actions, what: 'third-party actions' }),
       'a bare SHA bump is unreviewable by a human',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/version-checked-actions', actions.length),
+    ).toBeUndefined();
   });
 });
 
@@ -152,14 +160,18 @@ describe('Dependabot keeps the pins from rotting', () => {
       .filter(([key]) => !withoutYamlQuotes(config).includes(`${key}*`))
       .map(([key, refs]) => `${key} used at ${refs.size} sub-paths, ungrouped`);
 
+    const actions = externalUses();
     expect(
       // The population is every external action, NOT `subPathRepos()`. This
       // repo uses no sub-path actions today, so naming that as the subject
       // would rightly refuse -- and the guard would look broken rather than
       // dormant. Every action was still examined for a sub-path.
-      searched(ungrouped, { of: externalUses(), what: 'third-party actions' }),
+      searched(ungrouped, { of: actions, what: 'third-party actions' }),
       'separate PRs per sub-path break the one-SHA-per-repo invariant',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/sub-path-checked-actions', actions.length),
+    ).toBeUndefined();
   });
 
   /**
@@ -190,13 +202,17 @@ describe('Dependabot keeps the pins from rotting', () => {
         .map(() => `${key} grouped after patch-updates`),
     );
 
+    const blocks = ecosystemBlocks();
     expect(
       searched(misordered, {
-        of: ecosystemBlocks(),
+        of: blocks,
         what: 'Dependabot ecosystem blocks',
       }),
       'Dependabot assigns to the FIRST matching group and stops',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/ordered-ecosystem-blocks', blocks.length),
+    ).toBeUndefined();
   });
 
   it('a Dependabot config exists', () => {
@@ -260,10 +276,14 @@ describe('a container image CI runs is pinned, and watched', () => {
       )
       .map(({ where, text }) => `${where} ${text}`);
 
+    const lines = fromLines();
     expect(
-      searched(loose, { of: fromLines(), what: 'FROM lines' }),
+      searched(loose, { of: lines, what: 'FROM lines' }),
       'a tag can be repointed under us, and a bare digest is unreviewable',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/from-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('has Dependabot watching every directory that holds a Dockerfile', () => {
@@ -280,10 +300,14 @@ describe('a container image CI runs is pinned, and watched', () => {
       .map((dir) => (dir === '.' ? '/' : `/${dir}`))
       .filter((dir) => !watched.has(dir));
 
+    const files = dockerfiles();
     expect(
-      searched(unwatched, { of: dockerfiles(), what: 'Dockerfiles' }),
+      searched(unwatched, { of: files, what: 'Dockerfiles' }),
       'a digest nobody bumps rots',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/watched-dockerfiles', files.length),
+    ).toBeUndefined();
   });
 });
 
@@ -370,6 +394,9 @@ describe('TypeScript is held at 6 until it can move', () => {
       ),
       '@astrojs/check now accepts TypeScript 7 or later: port the six files under tests/ off the TypeScript 6 compiler API (7 moved it to typescript/unstable/*), then delete the typescript ignore in dependabot.yml and this describe block',
     ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/admitted-typescript-majors', majors.length),
+    ).toBeUndefined();
   });
 });
 

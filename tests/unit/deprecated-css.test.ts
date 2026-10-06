@@ -136,6 +136,9 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('deprecated-css/css-sources', files.length),
+    ).toBeUndefined();
+    expect(
       floorBreach(
         'deprecated-css/declarations',
         sheets.flatMap(({ css }) => declarationsIn(css)).length,

@@ -105,6 +105,9 @@ describe('typecheck reads the scripts that deploy this site (#228)', () => {
     const read = scripts();
     const opted = read.filter((path) => optsOut(readFileSync(path, 'utf8')));
     expect(searched(opted, { of: read, what: 'scripts read' })).toEqual([]);
+    expect(
+      floorBreach('typecheck-scope/nocheck-scripts', read.length),
+    ).toBeUndefined();
   });
 
   it('reads every script, and as many as there are', () => {

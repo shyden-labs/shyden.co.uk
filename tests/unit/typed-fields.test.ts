@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { searched, tsFilesUnder } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   IOS_ZOOM_FLOOR_PX,
   measureTypedFields,
@@ -69,6 +70,9 @@ describe('typed fields are defined once, and survive being sent to a phone', () 
       searched(missing, { of: needles, what: 'serialised field rules' }),
       `the serialised measurement lost: ${missing.join(', ')}`,
     ).toEqual([]);
+    expect(
+      floorBreach('typed-fields/serialised-rules', needles.length),
+    ).toBeUndefined();
   });
 
   it('closes over nothing, because anything it closed over would be undefined at the far end', () => {
@@ -104,5 +108,8 @@ describe('typed fields are defined once, and survive being sent to a phone', () 
       'typed fields are measured in one home; two definitions are how the ' +
         'phone came to check fewer fields than CI',
     ).toEqual(['tests/typed-fields.ts']);
+    expect(
+      floorBreach('typed-fields/test-ts-files', files.length),
+    ).toBeUndefined();
   });
 });

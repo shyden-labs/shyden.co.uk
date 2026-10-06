@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scratchDir } from '../scratch-dir';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { RUN_MARKER, RUN_TMPDIR, leakedEntries } from '../temporary-files';
 
 /**
@@ -37,6 +38,9 @@ describe('leakedEntries: what a test left in the run directory', () => {
     expect(
       searched(leakedEntries(dir), { of: kept, what: 'cache entries' }),
     ).toEqual([]);
+    expect(
+      floorBreach('temporary-files/kept-cache-entries', kept.length),
+    ).toBeUndefined();
   });
 
   it('reports what only looks like a module cache', () => {

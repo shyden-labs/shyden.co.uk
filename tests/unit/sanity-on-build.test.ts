@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { relative } from 'node:path';
 import { searched, specFilesUnder } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * A pull request runs the deployed-site suites against its own build (#335).
@@ -145,6 +146,12 @@ const deployedOnlyTests = (): ListedTest[] =>
     t.tags.includes('deployed-only'),
   );
 
+// One id per config: each case runs the same line over its own spec files.
+const SPEC_FILES_FLOOR: Readonly<Record<string, string>> = {
+  'tests/dev': 'sanity-on-build/spec-files-dev',
+  'tests/prod': 'sanity-on-build/spec-files-prod',
+};
+
 describe.each(CONFIGS)(
   '$config with SANITY_ON_BUILD=1',
   ({ config, testDir }) => {
@@ -176,6 +183,9 @@ describe.each(CONFIGS)(
         searched(silent, { of: specFiles, what: `spec files in ${testDir}` }),
         'these spec files contribute no test to the pull request run',
       ).toEqual([]);
+      expect(
+        floorBreach(SPEC_FILES_FLOOR[testDir], specFiles.length),
+      ).toBeUndefined();
     });
   },
 );
@@ -197,6 +207,12 @@ describe('tests tagged @deployed-only', () => {
       searched(unexplained, { of: tagged, what: '@deployed-only tests' }),
       'a @deployed-only test must carry a deployed-only annotation with a reason',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'sanity-on-build/explained-deployed-only-tests',
+        tagged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('are left out of the on-build run, and nothing else is', () => {
@@ -210,6 +226,12 @@ describe('tests tagged @deployed-only', () => {
       searched(leaked, { of: tagged, what: '@deployed-only tests' }),
       'these tests need the deployed site and must not run against a preview',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'sanity-on-build/excluded-deployed-only-tests',
+        tagged.length,
+      ),
+    ).toBeUndefined();
 
     const everyTest = CONFIGS.flatMap(
       ({ config }) => listing(config, false).tests,
