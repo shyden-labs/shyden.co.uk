@@ -13,6 +13,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withoutMarkupComments, withoutTsComments } from './source-text';
 import { filesUnder, tsFilesUnder, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { oneAttemptEach, reportLocation } from '../../scripts/test-e2e.mjs';
 import {
   CONTRACT_MODULE,
@@ -1064,6 +1065,9 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
       searched(deletions, { of: deletions.length, what: 'report cleanups' }),
       'the runner stopped deleting its temp report directory at all',
     ).toHaveLength(1);
+    expect(
+      floorBreach('evidence-page/report-cleanups', deletions.length),
+    ).toBeUndefined();
     expect(runner, 'the report directory is deleted unconditionally').toMatch(
       /if \(ephemeral\)\s*rmSync\(reportDir/,
     );
@@ -1247,6 +1251,9 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
       searched(respellings, { of: consumers, what: 'evidence consumers' }),
       'a filename spelled twice is two filenames the day one of them moves',
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/consumers', consumers.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1585,6 +1592,9 @@ describe('the page references its recordings by a path the artifact serves', () 
     expect(
       searched(unservable, { of: srcs, what: 'media references' }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/media-references', srcs.length),
+    ).toBeUndefined();
     // A positive control on the POPULATION, not merely on its size: the shots
     // are data URIs and would satisfy `searched` on their own, leaving the
     // recording -- the only blob path here -- entirely unexamined.
@@ -1665,6 +1675,9 @@ describe('a journey that captured nothing is still on the page', () => {
         what: 'recordings handed to the page',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/handed-recordings', keys.length),
+    ).toBeUndefined();
   });
 });
 
