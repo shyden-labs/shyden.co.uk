@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { en } from '../../src/lib/i18n/en';
 import { siteEn } from '../../src/lib/i18n/site';
 import { filesUnder, searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * A defined string that nothing renders.
@@ -72,6 +73,9 @@ describe('every translated string reaches a page', () => {
     expect(searched(unused, { of: defined, what: 'tool copy keys' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('dead-copy/tool-copy-keys', defined.length),
+    ).toBeUndefined();
   });
 
   it('every error code the copy defines is rendered by renderError', () => {
@@ -81,6 +85,9 @@ describe('every translated string reaches a page', () => {
     const defined = Object.keys(en.errors);
     const unused = defined.filter((code) => !renderer.includes(code));
     expect(searched(unused, { of: defined, what: 'error codes' })).toEqual([]);
+    expect(
+      floorBreach('dead-copy/error-codes', defined.length),
+    ).toBeUndefined();
   });
 
   // Task 8a. Same check, same reasoning, for the warnings channel:
@@ -101,25 +108,35 @@ describe('every translated string reaches a page', () => {
     expect(searched(unused, { of: defined, what: 'warning codes' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('dead-copy/warning-codes', defined.length),
+    ).toBeUndefined();
   });
 
   it('the site-wide copy defines nothing that no page renders', () => {
-    // Nested one level: `footer.companyNo`, `glory.needsJs`.
+    // Nested one level: `footer.companyNo`, `glory.needsJs`. The population
+    // is every name judged, a group and each key inside it, not the groups
+    // opened: a reader blind to the keys would open every group and pass.
     const unused: string[] = [];
-    const groups = Object.entries(siteEn);
-    for (const [group, value] of groups) {
+    const judged: string[] = [];
+    for (const [group, value] of Object.entries(siteEn)) {
+      judged.push(group);
       if (!isReferenced(group)) {
         unused.push(group);
         continue;
       }
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         for (const key of Object.keys(value)) {
+          judged.push(`${group}.${key}`);
           if (!isReferenced(key)) unused.push(`${group}.${key}`);
         }
       }
     }
-    expect(searched(unused, { of: groups, what: 'site copy groups' })).toEqual(
-      [],
-    );
+    expect(
+      searched(unused, { of: judged, what: 'site copy groups and keys' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('dead-copy/site-copy-names', judged.length),
+    ).toBeUndefined();
   });
 });

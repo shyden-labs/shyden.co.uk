@@ -63,6 +63,9 @@ describe.each(HOMES)('no file spawns $tool but $home', ({ tool, home }) => {
         what: 'files under tests/ and scripts/',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('device-tool-homes/call-site-files', files.length),
+    ).toBeUndefined();
 
     // The positive control: the home itself is caught by the same pattern, so
     // an empty list above is a fact about the other files and not a pattern
@@ -106,5 +109,8 @@ describe('`adb devices` is read in one place', () => {
     expect(
       searched(reading, { of: files, what: 'files under tests/ and scripts/' }),
     ).toEqual(['scripts/adb.mjs']);
+    expect(
+      floorBreach('device-tool-homes/adb-reader-files', files.length),
+    ).toBeUndefined();
   });
 });
