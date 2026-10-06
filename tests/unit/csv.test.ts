@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CSV_LOCALES, type CsvColumn } from '../../src/lib/csv-locale';
+import { floorBreach } from '../floors';
 import { nonEmpty, searched } from '../source-files';
 import { LOCALES, getStrings, type Locale } from '../../src/lib/i18n';
 import {
@@ -149,15 +150,19 @@ describe('CSV_LOCALES', () => {
     // detector that cannot tell them apart.
     const collisions: string[] = [];
     let pairs = 0;
-    for (const [a, b] of localePairs()) {
+    const unordered = localePairs();
+    for (const [a, b] of unordered) {
       pairs += 1;
       const first = new Set(parsableWords(a));
       for (const word of parsableWords(b))
         if (first.has(word)) collisions.push(`${a}/${b} both use "${word}"`);
     }
     expect(
-      searched(collisions, { of: localePairs(), what: 'locale pairs' }),
+      searched(collisions, { of: unordered, what: 'locale pairs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('csv/header-word-pairs', unordered.length),
+    ).toBeUndefined();
     // Anti-vacuity, the same reason the populated-tables test below exists:
     // an empty table makes every comparison above pass having compared
     // nothing. Count the pairs actually walked, and the words in each table.
@@ -205,14 +210,16 @@ describe('CSV_LOCALES', () => {
         seen.add(meaning);
         meanings.set(token, seen);
       }
-    const conflicts = [...meanings]
+    const tokens = [...meanings];
+    const conflicts = tokens
       .filter(([, seen]) => seen.size > 1)
       .map(
         ([token, seen]) => `"${token}" means ${[...seen].sort().join(' and ')}`,
       );
     expect(
-      searched(conflicts, { of: [...meanings], what: 'distinct CSV tokens' }),
+      searched(conflicts, { of: tokens, what: 'distinct CSV tokens' }),
     ).toEqual([]);
+    expect(floorBreach('csv/distinct-tokens', tokens.length)).toBeUndefined();
     // Anti-vacuity: a table of empty strings collides with nothing, so
     // assert every locale actually contributed a token for every meaning.
     for (const locale of LOCALES) {
@@ -1153,7 +1160,8 @@ describe('the sex column header, corrected without breaking old files', () => {
       student({ number: 2, name: 'Budi', sex: 'M', apart: 'B' }),
     ];
     const lost: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const result = parseRoster(
         serialiseRoster(sample, '6A', locale),
         locale,
@@ -1168,8 +1176,11 @@ describe('the sex column header, corrected without breaking old files', () => {
         lost.push(`${locale}: sex ${sexes.join(',')}`);
     }
     expect(
-      searched(lost, { of: [...LOCALES], what: 'locales round-tripped' }),
+      searched(lost, { of: locales, what: 'locales round-tripped' }),
     ).toEqual([]);
+    expect(
+      floorBreach('csv/round-tripped-locales', locales.length),
+    ).toBeUndefined();
   });
 
   it('the sex header agrees with the roster column the teacher sees', () => {
@@ -1188,7 +1199,8 @@ describe('the sex column header, corrected without breaking old files', () => {
     // genuine vocabulary choices. A blanket per-column guard would be red on
     // correct data, which is how #55 reddened CI on a correct config.
     const drift: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const inFile = CSV_LOCALES[locale].columns.sex;
       const onPage = getStrings(locale).rosterColSex;
       // Compared the way a reader compares them: a CSV header is lower case
@@ -1197,9 +1209,12 @@ describe('the sex column header, corrected without breaking old files', () => {
       if (inFile.trim().toLowerCase() !== onPage.trim().toLowerCase())
         drift.push(`${locale}: file "${inFile}" vs page "${onPage}"`);
     }
+    expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
+      [],
+    );
     expect(
-      searched(drift, { of: [...LOCALES], what: 'locales compared' }),
-    ).toEqual([]);
+      floorBreach('csv/sex-header-locales', locales.length),
+    ).toBeUndefined();
   });
 
   it('the sex tokens are the letters the roster offers the teacher', () => {
@@ -1211,7 +1226,8 @@ describe('the sex column header, corrected without breaking old files', () => {
     // this, changing one side reddened only literal pins, whose natural fix
     // leaves the other side behind.
     const drift: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const { M, F } = CSV_LOCALES[locale].sex;
       const t = getStrings(locale);
       if (M !== t.rosterSexMale)
@@ -1219,9 +1235,12 @@ describe('the sex column header, corrected without breaking old files', () => {
       if (F !== t.rosterSexFemale)
         drift.push(`${locale}: file F "${F}" vs page "${t.rosterSexFemale}"`);
     }
+    expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
+      [],
+    );
     expect(
-      searched(drift, { of: [...LOCALES], what: 'locales compared' }),
-    ).toEqual([]);
+      floorBreach('csv/sex-token-locales', locales.length),
+    ).toBeUndefined();
   });
 
   it("the class comment names the class the way the page's own field does", () => {
@@ -1232,7 +1251,8 @@ describe('the sex column header, corrected without breaking old files', () => {
     // must use one word. The `(optional)` the field adds is not part of it.
     const word = (text: string) => text.normalize('NFC').trim().toLowerCase();
     const drift: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const inFile = CSV_LOCALES[locale].classComment
         .replace(/^#\s*/, '')
         .replace(/[:：]\s*$/, '');
@@ -1243,9 +1263,12 @@ describe('the sex column header, corrected without breaking old files', () => {
       if (word(inFile) !== word(onPage))
         drift.push(`${locale}: file "${inFile}" vs page "${onPage}"`);
     }
+    expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
+      [],
+    );
     expect(
-      searched(drift, { of: [...LOCALES], what: 'locales compared' }),
-    ).toEqual([]);
+      floorBreach('csv/class-comment-locales', locales.length),
+    ).toBeUndefined();
   });
 
   it('correcting the sex header moved nothing else, in any locale', () => {
@@ -1298,7 +1321,8 @@ describe('the sex column header, corrected without breaking old files', () => {
     // Derived, so a sixth language fails here rather than shipping unpinned.
     expect(LOCALES.filter((l) => !(l in UNTOUCHED))).toEqual([]);
     const moved: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const table = CSV_LOCALES[locale];
       const pin = UNTOUCHED[locale];
       const actual = {
@@ -1314,9 +1338,12 @@ describe('the sex column header, corrected without breaking old files', () => {
             `${locale}.${field}: "${actual[field as keyof typeof actual]}" (pinned "${want}")`,
           );
     }
+    expect(searched(moved, { of: locales, what: 'locales pinned' })).toEqual(
+      [],
+    );
     expect(
-      searched(moved, { of: [...LOCALES], what: 'locales pinned' }),
-    ).toEqual([]);
+      floorBreach('csv/untouched-locales', locales.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1334,7 +1361,8 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
     // failure text so a regression says what leaked, not just that something
     // did.
     const leaked: string[] = [];
-    for (const locale of LOCALES) {
+    const locales = [...LOCALES];
+    for (const locale of locales) {
       const t = getStrings(locale);
       const file = serialiseRoster(
         [student({ number: 1, name: 'Ana', sex: null })],
@@ -1353,8 +1381,9 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
             `${locale}: ${name} exported "${cells[at]}" (the screen shows "${shown}")`,
           );
     }
-    expect(
-      searched(leaked, { of: [...LOCALES], what: 'locales exported' }),
-    ).toEqual([]);
+    expect(searched(leaked, { of: locales, what: 'locales exported' })).toEqual(
+      [],
+    );
+    expect(floorBreach('csv/exported-locales', locales.length)).toBeUndefined();
   });
 });

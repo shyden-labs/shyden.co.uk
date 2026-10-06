@@ -137,6 +137,9 @@ describe('a function body has one home across files', () => {
       searched(findings, { of: DECLARATIONS, what: 'function bodies' }),
       findings.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('duplication/judged-declarations', DECLARATIONS.length),
+    ).toBeUndefined();
   });
 
   it('carries no verdict for a pair that no longer exists', () => {
@@ -152,6 +155,11 @@ describe('a function body has one home across files', () => {
         { of: recorded, what: 'recorded verdicts' },
       ),
     ).toEqual([]);
+    // A verdict dropped from the table would leave its pair unexcused, but a
+    // reader dropping one silently would leave this test reading fewer (#524).
+    expect(
+      floorBreach('duplication/outliving-verdicts', recorded.length),
+    ).toBeUndefined();
   });
 
   it('records each verdict against one pair, which no copy can inherit', () => {
@@ -170,6 +178,9 @@ describe('a function body has one home across files', () => {
         { of: recorded, what: 'recorded verdicts' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('duplication/shared-verdicts', recorded.length),
+    ).toBeUndefined();
   });
 });
 

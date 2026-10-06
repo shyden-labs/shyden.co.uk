@@ -77,6 +77,10 @@ describe('browser-event collectors have exactly one home', () => {
         what: 'files in spec directories',
       }),
     ).toEqual([]);
+    // The walk and git's list can narrow together, and agree over less (#524).
+    expect(
+      floorBreach('event-collectors/walked-specs', SCANNED.length),
+    ).toBeUndefined();
   });
 
   it('is subscribed to only in recorders.ts', () => {
@@ -334,6 +338,9 @@ describe('a locator list cannot be looped unproved', () => {
     expect(searched(unfollowed, { of: calls, what: '.all() calls' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('event-collectors/all-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('reads as many .all() calls as the text holds, file by file', () => {
@@ -348,6 +355,9 @@ describe('a locator list cannot be looped unproved', () => {
     expect(
       searched(disagree, { of: SCANNED, what: 'scanned e2e specs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('event-collectors/compared-specs', SCANNED.length),
+    ).toBeUndefined();
   });
 
   it('catches a loop with nothing proving the list is not empty', () => {
@@ -568,16 +578,17 @@ describe('a locator list cannot be looped unproved', () => {
     const loops = SCANNED.flatMap((path) =>
       locatorLoops(readFileSync(path, 'utf8')).map((loop) => ({ path, loop })),
     );
+    const judged = loops.map(({ path, loop }) => `${path}: ${loop.subject}`);
     const unproved = loops
       .filter(({ loop }) => !loop.proved)
       .map(({ path, loop }) => `${path}: ${loop.subject}`);
     expect(
-      searched(unproved, {
-        of: loops.map(({ path, loop }) => `${path}: ${loop.subject}`),
-        what: 'locator loops',
-      }),
+      searched(unproved, { of: judged, what: 'locator loops' }),
       unproved.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('event-collectors/judged-loops', judged.length),
+    ).toBeUndefined();
   });
 
   it('reads a list spread into the array a loop walks', () => {
