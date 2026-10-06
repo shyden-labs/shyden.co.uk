@@ -163,6 +163,9 @@ describe("ShyTalk's brand mark has one home", () => {
     expect(
       searched(offenders, { of: files, what: 'source files scanned' }),
     ).toEqual([]);
+    expect(
+      floorBreach('shytalk-brand/spelling-scanned-files', files.length),
+    ).toBeUndefined();
   });
 
   it('reads every source file, and as many as there are', () => {
