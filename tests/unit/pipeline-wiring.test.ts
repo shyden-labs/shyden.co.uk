@@ -302,6 +302,9 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'jobs downstream of a conditional job',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/skip-downstream-jobs', downstream.length),
+    ).toBeUndefined();
   });
 
   it('the push path proves the tree instead of re-running the suite', () => {
@@ -379,6 +382,9 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(
       searched(refused, { of: asked, what: 'permissions ci.yml asks for' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/dispatch-asked-permissions', asked.length),
+    ).toBeUndefined();
   });
 
   // The merge gate. `dev-verified` has to be POSTED by something, or branch
@@ -646,12 +652,18 @@ describe('the deploy pipeline runs what it claims to', () => {
         );
       return findings;
     });
+    const counted = jobs.filter(
+      ({ job }) => job.environment === 'reports-count',
+    );
     expect(
       searched(strays, {
-        of: jobs.filter(({ job }) => job.environment === 'reports-count'),
+        of: counted,
         what: 'jobs in reports-count',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/reports-count-jobs', counted.length),
+    ).toBeUndefined();
   });
 
   // A prod job is any job in a workflow that changes what prod serves, and any
@@ -671,12 +683,16 @@ describe('the deploy pipeline runs what it claims to', () => {
         .filter((secret) => secret.startsWith('DEV_'))
         .map((secret) => `${where} reads ${secret}`),
     );
+    const judged = prodJobs.map(({ where }) => where);
     expect(
       searched(leaks, {
-        of: prodJobs.map(({ where }) => where),
+        of: judged,
         what: 'jobs that deploy or verify prod',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/prod-jobs', judged.length),
+    ).toBeUndefined();
   });
 
   // ---- the rollback's dry run (#241, Shyden's decision 2026-09-19) --------
@@ -1080,14 +1096,18 @@ describe('the deploy pipeline runs what it claims to', () => {
       .map(({ file, ref }) =>
         ref === undefined ? `${file}: not a workflow` : `${file} → ${ref}`,
       );
+    const judged = refs.map(({ file, ref }) =>
+      ref === undefined ? file : `${file} → ${ref}`,
+    );
     expect(
       searched(dangling, {
-        of: refs.map(({ file, ref }) =>
-          ref === undefined ? file : `${file} → ${ref}`,
-        ),
+        of: judged,
         what: 'workflow file references',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/named-workflow-refs', judged.length),
+    ).toBeUndefined();
   });
 
   it('reads every workflow file reference, and as many as there are', () => {
@@ -1108,6 +1128,9 @@ describe('the deploy pipeline runs what it claims to', () => {
     );
     expect(searched(missed, { of: files, what: 'workflow files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach('pipeline-wiring/ref-cross-checked-files', files.length),
+    ).toBeUndefined();
     expect(
       floorBreach(
         'pipeline-wiring/workflow-file-refs',
@@ -1329,6 +1352,9 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
     expect(searched(named, { of: workflows, what: 'workflow files' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('pipeline-wiring/image-selector-workflows', workflows.length),
+    ).toBeUndefined();
     expect(jobNamed('ci.yml', 'image').runs).toEqual([
       'node scripts/playwright-image.mjs',
     ]);
@@ -1706,6 +1732,12 @@ describe('every workflow that runs the e2e suite is read as doing so', () => {
     expect(searched(missed, { of: workflows, what: 'workflow files' })).toEqual(
       [],
     );
+    expect(
+      floorBreach(
+        'pipeline-wiring/suite-cross-checked-workflows',
+        workflows.length,
+      ),
+    ).toBeUndefined();
   });
 
   it.each([
@@ -1774,12 +1806,16 @@ describe('every job runs under a budget of its own (#157)', () => {
     const findings = checkouts
       .filter(({ persistsCredentials }) => persistsCredentials)
       .map(({ where }) => where);
+    const judged = checkouts.map(({ where }) => where);
     expect(
       searched(findings, {
-        of: checkouts.map(({ where }) => where),
+        of: judged,
         what: 'checkout steps across every workflow',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/checkout-steps', judged.length),
+    ).toBeUndefined();
   });
 
   it('no job in any workflow runs on the runner default budget', () => {
@@ -1787,12 +1823,16 @@ describe('every job runs under a budget of its own (#157)', () => {
     const findings = graphs.flatMap(({ name, jobs }) =>
       unboundedJobFindings(jobs).map((finding) => `${name}: ${finding}`),
     );
+    const judged = graphs.flatMap(({ jobs }) => jobs);
     expect(
       searched(findings, {
-        of: graphs.flatMap(({ jobs }) => jobs),
+        of: judged,
         what: 'jobs across every workflow',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/budgeted-jobs', judged.length),
+    ).toBeUndefined();
   });
 
   it('every job running the e2e suite carries exactly the shard budget', () => {
@@ -1950,6 +1990,9 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(
       searched(prebuilt, { of: suites, what: 'jobs running npm run test:e2e' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/prebuild-checked-suites', suites.length),
+    ).toBeUndefined();
   });
 
   it('each shard writes its account where build-and-test reads it', () => {
@@ -2045,12 +2088,16 @@ describe('no job rides a moving runner label', () => {
     const all = runnerLabels();
     // The CLASS, derived: any `*-latest` label floats, not only ubuntu's.
     const floating = all.filter(({ label }) => /-latest$/.test(label));
+    const labels = all.map(({ label }) => label);
     expect(
       searched(floating, {
-        of: all.map(({ label }) => label),
+        of: labels,
         what: `runner labels in ${WORKFLOWS}`,
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/runner-labels', labels.length),
+    ).toBeUndefined();
   });
 
   it('pins the images this repository has actually run on', () => {
@@ -2082,13 +2129,17 @@ describe('the visual job says which architecture it rendered on', () => {
       (script) =>
         /uname\s+-m/.test(script) && script.includes('GITHUB_STEP_SUMMARY'),
     );
+    const runs = visualRuns();
     expect(
       searched(recording, {
-        of: visualRuns(),
+        of: runs,
         what: "run steps in ci.yml's visual job",
       }),
       'the visual job must record the architecture it renders on',
     ).toHaveLength(1);
+    expect(
+      floorBreach('pipeline-wiring/visual-run-steps', runs.length),
+    ).toBeUndefined();
   });
 
   it('records it BEFORE the comparison, so a red run still reports it', () => {
@@ -2321,6 +2372,9 @@ describe('the drift measurement reports, and never gates (#224)', () => {
     expect(searched(unreadable, { of: paths, what: 'upload paths' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('pipeline-wiring/visual-upload-paths', paths.length),
+    ).toBeUndefined();
 
     const keeps = (dir: string) =>
       paths.some((path) => reaches(resolve(path), dir));
@@ -2541,12 +2595,16 @@ describe('no job inherits the repository default permissions (#301)', () => {
         (scope) => `${file} grants ${scope} at the workflow level`,
       ),
     );
+    const judged = onPullRequest.map(({ file }) => file);
     expect(
       searched(writes, {
-        of: onPullRequest.map(({ file }) => file),
+        of: judged,
         what: 'workflows a pull request can start',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/pull-request-workflows', judged.length),
+    ).toBeUndefined();
   });
 });
 
@@ -2778,12 +2836,16 @@ describe('wrangler comes from the lockfile (#97)', () => {
     const globalInstalls = workflows.flatMap(({ name, text }) =>
       globalWranglerInstalls(text).map((command) => `${name}: ${command}`),
     );
+    const texts = workflows.map(({ text }) => text);
     expect(
       searched(globalInstalls, {
-        of: workflows.map(({ text }) => text),
+        of: texts,
         what: 'workflow texts',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/global-install-workflows', texts.length),
+    ).toBeUndefined();
   });
 
   it('reads every workflow for an install, and as many as there are', () => {
@@ -2800,13 +2862,20 @@ describe('wrangler comes from the lockfile (#97)', () => {
         .filter((line) => globalWranglerInstalls(line).length === 0)
         .map((line) => `${name}: ${line}`),
     );
+    const workflowTexts = workflows.map(({ text }) => text);
     expect(
       searched(missed, {
-        of: workflows.map(({ text }) => text),
+        of: workflowTexts,
         what: 'workflow texts',
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach(
+        'pipeline-wiring/install-cross-checked-texts',
+        workflowTexts.length,
+      ),
+    ).toBeUndefined();
     expect(
       floorBreach(
         'pipeline-wiring/workflows-read-for-an-install',
@@ -2984,12 +3053,16 @@ describe('browsers come with the pinned Playwright image, never a download (#431
         ({ where, file, id }) =>
           `${where}: ${imageOf(file, id) ?? 'no container'}`,
       );
+    const judged = jobs.map(({ where }) => where);
     expect(
       searched(astray, {
-        of: jobs.map(({ where }) => where),
+        of: judged,
         what: 'jobs running Playwright',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/playwright-image-jobs', judged.length),
+    ).toBeUndefined();
   });
 });
 
@@ -3092,5 +3165,8 @@ describe('CI never records the guards’ floors (#468)', () => {
     expect(
       searched(recording, { of: runs, what: 'run steps in the workflows' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/record-checked-run-steps', runs.length),
+    ).toBeUndefined();
   });
 });

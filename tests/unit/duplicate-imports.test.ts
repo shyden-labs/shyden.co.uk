@@ -210,6 +210,9 @@ describe('no source imports one module twice (#390 F59)', () => {
     expect(searched(unread, { of: sources, what: 'source files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('duplicate-imports/scanned-sources', sources.length),
+    ).toBeUndefined();
+    expect(
       floorBreach(
         'duplicate-imports/imports',
         sources.flatMap(({ read }) => read).length,

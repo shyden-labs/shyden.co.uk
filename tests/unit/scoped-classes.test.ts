@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { scopedClassReport } from './scoped-classes';
 
 /**
@@ -249,12 +250,16 @@ describe('every class a scoped rule names is one its own file can carry', () => 
     const dead = all.flatMap(({ file, dead }) =>
       dead.map((name) => `${file}: .${name}`),
     );
+    const judged = all.flatMap(({ named }) => named);
     expect(
       searched(dead, {
-        of: all.flatMap(({ named }) => named),
+        of: judged,
         what: 'classes named in scoped styles',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('scoped-classes/named-classes', judged.length),
+    ).toBeUndefined();
   });
 
   it('can read every class those files write', () => {
@@ -262,11 +267,15 @@ describe('every class a scoped rule names is one its own file can carry', () => 
     const unreadable = all.flatMap(({ file, unreadable }) =>
       unreadable.map((expression) => `${file}: ${expression}`),
     );
+    const judged = all.flatMap(({ read }) => read);
     expect(
       searched(unreadable, {
-        of: all.flatMap(({ read }) => read),
+        of: judged,
         what: 'class values read',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('scoped-classes/read-class-values', judged.length),
+    ).toBeUndefined();
   });
 });

@@ -86,6 +86,9 @@ describe('the gauntlet’s by-design count selects exactly what android-chrome e
     expect(
       searched(literals, { of: strings, what: `string literals in ${SCRIPT}` }),
     ).toEqual([]);
+    expect(
+      floorBreach('excluded-by-design/script-strings', strings.length),
+    ).toBeUndefined();
     // Liveness: the listing still passes a --grep at all, built from the constant.
     const built = nodesOf(script())
       .filter(ts.isTemplateExpression)

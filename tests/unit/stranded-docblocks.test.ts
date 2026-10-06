@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { floorBreach } from '../floors';
 import { commentsIn, parseSource } from './ast';
 import { astroCodeViews } from './source-text';
 import {
@@ -128,6 +129,9 @@ describe('no docblock in tracked source sits directly on another', () => {
         { of: tracked, what: 'tracked source files' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('stranded-docblocks/tracked-sources', tracked.length),
+    ).toBeUndefined();
   });
 
   it('reads the kinds of source the ticket names, and no others', () => {
@@ -169,18 +173,25 @@ describe('no docblock in tracked source sits directly on another', () => {
         { of: held, what: 'kinds of source holding a docblock' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('stranded-docblocks/docblock-kinds', held.length),
+    ).toBeUndefined();
   });
 
   it('finds none sitting directly on another', () => {
+    const docblocks = SCANS.flatMap((scan) => scan.docblocks);
     expect(
       searched(
         SCANS.flatMap((scan) => scan.stranded),
         {
-          of: SCANS.flatMap((scan) => scan.docblocks),
+          of: docblocks,
           what: 'docblocks in tracked source',
         },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('stranded-docblocks/judged-docblocks', docblocks.length),
+    ).toBeUndefined();
   });
 });
 

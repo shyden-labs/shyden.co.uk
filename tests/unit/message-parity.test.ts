@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { parseFile } from './ast';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { DEFAULT_LOCALE, LOCALES, type Locale } from '../../src/lib/i18n';
@@ -130,6 +131,28 @@ describe('every language builds each message the way English does (#136)', () =>
     );
   });
 
+  // One id per locale: each case runs the same line over its own catalogue.
+  const ENGLISH_IMPORTS_FLOOR: Readonly<Record<string, string>> = {
+    id: 'message-parity/english-imports-id',
+    zh: 'message-parity/english-imports-zh',
+    vi: 'message-parity/english-imports-vi',
+    th: 'message-parity/english-imports-th',
+  };
+  // One id per locale, for the same reason.
+  const SLOT_STRINGS_FLOOR: Readonly<Record<string, string>> = {
+    id: 'message-parity/slot-checked-strings-id',
+    zh: 'message-parity/slot-checked-strings-zh',
+    vi: 'message-parity/slot-checked-strings-vi',
+    th: 'message-parity/slot-checked-strings-th',
+  };
+  // One id per locale, for the same reason.
+  const CHOICE_MESSAGES_FLOOR: Readonly<Record<string, string>> = {
+    id: 'message-parity/choice-checked-messages-id',
+    zh: 'message-parity/choice-checked-messages-zh',
+    vi: 'message-parity/choice-checked-messages-vi',
+    th: 'message-parity/choice-checked-messages-th',
+  };
+
   it.each(TRANSLATIONS)(
     '%s takes nothing from English but its type',
     (locale) => {
@@ -145,17 +168,20 @@ describe('every language builds each message the way English does (#136)', () =>
             statement.moduleSpecifier.getText(source),
           ),
       );
+      const imports = fromEnglish.map((declaration) =>
+        declaration.getText(source),
+      );
       expect(
         searched(
           fromEnglish
             .filter(bindsAValue)
             .map((declaration) => declaration.getText(source)),
-          {
-            of: fromEnglish.map((declaration) => declaration.getText(source)),
-            what: `imports from en.ts in ${file}`,
-          },
+          { of: imports, what: `imports from en.ts in ${file}` },
         ),
       ).toEqual([]);
+      expect(
+        floorBreach(ENGLISH_IMPORTS_FLOOR[locale], imports.length),
+      ).toBeUndefined();
     },
   );
 
@@ -169,12 +195,13 @@ describe('every language builds each message the way English does (#136)', () =>
         ([path, english]) =>
           `${path}: {${slotsOf(table.get(path))}} where English has {${slotsOf(english)}}`,
       );
+      const paths = ENGLISH.map(([path]) => path);
       expect(
-        searched(differing, {
-          of: ENGLISH.map(([path]) => path),
-          what: 'English catalogue strings',
-        }),
+        searched(differing, { of: paths, what: 'English catalogue strings' }),
       ).toEqual([]);
+      expect(
+        floorBreach(SLOT_STRINGS_FLOOR[locale], paths.length),
+      ).toBeUndefined();
     },
   );
 
@@ -192,12 +219,16 @@ describe('every language builds each message the way English does (#136)', () =>
           ([path, english]) =>
             `${path}: "${choicesOf(table.get(path))}" where English has "${choicesOf(english)}"`,
         );
+      const choosers = choosing.map(([path]) => path);
       expect(
         searched(differing, {
-          of: choosing.map(([path]) => path),
+          of: choosers,
           what: 'English messages that choose a sentence',
         }),
       ).toEqual([]);
+      expect(
+        floorBreach(CHOICE_MESSAGES_FLOOR[locale], choosers.length),
+      ).toBeUndefined();
     },
   );
 
@@ -233,11 +264,12 @@ describe('every language builds each message the way English does (#136)', () =>
         ({ where, offers, forms }) =>
           `${where} offers "${offers}", the language has "${forms}"`,
       );
+    const judged = plurals.map(({ where }) => where);
     expect(
-      searched(wrong, {
-        of: plurals.map(({ where }) => where),
-        what: 'plurals across every catalogue',
-      }),
+      searched(wrong, { of: judged, what: 'plurals across every catalogue' }),
     ).toEqual([]);
+    expect(
+      floorBreach('message-parity/plurals', judged.length),
+    ).toBeUndefined();
   });
 });
