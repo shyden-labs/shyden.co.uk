@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import { astroCode, codeWithoutComments, stylesheetCss } from './source-text';
 import {
@@ -190,6 +191,7 @@ const literalsUnderSrc = (): Literal[] =>
 describe('no colour a theme cannot see (#142)', () => {
   it('writes no colour literal outside tokens.css but the allowed ones', () => {
     const found = literalsUnderSrc();
+    const literals = found.map(describeLiteral);
     const refused = found
       .filter(
         (literal) => !ALLOWED.some((allowance) => allows(allowance, literal)),
@@ -197,14 +199,18 @@ describe('no colour a theme cannot see (#142)', () => {
       .map(describeLiteral);
     expect(
       searched(refused, {
-        of: found.map(describeLiteral),
+        of: literals,
         what: 'colour literals under src/',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('colour-literals/judged-literals', literals.length),
+    ).toBeUndefined();
   });
 
   it('allows nothing the reader cannot find', () => {
     const found = literalsUnderSrc();
+    const literals = found.map(describeLiteral);
     const idle = ALLOWED.flatMap((allowance) =>
       (allowance.literals ?? [undefined]).flatMap((literal) =>
         found.some(
@@ -220,10 +226,13 @@ describe('no colour a theme cannot see (#142)', () => {
     );
     expect(
       searched(idle, {
-        of: found.map(describeLiteral),
+        of: literals,
         what: 'colour literals under src/',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('colour-literals/allowance-literals', literals.length),
+    ).toBeUndefined();
   });
 
   it('reads CSS by rule and skips paper, and reads code whole', () => {
@@ -235,6 +244,9 @@ describe('no colour a theme cannot see (#142)', () => {
         what: 'the same rule on screen',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('colour-literals/screen-control', control.length),
+    ).toBeUndefined();
     expect(
       literalsIn(
         'x.astro',
