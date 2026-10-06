@@ -53,7 +53,44 @@ export interface WorkflowJob {
    * file (#163).
    */
   readonly uses: string | undefined;
+  /**
+   * Whether a step that runs `always()` is handed `${{ toJSON(needs) }}` in
+   * its env: the shape of an aggregate that judges the jobs it needs in a
+   * step rather than in its condition (#163, #582).
+   */
+  readonly judgesNeedsInAStep: boolean;
 }
+
+/** What an aggregate hands the step that judges its needs. */
+const NEEDS_AS_JSON = '${{ toJSON(needs) }}';
+
+function judgesNeedsInAStep(
+  job: Record<string, unknown>,
+  where: string,
+): boolean {
+  const { steps } = job;
+  if (steps === undefined) return false;
+  if (!Array.isArray(steps)) throw new Error(`${where}: steps is not a list`);
+  return steps.some(
+    (step: unknown) =>
+      isRecord(step) &&
+      step.if === 'always()' &&
+      isRecord(step.env) &&
+      Object.values(step.env).some(
+        (value) => typeof value === 'string' && value.trim() === NEEDS_AS_JSON,
+      ),
+  );
+}
+
+/**
+ * A job that runs whatever its needs did and judges them in a step instead:
+ * `if: always()`, exactly, and an `always()` step handed every need's
+ * result. A skipped required check reads as passing, so such a job must
+ * never be skipped, and it cannot ask for success in its condition (#157).
+ * The step's own verdict is what refuses a need that did not succeed.
+ */
+export const isAggregate = (job: WorkflowJob): boolean =>
+  job.condition === 'always()' && job.judgesNeedsInAStep;
 
 const withoutStringLiterals = (condition: string): string =>
   condition.replace(/'(?:[^']|'')*'/g, "''");
@@ -231,6 +268,7 @@ export function workflowJobs(text: string, file: string): WorkflowJob[] {
       environment: environmentOf(body, where),
       secrets: secretsOf(body, shared, where),
       uses: usesOf(body, where),
+      judgesNeedsInAStep: judgesNeedsInAStep(body, where),
     };
   });
 }
@@ -411,11 +449,13 @@ export function skippedUpstreamFindings(
       findings.push(
         `${job.id}'s if: calls success(), which a skipped ${upstream} makes false`,
       );
-    for (const need of job.needs)
-      if (!requiresSuccessOf(job.condition, need))
-        findings.push(
-          `${job.id}'s if: never requires needs.${need}.result == 'success', so it can run after ${need} was skipped or failed`,
-        );
+    // An aggregate asks in a step instead, and is held there (isAggregate).
+    if (!isAggregate(job))
+      for (const need of job.needs)
+        if (!requiresSuccessOf(job.condition, need))
+          findings.push(
+            `${job.id}'s if: never requires needs.${need}.result == 'success', so it can run after ${need} was skipped or failed`,
+          );
     return findings;
   });
 }

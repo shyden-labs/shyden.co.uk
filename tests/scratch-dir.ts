@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { onTestFinished } from 'vitest';
 
 /**
@@ -18,3 +18,14 @@ export function scratchDir(prefix: string): string {
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
+
+/**
+ * Writes `text` to `path` under `dir`, making any directory the path needs:
+ * how a test lays out the files of a scratch repository.
+ */
+export const writeUnder =
+  (dir: string) =>
+  (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };

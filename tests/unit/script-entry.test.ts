@@ -602,6 +602,14 @@ const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: signoff-status.mjs',
   },
+  // With nowhere to hand its verdict on, it refuses rather than decide
+  // nothing, which would leave the browser jobs to a missing output (#582).
+  'docs-only.mjs': {
+    args: [],
+    env: { GITHUB_OUTPUT: undefined },
+    status: 1,
+    says: 'GITHUB_OUTPUT is not set',
+  },
   // Without the API it can prove nothing, so it refuses to proceed.
   'deploy-gate.mjs': {
     args: [],

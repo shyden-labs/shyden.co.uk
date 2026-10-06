@@ -29,6 +29,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { messageOf } from './errors.mjs';
 import { isRecord } from '../src/lib/is-record.ts';
+import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
 
 /** @typedef {{ index: number, total: number }} Shard */
 
@@ -174,6 +175,66 @@ export function needsFindings(needs) {
         : `${job} reported no result at all`,
     ];
   });
+}
+
+/**
+ * Whether the scope job said this pull request is docs-only (#582). Only the
+ * exact string the runner hands over for `docs_only=true` counts; anything
+ * else is a full run, judged by its accounts.
+ *
+ * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @returns {boolean}
+ */
+export function isDocsOnlyRun(needs) {
+  if (!isRecord(needs) || !isRecord(needs.scope)) return false;
+  const { outputs } = needs.scope;
+  return isRecord(outputs) && outputs.docs_only === 'true';
+}
+
+/**
+ * Why `build-and-test` must not pass a docs-only pull request: a job the
+ * verdict skips that did anything but skip, or is not stood for at all; a job
+ * it keeps that did not succeed; `checks` not stood for; or a shard account,
+ * since no shard runs. Empty only when the pull request skipped exactly what
+ * a docs-only verdict skips and everything else succeeded.
+ *
+ * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @param {readonly string[]} accounts The account files that exist.
+ * @returns {string[]}
+ */
+export function docsOnlyFindings(needs, accounts) {
+  if (!isRecord(needs)) return needsFindings(needs);
+  const skippedJobs = SKIPPED_WHEN_DOCS_ONLY.flatMap((job) => {
+    const state = needs[job];
+    if (state === undefined)
+      return [
+        `${job} is not among the jobs build-and-test stands for, so its skip proves nothing`,
+      ];
+    const result = isRecord(state) ? state.result : undefined;
+    return result === 'skipped'
+      ? []
+      : [
+          `${job} finished \`${String(result)}\` on a docs-only pull request, which skips it`,
+        ];
+  });
+  const kept = Object.fromEntries(
+    Object.entries(needs).filter(
+      ([job]) => !SKIPPED_WHEN_DOCS_ONLY.includes(job),
+    ),
+  );
+  const missing = RUN_WHEN_DOCS_ONLY.filter((job) => !(job in needs)).map(
+    (job) =>
+      `${job} is not among the jobs build-and-test stands for, so a docs-only pull request would pass untested`,
+  );
+  return [
+    ...missing,
+    ...needsFindings(kept),
+    ...skippedJobs,
+    ...accounts.map(
+      (file) =>
+        `${file} is a shard account, and no shard runs on a docs-only pull request`,
+    ),
+  ];
 }
 
 /** @param {unknown} value @returns {value is number} */
@@ -336,17 +397,21 @@ function main() {
     needs = undefined;
   }
 
-  const missing = files.filter((file) => !existsSync(file));
-  const accounts = files
-    .filter((file) => existsSync(file))
-    .map((file) => loadAccount(file));
-  const findings = [
-    ...needsFindings(needs),
-    ...missing.map(
-      (file) => `${file} does not exist, so it holds no shard's account`,
-    ),
-    ...accountFindings(accounts),
-  ];
+  const present = files.filter((file) => existsSync(file));
+  const docsOnly = isDocsOnlyRun(needs);
+  const findings = docsOnly
+    ? // No shard runs, and the download is skipped, so the glob arrives
+      // unmatched; any account that does exist is refused by name.
+      docsOnlyFindings(needs, present)
+    : [
+        ...needsFindings(needs),
+        ...files
+          .filter((file) => !existsSync(file))
+          .map(
+            (file) => `${file} does not exist, so it holds no shard's account`,
+          ),
+        ...accountFindings(present.map((file) => loadAccount(file))),
+      ];
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +
@@ -355,6 +420,14 @@ function main() {
     process.exit(1);
   }
 
+  if (docsOnly) {
+    console.log(
+      'A docs-only pull request: checks and every job it keeps succeeded, and ' +
+        `${SKIPPED_WHEN_DOCS_ONLY.join(', ')} were skipped, as its verdict requires (#582).`,
+    );
+    return;
+  }
+  const accounts = present.map((file) => loadAccount(file));
   const [{ enumerated }] = /** @type {ShardAccount[]} */ (accounts);
   console.log(
     `${accounts.length} shards ran ${enumerated} of the ${enumerated} tests the suite holds, ` +

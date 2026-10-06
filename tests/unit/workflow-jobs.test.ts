@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   RUNNER_DEFAULT_TIMEOUT_MINUTES,
   checkoutSteps,
+  isAggregate,
   jobsDownstreamOfAConditionalJob,
   skippedUpstreamFindings,
   unboundedJobFindings,
@@ -580,5 +581,76 @@ jobs:
       { where: "f.yml job 'a': step 3", persistsCredentials: true },
       { where: "f.yml job 'b': step 1", persistsCredentials: false },
     ]);
+  });
+});
+
+/**
+ * An aggregate judges its needs in a step (#163, #582): it runs `always()`, so
+ * a skip upstream never skips it, and an `always()` step is handed every
+ * need's result. Only that exact shape is excused from asking for success in
+ * its condition; every near miss is still flagged.
+ */
+const aggregateShape = ({
+  condition = '    if: always()\n',
+  stepIf = '        if: always()\n',
+  env = "'${{ toJSON(needs) }}'",
+} = {}) => `name: fixture
+on: pull_request
+jobs:
+  maybe:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+  aggregate:
+    needs: [maybe]
+${condition}    runs-on: ubuntu-latest
+    steps:
+      - name: Judge every need
+${stepIf}        env:
+          NEEDS_JSON: ${env}
+        run: node judge.mjs
+`;
+
+const aggregateJob = (shape: Parameters<typeof aggregateShape>[0]) =>
+  workflowJobs(aggregateShape(shape), 'fixture.yml').find(
+    ({ id }) => id === 'aggregate',
+  ) as WorkflowJob;
+
+const NEVER_REQUIRES =
+  "aggregate's if: never requires needs.maybe.result == 'success', so it can run after maybe was skipped or failed";
+
+describe('an aggregate judges its needs in a step, and only that shape is excused (#582)', () => {
+  it('excuses the aggregate from asking for success in its condition', () => {
+    expect(isAggregate(aggregateJob({}))).toBe(true);
+    expect(
+      skippedUpstreamFindings(workflowJobs(aggregateShape(), 'fixture.yml')),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['a judging step with no condition', { stepIf: '' }],
+    [
+      'a judging step that runs only on success',
+      { stepIf: '        if: success()\n' },
+    ],
+    [
+      'a job condition that is more than always()',
+      { condition: '    if: always() && true\n' },
+    ],
+    [
+      'a job condition of !cancelled()',
+      { condition: '    if: ${{ !cancelled() }}\n' },
+    ],
+    [
+      'a step handed one need, not every need',
+      { env: "'${{ toJSON(needs.maybe) }}'" },
+    ],
+    ['a step handed something else', { env: "'${{ toJSON(github) }}'" }],
+  ])('still flags %s', (_, shape) => {
+    expect(isAggregate(aggregateJob(shape))).toBe(false);
+    expect(
+      skippedUpstreamFindings(
+        workflowJobs(aggregateShape(shape), 'fixture.yml'),
+      ),
+    ).toContain(NEVER_REQUIRES);
   });
 });
