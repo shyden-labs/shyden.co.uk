@@ -226,6 +226,11 @@ const jobBlockRunning = (yaml: string, needle: string): string => {
   expect(
     searched(owning, { of: blocks, what: 'job blocks in the workflow' }),
   ).toHaveLength(1);
+  // One caller today. A second, on another workflow, reads another count, and
+  // the recorder refuses an id that read two values, so this fails closed.
+  expect(
+    floorBreach('pipeline-wiring/job-blocks', blocks.length),
+  ).toBeUndefined();
   return owning[0];
 };
 
@@ -544,12 +549,16 @@ describe('the deploy pipeline runs what it claims to', () => {
         ({ where, job }) =>
           `${where} reads ${storedSecrets(job).join(', ')} in no environment`,
       );
+    const judged = readers.map(({ where }) => where);
     expect(
       searched(unplaced, {
-        of: readers.map(({ where }) => where),
+        of: judged,
         what: 'jobs reading a secret other than GITHUB_TOKEN',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/secret-readers', judged.length),
+    ).toBeUndefined();
   });
 
   // What a job does with the Cloudflare pair decides the environment it reads
@@ -601,12 +610,16 @@ describe('the deploy pipeline runs what it claims to', () => {
               `${environment}, not ${job.environment ?? 'no environment'}`,
           ];
     });
+    const judged = readers.map(({ where }) => where);
     expect(
       searched(misplaced, {
-        of: readers.map(({ where }) => where),
+        of: judged,
         what: 'jobs reading a Cloudflare secret',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/cloudflare-secret-readers', judged.length),
+    ).toBeUndefined();
   });
 
   // `reports-count` holds a token that reads production's reports table, so
@@ -944,12 +957,16 @@ describe('the deploy pipeline runs what it claims to', () => {
           `and no status in this repository reports`,
       );
 
+    const documented = claims.map(({ context }) => context);
     expect(
       searched(findings, {
-        of: claims.map(({ context }) => context),
+        of: documented,
         what: 'contexts this repository documents as required',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/documented-contexts', documented.length),
+    ).toBeUndefined();
   });
 
   // #284, operator: "if you're deploying to dev, say you're deploying to dev.
@@ -982,6 +999,9 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: `workflows running \`${DEPLOY_COMMAND}\``,
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/deploying-workflows', deploys.length),
+    ).toBeUndefined();
   });
 
   // #237: a push to an open pull request started a fresh run and left the
@@ -1224,7 +1244,8 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
     // `--project=` alone is NOT enough to be exempt. `--project=chromium`
     // would run a fifth of the real corpus with nobody counting it.
     const subset = new RegExp(`--project=${VISUAL_PROJECT.name}\\b`);
-    const bypasses = workflowFileNames()
+    const files = workflowFileNames();
+    const bypasses = files
       .flatMap((file) =>
         workflow(file)
           .split('\n')
@@ -1240,11 +1261,14 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
     expect(
       searched(
         bypasses.map(({ file, line }) => `${file}: ${line.trim()}`),
-        { of: workflowFileNames(), what: 'workflow files' },
+        { of: files, what: 'workflow files' },
       ),
       'a workflow running the default config outside `npm run test:e2e` is a ' +
         'full suite whose completeness nobody checks',
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/playwright-bypass-files', files.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1487,6 +1511,9 @@ describe('a failure capture cannot succeed having caught nothing', () => {
     expect(
       searched(silent, { of: steps, what: 'upload-artifact steps' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/ignored-capture-steps', steps.length),
+    ).toBeUndefined();
   });
 
   it('every artifact capture states what an empty capture means', () => {
@@ -1498,6 +1525,9 @@ describe('a failure capture cannot succeed having caught nothing', () => {
     expect(
       searched(undeclared, { of: steps, what: 'upload-artifact steps' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/undeclared-capture-steps', steps.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1538,13 +1568,17 @@ describe('the e2e server is supervised, not handed to a daemon', () => {
       return !command.includes(`ASTRO_${mode}_BACKGROUND=`);
     });
 
+    const commands = scripts.map(([, command]) => command);
     expect(
       searched(unguarded, {
-        of: scripts.map(([, command]) => command),
+        of: commands,
         what: 'astro server scripts',
       }),
       'an auto-backgrounded server exits early under Playwright and orphans the port',
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/astro-server-scripts', commands.length),
+    ).toBeUndefined();
   });
 
   it('the opt-out it relies on still exists in the installed Astro', () => {
@@ -1775,6 +1809,9 @@ describe('every job runs under a budget of its own (#157)', () => {
         what: 'jobs running npm run test:e2e',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/shard-budget-suites', suites.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1971,6 +2008,9 @@ describe('a matrix job names every artifact per leg', () => {
     expect(
       searched(shared, { of: uploads, what: 'uploads in matrix jobs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/matrix-uploads', uploads.length),
+    ).toBeUndefined();
   });
 });
 
@@ -2164,13 +2204,17 @@ describe('the drift measurement reports, and never gates (#224)', () => {
       )
       .map(({ file, line }) => `${file}: ${line.trim()}`);
 
+    const scriptLines = lines.map(({ line }) => line);
     expect(
       searched(findings, {
-        of: lines.map(({ line }) => line),
+        of: scriptLines,
         what: 'lines of workflow run scripts',
       }),
       'a command between a fallback and the status it tests makes it dead code',
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/workflow-script-lines', scriptLines.length),
+    ).toBeUndefined();
   });
 
   it('writes its numbers where they can be read back, not only to the summary', () => {
@@ -2398,6 +2442,9 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
     expect(
       searched(uncleared, { of: reports, what: 'per-group report files' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/device-reports', reports.length),
+    ).toBeUndefined();
   });
 
   it('nests none inside another, which a parent wipe would take with it', async () => {
@@ -2410,6 +2457,9 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
     expect(
       searched(nested, { of: dirs, what: 'gauntlet output folders' }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/gauntlet-output-dirs', dirs.length),
+    ).toBeUndefined();
   });
 });
 
@@ -2436,12 +2486,16 @@ describe('no job inherits the repository default permissions (#301)', () => {
 
   it('every workflow states a workflow-level permissions block', () => {
     const declared = declaredPermissions();
+    const files = declared.map(({ file }) => file);
     expect(
       searched(inheritedPermissionsFindings(declared), {
-        of: declared.map(({ file }) => file),
+        of: files,
         what: 'workflow files',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/permissions-workflows', files.length),
+    ).toBeUndefined();
   });
 
   // Four of the finder's five branches cannot fire on this repository's own
@@ -2569,6 +2623,9 @@ describe('the back-translation review', () => {
       searched(typed, { of: steps, what: 'review steps' }),
       'BACK_TRANSLATE_ENGINE typed into the workflow',
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/engine-review-steps', steps.length),
+    ).toBeUndefined();
   });
 
   it('can go red: nothing in it continues on error', () => {
@@ -2582,6 +2639,12 @@ describe('the back-translation review', () => {
       searched(excused, { of: steps, what: 'review steps' }),
       'a liveness failure swallowed here is a green check over nothing',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'pipeline-wiring/continue-on-error-review-steps',
+        steps.length,
+      ),
+    ).toBeUndefined();
   });
 
   /** Every module a script loads at run time, following relative imports. */
@@ -2805,6 +2868,9 @@ describe('wrangler comes from the lockfile (#97)', () => {
         { of: deploys, what: 'wrangler deploy lines' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/wrangler-deploy-lines', deploys.length),
+    ).toBeUndefined();
   });
 
   it('the functions job runs the functions-runtime suite', () => {
