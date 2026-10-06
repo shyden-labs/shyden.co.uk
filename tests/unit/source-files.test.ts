@@ -52,6 +52,9 @@ describe('filesUnder', () => {
         { of: all, what: 'walked paths' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('source-files/walked-test-paths', all.length),
+    ).toBeUndefined();
   });
 });
 
@@ -118,52 +121,94 @@ describe('filesUnder refuses to answer blind', () => {
 describe('searched -- the population a finding list was drawn from', () => {
   it('returns the findings untouched, so the caller still owns the verdict', () => {
     const findings = ['a'];
-    expect(searched(findings, { of: ['x', 'y'], what: 'rows' })).toBe(findings);
+    const rows = ['x', 'y'];
+    expect(searched(findings, { of: rows, what: 'rows' })).toBe(findings);
+    expect(
+      floorBreach('source-files/untouched-rows', rows.length),
+    ).toBeUndefined();
   });
 
   it('refuses a population that is empty', () => {
-    expect(() => searched([], { of: [], what: 'files' })).toThrow(/no files/);
+    const files: string[] = [];
+    expect(() => searched([], { of: files, what: 'files' })).toThrow(
+      /no files/,
+    );
+    expect(
+      floorBreach('source-files/empty-files', files.length),
+    ).toBeUndefined();
   });
 
   it('refuses a population of BLANK strings -- #112 exactly', () => {
     // The Thai headers, blanked. Six entries, no content.
-    expect(() => searched([], { of: ['', '  ', ''], what: 'headers' })).toThrow(
+    const headers = ['', '  ', ''];
+    expect(() => searched([], { of: headers, what: 'headers' })).toThrow(
       /no headers/,
     );
+    expect(
+      floorBreach('source-files/blank-headers', headers.length),
+    ).toBeUndefined();
   });
 
   it('refuses a population of empty containers', () => {
-    expect(() => searched([], { of: [[], {}], what: 'catalogues' })).toThrow(
+    const catalogues = [[], {}];
+    expect(() => searched([], { of: catalogues, what: 'catalogues' })).toThrow(
       /no catalogues/,
     );
+    expect(
+      floorBreach('source-files/empty-catalogues', catalogues.length),
+    ).toBeUndefined();
   });
 
   it('refuses a population of null and undefined', () => {
-    expect(() =>
-      searched([], { of: [null, undefined], what: 'locales' }),
-    ).toThrow(/no locales/);
+    const locales = [null, undefined];
+    expect(() => searched([], { of: locales, what: 'locales' })).toThrow(
+      /no locales/,
+    );
+    expect(
+      floorBreach('source-files/absent-locales', locales.length),
+    ).toBeUndefined();
   });
 
   it('accepts a population where only SOME members carry content', () => {
     // A partly-blank population is a real subject, not a dead walk: the
     // blanks may be what the caller is hunting.
-    expect(searched([], { of: ['', 'real'], what: 'rows' })).toEqual([]);
+    const rows = ['', 'real'];
+    expect(searched([], { of: rows, what: 'rows' })).toEqual([]);
+    expect(
+      floorBreach('source-files/partly-blank-rows', rows.length),
+    ).toBeUndefined();
   });
 
   it('accepts a plain count, which cannot be content-checked', () => {
-    expect(searched([], { of: 3, what: 'pairs' })).toEqual([]);
-    expect(() => searched([], { of: 0, what: 'pairs' })).toThrow(/no pairs/);
+    const pairs = 3;
+    const none = 0;
+    expect(searched([], { of: pairs, what: 'pairs' })).toEqual([]);
+    expect(() => searched([], { of: none, what: 'pairs' })).toThrow(/no pairs/);
+    expect(floorBreach('source-files/counted-pairs', pairs)).toBeUndefined();
+    expect(floorBreach('source-files/no-pairs', none)).toBeUndefined();
   });
 
   it('counts a zero and a false as content -- they are values, not blanks', () => {
-    expect(searched([], { of: [0], what: 'widths' })).toEqual([]);
-    expect(searched([], { of: [false], what: 'flags' })).toEqual([]);
+    const widths = [0];
+    const flags = [false];
+    expect(searched([], { of: widths, what: 'widths' })).toEqual([]);
+    expect(searched([], { of: flags, what: 'flags' })).toEqual([]);
+    expect(
+      floorBreach('source-files/zero-widths', widths.length),
+    ).toBeUndefined();
+    expect(
+      floorBreach('source-files/false-flags', flags.length),
+    ).toBeUndefined();
   });
 
   it('names the population in the message, so a failure says what died', () => {
-    expect(() => searched([], { of: [], what: 'built pages' })).toThrow(
+    const pages: string[] = [];
+    expect(() => searched([], { of: pages, what: 'built pages' })).toThrow(
       /built pages/,
     );
+    expect(
+      floorBreach('source-files/unbuilt-pages', pages.length),
+    ).toBeUndefined();
   });
 });
 
@@ -180,6 +225,9 @@ describe('committableFiles -- what git tracks or would (#477)', () => {
     expect(searched(dropped, { of: tracked, what: 'tracked files' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('source-files/tracked-test-files', tracked.length),
+    ).toBeUndefined();
   });
 
   it('holds no file git ignores, though it is on disk', () => {
