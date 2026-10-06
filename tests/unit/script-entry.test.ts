@@ -772,6 +772,9 @@ describe('a script asks whether it was run directly with import.meta.main alone 
       searched(unread, { of: files, what: 'files under scripts/' }),
       'a file these rules cannot parse is a file they do not guard',
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/script-files', files.length),
+    ).toBeUndefined();
   });
 
   it('never reads process.argv[1]', () => {
@@ -780,12 +783,16 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     // (#446).
     const readings = modules.map((file) => readArgv(parseFile(file)));
     const reads = readings.flatMap(({ findings }) => findings);
+    const argvReads = readings.flatMap(({ judged }) => judged);
     expect(
       searched(reads, {
-        of: readings.flatMap(({ judged }) => judged),
+        of: argvReads,
         what: 'reads of process.argv',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/argv1-checked-reads', argvReads.length),
+    ).toBeUndefined();
   });
 
   it('judges every read of process.argv the scripts make, and as many as there are', () => {
@@ -819,6 +826,9 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     expect(
       searched(wrong, { of: decisions, what: 'load-time main() decisions' }),
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/main-decisions', decisions.length),
+    ).toBeUndefined();
   });
 
   it('probes exactly the scripts that decide', () => {
@@ -946,13 +956,17 @@ describe('a script does no work while it loads (#276)', () => {
     const work = readings.flatMap(({ found }) =>
       found.map(({ at, what }) => `${at} ${what}`),
     );
+    const statements = readings.flatMap(({ judged }) => judged);
     expect(
       searched(work, {
-        of: readings.flatMap(({ judged }) => judged),
+        of: statements,
         what: 'load-time statements',
       }),
       'a module that works while it loads runs its program on import',
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/effect-checked-statements', statements.length),
+    ).toBeUndefined();
   });
 
   it('judges every load-time statement the scripts hold, and as many as there are', () => {
