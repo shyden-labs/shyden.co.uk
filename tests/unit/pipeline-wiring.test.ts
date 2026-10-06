@@ -14,6 +14,7 @@ import {
   codeWithoutComments,
   withoutCommentLines,
   withoutTsComments,
+  withoutYamlComments,
 } from './source-text';
 import { nonEmpty, searched, trackedFiles } from '../source-files';
 import type { Project } from '@playwright/test';
@@ -24,6 +25,7 @@ import playwrightConfig, {
 import {
   checkoutSteps,
   inheritedPermissionsFindings,
+  isAggregate,
   jobsDownstreamOfAConditionalJob,
   parseCleanYaml,
   skippedUpstreamFindings,
@@ -37,6 +39,7 @@ import {
 import { parseFile } from './ast';
 import { declarationsIn } from '../playwright-declarations';
 import { REQUIRED_CHECKS } from '../../scripts/deploy-gate.mjs';
+import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { floorBreach } from '../floors';
@@ -305,6 +308,16 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(
       floorBreach('pipeline-wiring/skip-downstream-jobs', downstream.length),
     ).toBeUndefined();
+  });
+
+  it('the one job excused from asking for success is build-and-test, which judges in a step (#582)', () => {
+    // An aggregate is excused from the rule above because a step judges every
+    // need instead. That is true of build-and-test (scripts/e2e-shards.mjs,
+    // pinned below) and must not quietly become true of anything else.
+    const aggregates = workflowGraphs().flatMap(({ name, jobs }) =>
+      jobs.filter(isAggregate).map(({ id }) => `${name} ${id}`),
+    );
+    expect(aggregates).toEqual(['ci.yml build-and-test']);
   });
 
   it('the push path proves the tree instead of re-running the suite', () => {
@@ -3168,5 +3181,79 @@ describe('CI never records the guards’ floors (#468)', () => {
     expect(
       floorBreach('pipeline-wiring/record-checked-run-steps', runs.length),
     ).toBeUndefined();
+  });
+});
+
+describe('a docs-only pull request skips the browser jobs and nothing else (#582)', () => {
+  type Step = {
+    id?: string;
+    run?: string;
+    uses?: string;
+    if?: string;
+    with?: Record<string, unknown>;
+  };
+  type Job = { steps?: Step[]; outputs?: Record<string, string> };
+  const ci = () =>
+    parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
+      jobs: Record<string, Job>;
+    };
+  const DOCS_IF = "needs.scope.outputs.docs_only != 'true'";
+
+  it('decides in a job of its own, from the merge commit and its base', () => {
+    const scope = jobNamed('ci.yml', 'scope');
+    expect(scope.runs).toEqual(['node scripts/docs-only.mjs']);
+    const steps = ci().jobs.scope?.steps ?? [];
+    expect(steps.find((step) => step.run !== undefined)?.id).toBe('verdict');
+    // Depth 2 holds the merge commit's first parent, the base it is diffed
+    // against; depth 1 would leave the script no parent to diff, which it
+    // refuses, so every pull request would quietly run everything.
+    const checkout = steps.find((step) =>
+      step.uses?.startsWith('actions/checkout@'),
+    );
+    expect(checkout?.with?.['fetch-depth']).toBe(2);
+    expect(ci().jobs.scope?.outputs).toEqual({
+      docs_only: '${{ steps.verdict.outputs.docs_only }}',
+    });
+  });
+
+  it('skips exactly the jobs the verdict names, each on that verdict alone', () => {
+    const jobs = workflowJobs(workflow('ci.yml'), 'ci.yml');
+    const conditioned = jobs.filter(({ condition }) =>
+      condition?.includes('docs_only'),
+    );
+    expect(conditioned.map(({ id }) => id).sort()).toEqual(
+      [...SKIPPED_WHEN_DOCS_ONLY].sort(),
+    );
+    for (const job of conditioned) {
+      // A runtime population: the jobs the workflow conditions, read above.
+      expect(job.condition, job.id).toBe(DOCS_IF);
+      expect(job.needs, job.id).toEqual(['image', 'scope']);
+    }
+  });
+
+  it.each(['checks', 'visual', 'image'])(
+    'keeps %s running whatever the verdict',
+    (id) => {
+      expect(jobNamed('ci.yml', id).condition).toBeUndefined();
+    },
+  );
+
+  it('build-and-test skips only the download of accounts no shard wrote', () => {
+    const steps = ci().jobs['build-and-test']?.steps ?? [];
+    const download = steps.find((step) =>
+      step.uses?.startsWith('actions/download-artifact@'),
+    );
+    expect(download?.if).toBe(DOCS_IF);
+    const verdict = steps.find((step) =>
+      step.run?.includes('scripts/e2e-shards.mjs'),
+    );
+    expect(verdict?.if).toBe('always()');
+  });
+
+  it('only ci.yml reads the verdict, so every deploy pipeline runs in full', () => {
+    const readers = workflowYamlNames().filter((name) =>
+      /docs_only|docs-only\.mjs/.test(withoutYamlComments(workflow(name))),
+    );
+    expect(readers).toEqual(['ci.yml']);
   });
 });

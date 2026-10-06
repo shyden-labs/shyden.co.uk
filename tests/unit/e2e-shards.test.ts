@@ -6,11 +6,17 @@ import { join } from 'node:path';
 import {
   accountFileName,
   accountFindings,
+  docsOnlyFindings,
+  isDocsOnlyRun,
   needsFindings,
   shardAccount,
   shardNotice,
   shardOf,
 } from '../../scripts/e2e-shards.mjs';
+import {
+  RUN_WHEN_DOCS_ONLY,
+  SKIPPED_WHEN_DOCS_ONLY,
+} from '../../scripts/docs-only.mjs';
 
 /**
  * `build-and-test` passing must still mean what it meant before the suite was
@@ -257,6 +263,137 @@ describe('needsFindings: every job build-and-test stands for succeeded', () => {
   });
 });
 
+/**
+ * A docs-only pull request (#582): the jobs that build or serve the site are
+ * skipped, so build-and-test cannot add up accounts. It passes only when the
+ * scope job's verdict says docs-only, every job it skips WAS skipped, and
+ * every job it keeps succeeded.
+ */
+const docsOnlyNeeds = (
+  overrides: Record<
+    string,
+    { result: string; outputs: Record<string, string> } | undefined
+  > = {},
+) => {
+  const needs: Record<string, unknown> = {
+    image: { result: 'success', outputs: { ref: 'image@sha256:x' } },
+    scope: { result: 'success', outputs: { docs_only: 'true' } },
+    checks: { result: 'success', outputs: {} },
+    e2e: { result: 'skipped', outputs: {} },
+    'sanity-on-build': { result: 'skipped', outputs: {} },
+    functions: { result: 'skipped', outputs: {} },
+  };
+  for (const [job, state] of Object.entries(overrides))
+    if (state === undefined) delete needs[job];
+    else needs[job] = state;
+  return needs;
+};
+
+describe('isDocsOnlyRun: whether the scope job said docs-only', () => {
+  it('reads the scope job saying true', () => {
+    expect(isDocsOnlyRun(docsOnlyNeeds())).toBe(true);
+  });
+
+  it.each([
+    ['false', { result: 'success', outputs: { docs_only: 'false' } }],
+    ['no output', { result: 'success', outputs: {} }],
+    ['TRUE', { result: 'success', outputs: { docs_only: 'TRUE' } }],
+    ['a failed scope job', { result: 'failure', outputs: {} }],
+  ])('reads %s as a full run', (_, scope) => {
+    expect(isDocsOnlyRun(docsOnlyNeeds({ scope }))).toBe(false);
+  });
+
+  it.each([
+    ['no scope job', docsOnlyNeeds({ scope: undefined })],
+    ['needs that are not a record', 'nothing'],
+    [
+      'a boolean, not the string the runner hands over',
+      { scope: { result: 'success', outputs: { docs_only: true } } },
+    ],
+  ])('reads %s as a full run', (_, needs) => {
+    expect(isDocsOnlyRun(needs)).toBe(false);
+  });
+});
+
+describe('docsOnlyFindings: a docs-only pull request skipped exactly what it may', () => {
+  it('has nothing to say when the skipped jobs were skipped and the rest succeeded', () => {
+    expect(docsOnlyFindings(docsOnlyNeeds(), [])).toEqual([]);
+  });
+
+  it.each(
+    SKIPPED_WHEN_DOCS_ONLY.flatMap((job) =>
+      ['success', 'failure', 'cancelled'].map((result) => [job, result]),
+    ),
+  )(
+    'refuses %s finishing %s, since a docs-only verdict skips it',
+    (job, result) => {
+      const findings = docsOnlyFindings(
+        docsOnlyNeeds({ [job]: { result, outputs: {} } }),
+        [],
+      );
+      expect(findings).toEqual([
+        `${job} finished \`${result}\` on a docs-only pull request, which skips it`,
+      ]);
+    },
+  );
+
+  it.each(SKIPPED_WHEN_DOCS_ONLY)(
+    'refuses %s missing from the jobs it stands for',
+    (job) => {
+      expect(docsOnlyFindings(docsOnlyNeeds({ [job]: undefined }), [])).toEqual(
+        [
+          `${job} is not among the jobs build-and-test stands for, so its skip proves nothing`,
+        ],
+      );
+    },
+  );
+
+  it.each(
+    RUN_WHEN_DOCS_ONLY.flatMap((job) =>
+      ['failure', 'skipped', 'cancelled'].map((result) => [job, result]),
+    ),
+  )(
+    'refuses %s finishing %s, since a docs-only verdict still runs it',
+    (job, result) => {
+      const findings = docsOnlyFindings(
+        docsOnlyNeeds({
+          [job]: {
+            result,
+            outputs: job === 'scope' ? { docs_only: 'true' } : {},
+          },
+        }),
+        [],
+      );
+      expect(findings).toContain(
+        `${job} finished \`${result}\`, not \`success\``,
+      );
+    },
+  );
+
+  it('refuses checks missing from the jobs it stands for', () => {
+    expect(docsOnlyFindings(docsOnlyNeeds({ checks: undefined }), [])).toEqual([
+      'checks is not among the jobs build-and-test stands for, so a docs-only pull request would pass untested',
+    ]);
+  });
+
+  it('refuses a job it keeps that failed, whatever its name', () => {
+    expect(
+      docsOnlyFindings(
+        docsOnlyNeeds({ image: { result: 'failure', outputs: {} } }),
+        [],
+      ),
+    ).toEqual(['image finished `failure`, not `success`']);
+  });
+
+  it('refuses a shard account, since no shard runs on a docs-only pull request', () => {
+    expect(
+      docsOnlyFindings(docsOnlyNeeds(), ['e2e-accounts/shard-1-of-8.json']),
+    ).toEqual([
+      'e2e-accounts/shard-1-of-8.json is a shard account, and no shard runs on a docs-only pull request',
+    ]);
+  });
+});
+
 describe('accountFindings: the shards add up to the suite', () => {
   it('has nothing to say when four shards ran exactly the enumerated suite', () => {
     expect(accountFindings(whole())).toEqual([]);
@@ -451,6 +588,37 @@ describe('the verdict, run as build-and-test runs it', () => {
     const run = verdict([first, ...rest], succeeded);
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(/not an account/);
+  });
+
+  it('passes a docs-only pull request whose download was skipped, and says so', () => {
+    const unmatched = join(scratch(), '*.json');
+    const run = verdict([unmatched], docsOnlyNeeds());
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(run.stdout).toMatch(/docs-only/);
+    expect(run.stdout).toMatch(/e2e, functions, sanity-on-build/);
+  });
+
+  it('fails a docs-only verdict when a shard ran anyway', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      docsOnlyNeeds({ e2e: { result: 'success', outputs: {} } }),
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /e2e finished `success` on a docs-only pull request/,
+    );
+    expect(run.stderr).toMatch(/is a shard account/);
+  });
+
+  it('judges a full run by its accounts when the scope job said false', () => {
+    const run = verdict([join(scratch(), '*.json')], {
+      ...docsOnlyNeeds(),
+      scope: { result: 'success', outputs: { docs_only: 'false' } },
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(/e2e finished `skipped`, not `success`/);
+    expect(run.stderr).toMatch(/no shard accounted for itself/);
   });
 
   it('fails when it is handed no needs to read', () => {

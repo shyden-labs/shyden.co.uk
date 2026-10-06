@@ -88,6 +88,34 @@ jobs:
       - id: pick
         run: node scripts/playwright-image.mjs
 
+  # Whether this pull request changes documentation and nothing else (#582).
+  # A ledger or handover change ran all 14 jobs, about 15 minutes and 83
+  # runner-minutes, while only `checks` could catch anything it does. On a
+  # docs-only verdict the jobs that build or serve the site (the e2e shards,
+  # sanity-on-build, functions) are skipped; `checks` always runs, and so does
+  # `visual`, because it is required by name and the deploy gate refuses it
+  # skipped (operator, 2026-10-06). Anything the script cannot place runs
+  # everything, and build-and-test refuses a docs-only verdict unless the
+  # jobs it skips were skipped and `checks` succeeded (scripts/e2e-shards.mjs).
+  #
+  # Depth 2: a pull request's checkout is GitHub's merge commit, and its first
+  # parent is the base, so the diff between them is what the merge lands.
+  scope:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.verdict.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - id: verdict
+        run: node scripts/docs-only.mjs
+
   # Everything the merge gate ran before the e2e suite, in the same order, as a
   # job of its own so it runs BESIDE the shards rather than ahead of them. It
   # gates because build-and-test stands for it (#163). (This sat above `image`
@@ -145,7 +173,10 @@ jobs:
   # one 13.2, which is the wall-clock. Eight splits the slow slices.
   e2e:
     name: e2e shard ${{ matrix.shard }} of ${{ strategy.job-total }}
-    needs: image
+    needs: [image, scope]
+    # Skipped on a docs-only pull request (#582); build-and-test then holds
+    # that every shard was skipped rather than adding up accounts.
+    if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
     # The e2e policy, restated per shard: tests/unit/pipeline-wiring.test.ts
     # pins it and fails if any job running the suite carries another.
@@ -227,7 +258,9 @@ jobs:
   # the deploy's own run still covers. It needs no credentials: nothing it
   # reaches is behind the dev site's Basic auth.
   sanity-on-build:
-    needs: image
+    needs: [image, scope]
+    # Skipped on a docs-only pull request (#582).
+    if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
     # 5 minutes: its last 12 green runs took at most 77 s (#431).
     timeout-minutes: 5
@@ -269,7 +302,9 @@ jobs:
   # browser submits real reports to it. build-and-test needs it, so it gates
   # with no change to branch protection.
   functions:
-    needs: image
+    needs: [image, scope]
+    # Skipped on a docs-only pull request (#582).
+    if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
     # 8 minutes: its last 12 green runs took at most 248 s (#431).
     timeout-minutes: 8
@@ -309,7 +344,7 @@ jobs:
   # what it meant when it ran the suite itself: every step ran, and the whole
   # suite ran. It runs none of that now. It stands for the jobs that do.
   build-and-test:
-    needs: [image, checks, e2e, sanity-on-build, functions]
+    needs: [image, scope, checks, e2e, sanity-on-build, functions]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read
     # green exactly when a shard failed or was skipped (#157). It runs always,
@@ -324,7 +359,10 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      # No shard ran on a docs-only pull request, so there is nothing to
+      # collect (#582); the verdict below holds that none was written.
       - name: Collect every shard's account
+        if: needs.scope.outputs.docs_only != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: e2e-account-*

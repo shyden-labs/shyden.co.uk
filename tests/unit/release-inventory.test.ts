@@ -1,14 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   VISITOR_PREFIXES,
@@ -18,6 +12,7 @@ import {
   releaseTests,
 } from '../../scripts/release-inventory.mjs';
 import { scratchGit, withoutLocalGit } from '../git-env';
+import { writeUnder } from '../scratch-dir';
 import { searched, trackedFiles } from '../source-files';
 import { withoutTsComments } from './source-text';
 import { parseSource } from './ast';
@@ -32,10 +27,7 @@ const repository = () => {
   git(['config', 'user.email', 'fixture@example.test']);
   git(['config', 'user.name', 'Fixture']);
   git(['config', 'commit.gpgsign', 'false']);
-  const write = (path: string, text: string) => {
-    mkdirSync(dirname(join(dir, path)), { recursive: true });
-    writeFileSync(join(dir, path), text);
-  };
+  const write = writeUnder(dir);
   const commit = (subject: string) => {
     git(['add', '-A']);
     git(['commit', '-q', '-m', subject]);
