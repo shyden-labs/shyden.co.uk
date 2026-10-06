@@ -290,6 +290,9 @@ describe('the suite', () => {
     // and pass. `searched` refuses an empty population (#390).
     const { tests, sites } = scan();
     expect(searched(sites, { of: tests, what: 'tests read' })).toEqual([]);
+    expect(
+      floorBreach('one-test-per-case/loop-checked-tests', tests.length),
+    ).toBeUndefined();
   });
 
   it('reads the tests every spec declares, and as many as there are', () => {

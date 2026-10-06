@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   anonymousStudent,
   buildGroups,
@@ -1967,6 +1968,9 @@ describe('sex mode: mix', () => {
       );
     });
     expect(searched(bothTogether, { of: seeds, what: 'seeds' })).toEqual([]);
+    expect(
+      floorBreach('grouping/girl-spread-seeds', seeds.length),
+    ).toBeUndefined();
   });
 
   // Correction 2: the dedicated variety regression guard the together-letters
