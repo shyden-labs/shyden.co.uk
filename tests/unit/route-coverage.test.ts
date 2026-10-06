@@ -160,6 +160,9 @@ describe('the post-deploy gates derive their routes', () => {
         'locales silently, and this gate is what stands between develop and ' +
         'production',
     ).toEqual([]);
+    expect(
+      floorBreach('route-coverage/hardcode-scanned-specs', specs.length),
+    ).toBeUndefined();
   });
 
   it('reads every locale-prefixed string the parse tree holds', () => {
@@ -180,6 +183,9 @@ describe('the post-deploy gates derive their routes', () => {
     expect(searched(missed, { of: specs, what: 'deploy-gate specs' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('route-coverage/parse-checked-specs', specs.length),
+    ).toBeUndefined();
   });
 
   it.each([
