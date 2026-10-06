@@ -3,6 +3,7 @@ import { writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { parseCleanYaml, workflowJobs } from '../workflow-jobs';
 import { withoutCommentLines } from './source-text';
 import { closingKeywordOffences } from '../../scripts/closing-keywords.mjs';
@@ -134,12 +135,16 @@ describe('the closing-keyword rule, in its one home', () => {
     const wrongly = ACCEPTED.filter(
       ({ text }) => closingKeywordOffences(text).length > 0,
     );
+    const phrasings = ACCEPTED.map(({ text }) => text);
     expect(
       searched(wrongly, {
-        of: ACCEPTED.map(({ text }) => text),
+        of: phrasings,
         what: 'safe phrasings',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('closing-keywords/safe-phrasings', phrasings.length),
+    ).toBeUndefined();
   });
 
   it('reports the line a multi-line message offends on, not the first', () => {
@@ -412,12 +417,16 @@ describe('the rule covers a pull request body, not only a commit message', () =>
     // The general form, not just the body: EVERY value this workflow reads
     // from the event is written by whoever opened the pull request. Naming
     // one field would leave the next one added unguarded.
-    const expanded = (only?.runs ?? []).filter((run) => run.includes('${{'));
+    const runs = only?.runs ?? [];
+    const expanded = runs.filter((run) => run.includes('${{'));
     expect(
       searched(expanded, {
-        of: only?.runs ?? [],
+        of: runs,
         what: `run: scripts in ${only?.file ?? 'no workflow'}`,
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('closing-keywords/rule-workflow-runs', runs.length),
+    ).toBeUndefined();
   });
 });

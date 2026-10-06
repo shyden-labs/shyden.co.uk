@@ -2,6 +2,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { bind, bindFiles, derivationOf, where, type Bound } from './ast';
 import { searched, tsFilesUnder } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * Collecting the suite never reads the built site (#351).
@@ -371,14 +372,18 @@ describe('what counts as reading the build while collecting', () => {
 describe('collecting the suite never needs a build (#351)', () => {
   it('no file under tests/ reads dist/ while the suite is collected', () => {
     const bound = bindFiles(tsFilesUnder('tests'));
+    const literals = builtLiterals(bound);
     expect(
       searched(collectionReads(bound), {
-        of: builtLiterals(bound),
+        of: literals,
         what: 'dist path literals under tests/',
       }),
       'a read of dist/ while collecting makes `playwright test --list` -- and ' +
         "so every filtered run's reconciliation -- fail on a checkout with no " +
         'build. Read it inside the test or hook that needs it.',
     ).toEqual([]);
+    expect(
+      floorBreach('collection-needs-no-build/dist-literals', literals.length),
+    ).toBeUndefined();
   });
 });
