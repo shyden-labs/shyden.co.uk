@@ -67,12 +67,13 @@ describe('no page is rendered from the clock (#370)', () => {
     const dated = views
       .filter(({ view }) => CLOCK.test(view))
       .map(({ path }) => path);
+    const judged = views.map(({ view }) => view);
     expect(
-      searched(dated, {
-        of: views.map(({ view }) => view),
-        what: '.astro code and markup views',
-      }),
+      searched(dated, { of: judged, what: '.astro code and markup views' }),
     ).toEqual([]);
+    expect(
+      floorBreach('no-dated-render/date-checked-views', judged.length),
+    ).toBeUndefined();
   });
 
   it('reads every view the sources hold, and as many as there are', () => {
@@ -125,5 +126,8 @@ describe('no page is rendered from the clock (#370)', () => {
         { of: views, what: 'views of the fixture' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('no-dated-render/comment-fixture-views', views.length),
+    ).toBeUndefined();
   });
 });
