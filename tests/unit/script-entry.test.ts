@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { filesUnder, searched } from '../source-files';
@@ -609,13 +617,14 @@ const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'build-and-test REFUSED',
   },
-  // Playwright rejects the option, so the run writes no report, and the
-  // reconciliation refuses rather than call that a pass.
+  // It refuses a shard it could not account for before it lists or runs
+  // anything (#163). The probe once passed an option only Playwright rejects,
+  // which started the Playwright CLI twice per probe and timed out under load
+  // (#572).
   'test-e2e.mjs': {
-    args: ['--no-such-flag'],
-    env: { EVIDENCE_DIR: undefined },
+    args: ['--shard=0/8'],
     status: 1,
-    says: 'E2E RECONCILIATION FAILED',
+    says: '--shard=0/8 is not a shard',
   },
   // Neither of these takes an argument, so one is a mistake they refuse
   // before doing any work (#227). They earned probes by gaining an entry
@@ -720,8 +729,33 @@ const PROBES: Readonly<Record<string, Probe>> = {
   },
 };
 
-const runAsScript = (script: string, probe: Probe) => {
-  const env = { ...process.env };
+/**
+ * A directory holding a stand-in `npx` that kills the process which called it.
+ *
+ * A probe shows that a script's entry point ran through a refusal the script
+ * makes before it does any work. `test-e2e.mjs`'s probe once got its refusal
+ * from Playwright instead, starting the Playwright CLI twice per probe, and
+ * timed out at 32-34 s under load (#572). Put first on every probe's PATH,
+ * this stand-in makes a probe that spawns `npx` fail outright rather than run
+ * slowly: the probed process dies with no exit status and none of its words.
+ * Leaving `npx` off PATH would not do that, because a failed spawn is quick
+ * and quiet, and `test-e2e.mjs` reads a failed listing as "no total" and
+ * carries on.
+ */
+const npxThatKillsItsCaller = () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'probe-bin-')));
+  const npx = join(dir, 'npx');
+  writeFileSync(npx, '#!/bin/sh\nkill -KILL "$PPID"\n');
+  chmodSync(npx, 0o755);
+  return { dir, remove: () => rmSync(dir, { recursive: true, force: true }) };
+};
+
+const runAsScript = (script: string, probe: Probe, bin: string) => {
+  // A probe that sets PATH itself replaces this one whole, stand-in included.
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+  };
   for (const [name, value] of Object.entries(probe.env ?? {}))
     if (value === undefined) delete env[name];
     else env[name] = value;
@@ -738,6 +772,9 @@ describe('a script asks whether it was run directly with import.meta.main alone 
       searched(unread, { of: files, what: 'files under scripts/' }),
       'a file these rules cannot parse is a file they do not guard',
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/script-files', files.length),
+    ).toBeUndefined();
   });
 
   it('never reads process.argv[1]', () => {
@@ -746,12 +783,16 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     // (#446).
     const readings = modules.map((file) => readArgv(parseFile(file)));
     const reads = readings.flatMap(({ findings }) => findings);
+    const argvReads = readings.flatMap(({ judged }) => judged);
     expect(
       searched(reads, {
-        of: readings.flatMap(({ judged }) => judged),
+        of: argvReads,
         what: 'reads of process.argv',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/argv1-checked-reads', argvReads.length),
+    ).toBeUndefined();
   });
 
   it('judges every read of process.argv the scripts make, and as many as there are', () => {
@@ -788,6 +829,9 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     expect(
       searched(wrong, { of: decisions, what: 'load-time main() decisions' }),
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/main-decisions', decisions.length),
+    ).toBeUndefined();
   });
 
   it('probes exactly the scripts that decide', () => {
@@ -801,10 +845,15 @@ describe('a script asks whether it was run directly with import.meta.main alone 
 
 describe('every script that decides still acts when run as one (#221)', () => {
   let checkout: ScriptCheckout;
+  let bin: ReturnType<typeof npxThatKillsItsCaller>;
   beforeAll(() => {
     checkout = scriptCheckout();
+    bin = npxThatKillsItsCaller();
   });
-  afterAll(() => checkout.remove());
+  afterAll(() => {
+    checkout.remove();
+    bin.remove();
+  });
 
   const places: Readonly<Record<string, () => string>> = {
     'this checkout': () => 'scripts',
@@ -815,7 +864,7 @@ describe('every script that decides still acts when run as one (#221)', () => {
   for (const [script, probe] of Object.entries(PROBES))
     for (const [place, dir] of Object.entries(places))
       it(`${script} refuses from ${place}`, () => {
-        const run = runAsScript(join(dir(), script), probe);
+        const run = runAsScript(join(dir(), script), probe, bin.dir);
         expect(`${run.stdout}${run.stderr}`).toContain(probe.says);
         expect(run.status).toBe(probe.status);
       });
@@ -910,13 +959,17 @@ describe('a script does no work while it loads (#276)', () => {
     const work = readings.flatMap(({ found }) =>
       found.map(({ at, what }) => `${at} ${what}`),
     );
+    const statements = readings.flatMap(({ judged }) => judged);
     expect(
       searched(work, {
-        of: readings.flatMap(({ judged }) => judged),
+        of: statements,
         what: 'load-time statements',
       }),
       'a module that works while it loads runs its program on import',
     ).toEqual([]);
+    expect(
+      floorBreach('script-entry/effect-checked-statements', statements.length),
+    ).toBeUndefined();
   });
 
   it('judges every load-time statement the scripts hold, and as many as there are', () => {

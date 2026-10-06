@@ -342,8 +342,8 @@ describe('every search checks a floor, or is listed (#515, #534)', () => {
     // search's population (17 token-floored sites in 12 scopes). A
     // conversion lowers these with the list; nothing else raises them.
     const counts = Object.values(FLOORLESS);
-    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(97);
-    expect(counts.length).toBeLessThanOrEqual(93);
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(70);
+    expect(counts.length).toBeLessThanOrEqual(66);
     expect(counts.filter((n) => !Number.isInteger(n) || n < 1)).toEqual([]);
   });
 });
