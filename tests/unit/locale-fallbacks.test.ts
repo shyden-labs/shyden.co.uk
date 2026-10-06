@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { en } from '../../src/lib/i18n/en';
 import { zh } from '../../src/lib/i18n/zh';
@@ -99,6 +100,18 @@ describe('what is still English in each catalogue', () => {
     );
   });
 
+  // One id per locale: each case runs the same line over its own catalogue.
+  const ENGLISH_MESSAGES_FLOOR: Readonly<Record<string, string>> = {
+    zh: 'locale-fallbacks/english-messages-zh',
+    vi: 'locale-fallbacks/english-messages-vi',
+    th: 'locale-fallbacks/english-messages-th',
+  };
+  // One id per locale, for the same reason.
+  const LEAF_PATHS_FLOOR: Readonly<Record<string, string>> = {
+    zh: 'locale-fallbacks/leaf-paths-zh',
+    vi: 'locale-fallbacks/leaf-paths-vi',
+    th: 'locale-fallbacks/leaf-paths-th',
+  };
   for (const [locale, table] of Object.entries(MACHINE_SEEDED)) {
     it(`${locale}: no message is still English`, () => {
       // Until #136 this pinned all 51 messages as the English function by
@@ -114,6 +127,9 @@ describe('what is still English in each catalogue', () => {
           what: 'English messages',
         }),
       ).toEqual([]);
+      expect(
+        floorBreach(ENGLISH_MESSAGES_FLOOR[locale], messages.length),
+      ).toBeUndefined();
     });
 
     it(`${locale}: carries exactly the documented English strings`, () => {
@@ -136,6 +152,9 @@ describe('what is still English in each catalogue', () => {
         searched(blank, { of: paths, what: 'catalogue leaf paths' }),
         'a blank string renders as nothing at all',
       ).toEqual([]);
+      expect(
+        floorBreach(LEAF_PATHS_FLOOR[locale], paths.length),
+      ).toBeUndefined();
     });
   }
 });
