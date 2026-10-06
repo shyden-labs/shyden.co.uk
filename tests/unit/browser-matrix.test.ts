@@ -15,6 +15,7 @@ import {
   specFilesUnder,
   trackedFiles,
 } from '../source-files';
+import { floorBreach } from '../floors';
 import { withoutCommentLines, withoutTsComments } from './source-text';
 import { workflowJobs } from '../workflow-jobs';
 import { engineDependence } from './engine-dependence';
@@ -96,14 +97,21 @@ const VISUAL_SPEC = join(E2E, 'visual.spec.ts');
 const read = (spec: string) => readFileSync(join(E2E, spec), 'utf8');
 describe('the content-only project', () => {
   it('names specs that actually exist', () => {
-    const missing = CONTENT_ONLY_SPECS.filter((s) => !existsSync(join(E2E, s)));
+    const contentOnly = CONTENT_ONLY_SPECS;
+    const missing = contentOnly.filter((s) => !existsSync(join(E2E, s)));
     expect(
       searched(missing, {
-        of: CONTENT_ONLY_SPECS,
+        of: contentOnly,
         what: 'content-only specs',
       }),
       'a renamed spec would silently stop being scoped',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'browser-matrix/named-content-only-specs',
+        contentOnly.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('does not simply list every spec, which would assert nothing', () => {
@@ -122,19 +130,26 @@ describe('the content-only project', () => {
     // substring. `rendered-text.spec.ts` READ layout instead, through
     // `getClientRects`, so it ran at 1280px on one engine and failed on every
     // page of a real phone.
-    const engineDependent = CONTENT_ONLY_SPECS.flatMap((spec) => {
+    const contentOnly = CONTENT_ONLY_SPECS;
+    const engineDependent = contentOnly.flatMap((spec) => {
       const signals = engineDependence(read(spec));
       return signals.length > 0 ? [`${spec}: ${signals.join(', ')}`] : [];
     });
 
     expect(
       searched(engineDependent, {
-        of: CONTENT_ONLY_SPECS,
+        of: contentOnly,
         what: 'content-only specs',
       }),
       'a spec that drives the viewport or reads layout is engine-dependent ' +
         'and must run on all five',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'browser-matrix/engine-checked-content-only-specs',
+        contentOnly.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('is judged by a detector that sees layout reads in the real suite', () => {
@@ -244,13 +259,20 @@ describe('the visual-regression project', () => {
       .filter((p) => claims(p, VISUAL_SPEC))
       .map((p) => p.name);
 
+    const otherNames = others.map((p) => p.name);
     expect(
       searched(claimants, {
-        of: others.map((p) => p.name),
+        of: otherNames,
         what: 'projects other than visual',
       }),
       'each would demand its own set of baselines',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'browser-matrix/projects-other-than-visual',
+        otherNames.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('states its flake policy rather than discovering it', () => {
@@ -376,26 +398,37 @@ describe('the real-device config (#194)', () => {
       .filter((p) => claims(p, VISUAL_SPEC))
       .map((p) => p.name);
 
+    const deviceNames = projects.map((p) => p.name);
     expect(
       searched(claimants, {
-        of: projects.map((p) => p.name),
+        of: deviceNames,
         what: 'device projects',
       }),
       'a phone has no baseline CI would read, so it must never be asked for one',
     ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/device-projects', deviceNames.length),
+    ).toBeUndefined();
   });
 
   it('still runs every other e2e spec on the phone, content-only ones included', () => {
     const android = phone();
     // The invariant first, so it is judged even when the exact set below is
     // not: an expectation ordered after a failing one never runs.
-    const dropped = CONTENT_ONLY_SPECS.filter(
+    const contentOnly = CONTENT_ONLY_SPECS;
+    const dropped = contentOnly.filter(
       (spec) => !claims(android, join(E2E, spec)),
     );
     expect(
-      searched(dropped, { of: CONTENT_ONLY_SPECS, what: 'content-only specs' }),
+      searched(dropped, { of: contentOnly, what: 'content-only specs' }),
       'the phone is the only run that measures touching words at phone width (#198)',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'browser-matrix/phone-content-only-specs',
+        contentOnly.length,
+      ),
+    ).toBeUndefined();
 
     const specs = specFilesUnder(E2E);
     expect(specs.filter((spec) => claims(android, spec))).toEqual(
@@ -435,6 +468,9 @@ describe('the real-device config (#194)', () => {
         what: 'specs a device project claims',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/device-claimed-specs', claimed.length),
+    ).toBeUndefined();
   });
 
   it('leaves git ignoring a snapshot a stray run writes beside a spec', () => {
@@ -568,6 +604,9 @@ describe('every project declares its colour scheme (#142)', () => {
     expect(
       searched(undeclared, { of: projects, what: 'Playwright projects' }),
     ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/colour-scheme-projects', projects.length),
+    ).toBeUndefined();
   });
 });
 
@@ -588,6 +627,9 @@ describe('no CI run can be narrowed to the tests someone focused (#390)', () => 
     expect(searched(lax, { of: configs, what: 'Playwright configs' })).toEqual(
       [],
     );
+    expect(
+      floorBreach('browser-matrix/forbid-only-configs', configs.length),
+    ).toBeUndefined();
   });
 });
 
@@ -628,6 +670,9 @@ describe('no test run retries (#445)', () => {
     expect(
       searched(retrying, { of: configs, what: 'Playwright configs' }),
     ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/retry-configs', configs.length),
+    ).toBeUndefined();
   });
 
   it('passes no --retries but 0 in any workflow step or package script', () => {
@@ -658,5 +703,8 @@ describe('no test run retries (#445)', () => {
         what: 'workflow steps and package scripts',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/retry-commands', commands.length),
+    ).toBeUndefined();
   });
 });

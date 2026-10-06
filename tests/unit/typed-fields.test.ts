@@ -75,6 +75,7 @@ describe('typed fields are defined once, and survive being sent to a phone', () 
     expectClosesOverNothing(
       'tests/typed-fields.ts',
       'export const measureTypedFields',
+      'typed-fields/closure-lines',
     );
   });
 
