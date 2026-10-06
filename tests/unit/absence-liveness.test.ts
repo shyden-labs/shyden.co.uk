@@ -330,6 +330,10 @@ describe('absence assertions prove the population they searched', () => {
         what: 'files under tests/',
       }),
     ).toEqual([]);
+    // The walk and git's list can narrow together, and agree over less (#522).
+    expect(
+      floorBreach('absence-liveness/walked-files', tsFiles.length),
+    ).toBeUndefined();
   });
 
   it('reads an absence however it is spelled, and never its inverse', () => {
@@ -458,6 +462,13 @@ describe('absence assertions prove the population they searched', () => {
     expect(
       searched(misread, { of: inverse, what: 'planted non-absences' }),
     ).toEqual([]);
+    // A spelling quietly deleted from either table drops its check (#522).
+    expect(
+      floorBreach('absence-liveness/planted-absences', read.length),
+    ).toBeUndefined();
+    expect(
+      floorBreach('absence-liveness/planted-non-absences', inverse.length),
+    ).toBeUndefined();
   });
 
   it('reads as many absences in each file as its text writes', () => {
@@ -477,7 +488,11 @@ describe('absence assertions prove the population they searched', () => {
           `its text writes ${written.get(file)}`,
       );
     expect(searched(disagree, { of: tsFiles, what: 'files' })).toEqual([]);
-    // Ratcheted after the verdict (#468), so growth never hides a finding.
+    // Ratcheted after the verdict (#468), so growth never hides a finding:
+    // the files compared (#522), then those that write an absence.
+    expect(
+      floorBreach('absence-liveness/compared-files', tsFiles.length),
+    ).toBeUndefined();
     expect(
       floorBreach(
         'absence-liveness/plain-files',
@@ -493,5 +508,8 @@ describe('absence assertions prove the population they searched', () => {
         what: 'absence assertions',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('absence-liveness/judged-sites', result.sites.length),
+    ).toBeUndefined();
   });
 });
