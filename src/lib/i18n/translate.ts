@@ -115,6 +115,9 @@ export const DO_NOT_TRANSLATE: readonly string[] = [
   'Shyden',
   'ShyTalk',
   'Glory Points',
+  // The game's name (#552). "Idle" is an English word DeepL would otherwise
+  // translate.
+  'Yawelo Idle',
   // 'Shyden Ltd', the company number and 'England & Wales' left with the
   // footer's disclosure (#370): the company is dissolved, and a term no
   // sentence carries protects nothing. translate.test.ts holds every term

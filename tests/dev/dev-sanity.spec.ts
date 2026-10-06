@@ -152,7 +152,7 @@ test(
 );
 
 // The dev build sets each product's variable (PUBLIC_SHYTALK_URL,
-// PUBLIC_WORDFARER_URL) to its dev host, so EVERY outbound link to that
+// PUBLIC_YAWELO_IDLE_URL) to its dev host, so EVERY outbound link to that
 // product must resolve there. The mirror of prod-sanity's check; the selection
 // and the liveness control live in `tests/product-links.ts`. One test per
 // product (#403).

@@ -14,11 +14,11 @@ export const PRODUCTS = [
     dev: 'dev.shytalk.shyden.co.uk',
   },
   {
-    name: 'Wordfarer',
-    hostWord: 'wordfarer',
-    variable: 'PUBLIC_WORDFARER_URL',
-    prod: 'wordfarer.shyden.co.uk',
-    dev: 'dev.wordfarer.shyden.co.uk',
+    name: 'Yawelo Idle',
+    hostWord: 'yawelo-idle',
+    variable: 'PUBLIC_YAWELO_IDLE_URL',
+    prod: 'yawelo-idle.shyden.co.uk',
+    dev: 'dev.yawelo-idle.shyden.co.uk',
   },
 ] as const;
 
@@ -26,7 +26,7 @@ export type Product = (typeof PRODUCTS)[number];
 
 /**
  * Every link on the homepage that leaves this site for `product` points at
- * `host` (#338, widened to Wordfarer by #403).
+ * `host` (#338, widened to Yawelo Idle by #403).
  *
  * One home for dev-sanity and prod-sanity, which assert the two halves of the
  * same cross-environment rule: each product's build variable points dev at the
@@ -45,7 +45,7 @@ export type Product = (typeof PRODUCTS)[number];
  * selector, `a[href*="shytalk.shyden.co.uk"]`, had the opposite hole: it could
  * not see a link to any other ShyTalk host, which is the leak it exists for.
  *
- * Hosts are READ, never fetched: the production Wordfarer host has no DNS
+ * Hosts are READ, never fetched: the production Yawelo Idle host has no DNS
  * record yet, by the operator's choice (2026-10-04, #403), and nothing here
  * depends on it resolving.
  *

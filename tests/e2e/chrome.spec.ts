@@ -19,7 +19,7 @@ test.describe('header + footer', () => {
       const nav = page.locator('header nav');
       await expect(nav.locator('a')).toHaveText([
         'ShyTalk',
-        'Wordfarer',
+        'Yawelo Idle',
         'Tools',
         'Contact',
       ]);
@@ -66,7 +66,12 @@ test.describe('header + footer', () => {
     const hrefs = await page
       .locator('header nav a')
       .evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-    expect(hrefs).toEqual(['/#shytalk', '/#wordfarer', '/#tools', '/#contact']);
+    expect(hrefs).toEqual([
+      '/#shytalk',
+      '/#yawelo-idle',
+      '/#tools',
+      '/#contact',
+    ]);
   });
 
   // Shyden Ltd is dissolved (operator, 2026-09-27, #370): the footer names no
@@ -185,7 +190,7 @@ test.describe('header + footer', () => {
       await page.keyboard.press('Tab');
       await expect(languages).toBeFocused();
 
-      for (const label of ['ShyTalk', 'Wordfarer', 'Tools', 'Contact']) {
+      for (const label of ['ShyTalk', 'Yawelo Idle', 'Tools', 'Contact']) {
         await page.keyboard.press('Tab');
         await expect(
           page.locator('header nav a', { hasText: label }),

@@ -1592,8 +1592,8 @@ describe('site-wide copy is fully translated', () => {
       // "ShyTalk" is the product's name. A nav item that translated it would
       // be naming a different product. Identical in all five by design.
       'nav.shytalk',
-      // "Wordfarer" likewise, the game's name, never translated (#403).
-      'nav.wordfarer',
+      // "Yawelo Idle" likewise, the game's name, never translated (#403).
+      'nav.yaweloIdle',
     ]);
     const enMap = new Map(stringLeaves(siteEn));
     const idLeaves = stringLeaves(siteId);

@@ -11,22 +11,22 @@ import { searched } from '../source-files';
  */
 const APPROVED_HOME = {
   description:
-    'Small software, made with care. Coming soon: ShyTalk, live rooms for learning a language by speaking it, and Wordfarer, an idle game for learning one.',
+    'Small software, made with care. Coming soon: ShyTalk, live rooms for learning a language by speaking it, and Yawelo Idle, an idle game for learning one.',
   heroLead:
-    "Coming soon: two new ways to learn a language. Talk it out in ShyTalk's live rooms, or play your way through Wordfarer, an idle game where every word you learn carries you further.",
+    "Coming soon: two new ways to learn a language. Talk it out in ShyTalk's live rooms, or play your way through Yawelo Idle, an idle game where every word you learn carries you further.",
   exploreShytalk: 'Explore ShyTalk',
-  exploreWordfarer: 'Explore Wordfarer',
+  exploreYaweloIdle: 'Explore Yawelo Idle',
   comingSoon: 'Coming soon',
   shytalkKicker: 'Learn by talking',
-  wordfarerKicker: 'Learn by playing',
-  wordfarerBody:
+  yaweloIdleKicker: 'Learn by playing',
+  yaweloIdleBody:
     'An idle game for learning a real language. Journey across the Indonesian archipelago, or across the English-speaking world, and the words you pick up power the game.',
-  wordfarerFeature1:
+  yaweloIdleFeature1:
     'Learn Indonesian from English, or English from Indonesian',
-  wordfarerFeature2: 'Review a word and it grows stronger',
-  wordfarerFeature3: 'No ads, no energy timers, no paid progress',
-  wordfarerFeature4: 'Miss a day and lose nothing. Nobody is forced to study.',
-  visitWordfarer: 'Visit the Wordfarer site',
+  yaweloIdleFeature2: 'Review a word and it grows stronger',
+  yaweloIdleFeature3: 'No ads, no energy timers, no paid progress',
+  yaweloIdleFeature4: 'Miss a day and lose nothing. Nobody is forced to study.',
+  visitYaweloIdle: 'Visit the Yawelo Idle site',
 } as const;
 
 describe('the homepage says what the operator approved (#403)', () => {
@@ -36,8 +36,8 @@ describe('the homepage says what the operator approved (#403)', () => {
       expect(home[key]).toBe(english);
     });
 
-  it('en nav.wordfarer is the product name', () => {
-    expect(getSiteStrings('en').nav.wordfarer).toBe('Wordfarer');
+  it('en nav.yaweloIdle is the product name', () => {
+    expect(getSiteStrings('en').nav.yaweloIdle).toBe('Yawelo Idle');
   });
 });
 
