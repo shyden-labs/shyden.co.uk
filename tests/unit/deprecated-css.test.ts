@@ -102,12 +102,16 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
     const findings = declarations
       .filter(({ declaration }) => CLIP.test(declaration))
       .map(({ file, declaration }) => `${file}: ${declaration}`);
+    const judged = declarations.map(({ declaration }) => declaration);
     expect(
       searched(findings, {
-        of: declarations.map(({ declaration }) => declaration),
+        of: judged,
         what: 'declarations under src/',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('deprecated-css/judged-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('reads every declaration the stylesheets hold, and as many as there are', () => {
