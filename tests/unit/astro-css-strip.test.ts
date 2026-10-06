@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { floorBreach } from '../floors';
 import { filesUnder, nonEmpty, searched } from '../source-files';
 import {
   astroStyleViews,
@@ -123,6 +124,9 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
         what: 'CSS comments in <style> bodies under src/',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('astro-css-strip/style-comments', comments.length),
+    ).toBeUndefined();
   });
 
   it('leaves the raw CSS stripper with no caller outside its own home', () => {
