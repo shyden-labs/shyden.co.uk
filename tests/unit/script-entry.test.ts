@@ -772,6 +772,9 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     expect(searched(disagree, { of: modules, what: 'scripts' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('script-entry/argv-compared-scripts', modules.length),
+    ).toBeUndefined();
+    expect(
       floorBreach(
         'script-entry/argv-reads',
         readings.reduce((sum, { judged }) => sum + judged, 0),
@@ -934,6 +937,9 @@ describe('a script does no work while it loads (#276)', () => {
       .map(({ file, judged, held }) => `${file}: ${judged} of ${held} judged`);
     expect(searched(skipped, { of: modules, what: 'scripts' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach('script-entry/load-time-compared-scripts', modules.length),
+    ).toBeUndefined();
     expect(
       floorBreach(
         'script-entry/load-time-statements',

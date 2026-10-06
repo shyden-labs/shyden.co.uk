@@ -1109,6 +1109,9 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(searched(missed, { of: files, what: 'workflow files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     expect(
+      floorBreach('pipeline-wiring/ref-cross-checked-files', files.length),
+    ).toBeUndefined();
+    expect(
       floorBreach(
         'pipeline-wiring/workflow-file-refs',
         read.flatMap(({ refs }) => refs).length,
@@ -2800,13 +2803,20 @@ describe('wrangler comes from the lockfile (#97)', () => {
         .filter((line) => globalWranglerInstalls(line).length === 0)
         .map((line) => `${name}: ${line}`),
     );
+    const workflowTexts = workflows.map(({ text }) => text);
     expect(
       searched(missed, {
-        of: workflows.map(({ text }) => text),
+        of: workflowTexts,
         what: 'workflow texts',
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
+    expect(
+      floorBreach(
+        'pipeline-wiring/install-cross-checked-texts',
+        workflowTexts.length,
+      ),
+    ).toBeUndefined();
     expect(
       floorBreach(
         'pipeline-wiring/workflows-read-for-an-install',
