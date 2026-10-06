@@ -314,6 +314,9 @@ describe('every floor demanding two or more is ratcheted (#468)', () => {
       searched(findings, { of: SITES, what: 'floors read under tests/' }),
       findings.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('literal-floors/judged-sites', SITES.length),
+    ).toBeUndefined();
   });
 });
 
@@ -339,6 +342,9 @@ describe('the floor reader proves what it read (#468)', () => {
     expect(
       searched(misread, { of: FILES, what: 'TypeScript files under tests/' }),
     ).toEqual([]);
+    expect(
+      floorBreach('literal-floors/compared-files', FILES.length),
+    ).toBeUndefined();
   });
 
   it('reads every TypeScript file git has under tests/', () => {
@@ -353,6 +359,10 @@ describe('the floor reader proves what it read (#468)', () => {
         what: 'files under tests/',
       }),
     ).toEqual([]);
+    // The walk and git's list can narrow together, and agree over less (#525).
+    expect(
+      floorBreach('literal-floors/walked-files', FILES.length),
+    ).toBeUndefined();
   });
 
   it('refuses nothing it could not classify', () => {
@@ -373,6 +383,9 @@ describe('the floor reader proves what it read (#468)', () => {
     const listed = [...Object.keys(PRODUCT_VALUES), ...Object.keys(GROUP_5)];
     const stale = listed.filter((key) => !live.has(key));
     expect(searched(stale, { of: listed, what: 'listed floors' })).toEqual([]);
+    expect(
+      floorBreach('literal-floors/listed-floors', listed.length),
+    ).toBeUndefined();
   });
 
   it('only shrinks the Group 5 list', () => {
@@ -395,5 +408,8 @@ describe('the floor reader proves what it read (#468)', () => {
       searched(wrong, { of: ids, what: 'recorded floor ids' }),
       wrong.join('\n'),
     ).toEqual([]);
+    expect(
+      floorBreach('literal-floors/recorded-ids', ids.length),
+    ).toBeUndefined();
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { catalogueLeaves, stringLeaves } from '../../src/lib/catalogue-leaves';
 import { en as enCatalogue } from '../../src/lib/i18n/en';
 import { id as idCatalogue } from '../../src/lib/i18n/id';
@@ -133,6 +134,9 @@ describe('locales are complete', () => {
         { of: idStrings, what: 'Indonesian catalogue strings' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('i18n/indonesian-catalogue-strings', idStrings.length),
+    ).toBeUndefined();
   });
 
   it('and the list of exceptions has no dead entries', () => {
@@ -1575,6 +1579,7 @@ describe('site-wide copy is fully translated', () => {
       .filter(([, value]) => value.trim() === '')
       .map(([key]) => key);
     expect(searched(blank, { of: strings, what: 'site strings' })).toEqual([]);
+    expect(floorBreach('i18n/site-strings', strings.length)).toBeUndefined();
   });
 
   it('the visible prose is genuinely translated, not copied English', () => {
@@ -1604,6 +1609,9 @@ describe('site-wide copy is fully translated', () => {
     expect(
       searched(identical, { of: idLeaves, what: 'Indonesian site strings' }),
     ).toEqual([]);
+    expect(
+      floorBreach('i18n/indonesian-site-strings', idLeaves.length),
+    ).toBeUndefined();
   });
 });
 

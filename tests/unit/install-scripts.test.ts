@@ -125,6 +125,9 @@ describe('the install-script allowlist', () => {
         'FUTURE version of that package, reviewed by nobody. Pin it, the ' +
         'same way this repo pins actions to a SHA rather than a tag',
     ).toEqual([]);
+    expect(
+      floorBreach('install-scripts/pinned-approvals', approved.length),
+    ).toBeUndefined();
   });
 
   it('approves rather than denies — a false value blocks the install', () => {
@@ -138,5 +141,8 @@ describe('the install-script allowlist', () => {
     expect(
       searched(denied, { of: approvals, what: 'approval entries' }),
     ).toEqual([]);
+    expect(
+      floorBreach('install-scripts/approval-entries', approvals.length),
+    ).toBeUndefined();
   });
 });
