@@ -17,6 +17,7 @@ import { en } from '../../src/lib/i18n/en';
 import { siteEn } from '../../src/lib/i18n/site';
 import { CSV_LOCALES } from '../../src/lib/csv-locale';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { messageOf } from '../../scripts/errors.mjs';
 import {
@@ -407,7 +408,8 @@ describe('protected terms are wrapped before they are sent', () => {
   it('round-trips every real catalogue string through the whole pipeline', () => {
     // The assertion that would have predicted the 400, over exactly what the
     // harness sends: escape, protect, then back again must be the identity.
-    const broken = collectCatalogue().filter(
+    const catalogue = collectCatalogue();
+    const broken = catalogue.filter(
       (source) =>
         unescapeXml(
           unprotectTerms(buildRequestBody([source], 'zh').text[0]),
@@ -415,11 +417,14 @@ describe('protected terms are wrapped before they are sent', () => {
     );
     expect(
       searched(broken, {
-        of: collectCatalogue(),
+        of: catalogue,
         what: 'catalogue strings',
       }),
       'these strings do not survive the request pipeline unchanged',
     ).toEqual([]);
+    expect(
+      floorBreach('translate/round-tripped-strings', catalogue.length),
+    ).toBeUndefined();
   });
 });
 
@@ -560,13 +565,19 @@ describe('a draft whose English is retired is dropped', () => {
         .filter((english) => !sent.has(english))
         .map((english) => `${locale}: ${english}`),
     );
+    const cachedDrafts = Object.values(cache).flatMap((drafts) =>
+      Object.keys(drafts),
+    );
     expect(
       searched(stale, {
-        of: Object.values(cache).flatMap((drafts) => Object.keys(drafts)),
+        of: cachedDrafts,
         what: 'cached drafts',
       }),
       'drafts for English no catalogue sends -- run `npm run i18n:translate -- <locale> --prune`',
     ).toEqual([]);
+    expect(
+      floorBreach('translate/cached-drafts', cachedDrafts.length),
+    ).toBeUndefined();
   });
 
   it('has nothing to drop for a locale with no drafts', () => {
@@ -679,6 +690,9 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       'a dry run made a request',
     ).toEqual([]);
+    expect(
+      floorBreach('translate/dry-run-trap-log', run.log.length),
+    ).toBeUndefined();
   });
 
   it('drops the stale drafts with --prune, with no key and no request', () => {
@@ -695,6 +709,9 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       '--prune made a request',
     ).toEqual([]);
+    expect(
+      floorBreach('translate/prune-trap-log', run.log.length),
+    ).toBeUndefined();
     expect(run.output).toMatch(
       /^✓ dropped 2 stale drafts — nothing sent, no key read\.$/m,
     );
@@ -711,6 +728,9 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       'nothing was pending, yet it sent',
     ).toEqual([]);
+    expect(
+      floorBreach('translate/send-trap-log', run.log.length),
+    ).toBeUndefined();
   });
 
   it('writes nothing when --prune has nothing to drop', () => {
