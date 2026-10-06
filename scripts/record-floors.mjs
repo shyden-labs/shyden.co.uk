@@ -237,6 +237,62 @@ export const decideRecord = (recorded, seen, carried = []) => {
   return { next, refusals };
 };
 
+/** Passes a record may take before its ids are called unsettled. */
+export const MAX_PASSES = 3;
+
+/**
+ * Measure and decide until a pass adds no id, then return that pass's figures.
+ *
+ * A floor may count the record itself: literal-floors' `recorded-ids` floors
+ * the ids it holds. One pass reads the record before its new ids are in it,
+ * so a pass that adds ids records that floor short (#525: read 90, recorded
+ * 76), and the next run fails its own ratchet. Measuring again over the ids
+ * the pass added settles it. A decision never drops an id (an unasserted one
+ * is refused), so a pass that changes the ids has added some, and a pass
+ * with as many ids as its record has settled.
+ *
+ * `measure(floors, pass)` runs the suites with `floors` as the record and
+ * returns what they saw, or why they could not run; `carry(seen)` names the
+ * recorded ids the pass was not asked to measure.
+ *
+ * @param {{
+ *   recorded: Readonly<Record<string, number>>,
+ *   measure: (floors: Readonly<Record<string, number>>, pass: number) => readonly Observation[] | string,
+ *   carry?: (seen: readonly Observation[]) => readonly string[],
+ *   maxPasses?: number,
+ * }} run
+ * @returns {{ next: Record<string, number>, refusals: string[], failure: string | undefined, passes: number }}
+ */
+export const recordUntilSettled = ({
+  recorded,
+  measure,
+  carry = () => [],
+  maxPasses = MAX_PASSES,
+}) => {
+  let floors = { ...recorded };
+  for (let pass = 1; pass <= maxPasses; pass++) {
+    const seen = measure(floors, pass);
+    if (typeof seen === 'string')
+      return { next: floors, refusals: [], failure: seen, passes: pass };
+    const { next, refusals } = decideRecord(floors, seen, [...carry(seen)]);
+    if (
+      refusals.length > 0 ||
+      Object.keys(next).length === Object.keys(floors).length
+    )
+      return { next, refusals, failure: undefined, passes: pass };
+    floors = next;
+  }
+  return {
+    next: floors,
+    refusals: [
+      `the recorded ids never held still in ${maxPasses} passes: each added ` +
+        'some, so no floor counting them can be trusted',
+    ],
+    failure: undefined,
+    passes: maxPasses,
+  };
+};
+
 /**
  * One line per figure that moved, largest move first: `id: 100 -> 125 (+25)`,
  * or `id: new, 3`.
@@ -315,49 +371,80 @@ const main = () => {
   // skips any `finally` still pending, and the scratch directory would leak.
   const cwd = process.cwd();
   const dir = mkdtempSync(join(cwd, RECORD_DIR_PREFIX));
-  /** @type {string | undefined} */
-  let refusal;
-  /** @type {Observation[]} */
-  let seen = [];
+  const original = existsSync(FLOORS_FILE)
+    ? readFileSync(FLOORS_FILE)
+    : undefined;
+  /** @type {readonly string[]} */
+  let carried = [];
+  let read = 0;
+  /** @type {readonly Observation[]} */
+  let e2eSeen = [];
+  let settled;
   try {
-    const unit = join(dir, 'unit.jsonl');
-    const e2e = join(dir, 'e2e.jsonl');
-    refusal = runRefusal(
-      UNIT,
-      spawnSync('npx', ['vitest', 'run'], {
-        stdio: 'inherit',
-        env: { ...env, [RECORD_ENV]: unit },
-      }),
-    );
-    if (refusal === undefined && !unitOnly) {
-      const image = localImage();
-      console.log(
-        `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
-      );
-      refusal = runRefusal(
-        PLAYWRIGHT,
-        spawnSync(
-          'docker',
-          playwrightRecordArgs({ image, cwd, record: e2e, specs }),
-          { stdio: 'inherit' },
-        ),
-      );
-    }
-    seen = [...observationsIn(unit), ...observationsIn(e2e)];
+    settled = recordUntilSettled({
+      recorded,
+      carry: (seen) => {
+        read = seen.length;
+        carried = unitOnly
+          ? carriedIds(
+              Object.keys(recorded),
+              specs.map((spec) => readFileSync(spec, 'utf8')),
+              new Set(seen.map(({ id }) => id)),
+            )
+          : [];
+        return carried;
+      },
+      measure: (floors, pass) => {
+        // A later pass reads the record the one before it decided. Only the
+        // unit suite runs again: no Playwright test reads the record's ids.
+        if (pass > 1) {
+          writeFileSync(FLOORS_FILE, floorsText(floors));
+          console.log(
+            `${FLOORS_FILE}: ids were added, so the unit suite runs again ` +
+              `(pass ${pass}): a floor may count the ids the record holds`,
+          );
+        }
+        const unit = join(dir, `unit-${pass}.jsonl`);
+        const unitRefusal = runRefusal(
+          UNIT,
+          spawnSync('npx', ['vitest', 'run'], {
+            stdio: 'inherit',
+            env: { ...env, [RECORD_ENV]: unit },
+          }),
+        );
+        if (unitRefusal !== undefined) return unitRefusal;
+        if (pass === 1 && !unitOnly) {
+          const image = localImage();
+          const e2e = join(dir, 'e2e.jsonl');
+          console.log(
+            `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
+          );
+          const e2eRefusal = runRefusal(
+            PLAYWRIGHT,
+            spawnSync(
+              'docker',
+              playwrightRecordArgs({ image, cwd, record: e2e, specs }),
+              { stdio: 'inherit' },
+            ),
+          );
+          if (e2eRefusal !== undefined) return e2eRefusal;
+          e2eSeen = observationsIn(e2e);
+        }
+        return [...observationsIn(unit), ...e2eSeen];
+      },
+    });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  if (refusal !== undefined) die(refusal);
-  const carried = unitOnly
-    ? carriedIds(
-        Object.keys(recorded),
-        specs.map((spec) => readFileSync(spec, 'utf8')),
-        new Set(seen.map(({ id }) => id)),
-      )
-    : [];
-  const { next, refusals } = decideRecord(recorded, seen, carried);
-  if (refusals.length > 0) die(`nothing recorded:\n  ${refusals.join('\n  ')}`);
+  const { next, refusals, failure, passes } = settled;
+  if (failure !== undefined || refusals.length > 0) {
+    // A later pass ran over a record this run wrote: put back what it found.
+    if (passes > 1)
+      if (original === undefined) rmSync(FLOORS_FILE, { force: true });
+      else writeFileSync(FLOORS_FILE, original);
+    die(failure ?? `nothing recorded:\n  ${refusals.join('\n  ')}`);
+  }
   if (carried.length > 0)
     console.log(
       `${UNIT_ONLY}: not measured, carried unchanged for CI to judge: ` +
@@ -368,7 +455,7 @@ const main = () => {
   writeFileSync(FLOORS_FILE, floorsText(next));
   console.log(
     moves.length === 0
-      ? `${FLOORS_FILE}: every floor already matches (${seen.length} read)`
+      ? `${FLOORS_FILE}: every floor already matches (${read} read)`
       : [
           `${FLOORS_FILE}: ${moves.length} floor(s) moved:`,
           ...moves.map((move) => `  ${move}`),
