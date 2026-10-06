@@ -1,83 +1,45 @@
-# Handover — 2026-09-26 ~14:30Z: #348 shipped to dev; #350 next
+# Handover — 2026-10-06 19:26Z: #582 (docs-only CI fast path) is merged and dev-verified (develop at `d691c5c`). This handover's own PR is the first docs-only run, and it measures AC5.
 
-Nothing local is running: no waiter, no preview, no container. The main checkout is on `develop` at `24798a5`, level with `origin/develop`; only this file is modified. This session's scratchpad (`$S`) is `/private/tmp/claude-501/-Users-shyden-Developer-Repos-shyden-co-uk/25c97635-9ff3-41a1-acd5-5108fe08142d/scratchpad`. It holds `wait-pr.sh <pr> <sha-file>`, `wait-dev.sh <sha-file>`, `board-done.sh <n> Done` (asserts the board title before it writes), and `mut348.py` (a mutation harness that refuses a target with uncommitted work).
+## The release decision (operator, 2026-10-04, recorded on #390, #446, #515 and #403; #552 added 2026-10-05)
 
-## Done this session: #348, the translation-reports review script
+- **Gates the release:** the #390 tranches (#497-#499), #510 (the probes), the conversion stories #530-#532 and #544, #494 (the summary), #362 (the evidence page), #553, then the operator's manual test. The operator releases.
+- **#553 (visual flake) is counted as gating**, because a required check that fails at random is a P0 defect under the global zero-tolerance rule. The operator has not ruled on it.
+- **Everything else below P0 is fixed forward**: the rest of the guard audit (#446, #469, #471-#474, #476, #478-#482), #547, #512, #514 and #576 come after the release.
+- **DeepL runs whenever it can. Floors everywhere** (#534). **The recorder repeats until stable** (#525). **Deliberately empty fixtures take a floor of 0** (#528).
+- **Alert 13: "A: Guard it"**, done in #457. The alert stays open. Dependabot's next `astro` bump will be red on `ASTRO_READ` by design: re-read the gate the tripwire's message names before moving it.
+- **One-unit floors take two mutants** (loss + growth); a population of 2 or more takes a real drop-one after any pin. Tool: `.superpowers/sdd/lossmut.py <spec.py>`.
+- **#582, operator 2026-10-06 18:33Z: `visual` keeps running on a docs-only PR** (it is required by name and `deploy-gate.mjs` refuses it skipped), so `image` runs too. Only `e2e` (8 shards), `functions` and `sanity-on-build` are skipped.
 
-- `npm run reports:review <shyden-reports-dev|shyden-reports>`:
-  - pure decisions in `src/lib/report-review.ts`;
-  - wiring in `scripts/reports-review.mjs`;
-  - the engine client shared with `i18n-back-translate.mjs` in `scripts/back-translate-client.mjs`.
-- Plan `docs/superpowers/plans/2026-09-26-reports-review.md`: three review passes, the last clean.
-- 22 mutations red as predicted.
-- PR #358 merged as `24798a5`, with 15 checks read by name (`back-translation review` among them).
-- deploy-dev run 36248541244, job by job: success. `dev-verified` = success.
-- Closed, and on Done.
-- Memory saved: `a-mutation-harness-refuses-a-dirty-target`.
+## Done this session
 
-## Next: #350 (a report route for the 404's translated `notFound` blocks)
+| Ticket | PR   | Merge     | dev-verified | Note                                                                                                                                                                                                                                   |
+| ------ | ---- | --------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #582   | #583 | `d691c5c` | 19:25:43Z    | `scope` job + `scripts/docs-only.mjs`; `build-and-test` judges a docs-only verdict; the #157 guard knows the aggregate shape; 23 mutants as predicted (one prediction corrected, M2); 4 new floors, each matching an independent count |
 
-- A UI feature, so a plan reviewed to zero first. The operator's rule: run the plan's code, not only read it.
-- Facts already read:
-  - `src/pages/404.astro` builds `others` from `LOCALES` minus the default, each with `copy: getSiteStrings(locale).notFound`.
-  - The footer's report form is inside `src/components/Footer.astro`, gated by `isBetaLocale(lang)` (`reportPage`, line ~62).
-  - AC4 pins the page's script inventory (`tests/e2e/theme-script.spec.ts`).
-  - AC6 needs the 404's visual baselines recaptured in the pinned container, which is a whole-machine job.
-- Then **#349**. Its AC1 is a question for the operator: ask it with `AskUserQuestion`, with the content inside the question.
-- Then **#354**, which needs the real iPhone.
+**#582 stays open until AC5 is measured.** This PR changes `HANDOVER.md` alone, so its CI run is the first docs-only one. Read it by job (`gh run view <id> --json jobs`): expect `scope` to print `docs-only`, `e2e`/`functions`/`sanity-on-build` `skipped`, and `checks`/`visual`/`image`/`build-and-test` `success`. Post the wall time and runner-minutes on #582 against 15 min and 83 runner-minutes, with every AC's evidence, then close it.
 
-## Parked: #205 (PR #213, branch `205-evidence-carousel`)
+**Found this session:**
 
-Unchanged from the previous handover:
+- **Floors recorded with new files untracked, a third time** (#390 F50, #475, #582). Every delta reconciled, because the reconcile reads the same blind set; the mutation harness's baseline caught it. Evidence added to **#547** (the recorder refusing untracked files). Until it lands, `git add -A` is the first command of every record.
+- **The full `npm run floors:record` was refused by `tests/e2e/feature-words.spec.ts`**: 11 failed and 9 passed, each failure a 30 s timeout at load average about 13. `--unit` was the right mode for #582, since no browser floor moved, but the Playwright-floor stories (#544, #530-#532) need the full record, so expect it there. Open PR #381 (#380) budgets exactly these locale-copy journeys.
 
-- Head `307c0fb`; it needs its branch updated.
-- The preview https://claude.ai/artifact/W5a4cfGN89NQ6ZtW4hoZmG is waiting for the operator to use it.
-- **Then:**
-  1. `ArtifactComments` watch, then read.
-  2. `ArtifactData list signoff/preview-205/items`.
-  3. Record it on PR #213, checked with `node scripts/closing-keywords.mjs`.
-  4. Update the branch and read the checks by name.
-  5. Merge with a merge commit, read `dev-verified`, and close #205.
+## Resume, in order
 
-## For the operator (production stays yours)
+1. **Finish #582**: measure this PR's run (above), post the evidence, close it, mark it Done.
+2. **#497** (tranche 26, from **row 348**; next finding **F206**), then #498, #499. The recipe is #492's: read each row whole, record findings in the row, prove each with a predicted pair, file P4s fixed forward on one collection ticket, a one-commit ledger PR (now docs-only, so about 2-3 minutes of CI), then a #390 progress comment. Harness shapes: `../shyden.co.uk-492/.superpowers/sdd/492/mut492.py`, and `../shyden.co.uk-582/.superpowers/sdd/582/mut582.py`, which refuses a red baseline and holds the test count.
+3. **#544, #530, #531, #532** (Playwright floors: `npm run floors:record`, Docker, one worker). The recipe is #545's `patch545.py`/`mut545.py` in `../shyden.co.uk-545/.superpowers/sdd/545/`. Every one-unit floor takes a loss mutant too. One PR at a time: each merge puts the next into conflict on `floors.json` and the burn-down, resolved by `.superpowers/sdd/resolve-floors-merge.py` and a re-record. Expect the feature-words timeouts above.
+4. **#553**: reproduce first per its ACs. No retry, no longer timeout, no mask.
+5. #510 (ask the operator about #459's probe), #494, #362.
+6. Merged worktrees that can be removed: `-457`, `-475`, `-492`, `-515`, `-522` to `-529`, `-536` to `-545`, `-548`, `-552`, `-570`, `-572`; `-582` once #582 is closed (it holds `mut582.py`), and `-582h` once this PR merges. `-475` holds `board.py` (already copied to `.superpowers/sdd/yawelo/board.py`).
+7. **Never search or read evidence in the main checkout: it is on the stale branch `380-locale-copy-budget`.** Search a develop worktree, with a known positive.
 
-- **#205's preview:** open a journey, download one screenshot and one recording, then press "Send review to Claude".
-- **Before #97 reaches prod:** the runbook's WAF rate-limit rule on `/api/report`, and confirming the Workers plan.
-- **Noticed, not changed:**
-  - `shyden-site` (prod) carries a `DEV_PASSWORD` env var.
-  - `shyden-reports-dev` holds 5 `automated dev check` rows, which the runbook's second `DELETE` clears.
-- **For your end-of-board read:**
-  - #189, #352, #351, #355 and #348 on dev.
-  - #346: 200 clean Firefox repeats are on the issue. Retire it, or keep it open?
-  - zh `site.nav.contact` in `AWAITING_READ`.
-  - #142's page: https://claude.ai/artifact/D4FaM5xxu2rjdoKen6UsPk
-  - #319's page: https://claude.ai/artifact/Bb9kLd4i2oN9rMnvZsC9hk
-- Nothing was opened towards `main`.
+## Running
 
-## The operating mode, from 2026-09-24 (unchanged)
+Nothing.
 
-The operator: _"review the plan on a /loop until there's no findings, then approve it. do this for all future plans. once all tickets are completed, i will manually test and review and make suggestions to improve after that. for now, just complete everything by yourself making sure you self-review everything comprehensively"_. Then: _"dont forget to pause to clear the session though"_.
+## Progress (shyden.co.uk)
 
-- **A ticket merges into `develop` on a comprehensive self-review:**
-  - CI green, read by name on the head being merged;
-  - mutations wherever guards changed;
-  - a full read of the diff;
-  - a grep of `tests/dev`, `tests/prod` and `tests/device` for every changed fact.
-- **Production stays the operator's.** Never open or merge a `develop` → `main` promotion.
-- **Pause to clear at every boundary.**
+Measured from the board at 19:26Z with `.superpowers/sdd/yawelo/board.py` (277 stories): 213 closed, 858 of 1121 points (87 closed and 3 open stories unscored, counted at the closed-scored mean of 4.05, assumed). Pace over the last 7 days (measured): 67 stories and 289 points, which is 9.6 stories and 41.3 points a day. Release path left (measured from `.superpowers/sdd/release-path.txt`, each ticket's Estimate): **11 tickets, 53 points** (#362, #494, #497-#499, #510, #530-#532, #544, #553), then the operator's manual test. #582 (5 points) closes on this PR's measurement.
 
-## Environment notes, not code problems
-
-- **Mutations: commit first.** A mutation harness that reverts with `git checkout --` destroys uncommitted work in its target. `mut348.py` now refuses a dirty target.
-- **`absence-liveness.test.ts`** wants `searched(x, { of, what })` inside the assertion itself. A helper returning an empty collector is traced and flagged.
-- **An artifact page runs in a sandboxed frame that Chrome automation cannot scroll.**
-- **Old branches meet `checkJs`**, over every `.js`/`.mjs` under `scripts/`.
-- **wrangler's OAuth login expires.** The operator re-runs `! npx wrangler login`. `wrangler pages dev` loads `.env.local` unasked.
-- **Shell:**
-  - `sips` crop is a silent no-op.
-  - In zsh, never `echo ==`, and brace every variable before a colon.
-  - macOS `git grep -E` has no `\b`.
-  - The Bash `grep` wrapper skips `.github/` and gitignored paths. Use `command grep`.
-- **The Shyden Site board** is `PVT_kwDOEOcG584BiyCS`. Assert its title before any write. Never touch project 1.
-- **Previews:** one per project; stop it with `npx astro preview stop`.
-- **`gh project item-list 2` truncates.** Use `--limit 1000` and check against `totalCount`.
+- By tickets: 213 / 277 = **77% complete**. ETA release-ready 2026-10-08 to 2026-10-12 (11 tickets at 9.6 a day, about 1.2 working days, plus serial CI rounds), medium confidence.
+- By effort: 858 / 1121 = **77% complete**. ETA release-ready 2026-10-08 to 2026-10-12 (53 points at 41.3 a day, about 1.3 working days), medium confidence. #553's cause is not yet found, the Playwright stories need Docker runs (and may meet the feature-words timeouts), and the operator's manual test is an outside wait.
