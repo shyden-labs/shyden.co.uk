@@ -61,7 +61,7 @@
     {
       "id": "prod-secrets",
       "group": "Before production, yours",
-      "label": "Decide on the repository-level Cloudflare secrets for this release (#241)."
+      "label": "Confirm no Cloudflare secret is held at repository level, only in the approval-gated environments: the repository list was empty when read on 2026-10-07 (#241, #415)."
     }
   ],
   "entries": {
