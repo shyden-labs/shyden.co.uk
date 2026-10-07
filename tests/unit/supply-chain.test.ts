@@ -476,3 +476,119 @@ describe('prettier-plugin-astro is pinned to the version the lockfile resolves',
     ).toBe(lockedVersion('prettier-plugin-astro'));
   });
 });
+
+/** Whether a plain `x.y.z` release is at least `floor`; anything else throws. */
+const atLeast = (version: string, floor: string): boolean => {
+  const parts = (v: string) => {
+    if (!/^\d+\.\d+\.\d+$/.test(v))
+      throw new Error(`not a plain x.y.z release: ${v}`);
+    return v.split('.').map(Number);
+  };
+  const [have, need] = [parts(version), parts(floor)];
+  const differs = have.findIndex((n, i) => n !== need[i]);
+  return differs === -1 || have[differs] > need[differs];
+};
+
+/**
+ * Every copy of sharp the lockfile installs is 0.35.5 or later (#595).
+ *
+ * Dependabot alert 15, CVE-2026-96889: sharp below 0.35.5 bundles a
+ * vulnerable librsvg. Astro accepts the fixed release, but miniflare (under
+ * wrangler) pins sharp EXACTLY at 0.35.4 in every wrangler up to 4.148.0,
+ * so `package.json`'s `overrides` holds it at 0.35.5 (operator, 2026-10-07).
+ * Read from the lockfile, which is what `npm ci` installs, and derived: every
+ * `node_modules/sharp` at any depth, so a nested copy a later bump brings in
+ * is judged the day it appears.
+ */
+describe('no installed sharp carries CVE-2026-96889', () => {
+  it('locks every sharp at 0.35.5 or later', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+      packages?: Record<string, { version?: string }>;
+    };
+    const sharps = Object.entries(lock.packages ?? {}).filter(
+      ([path]) =>
+        path === 'node_modules/sharp' || path.endsWith('/node_modules/sharp'),
+    );
+    const vulnerable = sharps
+      .filter(([, { version }]) => !atLeast(version ?? '', '0.35.5'))
+      .map(([path, { version }]) => `${path} = ${version}`);
+    expect(
+      searched(vulnerable, { of: sharps, what: 'locked copies of sharp' }),
+      'a sharp below 0.35.5 bundles the librsvg of CVE-2026-96889 (#595)',
+    ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/locked-sharps', sharps.length),
+    ).toBeUndefined();
+  });
+});
+
+describe('atLeast reads a plain release against a floor', () => {
+  it.each([
+    ['0.35.5', true],
+    ['0.35.4', false],
+    ['0.35.10', true],
+    ['0.36.0', true],
+    ['0.34.9', false],
+    ['1.0.0', true],
+  ])('%s against 0.35.5 is %s', (version, expected) => {
+    expect(atLeast(version, '0.35.5')).toBe(expected);
+  });
+
+  it('refuses a release it cannot read, never guessing', () => {
+    expect(() => atLeast('0.35.5-rc.1', '0.35.5')).toThrow(
+      'not a plain x.y.z release: 0.35.5-rc.1',
+    );
+  });
+});
+
+/**
+ * The sharp override lasts only as long as the pin that made it necessary
+ * (#595). An override outliving its reason would hold sharp below a later
+ * security release, so it is a caret range, open to every 0.35 patch, and
+ * this test goes red the day no dependency pins a vulnerable sharp any more:
+ * the Dependabot wrangler bump that brings a fixed miniflare is the pull
+ * request that has to remove it.
+ */
+describe('the sharp override stays only while a dependency pins a vulnerable sharp', () => {
+  const lockPackages = () =>
+    (
+      JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+        packages?: Record<
+          string,
+          {
+            dependencies?: Record<string, string>;
+            optionalDependencies?: Record<string, string>;
+            peerDependencies?: Record<string, string>;
+          }
+        >;
+      }
+    ).packages ?? {};
+
+  it('overrides sharp with a range that admits every later 0.35 patch', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      overrides?: Record<string, string>;
+    };
+    expect(pkg.overrides?.sharp).toBe('^0.35.5');
+  });
+
+  it('is still needed: some dependency pins sharp exactly, below 0.35.5', () => {
+    const declared = Object.entries(lockPackages()).flatMap(([path, entry]) => {
+      const spec =
+        entry.dependencies?.sharp ??
+        entry.optionalDependencies?.sharp ??
+        entry.peerDependencies?.sharp;
+      return spec === undefined ? [] : [{ path, spec }];
+    });
+    // Astro's caret and miniflare's exact pin, read from the lockfile.
+    expect(declared.length).toBeGreaterThan(0);
+    const holding = declared.filter(({ spec }) => {
+      if (/^\d+\.\d+\.\d+$/.test(spec)) return !atLeast(spec, '0.35.5');
+      if (/^\^0\.35\.\d+$/.test(spec)) return false;
+      throw new Error(`a sharp range this test cannot read: ${spec}`);
+    });
+    expect(
+      holding.length,
+      'no dependency pins a vulnerable sharp any more: remove the sharp override from package.json, and this test with it (#595)',
+    ).toBeGreaterThan(0);
+  });
+});
