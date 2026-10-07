@@ -476,3 +476,67 @@ describe('prettier-plugin-astro is pinned to the version the lockfile resolves',
     ).toBe(lockedVersion('prettier-plugin-astro'));
   });
 });
+
+/** Whether a plain `x.y.z` release is at least `floor`; anything else throws. */
+const atLeast = (version: string, floor: string): boolean => {
+  const parts = (v: string) => {
+    if (!/^\d+\.\d+\.\d+$/.test(v))
+      throw new Error(`not a plain x.y.z release: ${v}`);
+    return v.split('.').map(Number);
+  };
+  const [have, need] = [parts(version), parts(floor)];
+  const differs = have.findIndex((n, i) => n !== need[i]);
+  return differs === -1 || have[differs] > need[differs];
+};
+
+/**
+ * Every copy of sharp the lockfile installs is 0.35.5 or later (#595).
+ *
+ * Dependabot alert 15, CVE-2026-96889: sharp below 0.35.5 bundles a
+ * vulnerable librsvg. Astro accepts the fixed release, but miniflare (under
+ * wrangler) pins sharp EXACTLY at 0.35.4 in every wrangler up to 4.148.0,
+ * so `package.json`'s `overrides` holds it at 0.35.5 (operator, 2026-10-07).
+ * Read from the lockfile, which is what `npm ci` installs, and derived: every
+ * `node_modules/sharp` at any depth, so a nested copy a later bump brings in
+ * is judged the day it appears.
+ */
+describe('no installed sharp carries CVE-2026-96889', () => {
+  it('locks every sharp at 0.35.5 or later', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+      packages?: Record<string, { version?: string }>;
+    };
+    const sharps = Object.entries(lock.packages ?? {}).filter(
+      ([path]) =>
+        path === 'node_modules/sharp' || path.endsWith('/node_modules/sharp'),
+    );
+    const vulnerable = sharps
+      .filter(([, { version }]) => !atLeast(version ?? '', '0.35.5'))
+      .map(([path, { version }]) => `${path} = ${version}`);
+    expect(
+      searched(vulnerable, { of: sharps, what: 'locked copies of sharp' }),
+      'a sharp below 0.35.5 bundles the librsvg of CVE-2026-96889 (#595)',
+    ).toEqual([]);
+    expect(
+      floorBreach('supply-chain/locked-sharps', sharps.length),
+    ).toBeUndefined();
+  });
+});
+
+describe('atLeast reads a plain release against a floor', () => {
+  it.each([
+    ['0.35.5', true],
+    ['0.35.4', false],
+    ['0.35.10', true],
+    ['0.36.0', true],
+    ['0.34.9', false],
+    ['1.0.0', true],
+  ])('%s against 0.35.5 is %s', (version, expected) => {
+    expect(atLeast(version, '0.35.5')).toBe(expected);
+  });
+
+  it('refuses a release it cannot read, never guessing', () => {
+    expect(() => atLeast('0.35.5-rc.1', '0.35.5')).toThrow(
+      'not a plain x.y.z release: 0.35.5-rc.1',
+    );
+  });
+});
