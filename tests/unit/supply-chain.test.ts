@@ -540,3 +540,55 @@ describe('atLeast reads a plain release against a floor', () => {
     );
   });
 });
+
+/**
+ * The sharp override lasts only as long as the pin that made it necessary
+ * (#595). An override outliving its reason would hold sharp below a later
+ * security release, so it is a caret range, open to every 0.35 patch, and
+ * this test goes red the day no dependency pins a vulnerable sharp any more:
+ * the Dependabot wrangler bump that brings a fixed miniflare is the pull
+ * request that has to remove it.
+ */
+describe('the sharp override stays only while a dependency pins a vulnerable sharp', () => {
+  const lockPackages = () =>
+    (
+      JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+        packages?: Record<
+          string,
+          {
+            dependencies?: Record<string, string>;
+            optionalDependencies?: Record<string, string>;
+            peerDependencies?: Record<string, string>;
+          }
+        >;
+      }
+    ).packages ?? {};
+
+  it('overrides sharp with a range that admits every later 0.35 patch', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      overrides?: Record<string, string>;
+    };
+    expect(pkg.overrides?.sharp).toBe('^0.35.5');
+  });
+
+  it('is still needed: some dependency pins sharp exactly, below 0.35.5', () => {
+    const declared = Object.entries(lockPackages()).flatMap(([path, entry]) => {
+      const spec =
+        entry.dependencies?.sharp ??
+        entry.optionalDependencies?.sharp ??
+        entry.peerDependencies?.sharp;
+      return spec === undefined ? [] : [{ path, spec }];
+    });
+    // Astro's caret and miniflare's exact pin, read from the lockfile.
+    expect(declared.length).toBeGreaterThan(0);
+    const holding = declared.filter(({ spec }) => {
+      if (/^\d+\.\d+\.\d+$/.test(spec)) return !atLeast(spec, '0.35.5');
+      if (/^\^0\.35\.\d+$/.test(spec)) return false;
+      throw new Error(`a sharp range this test cannot read: ${spec}`);
+    });
+    expect(
+      holding.length,
+      'no dependency pins a vulnerable sharp any more: remove the sharp override from package.json, and this test with it (#595)',
+    ).toBeGreaterThan(0);
+  });
+});
