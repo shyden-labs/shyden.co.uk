@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -24,7 +27,10 @@ import {
   RECORD_DIR_PREFIX,
   runRefusal,
 } from '../../scripts/record-floors.mjs';
-import { localImage } from '../../scripts/playwright-image.mjs';
+import { DOCKERFILE, localImage } from '../../scripts/playwright-image.mjs';
+
+/** The recorder by absolute path: its tests run it from a scratch checkout. */
+const RECORDER = join(process.cwd(), 'scripts', 'record-floors.mjs');
 
 /**
  * The ratchet on guard liveness floors (#468): a floor is a recorded figure,
@@ -426,30 +432,55 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     args: readonly string[] = [],
   ) => {
     const dir = mkdtempSync(join(tmpdir(), 'floors-path-'));
+    // The recorder runs in a checkout of its own, holding copies of what it
+    // reads: the record, the Playwright floor specs, and the lockfile and
+    // Dockerfile that pick its image. Every floor in the
+    // suite reads the real record from other workers, and a write truncates
+    // it first, so a recorder test that wrote it, even to put it back, failed
+    // whichever test read it at that instant (#593).
+    const checkout = mkdtempSync(join(tmpdir(), 'floors-checkout-'));
+    for (const file of [
+      FLOORS_FILE,
+      ...floorSpecs(),
+      'package-lock.json',
+      DOCKERFILE,
+    ]) {
+      mkdirSync(dirname(join(checkout, file)), { recursive: true });
+      copyFileSync(file, join(checkout, file));
+    }
     const before = readFileSync(FLOORS_FILE);
+    // Equal bytes cannot show a write that restored them: the time is held too.
+    const writtenAt = statSync(FLOORS_FILE).mtimeMs;
     try {
       for (const [name, script] of Object.entries(bin))
         writeFileSync(join(dir, name), script, { mode: 0o755 });
-      const run = spawnSync(
-        process.execPath,
-        ['scripts/record-floors.mjs', ...args],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, CI: '', PATH: dir },
-        },
-      );
+      const run = spawnSync(process.execPath, [RECORDER, ...args], {
+        cwd: checkout,
+        encoding: 'utf8',
+        env: { ...process.env, CI: '', PATH: dir },
+      });
       expect(readFileSync(FLOORS_FILE).equals(before), FLOORS_FILE).toBe(true);
+      expect(
+        statSync(FLOORS_FILE).mtimeMs,
+        `${FLOORS_FILE} was written: another worker reading it then saw it empty`,
+      ).toBe(writtenAt);
+      // And the run's own copy is as it found it: a refused run writes nothing.
+      expect(
+        readFileSync(join(checkout, FLOORS_FILE)).equals(before),
+        `the scratch checkout's ${FLOORS_FILE}`,
+      ).toBe(true);
       const handed = join(dir, 'record-path');
       const recordPath = existsSync(handed)
         ? readFileSync(handed, 'utf8').trimEnd()
         : undefined;
-      return { ...run, recordPath };
+      // Read here, while the checkout it is relative to still exists.
+      const recordDirLeft =
+        recordPath !== undefined &&
+        existsSync(join(checkout, dirname(recordPath)));
+      return { ...run, recordPath, recordDirLeft };
     } finally {
       rmSync(dir, { recursive: true, force: true });
-      // The assertion above names a write; this undoes it, or a recorder
-      // gone wrong leaves its figures in the checkout's record (#525).
-      if (!readFileSync(FLOORS_FILE).equals(before))
-        writeFileSync(FLOORS_FILE, before);
+      rmSync(checkout, { recursive: true, force: true });
     }
   };
 
@@ -503,7 +534,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(basename(dirname(handed)).slice(0, RECORD_DIR_PREFIX.length)).toBe(
       RECORD_DIR_PREFIX,
     );
-    expect(existsSync(dirname(handed)), 'the scratch directory').toBe(false);
+    expect(run.recordDirLeft, 'the scratch directory').toBe(false);
   });
 
   it('with --unit, never asks for Docker: the unit suite is all it runs (#548)', () => {
@@ -577,10 +608,9 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
         `like this. If the corpus really shrank, lower it in ${FLOORS_FILE} ` +
         'by hand and say why in the commit.',
     ]);
-    expect(
-      existsSync(dirname(run.recordPath ?? '')),
-      'the scratch directory',
-    ).toBe(false);
+    // The record was handed over, so the directory below did exist.
+    expect(basename(run.recordPath ?? '')).toBe('e2e.jsonl');
+    expect(run.recordDirLeft, 'the scratch directory').toBe(false);
   });
 });
 
