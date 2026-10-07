@@ -911,6 +911,153 @@ test.describe('pause motion', () => {
     });
 });
 
+test.describe('the pause pill sits on the strip (#606)', () => {
+  // The control was its own 44px row above the strip: a mostly empty band of
+  // page between the header and the strip. It is now a pill on the strip's
+  // inline-end, centred on it. Geometry is read in the page, from the
+  // rendered boxes.
+  for (const width of BAND_WIDTHS)
+    test(
+      `at ${width}px no row sits between the header and the strip`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        const facts = await page.evaluate(() => {
+          const header = document.querySelector('header');
+          const strip = document.querySelector<HTMLElement>('.marquee');
+          const band = document.querySelector('.band');
+          const pill = document.querySelector('.band-pause');
+          if (!header || !strip || !band || !pill)
+            throw new Error('header, strip, band or pill missing');
+          // The strip is rotated, so its bounding box is not its layout box:
+          // its LAYOUT top is the band's top plus its own offset.
+          const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
+          const hb = header.getBoundingClientRect().bottom;
+          const p = pill.getBoundingClientRect();
+          return {
+            gap: layoutTop - hb,
+            margin: parseFloat(getComputedStyle(strip).marginTop),
+            pillMid: p.top + p.height / 2,
+            layoutTop,
+          };
+        });
+        expect(facts.margin, "the strip's own top margin").toBeGreaterThan(0);
+        expect(
+          facts.gap,
+          `${width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
+        ).toBeLessThanOrEqual(facts.margin + 1);
+        // No pill box lies in the space between the header and the strip.
+        expect(
+          facts.pillMid,
+          'the pill sits in the gap above the strip',
+        ).toBeGreaterThanOrEqual(facts.layoutTop);
+      },
+    );
+
+  for (const width of BAND_WIDTHS)
+    test(
+      `at ${width}px the pill is what a click at its centre hits, over the strip`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        const hit = await page.evaluate(() => {
+          const pill = document.querySelector('.band-pause');
+          const strip = document.querySelector('.marquee');
+          if (!pill || !strip) throw new Error('pill or strip missing');
+          const p = pill.getBoundingClientRect();
+          const s = strip.getBoundingClientRect();
+          const x = p.left + p.width / 2;
+          const y = p.top + p.height / 2;
+          const el = document.elementFromPoint(x, y);
+          return {
+            inPill: !!el && pill.contains(el),
+            overStrip: y > s.top && y < s.bottom,
+            centred: Math.abs(y - (s.top + s.height / 2)) <= 6,
+          };
+        });
+        expect(hit.overStrip, 'the pill is not over the strip').toBe(true);
+        expect(hit.centred, 'the pill is not centred on the strip').toBe(true);
+        expect(hit.inPill, 'a click at the pill centre misses the pill').toBe(
+          true,
+        );
+      },
+    );
+
+  for (const theme of THEMES)
+    test(`${theme}: the pill paints a solid ground and its label clears AA on it`, async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await emulateTheme(page, theme);
+      const ground = await page
+        .locator('.band-pause')
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(ground, `${theme}: the pill's own ground`).not.toMatch(
+        /^rgba\(.*, 0\)$|^transparent$/,
+      );
+      const ratio = await contrastRatio(page.locator('.band-pause span'));
+      expect(
+        ratio,
+        `${theme}: the pill label's painted contrast`,
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+
+  for (const locale of LOCALES)
+    test(
+      `${locale}: at 320px the pill is at most half the viewport, 44px tall, inside the viewport and band, and shows every word`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 800 });
+        await page.goto(localisePath('/', locale));
+        const pill = page.locator('.band-pause');
+        await expect(pill).toHaveCount(1);
+        const box = await pill.boundingBox();
+        const band = await page.locator('.band').boundingBox();
+        expect(box).not.toBeNull();
+        expect(band).not.toBeNull();
+        expect(
+          box!.x,
+          'pill starts inside the viewport',
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          box!.x + box!.width,
+          'pill ends inside the viewport',
+        ).toBeLessThanOrEqual(320);
+        expect(
+          box!.x + box!.width,
+          'pill ends inside its band',
+        ).toBeLessThanOrEqual(band!.x + band!.width + 0.5);
+        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+        // Every word is shown: the label's own text neither overflows its
+        // box nor leaves the pill, and the pill is at most half the viewport.
+        const text = await pill.evaluate((el) => {
+          const span = el.querySelector('span')!;
+          const r = span.getBoundingClientRect();
+          const p = el.getBoundingClientRect();
+          return {
+            overflow: span.scrollWidth - span.clientWidth,
+            inside:
+              r.left >= p.left - 0.5 &&
+              r.right <= p.right + 0.5 &&
+              r.top >= p.top - 0.5 &&
+              r.bottom <= p.bottom + 0.5,
+          };
+        });
+        expect(
+          text.overflow,
+          'the label overflows its own box',
+        ).toBeLessThanOrEqual(0);
+        expect(text.inside, 'the label leaves the pill').toBe(true);
+        expect(
+          box!.width,
+          `${locale}: the pill is ${Math.round(box!.width)}px x ${Math.round(box!.height)} of 320`,
+        ).toBeLessThanOrEqual(160);
+      },
+    );
+});
+
 test.describe('the ShyTalk phone frame', () => {
   // #390 F62. The bezel read `var(--line)`, a property defined nowhere, so the
   // whole border declaration was invalid and computed to `0px none`: the
