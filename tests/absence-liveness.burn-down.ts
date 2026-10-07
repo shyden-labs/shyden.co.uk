@@ -15,7 +15,6 @@ export const ABSENCE_BURN_DOWN: Readonly<Record<string, number>> = {
   'tests/device/ios/journeys.journey.ts › Journey 5 -- 0 students: the real localised error, no groups': 1,
   'tests/device/ios/journeys.journey.ts › Journey 6 -- more groups than students: the real localised message, no groups rendered': 1,
   'tests/device/ios/journeys.journey.ts › Journey 8b -- MAX_STUDENTS + 1 refused: the real localised message': 1,
-  'tests/e2e/recorders.ts › expectNone': 1,
   'tests/unit/base-url-calls.test.ts › names a relative URL on an unpatched API as the defect it is': 1,
   'tests/unit/base-url-calls.test.ts › says it could not resolve a URL, and does not call it relative': 1,
   'tests/unit/closing-keywords.test.ts › finds nothing in an empty message': 1,

@@ -35,20 +35,29 @@ export const urlMatching =
   (request) =>
     pattern.test(request.url);
 
+/**
+ * The requests every engine makes of a page, whatever it renders: documents,
+ * stylesheets, scripts and `fetch` calls. Images and fonts are left out
+ * because their count differs by engine (a favicon on Firefox, font subsets
+ * on the others), and a floor recorded for one engine would break on the next.
+ * Measured on all five engines (#610): the same count on each, per caller.
+ *
+ * This is the population a request absence is drawn from. A recorder that
+ * heard nothing returns an empty list, which `searched` refuses, and one that
+ * lost part of the load returns fewer, which the caller's floor refuses.
+ */
+export const requestsEveryEngineMakes = (
+  requests: readonly RecordedRequest[],
+): RecordedRequest[] =>
+  requests.filter(({ resourceType }) =>
+    ['document', 'stylesheet', 'script', 'fetch'].includes(resourceType),
+  );
+
 export interface RequestRecorder {
   /** Every request seen, in arrival order. */
   readonly all: readonly RecordedRequest[];
   /** The URLs of the requests `predicate` accepts. Pure: never asserts. */
   matching(predicate: RequestPredicate): string[];
-  /**
-   * Assert nothing matched — WITH the liveness control that makes it mean
-   * something (operator decision, 2026-09-10: the total-count form).
-   *
-   * A navigation always produces at least the document request, so a recorder
-   * holding nothing at all has not proved absence; it has proved only that it
-   * was not listening yet. That case now fails loudly instead of passing.
-   */
-  expectNone(predicate: RequestPredicate, because: string): void;
 }
 
 export function recordRequests(page: Page): RequestRecorder {
@@ -59,14 +68,6 @@ export function recordRequests(page: Page): RequestRecorder {
   return {
     all,
     matching: (predicate) => all.filter(predicate).map(({ url }) => url),
-    expectNone(predicate, because) {
-      expect(this.matching(predicate), because).toEqual([]);
-      expect(
-        all.length,
-        `${because}: the recorder saw NO requests at all, so this absence ` +
-          'assertion would have passed whatever the page did (#79)',
-      ).toBeGreaterThan(0);
-    },
   };
 }
 

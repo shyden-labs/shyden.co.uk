@@ -1,6 +1,11 @@
 import { test, expect } from './fixtures';
 import { chooseSpeed } from '../make-groups';
-import { recordErrors, recordRequests, urlMatching } from './recorders';
+import {
+  recordErrors,
+  recordRequests,
+  requestsEveryEngineMakes,
+  urlMatching,
+} from './recorders';
 import type { Page } from '@playwright/test';
 
 import { join, relative, sep, basename } from 'node:path';
@@ -537,10 +542,17 @@ test.describe('classroom group creator', () => {
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
-    seen.expectNone(
-      urlMatching(AUDIO_URL_PATTERN),
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect(
+      searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+        of: heard,
+        what: 'requests the page made',
+      }),
       'sound off means the assets are never downloaded',
-    );
+    ).toEqual([]);
+    expect(
+      floorBreach('classroom-groups/sound-off-requests', heard.length),
+    ).toBeUndefined();
   });
 
   test('with sound on, the audio requests that happen are exactly ours and same-origin', async ({
@@ -592,10 +604,17 @@ test.describe('classroom group creator', () => {
       await page.fill('#cg-count', '6');
       await page.click('#cg-go');
       await expect(page.locator('#cg-results .student')).toHaveCount(6);
-      seen.expectNone(
-        urlMatching(AUDIO_URL_PATTERN),
+      const heard = requestsEveryEngineMakes(seen.all);
+      expect(
+        searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+          of: heard,
+          what: 'requests the page made',
+        }),
         'a reduced-motion visitor downloads no audio at all',
-      );
+      ).toEqual([]);
+      expect(
+        floorBreach('classroom-groups/reduced-motion-requests', heard.length),
+      ).toBeUndefined();
     });
 
     /**
@@ -2238,10 +2257,17 @@ test.describe('the no-scroll rule, measured', () => {
     expect(scripts, 'the homepage carries the theme script alone').toEqual([
       { src: '', text: THEME_SCRIPT_SOURCE },
     ]);
-    seen.expectNone(
-      ({ resourceType }) => resourceType === 'script',
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect(
+      searched(
+        heard.filter(({ resourceType }) => resourceType === 'script'),
+        { of: heard, what: 'requests the homepage made' },
+      ),
       'the homepage fetches no script',
-    );
+    ).toEqual([]);
+    expect(
+      floorBreach('classroom-groups/homepage-requests', heard.length),
+    ).toBeUndefined();
   });
 });
 

@@ -1,8 +1,13 @@
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { recordRequests, urlMatching } from './recorders';
+import {
+  recordRequests,
+  requestsEveryEngineMakes,
+  urlMatching,
+} from './recorders';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { formTextsUnderAA, resolvedColour } from './helpers';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   PREFIXED_LOCALES,
@@ -242,8 +247,15 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
     .poll(() => seen.matching(urlMatching(/\/api\/report$/)).length)
     .toBe(1);
   const origin = new URL(page.url()).origin;
-  seen.expectNone(
-    (request) => new URL(request.url).origin !== origin,
+  const heard = requestsEveryEngineMakes(seen.all);
+  expect(
+    searched(
+      heard.filter((request) => new URL(request.url).origin !== origin),
+      { of: heard, what: 'requests the page made' },
+    ),
     'AC11: a request left the site',
-  );
+  ).toEqual([]);
+  expect(
+    floorBreach('report-form/report-send-requests', heard.length),
+  ).toBeUndefined();
 });
