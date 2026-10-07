@@ -69,7 +69,7 @@ const isVitestTestCallee = (callee: ts.Expression): boolean =>
     callee.expression.name.text === 'each');
 
 /** Every test body in `sf` to its title, in source order. */
-function testBodiesIn(sf: ts.SourceFile): Map<ts.Node, string> {
+export function testBodiesIn(sf: ts.SourceFile): Map<ts.Node, string> {
   const playwright = new Map(
     declarationsIn(sf)
       .filter(({ kind }) => kind === 'test')
@@ -107,6 +107,24 @@ function nameOf(node: ts.Node): string | undefined {
     ts.isIdentifier(holder.name)
   )
     return holder.name.text;
+  return undefined;
+}
+
+/**
+ * The scope a node sits in: the innermost test body (by title as written), else
+ * the innermost named function, else undefined. One home for "which test is
+ * this in", shared by every guard that keys a burn-down list by it (#515, #609).
+ */
+export function scopeOf(
+  bodies: ReadonlyMap<ts.Node, string>,
+  node: ts.Node,
+): { kind: ScopeKind; label: string; at: ts.Node } | undefined {
+  for (let at = node.parent; at !== undefined; at = at.parent) {
+    const title = bodies.get(at);
+    if (title !== undefined) return { kind: 'test', label: title, at };
+    const name = nameOf(at);
+    if (name !== undefined) return { kind: 'function', label: name, at };
+  }
   return undefined;
 }
 
@@ -190,24 +208,20 @@ export function searchSitesIn(sf: ts.SourceFile): SearchReading {
   };
 
   const site = (call: ts.CallExpression): void => {
-    for (let at = call.parent; at !== undefined; at = at.parent) {
-      const title = bodies.get(at);
-      const name = title === undefined ? nameOf(at) : undefined;
-      if (title === undefined && name === undefined) continue;
-      if (labelled(call))
-        return refuse(
-          call,
-          'a behavioural label, retired: every search checks a recorded floor (#534)',
-        );
-      sites.push({
-        line: lineOf(sf, call),
-        scope: title === undefined ? 'function' : 'test',
-        label: title ?? (name as string),
-        floored: floorsPopulation(sf, at, call),
-      });
-      return;
-    }
-    refuse(call, 'a search in no test and no named function');
+    const scope = scopeOf(bodies, call);
+    if (scope === undefined)
+      return refuse(call, 'a search in no test and no named function');
+    if (labelled(call))
+      return refuse(
+        call,
+        'a behavioural label, retired: every search checks a recorded floor (#534)',
+      );
+    sites.push({
+      line: lineOf(sf, call),
+      scope: scope.kind,
+      label: scope.label,
+      floored: floorsPopulation(sf, scope.at, call),
+    });
   };
 
   const visit = (node: ts.Node): void => {
