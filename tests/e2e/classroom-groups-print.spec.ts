@@ -9,6 +9,7 @@ import {
   openRoster,
 } from './helpers';
 import { todayISO } from '../../src/lib/csv';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { recorded, shoot } from './evidence';
 
@@ -661,20 +662,35 @@ test.describe('the printed sheet', () => {
   test('carries no controls', async ({ page }) => {
     await withGroups(page, 6);
     await page.emulateMedia({ media: 'print' });
-    const controls = await page.evaluate(() =>
-      [...document.querySelectorAll('button, a[href]')]
-        .filter((el) => {
-          const cs = getComputedStyle(el);
-          const r = el.getBoundingClientRect();
-          return (
-            cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0
-          );
-        })
-        .map((el) => (el.textContent || '').trim().slice(0, 24)),
-    );
+    // Every button and link on the page, and which of them print: the
+    // population the verdict is drawn from (#610).
+    const { candidates, controls } = await page.evaluate(() => {
+      const found = [...document.querySelectorAll('button, a[href]')];
+      const printed = found.filter((el) => {
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return (
+          cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0
+        );
+      });
+      const label = (el: Element) => (el.textContent || '').trim().slice(0, 24);
+      return { candidates: found.map(label), controls: printed.map(label) };
+    });
     // "Full screen" printed on every sheet: the print CSS named controls one
     // at a time and that button was never added to the list.
-    expect(controls, `printed controls: ${controls.join(' | ')}`).toEqual([]);
+    expect(
+      searched(controls, {
+        of: candidates,
+        what: 'buttons and links on the page',
+      }),
+      `printed controls: ${controls.join(' | ')}`,
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'classroom-groups-print/buttons-and-links',
+        candidates.length,
+      ),
+    ).toBeUndefined();
   });
 
   test('carries the class name and the date however it was printed', async ({

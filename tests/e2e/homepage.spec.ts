@@ -9,6 +9,8 @@ import {
   localisePath,
   type Locale,
 } from '../../src/lib/i18n';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import { expectNoHorizontalScroll } from '../viewport';
 import { THEMES } from '../palette';
 import { emulateTheme, expectTheme, saveTheme } from '../themes';
@@ -542,11 +544,17 @@ test.describe('the language band sits under the header (#599)', () => {
       ).toBe(true);
       expect(facts.before, 'the band does not precede the hero').toBe(true);
       expect(
-        facts.positions.filter(
-          (p) => p === 'sticky' || p === 'fixed' || p === 'missing',
+        searched(
+          facts.positions.filter(
+            (p) => p === 'sticky' || p === 'fixed' || p === 'missing',
+          ),
+          { of: facts.positions, what: 'band elements whose position is read' },
         ),
         'the band, its clip or its strip is pinned',
       ).toEqual([]);
+      expect(
+        floorBreach('homepage/band-positions', facts.positions.length),
+      ).toBeUndefined();
       expect(facts.positions).toHaveLength(3);
       await shoot(
         page,
@@ -636,11 +644,17 @@ test.describe('the language band sits under the header (#599)', () => {
           hit.overlap,
           'the band never reached under the header',
         ).toBeGreaterThan(0);
-        expect(hit.samples).toHaveLength(3);
         expect(
-          hit.samples.filter((s) => !s.inHeader || s.inBand),
+          searched(
+            hit.samples.filter((s) => !s.inHeader || s.inBand),
+            { of: hit.samples, what: 'points sampled across the overlap' },
+          ),
           'the band paints over the header',
         ).toEqual([]);
+        expect(
+          floorBreach('homepage/overlap-samples', hit.samples.length),
+        ).toBeUndefined();
+        expect(hit.samples).toHaveLength(3);
         await shoot(
           page,
           `${width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,

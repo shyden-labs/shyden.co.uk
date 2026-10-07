@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { shoot } from './evidence';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
@@ -65,51 +66,56 @@ for (const path of PAGES) {
           details.open = true;
       });
 
-      const { allowed, readings } = await page.evaluate((selector) => {
-        // Resolve a declared value the way the renderer does, so the comparison
-        // cannot disagree with what is actually on screen.
-        const probe = document.createElement('span');
-        probe.style.display = 'none';
-        document.body.append(probe);
-        const computed = (value: string): string => {
-          probe.style.color = '';
-          probe.style.color = value;
-          return getComputedStyle(probe).color;
-        };
+      const { allowed, examined, readings } = await page.evaluate(
+        (selector) => {
+          // Resolve a declared value the way the renderer does, so the comparison
+          // cannot disagree with what is actually on screen.
+          const probe = document.createElement('span');
+          probe.style.display = 'none';
+          document.body.append(probe);
+          const computed = (value: string): string => {
+            probe.style.color = '';
+            probe.style.color = value;
+            return getComputedStyle(probe).color;
+          };
 
-        const root = getComputedStyle(document.documentElement);
-        const names = Array.from(document.styleSheets)
-          .flatMap((sheet) => {
-            try {
-              return Array.from(sheet.cssRules);
-            } catch {
-              return []; // a cross-origin sheet; none of ours are
-            }
-          })
-          .flatMap((rule) =>
-            rule instanceof CSSStyleRule ? Array.from(rule.style) : [],
-          )
-          .filter((property) => property.startsWith('--'));
+          const root = getComputedStyle(document.documentElement);
+          const names = Array.from(document.styleSheets)
+            .flatMap((sheet) => {
+              try {
+                return Array.from(sheet.cssRules);
+              } catch {
+                return []; // a cross-origin sheet; none of ours are
+              }
+            })
+            .flatMap((rule) =>
+              rule instanceof CSSStyleRule ? Array.from(rule.style) : [],
+            )
+            .filter((property) => property.startsWith('--'));
 
-        const palette = new Set<string>(['rgba(0, 0, 0, 0)']);
-        for (const name of new Set(names)) {
-          const value = root.getPropertyValue(name).trim();
-          if (value) palette.add(computed(value));
-        }
-        probe.remove();
+          const palette = new Set<string>(['rgba(0, 0, 0, 0)']);
+          for (const name of new Set(names)) {
+            const value = root.getPropertyValue(name).trim();
+            if (value) palette.add(computed(value));
+          }
+          probe.remove();
 
-        return {
-          allowed: [...palette],
-          readings: [...document.querySelectorAll(selector)].map((el) => {
-            const style = getComputedStyle(el);
-            return {
-              what: `${el.tagName.toLowerCase()}#${el.id || '(no id)'}`,
-              background: style.backgroundColor,
-              color: style.color,
-            };
-          }),
-        };
-      }, PAINTED);
+          return {
+            allowed: [...palette],
+            // Every element the selector ran over (#610).
+            examined: document.body.querySelectorAll('*').length,
+            readings: [...document.querySelectorAll(selector)].map((el) => {
+              const style = getComputedStyle(el);
+              return {
+                what: `${el.tagName.toLowerCase()}#${el.id || '(no id)'}`,
+                background: style.backgroundColor,
+                color: style.color,
+              };
+            }),
+          };
+        },
+        PAINTED,
+      );
 
       // Liveness. A page with no controls would pass the loop below having
       // measured nothing, and every page but the English homepage carries
@@ -132,9 +138,20 @@ for (const path of PAGES) {
           allowed.length,
           'the homepage served no palette, so nothing was measured at all',
         ).toBeGreaterThan(0);
-        expect(readings, 'the homepage paints no form controls').toHaveLength(
-          0,
-        );
+        // And that the selector was run over a page with something on it
+        // (#610): the elements it examined are the population of that
+        // absence, with a recorded floor, so a page that lost its content
+        // does not read as one that merely paints no controls.
+        expect(
+          searched(readings, {
+            of: examined,
+            what: 'elements on the homepage the selector ran over',
+          }),
+          'the homepage paints no form controls',
+        ).toHaveLength(0);
+        expect(
+          floorBreach('palette-controls/homepage-elements', examined),
+        ).toBeUndefined();
         return;
       }
       expect(

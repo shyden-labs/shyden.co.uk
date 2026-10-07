@@ -92,12 +92,33 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
 
   it('reads no comment from a file that holds no style element', () => {
     const page = '---\nconst a = 1;\n---\n<p>b</p>';
-    expect(astroStyleViews(page).flatMap(cssComments)).toEqual([]);
+    // The lines the reader looked through for a style element (#610).
+    const lines = page.split('\n');
+    expect(
+      searched(astroStyleViews(page).flatMap(cssComments), {
+        of: lines,
+        what: 'lines of a page with no style element',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('astro-css-strip/no-style-page-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('counts a frontmatter comment as none of its CSS', () => {
     const page = '---\n/* not css */\nconst a = 1;\n---\n<style>a{b:c}</style>';
-    expect(astroStyleViews(page).flatMap(cssComments)).toEqual([]);
+    // The comments the page holds anywhere, read as plain CSS: the ones the
+    // style-only read must not count (#610).
+    const held = cssComments(page);
+    expect(
+      searched(astroStyleViews(page).flatMap(cssComments), {
+        of: held,
+        what: 'comments held outside the page style',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('astro-css-strip/frontmatter-comments', held.length),
+    ).toBeUndefined();
   });
 
   it('scans no comment that the per-style read removes', () => {

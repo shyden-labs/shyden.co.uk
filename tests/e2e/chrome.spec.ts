@@ -3,6 +3,7 @@ import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 test.use(recorded);
@@ -238,6 +239,11 @@ test.describe('header + footer', () => {
     // than chosen by anyone. Links are focusable natively; the attribute is
     // redundant everywhere it is not actively harmful.
     await page.goto('/');
+    const headerLinks = await page
+      .locator('header a')
+      .evaluateAll((els) =>
+        els.map((e) => e.className || e.textContent?.trim()),
+      );
     const withTabindex = await page
       .locator('header a[tabindex]')
       .evaluateAll((els) =>
@@ -246,7 +252,12 @@ test.describe('header + footer', () => {
             `${e.className || e.textContent?.trim()}=${e.getAttribute('tabindex')}`,
         ),
       );
-    expect(withTabindex).toEqual([]);
+    expect(
+      searched(withTabindex, { of: headerLinks, what: 'header links' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('chrome/header-links', headerLinks.length),
+    ).toBeUndefined();
   });
 });
 

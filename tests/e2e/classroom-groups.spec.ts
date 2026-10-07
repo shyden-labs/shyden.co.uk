@@ -4,7 +4,8 @@ import { recordErrors, recordRequests, urlMatching } from './recorders';
 import type { Page } from '@playwright/test';
 
 import { join, relative, sep, basename } from 'node:path';
-import { filesUnder } from '../source-files';
+import { floorBreach } from '../floors';
+import { filesUnder, searched } from '../source-files';
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -2138,8 +2139,10 @@ test.describe('the no-scroll rule, measured', () => {
         for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
           await page.locator(`#${id}-toggle`).click();
         }
-        const small = await page.evaluate(() =>
-          [
+        // Every target on screen is measured; the ones too small are the
+        // verdict, the ones measured are its population (#610).
+        const { measured, small } = await page.evaluate(() => {
+          const targets = [
             ...document.querySelectorAll(
               'button, input, select, textarea, summary, a',
             ),
@@ -2160,10 +2163,32 @@ test.describe('the no-scroll rule, measured', () => {
                 r: target.getBoundingClientRect(),
               };
             })
-            .filter(({ r }) => r.width > 0 && (r.height < 44 || r.width < 44))
-            .map(({ tag, id }) => `${tag}#${id}`),
-        );
-        expect(small).toEqual([]);
+            .filter(({ r }) => r.width > 0);
+          const name = ({ tag, id }: { tag: string; id: string }) =>
+            `${tag}#${id}`;
+          return {
+            measured: targets.map(name),
+            small: targets
+              .filter(({ r }) => r.height < 44 || r.width < 44)
+              .map(name),
+          };
+        });
+        expect(
+          searched(small, {
+            of: measured,
+            what: 'interactive targets on screen with every section open',
+          }),
+        ).toEqual([]);
+        expect(
+          floorBreach(
+            // English carries one footer link; every beta language also
+            // carries the report form's fields, so the two read differently.
+            path === '/classroom-groups'
+              ? 'classroom-groups/interactive-targets-en'
+              : 'classroom-groups/interactive-targets-beta',
+            measured.length,
+          ),
+        ).toBeUndefined();
       },
     );
 

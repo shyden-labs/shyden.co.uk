@@ -9,6 +9,8 @@ import {
   type SiteStrings,
 } from '../../src/lib/i18n/site';
 import { sitePaths, TITLE_FOR } from '../site-pages';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 
 /**
  * Every published page is served in every locale it claims to ship.
@@ -62,7 +64,15 @@ test.describe('every locale, every page', () => {
     // picked one with `lang === 'id' ? siteId : siteEn`, which returned
     // ENGLISH silently; they now go through getSiteStrings, and this is still
     // the assertion that makes a missing catalogue loud.
-    expect(LOCALES.filter((l) => !SITE[l])).toEqual([]);
+    expect(
+      searched(
+        LOCALES.filter((l) => !SITE[l]),
+        { of: LOCALES, what: 'shipped locales' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('locale-parity/shipped-locales', LOCALES.length),
+    ).toBeUndefined();
   });
 
   // 'localisePath agrees with the route layout for every locale' is retired
