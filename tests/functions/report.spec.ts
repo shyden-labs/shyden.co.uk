@@ -8,7 +8,9 @@ import {
 } from '../../src/lib/i18n';
 import { pagePath } from '../../src/lib/report';
 import { expectReportsBound } from '../report-health';
-import { reportsWithNote } from './local.mjs';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
+import { plantReport, reportsStartingWith, reportsWithNote } from './local.mjs';
 
 const vi = getSiteStrings('vi').report;
 const tool = getStrings('vi');
@@ -59,13 +61,26 @@ test.describe('with JavaScript disabled', () => {
     'a quote on no page lands on #report-not-found and stores nothing',
     { tag: '@requires-isolated-context' },
     async ({ page }) => {
-      const note = noteFor('not-found');
+      const stem = noteFor('not-found');
+      const note = `${stem} refused`;
+      plantReport(`${stem} control`);
       await page.goto(pagePath('home', 'vi'));
       await fillReport(page, 'on no page at all, anywhere', note);
       await page.getByRole('button', { name: vi.send }).click();
       await expect(page).toHaveURL(/#report-not-found$/);
       await expect(page.locator('#report-not-found')).toBeVisible();
-      expect(reportsWithNote(note)).toEqual([]);
+      // Drawn from the table's own rows under this test's stem: the planted
+      // control, which the endpoint did not write. One row, on every engine.
+      const stored = reportsStartingWith(stem);
+      expect(
+        searched(reportsWithNote(note), {
+          of: stored,
+          what: 'reports stored under this test',
+        }),
+      ).toEqual([]);
+      expect(
+        floorBreach('report/not-found-stored-rows', stored.length),
+      ).toBeUndefined();
     },
   );
 
@@ -102,7 +117,9 @@ test.describe('with JavaScript disabled', () => {
     "another block's words are not found in this one, and nothing is stored",
     { tag: '@requires-isolated-context' },
     async ({ page }) => {
-      const note = noteFor('404 cross-block');
+      const stem = noteFor('404 cross-block');
+      const note = `${stem} refused`;
+      plantReport(`${stem} control`);
       const block = page.locator('details[data-report][lang="vi"]');
       await page.goto('/404');
       await block.locator('summary').click();
@@ -113,7 +130,17 @@ test.describe('with JavaScript disabled', () => {
       await block.getByRole('button', { name: vi.send }).click();
       await expect(page).toHaveURL(/\/404#report-vi-not-found$/);
       await expect(page.locator('#report-vi-not-found')).toBeVisible();
-      expect(reportsWithNote(note)).toEqual([]);
+      // The planted control is the only row under this test's stem.
+      const stored = reportsStartingWith(stem);
+      expect(
+        searched(reportsWithNote(note), {
+          of: stored,
+          what: 'reports stored under this test',
+        }),
+      ).toEqual([]);
+      expect(
+        floorBreach('report/cross-block-stored-rows', stored.length),
+      ).toBeUndefined();
     },
   );
 });
@@ -121,7 +148,9 @@ test.describe('with JavaScript disabled', () => {
 test('a cross-origin POST is refused and stores nothing', async ({
   request,
 }) => {
-  const note = noteFor('cross-origin');
+  const stem = noteFor('cross-origin');
+  const note = `${stem} refused`;
+  plantReport(`${stem} control`);
   const response = await request.post('/api/report', {
     headers: {
       Origin: 'https://evil.example',
@@ -136,7 +165,17 @@ test('a cross-origin POST is refused and stores nothing', async ({
     }).toString(),
   });
   expect(response.status()).toBe(403);
-  expect(reportsWithNote(note)).toEqual([]);
+  // The planted control is the only row under this test's stem.
+  const stored = reportsStartingWith(stem);
+  expect(
+    searched(reportsWithNote(note), {
+      of: stored,
+      what: 'reports stored under this test',
+    }),
+  ).toEqual([]);
+  expect(
+    floorBreach('report/cross-origin-stored-rows', stored.length),
+  ).toBeUndefined();
 });
 
 test.describe('on a tool page', () => {

@@ -20,6 +20,7 @@ import {
   decideRecord,
   describeMoves,
   carriedIds,
+  carriedOutside,
   floorSpecs,
   floorsText,
   playwrightRecordArgs,
@@ -427,9 +428,75 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       `exit ${status}`,
     ].join('\n') + '\n';
 
+  /**
+   * The functions suite's floor spec in the scratch checkout, and the figures
+   * the record holds for the ids it spells (#610): a stand-in for the real
+   * ones, so these tests judge the recorder and not today's functions specs.
+   */
+  const PLANTED_FUNCTIONS_SPEC = 'tests/functions/planted.spec.ts';
+  const FN_SITE = 'tests/functions/planted.spec.ts:1';
+  const plantedSpec = (ids: readonly string[]) =>
+    // Always one call, so the recorder finds a functions floor spec even
+    // where a test spells no recorded id.
+    ['probe/planted', ...ids]
+      .map((id) => `expect(floorBreach('${id}', 1)).toBeUndefined();`)
+      .join('\n') + '\n';
+
+  /**
+   * An `npm` that appends `lines` to the file `FLOORS_RECORD` names (an
+   * absolute path on the host: the functions suite is not run in the
+   * container), then exits `status`.
+   */
+  const npmWriting = (lines: readonly string[], status: number) =>
+    [
+      '#!/bin/sh',
+      ...lines.map((line) => `printf '%s\\n' '${line}' >> "$FLOORS_RECORD"`),
+      `exit ${status}`,
+    ].join('\n') + '\n';
+
+  /**
+   * The recorded ids the unit suite owns once `recorded` is added to the
+   * record: every id no Playwright or functions spec spells whole.
+   */
+  const recordedKeys = (recorded: Readonly<Record<string, number>>) =>
+    Object.keys(JSON.parse(floorsText({ ...readFloors(), ...recorded })));
+  const spellingSpecs = (functionsIds: readonly string[]) => [
+    ...floorSpecs().map((file) => readFileSync(file, 'utf8')),
+    plantedSpec(functionsIds),
+  ];
+  const carriedBeside = (
+    recorded: Readonly<Record<string, number>>,
+    functionsIds: readonly string[],
+  ) =>
+    carriedIds(recordedKeys(recorded), spellingSpecs(functionsIds), new Set());
+
+  /**
+   * A unit suite that asserts the ids it owns at their recorded figures, as
+   * the real one does: `owned` is baked in, so the stand-in reads no directory.
+   */
+  const npxAsserting = (owned: readonly string[]) =>
+    [
+      `#!${process.execPath}`,
+      "const { appendFileSync, readFileSync } = require('node:fs');",
+      "const floors = JSON.parse(readFileSync('tests/floors.json', 'utf8'));",
+      "const site = 'tests/unit/a.test.ts:1';",
+      `const owned = ${JSON.stringify(owned)};`,
+      'const rows = owned.map((id) => ({ id, actual: floors[id], site }));',
+      "appendFileSync(process.env.FLOORS_RECORD, rows.map((row) => JSON.stringify(row)).join('\\n') + '\\n');",
+    ].join('\n') + '\n';
+
   const recordWith = (
     bin: Readonly<Record<string, string>>,
     args: readonly string[] = [],
+    {
+      functionsIds = [],
+      recorded = {},
+      writes = false,
+    }: {
+      functionsIds?: readonly string[];
+      recorded?: Readonly<Record<string, number>>;
+      writes?: boolean;
+    } = {},
   ) => {
     const dir = mkdtempSync(join(tmpdir(), 'floors-path-'));
     // The recorder runs in a checkout of its own, holding copies of what it
@@ -448,7 +515,19 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       mkdirSync(dirname(join(checkout, file)), { recursive: true });
       copyFileSync(file, join(checkout, file));
     }
-    const before = readFileSync(FLOORS_FILE);
+    mkdirSync(join(checkout, dirname(PLANTED_FUNCTIONS_SPEC)), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(checkout, PLANTED_FUNCTIONS_SPEC),
+      plantedSpec(functionsIds),
+    );
+    const sitting = readFileSync(FLOORS_FILE);
+    writeFileSync(
+      join(checkout, FLOORS_FILE),
+      floorsText({ ...JSON.parse(sitting.toString('utf8')), ...recorded }),
+    );
+    const before = readFileSync(join(checkout, FLOORS_FILE));
     // Equal bytes cannot show a write that restored them: the time is held too.
     const writtenAt = statSync(FLOORS_FILE).mtimeMs;
     try {
@@ -459,16 +538,18 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
         encoding: 'utf8',
         env: { ...process.env, CI: '', PATH: dir },
       });
-      expect(readFileSync(FLOORS_FILE).equals(before), FLOORS_FILE).toBe(true);
+      expect(readFileSync(FLOORS_FILE).equals(sitting), FLOORS_FILE).toBe(true);
       expect(
         statSync(FLOORS_FILE).mtimeMs,
         `${FLOORS_FILE} was written: another worker reading it then saw it empty`,
       ).toBe(writtenAt);
       // And the run's own copy is as it found it: a refused run writes nothing.
-      expect(
-        readFileSync(join(checkout, FLOORS_FILE)).equals(before),
-        `the scratch checkout's ${FLOORS_FILE}`,
-      ).toBe(true);
+      const after = readFileSync(join(checkout, FLOORS_FILE));
+      if (!writes)
+        expect(
+          after.equals(before),
+          `the scratch checkout's ${FLOORS_FILE}`,
+        ).toBe(true);
       const handed = join(dir, 'record-path');
       const recordPath = existsSync(handed)
         ? readFileSync(handed, 'utf8').trimEnd()
@@ -477,7 +558,12 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       const recordDirLeft =
         recordPath !== undefined &&
         existsSync(join(checkout, dirname(recordPath)));
-      return { ...run, recordPath, recordDirLeft };
+      return {
+        ...run,
+        recordPath,
+        recordDirLeft,
+        floors: JSON.parse(after.toString('utf8')) as Record<string, number>,
+      };
     } finally {
       rmSync(dir, { recursive: true, force: true });
       rmSync(checkout, { recursive: true, force: true });
@@ -551,9 +637,154 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     const run = recordWith({}, ['--units']);
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ usage: npm run floors:record [-- --unit] (got --units)\n',
+      '✗ usage: npm run floors:record [-- --unit | --functions] (got --units)\n',
     );
     expect(run.stdout).toBe('');
+  });
+
+  it('refuses two modes at once, before running anything (#610)', () => {
+    const run = recordWith({}, ['--unit', '--functions']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ usage: npm run floors:record [-- --unit | --functions] ' +
+        '(got --unit --functions)\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('refuses a functions suite that did not start, naming why (#610)', () => {
+    // Docker answers and the unit suite passes, so the refusal can only be the
+    // functions suite's: no `npm` is on PATH.
+    const run = recordWith({
+      docker: dockerWriting([], 0),
+      npx: PASSING_NPX,
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the functions suite did not start: spawnSync npm ENOENT\n',
+    );
+  });
+
+  it('refuses a functions suite that failed, after the Playwright run (#610)', () => {
+    const run = recordWith({
+      docker: dockerWriting([], 0),
+      npx: PASSING_NPX,
+      npm: npmWriting([], 4),
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the functions suite failed in record mode (exit 4): nothing recorded\n',
+    );
+    expect(run.stdout).toBe(
+      `Recording the Playwright floors in ${localImage()}: ` +
+        `${floorSpecs().join(' ')}\n` +
+        'Recording the functions floors: tests/functions/planted.spec.ts\n',
+    );
+  });
+
+  it('with --functions, asks for neither Docker nor the unit suite, and refuses a functions suite that failed (#610)', () => {
+    // Neither `docker` nor `npx` is on PATH: had either been asked for, its
+    // refusal would be the message below.
+    const run = recordWith({ npm: npmWriting([], 4) }, ['--functions']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the functions suite failed in record mode (exit 4): nothing recorded\n',
+    );
+    expect(run.stdout).toBe(
+      'Recording the functions floors: tests/functions/planted.spec.ts\n',
+    );
+  });
+
+  it('with --functions, refuses a functions suite that did not start, naming why (#610)', () => {
+    const run = recordWith({}, ['--functions']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the functions suite did not start: spawnSync npm ENOENT\n',
+    );
+  });
+
+  it('with --functions, refuses a functions figure that would fall, and carries every other id (#610)', () => {
+    // The only refusal is the functions id's: the unit and Playwright ids the
+    // mode did not measure are carried, not refused as unasserted.
+    const run = recordWith(
+      {
+        npm: npmWriting(
+          [JSON.stringify({ id: 'probe/fn', actual: 3, site: FN_SITE })],
+          0,
+        ),
+      },
+      ['--functions'],
+      { functionsIds: ['probe/fn'], recorded: { 'probe/fn': 5 } },
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n' +
+        '  probe/fn would fall from 5 to 3: a blind reader looks like this. ' +
+        `If the corpus really shrank, lower it in ${FLOORS_FILE} by hand and ` +
+        'say why in the commit.\n',
+    );
+  });
+
+  it('with --functions, refuses a recorded functions id that no functions test asserted (#610)', () => {
+    const run = recordWith({ npm: npmWriting([], 0) }, ['--functions'], {
+      functionsIds: ['probe/fn'],
+      recorded: { 'probe/fn': 5 },
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n' +
+        '  probe/fn is recorded but no test asserted it: remove it from ' +
+        `${FLOORS_FILE} with the floor that used it, or run the whole suite\n`,
+    );
+  });
+
+  it('with --functions, records a new functions id, runs the unit suite once to settle, and carries the Playwright ids (#610)', () => {
+    const carried = carriedBeside({}, ['probe/fn']);
+    const owned = recordedKeys({}).filter((id) => !carried.includes(id));
+    const run = recordWith(
+      {
+        npm: npmWriting(
+          [JSON.stringify({ id: 'probe/fn', actual: 2, site: FN_SITE })],
+          0,
+        ),
+        npx: npxAsserting(owned),
+      },
+      ['--functions'],
+      { functionsIds: ['probe/fn'], writes: true },
+    );
+    expect({ status: run.status, stderr: run.stderr }).toEqual({
+      status: 0,
+      stderr: '',
+    });
+    expect(run.floors['probe/fn']).toBe(2);
+    expect(run.stdout.split('\n').slice(0, 5)).toEqual([
+      'Recording the functions floors: tests/functions/planted.spec.ts',
+      `${FLOORS_FILE}: ids were added, so the unit suite runs again (pass 2): ` +
+        'a floor may count the ids the record holds',
+      `--functions: not measured, carried unchanged for CI to judge: ${carried.join(', ')}`,
+      `${FLOORS_FILE}: 1 floor(s) moved:`,
+      '  probe/fn: new, 2',
+    ]);
+  });
+
+  it('with --unit, carries a functions id its spec spells as it carries a Playwright one (#610)', () => {
+    const recorded = { 'probe/fn': 5 };
+    const carried = carriedBeside(recorded, ['probe/fn']);
+    const owned = recordedKeys(recorded).filter((id) => !carried.includes(id));
+    const run = recordWith({ npx: npxAsserting(owned) }, ['--unit'], {
+      functionsIds: ['probe/fn'],
+      recorded,
+      writes: true,
+    });
+    expect({ status: run.status, stderr: run.stderr }).toEqual({
+      status: 0,
+      stderr: '',
+    });
+    expect(run.floors['probe/fn']).toBe(5);
+    expect(run.stdout).toBe(
+      `--unit: not measured, carried unchanged for CI to judge: ${carried.join(', ')}\n` +
+        `${FLOORS_FILE}: every floor already matches (${owned.length} read)\n`,
+    );
   });
 
   it('restores the record when a later pass is refused, having written it for that pass', () => {
@@ -597,6 +828,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     const [id] = Object.keys(readFloors());
     const run = recordWith({
       npx: PASSING_NPX,
+      npm: PASSING_NPX,
       docker: dockerWriting(
         [JSON.stringify({ id, actual: 0, site: 'tests/e2e/a.spec.ts:1' })],
         0,
@@ -717,6 +949,40 @@ describe('carriedIds (#548)', () => {
     expect(carriedIds(['e2e/page', 'unit/files'], SPECS, new Set())).toEqual(
       [],
     );
+  });
+});
+
+describe('carriedOutside (#610)', () => {
+  const FUNCTIONS = [
+    "expect(floorBreach('functions/rows', 1)).toBeUndefined();",
+  ];
+
+  it('carries every unasserted id no functions spec spells', () => {
+    expect(
+      carriedOutside(['unit/files', 'e2e/pages'], FUNCTIONS, new Set()),
+    ).toEqual(['unit/files', 'e2e/pages']);
+  });
+
+  it('never carries an id a functions spec spells: unasserted, it is a floor that lost its test', () => {
+    expect(
+      carriedOutside(['functions/rows', 'unit/files'], FUNCTIONS, new Set()),
+    ).toEqual(['unit/files']);
+  });
+
+  it('never carries an id the run asserted', () => {
+    expect(
+      carriedOutside(
+        ['unit/files', 'unit/other'],
+        FUNCTIONS,
+        new Set(['unit/files']),
+      ),
+    ).toEqual(['unit/other']);
+  });
+
+  it('reads a spec for the whole id, so a longer id does not hide a shorter one', () => {
+    expect(carriedOutside(['functions/row'], FUNCTIONS, new Set())).toEqual([
+      'functions/row',
+    ]);
   });
 });
 
