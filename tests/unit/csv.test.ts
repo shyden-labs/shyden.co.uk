@@ -697,10 +697,18 @@ describe('parseRoster', () => {
   // NOT an error -- it is an empty class list, and importing it empties the
   // roster, which is a thing a teacher may mean.
   it('accepts a header-only file as an empty roster', () => {
-    const out = parseRoster('number,name\n', 'en', en);
+    const text = 'number,name\n';
+    const lines = text.split('\n').filter((line) => line !== '');
+    const out = parseRoster(text, 'en', en);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.roster).toEqual([]);
+    expect(
+      searched(out.roster, {
+        of: lines,
+        what: 'lines of the header-only file',
+      }),
+    ).toEqual([]);
+    expect(floorBreach('csv/header-only-lines', lines.length)).toBeUndefined();
   });
 
   it('ignores every # line except the class comment', () => {
@@ -731,17 +739,37 @@ describe('parseRoster', () => {
     // `emptyTemplate` is the same exported function the download button calls,
     // so this proves the artefact a teacher actually receives -- not a copy of
     // it written in the test, which would pass while the real one drifted.
-    const out = parseRoster(emptyTemplate('en'), 'en', en);
+    const template = emptyTemplate('en');
+    const lines = template.split('\n').filter((line) => line !== '');
+    const out = parseRoster(template, 'en', en);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.roster).toEqual([]);
+    expect(
+      searched(out.roster, {
+        of: lines,
+        what: 'lines of the English template',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('csv/english-template-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('imports nothing from an untouched Indonesian template either', () => {
-    const out = parseRoster(emptyTemplate('id'), 'id', id);
+    const template = emptyTemplate('id');
+    const lines = template.split('\n').filter((line) => line !== '');
+    const out = parseRoster(template, 'id', id);
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.roster).toEqual([]);
+    expect(
+      searched(out.roster, {
+        of: lines,
+        what: 'lines of the Indonesian template',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('csv/indonesian-template-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('does not import a real child called Example One', () => {
@@ -1319,9 +1347,14 @@ describe('the sex column header, corrected without breaking old files', () => {
       },
     } as const;
     // Derived, so a sixth language fails here rather than shipping unpinned.
-    expect(LOCALES.filter((l) => !(l in UNTOUCHED))).toEqual([]);
-    const moved: string[] = [];
     const locales = [...LOCALES];
+    expect(
+      searched(
+        locales.filter((l) => !(l in UNTOUCHED)),
+        { of: locales, what: 'locales pinned' },
+      ),
+    ).toEqual([]);
+    const moved: string[] = [];
     for (const locale of locales) {
       const table = CSV_LOCALES[locale];
       const pin = UNTOUCHED[locale];

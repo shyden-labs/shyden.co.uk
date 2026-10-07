@@ -60,6 +60,10 @@ const undefinedReads = ({ defined, read }: Properties): string[] =>
 const undefinedIn = (files: Record<string, string>): string[] =>
   undefinedReads(propertiesOf(new Map(Object.entries(files))));
 
+/** Every var() read written in `files`, comments included: what the scan must judge. */
+const readsWritten = (files: Record<string, string>): string[] =>
+  Object.values(files).flatMap((raw) => all(READ, raw));
+
 describe('propertiesOf reads definitions and reads, not comments', () => {
   it('names a property read and never defined', () => {
     expect(undefinedIn({ 'a.css': '.a { color: var(--line); }' })).toEqual([
@@ -74,31 +78,55 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
   });
 
   it('accepts a property defined in another file', () => {
+    const files = {
+      'tokens.css': ':root { --ink: #000; }',
+      'a.astro': '<style>.a { color: var(--ink); }</style>',
+    };
+    const reads = readsWritten(files);
     expect(
-      undefinedIn({
-        'tokens.css': ':root { --ink: #000; }',
-        'a.astro': '<style>.a { color: var(--ink); }</style>',
+      searched(undefinedIn(files), {
+        of: reads,
+        what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('custom-properties/other-file-reads', reads.length),
+    ).toBeUndefined();
   });
 
   it('accepts a define:vars key as a definition', () => {
+    const files = {
+      'a.astro':
+        '<style define:vars={{ frameWidth: `${w}px` }}>.a { width: var(--frameWidth); }</style>',
+    };
+    const reads = readsWritten(files);
     expect(
-      undefinedIn({
-        'a.astro':
-          '<style define:vars={{ frameWidth: `${w}px` }}>.a { width: var(--frameWidth); }</style>',
+      searched(undefinedIn(files), {
+        of: reads,
+        what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('custom-properties/define-vars-reads', reads.length),
+    ).toBeUndefined();
   });
 
   it('accepts setProperty and a quoted style key as definitions', () => {
+    const files = {
+      'a.ts': "el.style.setProperty('--x', '1');",
+      'b.astro': "<div style={{ '--y': 2 }} />",
+      'c.css': '.c { a: var(--x); b: var(--y); }',
+    };
+    const reads = readsWritten(files);
     expect(
-      undefinedIn({
-        'a.ts': "el.style.setProperty('--x', '1');",
-        'b.astro': "<div style={{ '--y': 2 }} />",
-        'c.css': '.c { a: var(--x); b: var(--y); }',
+      searched(undefinedIn(files), {
+        of: reads,
+        what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('custom-properties/set-property-reads', reads.length),
+    ).toBeUndefined();
   });
 
   it('lets no comment define a property', () => {
@@ -110,9 +138,17 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
   });
 
   it('lets no comment read a property', () => {
+    const files = { 'a.astro': '<style>/* var(--muted) */ .a {}</style>' };
+    const reads = readsWritten(files);
     expect(
-      undefinedIn({ 'a.astro': '<style>/* var(--muted) */ .a {}</style>' }),
+      searched(undefinedIn(files), {
+        of: reads,
+        what: 'var() reads in the fixture',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('custom-properties/comment-reads', reads.length),
+    ).toBeUndefined();
   });
 });
 

@@ -175,7 +175,18 @@ describe('the closing-keyword rule, in its one home', () => {
   });
 
   it('finds nothing in an empty message', () => {
-    expect(closingKeywordOffences('')).toEqual([]);
+    // The scanner walks lines: an empty message is one blank line, not none.
+    const message = '';
+    const lines = message.split('\n');
+    expect(
+      searched(closingKeywordOffences(message), {
+        of: lines.length,
+        what: 'lines of the empty message',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('closing-keywords/empty-message-lines', lines.length),
+    ).toBeUndefined();
   });
 });
 

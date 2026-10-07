@@ -88,9 +88,17 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
       '.b { --clip: 1px; overflow: clip; }',
       '.c { /* was: position: absolute; clip: rect(0 0 0 0); */ }',
     ].join('\n');
+    const sheet = stylesheetCss(CSS_FIXTURE, css).join('\n');
+    const judged = declarationsIn(sheet);
     expect(
-      clipDeclarations(stylesheetCss(CSS_FIXTURE, css).join('\n')),
+      searched(clipDeclarations(sheet), {
+        of: judged,
+        what: 'declarations in the fixture',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('deprecated-css/lookalike-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('finds none in any stylesheet under src/', () => {
