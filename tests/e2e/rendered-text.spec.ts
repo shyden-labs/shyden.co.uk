@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { searched } from '../source-files';
+import { LOCALES, getSiteStrings } from '../../src/lib/i18n';
 import {
   PUBLISHED_ROUTES,
   publishedPaths,
@@ -108,6 +109,16 @@ const INTENTIONAL_JOINS: Array<{ left: RegExp; right: RegExp; why: string }> = [
       'a full-width stop carries its own space: Chinese sets the next ' +
       'sentence straight after it (#390 F65)',
   },
+  // The Pause motion pill is laid ON the language strip, so its words sit over
+  // the strip's first words, not beside them (#606). One entry per locale,
+  // naming that locale's own label exactly.
+  ...LOCALES.map((locale) => ({
+    left: new RegExp(
+      `^${getSiteStrings(locale).home.pauseMotion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    ),
+    right: /^\S+ ✱ /,
+    why: 'the pause pill is drawn over the language strip, not beside it (#606)',
+  })),
 ];
 
 /**

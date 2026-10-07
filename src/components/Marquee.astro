@@ -72,6 +72,11 @@ const half = run.repeat(2);
     position: relative;
     z-index: 2;
     overflow: hidden;
+    /* At least as tall as the pill that sits on it (#606), so the pill stays
+       inside the band at every width; the text keeps its middle. */
+    display: flex;
+    align-items: center;
+    min-block-size: 44px;
     margin-block: clamp(1.5rem, 1rem + 2vw, 2.5rem);
     padding-block: 0.5rem;
     background: var(--accent);
@@ -99,19 +104,43 @@ const half = run.repeat(2);
     animation-play-state: paused;
   }
 
-  /* The control sits above the band, at its inline-end edge, where the tilted
-     strip never reaches. The label is the touch target: 44px tall. The ring
-     is the site's global :focus-visible one, on the input. */
+  /* The control is a pill ON the strip (#606), at its inline-end and centred
+     on it, where it used to be a 44px row of its own above the strip with
+     nothing in it but the checkbox. The band is the positioning context and
+     is exactly the strip's height (the strip's margins collapse out of it),
+     so `top: 50%` is the strip's middle. It paints above the strip's text
+     (z-index 3 over the strip's 2) and BELOW the sticky header (10, #599), so
+     the header still covers it after scrolling. A solid --surface ground with
+     its own --ink: tests/unit/contrast.test.ts scores that pair. The label is
+     the touch target: 44px tall. The ring is the site's global
+     :focus-visible one, on the input. */
+  .band {
+    position: relative;
+  }
   .band-pause {
+    position: absolute;
+    z-index: 3;
+    inset-inline-end: var(--space);
+    top: 50%;
+    translate: 0 -50%;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     gap: 0.5rem;
     min-block-size: 44px;
-    padding-inline: var(--space);
+    padding-block: 0.25rem;
+    padding-inline: 0.9rem;
+    /* Never wider than half the band: a long label (Vietnamese, Thai) wraps
+       onto two even lines inside the pill instead of widening it (#606). */
+    max-inline-size: 50%;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface);
     color: var(--ink);
     font-size: 0.95rem;
     cursor: pointer;
+  }
+  .band-pause span {
+    text-wrap: balance;
   }
   .band-pause input {
     inline-size: 1.25rem;
