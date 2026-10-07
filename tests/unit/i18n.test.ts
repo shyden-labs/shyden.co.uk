@@ -30,7 +30,13 @@ import {
   NUMBER_SETS_PROBLEM_KINDS,
   type NumberSetsProblem,
 } from '../../src/lib/numberSets';
-import { siteEn, siteId } from '../../src/lib/i18n/site';
+import {
+  siteEn,
+  siteId,
+  siteZh,
+  siteVi,
+  siteTh,
+} from '../../src/lib/i18n/site';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { isMessageTemplate } from '../../src/lib/i18n/message';
 
@@ -86,6 +92,29 @@ const ALLOWED_IDENTICAL = new Set([
   'rosterColNumber',
   'rosterUnset',
 ]);
+
+/**
+ * Site keys that are legitimately identical to English in every locale, each
+ * with the decision behind it. ONE set for every locale's test (#602); a
+ * stale entry is refused by name.
+ */
+const SITE_ALLOWED_IDENTICAL: ReadonlyMap<string, string> = new Map([
+  // "Glory points" is YeeTalk's in-app currency, a product name, not English
+  // prose. Listed explicitly rather than loosening the check: the guard's
+  // value is that every exception is a decision someone made on purpose.
+  ['glory.inputLabel', 'product name: the in-app currency'],
+  // "ShyTalk" is the product's name. A nav item that translated it would be
+  // naming a different product. Identical in all five by design.
+  ['nav.shytalk', 'product name'],
+  // "Yawelo Idle" likewise, the game's name, never translated (#403).
+  ['nav.yaweloIdle', 'product name'],
+]);
+const siteEnMap = new Map(stringLeaves(siteEn));
+const identicalToEnglish = (table: typeof siteEn): string[] =>
+  stringLeaves(table)
+    .filter(([k, v]) => siteEnMap.get(k) === v)
+    .map(([k]) => k)
+    .filter((k) => !SITE_ALLOWED_IDENTICAL.has(k));
 
 describe('locales are complete', () => {
   it('Indonesian defines every key English defines, at every depth', () => {
@@ -1585,32 +1614,56 @@ describe('site-wide copy is fully translated', () => {
   it('the visible prose is genuinely translated, not copied English', () => {
     // Walks EVERY string rather than a hand-picked sample, so a section that
     // was forgotten during translation cannot hide behind the ones that were
-    // done. Proper nouns and the language switcher label are legitimately
-    // identical across locales, so they are excluded by name.
-    const allowedIdentical = new Set([
-      'language.label',
-      // "Glory points" is YeeTalk's in-app currency — a product name, not
-      // English prose, so it is correctly identical in both locales. Listed
-      // explicitly rather than loosening the check: the guard's value is that
-      // every exception is a decision someone made on purpose.
-      'glory.inputLabel',
-      // "ShyTalk" is the product's name. A nav item that translated it would
-      // be naming a different product. Identical in all five by design.
-      'nav.shytalk',
-      // "Yawelo Idle" likewise, the game's name, never translated (#403).
-      'nav.yaweloIdle',
-    ]);
-    const enMap = new Map(stringLeaves(siteEn));
+    // done. Proper nouns are legitimately identical across locales, so they
+    // are excluded by name (SITE_ALLOWED_IDENTICAL, shared by every locale).
     const idLeaves = stringLeaves(siteId);
-    const identical = idLeaves
-      .filter(([k, v]) => enMap.get(k) === v)
-      .map(([k]) => k)
-      .filter((k) => !allowedIdentical.has(k));
+    const identical = identicalToEnglish(siteId);
     expect(
       searched(identical, { of: idLeaves, what: 'Indonesian site strings' }),
     ).toEqual([]);
     expect(
       floorBreach('i18n/indonesian-site-strings', idLeaves.length),
+    ).toBeUndefined();
+  });
+
+  // #602: the same walk for the other machine-seeded site locales. One test
+  // per locale, generated, never a loop of locales inside a body.
+  const SITE_BY_LOCALE = { zh: siteZh, vi: siteVi, th: siteTh } as const;
+  // One literal id per locale, each spelled exactly once (literal-floors).
+  const SITE_FLOOR = {
+    zh: 'i18n/site-strings-zh',
+    vi: 'i18n/site-strings-vi',
+    th: 'i18n/site-strings-th',
+  } as const;
+  for (const locale of ['zh', 'vi', 'th'] as const) {
+    it(`${locale}: no site string is English left untranslated`, () => {
+      const leaves = stringLeaves(SITE_BY_LOCALE[locale]);
+      const identical = identicalToEnglish(SITE_BY_LOCALE[locale]);
+      expect(
+        searched(identical, { of: leaves, what: `${locale} site strings` }),
+      ).toEqual([]);
+      expect(floorBreach(SITE_FLOOR[locale], leaves.length)).toBeUndefined();
+    });
+  }
+
+  it('every allowed-identical site key is identical to English in some locale', () => {
+    // A stale allowance is a hole: it would excuse English copy the day the
+    // key is next left untranslated (#422's class).
+    const allowedKeys = [...SITE_ALLOWED_IDENTICAL.keys()];
+    const tables = [siteId, siteZh, siteVi, siteTh];
+    const needed = new Set(
+      tables.flatMap((table) =>
+        stringLeaves(table)
+          .filter(([k, v]) => siteEnMap.get(k) === v)
+          .map(([k]) => k),
+      ),
+    );
+    const stale = allowedKeys.filter((k) => !needed.has(k));
+    expect(
+      searched(stale, { of: allowedKeys, what: 'allowed-identical site keys' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('i18n/site-allowed-identical', allowedKeys.length),
     ).toBeUndefined();
   });
 });
