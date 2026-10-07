@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import ts from 'typescript';
 import { floorBreach } from '../floors';
+import { scopeOf, testBodiesIn } from '../floorless-searches';
+import { ABSENCE_BURN_DOWN } from '../absence-liveness.burn-down';
 import {
   committableFiles,
   filesUnder,
@@ -33,23 +35,30 @@ import {
  *
  *     expect(searched(findings, { of: files, what: 'files' })).toEqual([]);
  *
- * Two structural shapes are in scope, and both are shapes rather than names,
- * because #80 found nine copies of one walker sharing only two names:
+ * Every absence is judged, whatever its shape (#609, the operator's rule
+ * from #534: no exceptions). Two structural shapes name their reason:
  *
  *  - **A collector** — a variable initialised empty and accumulated into, or
- *    produced by `.filter()` / `.flatMap()`. Its emptiness says nothing until
- *    you know the thing it accumulated FROM was not empty.
+ *    produced by `.filter()` / `.flatMap()`, whether the call is in the
+ *    binding's initialiser or written inline in the subject. Its emptiness
+ *    says nothing until you know the thing it accumulated FROM was not empty.
  *  - **A discovery** — a subject whose derivation transitively reaches the
  *    filesystem. `const result = scan()` three hops above a `readFileSync` is
  *    the shape `anchored-presence.test.ts` uses on itself.
  *
- * Deliberately OUT of scope, and this is the distinction the ticket's "109
- * absence assertions" figure missed: an assertion over a self-contained call,
- * `expect(rosterWarnings([], en)).toEqual([])`. Its population is the literal
- * written beside it. Requiring a control there would buy nothing and would
- * teach every author to write `of: 1` to get past it -- a mandatory control
- * with a trivial escape hatch is a ritual, and rituals are how the vacuity
- * this ticket exists to remove got written in the first place.
+ * Anything else not routed through `searched(` is "self-contained", and that
+ * is a finding too. This guard used to put it out of scope --
+ * `expect(rosterWarnings([], en)).toEqual([])`, "its population is the literal
+ * written beside it" -- and 185 of 470 sites in 60 files went unjudged, with
+ * neither a population in the verdict nor a floor, while the floor guard
+ * judged only `searched(` calls and saw nothing either. A category the guard
+ * cannot see is an exemption by another name.
+ *
+ * Today's unjudged sites are DEBT, listed in `absence-liveness.burn-down.ts`
+ * by `file › test title as written`, and checked for equality both ways: a
+ * converted site is red until the list is lowered, and a new unjudged site is
+ * red by name. The list only shrinks, and nothing exempts a site by shape,
+ * label or reason; the conversions (#610-#617) empty it.
  *
  * `.not.toEqual([])` is a PRESENCE assertion and is skipped: it fails, loudly,
  * on an empty population, so it cannot hide one.
@@ -157,6 +166,25 @@ function unproved(subject: ts.Expression, file: string): string | null {
   )
     return null;
 
+  // A derivation written in the subject itself: `expect(xs.filter(...))`.
+  // `derivationOf` reads the initialisers of the names a subject uses, never
+  // the subject's own receiver chain, so this was read as self-contained (#609).
+  for (let at: ts.Expression = subject; ;) {
+    if (ts.isParenthesizedExpression(at) || ts.isAwaitExpression(at)) {
+      at = at.expression;
+    } else if (ts.isCallExpression(at)) {
+      at = at.expression;
+    } else if (ts.isPropertyAccessExpression(at)) {
+      if (
+        DERIVING.has(at.name.text) &&
+        ts.isCallExpression(at.parent) &&
+        at.parent.expression === at
+      )
+        return `derived by .${at.name.text}() over a population`;
+      at = at.expression;
+    } else break;
+  }
+
   const { names, initializers } = derivationOf(subject, bound);
   if (names.some((name) => discoverers.reaches(file, name)))
     return 'derives from the filesystem';
@@ -180,7 +208,11 @@ function unproved(subject: ts.Expression, file: string): string | null {
     )
       return `derived by .${init.expression.name.text}() over a population`;
   }
-  return null;
+  // Anything else is a finding too (#609, #534: no exceptions). An assertion
+  // over a call whose input is written beside it has no population in the
+  // verdict and no floor, so nothing would notice a reader that stopped
+  // reading part of it.
+  return 'self-contained: no population in the verdict';
 }
 
 /**
@@ -262,8 +294,11 @@ function scan() {
   const findings: string[] = [];
   const sites: string[] = [];
   const perFile = new Map<string, number>();
+  /** Unjudged absences by `file › test title as written` (#609). */
+  const unjudged = new Map<string, number>();
   let proved = 0;
   for (const [file, sf] of bound.files) {
+    const bodies = testBodiesIn(sf);
     const check = (node: ts.Node) => {
       if (ts.isCallExpression(node)) {
         const root = unclassified(node);
@@ -277,21 +312,31 @@ function scan() {
           perFile.set(file, (perFile.get(file) ?? 0) + 1);
           const why = unproved(subject, file);
           if (why === null) proved += 1;
-          else
-            findings.push(
-              `${where(sf, node)} — ${why}: ` +
-                subject.getText().replace(/\s+/g, ' ').slice(0, 70),
-            );
+          else {
+            const scope = scopeOf(bodies, node);
+            // Fail closed: a site the reader cannot place cannot be listed.
+            if (scope === undefined)
+              findings.push(
+                `${where(sf, node)} — an absence in no test and no named function`,
+              );
+            else {
+              const key = `${file} › ${scope.label}`;
+              unjudged.set(key, (unjudged.get(key) ?? 0) + 1);
+            }
+          }
         }
       }
       ts.forEachChild(node, check);
     };
     check(sf);
   }
-  return { sites, perFile, proved, findings };
+  return { sites, perFile, proved, findings, unjudged };
 }
 
 const result = scan();
+
+const CEILING_SITES = 185;
+const CEILING_SCOPES = 180;
 
 describe('absence assertions prove the population they searched', () => {
   // Separate from the verdict, and load-bearing: the verdict below is itself
@@ -370,6 +415,45 @@ describe('absence assertions prove the population they searched', () => {
     };
     visit(sf);
     expect(subjects).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'l', 'm']);
+  });
+
+  it('judges a subject that is not routed through searched, whatever its shape', () => {
+    // Planted (#609). Written out, never generated from `unproved`'s own
+    // branches: a plant built from the reader's list cannot see it drop one.
+    const reasonFor = (subject: string): string | null => {
+      const sf = ts.createSourceFile(
+        'fixture.test.ts',
+        `expect(${subject}).toEqual([]);`,
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      let why: string | null = 'no absence read';
+      const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node)) {
+          const read = absenceSubject(node);
+          if (read) why = unproved(read, 'fixture.test.ts');
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+      return why;
+    };
+    // The exempt shape: a call over input written beside it.
+    expect(reasonFor('rosterWarnings([], en)')).toMatch(/^self-contained/);
+    expect(reasonFor('plantedNameNothingDeclares')).toMatch(/^self-contained/);
+    // An inline derivation, read on the subject itself, in every position of
+    // the receiver chain.
+    expect(reasonFor('LOCALES.filter((l) => l !== "en")')).toMatch(
+      /^derived by \.filter\(\)/,
+    );
+    expect(reasonFor('rows.flatMap((r) => r.cells)')).toMatch(
+      /^derived by \.flatMap\(\)/,
+    );
+    expect(reasonFor('rows.filter((r) => r.bad).map((r) => r.id)')).toMatch(
+      /^derived by \.filter\(\)/,
+    );
+    // Routed through the helper: the population is in the verdict.
+    expect(reasonFor("searched(f, { of: p, what: 'w' })")).toBeNull();
   });
 
   it('refuses an absence on a root it cannot classify, rather than skipping it', () => {
@@ -501,15 +585,57 @@ describe('absence assertions prove the population they searched', () => {
     ).toBeUndefined();
   });
 
-  it('finds none whose population could be empty without saying so', () => {
+  it('finds every scope holding exactly the unjudged absences listed', () => {
+    // The listed sites are today's debt (#609), keyed by the test that holds
+    // them. Equality both ways: a converted site leaves its key too high and
+    // is red until the list is lowered, and a new unjudged site is red by
+    // name. Nothing is exempt by shape, label or reason.
+    const keys = new Set([
+      ...result.unjudged.keys(),
+      ...Object.keys(ABSENCE_BURN_DOWN),
+    ]);
+    const mismatched = [...keys]
+      .filter(
+        (key) =>
+          (result.unjudged.get(key) ?? 0) !== (ABSENCE_BURN_DOWN[key] ?? 0),
+      )
+      .map((key) => {
+        const [listed, read] = [
+          ABSENCE_BURN_DOWN[key] ?? 0,
+          result.unjudged.get(key) ?? 0,
+        ];
+        return read > listed
+          ? `${key}: ${read} absences with no population in the verdict, ${listed} listed. Route each through searched() and check a floor.`
+          : `${key}: ${read} unjudged, ${listed} listed. Lower the entry in tests/absence-liveness.burn-down.ts: the list only shrinks.`;
+      });
     expect(
       searched(result.findings, {
         of: result.sites,
         what: 'absence assertions',
       }),
+      result.findings.join('\n'),
+    ).toEqual([]);
+    expect(
+      searched(mismatched, { of: result.sites, what: 'absence assertions' }),
+      mismatched.join('\n'),
     ).toEqual([]);
     expect(
       floorBreach('absence-liveness/judged-sites', result.sites.length),
+    ).toBeUndefined();
+  });
+
+  it('only shrinks the burn-down list', () => {
+    // Measured when the list landed (#609); a conversion lowers these with
+    // the list and nothing else raises them. The recorded floor holds the
+    // list's own size, so a key quietly deleted from it is seen.
+    const counts = Object.values(ABSENCE_BURN_DOWN);
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(
+      CEILING_SITES,
+    );
+    expect(counts.length).toBeLessThanOrEqual(CEILING_SCOPES);
+    expect(counts.every((n) => Number.isInteger(n) && n >= 1)).toBe(true);
+    expect(
+      floorBreach('absence-liveness/burn-down-scopes', counts.length),
     ).toBeUndefined();
   });
 });
