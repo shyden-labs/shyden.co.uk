@@ -21,6 +21,14 @@
  * carries every Playwright floor unchanged, naming them: for a change that
  * moves no browser floor, which CI then judges as it judges every floor.
  *
+ * `npm run floors:record -- --functions` runs the Functions-runtime suite
+ * alone (#610): `npm run test:functions`, which builds and serves the site on
+ * workerd and posts real reports to it, on this machine (it needs no
+ * credential and no container: its figures are row and request counts, not
+ * layout). A full record runs it too, after the Playwright run. Where a
+ * functions id is new, the unit suite runs once more, as in every mode, for the
+ * floor that counts the record's ids; the Playwright figures are carried.
+ *
  * One id read two different values when its figure differs by engine, so
  * that refusal is also where a floor that needs one id per engine shows.
  *
@@ -44,7 +52,9 @@ import { containerArgs, localImage } from './playwright-image.mjs';
 
 const UNIT = 'unit suite';
 const PLAYWRIGHT = 'Playwright run';
+const FUNCTIONS = 'functions suite';
 const UNIT_ONLY = '--unit';
+const FUNCTIONS_ONLY = '--functions';
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -68,13 +78,14 @@ export const RECORD_ENV = 'FLOORS_RECORD';
 export const RECORD_DIR_PREFIX = '.floors-record-';
 
 const E2E_DIR = 'tests/e2e';
+const FUNCTIONS_DIR = 'tests/functions';
 
 /**
  * The Playwright specs that call `floorBreach`, which the record run is
  * limited to: every other spec would cost minutes and record nothing. Read
  * from each spec's text, so one that names the function only in a comment
  * runs for nothing; `tests/unit/floors.test.ts` holds this list equal to the
- * specs whose parse tree calls it.
+ * specs whose parse tree calls it. `FUNCTIONS_DIR` is read the same way (#610).
  *
  * @param {string} [dir]
  * @returns {string[]}
@@ -160,6 +171,27 @@ export const carriedIds = (ids, specTexts, asserted) =>
     (id) =>
       !asserted.has(id) &&
       specTexts.some(
+        (text) => text.includes(`'${id}'`) || text.includes(`"${id}"`),
+      ),
+  );
+
+/**
+ * The recorded ids a functions-only record (`--functions`, #610) carries
+ * unchanged: every one the run did not assert that no functions spec spells.
+ * Those belong to the unit suite or the Playwright run, which this mode was
+ * not asked to measure. One a functions spec spells and the run did not assert
+ * is a floor whose test is gone, and is refused as in every mode.
+ *
+ * @param {readonly string[]} ids the recorded ids
+ * @param {readonly string[]} functionsTexts the functions specs, read
+ * @param {ReadonlySet<string>} asserted the ids the run asserted
+ * @returns {string[]}
+ */
+export const carriedOutside = (ids, functionsTexts, asserted) =>
+  ids.filter(
+    (id) =>
+      !asserted.has(id) &&
+      !functionsTexts.some(
         (text) => text.includes(`'${id}'`) || text.includes(`"${id}"`),
       ),
   );
@@ -341,13 +373,20 @@ export const floorsText = (floors) =>
 const main = () => {
   if (env.CI) die('CI never records floors: run npm run floors:record locally');
   const args = argv.slice(2);
-  if (args.length > 1 || (args.length === 1 && args[0] !== UNIT_ONLY))
+  if (
+    args.length > 1 ||
+    (args.length === 1 && ![UNIT_ONLY, FUNCTIONS_ONLY].includes(args[0]))
+  )
     die(
-      `usage: npm run floors:record [-- ${UNIT_ONLY}] (got ${args.join(' ')})`,
+      `usage: npm run floors:record [-- ${UNIT_ONLY} | ${FUNCTIONS_ONLY}] ` +
+        `(got ${args.join(' ')})`,
     );
   // The unit floors alone (#548): a change that moves no Playwright floor
   // need not pay for the container, about five minutes a record.
   const unitOnly = args[0] === UNIT_ONLY;
+  // The functions floors alone (#610): the suite takes minutes, the whole
+  // record hours.
+  const functionsOnly = args[0] === FUNCTIONS_ONLY;
 
   /** @type {Readonly<Record<string, number>>} */
   const recorded = existsSync(FLOORS_FILE)
@@ -356,16 +395,20 @@ const main = () => {
 
   // Asked first, before minutes of unit suite: without Docker the Playwright
   // floors cannot be recorded, and they are never recorded on this machine.
-  const docker = unitOnly
-    ? undefined
-    : runRefusal(
-        PLAYWRIGHT,
-        spawnSync('docker', ['--version'], { stdio: 'ignore' }),
-      );
+  const docker =
+    unitOnly || functionsOnly
+      ? undefined
+      : runRefusal(
+          PLAYWRIGHT,
+          spawnSync('docker', ['--version'], { stdio: 'ignore' }),
+        );
   if (docker !== undefined) die(docker);
   const specs = floorSpecs();
   if (specs.length === 0)
     die('no Playwright spec calls floorBreach: nothing to record there');
+  const functionsSpecs = floorSpecs(FUNCTIONS_DIR);
+  if (functionsSpecs.length === 0)
+    die('no functions spec calls floorBreach: nothing to record there');
 
   // Collected inside the try and judged after it: `die` exits at once, which
   // skips any `finally` still pending, and the scratch directory would leak.
@@ -379,24 +422,35 @@ const main = () => {
   let read = 0;
   /** @type {readonly Observation[]} */
   let e2eSeen = [];
+  /** @type {readonly Observation[]} */
+  let functionsSeen = [];
   let settled;
   try {
     settled = recordUntilSettled({
       recorded,
       carry: (seen) => {
         read = seen.length;
+        const asserted = new Set(seen.map(({ id }) => id));
+        const functionsTexts = functionsSpecs.map((spec) =>
+          readFileSync(spec, 'utf8'),
+        );
         carried = unitOnly
           ? carriedIds(
               Object.keys(recorded),
-              specs.map((spec) => readFileSync(spec, 'utf8')),
-              new Set(seen.map(({ id }) => id)),
+              [...specs, ...functionsSpecs].map((spec) =>
+                readFileSync(spec, 'utf8'),
+              ),
+              asserted,
             )
-          : [];
+          : functionsOnly
+            ? carriedOutside(Object.keys(recorded), functionsTexts, asserted)
+            : [];
         return carried;
       },
       measure: (floors, pass) => {
         // A later pass reads the record the one before it decided. Only the
-        // unit suite runs again: no Playwright test reads the record's ids.
+        // unit suite runs again: no Playwright or functions test reads the
+        // record's ids.
         if (pass > 1) {
           writeFileSync(FLOORS_FILE, floorsText(floors));
           console.log(
@@ -405,15 +459,19 @@ const main = () => {
           );
         }
         const unit = join(dir, `unit-${pass}.jsonl`);
-        const unitRefusal = runRefusal(
-          UNIT,
-          spawnSync('npx', ['vitest', 'run'], {
-            stdio: 'inherit',
-            env: { ...env, [RECORD_ENV]: unit },
-          }),
-        );
-        if (unitRefusal !== undefined) return unitRefusal;
-        if (pass === 1 && !unitOnly) {
+        // `--functions` measures the functions suite alone; the unit suite
+        // runs only to settle the ids that pass added.
+        if (!functionsOnly || pass > 1) {
+          const unitRefusal = runRefusal(
+            UNIT,
+            spawnSync('npx', ['vitest', 'run'], {
+              stdio: 'inherit',
+              env: { ...env, [RECORD_ENV]: unit },
+            }),
+          );
+          if (unitRefusal !== undefined) return unitRefusal;
+        }
+        if (pass === 1 && !unitOnly && !functionsOnly) {
           const image = localImage();
           const e2e = join(dir, 'e2e.jsonl');
           console.log(
@@ -430,7 +488,26 @@ const main = () => {
           if (e2eRefusal !== undefined) return e2eRefusal;
           e2eSeen = observationsIn(e2e);
         }
-        return [...observationsIn(unit), ...e2eSeen];
+        if (pass === 1 && !unitOnly) {
+          const functions = join(dir, 'functions.jsonl');
+          console.log(
+            `Recording the functions floors: ${functionsSpecs.join(' ')}`,
+          );
+          const functionsRefusal = runRefusal(
+            FUNCTIONS,
+            spawnSync('npm', ['run', 'test:functions'], {
+              stdio: 'inherit',
+              env: { ...env, [RECORD_ENV]: functions },
+            }),
+          );
+          if (functionsRefusal !== undefined) return functionsRefusal;
+          functionsSeen = observationsIn(functions);
+        }
+        return [
+          ...(existsSync(unit) ? observationsIn(unit) : []),
+          ...e2eSeen,
+          ...functionsSeen,
+        ];
       },
     });
   } finally {
@@ -447,7 +524,8 @@ const main = () => {
   }
   if (carried.length > 0)
     console.log(
-      `${UNIT_ONLY}: not measured, carried unchanged for CI to judge: ` +
+      `${unitOnly ? UNIT_ONLY : FUNCTIONS_ONLY}: not measured, carried ` +
+        'unchanged for CI to judge: ' +
         carried.join(', '),
     );
 
