@@ -42,9 +42,12 @@ export const urlMatching =
  * on the others), and a floor recorded for one engine would break on the next.
  * Measured on all five engines (#610): the same count on each, per caller.
  *
- * This is the population a request absence is drawn from. A recorder that
- * heard nothing returns an empty list, which `searched` refuses, and one that
- * lost part of the load returns fewer, which the caller's floor refuses.
+ * This is the population a request absence is COUNTED over, for its floor and
+ * its liveness: a recorder that heard nothing returns an empty list, which
+ * `searched` refuses, and one that lost part of the load returns fewer, which
+ * the caller's floor refuses. It is never what the absence SEARCHES: search
+ * `seen.matching(...)`, which reads every request, or an off-site font or
+ * image passes a check that names every request (#610, report-form AC11).
  */
 export const requestsEveryEngineMakes = (
   requests: readonly RecordedRequest[],
