@@ -503,10 +503,181 @@ test.describe('two products, both coming soon (#403)', () => {
     });
 });
 
+// The six widths the band is held to (#599 AC2): the four #423 read, plus 390
+// (the common phone) and 1024 (the tablet-landscape edge).
+const BAND_WIDTHS = [320, 375, 390, 768, 1024, 1280];
+
+test.describe('the language band sits under the header (#599)', () => {
+  // The band is the first thing after the header, in normal flow: it scrolls
+  // away and is never pinned (operator, 2026-10-07).
+  for (const locale of LOCALES)
+    test(`${locale}: the band is the first element in main, before the hero, and not pinned`, async ({
+      page,
+    }) => {
+      await page.goto(localisePath('/', locale));
+      await expect(page.locator('main > .band')).toHaveCount(1);
+      const facts = await page.evaluate(() => {
+        const main = document.querySelector('main');
+        const band = document.querySelector('.band');
+        const hero = document.querySelector('.hero');
+        if (!main || !band || !hero)
+          throw new Error('main, band or hero missing');
+        const positions = [
+          band,
+          band.querySelector('.marquee-clip'),
+          band.querySelector('.marquee'),
+        ].map((el) => (el ? getComputedStyle(el).position : 'missing'));
+        return {
+          first: main.firstElementChild === band,
+          before: !!(
+            band.compareDocumentPosition(hero) &
+            Node.DOCUMENT_POSITION_FOLLOWING
+          ),
+          positions,
+        };
+      });
+      expect(
+        facts.first,
+        'the band is not the first element child of main',
+      ).toBe(true);
+      expect(facts.before, 'the band does not precede the hero').toBe(true);
+      expect(
+        facts.positions.filter(
+          (p) => p === 'sticky' || p === 'fixed' || p === 'missing',
+        ),
+        'the band, its clip or its strip is pinned',
+      ).toEqual([]);
+      expect(facts.positions).toHaveLength(3);
+      await shoot(
+        page,
+        `${locale}: the band is first in main, before the hero, unpinned`,
+      );
+    });
+
+  // Geometry of the rendered page, read in the page. `clip` is the band's own
+  // clip box: the rotated strip never paints outside it.
+  const readBand = (page: Page) =>
+    page.evaluate(() => {
+      const box = (selector: string) => {
+        const el = document.querySelector(selector);
+        if (!el) throw new Error(`${selector} missing`);
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+      };
+      return { header: box('header'), clip: box('.marquee-clip') };
+    });
+
+  // AC3 at load: the band and the header do not intersect.
+  for (const width of BAND_WIDTHS)
+    test(
+      `at ${width}px the band and the header do not intersect at load`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        const { header, clip } = await readBand(page);
+        expect(
+          clip.top,
+          `the band's top (${clip.top}) is above the header's bottom (${header.bottom})`,
+        ).toBeGreaterThanOrEqual(header.bottom);
+        await shoot(
+          page,
+          `${width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
+        );
+      },
+    );
+
+  // AC3 after scrolling: the band is unpinned, so it passes beneath the
+  // sticky header, and wherever the two meet the header is the topmost thing.
+  // `elementFromPoint` is what a click would hit, so it reads the painted
+  // stacking order, which a bounding box cannot.
+  for (const width of BAND_WIDTHS)
+    test(
+      `at ${width}px the header paints above the band as it scrolls beneath`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        const hit = await page.evaluate(async () => {
+          const header = document.querySelector('header');
+          const clip = document.querySelector('.marquee-clip');
+          if (!header || !clip) throw new Error('header or band missing');
+          const headerHeight = header.getBoundingClientRect().height;
+          // The band's top edge halfway up under the header.
+          window.scrollTo(
+            0,
+            clip.getBoundingClientRect().top +
+              window.scrollY -
+              headerHeight / 2,
+          );
+          const frame = () =>
+            new Promise((done) => requestAnimationFrame(done));
+          await frame();
+          await frame();
+          const h = header.getBoundingClientRect();
+          const c = clip.getBoundingClientRect();
+          const top = Math.max(h.top, c.top);
+          const bottom = Math.min(h.bottom, c.bottom);
+          const y = top + (bottom - top) / 2;
+          // Runs in the page over a population that exists only at runtime:
+          // the overlap's own sample points.
+          const samples = [0.1, 0.5, 0.9].map((f) => {
+            const x = window.innerWidth * f;
+            const el = document.elementFromPoint(x, y);
+            return {
+              inHeader: !!el?.closest('header'),
+              inBand: !!el?.closest('.band'),
+            };
+          });
+          return { overlap: bottom - top, samples };
+        });
+        // Liveness: the two really overlap, or nothing below was tested.
+        expect(
+          hit.overlap,
+          'the band never reached under the header',
+        ).toBeGreaterThan(0);
+        expect(hit.samples).toHaveLength(3);
+        expect(
+          hit.samples.filter((s) => !s.inHeader || s.inBand),
+          'the band paints over the header',
+        ).toEqual([]);
+        await shoot(
+          page,
+          `${width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
+        );
+      },
+    );
+
+  // AC1: the band scrolls away with the page.
+  test('the band scrolls away: past it, its box is above the viewport', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const bottom = await page.evaluate(async () => {
+      const clip = document.querySelector('.marquee-clip');
+      if (!clip) throw new Error('band missing');
+      window.scrollTo(
+        0,
+        clip.getBoundingClientRect().bottom + window.scrollY + 1,
+      );
+      await new Promise((done) => requestAnimationFrame(done));
+      return clip.getBoundingClientRect().bottom;
+    });
+    expect(
+      bottom,
+      'the band is still on screen after scrolling past it',
+    ).toBeLessThanOrEqual(0);
+    await shoot(
+      page,
+      `scrolled past, the band's bottom is at ${Math.round(bottom)}px`,
+    );
+  });
+});
+
 test.describe('mobile-first layout', () => {
   // Every locale at every width (#423): theme-gallery reads every locale at
   // 320 and 1280px only, so 375 and 768px were read in English alone.
-  for (const width of [320, 375, 768, 1280]) {
+  for (const width of BAND_WIDTHS) {
     for (const locale of LOCALES)
       test(
         `${locale}: no horizontal scroll at ${width}px`,
@@ -619,19 +790,21 @@ test.describe('pause motion', () => {
       );
     });
 
-  test('Tab reaches the control from the last link before it, and Space ticks it', async ({
+  test('Shift+Tab from the first hero link reaches the control, and Space ticks it', async ({
     page,
     browserName,
   }) => {
     await page.goto('/');
     const control = pauseControl(page, 'en');
-    // The last focusable thing in the hero is the control's predecessor in
-    // tab order: the band follows the hero in the DOM.
-    await page.locator('.hero a').last().focus();
+    // The band now sits before the hero in the DOM (#599), so the control is
+    // the first hero link's predecessor in tab order.
+    await page.locator('.hero a').first().focus();
     // Safari's Tab skips form controls unless Full Keyboard Access is on;
     // its documented way to reach one is Option+Tab, which is what WebKit
     // here is given. Every other engine takes a plain Tab.
-    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
+    await page.keyboard.press(
+      browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab',
+    );
     await expect(control).toBeFocused();
     await page.keyboard.press('Space');
     await expect(control).toBeChecked();

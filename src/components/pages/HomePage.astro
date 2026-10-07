@@ -55,6 +55,9 @@ const yaweloIdleFeatures = [
 ---
 
 <BaseLayout title={t.title} description={t.description} lang={lang}>
+  <!-- First under the header, in normal flow and not pinned (#599). -->
+  <Marquee pauseLabel={t.pauseMotion} />
+
   <section class="hero wrap">
     <h1>{t.heroHeading}</h1>
     <p class="lead">{t.heroLead}</p>
@@ -71,8 +74,6 @@ const yaweloIdleFeatures = [
       ))}
     </div>
   </section>
-
-  <Marquee pauseLabel={t.pauseMotion} />
 
   <section id="shytalk" class="wrap showcase">
     <div class="showcase-copy">
@@ -164,8 +165,10 @@ const yaweloIdleFeatures = [
     margin: 0 auto;
     padding: 3rem var(--space);
   }
+  /* The band now sits above the hero (#599) and brings its own bottom
+     margin, so the hero no longer needs 4.5rem of its own above the heading. */
   .hero {
-    padding-top: 4.5rem;
+    padding-top: 2rem;
   }
   /* Monospace, tracked-out, small: a section's kicker. Drawn in --accent;
      tests/unit/contrast.test.ts scores every token pair the site paints. The
