@@ -64,6 +64,7 @@ export const siteEn = {
       'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
     openClassroom: 'Open the group creator',
     emailUs: 'Email us',
+    pauseMotion: 'Pause motion',
   },
 
   notFound: {
@@ -202,6 +203,7 @@ export const siteId: SiteStrings = {
       'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
     openClassroom: 'Buka pembuat kelompok',
     emailUs: 'Kirim email',
+    pauseMotion: 'Jeda gerakan',
   },
 
   notFound: {
@@ -324,6 +326,7 @@ export const siteZh: SiteStrings = {
       '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
     openClassroom: '打开小组创建器',
     emailUs: '给我们发邮件',
+    pauseMotion: '暂停动作',
   },
   notFound: {
     title: '页面未找到 — Shyden',
@@ -444,6 +447,7 @@ export const siteVi: SiteStrings = {
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
     openClassroom: 'Mở trình tạo nhóm',
     emailUs: 'Gửi email cho chúng tôi',
+    pauseMotion: 'Tạm dừng chuyển động',
   },
   notFound: {
     title: 'Không tìm thấy trang — Shyden',
@@ -567,6 +571,7 @@ export const siteTh: SiteStrings = {
       'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
     emailUs: 'ส่งอีเมลให้เรา',
+    pauseMotion: 'หยุดการเคลื่อนไหว',
   },
   notFound: {
     title: 'ไม่พบหน้า — Shyden',
