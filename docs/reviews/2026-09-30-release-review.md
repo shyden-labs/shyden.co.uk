@@ -448,30 +448,30 @@ Columns: **Review** is `—` until the file is read in full; **Mutations** is `n
 | 434 | test | A | `tests/unit/dashboard-paths.test.ts` | +76/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
 | 435 | test | A | `tests/unit/dependabot-labels-script.test.ts` | +170/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
 | 436 | test | A | `tests/unit/deploy-gate-script.test.ts` | +258/-0 | read whole at c117042 (tranche 28) | Tranche 28: none. |  |
-| 437 | test | A | `tests/unit/device-runner.test.ts` | +468/-0 | — |  |  |
-| 438 | test | A | `tests/unit/device-tool-homes.test.ts` | +110/-0 | — |  |  |
-| 439 | test | A | `tests/unit/devicectl.test.ts` | +141/-0 | — |  |  |
-| 440 | test | A | `tests/unit/dissolved-company.test.ts` | +95/-0 | — |  |  |
-| 441 | test | A | `tests/unit/duplicate-imports.test.ts` | +215/-0 | — |  |  |
-| 442 | test | A | `tests/unit/e2e-report-cleanup.test.ts` | +122/-0 | — |  |  |
-| 443 | test | A | `tests/unit/evidence-files.test.ts` | +122/-0 | — |  |  |
-| 444 | test | A | `tests/unit/floors.test.ts` | +262/-0 | — |  |  |
-| 445 | test | A | `tests/unit/html-text.test.ts` | +36/-0 | — |  |  |
-| 446 | test | A | `tests/unit/i18n-scaffold.test.ts` | +271/-0 | — |  |  |
-| 447 | test | A | `tests/unit/init-script-disposals.test.ts` | +85/-0 | — |  |  |
-| 448 | test | A | `tests/unit/install-hooks.test.ts` | +80/-0 | — |  |  |
-| 449 | test | A | `tests/unit/ios-session-end.test.ts` | +119/-0 | — |  |  |
-| 450 | test | A | `tests/unit/jsonl-reporter.test.ts` | +81/-0 | — |  |  |
-| 451 | test | A | `tests/unit/literal-floors.test.ts` | +402/-0 | — |  |  |
-| 452 | test | A | `tests/unit/one-test-per-case.test.ts` | +332/-0 | — |  |  |
-| 453 | test | A | `tests/unit/organisation-name.test.ts` | +67/-0 | — |  |  |
-| 454 | test | A | `tests/unit/playwright-image.test.ts` | +128/-0 | — |  |  |
-| 455 | test | A | `tests/unit/presence-text.test.ts` | +126/-0 | — |  |  |
-| 456 | test | A | `tests/unit/presence-text.ts` | +149/-0 | — |  |  |
-| 457 | test | A | `tests/unit/temporary-files.test.ts` | +67/-0 | — |  |  |
-| 458 | test | A | `tests/unit/token-reach.test.ts` | +87/-0 | — |  |  |
-| 459 | test | A | `tests/unit/typed-fields.test.ts` | +107/-0 | — |  |  |
-| 460 | test | A | `tests/unit/webdriver.test.ts` | +275/-0 | — |  |  |
+| 437 | test | A | `tests/unit/device-runner.test.ts` | +468/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 438 | test | A | `tests/unit/device-tool-homes.test.ts` | +110/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F216 P4 latent, fixed forward (#591): the call-site scan knows seven spawner names, each with the tool as its first argument; the tree's own wrappers take it elsewhere (test-devices.mjs runTagged/spawnTagged second, after a tag; server-process.ts startServerProcess), so `runTagged('cleanup', 'adb', …)` passes, as does a tool held in a const; `adb devices` readers matching `'device' === state` are unread too. Swept: no adb/xcrun spawned outside the homes today. | D1 GREEN, D2 RED (as predicted) |
+| 439 | test | A | `tests/unit/devicectl.test.ts` | +141/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 440 | test | A | `tests/unit/dissolved-company.test.ts` | +95/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 441 | test | A | `tests/unit/duplicate-imports.test.ts` | +215/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. Observed: the unread check is per file (at least one import), not per-file equality; the equality-checked floors on imports read catch a reader that loses a form. |  |
+| 442 | test | A | `tests/unit/e2e-report-cleanup.test.ts` | +122/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. Observed: 'still removes its report' on the passing path is an absence with no proof of use; the refusal-path test proves the same directory through stderr. |  |
+| 443 | test | A | `tests/unit/evidence-files.test.ts` | +122/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none (a capture name is at most 178 bytes by construction). |  |
+| 444 | test | A | `tests/unit/floors.test.ts` | +262/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. Checked: carriedIds reads raw spec text, but literal-floors refuses a recorded id not spelled exactly once as a string, so a comment cannot carry one. |  |
+| 445 | test | A | `tests/unit/html-text.test.ts` | +36/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 446 | test | A | `tests/unit/i18n-scaffold.test.ts` | +271/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 447 | test | A | `tests/unit/init-script-disposals.test.ts` | +85/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 448 | test | A | `tests/unit/install-hooks.test.ts` | +80/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 449 | test | A | `tests/unit/ios-session-end.test.ts` | +119/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F217 P4 latent, fixed forward (#591): 'outside endSession, only by the start-of-run clear' counts `clearSessionMarker();` statements only, so a failure path that clears whatever the delete did in expression form (`.finally(() => clearSessionMarker())`, a reference passed) or by unlinking the marker file passes. | S1 GREEN, S2 RED (as predicted) |
+| 450 | test | A | `tests/unit/jsonl-reporter.test.ts` | +81/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 451 | test | A | `tests/unit/literal-floors.test.ts` | +402/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F218 P4, fixed forward (#591): PRODUCT_VALUES and GROUP_5 are keyed `file: subject`, not bound to a site, so every counted floor with a listed subject in that file is exempt however many there are: 33 sites ride 29 reasons today (grouping's `partitions.size` covers 4, `successes` 2), and a new liveness floor on `seen` or `g.length` would inherit one. | V1 GREEN, V2 RED (as predicted) |
+| 452 | test | A | `tests/unit/one-test-per-case.test.ts` | +332/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F219 P4 latent, fixed forward (#591; with #462): a `// runtime population:` comment exempts the loop under it whatever it iterates; the claim is never checked against the iterable, so a fixed list under the comment passes. 4 sites carry it, all true today. | R1 GREEN, R2 RED (as predicted) |
+| 453 | test | A | `tests/unit/organisation-name.test.ts` | +67/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F220 P4 latent, fixed forward (#591): the old-handle scan matches case-sensitively while a GitHub handle is case-insensitive (the game-name scan beside it lowercases). Swept: no other-case spelling outside docs/superpowers today. | O1 GREEN, O2 RED (as predicted) |
+| 454 | test | A | `tests/unit/playwright-image.test.ts` | +128/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 455 | test | A | `tests/unit/presence-text.test.ts` | +126/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F221's cross-check (see presence-text.ts). |  |
+| 456 | test | A | `tests/unit/presence-text.ts` | +149/-0 | read whole at a70e15b (tranche 29) | Tranche 29: F221 P4 latent, fixed forward (#591): presence-text and presence-detector both read `toContain`/`toMatch` only, so presence over raw file text written `/re/.test(raw)` or `raw.includes(x)` held `toBe(true)` is judged by neither, and the per-file cross-check agrees over nothing. Swept: 19 such sites in files that read files; the two over raw text (translate.test.ts:459, :490) are anchored by hand. | P1 GREEN, P2 RED (as predicted) |
+| 457 | test | A | `tests/unit/temporary-files.test.ts` | +67/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
+| 458 | test | A | `tests/unit/token-reach.test.ts` | +87/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. Observed: a body with no result_info counts its total as the ids listed (token-reach.mjs:65), harmless because the request asks per_page=50. |  |
+| 459 | test | A | `tests/unit/typed-fields.test.ts` | +107/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. Checked: the serialised needles cannot be met by a comment, since vitest's esbuild drops comments inside the function (measured). |  |
+| 460 | test | A | `tests/unit/webdriver.test.ts` | +275/-0 | read whole at a70e15b (tranche 29) | Tranche 29: none. |  |
 | 461 | doc | A | `docs/reviews/2026-10-03-guard-liveness-ledger.md` | +837/-0 | not code: prose, read for claims the code contradicts |  |  |
 | 462 | doc | A | `docs/superpowers/plans/2026-10-03-floor-ratchet.md` | +3730/-0 | not code: prose, read for claims the code contradicts |  |  |
 | 463 | doc | A | `docs/superpowers/plans/2026-10-03-guard-audit-group-2a.md` | +2168/-0 | not code: prose, read for claims the code contradicts |  |  |
