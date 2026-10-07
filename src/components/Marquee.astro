@@ -15,8 +15,19 @@ import { localeNativeNames } from '../lib/i18n/metadata';
  * does not serve. `tests/unit/marquee.test.ts` pins the endonyms literally.
  *
  * No JavaScript: one CSS keyframe, which the global `prefers-reduced-motion`
- * rule in tokens.css already reduces to a stop.
+ * rule in tokens.css already reduces to a stop. The visitor's OWN way to stop
+ * it (#598, WCAG 2.2.2 Pause, Stop, Hide: it moves for far longer than five
+ * seconds, and the operating system's setting is not a mechanism the page
+ * provides) is a native checkbox beside the band: ticked means paused, and a
+ * `:has(:checked)` rule sets `animation-play-state`, so the page still ships
+ * only the theme script. The control is a SIBLING of the aria-hidden clip,
+ * never inside it, or a screen reader would not find it.
  */
+interface Props {
+  /** The locale's label for the control: "Pause motion". */
+  pauseLabel: string;
+}
+const { pauseLabel } = Astro.props;
 const run = `${localeNativeNames().join(' ✱ ')} ✱ `;
 
 // Two IDENTICAL halves, so translating the track by exactly -50% lands the
@@ -25,11 +36,17 @@ const run = `${localeNativeNames().join(' ✱ ')} ✱ `;
 const half = run.repeat(2);
 ---
 
-<div class="marquee-clip" aria-hidden="true">
-  <div class="marquee">
-    <div class="marquee-track">
-      <span>{half}</span>
-      <span>{half}</span>
+<div class="band">
+  <label class="band-pause">
+    <input type="checkbox" />
+    <span>{pauseLabel}</span>
+  </label>
+  <div class="marquee-clip" aria-hidden="true">
+    <div class="marquee">
+      <div class="marquee-track">
+        <span>{half}</span>
+        <span>{half}</span>
+      </div>
     </div>
   </div>
 </div>
@@ -76,6 +93,34 @@ const half = run.repeat(2);
     animation: marquee-slide 30s linear infinite;
   }
 
+  /* The visitor's pause (#598). Ticked means paused; the rule reads the
+     checkbox's state from the DOM, so no script is needed. */
+  .band:has(.band-pause input:checked) .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* The control sits above the band, at its inline-end edge, where the tilted
+     strip never reaches. The label is the touch target: 44px tall. The ring
+     is the site's global :focus-visible one, on the input. */
+  .band-pause {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-block-size: 44px;
+    padding-inline: var(--space);
+    color: var(--ink);
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .band-pause input {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    flex: none;
+    margin: 0;
+    cursor: pointer;
+  }
+
   .marquee-track span {
     padding-inline-end: 1.6rem;
     white-space: nowrap;
@@ -92,7 +137,8 @@ const half = run.repeat(2);
      --on-accent, legible only on the mint ground, and a background browsers
      do not print by default. Hiding it settles both at once. */
   @media print {
-    .marquee {
+    .marquee,
+    .band-pause {
       display: none;
     }
   }

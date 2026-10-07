@@ -571,6 +571,173 @@ test.describe('reduced motion', () => {
   });
 });
 
+test.describe('pause motion', () => {
+  // #598, WCAG 2.2.2 (Pause, Stop, Hide, level A): the band moves for longer
+  // than five seconds with nothing the visitor can do about it, and the
+  // operating system's reduce-motion setting is not a mechanism the PAGE
+  // provides. The control is a native checkbox beside the band, never inside
+  // its aria-hidden subtree, and CSS alone pauses the track: the homepage
+  // still ships only the theme script.
+  const pauseControl = (page: Page, locale: Locale) =>
+    page.getByRole('checkbox', {
+      name: getSiteStrings(locale).home.pauseMotion,
+      exact: true,
+    });
+  // The track's offset on six consecutive frames; a moving band gives more
+  // than one distinct value. Runs in the page, so it reads what is painted.
+  const offsetsOf = (track: ReturnType<Page['locator']>) =>
+    track.evaluate(async (element) => {
+      const frame = () => new Promise((done) => requestAnimationFrame(done));
+      const seen: number[] = [];
+      for (let i = 0; i < 6; i++) {
+        await frame();
+        seen.push(new DOMMatrix(getComputedStyle(element).transform).m41);
+      }
+      return seen;
+    });
+
+  // Whether the band moved across those frames.
+  const moves = async (track: ReturnType<Page['locator']>) =>
+    new Set(await offsetsOf(track)).size !== 1;
+
+  for (const locale of LOCALES)
+    test(`${locale}: a visible, unticked checkbox named for the band, outside its hidden subtree`, async ({
+      page,
+    }) => {
+      await page.goto(localisePath('/', locale));
+      const control = pauseControl(page, locale);
+      await expect(control).toHaveCount(1);
+      await expect(control).toBeVisible();
+      await expect(control).not.toBeChecked();
+      expect(
+        await control.evaluate((el) => el.closest('[aria-hidden="true"]')),
+        'the control sits inside an aria-hidden ancestor',
+      ).toBeNull();
+      await expect(page.locator('.marquee-clip')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+    });
+
+  test('Tab reaches the control from the last link before it, and Space ticks it', async ({
+    page,
+    browserName,
+  }) => {
+    await page.goto('/');
+    const control = pauseControl(page, 'en');
+    // The last focusable thing in the hero is the control's predecessor in
+    // tab order: the band follows the hero in the DOM.
+    await page.locator('.hero a').last().focus();
+    // Safari's Tab skips form controls unless Full Keyboard Access is on;
+    // its documented way to reach one is Option+Tab, which is what WebKit
+    // here is given. Every other engine takes a plain Tab.
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
+    await expect(control).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(control).toBeChecked();
+  });
+
+  test('ticked pauses the band and unticked resumes it', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    const track = page.locator('.marquee-track');
+    await expect(track).toHaveCount(1);
+    const control = pauseControl(page, 'en');
+    const running = () =>
+      track.evaluate(
+        (element) =>
+          element.getAnimations().filter((a) => a.playState === 'running')
+            .length,
+      );
+
+    expect(await moves(track), 'the band moves before it is paused').toBe(true);
+    expect(await running(), 'animations running before the pause').toBe(1);
+
+    await control.check();
+    await expect(track).toHaveCSS('animation-play-state', 'paused');
+    expect(await running(), 'animations running while paused').toBe(0);
+    const held = await offsetsOf(track);
+    expect(
+      new Set(held).size,
+      `the band's offset on six frames while paused: ${held.join(', ')}`,
+    ).toBe(1);
+
+    await control.uncheck();
+    await expect(track).toHaveCSS('animation-play-state', 'running');
+    expect(await running(), 'animations running after resuming').toBe(1);
+    expect(await moves(track), 'the band moves again once resumed').toBe(true);
+  });
+
+  test('with motion reduced and the box unticked the band is still stopped', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(pauseControl(page, 'en')).not.toBeChecked();
+    const running = await page
+      .locator('.marquee-track')
+      .evaluate(
+        (element) =>
+          element.getAnimations().filter((a) => a.playState === 'running')
+            .length,
+      );
+    expect(running, 'animations running with motion reduced').toBe(0);
+  });
+
+  // At 320px, in every locale: measured, because Thai and Vietnamese run long.
+  for (const locale of LOCALES)
+    test(
+      `${locale}: at 320px the label fits its band and the control is 44px tall`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 800 });
+        await page.goto(localisePath('/', locale));
+        const control = pauseControl(page, locale);
+        const label = page.locator('.band-pause');
+        await expect(label).toHaveCount(1);
+        const box = await label.boundingBox();
+        const band = await page.locator('.band').boundingBox();
+        expect(box).not.toBeNull();
+        expect(band).not.toBeNull();
+        expect(
+          box!.x,
+          'label starts inside the viewport',
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          box!.x + box!.width,
+          'label ends inside the viewport',
+        ).toBeLessThanOrEqual(320);
+        expect(
+          box!.x + box!.width,
+          'label ends inside its band',
+        ).toBeLessThanOrEqual(band!.x + band!.width + 0.5);
+        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+        // The text itself must not be clipped by the label's own box.
+        const clipped = await control.evaluate((input) => {
+          const text = input.parentElement!.querySelector('span')!;
+          return text.scrollWidth - text.clientWidth;
+        });
+        expect(clipped, 'label text overflows its own box').toBeLessThanOrEqual(
+          0,
+        );
+        await expectNoHorizontalScroll(page);
+      },
+    );
+
+  for (const theme of THEMES)
+    test(`${theme}: the label clears AA against what is painted behind it`, async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await emulateTheme(page, theme);
+      const ratio = await contrastRatio(page.locator('.band-pause span'));
+      expect(
+        ratio,
+        `${theme}: the label's painted contrast`,
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+});
+
 test.describe('the ShyTalk phone frame', () => {
   // #390 F62. The bezel read `var(--line)`, a property defined nowhere, so the
   // whole border declaration was invalid and computed to `0px none`: the
