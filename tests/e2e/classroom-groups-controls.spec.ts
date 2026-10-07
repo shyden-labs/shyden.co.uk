@@ -4,6 +4,7 @@ import { MAX_STUDENTS } from '../../src/lib/grouping';
 import { recordErrors } from './recorders';
 import { localePaths, sampledPaths } from './locale-sampling';
 import { getStrings, localeFromPath } from '../../src/lib/i18n';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   addSeveral,
@@ -496,13 +497,15 @@ test.describe('classroom groups — mobile-first layout', () => {
                 .map((el) => ({
                   id: el.id,
                   height: el.getBoundingClientRect().height,
-                }))
-                .filter((c) => c.height < 44),
+                })),
             );
 
-        const small = [...(await measureVisible())];
+        // Every control measured, in both states: the population the verdict
+        // below is drawn from (#610).
+        const measured = [...(await measureVisible())];
         await page.check('input[name="mode"][value="groupCount"]');
-        small.push(...(await measureVisible()));
+        measured.push(...(await measureVisible()));
+        const small = measured.filter((c) => c.height < 44);
 
         // And prove the measurement actually saw the fields, rather than
         // reporting nothing because it found nothing to look at.
@@ -516,7 +519,18 @@ test.describe('classroom groups — mobile-first layout', () => {
                 .length,
           );
         expect(seen).toBeGreaterThanOrEqual(5);
-        expect(small).toEqual([]);
+        expect(
+          searched(small, {
+            of: measured,
+            what: 'visible controls measured in both modes',
+          }),
+        ).toEqual([]);
+        expect(
+          floorBreach(
+            'classroom-groups-controls/measured-controls',
+            measured.length,
+          ),
+        ).toBeUndefined();
       },
     );
 

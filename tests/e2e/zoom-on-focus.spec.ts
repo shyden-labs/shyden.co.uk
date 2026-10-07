@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../typed-fields';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
@@ -49,7 +50,21 @@ test.describe('no field makes iOS zoom the page (#352)', () => {
         // since English is not a beta language. That empty answer is only
         // worth something if the page rendered.
         await expect(page.locator('main h1')).toBeVisible();
-        expect(controls, 'the English homepage has no typed field').toEqual([]);
+        // The elements the measurement ran over (#610): a page that lost its
+        // content would answer "no typed field" just the same.
+        const examined = await page.evaluate(
+          () => document.body.querySelectorAll('*').length,
+        );
+        expect(
+          searched(controls, {
+            of: examined,
+            what: 'elements on the English homepage',
+          }),
+          'the English homepage has no typed field',
+        ).toEqual([]);
+        expect(
+          floorBreach('zoom-on-focus/homepage-elements', examined),
+        ).toBeUndefined();
         return;
       }
       expect(

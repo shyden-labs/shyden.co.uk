@@ -139,9 +139,16 @@ describe('unitsBetween: what the reader is asked to read', () => {
   });
 
   it('sends no symbol even when its translation differs', () => {
-    expect(unitsBetween({ n: '#', dash: '—' }, { n: '＃', dash: '–' })).toEqual(
-      [],
-    );
+    const symbols = { n: '#', dash: '—' };
+    expect(
+      searched(unitsBetween(symbols, { n: '＃', dash: '–' }), {
+        of: Object.keys(symbols),
+        what: 'symbol entries offered',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('back-translate/symbol-entries', Object.keys(symbols).length),
+    ).toBeUndefined();
   });
 
   it('sends nothing for copy the locale has no string for', () => {
@@ -328,7 +335,18 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
   });
 
   it('reads nothing for English, which has nothing to read back', () => {
-    expect(backTranslationUnits('en')).toEqual([]);
+    // What a translated locale sends: the copy English would send if it had
+    // a translation, so an empty English read is a choice and not a blind one.
+    const offered = backTranslationUnits('id');
+    expect(
+      searched(backTranslationUnits('en'), {
+        of: offered,
+        what: 'units a translated locale sends',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('back-translate/units-english-withholds', offered.length),
+    ).toBeUndefined();
   });
 });
 
@@ -376,12 +394,16 @@ describe('worstFirst', () => {
 
 describe('livenessProblems: a run that read nothing is a failure', () => {
   it('finds none when every locale read something back', () => {
+    const comparisons = [compared('id', 'a', 90), compared('zh', 'a', 40)];
     expect(
-      livenessProblems(
-        ['id', 'zh'],
-        [compared('id', 'a', 90), compared('zh', 'a', 40)],
-      ),
+      searched(livenessProblems(['id', 'zh'], comparisons), {
+        of: comparisons,
+        what: 'comparisons across both locales',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('back-translate/liveness-comparisons', comparisons.length),
+    ).toBeUndefined();
   });
 
   it('names a locale that compared nothing', () => {
@@ -400,12 +422,16 @@ describe('livenessProblems: a run that read nothing is a failure', () => {
   });
 
   it('leaves one empty back-translation to the review, as its worst row', () => {
+    const comparisons = [compared('th', 'a', 0, ''), compared('th', 'b', 80)];
     expect(
-      livenessProblems(
-        ['th'],
-        [compared('th', 'a', 0, ''), compared('th', 'b', 80)],
-      ),
+      searched(livenessProblems(['th'], comparisons), {
+        of: comparisons,
+        what: 'comparisons, one of them empty',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('back-translate/one-empty-comparisons', comparisons.length),
+    ).toBeUndefined();
   });
 
   it('fails a run that compared nothing at all, once per locale', () => {

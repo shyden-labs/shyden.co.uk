@@ -106,13 +106,25 @@ const FIXTURE_CLOSURES: PresenceClosures = {
   commentReaders: seeded('isMarkerCommentLine', 'commentsIn'),
 };
 
-/** The line of every assertion the detector flags in one fixture test file. */
-function flaggedLines(source: string): number[] {
+/**
+ * What the detector made of one fixture test file: the line of every assertion
+ * it flags, and how many presence assertions it read at all. The count is the
+ * population a "flags nothing" verdict is judged over (#610): a detector
+ * blind to one assertion of the fixture flags nothing there either.
+ */
+function scanFixture(source: string): { flagged: number[]; scanned: number } {
   const bound = bind(new Map([['fixture.test.ts', source]]));
-  return scanPresence(bound, FIXTURE_CLOSURES).findings.map((finding) =>
-    Number(/^fixture\.test\.ts:(\d+) /.exec(finding)?.[1]),
-  );
+  const scan = scanPresence(bound, FIXTURE_CLOSURES);
+  return {
+    flagged: scan.findings.map((finding) =>
+      Number(/^fixture\.test\.ts:(\d+) /.exec(finding)?.[1]),
+    ),
+    scanned: scan.scanned,
+  };
 }
+
+/** The line of every assertion the detector flags in one fixture test file. */
+const flaggedLines = (source: string): number[] => scanFixture(source).flagged;
 
 /** Each matcher on its own line under one raw read, so a line names a case. */
 const overRaw = (...matchers: string[]): string =>
@@ -129,11 +141,15 @@ describe('the detector counts only a real anchor (#183)', () => {
   });
 
   it('accepts a regex whose every alternative starts at a line', () => {
+    const { flagged, scanned } = scanFixture(
+      overRaw('toMatch(/^foo$/m)', 'toMatch(/^foo/)', 'toMatch(/^a|^b/m)'),
+    );
     expect(
-      flaggedLines(
-        overRaw('toMatch(/^foo$/m)', 'toMatch(/^foo/)', 'toMatch(/^a|^b/m)'),
-      ),
+      searched(flagged, { of: scanned, what: 'anchored matchers read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('anchored-presence/anchored-matchers-read', scanned),
+    ).toBeUndefined();
   });
 
   it('does not count `$` alone, or an anchor on only one alternative', () => {
@@ -149,15 +165,15 @@ describe('the detector counts only a real anchor (#183)', () => {
   });
 
   it('splits alternatives only at the top level', () => {
+    const { flagged, scanned } = scanFixture(
+      overRaw('toMatch(/^[a|b]c/)', 'toMatch(/^(a|b)c/)', 'toMatch(/^a\\|b/)'),
+    );
     expect(
-      flaggedLines(
-        overRaw(
-          'toMatch(/^[a|b]c/)',
-          'toMatch(/^(a|b)c/)',
-          'toMatch(/^a\\|b/)',
-        ),
-      ),
+      searched(flagged, { of: scanned, what: 'top-level splits read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('anchored-presence/top-level-splits-read', scanned),
+    ).toBeUndefined();
   });
 
   it('flags a string handed to toMatch, which is a substring test', () => {
@@ -165,32 +181,40 @@ describe('the detector counts only a real anchor (#183)', () => {
   });
 
   it('accepts stripped text with any matcher', () => {
+    const { flagged, scanned } = scanFixture(
+      [
+        "const code = withoutTsComments(readFileSync('x.ts', 'utf8'));",
+        "expect(code).toContain('foo');",
+        'expect(code).toMatch(/foo/);',
+      ].join('\n'),
+    );
     expect(
-      flaggedLines(
-        [
-          "const code = withoutTsComments(readFileSync('x.ts', 'utf8'));",
-          "expect(code).toContain('foo');",
-          'expect(code).toMatch(/foo/);',
-        ].join('\n'),
-      ),
+      searched(flagged, { of: scanned, what: 'stripped matchers read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('anchored-presence/stripped-matchers-read', scanned),
+    ).toBeUndefined();
   });
 
   it('accepts text derived from the comments, which asserts documentation', () => {
+    const { flagged, scanned } = scanFixture(
+      [
+        "const example = readFileSync('.env.example', 'utf8');",
+        'const docs = example',
+        "  .split('\\n')",
+        "  .filter((line) => isMarkerCommentLine(line, '#'))",
+        "  .join('\\n');",
+        'expect(docs).toMatch(/:fx\\b/);',
+        'const prose = commentsIn(parseSource(example)).map((c) => c.pos);',
+        "expect(prose).toContain('timeout');",
+      ].join('\n'),
+    );
     expect(
-      flaggedLines(
-        [
-          "const example = readFileSync('.env.example', 'utf8');",
-          'const docs = example',
-          "  .split('\\n')",
-          "  .filter((line) => isMarkerCommentLine(line, '#'))",
-          "  .join('\\n');",
-          'expect(docs).toMatch(/:fx\\b/);',
-          'const prose = commentsIn(parseSource(example)).map((c) => c.pos);',
-          "expect(prose).toContain('timeout');",
-        ].join('\n'),
-      ),
+      searched(flagged, { of: scanned, what: 'comment-derived matchers read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('anchored-presence/comment-derived-matchers-read', scanned),
+    ).toBeUndefined();
   });
 
   it('scans only content reads in test files, and never parsed data', () => {
