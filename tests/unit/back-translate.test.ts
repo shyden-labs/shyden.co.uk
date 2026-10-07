@@ -117,14 +117,14 @@ describe('unitsBetween: what the reader is asked to read', () => {
     expect(
       unitsBetween(
         { menuLabel: 'Toggle navigation menu' },
-        { menuLabel: 'Chuyển đổi menu điều hướng' },
+        { menuLabel: 'Mở hoặc đóng menu điều hướng' },
         'site',
       ),
     ).toEqual([
       {
         key: 'site.menuLabel',
         english: 'Toggle navigation menu',
-        translation: 'Chuyển đổi menu điều hướng',
+        translation: 'Mở hoặc đóng menu điều hướng',
       },
     ]);
   });
@@ -287,7 +287,7 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
     expect(backTranslationUnits('vi')).toContainEqual({
       key: 'site.menuLabel',
       english: 'Toggle navigation menu',
-      translation: 'Chuyển đổi menu điều hướng',
+      translation: 'Mở hoặc đóng menu điều hướng',
     });
   });
 

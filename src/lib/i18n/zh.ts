@@ -36,10 +36,10 @@ export const zh: Catalogue = {
   // #188. DeepL draft, awaiting a speaker (#53, #161). The three labels are
   // short -- the class that shipped a wrong-sense translation on a pupil
   // roster before -- so they need reviewing apart from the sentences.
-  absentNumbersLabel: '缺席编号',
+  absentNumbersLabel: '学生编号',
   keepTogetherLabel: '同组',
   keepApartLabel: '分开',
-  absentNumbersHelp: '缺席学生的学号，用逗号分隔。',
+  absentNumbersHelp: '缺席学生的学生编号，用逗号分隔。',
   pairNumbersHelp: '逗号连接一对；分号开始新的一对——3,9; 14,15。',
   numbersLockedReason:
     '由您的列表设定。如需修改，请在“学生详情”中标记缺席和配对。',
@@ -70,8 +70,8 @@ export const zh: Catalogue = {
   leftoversSpread: '把他们平均分到各组',
   leftoversBunch: '把他们全都放进同一个组',
   leftoversHelp: '无论哪种情况，任何一组的人数都不会少于你所选的数量。',
-  soundOn: '打开声音',
-  soundOff: '关闭声音',
+  soundOn: '声音：开',
+  soundOff: '声音：关',
   speedLabel: '速度',
   speedNormal: '正常',
   speedFast: '快',
@@ -164,7 +164,7 @@ export const zh: Catalogue = {
     th: '泰语',
   },
   ioExportClassList: '导出班级名单',
-  ioExportGroups: '导出组',
+  ioExportGroups: '导出分组',
   ioDownloadTemplate: '下载模板',
   ioImportLabel: '导入班级名单',
   ioProblemsHeading: '未导入此文件：',

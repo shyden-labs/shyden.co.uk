@@ -326,7 +326,7 @@ export const siteZh: SiteStrings = {
       '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
     openClassroom: '打开小组创建器',
     emailUs: '给我们发邮件',
-    pauseMotion: '暂停动作',
+    pauseMotion: '暂停动画',
   },
   notFound: {
     title: '页面未找到 — Shyden',
@@ -374,7 +374,7 @@ export const siteZh: SiteStrings = {
     quoteLabel: '哪些文字有误？',
     quoteHint: '开始输入并从列表中选择这些文字，或从页面上复制。',
     suggestionLabel: '应该怎么写？（可选）',
-    noteLabel: '还有其他问题吗？（可选）',
+    noteLabel: '还有其他要补充的吗？（可选）',
     noteHint: '请勿填写姓名或联系方式。',
     honeypotLabel: '请将此栏留空',
     send: '发送报告',
@@ -398,7 +398,7 @@ export const siteVi: SiteStrings = {
     tools: 'Công cụ',
     contact: 'Liên hệ',
   },
-  menuLabel: 'Chuyển đổi menu điều hướng',
+  menuLabel: 'Mở hoặc đóng menu điều hướng',
   themeDarkMode: 'Chế độ tối',
   skipToContent: 'Chuyển thẳng đến nội dung',
   home: {
@@ -523,7 +523,7 @@ export const siteTh: SiteStrings = {
     tools: 'เครื่องมือ',
     contact: 'ติดต่อ',
   },
-  menuLabel: 'สลับเมนูนำทาง',
+  menuLabel: 'เปิดหรือปิดเมนูนำทาง',
   themeDarkMode: 'โหมดมืด',
   skipToContent: 'ไปตรงสู่เนื้อหา',
   home: {
@@ -571,7 +571,7 @@ export const siteTh: SiteStrings = {
       'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
     emailUs: 'ส่งอีเมลให้เรา',
-    pauseMotion: 'หยุดการเคลื่อนไหว',
+    pauseMotion: 'หยุดภาพเคลื่อนไหว',
   },
   notFound: {
     title: 'ไม่พบหน้า — Shyden',

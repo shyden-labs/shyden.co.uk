@@ -172,7 +172,7 @@ test.describe('classroom group creator', () => {
     await expect(page.locator('#cg-numbers-absent')).toHaveValue('7');
     await shoot(
       page,
-      'number 7 typed into Absent numbers',
+      'number 7 typed into Student numbers',
       page.locator('.number-fields'),
     );
     await page.click('#cg-go');
