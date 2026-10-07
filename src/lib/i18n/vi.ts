@@ -39,11 +39,11 @@ export const vi: Catalogue = {
   // three words or fewer -- the exact class that produced `Tình dục` as a
   // column header on a pupil roster -- so a speaker must read them apart
   // from the surrounding prose, which machine translation gets right.
-  absentNumbersLabel: 'Số vắng mặt',
+  absentNumbersLabel: 'Mã học sinh',
   keepTogetherLabel: 'Xếp cùng nhóm',
   keepApartLabel: 'Xếp khác nhóm',
   absentNumbersHelp:
-    'Số thứ tự của những học sinh vắng mặt, phân tách bằng dấu phẩy.',
+    'Mã học sinh của những học sinh vắng mặt, phân tách bằng dấu phẩy.',
   pairNumbersHelp:
     'Dấu phẩy nối một cặp; dấu chấm phẩy bắt đầu cặp mới — 3,9; 14,15.',
   numbersLockedReason:
@@ -108,7 +108,7 @@ export const vi: Catalogue = {
   rosterAbsentPill: 'vắng mặt',
   rosterAbsentConsequence:
     'Học sinh được ghi là vắng mặt sẽ không được tính vào khi chia nhóm.',
-  rosterCountLine: '{total} học sinh · {here} tại đây · {absent} vắng mặt',
+  rosterCountLine: '{total} học sinh · {here} có mặt · {absent} vắng mặt',
   rosterDuplicateMessage:
     'Số {number} đã được {name} sử dụng. Mỗi học sinh cần có một số riêng.',
   rosterNoSexMessage:
@@ -206,9 +206,9 @@ export const vi: Catalogue = {
   ioHandoverSent: 'Danh sách lớp học của bạn hiện đã được mở tại {language}.',
   printOpen: 'In',
   printHeading: 'In',
-  printWhat: 'In những gì',
+  printWhat: 'Nội dung cần in',
   printWhatClassList: 'Danh sách lớp',
-  printWhatGroups: 'Kết quả của nhóm',
+  printWhatGroups: 'Kết quả chia nhóm',
   printWhatBoth: 'Cả hai',
   printOnTheClassList: 'Trong danh sách lớp',
   printShowAbsent: 'Hiển thị danh sách học sinh vắng mặt',

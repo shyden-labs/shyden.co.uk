@@ -63,11 +63,11 @@ export const id: Catalogue = {
   // implementer sendiri -- PERMUKAAN TINJAUAN, sama seperti catatan lain di
   // berkas ini. Label pendek (tiga kata atau kurang) perlu ditinjau penutur
   // asli secara terpisah dari kalimat panjang.
-  absentNumbersLabel: 'Nomor yang tidak hadir',
+  absentNumbersLabel: 'Nomor siswa',
   keepTogetherLabel: 'Selalu bersama',
   keepApartLabel: 'Jangan bersama',
   absentNumbersHelp:
-    'Nomor absen siswa yang tidak hadir, dipisahkan dengan koma.',
+    'Nomor siswa untuk setiap siswa yang tidak hadir, dipisahkan dengan koma.',
   pairNumbersHelp:
     'Koma menggabungkan satu pasangan; titik koma memulai pasangan baru — 3,9; 14,15.',
   numbersLockedReason:

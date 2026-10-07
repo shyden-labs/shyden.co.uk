@@ -109,7 +109,7 @@ export const en = {
   // number 7 today", "keep 3 with 9" and "keep 2 away from 5" without
   // opening Student details and hand-building a row per pupil. The labels
   // are the operator's own, from the ticket's design block (2026-09-16).
-  absentNumbersLabel: 'Absent numbers',
+  absentNumbersLabel: 'Student numbers',
   keepTogetherLabel: 'Keep together',
   keepApartLabel: 'Keep apart',
   // Two help lines, not one shared: the absent field takes a flat list and
@@ -120,7 +120,7 @@ export const en = {
   // classroom-groups-roster.spec.ts asserts `/\baway\b/` appears nowhere in
   // the body. This copy said "who are away" and turned that guard red.
   absentNumbersHelp:
-    'The register numbers of anyone absent, separated by commas.',
+    'The student numbers of anyone absent, separated by commas.',
   pairNumbersHelp:
     'A comma joins a pair; a semicolon starts another — 3,9; 14,15.',
   // AC14, mirroring `studentsLockedReason` above: the list and these fields

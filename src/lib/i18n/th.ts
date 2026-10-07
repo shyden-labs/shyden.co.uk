@@ -38,11 +38,11 @@ export const th: Catalogue = {
   // #188. DeepL draft, awaiting a speaker (#53, #161). The three labels are
   // short -- the class that shipped a wrong-sense translation on a pupil
   // roster before -- so they need reviewing apart from the sentences.
-  absentNumbersLabel: 'หมายเลขที่ขาดเรียน',
+  absentNumbersLabel: 'เลขประจำตัวนักเรียน',
   keepTogetherLabel: 'ให้อยู่กลุ่มเดียวกัน',
   keepApartLabel: 'ให้อยู่คนละกลุ่ม',
   absentNumbersHelp:
-    'หมายเลขประจำตัวของนักเรียนที่ขาดเรียน คั่นด้วยเครื่องหมายจุลภาค',
+    'เลขประจำตัวนักเรียนของผู้ที่ขาดเรียน คั่นด้วยเครื่องหมายจุลภาค',
   pairNumbersHelp: 'จุลภาคเชื่อมหนึ่งคู่ อัฒภาคเริ่มคู่ใหม่ — 3,9; 14,15',
   numbersLockedReason:
     'กำหนดตามรายชื่อของคุณ ทำเครื่องหมายการขาดเรียนและการจับคู่ในส่วน "รายละเอียดนักเรียน" เพื่อปรับเปลี่ยน',
@@ -99,7 +99,7 @@ export const th: Catalogue = {
   rosterSexMale: 'M',
   rosterSexFemale: 'F',
   rosterAddStudent: '+ เพิ่มนักเรียน',
-  rosterAddSeveral: '+ เพิ่มอีกหลาย…',
+  rosterAddSeveral: '+ เพิ่มหลายคน…',
   rosterHowMany: 'เพิ่มกี่คน?',
   rosterAddConfirm: 'เพิ่ม',
   rosterAbsentPill: 'ไม่มา',
