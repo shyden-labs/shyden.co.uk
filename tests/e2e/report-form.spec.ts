@@ -247,10 +247,12 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
     .poll(() => seen.matching(urlMatching(/\/api\/report$/)).length)
     .toBe(1);
   const origin = new URL(page.url()).origin;
+  // Every request is searched, fonts and images included; `heard` only
+  // counts, so the floor reads one figure on all five engines.
   const heard = requestsEveryEngineMakes(seen.all);
   expect(
     searched(
-      heard.filter((request) => new URL(request.url).origin !== origin),
+      seen.matching((request) => new URL(request.url).origin !== origin),
       { of: heard, what: 'requests the page made' },
     ),
     'AC11: a request left the site',
