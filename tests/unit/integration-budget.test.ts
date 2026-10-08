@@ -55,8 +55,11 @@ describe('the integration suite budget', () => {
     expect(unit.test?.include).toEqual(['tests/unit/**/*.test.ts']);
   });
 
-  it('has the repo setup files the unit suite has, so a run is as isolated', () => {
-    expect(integration.test?.setupFiles).toEqual(unit.test?.setupFiles);
+  it("has the shared setup files and the unit suite's global setup, so a run is as isolated", () => {
+    expect(integration.test?.setupFiles).toEqual([
+      'tests/git-env-setup.ts',
+      'tests/temporary-files-setup.ts',
+    ]);
     expect(integration.test?.globalSetup).toEqual(unit.test?.globalSetup);
   });
 });

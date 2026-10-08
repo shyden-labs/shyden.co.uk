@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config';
+import { SHARED_SETUP } from './tests/setup-files';
 
 /**
  * The guards suite (#638): every test whose cost is reading or parsing the
@@ -15,7 +16,7 @@ import unit from './vitest.config';
 export default defineConfig({
   test: {
     include: ['tests/guards/**/*.test.ts'],
-    setupFiles: unit.test?.setupFiles,
+    setupFiles: [...SHARED_SETUP],
     globalSetup: unit.test?.globalSetup,
   },
 });

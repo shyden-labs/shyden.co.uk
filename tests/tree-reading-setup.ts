@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { withoutLocalGit } from './git-env';
+import { LOCAL_GIT_VARS, askGitForLocalVars, withoutLocalGit } from './git-env';
 import { docsNamingArgs, docsPathspec, ignoreQuestions } from './git-questions';
 import { RUN_TMPDIR } from './temporary-files';
 import { TREE_READING, type TreeReading } from './tree-reading';
@@ -77,6 +77,9 @@ export function setup(): void {
     throw new Error(
       `${RUN_TMPDIR} is not set: tests/temporary-files.ts must be listed before this setup`,
     );
+  // The run's one asking of git for the variables that point it at a
+  // repository, handed to every worker in the environment (#632).
+  process.env[LOCAL_GIT_VARS] = JSON.stringify(askGitForLocalVars());
   snapshot = join(dir, SNAPSHOT_NAME);
   writeFileSync(snapshot, JSON.stringify(buildTreeReading()));
   process.env[TREE_READING] = snapshot;

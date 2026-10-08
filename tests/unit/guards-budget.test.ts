@@ -49,12 +49,12 @@ describe('the guards suite budget', () => {
     expect(unit.test?.include).toEqual(['tests/unit/**/*.test.ts']);
   });
 
-  it('has the repo setup files the unit suite has, so a run is as isolated', () => {
+  it("has the shared setup files and the unit suite's global setup, so a run is as isolated", () => {
     expect({
       setup: guards.test?.setupFiles,
       global: guards.test?.globalSetup,
     }).toEqual({
-      setup: unit.test?.setupFiles,
+      setup: ['tests/git-env-setup.ts', 'tests/temporary-files-setup.ts'],
       global: unit.test?.globalSetup,
     });
   });
