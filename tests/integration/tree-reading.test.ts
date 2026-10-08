@@ -67,12 +67,23 @@ describe('the tree reading is what git says now (#631)', () => {
         .filter(Boolean),
     );
     const answers = treeReading().ignored;
-    const wrong = asked.filter((path) => answers[path] !== ignored.has(path));
-    expect(searched(wrong, { of: asked, what: 'ignore questions' })).toEqual(
+    // Every question, ignored or not, as an equality of two answer tables. The
+    // whole population differs by machine (dist/ and tool output: 432 here,
+    // 435 on CI's runner), so no floor holds it; the part git does NOT ignore
+    // is the same everywhere, and it is the population proved live below. It
+    // is a subset of `asked`, so an empty `asked` is empty here and refused.
+    expect(
+      Object.fromEntries(asked.map((path) => [path, answers[path]])),
+    ).toEqual(
+      Object.fromEntries(asked.map((path) => [path, ignored.has(path)])),
+    );
+    const kept = asked.filter((path) => !ignored.has(path));
+    const wrong = kept.filter((path) => answers[path] !== false);
+    expect(searched(wrong, { of: kept, what: 'unignored questions' })).toEqual(
       [],
     );
     expect(
-      floorBreach('tree-reading/fresh-ignore-questions', asked.length),
+      floorBreach('tree-reading/fresh-unignored-questions', kept.length),
     ).toBeUndefined();
   });
 
