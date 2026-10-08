@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
  * process it starts inherits it. A unit test that ran `git init` and `git
  * config` in a temp directory under that hook acted on the real repository:
  * it set `core.bare`, appended a fixture identity, and moved `develop`.
- * `tests/unit/scratch-git-home.test.ts` holds every such call to this file.
+ * `tests/guards/scratch-git-home.test.ts` holds every such call to this file.
  */
 
 let listed: string[] | undefined;

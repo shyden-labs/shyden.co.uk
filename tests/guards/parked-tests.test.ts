@@ -3,9 +3,9 @@ import {
   declarationsRead,
   expectNothingFound,
   type Reading,
-} from './spec-scan';
+} from '../unit/spec-scan';
 import ts from 'typescript';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import { declarationsIn, type Declaration } from '../playwright-declarations';
 
 /**

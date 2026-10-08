@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { expectNothingFound, type Reading } from './spec-scan';
+import { expectNothingFound, type Reading } from '../unit/spec-scan';
 import ts from 'typescript';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import { callsIn, lineOf } from '../playwright-declarations';
-import { withoutTsComments } from './source-text';
+import { withoutTsComments } from '../unit/source-text';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 

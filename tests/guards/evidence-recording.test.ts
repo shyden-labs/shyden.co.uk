@@ -17,9 +17,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { withoutTsComments } from './source-text';
+import { withoutTsComments } from '../unit/source-text';
 import { specFilesUnder, searched, nonEmpty } from '../source-files';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import {
   callsIn,
   declarationsIn,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 

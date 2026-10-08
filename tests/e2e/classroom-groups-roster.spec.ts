@@ -323,7 +323,7 @@ test.describe('absence', () => {
  *    `addSeveral`, the established correction this file's own Task 3
  *    section already made once for the identical reason.
  *  - Every test that resizes the viewport carries `@emulated-viewport`
- *    (global-constraints.md; tests/unit/viewport-tagging.test.ts is a hard
+ *    (global-constraints.md; tests/guards/viewport-tagging.test.ts is a hard
  *    guard on it), which the brief's own snippet does not carry on any of
  *    its tests -- none of the brief's own six actually resize the
  *    viewport, so none needed it; the tag only appears below on the tests
@@ -1621,7 +1621,7 @@ test.describe('Indonesian', () => {
  *  - Every test that calls `page.setViewportSize` is tagged
  *    `@emulated-viewport`, per this stage's own global-constraints.md
  *    ("Any test that resizes the viewport must be tagged") -- the brief's
- *    literal code has no tag, which `tests/unit/viewport-tagging.test.ts`
+ *    literal code has no tag, which `tests/guards/viewport-tagging.test.ts`
  *    (a hard guard, not a style preference) would fail on: a real phone
  *    cannot resize itself, so an untagged resize test would run, and fail
  *    for a false reason, on `android-chrome`/`ios-safari`.

@@ -14,7 +14,7 @@
  * the page, and the iOS leg sends `(${measureTypedFields})()` down a WebDriver
  * wire. So it closes over nothing and this module imports nothing: a binding
  * from outside would type-check here and be `undefined` there.
- * `tests/unit/typed-fields.test.ts` holds both properties.
+ * `tests/guards/typed-fields.test.ts` holds both properties.
  */
 
 /** Below this computed font-size, focusing a field makes iOS zoom the page. */

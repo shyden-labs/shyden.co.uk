@@ -1,9 +1,13 @@
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { callsIn } from '../playwright-declarations';
-import { parseSource } from './ast';
-import { blankCommentLines } from './source-text';
-import { expectNothingFound, type Analyze, type Liveness } from './spec-scan';
+import { parseSource } from '../unit/ast';
+import { blankCommentLines } from '../unit/source-text';
+import {
+  expectNothingFound,
+  type Analyze,
+  type Liveness,
+} from '../unit/spec-scan';
 
 /**
  * An evidence capture belongs AFTER the assertion it documents (#261).

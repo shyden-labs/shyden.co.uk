@@ -46,8 +46,13 @@ describe('the guards suite budget', () => {
   });
 
   it('has the repo setup files the unit suite has, so a run is as isolated', () => {
-    expect(guards.test?.setupFiles).toEqual(unit.test?.setupFiles);
-    expect(guards.test?.globalSetup).toEqual(unit.test?.globalSetup);
+    expect({
+      setup: guards.test?.setupFiles,
+      global: guards.test?.globalSetup,
+    }).toEqual({
+      setup: unit.test?.setupFiles,
+      global: unit.test?.globalSetup,
+    });
   });
 
   it('is run by npm test, after the unit suite', () => {

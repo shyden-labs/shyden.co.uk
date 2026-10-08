@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
-import { parseSource } from './ast';
-import { astroCodeViews, withoutTsComments } from './source-text';
+import { parseSource } from '../unit/ast';
+import { astroCodeViews, withoutTsComments } from '../unit/source-text';
 import { floorBreach } from '../floors';
 
 /**

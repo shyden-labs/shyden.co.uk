@@ -9,8 +9,8 @@ import {
 } from '../playwright-declarations';
 import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
-import { parseSource } from './ast';
-import { withoutTsComments } from './source-text';
+import { parseSource } from '../unit/ast';
+import { withoutTsComments } from '../unit/source-text';
 import { floorBreach } from '../floors';
 
 /**

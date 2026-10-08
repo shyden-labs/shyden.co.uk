@@ -3,8 +3,8 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { searched, specFilesUnder } from '../source-files';
 import { floorBreach } from '../floors';
-import { parseFile, parseSource } from './ast';
-import { withoutAstroComments, withoutTsComments } from './source-text';
+import { parseFile, parseSource } from '../unit/ast';
+import { withoutAstroComments, withoutTsComments } from '../unit/source-text';
 
 /**
  * An expectation may not be satisfiable by the page's own shipped markup.

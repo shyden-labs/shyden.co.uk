@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { filesUnder, nonEmpty, searched } from '../source-files';
-import { codeWithoutComments } from './source-text';
+import { codeWithoutComments } from '../unit/source-text';
 import {
   SHYTALK_MARK,
   asComputedRgb,
@@ -27,7 +27,7 @@ import { floorBreach } from '../floors';
  * spelling is a copy, and copies are what make a rebrand expensive.
  */
 const HOME = 'src/lib/shytalk-brand.ts';
-const PIN = 'tests/unit/shytalk-brand.test.ts';
+const PIN = 'tests/guards/shytalk-brand.test.ts';
 const ALLOWED = new Set([HOME, PIN]);
 const SCAN = ['src', 'tests'];
 

@@ -18,7 +18,7 @@ import {
   parseFile,
   parseSource,
   where,
-} from './ast';
+} from '../unit/ast';
 
 /**
  * An absence assertion must prove its POPULATION was live (#118).

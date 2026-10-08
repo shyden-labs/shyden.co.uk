@@ -197,7 +197,7 @@ for (const theme of THEMES)
     const boxes = page.locator('input[type="checkbox"], input[type="radio"]');
     // Liveness: an empty list and a correct one both report zero offenders.
     // Written as a locator assertion rather than `expect(await boxes.count())`
-    // because that is the form tests/unit/event-collectors.test.ts recognises,
+    // because that is the form tests/guards/event-collectors.test.ts recognises,
     // and a proof a guard cannot see is not a proof.
     await expect(boxes.first()).toBeVisible();
     await emulateTheme(page, theme);

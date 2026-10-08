@@ -619,7 +619,7 @@ function isIosPresent() {
 
 /**
  * The `--grep` pattern that SELECTS what `android-chrome`'s `grepInvert` excludes. Declared
- * once and used for the listing and both messages; tests/unit/excluded-by-design.test.ts holds
+ * once and used for the listing and both messages; tests/guards/excluded-by-design.test.ts holds
  * it to the config's `grepInvert`, character for character. It was once two hand-typed copies,
  * and this one missed `@requires-download-bytes` for as long as that tag existed (#308).
  */

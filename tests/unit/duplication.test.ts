@@ -82,7 +82,7 @@ const CROSS_CHECK_STAYS_IN_ITS_GUARD =
  */
 const SEPARATE: ReadonlyMap<string, string> = new Map([
   [
-    "tests/unit/absence-liveness.test.ts:it('walks every .ts file git has under tests/')  <->  tests/unit/anchored-presence.test.ts:it('walks every .ts file git has under tests/')",
+    "tests/guards/absence-liveness.test.ts:it('walks every .ts file git has under tests/')  <->  tests/guards/anchored-presence.test.ts:it('walks every .ts file git has under tests/')",
     CROSS_CHECK_STAYS_IN_ITS_GUARD,
   ],
   [

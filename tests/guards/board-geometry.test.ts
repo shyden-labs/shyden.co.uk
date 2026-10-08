@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { measureBoard, measureBoardScript } from '../board-geometry';
 import { floorBreach } from '../floors';
 import { searched, tsFilesUnder } from '../source-files';
-import { expectClosesOverNothing } from './closes-over-nothing';
-import { withoutTsComments } from './source-text';
+import { expectClosesOverNothing } from '../unit/closes-over-nothing';
+import { withoutTsComments } from '../unit/source-text';
 
 /**
  * The board measurement is serialised into two runtimes, so it is guarded here.

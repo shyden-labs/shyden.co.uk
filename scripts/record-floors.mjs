@@ -1,7 +1,8 @@
 /**
  * Record the guards' liveness floors (#468): `npm run floors:record`.
  *
- * Runs the unit suite and then the integration suite (#630) with
+ * Runs the unit suite, then the guards suite (#638), then the integration
+ * suite (#630) with
  * `FLOORS_RECORD` set, so every `floorBreach` call
  * writes the count it saw instead of judging it (`tests/floors.ts`), then the
  * Playwright specs that call it, on every project, in the pinned image CI
@@ -52,6 +53,7 @@ import { die, messageOf, nonEmpty } from './errors.mjs';
 import { containerArgs, localImage } from './playwright-image.mjs';
 
 const UNIT = 'unit suite';
+const GUARDS = 'guards suite';
 const INTEGRATION = 'integration suite';
 const PLAYWRIGHT = 'Playwright run';
 const FUNCTIONS = 'functions suite';
@@ -59,23 +61,29 @@ const UNIT_ONLY = '--unit';
 const FUNCTIONS_ONLY = '--functions';
 
 /**
- * The integration suite's command, read from the `test:integration` script
- * that carries its one limit (#630), so the record run and CI cannot differ
- * on it. Refuses a script of another shape rather than guessing.
+ * A suite's command, read from the `test:<name>` script that carries its one
+ * limit (#630, #638), so the record run and CI cannot differ on it. Refuses a
+ * script of another shape rather than guessing.
+ *
+ * @param {string} name `integration` or `guards`
  */
-export const integrationArguments = () => {
+const suiteArguments = (name) => {
   const { scripts } = JSON.parse(
     readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
   );
   const match = /^vitest run( --[\w-]+(?:[= ][\w.-]+)?)+$/.exec(
-    scripts?.['test:integration'] ?? '',
+    scripts?.[`test:${name}`] ?? '',
   );
   if (match === null)
     die(
-      'package.json has no test:integration script of the shape vitest run --flag…',
+      `package.json has no test:${name} script of the shape vitest run --flag…`,
     );
-  return scripts['test:integration'].split(' ');
+  return scripts[`test:${name}`].split(' ');
 };
+
+export const integrationArguments = () => suiteArguments('integration');
+
+export const guardsArguments = () => suiteArguments('guards');
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -105,7 +113,7 @@ const FUNCTIONS_DIR = 'tests/functions';
  * The Playwright specs that call `floorBreach`, which the record run is
  * limited to: every other spec would cost minutes and record nothing. Read
  * from each spec's text, so one that names the function only in a comment
- * runs for nothing; `tests/unit/floors.test.ts` holds this list equal to the
+ * runs for nothing; `tests/guards/floors.test.ts` holds this list equal to the
  * specs whose parse tree calls it. `FUNCTIONS_DIR` is read the same way (#610).
  *
  * @param {string} [dir]
@@ -491,6 +499,16 @@ const main = () => {
             }),
           );
           if (unitRefusal !== undefined) return unitRefusal;
+          // The guards suite asserts most of the floors (#638), so it runs into
+          // the same record, with the limit its own script carries.
+          const guardsRefusal = runRefusal(
+            GUARDS,
+            spawnSync('npx', guardsArguments(), {
+              stdio: 'inherit',
+              env: { ...env, [RECORD_ENV]: unit },
+            }),
+          );
+          if (guardsRefusal !== undefined) return guardsRefusal;
           // The integration suite asserts floors too (#630), so it runs into
           // the same record, with the limit its own script carries.
           const integrationRefusal = runRefusal(
