@@ -57,7 +57,7 @@ describe('waitUntil: the timeout bounds the whole wait', () => {
       'Timed out after 50ms waiting for: a request the server accepted and never answered',
     );
     expect(Date.now() - started).toBeLessThan(1_000);
-  }, 2_000);
+  });
 
   it('answers the predicate’s own value, not a boolean', async () => {
     const answer = { ok: true };

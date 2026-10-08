@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config';
+import { SHARED_SETUP } from './tests/setup-files';
 
 /**
  * The integration suite (#630): every test that starts a process (a script run
@@ -14,7 +15,7 @@ import unit from './vitest.config';
 export default defineConfig({
   test: {
     include: ['tests/integration/**/*.test.ts'],
-    setupFiles: unit.test?.setupFiles,
+    setupFiles: [...SHARED_SETUP],
     globalSetup: unit.test?.globalSetup,
   },
 });

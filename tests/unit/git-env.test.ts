@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localGitVars, withoutLocalGit } from '../git-env';
+import { LOCAL_GIT_VARS, localGitVars, withoutLocalGit } from '../git-env';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 
@@ -41,5 +41,15 @@ describe('the variables that point git at one repository (#377)', () => {
       ),
     ).toEqual([]);
     expect(floorBreach('git-env/local-git-vars', vars.length)).toBeUndefined();
+  });
+
+  // The list is asked of git once per run, in global setup, and handed to the
+  // workers through the environment (#632): a worker's setup file starts no
+  // process, so it can sit beside the setup that refuses every process.
+  it('reach the worker from the run, which asked git once', () => {
+    expect(process.env[LOCAL_GIT_VARS]).toBeDefined();
+    const handed = JSON.parse(process.env[LOCAL_GIT_VARS] ?? '[]') as string[];
+    expect(handed).toContain('GIT_DIR');
+    expect(localGitVars()).toEqual(handed);
   });
 });
