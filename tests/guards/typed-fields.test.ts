@@ -9,8 +9,8 @@ import {
   measureTypedFields,
   measureTypedFieldsScript,
 } from '../typed-fields';
-import { expectClosesOverNothing } from './closes-over-nothing';
-import { withoutTsComments } from './source-text';
+import { expectClosesOverNothing } from '../unit/closes-over-nothing';
+import { withoutTsComments } from '../unit/source-text';
 
 /**
  * The typed-field measurement is serialised into two runtimes, the emulated

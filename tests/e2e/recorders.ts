@@ -3,7 +3,7 @@ import { searched } from '../source-files';
 
 /**
  * Browser-event recorders — the only place in the suite that subscribes to a
- * collected event. `tests/unit/event-collectors.test.ts` fails if a spec
+ * collected event. `tests/guards/event-collectors.test.ts` fails if a spec
  * hand-rolls one.
  *
  * WHY A HOME AT ALL. A collected event reaches Node asynchronously over the

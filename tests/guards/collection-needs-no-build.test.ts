@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { bind, bindFiles, derivationOf, where, type Bound } from './ast';
+import { bind, bindFiles, derivationOf, where, type Bound } from '../unit/ast';
 import { searched, tsFilesUnder } from '../source-files';
 import { floorBreach } from '../floors';
 

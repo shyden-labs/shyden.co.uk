@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { declaredName, parseSource } from './ast';
-import { withoutTsComments } from './source-text';
+import { declaredName, parseSource } from '../unit/ast';
+import { withoutTsComments } from '../unit/source-text';
 import { filesUnder } from '../source-files';
 import { floorBreach } from '../floors';
 
@@ -82,7 +82,7 @@ describe('comment stripping has exactly one home', () => {
       // The detector itself: the one other file that must name comment
       // syntax, in order to find it anywhere else. Renamed from
       // `stripper-homes.test.ts` in #80, when it grew a second rule.
-      'tests/unit/one-home.test.ts',
+      'tests/guards/one-home.test.ts',
       // The suite that proves the strippers work: it must quote the very
       // markers they remove, or it would be asserting on nothing.
       'tests/unit/source-text.test.ts',
@@ -166,11 +166,11 @@ describe('walking a directory tree has exactly one home', () => {
         definesADirectoryWalker(readFileSync(path, 'utf8')),
       ),
     ).toEqual([
-      // The shared home. Every scan in the suite recurses through here.
-      'tests/source-files.ts',
       // The detector itself: the one other file that must name the syntax,
       // in order to find it anywhere else.
-      'tests/unit/one-home.test.ts',
+      'tests/guards/one-home.test.ts',
+      // The shared home. Every scan in the suite recurses through here.
+      'tests/source-files.ts',
     ]);
   });
 
@@ -400,12 +400,12 @@ describe('a directory read cannot reach a guard unproved', () => {
         readsADirectoryUnproved(readFileSync(path, 'utf8')),
       ),
     ).toEqual([
+      // The detector's own fixtures, which have to spell the syntax out in
+      // order to prove the detector catches it.
+      'tests/guards/one-home.test.ts',
       // The recursion. An empty sub-result is ordinary here and must stay
       // that way, so the proof belongs to the exported top-level form.
       'tests/source-files.ts',
-      // The detector's own fixtures, which have to spell the syntax out in
-      // order to prove the detector catches it.
-      'tests/unit/one-home.test.ts',
     ]);
   });
 

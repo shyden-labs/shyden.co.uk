@@ -11,7 +11,7 @@
  * So the names live HERE, once, and every consumer imports them --
  * `tests/e2e/evidence.ts` writes the manifest, `scripts/test-e2e.mjs` writes
  * the report, `scripts/build-evidence-page.mjs` reads both.
- * `tests/unit/evidence-page.test.ts` asserts no consumer spells either name
+ * `tests/guards/evidence-page.test.ts` asserts no consumer spells either name
  * for itself, derived from the filesystem rather than a list, because a
  * filename spelled twice is two filenames the day one of them moves.
  *
@@ -152,7 +152,7 @@ export const captureFile = ({ project, title, order, label, ext }) => {
  * `scripts/build-evidence-page.mjs` tells them apart: a run's rows are the ones
  * stamped once its report's `stats.startTime` had passed.
  *
- * PURE, with the clock as an argument, so `tests/unit/evidence-page.test.ts`
+ * PURE, with the clock as an argument, so `tests/guards/evidence-page.test.ts`
  * feeds the builder rows this function wrote rather than a copy of their shape.
  *
  * @param {Capture} capture

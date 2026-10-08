@@ -100,8 +100,9 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     [
       `#!${process.execPath}`,
       "const { appendFileSync, readFileSync } = require('node:fs');",
-      // The recorder runs the integration suite after this one (#630): that
-      // run is a second `npx vitest run` with --config, and asserts nothing here.
+      // The recorder runs the guards suite (#638) and the integration suite
+      // (#630) after this one: each is another `npx vitest run` with --config,
+      // and asserts nothing here.
       "if (process.argv.includes('--config')) process.exit(0);",
       "const floors = JSON.parse(readFileSync('tests/floors.json', 'utf8'));",
       "const site = 'tests/unit/a.test.ts:1';",
@@ -204,6 +205,37 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.stdout).toBe('');
   });
 
+  it('runs the guards suite after the unit suite, with the limit its own script carries (#638)', () => {
+    const run = recordWith({ npx: '#!/bin/sh\necho "ran: $*"\nexit 0\n' }, [
+      '--unit',
+    ]);
+    const script = (
+      JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts['test:guards'];
+    expect(
+      run.stdout.split('\n').filter((line) => line.startsWith('ran: ')),
+    ).toEqual([
+      'ran: vitest run',
+      `ran: ${script}`,
+      expect.stringContaining('vitest.integration.config.ts'),
+    ]);
+  });
+
+  it('refuses a guards suite that failed, naming it (#638)', () => {
+    const run = recordWith(
+      {
+        npx: '#!/bin/sh\nfor a; do [ "$a" = vitest.guards.config.ts ] && exit 5; done\nexit 0\n',
+      },
+      ['--unit'],
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the guards suite failed in record mode (exit 5): nothing recorded\n',
+    );
+  });
+
   it('runs the integration suite after the unit suite, with the limit its own script carries (#630)', () => {
     const run = recordWith({ npx: '#!/bin/sh\necho "ran: $*"\nexit 0\n' }, [
       '--unit',
@@ -215,13 +247,17 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     ).scripts['test:integration'];
     expect(
       run.stdout.split('\n').filter((line) => line.startsWith('ran: ')),
-    ).toEqual(['ran: vitest run', `ran: ${script}`]);
+    ).toEqual([
+      'ran: vitest run',
+      expect.stringContaining('vitest.guards.config.ts'),
+      `ran: ${script}`,
+    ]);
   });
 
   it('refuses an integration suite that failed, naming it (#630)', () => {
     const run = recordWith(
       {
-        npx: '#!/bin/sh\nfor a; do [ "$a" = --config ] && exit 4; done\nexit 0\n',
+        npx: '#!/bin/sh\nfor a; do [ "$a" = vitest.integration.config.ts ] && exit 4; done\nexit 0\n',
       },
       ['--unit'],
     );

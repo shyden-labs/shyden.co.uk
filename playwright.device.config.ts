@@ -59,13 +59,13 @@ export default defineConfig({
       testIgnore: VISUAL_PROJECT.testMatch,
       // A real phone has one screen: `page.setViewportSize`/`test.use({ viewport })`
       // would "succeed" against CDP and report numbers describing nothing physical
-      // (see tests/unit/viewport-tagging.test.ts, which is what keeps every such
+      // (see tests/guards/viewport-tagging.test.ts, which is what keeps every such
       // test actually carrying this tag). Scoped to this project alone -- the
       // preflight project runs exactly one setup file that never touches the
       // viewport, and must not be affected by a grep option meant for the suite.
       //
       // `@requires-isolated-context` is the second, structurally identical exclusion
-      // (tests/unit/isolated-context-tagging.test.ts is what keeps every such test tagged):
+      // (tests/guards/isolated-context-tagging.test.ts is what keeps every such test tagged):
       // `test.use({ javaScriptEnabled: false })` only takes effect on a context Playwright
       // itself creates fresh. The real device has exactly ONE adopted context for the whole
       // run (`browser.newContext()` measured to fail against it -- "Protocol error

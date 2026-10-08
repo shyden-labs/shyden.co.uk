@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { floorBreach, readFloors, FLOORS_FILE, RECORD_ENV } from '../floors';
 import { searched, specFilesUnder } from '../source-files';
-import { parseFile } from './ast';
+import { parseFile } from '../unit/ast';
 import {
   decideRecord,
   describeMoves,
@@ -97,7 +97,9 @@ describe('floorBreach', () => {
         .trimEnd()
         .split('\n')
         .map((line) => JSON.parse(line) as Record<string, unknown>);
-      const here = expect.stringMatching(/^tests\/unit\/floors\.test\.ts:\d+$/);
+      const here = expect.stringMatching(
+        /^tests\/guards\/floors\.test\.ts:\d+$/,
+      );
       expect(lines).toEqual([
         { id: 'guard/units', actual: 12, site: here },
         { id: 'guard/new', actual: 3, site: here },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import {
   filesUnder,
   searched,
@@ -16,6 +16,7 @@ import {
 } from '../one-test-per-case';
 import { declaresTests, testsWritten } from '../playwright-declarations';
 import { floorBreach } from '../floors';
+import { inFixtureTestDir } from '../vitest-suite-dirs';
 
 /**
  * One test per case (operator, 2026-10-02; #417).
@@ -240,7 +241,7 @@ const sharedStateful = () =>
       (path) =>
         path.endsWith('.ts') &&
         !path.endsWith('.spec.ts') &&
-        !path.startsWith('tests/unit/'),
+        !inFixtureTestDir(path),
     ).map(parsed),
   );
 

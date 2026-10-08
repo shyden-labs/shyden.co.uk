@@ -12,7 +12,7 @@ import {
 import { floorBreach } from '../floors';
 import { trackedFiles } from '../source-files';
 import { treeReading } from '../tree-reading';
-import { withoutTsComments, withoutYamlComments } from './source-text';
+import { withoutTsComments, withoutYamlComments } from '../unit/source-text';
 
 describe('which paths are documentation alone', () => {
   it.each([
@@ -81,7 +81,7 @@ const isProse = (path: string): boolean => /\.md$/i.test(path);
  */
 const ALLOWLIST_HOMES = [
   'scripts/docs-only.mjs',
-  'tests/unit/docs-only.test.ts',
+  'tests/guards/docs-only.test.ts',
   'tests/integration/docs-only.test.ts',
 ] as const;
 const codeFiles = (): string[] =>

@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { releaseTests } from '../../scripts/release-inventory.mjs';
 import { searched, trackedFiles } from '../source-files';
-import { withoutTsComments } from './source-text';
-import { parseSource } from './ast';
+import { withoutTsComments } from '../unit/source-text';
+import { parseSource } from '../unit/ast';
 import { callsIn } from '../playwright-declarations';
 import { floorBreach } from '../floors';
+import { inFixtureTestDir } from '../vitest-suite-dirs';
 
 describe('the capture selection (#362)', () => {
   const sources: Record<string, string> = {
@@ -78,7 +79,7 @@ describe('release-inventory.mjs as a command (#362)', () => {
     trackedFiles(
       (path) =>
         path.startsWith('tests/') &&
-        !path.startsWith('tests/unit/') &&
+        !inFixtureTestDir(path) &&
         /\.(ts|mjs|js)$/.test(path) &&
         !path.endsWith('.spec.ts'),
     );

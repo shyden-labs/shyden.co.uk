@@ -6,9 +6,15 @@ import {
   searched,
   walkDisagreements,
 } from '../source-files';
-import { bind, bindFiles, callGraph, parseFile, type Closure } from './ast';
-import { presenceOverRawText } from './presence-text';
-import { scanPresence, type PresenceClosures } from './presence-detector';
+import {
+  bind,
+  bindFiles,
+  callGraph,
+  parseFile,
+  type Closure,
+} from '../unit/ast';
+import { presenceOverRawText } from '../unit/presence-text';
+import { scanPresence, type PresenceClosures } from '../unit/presence-detector';
 import { floorBreach } from '../floors';
 /**
  * A presence assertion over source text must be STRIPPED or ANCHORED.

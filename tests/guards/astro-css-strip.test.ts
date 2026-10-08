@@ -8,7 +8,7 @@ import {
   cssComments,
   stylesheetCss,
   withoutTsComments,
-} from './source-text';
+} from '../unit/source-text';
 
 /**
  * A guard that reads an `.astro` file reads its CSS as CSS (#203).

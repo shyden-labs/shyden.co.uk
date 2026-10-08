@@ -9,7 +9,7 @@ import { floorBreach } from '../floors';
  * The recorder tells two call sites apart by the `file:line` the stack names,
  * and Playwright compiles a spec before it runs it, so a line that came out
  * of the compiled code instead of the source would let two floors share an id
- * unseen, or split one in two. `tests/unit/floors.test.ts` proves the record
+ * unseen, or split one in two. `tests/guards/floors.test.ts` proves the record
  * under vitest; this proves it under the runner the e2e floors use, against
  * the line read from this file's own text rather than from another stack.
  */

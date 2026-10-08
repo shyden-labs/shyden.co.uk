@@ -12,6 +12,7 @@
     "preview": "ASTRO_PREVIEW_BACKGROUND=1 astro preview",
     "typecheck": "astro check",
     "test:unit": "vitest run",
+    "test:guards": "vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=25000",
     "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose --testTimeout=30000",
     "floors:record": "node scripts/record-floors.mjs",
     "test:e2e": "node scripts/test-e2e.mjs",
@@ -25,7 +26,7 @@
     "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
     "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
-    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test": "npm run test:unit && npm run test:guards && npm run test:integration && npm run test:e2e",
     "format": "prettier --check .",
     "i18n:scaffold": "node scripts/i18n-scaffold.mjs",
     "prepare": "node scripts/install-hooks.mjs"

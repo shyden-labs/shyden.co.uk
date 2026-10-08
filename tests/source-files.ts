@@ -14,7 +14,7 @@ import { treeReading } from './tree-reading';
  * four hand-written `[tests/e2e, tests/device]` lists left the deploy gates
  * unscanned.
  *
- * `tests/unit/one-home.test.ts` fails if a tenth appears.
+ * `tests/guards/one-home.test.ts` fails if a tenth appears.
  */
 
 /**

@@ -13,7 +13,7 @@
  * both callers serialise it: Playwright ships the function source into the
  * page, and the iOS leg sends `(${measureBoard})()` down the wire. A reference
  * to an import would survive type-checking here and be `undefined` in the
- * browser -- which is why `tests/unit/board-geometry.test.ts` asserts the
+ * browser -- which is why `tests/guards/board-geometry.test.ts` asserts the
  * serialised text still carries the real selectors.
  *
  * Visibility is judged by `getClientRects().length`, never by an element's own

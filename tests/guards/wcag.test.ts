@@ -10,7 +10,7 @@ import {
   parseColour,
   type RGB,
 } from '../wcag';
-import { declaredName, parseSource } from './ast';
+import { declaredName, parseSource } from '../unit/ast';
 import { floorBreach } from '../floors';
 
 /** The sRGB transfer curve's constants: the linear slope, then the curve's. */

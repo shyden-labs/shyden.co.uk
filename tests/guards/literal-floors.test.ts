@@ -9,8 +9,8 @@ import {
   tsFilesUnder,
   walkDisagreements,
 } from '../source-files';
-import { parseFile, parseSource, stringTextsIn } from './ast';
-import { withoutTsComments } from './source-text';
+import { parseFile, parseSource, stringTextsIn } from '../unit/ast';
+import { withoutTsComments } from '../unit/source-text';
 
 /**
  * A liveness floor written as a literal is tight only on the day it is

@@ -168,7 +168,7 @@ for (const theme of THEMES) {
     for (const { label, viewport } of WIDTHS) {
       // `test.use({ viewport })` resizes every test in this group, and a real
       // phone has one screen: the tag is what keeps android-chrome from running
-      // them (tests/unit/viewport-tagging.test.ts, #218).
+      // them (tests/guards/viewport-tagging.test.ts, #218).
       test.describe(
         `${label} @${viewport.width}px`,
         { tag: '@emulated-viewport' },

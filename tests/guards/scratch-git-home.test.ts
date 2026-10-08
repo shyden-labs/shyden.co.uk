@@ -2,7 +2,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { searched, trackedFiles } from '../source-files';
 import { floorBreach } from '../floors';
-import { parseFile, where } from './ast';
+import { parseFile, where } from '../unit/ast';
 
 /**
  * Git runs in a scratch repository through `tests/git-env.ts` alone (#377).

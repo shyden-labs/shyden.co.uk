@@ -3,9 +3,9 @@ import {
   declarationsRead,
   expectNothingFound,
   type Reading,
-} from './spec-scan';
+} from '../unit/spec-scan';
 import ts from 'typescript';
-import { parseSource } from './ast';
+import { parseSource } from '../unit/ast';
 import {
   declarationsIn,
   enclosingDeclaration,
@@ -26,7 +26,7 @@ import {
  * `@requires-isolated-context` tag so `android-chrome`'s own `grepInvert`
  * (playwright.device.config.ts) excludes it, the same "physically
  * impossible on one real device" treatment `@emulated-viewport` already
- * gets for the screen (tests/unit/viewport-tagging.test.ts). This file is
+ * gets for the screen (tests/guards/viewport-tagging.test.ts). This file is
  * what keeps that true: an exclusion list nobody checks rots the moment
  * someone adds a test.
  *

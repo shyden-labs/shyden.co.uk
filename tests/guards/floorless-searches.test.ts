@@ -13,7 +13,7 @@ import {
   tsFilesUnder,
   walkDisagreements,
 } from '../source-files';
-import { parseFile, parseSource } from './ast';
+import { parseFile, parseSource } from '../unit/ast';
 
 /**
  * Every discovery guard that asserts absence through `searched` checks a

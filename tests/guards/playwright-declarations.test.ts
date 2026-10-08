@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFile, parseSource, where } from './ast';
+import { parseFile, parseSource, where } from '../unit/ast';
 import { specDirs } from '../spec-dirs';
 import { searched, tsFilesUnder } from '../source-files';
 import { floorBreach } from '../floors';

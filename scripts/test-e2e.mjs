@@ -450,7 +450,7 @@ export function reconcile({
  * in a temp directory and was deleted. So the single switch that turns on
  * captures and video now also decides where the report lands.
  *
- * PURE, so `tests/unit/evidence-page.test.ts` can assert the seam without
+ * PURE, so `tests/guards/evidence-page.test.ts` can assert the seam without
  * running Playwright: the caller creates the directory.
  */
 export function reportLocation(env = process.env) {

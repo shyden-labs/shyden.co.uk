@@ -5,7 +5,7 @@
  * fired the test timeout, so the gauntlet hangs with nothing to say why. Here
  * a call that runs past its deadline is stopped, and the error names the
  * command. `scripts/adb.mjs` and `scripts/devicectl.mjs` are its callers;
- * `tests/unit/device-tool-homes.test.ts` refuses any other file that runs
+ * `tests/guards/device-tool-homes.test.ts` refuses any other file that runs
  * either tool.
  */
 
