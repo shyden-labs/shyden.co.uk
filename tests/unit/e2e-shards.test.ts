@@ -17,6 +17,8 @@ import {
   RUN_WHEN_DOCS_ONLY,
   SKIPPED_WHEN_DOCS_ONLY,
 } from '../../scripts/docs-only.mjs';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * `build-and-test` passing must still mean what it meant before the suite was
@@ -154,7 +156,13 @@ describe('shardAccount: what a shard writes down about its own run', () => {
   it('is an account the verdict accepts, filed under its own name', () => {
     const recorded = shardAccount({ argv: ['--shard=1/1'], ...measured });
     expect(recorded?.file).toBe('e2e-account-1-of-1.json');
-    expect(accountFindings([recorded?.account])).toEqual([]);
+    const accounts = [recorded?.account];
+    expect(
+      searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/round-trip-accounts', accounts.length),
+    ).toBeUndefined();
   });
 
   it('carries what the run measured, not what it was meant to', () => {
@@ -216,7 +224,16 @@ describe('needsFindings: every job build-and-test stands for succeeded', () => {
   });
 
   it('has nothing to say when every job succeeded', () => {
-    expect(needsFindings(needs('success'))).toEqual([]);
+    const jobs = needs('success');
+    expect(
+      searched(needsFindings(jobs), {
+        of: Object.values(jobs),
+        what: 'jobs build-and-test stands for',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/succeeded-jobs', Object.values(jobs).length),
+    ).toBeUndefined();
   });
 
   // `skipped` is the dangerous one: a skipped required check is reported to
@@ -317,7 +334,16 @@ describe('isDocsOnlyRun: whether the scope job said docs-only', () => {
 
 describe('docsOnlyFindings: a docs-only pull request skipped exactly what it may', () => {
   it('has nothing to say when the skipped jobs were skipped and the rest succeeded', () => {
-    expect(docsOnlyFindings(docsOnlyNeeds(), [])).toEqual([]);
+    const jobs = docsOnlyNeeds();
+    expect(
+      searched(docsOnlyFindings(jobs, []), {
+        of: Object.values(jobs),
+        what: 'jobs build-and-test stands for',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/docs-only-jobs', Object.values(jobs).length),
+    ).toBeUndefined();
   });
 
   it.each(
@@ -396,7 +422,13 @@ describe('docsOnlyFindings: a docs-only pull request skipped exactly what it may
 
 describe('accountFindings: the shards add up to the suite', () => {
   it('has nothing to say when four shards ran exactly the enumerated suite', () => {
-    expect(accountFindings(whole())).toEqual([]);
+    const accounts = whole();
+    expect(
+      searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/whole-suite-accounts', accounts.length),
+    ).toBeUndefined();
   });
 
   it('refuses a total one short, and says by how much', () => {

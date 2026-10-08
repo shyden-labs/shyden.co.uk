@@ -10,6 +10,8 @@ import {
   NAV_TIMING_REPORTER,
   enumerationArgs,
 } from '../../scripts/test-e2e.mjs';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * A green e2e run must mean the whole suite ran, not that some of it did.
@@ -385,16 +387,36 @@ describe('what the enumeration is allowed to inherit', () => {
     // `--project` shrinks the enumeration to exactly what the run executes, so
     // the two always agree and the guard can never fire again — while still
     // appearing to be present and passing.
+    const argv = ['--project=chromium', '--grep=@smoke', '--shard=1/3'];
     expect(
-      enumerationArgs(['--project=chromium', '--grep=@smoke', '--shard=1/3']),
+      searched(enumerationArgs(argv), {
+        of: argv.filter((arg) => arg.startsWith('-')),
+        what: 'flags offered to the enumeration',
+      }),
       'the total must describe the whole suite, not the slice being run',
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'e2e-reconciliation/filter-flags',
+        argv.filter((arg) => arg.startsWith('-')).length,
+      ),
+    ).toBeUndefined();
   });
 
   it('ignores flags that change neither the suite nor its size', () => {
+    const argv = ['--workers=2', '--headed', '--retries', '1'];
     expect(
-      enumerationArgs(['--workers=2', '--headed', '--retries', '1']),
+      searched(enumerationArgs(argv), {
+        of: argv.filter((arg) => arg.startsWith('-')),
+        what: 'flags offered to the enumeration',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'e2e-reconciliation/neutral-flags',
+        argv.filter((arg) => arg.startsWith('-')).length,
+      ),
+    ).toBeUndefined();
   });
 });
 

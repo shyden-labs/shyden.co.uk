@@ -4,6 +4,8 @@ import ts from 'typescript';
 import { parseSource } from './ast';
 import { callsIn, lineOf } from '../playwright-declarations';
 import { withoutTsComments } from './source-text';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * A download's bytes are read in ONE place: `downloadText` (tests/e2e/helpers.ts).
@@ -95,6 +97,9 @@ describe('a download’s bytes are read only through downloadText', () => {
 describe('analyze() -- the scanner proven on synthetic input, not just trusted', () => {
   const scanned = (src: string[]) =>
     analyze('synthetic.spec.ts', src.join('\n'));
+  /** Every byte read the scanner judged in the same input. */
+  const judgedIn = (src: string[]) =>
+    read('synthetic.spec.ts', src.join('\n')).judged;
 
   it('flags a spec reading a download with createReadStream, naming file and line', () => {
     const findings = scanned([
@@ -115,9 +120,14 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('accepts a spec that reads through downloadText', () => {
+    const src = ["const text = await downloadText(page, 'Download template');"];
+    const reads = judgedIn(src);
     expect(
-      scanned(["const text = await downloadText(page, 'Download template');"]),
+      searched(scanned(src), { of: reads, what: 'download byte reads' }),
     ).toEqual([]);
+    expect(
+      floorBreach('download-readers/accepted-reads', reads.length),
+    ).toBeUndefined();
   });
 
   it('allows the read inside the home, and only there', () => {
@@ -126,7 +136,13 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '  const stream = await download.createReadStream();',
       '};',
     ];
-    expect(scanned(home)).toEqual([]);
+    const reads = judgedIn(home);
+    expect(
+      searched(scanned(home), { of: reads, what: 'download byte reads' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('download-readers/reads-inside-home', reads.length),
+    ).toBeUndefined();
     const elsewhere = home.map((line) =>
       line.replace('downloadText', 'readItMyself'),
     );
@@ -134,11 +150,17 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('ignores a read written only in a comment or a string', () => {
+    // No call is a read here, so the units the scanner walked are the two
+    // lines it was handed, each naming a direct reader in prose.
+    const lines = [
+      '// never call download.createReadStream() in a spec',
+      "const hint = 'use download.saveAs() only in helpers';",
+    ];
     expect(
-      scanned([
-        '// never call download.createReadStream() in a spec',
-        "const hint = 'use download.saveAs() only in helpers';",
-      ]),
+      searched(scanned(lines), { of: lines, what: 'lines naming a reader' }),
     ).toEqual([]);
+    expect(
+      floorBreach('download-readers/commented-lines', lines.length),
+    ).toBeUndefined();
   });
 });

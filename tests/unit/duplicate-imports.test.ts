@@ -62,6 +62,10 @@ function moduleOf(specifier: string): string {
 const repeatsIn = (text: string, file = 'case.ts'): string[] =>
   readImports(parseSource(text, file)).repeated;
 
+/** The imports the reader judged in the same text: what a repeat is sought among. */
+const importsIn = (text: string, file = 'case.ts'): string[] =>
+  readImports(parseSource(text, file)).read;
+
 /** Each module the file holds: an `.astro` file's frontmatter and scripts are separate programs. */
 function programsOf(path: string, text: string): string[] {
   return path.endsWith('.astro') ? astroCodeViews(text) : [text];
@@ -113,27 +117,48 @@ describe('readImports reads declarations, not text', () => {
   });
 
   it('allows a namespace import beside named ones', () => {
+    const text = "import { a } from './m';\nimport * as m from './m';\n";
+    const imports = importsIn(text);
     expect(
-      repeatsIn("import { a } from './m';\nimport * as m from './m';\n"),
+      searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/namespace-beside-named', imports.length),
+    ).toBeUndefined();
   });
 
   it('allows an import type beside a value import', () => {
+    const text = "import { a } from './m';\nimport type { B } from './m';\n";
+    const imports = importsIn(text);
     expect(
-      repeatsIn("import { a } from './m';\nimport type { B } from './m';\n"),
+      searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/type-beside-value', imports.length),
+    ).toBeUndefined();
   });
 
   it('allows a side-effect import beside a named one', () => {
-    expect(repeatsIn("import './m';\nimport { a } from './m';\n")).toEqual([]);
+    const text = "import './m';\nimport { a } from './m';\n";
+    const imports = importsIn(text);
+    expect(
+      searched(repeatsIn(text), { of: imports, what: 'imports read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/side-effect-beside-named', imports.length),
+    ).toBeUndefined();
   });
 
   it('ignores an import spelled inside a string', () => {
+    const text =
+      "import { a } from './m';\nconst fixture = \"import { b } from './m';\";\n";
+    const imports = importsIn(text);
     expect(
-      repeatsIn(
-        "import { a } from './m';\nconst fixture = \"import { b } from './m';\";\n",
-      ),
+      searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/string-spelled-import', imports.length),
+    ).toBeUndefined();
   });
 
   it("reads an .astro file's frontmatter and script as separate programs", () => {
@@ -147,7 +172,16 @@ describe('readImports reads declarations, not text', () => {
       '</script>',
       '',
     ].join('\n');
-    expect(fileRepeats('case.astro', component)).toEqual([]);
+    const imports = fileImports('case.astro', component).read;
+    expect(
+      searched(fileRepeats('case.astro', component), {
+        of: imports,
+        what: 'imports read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/astro-programs', imports.length),
+    ).toBeUndefined();
     expect(fileRepeats('case.ts', component)).toEqual(['./m']);
   });
 
@@ -160,9 +194,14 @@ describe('readImports reads declarations, not text', () => {
   });
 
   it('keeps different modules apart', () => {
+    const text = "import { a } from './m';\nimport { b } from './n';\n";
+    const imports = importsIn(text);
     expect(
-      repeatsIn("import { a } from './m';\nimport { b } from './n';\n"),
+      searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('duplicate-imports/different-modules', imports.length),
+    ).toBeUndefined();
   });
 });
 

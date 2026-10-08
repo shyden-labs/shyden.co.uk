@@ -82,7 +82,7 @@ export const DUPLICATE_RATIO = 0.85;
 
 const printer = ts.createPrinter({ removeComments: true });
 
-const isComparableFunction = (node: ts.Node): boolean =>
+export const isComparableFunction = (node: ts.Node): boolean =>
   ts.isFunctionDeclaration(node) ||
   ts.isFunctionExpression(node) ||
   ts.isArrowFunction(node) ||

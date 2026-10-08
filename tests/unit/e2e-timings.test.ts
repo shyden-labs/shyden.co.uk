@@ -7,6 +7,8 @@ import {
 } from '../../scripts/test-e2e.mjs';
 import { withoutTsComments } from './source-text';
 import { commentsIn, parseSource } from './ast';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * Where the e2e suite's time actually goes, per project.
@@ -118,7 +120,18 @@ describe('per-project e2e timings', () => {
   });
 
   it('survives a report with no tests rather than dividing by zero', () => {
-    expect(projectTimings(report([]))).toEqual([]);
+    // No test is the point, so the units the reader walked are the report's
+    // suites: one file, holding no spec.
+    const empty = report([]);
+    expect(
+      searched(projectTimings(empty), {
+        of: empty.suites,
+        what: 'suites of the empty report',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-timings/empty-report-suites', empty.suites.length),
+    ).toBeUndefined();
   });
 
   it('formats a table naming the budget each project is measured against', () => {

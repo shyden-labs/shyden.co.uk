@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { dissolvedIn } from '../dissolved-company';
+import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { renderedText } from '../html-text';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * What the site printed about the company before #370, copied from
@@ -81,15 +83,35 @@ describe('dissolvedIn: every form the dissolved company was printed in', () => {
   });
 
   it('reads Ltd as a word, not as letters inside one', () => {
-    expect(dissolvedIn('Altdorf and Ltda.')).toEqual([]);
+    expect(
+      searched(dissolvedIn('Altdorf and Ltda.'), {
+        of: DISSOLVED_COMPANY,
+        what: 'dissolved-company forms',
+      }),
+    ).toEqual([]);
     expect(dissolvedIn('Shyden Ltd.')).toEqual(['Ltd']);
+    expect(
+      floorBreach(
+        'dissolved-company/forms-read-as-words',
+        DISSOLVED_COMPANY.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('passes the copy the site prints today', () => {
     expect(
-      dissolvedIn(
-        'Built for teachers, by Shyden. Questions or problems? support@shyden.co.uk',
+      searched(
+        dissolvedIn(
+          'Built for teachers, by Shyden. Questions or problems? support@shyden.co.uk',
+        ),
+        { of: DISSOLVED_COMPANY, what: 'dissolved-company forms' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'dissolved-company/forms-read-against-current-copy',
+        DISSOLVED_COMPANY.length,
+      ),
+    ).toBeUndefined();
   });
 });

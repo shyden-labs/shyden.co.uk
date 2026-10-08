@@ -3,6 +3,7 @@ import {
   DUPLICATE_RATIO,
   MIN_PRINTED_LENGTH,
   functionBodiesIn,
+  isComparableFunction,
   functionBodiesOf,
   duplicatePairs,
   similarity,
@@ -10,6 +11,7 @@ import {
 } from './duplication';
 import { searched, trackedFiles } from '../source-files';
 import { floorBreach } from '../floors';
+import { nodesIn, parseSource } from './ast';
 
 /**
  * Every file a duplicate could live in, from git rather than a list.
@@ -304,11 +306,34 @@ describe('the scan itself', () => {
         const c = value / 255;
         return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
       };`;
-    expect(duplicatePairs(functionBodiesOf(source, 'a.ts'))).toEqual([]);
+    const bodies = functionBodiesOf(source, 'a.ts');
+    expect(
+      searched(duplicatePairs(bodies), {
+        of: bodies,
+        what: 'function bodies',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('duplication/same-file-bodies', bodies.length),
+    ).toBeUndefined();
   });
 
   it('ignores a body shorter than the floor', () => {
     const source = 'const f = (a: number) => a + 1;';
-    expect(functionBodiesOf(source, 'a.ts')).toEqual([]);
+    // The units the scan weighs against the floor are every function-like node
+    // it meets, before it drops the short ones.
+    const candidates = nodesIn(
+      parseSource(source, 'a.ts'),
+      isComparableFunction,
+    );
+    expect(
+      searched(functionBodiesOf(source, 'a.ts'), {
+        of: candidates,
+        what: 'function-like nodes',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('duplication/short-candidates', candidates.length),
+    ).toBeUndefined();
   });
 });
