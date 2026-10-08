@@ -97,7 +97,9 @@ describe('floorBreach', () => {
         .trimEnd()
         .split('\n')
         .map((line) => JSON.parse(line) as Record<string, unknown>);
-      const here = expect.stringMatching(/^tests\/guards\/floors\.test\.ts:\d+$/);
+      const here = expect.stringMatching(
+        /^tests\/guards\/floors\.test\.ts:\d+$/,
+      );
       expect(lines).toEqual([
         { id: 'guard/units', actual: 12, site: here },
         { id: 'guard/new', actual: 3, site: here },
