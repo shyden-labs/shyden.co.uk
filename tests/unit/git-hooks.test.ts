@@ -93,7 +93,15 @@ describe('the pre-push hook', () => {
     // `typecheck` was that edit (#390). vitest strips types without checking
     // them, so a test indexing a union as a record passed the hook, was
     // pushed, and only `astro check` in CI could have refused it.
-    expect(invokedNpmScripts()).toEqual(['format', 'test:unit', 'typecheck']);
+    //
+    // `test:guards` was the next (#638): the whole-repo guards left the unit
+    // suite for their own, and the hook still has to run them.
+    expect(invokedNpmScripts()).toEqual([
+      'format',
+      'test:guards',
+      'test:unit',
+      'typecheck',
+    ]);
   });
 
   it('clears the repository git hands it before any check runs (#377)', () => {
