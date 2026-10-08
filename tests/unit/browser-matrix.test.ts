@@ -16,6 +16,7 @@ import {
   trackedFiles,
 } from '../source-files';
 import { floorBreach } from '../floors';
+import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { withoutCommentLines, withoutTsComments } from './source-text';
 import { workflowJobs } from '../workflow-jobs';
 import { engineDependence } from './engine-dependence';
@@ -476,9 +477,8 @@ describe('the real-device config (#194)', () => {
   it('leaves git ignoring a snapshot a stray run writes beside a spec', () => {
     // Neither path is tracked, so git answers from its rules alone (see
     // `ignoredByGit`). The second is where a REAL new baseline would land.
-    const stray =
-      'tests/e2e/visual.spec.ts-snapshots/home-id-mobile-android-chrome-darwin.png';
-    const baseline = 'tests/e2e/__screenshots__/a-new-page-desktop-linux.png';
+    const stray = STRAY_SNAPSHOT;
+    const baseline = NEW_BASELINE;
     const ignored = ignoredByGit([stray, baseline]);
 
     expect(

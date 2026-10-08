@@ -5,12 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { floorBreach } from '../floors';
 import { commentsIn, parseSource } from './ast';
 import { astroCodeViews } from './source-text';
-import {
-  filesUnder,
-  ignoredByGit,
-  searched,
-  trackedFiles,
-} from '../source-files';
+import { SOURCE_FILE, walkedSource } from '../git-questions';
+import { ignoredByGit, searched, trackedFiles } from '../source-files';
 
 /**
  * A docblock documents the declaration directly below it, so a docblock
@@ -26,12 +22,12 @@ import {
  * overview, and this leaves it alone.
  */
 
-/** The files that hold code here; an `.astro` file is read by its regions. */
-const SOURCE = /\.(ts|tsx|mjs|js|astro)$/;
+/** The files that hold code here (`SOURCE_FILE`, one home); an `.astro` file is read by its regions. */
+const SOURCE = SOURCE_FILE;
 
 /** Every source file on disk that git does not ignore, from the one walk. */
 function scannedSource(): string[] {
-  const candidates = filesUnder('.', (path) => SOURCE.test(path));
+  const candidates = walkedSource();
   const ignored = ignoredByGit(candidates);
   return candidates.filter((path) => !ignored.has(path));
 }
