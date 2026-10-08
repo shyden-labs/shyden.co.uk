@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -12,6 +11,7 @@ import {
 } from '../../scripts/docs-only.mjs';
 import { floorBreach } from '../floors';
 import { trackedFiles } from '../source-files';
+import { treeReading } from '../tree-reading';
 import { withoutTsComments, withoutYamlComments } from './source-text';
 
 describe('which paths are documentation alone', () => {
@@ -57,16 +57,9 @@ describe('which paths are documentation alone', () => {
   it('accepts exactly the tracked files a git pathspec of the same allowlist selects', () => {
     // Two matchers for one allowlist: this module's, and git's own pathspec
     // engine. They must agree on every tracked file.
-    const pathspec = [
-      ...DOCS_ONLY_FILES.map((file) => `:(literal)${file}`),
-      `:(glob)${DOCS_TREE}**`,
-      ...DOCS_READ_BY_CODE.map((tree) => `:(exclude,glob)${tree}**`),
-    ];
-    const run = spawnSync('git', ['ls-files', '-z', '--', ...pathspec], {
-      encoding: 'utf8',
-    });
-    expect(run.status, run.stderr).toBe(0);
-    const selected = run.stdout.split('\0').filter(Boolean).sort();
+    // Git was asked once per run, in the global setup, with the pathspec
+    // from `docsPathspec()` (#631): a unit test starts no process.
+    const selected = [...treeReading().docsPathspecSelected].sort();
     const accepted = trackedFiles(isDocsOnlyPath);
     expect(accepted).toEqual(selected);
     expect(
@@ -134,25 +127,9 @@ describe('the parts of docs/ that code reads are never documentation alone', () 
   it('the walk reads every file whose raw text names a docs/ path', () => {
     // An independent reading of the same population: git's own search over
     // the raw bytes, which no stripper or extension table stands between.
-    const run = spawnSync(
-      'git',
-      [
-        'grep',
-        '-l',
-        '-I',
-        '-z',
-        '-F',
-        DOCS_TREE,
-        '--',
-        '.',
-        `:(exclude)${DOCS_TREE}`,
-        ':(exclude,glob)**/*.md',
-        ':(exclude)*.md',
-      ],
-      { encoding: 'utf8' },
-    );
-    expect(run.status, run.stderr).toBe(0);
-    const naming = run.stdout.split('\0').filter(Boolean).sort();
+    // Git's own search, asked once per run in the global setup with
+    // `docsNamingArgs()` (#631); a unit test starts no process.
+    const naming = [...treeReading().docsNaming].sort();
     const walked = new Set(codeFiles());
     expect(naming.filter((path) => walked.has(path))).toEqual(naming);
     expect(
