@@ -6,6 +6,8 @@ import {
   NAMED_COLOURS,
   onPaper,
 } from './css-rules';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 
 describe('cssRules', () => {
   it('keeps every block header a rule sits under, outermost first', () => {
@@ -144,9 +146,15 @@ describe('colourLiterals', () => {
       '&#123;',
       'color-mix(in srgb, var(--a), var(--b))',
     ];
-    expect(none.filter((value) => colourLiterals(value).length > 0)).toEqual(
-      [],
-    );
+    expect(
+      searched(
+        none.filter((value) => colourLiterals(value).length > 0),
+        { of: none, what: 'values that fix no colour' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('css-rules/no-colour-values', none.length),
+    ).toBeUndefined();
   });
 
   it('knows every CSS named colour once', () => {
@@ -158,23 +166,40 @@ describe('colourLiterals', () => {
 });
 
 describe('onPaper', () => {
-  it('holds for a rule inside a print-only media block, and only there', () => {
+  it('holds for a rule inside a print-only media block', () => {
+    const onPrint = [
+      ['@media print', '.a'],
+      ['@media only print', '.a'],
+      ['@media print and (orientation: portrait)', '.a'],
+      ['@media screen', '@media print', '.a'],
+    ];
     expect(
-      [
-        ['@media print', '.a'],
-        ['@media only print', '.a'],
-        ['@media print and (orientation: portrait)', '.a'],
-        ['@media screen', '@media print', '.a'],
-      ].filter((chain) => !onPaper(chain)),
+      searched(
+        onPrint.filter((chain) => !onPaper(chain)),
+        { of: onPrint, what: 'rules inside a print-only media block' },
+      ),
     ).toEqual([]);
     expect(
-      [
-        ['.a'],
-        ['@media screen', '.a'],
-        ['@media screen, print', '.a'],
-        ['@media not print', '.a'],
-      ].filter((chain) => onPaper(chain)),
+      floorBreach('css-rules/print-only-chains', onPrint.length),
+    ).toBeUndefined();
+  });
+
+  it('does not hold for a rule outside every print-only media block', () => {
+    const offPrint = [
+      ['.a'],
+      ['@media screen', '.a'],
+      ['@media screen, print', '.a'],
+      ['@media not print', '.a'],
+    ];
+    expect(
+      searched(
+        offPrint.filter((chain) => onPaper(chain)),
+        { of: offPrint, what: 'rules outside every print-only media block' },
+      ),
     ).toEqual([]);
+    expect(
+      floorBreach('css-rules/not-print-only-chains', offPrint.length),
+    ).toBeUndefined();
   });
 });
 
@@ -202,9 +227,16 @@ describe('codeColourLiterals', () => {
   });
 
   it('never reads a character reference or a call named color() as a colour', () => {
+    const lookalikes = ['&#123;', '&#x2014;', 'color(x)', 'theme.color(y)'];
     expect(
-      codeColourLiterals('&#123; &#x2014; color(x) theme.color(y)'),
+      searched(codeColourLiterals(lookalikes.join(' ')), {
+        of: lookalikes,
+        what: 'colour lookalikes',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('css-rules/colour-lookalikes', lookalikes.length),
+    ).toBeUndefined();
   });
 
   it('finds a hex-shaped issue number too, which only an allowlist can excuse', () => {

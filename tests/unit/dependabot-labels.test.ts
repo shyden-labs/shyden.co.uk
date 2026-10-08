@@ -76,7 +76,19 @@ describe('the labels dependabot.yml asks for', () => {
   it('are none at all when the config declares none — the liveness control', () => {
     // The whole check is satisfied for free by an empty set, which is why the
     // script refuses one rather than reporting a clean pass (#112, #118).
-    expect(declaredLabels('version: 2\nupdates: []\n')).toHaveLength(0);
+    // An empty `updates` has no entry to walk, so the units here are the
+    // document's own lines: what the reader parsed before finding none.
+    const bare = 'version: 2\nupdates: []\n';
+    const lines = bare.split('\n').filter((line) => line !== '');
+    expect(
+      searched(declaredLabels(bare), {
+        of: lines,
+        what: 'lines of the label-less config',
+      }),
+    ).toHaveLength(0);
+    expect(
+      floorBreach('dependabot-labels/label-less-config-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('refuse a label YAML does not read as text, rather than dropping it', () => {
@@ -110,9 +122,16 @@ describe('a declared label with nothing behind it', () => {
   it('is not reported when the repository spells it in another case', () => {
     // GitHub treats two labels differing only in case as the same label, so an
     // exact match would go red on a repository that is perfectly configured.
-    expect(missingLabels(['GitHub-Actions'], ['github-actions'])).toHaveLength(
-      0,
-    );
+    const declared = ['GitHub-Actions'];
+    expect(
+      searched(missingLabels(declared, ['github-actions']), {
+        of: declared,
+        what: 'declared labels',
+      }),
+    ).toHaveLength(0);
+    expect(
+      floorBreach('dependabot-labels/respelled-labels', declared.length),
+    ).toBeUndefined();
   });
 
   it('names itself and the command that creates it in the refusal', () => {

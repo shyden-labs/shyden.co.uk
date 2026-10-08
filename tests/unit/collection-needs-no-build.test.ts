@@ -203,6 +203,14 @@ const builtLiterals = (bound: Bound): string[] =>
 const readsIn = (sources: Record<string, string>) =>
   collectionReads(bind(new Map(Object.entries(sources))));
 
+/** Every call the scan examines in `sources`: the population of its verdict. */
+const callsIn = (sources: Record<string, string>): ts.CallExpression[] =>
+  [...bind(new Map(Object.entries(sources))).files.values()].flatMap((sf) =>
+    nodesOf(sf).filter((node): node is ts.CallExpression =>
+      ts.isCallExpression(node),
+    ),
+  );
+
 const SPEC = 'tests/e2e/fixture.spec.ts';
 const HELPER = 'tests/e2e/fixture-helper.ts';
 const HEAD = `import { test, expect } from '@playwright/test';\n`;
@@ -223,19 +231,35 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('the same walk inside a test body is not', () => {
+    const sources = {
+      [SPEC]: `${HEAD}test('t', () => { expect(filesUnder('dist', keep)).toBeTruthy(); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}test('t', () => { expect(filesUnder('dist', keep)).toBeTruthy(); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the test-body fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('collection-needs-no-build/test-body-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('nor inside a hook, which also runs only when tests do', () => {
+    const sources = {
+      [SPEC]: `${HEAD}test.beforeAll(() => { statSync('dist'); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}test.beforeAll(() => { statSync('dist'); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the hook fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('collection-needs-no-build/hook-body-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('a describe body runs while collecting, so a read there is one', () => {
@@ -247,11 +271,22 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('a path constant in a describe body is not a read; the test that reads it is deferred', () => {
+    const sources = {
+      [SPEC]: `${HEAD}test.describe('d', () => {\n  const page404 = 'dist/404.html';\n  test('t', () => { readFileSync(page404, 'utf8'); });\n});`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}test.describe('d', () => {\n  const page404 = 'dist/404.html';\n  test('t', () => { readFileSync(page404, 'utf8'); });\n});`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the describe-constant fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'collection-needs-no-build/describe-constant-calls',
+        calls.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('a path constant read at module scope is a read, at the read', () => {
@@ -263,11 +298,22 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('composing a path reads nothing', () => {
+    const sources = {
+      [SPEC]: `${HEAD}const P = join('dist', '404.html');\ntest('t', () => { readFileSync(P); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}const P = join('dist', '404.html');\ntest('t', () => { readFileSync(P); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the composed-path fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'collection-needs-no-build/composed-path-calls',
+        calls.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('...but reading the composed path at module scope does', () => {
@@ -287,11 +333,19 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('a lazy helper called only from tests is not a read', () => {
+    const sources = {
+      [SPEC]: `${HEAD}const built = () => filesUnder('dist', keep);\ntest('t', () => { expect(built()).toBeTruthy(); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}const built = () => filesUnder('dist', keep);\ntest('t', () => { expect(built()).toBeTruthy(); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the lazy-helper fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('collection-needs-no-build/lazy-helper-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('the same helper called at module scope is, two hops away included', () => {
@@ -312,12 +366,23 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('importing a helper is not calling it', () => {
+    const sources = {
+      [HELPER]: `export const built = () => filesUnder('dist', keep);`,
+      [SPEC]: `${HEAD}import { built } from './fixture-helper';\ntest('t', () => { built(); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [HELPER]: `export const built = () => filesUnder('dist', keep);`,
-        [SPEC]: `${HEAD}import { built } from './fixture-helper';\ntest('t', () => { built(); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the imported-helper fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'collection-needs-no-build/imported-helper-calls',
+        calls.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('a callback handed to a module-scope call runs with it, and is reported once, at the read', () => {
@@ -340,27 +405,57 @@ describe('what counts as reading the build while collecting', () => {
   });
 
   it('a helper that calls itself is judged, not followed forever', () => {
+    const sources = {
+      [SPEC]: `${HEAD}function walk(n) { return n ? walk(n - 1) : statSync('dist'); }\ntest('t', () => { walk(2); });`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}function walk(n) { return n ? walk(n - 1) : statSync('dist'); }\ntest('t', () => { walk(2); });`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the recursive-helper fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'collection-needs-no-build/recursive-helper-calls',
+        calls.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('a title that starts with dist/ is a title, not a path', () => {
+    const sources = {
+      [SPEC]: `${HEAD}test.describe('dist/404.html', () => {\n  test('dist/ is built', () => {});\n});`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}test.describe('dist/404.html', () => {\n  test('dist/ is built', () => {});\n});`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the dist-title fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach('collection-needs-no-build/dist-title-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('a comment naming the read neither is one nor hides one', () => {
+    const sources = {
+      [SPEC]: `${HEAD}// const PAGES = filesUnder('dist', keep);\nconst built = () => filesUnder('dist', keep);`,
+    };
+    const calls = callsIn(sources);
     expect(
-      readsIn({
-        [SPEC]: `${HEAD}// const PAGES = filesUnder('dist', keep);\nconst built = () => filesUnder('dist', keep);`,
+      searched(readsIn(sources), {
+        of: calls,
+        what: 'calls in the commented fixture',
       }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'collection-needs-no-build/comment-fixture-calls',
+        calls.length,
+      ),
+    ).toBeUndefined();
     expect(
       readsIn({
         [SPEC]: `${HEAD}// deliberately lazy: filesUnder('dist', keep)\nconst PAGES = filesUnder('dist', keep);`,

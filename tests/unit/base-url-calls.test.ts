@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { bind } from './ast';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import {
   apiName,
   baseUrlCalls,
@@ -381,10 +383,16 @@ describe('what never meets baseURL is not judged as a URL', () => {
 
 describe('what the guard reports', () => {
   it('names a relative URL on an unpatched API as the defect it is', () => {
-    const [finding, ...rest] = baseUrlFindings(
-      callsIn({ 'tests/e2e/a.spec.ts': `page.route('/framed', handler);` }),
-    );
-    expect(rest).toHaveLength(0);
+    const calls = callsIn({
+      'tests/e2e/a.spec.ts': `page.route('/framed', handler);`,
+    });
+    const [finding, ...rest] = baseUrlFindings(calls);
+    expect(
+      searched(rest, { of: calls, what: 'examined base-URL calls' }),
+    ).toHaveLength(0);
+    expect(
+      floorBreach('base-url-calls/relative-url-examined', calls.length),
+    ).toBeUndefined();
     expect(finding).toBe(
       'tests/e2e/a.spec.ts:1 calls `page.route(...)` with a relative URL, ' +
         "'/framed', which resolves to /framed; page.route is not patched to " +
@@ -397,12 +405,16 @@ describe('what the guard reports', () => {
   });
 
   it('says it could not resolve a URL, and does not call it relative', () => {
-    const [finding, ...rest] = baseUrlFindings(
-      callsIn({
-        'tests/e2e/a.spec.ts': `const go = (url: string) => page.route(url, handler);`,
-      }),
-    );
-    expect(rest).toHaveLength(0);
+    const calls = callsIn({
+      'tests/e2e/a.spec.ts': `const go = (url: string) => page.route(url, handler);`,
+    });
+    const [finding, ...rest] = baseUrlFindings(calls);
+    expect(
+      searched(rest, { of: calls, what: 'examined base-URL calls' }),
+    ).toHaveLength(0);
+    expect(
+      floorBreach('base-url-calls/unresolved-url-examined', calls.length),
+    ).toBeUndefined();
     expect(finding).toBe(
       'tests/e2e/a.spec.ts:1 calls `page.route(...)` with url, and could not ' +
         'resolve `url` (a parameter). That is a limit of this guard, not a ' +
