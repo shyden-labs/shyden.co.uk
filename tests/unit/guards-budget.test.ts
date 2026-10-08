@@ -15,8 +15,12 @@ import unit from '../../vitest.config';
  * The limit is pinned here as a literal, because a value asserted against the
  * script it was read from would move with it and pin nothing.
  *
- * Measurement: INTERIM, to be replaced by the measured figure before the
- * story merges.
+ * Measurement (2026-10-08, the 597 tests as moved): the slowest test on the CI
+ * runner took 7.2s (run 37798571160, `collection-needs-no-build`: it parses
+ * every file under tests/), the next 4.3s. On a laptop running the whole
+ * suite the same test took 7.6s, the next 2.5s. 25s is 3.3x the laptop's worst
+ * and 3.5x the runner's, below the 30s the unit suite once allowed these same
+ * tests, so moving them raises nothing.
  */
 const scripts = (): Record<string, string> =>
   (
@@ -28,7 +32,7 @@ const scripts = (): Record<string, string> =>
 describe('the guards suite budget', () => {
   it('gives every test one limit, set on the command that runs the suite', () => {
     expect(scripts()['test:guards']).toBe(
-      'vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=30000',
+      'vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=25000',
     );
   });
 

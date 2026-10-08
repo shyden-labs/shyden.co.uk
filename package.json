@@ -12,7 +12,7 @@
     "preview": "ASTRO_PREVIEW_BACKGROUND=1 astro preview",
     "typecheck": "astro check",
     "test:unit": "vitest run",
-    "test:guards": "vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=30000",
+    "test:guards": "vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=25000",
     "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose --testTimeout=30000",
     "floors:record": "node scripts/record-floors.mjs",
     "test:e2e": "node scripts/test-e2e.mjs",
