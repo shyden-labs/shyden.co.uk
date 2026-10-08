@@ -31,7 +31,7 @@ const script = (): string => {
 describe('the integration suite budget', () => {
   it('gives every test one limit, set on the command that runs the suite', () => {
     expect(script()).toBe(
-      'vitest run --config vitest.integration.config.ts --testTimeout=30000',
+      'vitest run --config vitest.integration.config.ts --reporter=verbose --testTimeout=30000',
     );
   });
 
