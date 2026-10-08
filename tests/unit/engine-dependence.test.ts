@@ -1,4 +1,8 @@
+import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
+import { nodesIn, parseSource } from './ast';
 import {
   EMULATED_VIEWPORT_TAG,
   ENGINE_DEPENDENT_NAMES,
@@ -22,6 +26,10 @@ import {
  */
 
 const names = (...list: string[]): ReadonlySet<string> => new Set(list);
+
+/** Every identifier the detector compares against its name set, in the code it was handed. */
+const identifiersIn = (source: string): ts.Node[] =>
+  nodesIn(parseSource(source), ts.isIdentifier);
 
 describe('engineDependence finds a name wherever the code uses it', () => {
   it('as a call', () => {
@@ -74,11 +82,20 @@ describe('engineDependence reads code, never prose', () => {
       "await expect(page).toHaveTitle('Shyden');",
     ].join('\n');
     expect(
-      engineDependence(
-        src,
-        names('getClientRects', 'offsetWidth', 'innerText'),
+      searched(
+        engineDependence(
+          src,
+          names('getClientRects', 'offsetWidth', 'innerText'),
+        ),
+        { of: identifiersIn(src), what: 'identifiers in the code' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/comment-fixture-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 
   it('ignores the name in a test title and in any other plain string', () => {
@@ -88,9 +105,18 @@ describe('engineDependence reads code, never prose', () => {
       '  await page.goto(`/${label}`);',
       '});',
     ].join('\n');
-    expect(engineDependence(src, names('innerText', 'getClientRects'))).toEqual(
-      [],
-    );
+    expect(
+      searched(engineDependence(src, names('innerText', 'getClientRects')), {
+        of: identifiersIn(src),
+        what: 'identifiers in the code',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/string-fixture-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -117,13 +143,35 @@ describe('engineDependence reads code a page function receives as a string', () 
 
   it('but never reads a selector as code', () => {
     const src = "await page.$eval('.innerText', (el) => el.id);";
-    expect(engineDependence(src, names('innerText'))).toEqual([]);
+    expect(
+      searched(engineDependence(src, names('innerText')), {
+        of: identifiersIn(src),
+        what: 'identifiers in the code',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/selector-fixture-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 
   it('and still ignores a comment inside that code', () => {
     const src =
       "await page.evaluate('/* offsetWidth */ document.title.length');";
-    expect(engineDependence(src, names('offsetWidth'))).toEqual([]);
+    expect(
+      searched(engineDependence(src, names('offsetWidth')), {
+        of: identifiersIn(src),
+        what: 'identifiers in the code',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/commented-page-code-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -139,7 +187,18 @@ describe('engineDependence finds the emulated-viewport tag', () => {
 
   it('but not in a comment that names it', () => {
     const src = `// no ${EMULATED_VIEWPORT_TAG} here\ntest('t', async () => {});`;
-    expect(engineDependence(src, names())).toEqual([]);
+    expect(
+      searched(engineDependence(src, names()), {
+        of: identifiersIn(src),
+        what: 'identifiers in the code',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/commented-tag-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -163,7 +222,18 @@ describe('engineDependence reports what it found', () => {
       "  expect(await res.text()).toContain('/classroom-groups');",
       '});',
     ].join('\n');
-    expect(engineDependence(src)).toEqual([]);
+    expect(
+      searched(engineDependence(src), {
+        of: identifiersIn(src),
+        what: 'identifiers in the code',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'engine-dependence/content-only-identifiers',
+        identifiersIn(src).length,
+      ),
+    ).toBeUndefined();
   });
 });
 

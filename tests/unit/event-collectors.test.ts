@@ -402,11 +402,18 @@ describe('a locator list cannot be looped unproved', () => {
   it('is not fired by a comment describing one', () => {
     // chrome.spec.ts spells `.all()` out in prose at length, so this is a live
     // false-positive risk, not a hypothetical.
+    const commented =
+      "// for (const a of await links.all()) would be unproved here\ntest('x', () => {});";
+    const calls = callsIn(parseSource(commented));
     expect(
-      locatorLoops(
-        "// for (const a of await links.all()) would be unproved here\ntest('x', () => {});",
-      ),
+      searched(locatorLoops(commented), {
+        of: calls,
+        what: 'calls in the commented spec',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('event-collectors/commented-loop-calls', calls.length),
+    ).toBeUndefined();
   });
 
   it('is not satisfied by the test above a parked one (test.fixme)', () => {

@@ -37,6 +37,27 @@ import { withoutTsComments } from './source-text';
 export const parseSource = (text: string, file = 'source.ts'): ts.SourceFile =>
   ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 
+/**
+ * Every node in `sf`, at any depth, that `keep` accepts, in source order. The
+ * walk returns nothing from its callback on purpose: `ts.forEachChild` stops
+ * at the first truthy result, so a point-free visitor would read one child per
+ * node (#118).
+ */
+export function nodesIn(
+  sf: ts.SourceFile,
+  keep: (node: ts.Node) => boolean,
+): ts.Node[] {
+  const found: ts.Node[] = [];
+  const visit = (node: ts.Node): void => {
+    if (keep(node)) found.push(node);
+    ts.forEachChild(node, (child) => {
+      visit(child);
+    });
+  };
+  visit(sf);
+  return found;
+}
+
 /** A file parsed with parent pointers (`parseSource`). */
 export const parseFile = (file: string): ts.SourceFile =>
   parseSource(readFileSync(file, 'utf8'), file);
