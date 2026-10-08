@@ -161,6 +161,9 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - run: npm run test:unit
+      # Every test that starts a process (#630). The unit suite starts none.
+      # One limit, measured, on the command itself (tests/unit/integration-budget.test.ts).
+      - run: npm run test:integration
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
