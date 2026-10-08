@@ -77,5 +77,5 @@ describe('the Playwright dashboard reporter', () => {
       'passes though declared to fail': 'failed',
       skipped: 'skipped',
     });
-  }, 60_000);
+  });
 });

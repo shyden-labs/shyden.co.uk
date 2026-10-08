@@ -1,7 +1,8 @@
 /**
  * Record the guards' liveness floors (#468): `npm run floors:record`.
  *
- * Runs the unit suite with `FLOORS_RECORD` set, so every `floorBreach` call
+ * Runs the unit suite and then the integration suite (#630) with
+ * `FLOORS_RECORD` set, so every `floorBreach` call
  * writes the count it saw instead of judging it (`tests/floors.ts`), then the
  * Playwright specs that call it, on every project, in the pinned image CI
  * runs them in (#475). It judges both runs' counts together and raises
@@ -51,10 +52,30 @@ import { die, messageOf, nonEmpty } from './errors.mjs';
 import { containerArgs, localImage } from './playwright-image.mjs';
 
 const UNIT = 'unit suite';
+const INTEGRATION = 'integration suite';
 const PLAYWRIGHT = 'Playwright run';
 const FUNCTIONS = 'functions suite';
 const UNIT_ONLY = '--unit';
 const FUNCTIONS_ONLY = '--functions';
+
+/**
+ * The integration suite's command, read from the `test:integration` script
+ * that carries its one limit (#630), so the record run and CI cannot differ
+ * on it. Refuses a script of another shape rather than guessing.
+ */
+export const integrationArguments = () => {
+  const { scripts } = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  );
+  const match = /^vitest run( --[\w-]+(?:[= ][\w.-]+)?)+$/.exec(
+    scripts?.['test:integration'] ?? '',
+  );
+  if (match === null)
+    die(
+      'package.json has no test:integration script of the shape vitest run --flag…',
+    );
+  return scripts['test:integration'].split(' ');
+};
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -470,6 +491,16 @@ const main = () => {
             }),
           );
           if (unitRefusal !== undefined) return unitRefusal;
+          // The integration suite asserts floors too (#630), so it runs into
+          // the same record, with the limit its own script carries.
+          const integrationRefusal = runRefusal(
+            INTEGRATION,
+            spawnSync('npx', integrationArguments(), {
+              stdio: 'inherit',
+              env: { ...env, [RECORD_ENV]: unit },
+            }),
+          );
+          if (integrationRefusal !== undefined) return integrationRefusal;
         }
         if (pass === 1 && !unitOnly && !functionsOnly) {
           const image = localImage();

@@ -18,7 +18,7 @@ import type { PlaywrightTestConfig } from '@playwright/test';
  *       annotation: { type: 'deployed-only', description: '<why>' },
  *     }, async () => { ... });
  *
- * `tests/unit/sanity-on-build.test.ts` refuses the tag without a reason.
+ * `tests/integration/sanity-on-build.test.ts` refuses the tag without a reason.
  *
  * `SANITY_ON_BUILD=1` is set by `npm run test:sanity`, which is what CI's
  * `sanity-on-build` job runs. Off, which is every deploy's run, nothing here
