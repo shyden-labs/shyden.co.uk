@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { cpuBreach } from '../unit-cpu-limit';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cpuBreach, startOwnCpu } from '../unit-cpu-limit';
 
 /**
  * The unit suite fails a test whose own CPU passes 1 s (#632). The figures are
@@ -25,5 +25,39 @@ describe('the CPU limit of one unit test', () => {
 
   it('names the figure in milliseconds, rounded', () => {
     expect(cpuBreach(2_345_678, 'a test')).toContain('2346 ms');
+  });
+});
+
+/**
+ * Whose CPU is counted. `process.cpuUsage()` sums every thread in the worker,
+ * and V8 collects garbage on helper threads: measured on the operator's Mac, a
+ * test that allocated for 500 ms of its own thread (552 ms wall) read 1 489 ms
+ * process-wide and failed. The test's own figure is its thread's.
+ */
+describe('the CPU a unit test is charged with', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is its own thread's, user plus system, since the clock started", () => {
+    const start = { user: 7, system: 3 };
+    const thread = vi
+      .spyOn(process, 'threadCpuUsage')
+      .mockReturnValueOnce(start)
+      .mockReturnValueOnce({ user: 400_000, system: 100_000 });
+    vi.spyOn(process, 'cpuUsage').mockReturnValue({
+      user: 9_000_000,
+      system: 0,
+    });
+    const stop = startOwnCpu();
+    expect(stop()).toBe(500_000);
+    expect(thread).toHaveBeenLastCalledWith(start);
+  });
+
+  it('never reads the whole process', () => {
+    vi.spyOn(process, 'threadCpuUsage').mockReturnValue({ user: 0, system: 0 });
+    const whole = vi.spyOn(process, 'cpuUsage');
+    startOwnCpu()();
+    expect(whole).not.toHaveBeenCalled();
   });
 });

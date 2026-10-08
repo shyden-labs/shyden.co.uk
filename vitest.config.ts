@@ -22,8 +22,8 @@ export default defineConfig({
     // tests/guards/unit-limit.test.ts.
     testTimeout: 1_000,
     hookTimeout: 1_000,
-    // A worker is a process of its own, so `process.cpuUsage()` in the CPU
-    // check is the running test's alone; threads would share it (#632).
+    // Each worker a process of its own, its tests on its main thread: the
+    // ground the CPU check and the refusals were measured on (#632).
     pool: 'forks',
   },
 });

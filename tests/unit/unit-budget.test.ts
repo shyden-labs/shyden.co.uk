@@ -31,11 +31,12 @@ describe('the unit suite budget', () => {
     expect(config.test?.hookTimeout).toBe(1_000);
   });
 
-  // The CPU check reads `process.cpuUsage()`, which counts every thread in the
-  // process. In a forked worker that is the one test running; in a thread
-  // worker it would be every file the pool runs beside it. Vitest's default
-  // was forks when this was measured, and a default can move, so it is spelled.
-  it('runs each worker as its own process, so a test CPU is its own', () => {
+  // The CPU check reads the running thread's CPU, and the refusals patch the
+  // worker's own `child_process` and `net`; both were measured in forked
+  // workers, each test on the main thread of its own process. A thread pool
+  // was never measured. Vitest's default was forks then, and a default can
+  // move, so it is spelled.
+  it('runs each worker as its own process, the ground the CPU check was measured on', () => {
     expect(config.test?.pool).toBe('forks');
   });
 
