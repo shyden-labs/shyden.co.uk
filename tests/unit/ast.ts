@@ -765,10 +765,17 @@ export function stringTextsIn(sf: ts.SourceFile): string[] {
  * whole with its substitutions; `withoutTsComments` then removes comments
  * from text that holds no literal it could misread.
  *
+ * A caller whose cross-check must tell two strings apart (`'length'` from
+ * `'count'`) passes `keep`: a plain string literal it accepts is left as
+ * written (#648). Every other literal is still blanked.
+ *
  * The visitor returns nothing: `ts.forEachChild` stops at the first child
  * whose callback returns a truthy value.
  */
-export function codeWithoutLiterals(sf: ts.SourceFile): string {
+export function codeWithoutLiterals(
+  sf: ts.SourceFile,
+  keep?: (literal: ts.StringLiteral) => boolean,
+): string {
   const ranges: [number, number][] = [];
   const visit = (node: ts.Node): void => {
     if (
@@ -777,7 +784,8 @@ export function codeWithoutLiterals(sf: ts.SourceFile): string {
       ts.isTemplateExpression(node) ||
       ts.isRegularExpressionLiteral(node)
     ) {
-      ranges.push([node.getStart(sf), node.end]);
+      if (!(ts.isStringLiteral(node) && keep?.(node)))
+        ranges.push([node.getStart(sf), node.end]);
       return;
     }
     ts.forEachChild(node, visit);

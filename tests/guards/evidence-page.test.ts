@@ -252,8 +252,39 @@ describe('a run that recorded nothing still publishes (#214 AC7)', () => {
     expect(
       floorBreach('evidence-page/report-results-no-recording', results.length),
     ).toBeUndefined();
-    expect(assetUploads(candidates)).toEqual({});
-    expect(reconcileFiles({ desired: {}, published: [] })).toEqual({});
+    // Empty by design, so the inputs are the population (operator ruling
+    // 2026-10-09): one case each, counted, and every entry either call
+    // returns is an assertion failure.
+    const uploadCases = [{ case: 'a run that recorded nothing', candidates }];
+    expect(
+      searched(
+        uploadCases.flatMap(({ candidates: fed }) =>
+          Object.entries(assetUploads(fed)),
+        ),
+        { of: uploadCases, what: 'candidate lists fed to assetUploads' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/empty-upload-cases', uploadCases.length),
+    ).toBeUndefined();
+    const reconcileCases = [
+      {
+        case: 'nothing desired and nothing published',
+        desired: {},
+        published: [],
+      },
+    ];
+    expect(
+      searched(
+        reconcileCases.flatMap(({ desired, published }) =>
+          Object.entries(reconcileFiles({ desired, published })),
+        ),
+        { of: reconcileCases, what: 'file sets fed to reconcileFiles' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/empty-reconcile-cases', reconcileCases.length),
+    ).toBeUndefined();
     // A page that USED to carry recordings as supporting files must retract
     // them, rather than leaving files nothing on the page names. Since #268
     // that is every capture: recordings are assets, so `desired` is always

@@ -94,11 +94,51 @@ const EQUALITY = new Set(['toEqual', 'toStrictEqual', 'toBe']);
 const isZero = (arg: ts.Expression | undefined): boolean =>
   arg !== undefined && ts.isNumericLiteral(arg) && arg.text === '0';
 
+/** `[]`: an array literal with nothing in it. */
+const isEmptyArray = (arg: ts.Expression | undefined): boolean =>
+  arg !== undefined &&
+  ts.isArrayLiteralExpression(arg) &&
+  arg.elements.length === 0;
+
+/**
+ * Every literal spelling of an empty collection (#648): `[]`, `{}`, and a
+ * `new Set()` / `new Map()` with no argument or an empty array.
+ */
+function isEmptyCollection(arg: ts.Expression | undefined): boolean {
+  if (arg === undefined) return false;
+  if (isEmptyArray(arg)) return true;
+  if (ts.isObjectLiteralExpression(arg)) return arg.properties.length === 0;
+  if (
+    !ts.isNewExpression(arg) ||
+    !ts.isIdentifier(arg.expression) ||
+    (arg.expression.text !== 'Set' && arg.expression.text !== 'Map')
+  )
+    return false;
+  const args = arg.arguments ?? [];
+  return args.length === 0 || (args.length === 1 && isEmptyArray(args[0]));
+}
+
+/**
+ * `toHaveProperty('length', 0)` / `toHaveProperty('size', 0)`: the subject
+ * itself is held empty (#648).
+ */
+const isNoLengthProperty = (
+  matcher: string,
+  args: ts.NodeArray<ts.Expression>,
+): boolean =>
+  matcher === 'toHaveProperty' &&
+  args.length === 2 &&
+  ts.isStringLiteralLike(args[0]) &&
+  (args[0].text === 'length' || args[0].text === 'size') &&
+  isZero(args[1]);
+
 /**
  * The call an absence matcher hangs off -- `expect(x)` in
  * `expect(x).toEqual([])` -- for every spelling of "this is empty":
- * `.toEqual([])`, `.toStrictEqual([])`, `.toHaveLength(0)`, and anything held
- * equal to 0. Null for any other matcher, and for a `.not` inverse.
+ * `.toEqual([])`, `.toStrictEqual([])` (and `{}`, `new Set()`, `new Map()`
+ * in their place, #648), `.toHaveLength(0)`, `.toHaveProperty('length', 0)`,
+ * and anything held equal to 0 -- or falsy, when it is a `.length`/`.size`.
+ * Null for any other matcher, and for a `.not` inverse.
  */
 function absenceRoot(
   node: ts.CallExpression,
@@ -108,11 +148,13 @@ function absenceRoot(
   const arg = node.arguments[0];
   const emptyList =
     (matcher === 'toEqual' || matcher === 'toStrictEqual') &&
-    arg !== undefined &&
-    ts.isArrayLiteralExpression(arg) &&
-    arg.elements.length === 0;
-  const noLength = matcher === 'toHaveLength' && isZero(arg);
-  const zeroCount = EQUALITY.has(matcher) && isZero(arg);
+    isEmptyCollection(arg);
+  const noLength =
+    (matcher === 'toHaveLength' && isZero(arg)) ||
+    isNoLengthProperty(matcher, node.arguments);
+  const zeroCount =
+    (EQUALITY.has(matcher) && isZero(arg)) ||
+    (matcher === 'toBeFalsy' && node.arguments.length === 0);
   if (!emptyList && !noLength && !zeroCount) return null;
 
   // Walk back through any modifier chain (`.not`, `.resolves`). A `.not`
@@ -274,16 +316,24 @@ function countsAPopulation(root: ts.Expression): boolean {
  */
 const ABSENCE_TEXT = new RegExp(
   [
-    String.raw`(?<!\.not)\.(?:toEqual|toStrictEqual)\(\[\]\)`,
+    String.raw`(?<!\.not)\.(?:toEqual|toStrictEqual)\((?:\[\]|\{\}|new(?:Set|Map)\((?:\[\])?\))\)`,
     String.raw`(?<!\.not)\.toHaveLength\(0\)`,
-    String.raw`expect(?:\.soft)?\([\w$.()[\]]+?\.(?:length|size)(?:,"")?\)\.(?:toBe|toEqual|toStrictEqual)\(0\)`,
+    String.raw`(?<!\.not)\.toHaveProperty\(["'](?:length|size)["'],0\)`,
+    String.raw`expect(?:\.soft)?\([\w$.()[\]]+?\.(?:length|size)(?:,"")?\)\.(?:(?:toBe|toEqual|toStrictEqual)\(0\)|toBeFalsy\(\))`,
   ].join('|'),
   'g',
 );
 
 /** How many absence matchers `sf` writes, counted as text (#477). */
 function absencesWritten(sf: ts.SourceFile): number {
-  const code = codeWithoutLiterals(sf)
+  // `toHaveProperty` is an absence only for `length` and `size`, so those two
+  // names are kept where the matcher's first argument writes them (#648).
+  const code = codeWithoutLiterals(
+    sf,
+    (literal) =>
+      /^(?:length|size)$/.test(literal.text) &&
+      /\.toHaveProperty\(\s*$/.test(sf.text.slice(0, literal.getStart(sf))),
+  )
     .replace(/\s+/g, '')
     .replace(/,\)/g, ')')
     .replace(/,\]/g, ']');
@@ -415,6 +465,178 @@ describe('absence assertions prove the population they searched', () => {
     };
     visit(sf);
     expect(subjects).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'l', 'm']);
+  });
+
+  // Every other spelling of "this is empty" (#648). One test per form, written
+  // out by hand, never generated from either reader's list: a plant built from
+  // the list a reader uses cannot see that list drop a form (#446). Each form
+  // is read by the AST reader and, separately, by the text cross-check, and
+  // its `.not` inverse by neither (a presence fails loudly on an empty
+  // population, so it cannot hide one).
+  const emptyForms: { form: string; read: string; inverse: string }[] = [
+    {
+      form: 'an empty object under toEqual',
+      read: 'expect(a).toEqual({});',
+      inverse: 'expect(a).not.toEqual({});',
+    },
+    {
+      form: 'an empty object under toStrictEqual',
+      read: 'expect(a).toStrictEqual({});',
+      inverse: 'expect(a).not.toStrictEqual({});',
+    },
+    {
+      form: 'new Set() under toEqual',
+      read: 'expect(a).toEqual(new Set());',
+      inverse: 'expect(a).not.toEqual(new Set());',
+    },
+    {
+      form: 'new Map() under toEqual',
+      read: 'expect(a).toEqual(new Map());',
+      inverse: 'expect(a).not.toEqual(new Map());',
+    },
+    {
+      form: 'new Set() under toStrictEqual',
+      read: 'expect(a).toStrictEqual(new Set());',
+      inverse: 'expect(a).not.toStrictEqual(new Set());',
+    },
+    {
+      form: 'new Map() under toStrictEqual',
+      read: 'expect(a).toStrictEqual(new Map());',
+      inverse: 'expect(a).not.toStrictEqual(new Map());',
+    },
+    {
+      form: 'new Set([]) under toEqual',
+      read: 'expect(a).toEqual(new Set([]));',
+      inverse: 'expect(a).not.toEqual(new Set([]));',
+    },
+    {
+      form: 'new Map([]) under toEqual',
+      read: 'expect(a).toEqual(new Map([]));',
+      inverse: 'expect(a).not.toEqual(new Map([]));',
+    },
+    {
+      form: 'new Set([]) under toStrictEqual',
+      read: 'expect(a).toStrictEqual(new Set([]));',
+      inverse: 'expect(a).not.toStrictEqual(new Set([]));',
+    },
+    {
+      form: 'new Map([]) under toStrictEqual',
+      read: 'expect(a).toStrictEqual(new Map([]));',
+      inverse: 'expect(a).not.toStrictEqual(new Map([]));',
+    },
+    {
+      form: "toHaveProperty('length', 0)",
+      read: "expect(a).toHaveProperty('length', 0);",
+      inverse: "expect(a).not.toHaveProperty('length', 0);",
+    },
+    {
+      form: "toHaveProperty('size', 0)",
+      read: "expect(a).toHaveProperty('size', 0);",
+      inverse: "expect(a).not.toHaveProperty('size', 0);",
+    },
+    {
+      form: 'toBeFalsy() on a length',
+      read: 'expect(a.length).toBeFalsy();',
+      inverse: 'expect(a.length).not.toBeFalsy();',
+    },
+    {
+      form: 'toBeFalsy() on a size',
+      read: 'expect(a.size).toBeFalsy();',
+      inverse: 'expect(a.size).not.toBeFalsy();',
+    },
+    {
+      form: 'a prettier-split empty object',
+      read: 'expect(a).toEqual(\n  {},\n);',
+      inverse: 'expect(a)\n  .not\n  .toEqual({});',
+    },
+    {
+      form: 'a prettier-split property check',
+      read: "expect(a).toHaveProperty(\n  'size',\n  0,\n);",
+      inverse: "expect(a)\n  .not\n  .toHaveProperty('size', 0);",
+    },
+  ];
+  /** Forms that say something else, and so are no absence. */
+  const notEmptyForms: { form: string; line: string }[] = [
+    { form: 'an object with a key', line: 'expect(a).toEqual({ x: 1 });' },
+    {
+      form: 'a Set holding something',
+      line: 'expect(a).toEqual(new Set([1]));',
+    },
+    {
+      form: 'a Map holding something',
+      line: 'expect(a).toEqual(new Map([[1, 2]]));',
+    },
+    {
+      form: 'a Set built from a variable',
+      line: 'expect(a).toEqual(new Set(b));',
+    },
+    {
+      form: "toHaveProperty('length', 1)",
+      line: "expect(a).toHaveProperty('length', 1);",
+    },
+    {
+      form: "toHaveProperty('count', 0)",
+      line: "expect(a).toHaveProperty('count', 0);",
+    },
+    { form: 'toBeFalsy() on a bare value', line: 'expect(a).toBeFalsy();' },
+    {
+      form: 'toBeFalsy() on a count that is not a size',
+      line: 'expect(a.count).toBeFalsy();',
+    },
+    {
+      form: 'toBeTruthy() on a length',
+      line: 'expect(a.length).toBeTruthy();',
+    },
+  ];
+  const subjectsIn = (source: string): string[] => {
+    const sf = ts.createSourceFile(
+      'fixture.test.ts',
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const subjects: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const subject = absenceSubject(node);
+        if (subject) subjects.push(subject.getText(sf));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return subjects;
+  };
+  for (const { form, read, inverse } of emptyForms) {
+    it(`the reader judges ${form} as an absence of its subject, and never its inverse`, () => {
+      // One list: the plant yields its subject and the inverse yields nothing.
+      expect([...subjectsIn(read), ...subjectsIn(inverse)]).toEqual(['a']);
+    });
+    it(`the text cross-check counts ${form} once, and never its inverse`, () => {
+      expect([
+        absencesWritten(parseSource(read)),
+        absencesWritten(parseSource(inverse)),
+      ]).toEqual([1, 0]);
+    });
+  }
+  for (const { form, line } of notEmptyForms) {
+    it(`${form} is no absence to either reader`, () => {
+      expect([
+        subjectsIn(line).length,
+        absencesWritten(parseSource(line)),
+      ]).toEqual([0, 0]);
+    });
+  }
+  it('plants every empty form it names', () => {
+    // A form quietly deleted from either table drops its tests (#522).
+    expect(
+      floorBreach('absence-liveness/planted-empty-forms', emptyForms.length),
+    ).toBeUndefined();
+    expect(
+      floorBreach(
+        'absence-liveness/planted-not-empty-forms',
+        notEmptyForms.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('judges a subject that is not routed through searched, whatever its shape', () => {
