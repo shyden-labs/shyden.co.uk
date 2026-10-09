@@ -15,7 +15,6 @@ export const ABSENCE_BURN_DOWN: Readonly<Record<string, number>> = {
   'tests/device/ios/journeys.journey.ts › Journey 5 -- 0 students: the real localised error, no groups': 1,
   'tests/device/ios/journeys.journey.ts › Journey 6 -- more groups than students: the real localised message, no groups rendered': 1,
   'tests/device/ios/journeys.journey.ts › Journey 8b -- MAX_STUDENTS + 1 refused: the real localised message': 1,
-  'tests/unit/nav-timings.test.ts › survives a run that recorded nothing rather than dividing by zero': 1,
   'tests/unit/report.test.ts › %s: glory-points carries every leaf of site.glory and none of site.home': 1,
   'tests/unit/report.test.ts › a nonsense quote matches nothing on any page in any locale': 1,
   'tests/unit/report.test.ts › matches nothing for text that is not on the page': 2,

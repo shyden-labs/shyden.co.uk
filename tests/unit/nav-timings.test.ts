@@ -225,7 +225,16 @@ describe('summarising navigations per project', () => {
   });
 
   it('survives a run that recorded nothing rather than dividing by zero', () => {
-    expect(navTimings([])).toEqual([]);
+    const inputs: unknown[][] = [[]];
+    expect(
+      searched(
+        inputs.flatMap((records) => navTimings(records)),
+        { of: inputs.length, what: 'runs handed to navTimings' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('nav-timings/runs-that-recorded-nothing', inputs.length),
+    ).toBeUndefined();
   });
 });
 
@@ -307,6 +316,19 @@ describe('which projects must navigate — read back out of the report', () => {
   it('excuses nothing when the report carries no project config', () => {
     // Fail closed: a report without the mark counts every project, which is
     // the behaviour before #355 rather than a silent pass.
+    const inputs = [{}];
+    expect(
+      searched(
+        inputs.flatMap((report) => [...excusedFromNavigating(report)]),
+        { of: inputs.length, what: 'reports handed to excusedFromNavigating' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('nav-timings/reports-without-config', inputs.length),
+    ).toBeUndefined();
+  });
+
+  it('excuses nothing when no project in the report carries the mark', () => {
     const projects = [{ name: 'chromium' }, { name: 'content' }];
     expect(
       searched([...excusedFromNavigating({ config: { projects } })], {
@@ -317,7 +339,6 @@ describe('which projects must navigate — read back out of the report', () => {
     expect(
       floorBreach('nav-timings/unmarked-report-projects', projects.length),
     ).toBeUndefined();
-    expect(excusedFromNavigating({})).toEqual(new Set());
   });
 
   it('counts each project’s results, however deep the describe blocks, and never a skip', () => {
