@@ -365,7 +365,17 @@ describe('recordUntilSettled', () => {
 
 describe('describeMoves', () => {
   it('says nothing when no figure moved', () => {
-    expect(describeMoves({ 'a/b': 4 }, { 'a/b': 4 })).toEqual([]);
+    const recorded = { 'a/b': 4 };
+    const compared = Object.keys(recorded);
+    expect(
+      searched(describeMoves(recorded, { 'a/b': 4 }), {
+        of: compared,
+        what: 'recorded figures compared',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floors/compared-figures', compared.length),
+    ).toBeUndefined();
   });
 
   it('prints every figure that moved, its delta, largest first, so a raise is read', () => {
@@ -483,15 +493,29 @@ describe('carriedIds (#548)', () => {
   });
 
   it('never carries an id the unit run asserted', () => {
-    expect(carriedIds(['e2e/pages'], SPECS, new Set(['e2e/pages']))).toEqual(
-      [],
-    );
+    const recorded = ['e2e/pages'];
+    expect(
+      searched(carriedIds(recorded, SPECS, new Set(['e2e/pages'])), {
+        of: recorded,
+        what: 'recorded ids offered to carry',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floors/asserted-ids-offered', recorded.length),
+    ).toBeUndefined();
   });
 
   it('never carries an id no spec spells whole, a prefix of one included', () => {
-    expect(carriedIds(['e2e/page', 'unit/files'], SPECS, new Set())).toEqual(
-      [],
-    );
+    const recorded = ['e2e/page', 'unit/files'];
+    expect(
+      searched(carriedIds(recorded, SPECS, new Set()), {
+        of: recorded,
+        what: 'recorded ids offered to carry',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floors/unspelled-ids-offered', recorded.length),
+    ).toBeUndefined();
   });
 });
 

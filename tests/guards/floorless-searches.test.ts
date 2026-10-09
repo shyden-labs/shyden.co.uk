@@ -61,7 +61,15 @@ describe('searchSitesIn', () => {
     ],
   ])('reads a site in %s as floorless in its test', (_, source) => {
     const { sites, refused } = read(source);
-    expect(refused).toEqual([]);
+    // The searches the reader met in the source: each is read as a site or
+    // refused, so the two together are what a refusal count is judged over.
+    const met = [...sites, ...refused];
+    expect(
+      searched(refused, { of: met, what: 'searches the reader met' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/test-form-searches', met.length),
+    ).toBeUndefined();
     expect(sites).toEqual([
       expect.objectContaining({ scope: 'test', label: 't', floored: false }),
     ]);
@@ -148,7 +156,13 @@ describe('searchSitesIn', () => {
     ],
   ])('reads a site in %s by the function name', (_, source) => {
     const { sites, refused } = read(source);
-    expect(refused).toEqual([]);
+    const met = [...sites, ...refused];
+    expect(
+      searched(refused, { of: met, what: 'searches the reader met' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/function-form-searches', met.length),
+    ).toBeUndefined();
     expect(sites).toEqual([
       expect.objectContaining({
         scope: 'function',
@@ -344,7 +358,20 @@ describe('every search checks a floor, or is listed (#515, #534)', () => {
     const counts = Object.values(FLOORLESS);
     expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(48);
     expect(counts.length).toBeLessThanOrEqual(45);
-    expect(counts.filter((n) => !Number.isInteger(n) || n < 1)).toEqual([]);
+    // The entries judged are the list's own: the floor falls with it, by hand,
+    // in the conversion that removes an entry.
+    expect(
+      searched(
+        counts.filter((n) => !Number.isInteger(n) || n < 1),
+        {
+          of: counts,
+          what: 'burn-down entries',
+        },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/burn-down-entries', counts.length),
+    ).toBeUndefined();
   });
 });
 

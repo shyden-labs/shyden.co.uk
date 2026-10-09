@@ -35,6 +35,7 @@ import {
   assetUploads,
   assetVideoPaths,
   assertAssetLimits,
+  flattenReport,
 } from '../../scripts/build-evidence-page.mjs';
 import {
   CONTENT,
@@ -242,8 +243,15 @@ describe('a run that recorded nothing still publishes (#214 AC7)', () => {
         file: 'tests/e2e/still.spec.ts',
       },
     ]);
+    // What `videoCandidates` walks: one row per result the report holds.
+    const results = flattenReport(report);
     const candidates = videoCandidates(report);
-    expect(candidates).toEqual([]);
+    expect(
+      searched(candidates, { of: results, what: 'report results' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/report-results-no-recording', results.length),
+    ).toBeUndefined();
     expect(assetUploads(candidates)).toEqual({});
     expect(reconcileFiles({ desired: {}, published: [] })).toEqual({});
     // A page that USED to carry recordings as supporting files must retract
@@ -355,10 +363,19 @@ describe('a captured journey the report never ran says which kind of missing it 
       '<div class="novid mono">recording missing</div>',
     );
     // And neither is the policy wording, which nothing here has grounds for.
+    // What the page printed under a journey that has no recording: the
+    // wordings the policy reading chooses between.
+    const notes = [...html.matchAll(/<div class="novid mono">[^<]*<\/div>/g)];
     expect(
-      [...html.matchAll(/not recorded by policy/g)],
+      searched([...html.matchAll(/not recorded by policy/g)], {
+        of: notes,
+        what: 'no-recording notes',
+      }),
       'nothing here read a policy',
     ).toHaveLength(0);
+    expect(
+      floorBreach('evidence-page/no-recording-notes', notes.length),
+    ).toBeUndefined();
   });
 });
 
@@ -440,11 +457,17 @@ describe('a recording the report names is on disk, or the build refuses', () => 
   it('reads a result with no recording as nothing to embed, not as a loss', () => {
     // An ordinary run records no video, so a missing attachment is not the
     // defect; a path to a file that is not there is.
+    const report = reportOf([{ journey: 'a journey', project: 'chromium' }]);
+    const results = flattenReport(report);
     expect(
-      videoCandidates(
-        reportOf([{ journey: 'a journey', project: 'chromium' }]),
-      ),
+      searched(videoCandidates(report), {
+        of: results,
+        what: 'report results',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('evidence-page/results-without-recording', results.length),
+    ).toBeUndefined();
   });
 });
 
@@ -1257,7 +1280,13 @@ describe('a journey that captured nothing is still on the page', () => {
     // The precondition IS part of the assertion: add a manifest row for this
     // title and the old manifest-derived list renders it anyway, leaving a
     // guard that passes without testing what it claims to.
-    expect(MANIFEST.filter((m) => m.title.endsWith(JOURNEY))).toEqual([]);
+    const naming = MANIFEST.filter((m) => m.title.endsWith(JOURNEY));
+    expect(searched(naming, { of: MANIFEST, what: 'manifest rows' })).toEqual(
+      [],
+    );
+    expect(
+      floorBreach('evidence-page/manifest-rows', MANIFEST.length),
+    ).toBeUndefined();
 
     const html = build({ report: reportNamingAnUncapturedJourney });
 
