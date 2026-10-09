@@ -6,6 +6,8 @@ import {
 } from '../unit/spec-scan';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import {
   callsIn,
   declarationsIn,
@@ -255,6 +257,9 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   // What the corpus loop reports for a file, read the way it reads one.
   const scanned = (src: string[]) =>
     analyze('synthetic.spec.ts', src.join('\n'));
+  // The same scan with the declarations it walked kept beside its findings,
+  // so a clean verdict is searched over what the scanner read in that source.
+  const readOf = (src: string) => read('synthetic.spec.ts', src);
 
   it('flags an untagged test that resizes the viewport, naming file, line and title', () => {
     const src = [
@@ -285,7 +290,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const reading = readOf(src);
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/tag-added', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('flags a tag on a test whose body never touches the viewport as stale', () => {
@@ -345,8 +359,8 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('accepts a page.viewportSize() read in a tagged test that resizes', () => {
-    expect(
-      scanned([
+    const reading = readOf(
+      [
         "import { test, expect } from './fixtures';",
         '',
         "test('reads back its own size', { tag: '@emulated-viewport' }, async ({ page }) => {",
@@ -354,8 +368,20 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         '  expect(page.viewportSize()?.width).toBe(320);',
         '});',
         '',
-      ]),
+      ].join('\n'),
+    );
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'viewport-tagging/read-in-tagged-resize',
+        reading.judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('still calls a tag stale when a page.viewportSize() read is all that justifies it', () => {
@@ -391,7 +417,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const reading = readOf(src);
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/runtime-skip', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('attributes test.use({ viewport }) to its enclosing describe, both directions', () => {
@@ -417,7 +452,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "test.describe('narrow screens', () => {",
       "test.describe('narrow screens', { tag: '@emulated-viewport' }, () => {",
     );
-    expect(analyze('synthetic.spec.ts', tagged)).toEqual([]);
+    const reading = readOf(tagged);
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/tagged-describe', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('asks the group to carry the tag for a resize reached through an aliased callee, rather than passing over it', () => {
@@ -475,7 +519,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const reading = readOf(src);
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/comment-only', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('tolerates a wrapped title (test( on one line, the quoted title on the next)', () => {
@@ -496,7 +549,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const reading = readOf(src);
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/wrapped-title', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('sees test.use({ viewport }) written in shorthand', () => {
@@ -517,15 +579,24 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('is not fooled by a declaration spelled inside a string', () => {
-    expect(
-      scanned([
+    const reading = readOf(
+      [
         "import { test } from './fixtures';",
         "test('resizes', { tag: '@emulated-viewport' }, async ({ page }) => {",
         '  const example = "test(\'not a test\', async () => {})";',
         '  await page.setViewportSize({ width: 320, height: 800 });',
         '});',
-      ]),
+      ].join('\n'),
+    );
+    expect(
+      searched(reading.findings, {
+        of: reading.judged,
+        what: 'declarations the scanner read',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('viewport-tagging/string-declaration', reading.judged.length),
+    ).toBeUndefined();
   });
 
   it('gives a resize in a hook to the group the hook runs for, not to the test above it', () => {

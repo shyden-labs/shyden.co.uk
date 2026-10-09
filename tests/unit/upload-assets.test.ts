@@ -6,6 +6,8 @@ import {
   planOf,
   UPLOAD_BATCH,
 } from '../../scripts/upload-evidence-assets.mjs';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,11 +57,22 @@ describe('reading what the asset store already holds', () => {
   it('reads an empty store as empty, because that is what a first run sees', () => {
     // The store starts empty. Refusing here would make the first upload of
     // any artifact impossible.
+    const cases = [
+      {
+        case: 'the listing of a store holding nothing',
+        listing:
+          'Assets of https://x: 0 files, 0 of 1073741824 bytes used (limit 5000 files).',
+      },
+    ];
     expect(
-      parseAssetListing(
-        'Assets of https://x: 0 files, 0 of 1073741824 bytes used (limit 5000 files).',
+      searched(
+        cases.flatMap(({ listing }) => parseAssetListing(listing)),
+        { of: cases, what: 'listings parsed' },
       ),
     ).toEqual([]);
+    expect(
+      floorBreach('upload-assets/empty-store-listings', cases.length),
+    ).toBeUndefined();
   });
 
   it('refuses a listing that lists fewer assets than its own header declares', () => {

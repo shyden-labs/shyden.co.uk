@@ -267,7 +267,16 @@ describe("a job's own budget and scripts, as the runner reads them (#157)", () =
   });
 
   it('lists no scripts for a job with no steps', () => {
-    expect(onlyJob('').runs).toEqual([]);
+    const cases = [{ case: 'a job with no steps', job: '' }];
+    expect(
+      searched(
+        cases.flatMap(({ job }) => onlyJob(job).runs),
+        { of: cases, what: 'jobs read for scripts' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/job-with-no-steps', cases.length),
+    ).toBeUndefined();
   });
 
   it('refuses steps that are not a list of mappings with script runs', () => {
@@ -354,15 +363,21 @@ describe('no job runs on the runner default budget (#157)', () => {
   // the call is bounded exactly when the called file is one this repo's guards
   // read (#163).
   it('reads a job-level uses: as the workflow the job calls', () => {
-    const [caller, ordinary] = workflowJobs(
+    const jobs = workflowJobs(
       'jobs:\n  test:\n    uses: ./.github/workflows/ci.yml\n' +
         '  build:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n',
       'fixture.yml',
     );
+    const [caller, ordinary] = jobs;
     expect(caller.uses).toBe('./.github/workflows/ci.yml');
     // GitHub refuses `runs-on` beside a job-level `uses:`, so a caller asks
     // for no runner of its own; the jobs it calls do.
-    expect(caller.runsOn).toEqual([]);
+    expect(
+      searched(caller.runsOn, { of: jobs, what: 'jobs of the fixture' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/job-level-uses-jobs', jobs.length),
+    ).toBeUndefined();
     expect(ordinary.uses).toBeUndefined();
     expect(ordinary.runsOn).toEqual(['ubuntu-latest']);
   });
@@ -512,7 +527,21 @@ describe('the secrets a job reads, and the environment it reads them in (#241)',
       onlyJob('    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n')
         .secrets,
     ).toEqual(['GITHUB_TOKEN']);
-    expect(onlyJob('    steps:\n      - run: npm ci\n').secrets).toEqual([]);
+    const cases = [
+      {
+        case: 'a job whose only step reads no secret',
+        job: '    steps:\n      - run: npm ci\n',
+      },
+    ];
+    expect(
+      searched(
+        cases.flatMap(({ job }) => onlyJob(job).secrets),
+        { of: cases, what: 'jobs read for secrets' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/job-reading-no-secret', cases.length),
+    ).toBeUndefined();
   });
 });
 
@@ -621,9 +650,16 @@ const NEVER_REQUIRES =
 describe('an aggregate judges its needs in a step, and only that shape is excused (#582)', () => {
   it('excuses the aggregate from asking for success in its condition', () => {
     expect(isAggregate(aggregateJob({}))).toBe(true);
+    const jobs = workflowJobs(aggregateShape(), 'fixture.yml');
     expect(
-      skippedUpstreamFindings(workflowJobs(aggregateShape(), 'fixture.yml')),
+      searched(skippedUpstreamFindings(jobs), {
+        of: jobs,
+        what: 'jobs of the aggregate fixture',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('workflow-jobs/aggregate-excused-jobs', jobs.length),
+    ).toBeUndefined();
   });
 
   it.each([
