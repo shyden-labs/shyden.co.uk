@@ -65,6 +65,33 @@ export function wwwRedirectLocation(url) {
 }
 
 /**
+ * The locales whose pages sit under a path prefix (`/id/...`). Written out
+ * because this file runs as plain JS at the edge and cannot import
+ * `src/lib/i18n`; `tests/unit/lockdown.test.ts` asserts it equals
+ * `PREFIXED_LOCALES` (exact set and order).
+ */
+export const PREFIXED_LOCALE_CODES = ['id', 'zh', 'vi', 'th'];
+
+/**
+ * #635: the Glory Points page moved to /yeetalk-calculators. The old address
+ * redirects (301) to the calculator the bookmark was for, keeping the locale
+ * prefix and query string. Host is not consulted, so dev and prod behave the
+ * same. Returns a root-relative target, or null for any other path. Runs
+ * BEFORE the auth gate so the redirect is public.
+ *
+ *  @param {URL} url
+ */
+export function legacyPathRedirectLocation(url) {
+  if (typeof url?.pathname !== 'string') return null;
+  const match = new RegExp(
+    `^(?:/(${PREFIXED_LOCALE_CODES.join('|')}))?/glory-points/?$`,
+  ).exec(url.pathname);
+  if (!match) return null;
+  const prefix = match[1] ? `/${match[1]}` : '';
+  return `${prefix}/yeetalk-calculators${url.search}#glory-points`;
+}
+
+/**
  * Body of the dev `robots.txt`. Single literal so the format doesn't
  * drift between the served response and the test.
  */
