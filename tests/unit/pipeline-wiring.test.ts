@@ -1234,9 +1234,6 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
   });
 
   it('reads every workflow for an image, and as many as there are', () => {
-    // Two of the workflows read are #459's probes (probe-459.yml,
-    // probe-459-relay.yml): when they go, lower this floor's figure in
-    // tests/floors.json by hand, which is what a real shrink takes (#468).
     const workflows = workflowYamlNames();
     // Cross-checked against the parsed document: every value naming the
     // image once YAML has unquoted and unfolded it must be one the text scan
@@ -2718,9 +2715,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
   });
 
   it('reads every workflow for an install, and as many as there are', () => {
-    // Two of the workflows read are #459's probes (probe-459.yml,
-    // probe-459-relay.yml): when they go, lower this floor's figure in
-    // tests/floors.json by hand, which is what a real shrink takes (#468).
     const workflows = allWorkflows();
     // Cross-checked against a coarser reading: any line naming wrangler
     // beside a global flag must hold a command the parser reports, or the
