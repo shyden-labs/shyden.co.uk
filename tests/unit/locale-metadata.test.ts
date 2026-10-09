@@ -69,7 +69,15 @@ describe('the locale metadata table', () => {
     // Length first: without it this test passes on an EMPTY table, because
     // "no blanks" and "no duplicates" are both true of nothing.
     expect(names).toHaveLength(5);
-    expect(names.filter((n) => n.trim() === '')).toEqual([]);
+    expect(
+      searched(
+        names.filter((n) => n.trim() === ''),
+        { of: names, what: 'native names' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('locale-metadata/native-names', names.length),
+    ).toBeUndefined();
     expect(
       new Set(names).size,
       'two languages sharing a label is the binary-switcher bug in a new shape',

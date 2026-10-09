@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   declarationsRead,
   expectNothingFound,
@@ -203,6 +205,8 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   // What the corpus loop reports for a file, read the way it reads one.
   const scanned = (src: string[]) =>
     analyze('synthetic.spec.ts', src.join('\n'));
+  // The same read, with the tests it judged beside what it found.
+  const judgedBy = (src: string[]) => read('synthetic.spec.ts', src.join('\n'));
 
   it('flags an untagged test inside a javaScriptEnabled:false describe, naming file, line and title', () => {
     const src = [
@@ -239,7 +243,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const { judged, findings } = read('synthetic.spec.ts', src);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/identical-tagged-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('flags a tag on a test with no enclosing javaScriptEnabled:false describe as stale', () => {
@@ -283,7 +296,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const { judged, findings } = read('synthetic.spec.ts', src);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/sibling-describe-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('holds a nested group to the tag too, since test.use() reaches it', () => {
@@ -314,7 +336,13 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const { judged, findings } = read('synthetic.spec.ts', src);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('isolated-context-tagging/runtime-use-tests', judged.length),
+    ).toBeUndefined();
   });
 
   it('reports test.use({ javaScriptEnabled: false }) inside a test body, which Playwright rejects', () => {
@@ -353,7 +381,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const { judged, findings } = read('synthetic.spec.ts', src);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/template-title-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('ignores a javaScriptEnabled:false-shaped call when it appears only in a comment', () => {
@@ -369,7 +406,16 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       '',
     ].join('\n');
 
-    expect(analyze('synthetic.spec.ts', src)).toEqual([]);
+    const { judged, findings } = read('synthetic.spec.ts', src);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/commented-use-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('finds the group when prettier wraps its opening across lines', () => {
@@ -389,17 +435,24 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('is not fooled by a declaration spelled inside a string', () => {
+    const { judged, findings } = judgedBy([
+      "import { test } from './fixtures';",
+      "test.describe('no script', () => {",
+      '  test.use({ javaScriptEnabled: false });',
+      "  test('real', { tag: '@requires-isolated-context' }, async () => {",
+      '    const example = "test(\'not a test\', async () => {})";',
+      '  });',
+      '});',
+    ]);
     expect(
-      scanned([
-        "import { test } from './fixtures';",
-        "test.describe('no script', () => {",
-        '  test.use({ javaScriptEnabled: false });',
-        "  test('real', { tag: '@requires-isolated-context' }, async () => {",
-        '    const example = "test(\'not a test\', async () => {})";',
-        '  });',
-        '});',
-      ]),
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/string-declaration-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('reports a javaScriptEnabled it cannot read, instead of reading it as enabled', () => {
@@ -460,17 +513,24 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
   });
 
   it('accepts that test once tagged', () => {
+    const { judged, findings } = judgedBy([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a new session', { tag: '@requires-isolated-context' }, async ({ browser }) => {",
+      '  const session = await browser.newContext();',
+      '  await session.close();',
+      '});',
+      '',
+    ]);
     expect(
-      scanned([
-        "import { test, expect } from './fixtures';",
-        '',
-        "test('a new session', { tag: '@requires-isolated-context' }, async ({ browser }) => {",
-        '  const session = await browser.newContext();',
-        '  await session.close();',
-        '});',
-        '',
-      ]),
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/newcontext-tagged-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('opens no context for a newContext() written only in a comment or a string', () => {

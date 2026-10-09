@@ -299,7 +299,15 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
       'No class list arrived. Go back to the other tab and try again.',
       '没有收到名单。',
     );
-    expect(checkNamedLabels([list, common], 'zh')).toEqual([]);
+    // What the check walks: the label unit and the sentence that holds its
+    // common words.
+    const units = [list, common];
+    expect(
+      searched(checkNamedLabels(units, 'zh'), { of: units, what: 'units' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('label-check/common-words-units', units.length),
+    ).toBeUndefined();
   });
 
   // #403. English capitalises a language's name wherever it stands, so the

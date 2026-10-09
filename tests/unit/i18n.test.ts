@@ -132,12 +132,20 @@ describe('locales are complete', () => {
     );
   });
 
-  it.each(catalogues)('%s has no blank string anywhere', (_name, catalogue) => {
-    const blank = deepStrings(catalogue)
-      .filter(([, v]) => v.trim() === '')
-      .map(([k]) => k);
-    expect(blank).toEqual([]);
-  });
+  it.each([
+    ['en', enCatalogue, 'i18n/en-catalogue-blank-strings'],
+    ['id', idCatalogue, 'i18n/id-catalogue-blank-strings'],
+  ] as const)(
+    '%s has no blank string anywhere',
+    (_name, catalogue, floorId) => {
+      const strings = deepStrings(catalogue);
+      const blank = strings.filter(([, v]) => v.trim() === '').map(([k]) => k);
+      expect(
+        searched(blank, { of: strings, what: 'catalogue strings' }),
+      ).toEqual([]);
+      expect(floorBreach(floorId, strings.length)).toBeUndefined();
+    },
+  );
 
   it('Indonesian is actually translated, not copied English', () => {
     // Walks EVERY string rather than five hand-picked ones. A copy-paste
@@ -175,9 +183,16 @@ describe('locales are complete', () => {
     const stillIdentical = deepStrings(idCatalogue)
       .filter(([k, v]) => enMap.get(k) === v)
       .map(([k]) => k);
+    const allowed = [...ALLOWED_IDENTICAL];
     expect(
-      [...ALLOWED_IDENTICAL].filter((k) => !stillIdentical.includes(k)).sort(),
+      searched(allowed.filter((k) => !stillIdentical.includes(k)).sort(), {
+        of: allowed,
+        what: 'allowed-identical entries',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('i18n/allowed-identical-entries', allowed.length),
+    ).toBeUndefined();
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { layoutWidthsFrom } from '../layout-widths';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 /**
  * A breakpoint is measured on BOTH sides: the last width one layout holds and
@@ -74,7 +76,12 @@ describe('the widths a stylesheet can lay out', () => {
       '(device-width >= 600px)',
       '(min-device-width: 600px)',
     ];
-    expect(edgesOf(...others)).toEqual([]);
+    expect(
+      searched(edgesOf(...others), { of: others, what: 'media conditions' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('layout-widths/non-width-conditions', others.length),
+    ).toBeUndefined();
     // The same list with one width condition added finds exactly that one,
     // so the empty answer above is the filter working, not the reader dead.
     expect(edgesOf(...others, '(min-width: 720px)')).toEqual([719, 720]);

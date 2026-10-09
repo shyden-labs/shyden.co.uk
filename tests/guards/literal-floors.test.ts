@@ -21,6 +21,40 @@ import { withoutTsComments } from '../unit/source-text';
 const read = (source: string) =>
   floorSitesIn(parseSource(source, 'fixture.test.ts'));
 
+/**
+ * The units of a planted source the floor reader weighs, as it counts them:
+ * the nodes `pick` keeps, in source order, each as its own text.
+ */
+const unitsIn = (
+  source: string,
+  pick: (node: ts.Node) => boolean,
+): string[] => {
+  const sf = parseSource(source, 'fixture.test.ts');
+  const units: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (pick(node)) units.push(node.getText(sf));
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return units;
+};
+
+/** A relational comparison: what a reader could mistake for a floor. */
+const isComparison = (node: ts.Node): boolean =>
+  ts.isBinaryExpression(node) &&
+  [
+    ts.SyntaxKind.GreaterThanToken,
+    ts.SyntaxKind.GreaterThanEqualsToken,
+    ts.SyntaxKind.LessThanToken,
+    ts.SyntaxKind.LessThanEqualsToken,
+  ].includes(node.operatorToken.kind);
+
+/** A floor matcher call: the one thing a refused source is written around. */
+const isFloorMatcher = (node: ts.Node): boolean =>
+  ts.isCallExpression(node) &&
+  ts.isPropertyAccessExpression(node.expression) &&
+  node.expression.name.text.startsWith('toBeGreaterThan');
+
 describe('floorSitesIn', () => {
   // Planted by hand, one per way this repository writes a floor. Generated
   // from the reader's own list, a dropped form would vanish from both sides
@@ -131,9 +165,17 @@ describe('floorSitesIn', () => {
   });
 
   it("reads no floor in a callback's own comparison", () => {
+    const source = 'expect(rows.filter((r) => r.length > 3)).toEqual([]);';
+    const comparisons = unitsIn(source, isComparison);
     expect(
-      read('expect(rows.filter((r) => r.length > 3)).toEqual([]);').sites,
+      searched(read(source).sites, {
+        of: comparisons,
+        what: 'comparisons in the planted source',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('literal-floors/callback-comparisons', comparisons.length),
+    ).toBeUndefined();
   });
 
   it('reads a bound computed in place as a comparison', () => {
@@ -192,7 +234,13 @@ describe('floorSitesIn', () => {
     ['a spread bound', 'expect(k).toBeGreaterThan(...bounds);', 'one bound'],
   ])('refuses %s by line, never skips it', (_, source, why) => {
     const { sites, refused } = read(source);
-    expect(sites).toEqual([]);
+    const matchers = unitsIn(source, isFloorMatcher);
+    expect(
+      searched(sites, { of: matchers, what: 'floor matchers in the source' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('literal-floors/refused-matchers', matchers.length),
+    ).toBeUndefined();
     expect(refused).toHaveLength(1);
     expect(refused[0]).toMatch(/^fixture\.test\.ts:1: /);
     expect(refused[0]).toContain(why);
