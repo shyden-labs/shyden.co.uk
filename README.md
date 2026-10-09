@@ -7,12 +7,12 @@ sits behind Basic auth and disallows crawling.
 
 ## What's on the site
 
-| Route               | What it is                                                                             | Ships JS |
-| ------------------- | -------------------------------------------------------------------------------------- | -------- |
-| `/`                 | Company homepage                                                                       | **no**   |
-| `/glory-points`     | Glory Points Calculator — a client-side companion tool for the third-party YeeTalk app | yes      |
-| `/classroom-groups` | Classroom Group Creator — builds fair random groups from a class list, for teachers    | yes      |
-| `/404`              | Not-found page                                                                         | no       |
+| Route                  | What it is                                                                                                                 | Ships JS |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `/`                    | Company homepage                                                                                                           | **no**   |
+| `/yeetalk-calculators` | YeeTalk Calculators — client-side companion tools for the third-party YeeTalk app (the old `/glory-points` redirects here) | yes      |
+| `/classroom-groups`    | Classroom Group Creator — builds fair random groups from a class list, for teachers                                        | yes      |
+| `/404`                 | Not-found page                                                                                                             | no       |
 
 Every route also exists in four more languages: `/id/` (Bahasa Indonesia),
 `/zh/`, `/vi/` and `/th/`. Locales are declared in `src/lib/i18n/locales.ts`;

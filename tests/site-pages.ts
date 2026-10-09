@@ -52,7 +52,8 @@ export const sitePaths = (): string[] =>
  */
 export const HEADING_FOR: Record<string, (locale: Locale) => string> = {
   '/': (locale) => getSiteStrings(locale).home.heroHeading,
-  '/glory-points': (locale) => getSiteStrings(locale).glory.heading,
+  '/yeetalk-calculators': (locale) =>
+    getSiteStrings(locale).calculators.heading,
   '/classroom-groups': (locale) => getStrings(locale).heading,
 };
 
@@ -84,7 +85,7 @@ export function headingFor(path: string): (locale: Locale) => string {
  */
 export const TITLE_FOR: Record<string, (locale: Locale) => string> = {
   '/': (locale) => getSiteStrings(locale).home.title,
-  '/glory-points': (locale) => getSiteStrings(locale).glory.title,
+  '/yeetalk-calculators': (locale) => getSiteStrings(locale).calculators.title,
   '/classroom-groups': (locale) => `${getStrings(locale).title} — Shyden`,
 };
 

@@ -42,7 +42,7 @@ test.describe('the sitemap', () => {
     // six was correct for two languages and silently wrong the moment #22
     // added three more.
     for (const locale of LOCALES)
-      for (const page of ['/', '/classroom-groups', '/glory-points'])
+      for (const page of ['/', '/classroom-groups', '/yeetalk-calculators'])
         expect(built).toContain(localisePath(page, locale).replace(/\/$/, ''));
   });
 

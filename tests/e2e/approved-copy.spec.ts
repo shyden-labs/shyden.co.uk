@@ -187,11 +187,11 @@ test.describe('the copy the operator approved on #161', () => {
       );
     });
 
-    test(`${locale}: the Glory Points page reads as approved`, async ({
+    test(`${locale}: the YeeTalk Calculators page reads as approved`, async ({
       page,
     }) => {
-      const glory = getSiteStrings(locale).glory;
-      await page.goto(localisePath('/glory-points', locale));
+      const glory = getSiteStrings(locale).calculators;
+      await page.goto(localisePath('/yeetalk-calculators', locale));
 
       const heading = page.getByRole('heading', { level: 1 });
       await expectVisibleText(heading, glory.heading);

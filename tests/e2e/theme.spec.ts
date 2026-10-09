@@ -48,7 +48,7 @@ test.describe('no flash of the other theme (#142 §6.3, AC5)', () => {
       test('the first frame that paints a ground paints the saved theme', async ({
         page,
       }) => {
-        await page.goto('/glory-points');
+        await page.goto('/yeetalk-calculators');
         await expectTheme(page, device);
         await page.evaluate(
           (theme) => localStorage.setItem('theme', theme),
@@ -224,11 +224,11 @@ test.describe('the choice persists (#142 AC4)', () => {
     await page.reload();
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     await expectTheme(page, 'light');
     await shoot(
       page,
-      'a light choice made on the homepage holds on /glory-points',
+      'a light choice made on the homepage holds on /yeetalk-calculators',
       toggle(page),
     );
   });
@@ -369,7 +369,7 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
         if (event.persisted) document.documentElement.dataset.restored = '';
       });
     });
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     await toggle(page).click();
     await expectTheme(page, 'light');
     await page.goBack();

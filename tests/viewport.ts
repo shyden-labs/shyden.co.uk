@@ -110,7 +110,7 @@ export const spillPastCard = (
  * target floor, and WCAG 2.2 SC 2.5.8's.
  *
  * Two byte-identical copies before #277 (`chrome.spec.ts` and
- * `glory-points.spec.ts`), and a THIRD in `homepage.spec.ts` that stays where
+ * `yeetalk-calculators.spec.ts`), and a THIRD in `homepage.spec.ts` that stays where
  * it is on purpose: it sits inline inside a `.all()` loop because the
  * unproved-loop scanner in `event-collectors.test.ts` matches that exact
  * shape, and hoisting it out would make the loop invisible to a guard that

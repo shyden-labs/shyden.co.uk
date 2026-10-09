@@ -83,7 +83,7 @@ test.describe('the production smoke', () => {
     });
 
   test('the calculator still explains itself', async ({ request }) => {
-    const page = await served(request, '/glory-points');
+    const page = await served(request, '/yeetalk-calculators');
     expect(page.status).toBe(200);
     expect(page.body).toMatch(/How to use it/i);
   });

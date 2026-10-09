@@ -29,7 +29,7 @@ import {
 /** The pages whose footer carries the form: one form, the locale in the path. */
 export const FOOTER_PAGE_IDS = [
   'home',
-  'glory-points',
+  'yeetalk-calculators',
   'classroom-groups',
 ] as const;
 export type FooterPageId = (typeof FOOTER_PAGE_IDS)[number];
@@ -76,7 +76,7 @@ interface PageEntry {
   readonly unshown?: ReadonlySet<string>;
 }
 
-/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, GloryPointsPage `.glory`, ClassroomGroupsPage `getStrings`, 404.astro `.notFound`. */
+/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, YeetalkCalculatorsPage `.calculators`, ClassroomGroupsPage `getStrings`, 404.astro `.notFound`. */
 const PAGES: Record<PageId, PageEntry> = {
   home: {
     route: '/',
@@ -85,10 +85,10 @@ const PAGES: Record<PageId, PageEntry> = {
     toolCatalogue: false,
     chrome: true,
   },
-  'glory-points': {
-    route: '/glory-points',
+  'yeetalk-calculators': {
+    route: '/yeetalk-calculators',
     localised: true,
-    siteSection: 'glory',
+    siteSection: 'calculators',
     toolCatalogue: false,
     chrome: true,
   },

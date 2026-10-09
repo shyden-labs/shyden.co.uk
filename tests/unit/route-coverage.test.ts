@@ -12,7 +12,7 @@ import { floorBreach } from '../floors';
  * #21 Stage 4. Adding a locale must not mean writing routes by hand.
  *
  * Every prefixed locale used to need its own directory of `.astro` files —
- * `src/pages/id/index.astro`, `id/glory-points.astro`, `id/classroom-groups
+ * `src/pages/id/index.astro`, `id/yeetalk-calculators.astro`, `id/classroom-groups
  * .astro`, each a two-line wrapper around the same page component. Adding
  * `zh`, `vi` and `th` that way is nine more files, and the failure mode is
  * silent: forget one and that locale simply 404s on that page, with nothing
@@ -189,7 +189,7 @@ describe('the post-deploy gates derive their routes', () => {
   });
 
   it.each([
-    ['a quoted path', "await page.goto('/id/glory-points');"],
+    ['a quoted path', "await page.goto('/id/yeetalk-calculators');"],
     ['a locale home', 'await page.goto("/zh");'],
     ['a template with a substitution', 'await page.goto(`/th/${page}`);'],
     ['a path after a base URL', 'await fetch(`${base}/vi/classroom-groups`);'],
@@ -217,7 +217,7 @@ describe('the post-deploy gates derive their routes', () => {
  *
  * It was, in a `describe('the production smoke covers every route')` that
  * built its expectation from `LOCALES` and a hand-written
- * `['/', '/glory-points', '/classroom-groups']` — inside a guard whose stated
+ * `['/', '/yeetalk-calculators', '/classroom-groups']` — inside a guard whose stated
  * purpose was to make a hand-written list unable to go stale. It could catch a
  * sixth locale and was blind to a fourth page.
  *

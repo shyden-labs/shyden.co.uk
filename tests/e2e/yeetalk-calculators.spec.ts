@@ -5,13 +5,13 @@ import { getSiteStrings } from '../../src/lib/i18n/index';
 import { expectVisibleText } from './helpers';
 import { localePaths } from './locale-sampling';
 
-const en = getSiteStrings('en').glory;
-const id = getSiteStrings('id').glory;
+const en = getSiteStrings('en').calculators;
+const id = getSiteStrings('id').calculators;
 
 test.use(recorded);
 test.describe('glory points calculator', () => {
   test('computes the exact breakdown for 1000', async ({ page }) => {
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     await page.fill('#glory-input', '1000');
     await page.click('#glory-submit');
     // The whole line, so each amount sits in its own place: three
@@ -19,7 +19,7 @@ test.describe('glory points calculator', () => {
     // F124). The amounts are literals, the sentence is the catalogue's.
     await expectVisibleText(
       page.locator('#glory-result'),
-      en.resultLine('1,000', '1,112', '2,780'),
+      en.glory.resultLine('1,000', '1,112', '2,780'),
     );
     await expect(page.locator('#glory-error')).toBeEmpty(); // result & error are mutually exclusive
   });
@@ -32,21 +32,21 @@ test.describe('glory points calculator', () => {
     //
     // The Indonesian calculator had never been exercised at all — which is
     // how this survived, along with t.errors.* and the English fallback in
-    // glory-points.ts.
-    await page.goto('/id/glory-points');
+    // yeetalk-calculators.ts.
+    await page.goto('/id/yeetalk-calculators');
     await page.fill('#glory-input', '1000');
     await page.click('#glory-submit');
     await expectVisibleText(
       page.locator('#glory-result'),
-      id.resultLine('1.000', '1.112', '2.780'),
+      id.glory.resultLine('1.000', '1.112', '2.780'),
     );
   });
 
   test('the Indonesian calculator refuses in Indonesian', async ({ page }) => {
-    await page.goto('/id/glory-points');
+    await page.goto('/id/yeetalk-calculators');
     await page.fill('#glory-input', 'abc');
     await page.click('#glory-submit');
-    // The English fallback at glory-points.ts would render the raw English
+    // The English fallback at yeetalk-calculators.ts would render the raw English
     // message here; the map must actually cover this code. Named, not merely
     // "not English": any other Indonesian sentence passed that (#390 F124).
     await expectVisibleText(page.locator('#glory-error'), id.errors.notWhole);
@@ -54,19 +54,19 @@ test.describe('glory points calculator', () => {
   });
 
   test('Enter key submits', async ({ page }) => {
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     await page.fill('#glory-input', '9');
     await page.press('#glory-input', 'Enter');
     await expectVisibleText(
       page.locator('#glory-result'),
-      en.resultLine('9', '10', '25'),
+      en.glory.resultLine('9', '10', '25'),
     );
     await expect(page.locator('#glory-error')).toBeEmpty();
   });
   test('shows YeeTalk attribution linking to the official site', async ({
     page,
   }) => {
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     const link = page.locator('a[href="https://yeetalkapp.com/"]');
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('rel', /noopener/);
@@ -86,7 +86,7 @@ test.describe('glory points calculator', () => {
     test(`input ${JSON.stringify(input)} shows error ${JSON.stringify(message)}`, async ({
       page,
     }) => {
-      await page.goto('/glory-points');
+      await page.goto('/yeetalk-calculators');
       if (input) await page.fill('#glory-input', input);
       await page.click('#glory-submit');
       await expectVisibleText(page.locator('#glory-error'), message);
@@ -96,25 +96,24 @@ test.describe('glory points calculator', () => {
 });
 
 test.describe('glory points — explains what it does and how to use it', () => {
-  test('the lead says: enter a target, get the exact amounts NEEDED to reach it', async ({
+  test('the lead names both jobs: reach a glory points target, or value a received gift', async ({
     page,
   }) => {
-    // Pin the CAUSAL DIRECTION, not just the vocabulary: glory points are the
-    // INPUT you enter, and the exact coins/beans/total gift value are the OUTPUT
-    // you NEED to reach that target. A backwards rewrite that keeps all the same
-    // keywords (e.g. "enter the gift value → get the glory points") must FAIL
-    // this, which a set of order-independent substring checks could not catch.
-    await page.goto('/glory-points');
+    // Pin the order and the direction, not just the vocabulary: the page says
+    // what it takes to REACH a glory points target, then what a gift is WORTH
+    // once received. Order-independent substring checks would pass a lead that
+    // swapped the two jobs (#390 F124).
+    await page.goto('/yeetalk-calculators');
     const lead = page.locator('.lead');
     await expect(lead).toContainText(
-      /enter the number of glory points.+exact coins, beans and total gift value you need to reach it/i,
+      /what it takes to reach a glory points target.+what a gift is worth once it's received/i,
     );
   });
 
   test('gives numbered, in-order steps: enter → calculate → read the result', async ({
     page,
   }) => {
-    await page.goto('/glory-points');
+    await page.goto('/yeetalk-calculators');
     await expect(
       page.getByRole('heading', { name: /how to use it/i }),
     ).toBeVisible();
@@ -140,7 +139,7 @@ test.describe('glory points — explains what it does and how to use it', () => 
 
 test.describe('glory points — touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
   // Every locale (#423): the submit button's label is the page's own copy.
-  for (const path of localePaths('/glory-points'))
+  for (const path of localePaths('/yeetalk-calculators'))
     test(
       `mobile: attribution link, input and submit button are ≥44px -- ${path}`,
       { tag: '@emulated-viewport' },
@@ -158,7 +157,7 @@ test.describe('glory points — touch targets ≥ 44×44px (WCAG / mobile-first)
 // and 1280px only, so 375 and 768px were read in English alone.
 test.describe('glory points — mobile-first layout', () => {
   for (const width of [320, 375, 768, 1280]) {
-    for (const path of localePaths('/glory-points'))
+    for (const path of localePaths('/yeetalk-calculators'))
       test(
         `no horizontal scroll at ${width}px -- ${path}`,
         { tag: '@emulated-viewport' },

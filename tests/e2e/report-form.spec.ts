@@ -68,7 +68,7 @@ for (const locale of PREFIXED_LOCALES)
   test(`${locale}: every control is at least 44px, every text meets AA, every field has a 3:1 boundary`, async ({
     page,
   }) => {
-    await page.goto(pagePath('glory-points', locale));
+    await page.goto(pagePath('yeetalk-calculators', locale));
     const t = getSiteStrings(locale).report;
     await page.locator('[data-report] summary').click();
     for (const target of [

@@ -12,6 +12,7 @@ import { expectedBadges } from '../beta-badges';
 import { deployedRoutes } from '../site-pages';
 import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectTheSwitchPersists } from '../themes';
+import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 import { robotsDirectives } from '../robots-directives';
 import { expectNotFoundServed } from '../not-found-served';
 
@@ -35,7 +36,7 @@ test('an unknown path answers 404 with the not-found page', async ({
 });
 
 test('the Glory Points calculator loads on dev', async ({ page }) => {
-  const res = await page.goto('/glory-points');
+  const res = await page.goto('/yeetalk-calculators');
   expect(res?.status()).toBe(200);
   await expect(page.locator('#glory-input')).toBeVisible();
 });
@@ -150,6 +151,25 @@ test(
     expect(res.headers.get('www-authenticate')).toMatch(/^Basic realm=/);
   },
 );
+
+// #635: the Glory Points page moved. The redirect answers BEFORE the auth gate
+// (like www), so a bookmark never meets a 401: raw fetch, no credentials.
+for (const [from, to] of LEGACY_REDIRECTS)
+  test(
+    `${from} answers 301 to ${to} with no credentials`,
+    {
+      tag: '@deployed-only',
+      annotation: {
+        type: 'deployed-only',
+        description:
+          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+      },
+    },
+    async () => {
+      const res = await fetch(`${BASE}${from}`, { redirect: 'manual' });
+      expectMovedTo(res.status, res.headers.get('location'), to);
+    },
+  );
 
 // The dev build sets each product's variable (PUBLIC_SHYTALK_URL,
 // PUBLIC_YAWELO_IDLE_URL) to its dev host, so EVERY outbound link to that

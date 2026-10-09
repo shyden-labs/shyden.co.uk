@@ -452,19 +452,19 @@ describe('on the live catalogues', () => {
     ['th', 'stateMixed', 'แบ่งตามเพศ', 'mix'],
     [
       'vi',
-      'site.glory.howToSteps[0]',
+      'site.calculators.glory.howToSteps[0]',
       'Hãy nhập số điểm vinh quang mà bạn muốn đạt được vào ô bên dưới.',
       'gloryPoints',
     ],
     [
       'th',
-      'site.glory.assumptions',
+      'site.calculators.glory.assumptions',
       'สมมติว่า 1 คะแนนเท่ากับ 1 เหรียญ, 0.9 เหรียญต่อถั่ว และของขวัญจะถูกแปลงเป็นถั่วในอัตรา 40%',
       'bean',
     ],
     [
       'zh',
-      'site.glory.howToSteps[2]',
+      'site.calculators.glory.howToSteps[2]',
       '请准确读出达到该目标所需的硬币、豆子以及礼物总价值。',
       'coin',
     ],

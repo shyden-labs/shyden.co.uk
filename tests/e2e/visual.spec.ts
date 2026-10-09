@@ -47,7 +47,7 @@ import { expectTheme } from '../themes';
 const PAGES = [
   { name: 'home-en', path: '/' },
   { name: 'home-id', path: '/id/' },
-  { name: 'glory-points', path: '/glory-points' },
+  { name: 'yeetalk-calculators', path: '/yeetalk-calculators' },
   { name: 'classroom-groups', path: '/classroom-groups' },
   { name: 'not-found', path: '/404' },
 ] as const;

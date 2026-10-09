@@ -49,7 +49,7 @@ import { checkLabels } from '../../src/lib/i18n/label-check';
  * read there is pinned here: the 29 corrections he approved, the sentences
  * that came with them, and the values he chose to keep. Those keys are
  * spelled the way `backTranslationUnits` spells a path (`howToSteps[2]`,
- * `site.glory.heading`, `csv.columns.apart`), so a flag and its pin name the
+ * `site.calculators.heading`, `csv.columns.apart`), so a flag and its pin name the
  * same copy. A CSV header word is a parsing token as well as copy (#252), so
  * correcting one keeps the old word readable: `supersededColumns`.
  *
@@ -132,11 +132,10 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionGroupingHeading: 'Opsi pengelompokan',
     sectionImportExportHeading: 'Impor / ekspor',
     sectionSoundHeading: 'Suara dan animasi',
-    'site.glory.forYeetalk': 'Untuk YeeTalk ↗',
+    'site.calculators.forYeetalk': 'Untuk YeeTalk ↗',
     'site.home.emailUs': 'Kirim email',
     'site.home.exploreShytalk': 'Jelajahi ShyTalk',
     'site.home.exploreYaweloIdle': 'Jelajahi Yawelo Idle',
-    'site.home.openGlory': 'Buka kalkulator',
     'site.home.pauseMotion': 'Jeda gerakan',
     'site.home.shytalkKicker': 'Belajar dengan berbicara',
     'site.home.toolBadge': 'Aktif sekarang',
@@ -265,11 +264,10 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionGroupingHeading: '分组选项',
     sectionImportExportHeading: '导入 / 导出',
     sectionSoundHeading: '声音和动画',
-    'site.glory.forYeetalk': '适用于 YeeTalk ↗',
+    'site.calculators.forYeetalk': '适用于 YeeTalk ↗',
     'site.home.emailUs': '给我们发邮件',
     'site.home.exploreShytalk': '了解 ShyTalk',
     'site.home.exploreYaweloIdle': '了解 Yawelo Idle',
-    'site.home.openGlory': '打开计算器',
     'site.home.pauseMotion': '暂停动画',
     'site.home.shytalkKicker': '通过交谈学习',
     'site.home.toolBadge': '已上线',
@@ -308,9 +306,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     keepApartLabel: 'Xếp khác nhóm',
     modeLabel: 'Phân chia theo',
     sectionStudentsHeading: 'Thông tin học sinh',
-    'site.glory.heading': 'Máy tính Glory Points',
-    'site.glory.title': 'Máy tính Glory Points — Shyden',
-    'site.home.workGloryTitle': 'Máy tính Glory Points',
+    'site.calculators.glory.heading': 'Máy tính Glory Points',
     stateAdded: '{n} đã được thêm vào',
     stateApart: '{n} tách biệt',
     stateNamed: '{n} đã có tên',
@@ -391,11 +387,10 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionGroupingHeading: 'Các tùy chọn phân nhóm',
     sectionImportExportHeading: 'Nhập / xuất',
     sectionSoundHeading: 'Âm thanh và hoạt ảnh',
-    'site.glory.forYeetalk': 'Dành cho YeeTalk ↗',
+    'site.calculators.forYeetalk': 'Dành cho YeeTalk ↗',
     'site.home.emailUs': 'Gửi email cho chúng tôi',
     'site.home.exploreShytalk': 'Khám phá ShyTalk',
     'site.home.exploreYaweloIdle': 'Khám phá Yawelo Idle',
-    'site.home.openGlory': 'Mở máy tính',
     'site.home.pauseMotion': 'Tạm dừng chuyển động',
     'site.home.shytalkKicker': 'Học qua giao tiếp',
     'site.home.toolBadge': 'Đang hoạt động',
@@ -439,9 +434,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printClassListHeading: 'รายชื่อนักเรียน',
     printWhatClassList: 'รายชื่อนักเรียน',
     rosterAbsentPill: 'ไม่มา',
-    'site.glory.heading': 'เครื่องคำนวณ Glory Points',
-    'site.glory.title': 'เครื่องคำนวณ Glory Points — Shyden',
-    'site.home.workGloryTitle': 'เครื่องคำนวณ Glory Points',
+    'site.calculators.glory.heading': 'เครื่องคำนวณ Glory Points',
     stateAbsent: '{n} ไม่มา',
     stateAdded: '{n} ได้เพิ่มแล้ว',
     stateApart: '{n} แยกกัน',
@@ -536,11 +529,10 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionGroupingHeading: 'ตัวเลือกการจัดกลุ่ม',
     sectionImportExportHeading: 'นำเข้า / ส่งออก',
     sectionSoundHeading: 'เสียงและภาพเคลื่อนไหว',
-    'site.glory.forYeetalk': 'สำหรับ YeeTalk ↗',
+    'site.calculators.forYeetalk': 'สำหรับ YeeTalk ↗',
     'site.home.emailUs': 'ส่งอีเมลให้เรา',
     'site.home.exploreShytalk': 'สำรวจ ShyTalk',
     'site.home.exploreYaweloIdle': 'สำรวจ Yawelo Idle',
-    'site.home.openGlory': 'เปิดเครื่องคำนวณ',
     'site.home.pauseMotion': 'หยุดภาพเคลื่อนไหว',
     'site.home.shytalkKicker': 'เรียนรู้ผ่านการพูดคุย',
     'site.home.toolBadge': 'พร้อมใช้งาน',
@@ -754,10 +746,20 @@ describe('short labels that disagree with their own locale', () => {
  * has no labels to judge here.
  */
 const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
-  id: [],
-  zh: [],
-  vi: [],
-  th: [],
+  id: [
+    'site.calculators.glory.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
+  zh: [
+    'site.calculators.glory.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
+  // #635: YeeTalk Calculators and "Open the calculators" are new English the
+  // operator has not read in these two locales. Awaiting his read, then pinned.
+  vi: ['site.calculators.title', 'site.home.openCalculators'],
+  th: ['site.calculators.title', 'site.home.openCalculators'],
 };
 
 // One id per locale: the search below runs once per locale over its own labels.

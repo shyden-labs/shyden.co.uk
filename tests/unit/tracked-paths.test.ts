@@ -62,7 +62,7 @@ describe('tracked paths', () => {
     'package.json',
     '.github/workflows/ci.yml',
     'src/pages/[locale]/index.astro',
-    'src/pages/[locale]/glory-points.astro',
+    'src/pages/[locale]/yeetalk-calculators.astro',
     'src/assets/sfx/land-1.m4a',
   ])('accepts %j', (path) => {
     expect(isPlainPath(path)).toBe(true);

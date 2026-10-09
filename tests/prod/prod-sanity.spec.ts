@@ -5,6 +5,7 @@ import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectNoHorizontalScroll } from '../viewport';
 import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
+import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 
 /**
  * Every route the site serves, derived. #49.
@@ -63,7 +64,7 @@ test('the homepage renders, and its stylesheet actually applied', async ({
 test('the Glory Points calculator computes, not just loads', async ({
   page,
 }) => {
-  await page.goto('/glory-points');
+  await page.goto('/yeetalk-calculators');
   await expect(page.locator('#glory-input')).toBeVisible();
 
   // The script is what makes this a calculator rather than a form. If the
@@ -183,3 +184,21 @@ test(
     await expectReportsBound(request);
   },
 );
+
+// #635: the Glory Points page moved; the old address answers 301 on production.
+for (const [from, to] of LEGACY_REDIRECTS)
+  test(
+    `${from} answers 301 to ${to}`,
+    {
+      tag: '@deployed-only',
+      annotation: {
+        type: 'deployed-only',
+        description:
+          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+      },
+    },
+    async ({ request }) => {
+      const res = await request.get(from, { maxRedirects: 0 });
+      expectMovedTo(res.status(), res.headers()['location'] ?? null, to);
+    },
+  );

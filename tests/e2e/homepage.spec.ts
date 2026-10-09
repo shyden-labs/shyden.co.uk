@@ -327,7 +327,7 @@ test.describe('homepage content', () => {
         .locator('a[href]')
         .evaluateAll((links) => links.map((l) => l.getAttribute('href')));
       expect(hrefs.sort(), 'the tool links').toEqual(
-        ['/classroom-groups', '/glory-points'].map((tool) =>
+        ['/classroom-groups', '/yeetalk-calculators'].map((tool) =>
           localisePath(tool, locale),
         ),
       );

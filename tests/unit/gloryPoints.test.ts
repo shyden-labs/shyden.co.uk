@@ -138,12 +138,12 @@ describe('the assumptions line states the rate the formula uses (#382)', () => {
       'สมมติว่า 1 คะแนนเท่ากับ 1 เหรียญ, 0.9 เหรียญต่อ bean และของขวัญจะถูกแปลงเป็น bean ในอัตรา 40%',
     ],
   ])('%s', (_locale, site, sentence) => {
-    expect(site.glory.assumptions).toBe(sentence);
+    expect(site.calculators.glory.assumptions).toBe(sentence);
   });
 });
 
 describe('the result line reads in the page’s own language (#390)', () => {
-  // zh, vi and th assigned `siteEn.glory.resultLine` itself, so every result
+  // zh, vi and th assigned `siteEn.calculators.glory.resultLine` itself, so every result
   // on those pages read "… coins → … beans → … total gift value". A function
   // is code, not a string, so no translation guard ever read it.
   it.each([
@@ -153,7 +153,7 @@ describe('the result line reads in the page’s own language (#390)', () => {
     ['vi', siteVi, '1 xu → 2 bean → 3 tổng giá trị quà tặng'],
     ['th', siteTh, '1 เหรียญ → 2 bean → 3 มูลค่ารวมของของขวัญ'],
   ])('%s', (_locale, site, line) => {
-    expect(site.glory.resultLine('1', '2', '3')).toBe(line);
+    expect(site.calculators.glory.resultLine('1', '2', '3')).toBe(line);
   });
 
   it('no translated site catalogue reuses one of English’s functions', () => {

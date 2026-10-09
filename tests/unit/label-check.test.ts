@@ -309,7 +309,11 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
   // cannot pass this.
   it("a language's name is grammar, not a label, while a control is still named", () => {
     const indonesian = unit('csvLanguageVersion.id', 'Indonesian', '印尼语');
-    const calculate = unit('site.glory.calculate', 'Calculate', '计算');
+    const calculate = unit(
+      'site.calculators.glory.calculate',
+      'Calculate',
+      '计算',
+    );
     const journey = unit(
       'site.home.yaweloIdleBody',
       'Journey across the Indonesian archipelago, then select Calculate.',
@@ -319,18 +323,22 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
       checkNamedLabels([indonesian, calculate, journey], 'zh').map(
         ({ labels }) => labels.map(({ key }) => key),
       ),
-    ).toEqual([['site.glory.calculate']]);
+    ).toEqual([['site.calculators.glory.calculate']]);
   });
 
   it('a one-word label is named mid-sentence, never by the capital that starts one', () => {
-    const calculate = unit('site.glory.calculate', 'Calculate', '计算');
+    const calculate = unit(
+      'site.calculators.glory.calculate',
+      'Calculate',
+      '计算',
+    );
     const named = unit(
-      'site.glory.howToSteps[1]',
+      'site.calculators.glory.howToSteps[1]',
       'Select Calculate — or press Enter.',
       '选择“计算”——或按 Enter 键。',
     );
     const opening = unit(
-      'site.glory.lead',
+      'site.calculators.lead',
       'Calculate the coins you need.',
       '算出所需金币。',
     );
@@ -338,7 +346,7 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
       checkNamedLabels([calculate, named, opening], 'zh').map(
         ({ sentence }) => sentence.key,
       ),
-    ).toEqual(['site.glory.howToSteps[1]']);
+    ).toEqual(['site.calculators.glory.howToSteps[1]']);
   });
 
   it('a label inside a longer label the sentence names belongs to the longer one', () => {
@@ -374,8 +382,8 @@ describe('renderedOn: where a label is read', () => {
   it.each([
     ['rosterColSex', '/classroom-groups'],
     ['warnings.SEX_SPILLOVER [sex=M]', '/classroom-groups'],
-    ['site.home.workGloryTitle', '/'],
-    ['site.glory.heading', '/glory-points'],
+    ['site.home.workCalculatorsTitle', '/'],
+    ['site.calculators.heading', '/yeetalk-calculators'],
     ['site.notFound.heading', 'the 404 page'],
     ['site.nav.home', 'the header or footer of every page'],
     ['csv.columns.sex', 'the CSV file a teacher downloads'],

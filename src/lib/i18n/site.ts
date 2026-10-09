@@ -55,10 +55,10 @@ export const siteEn = {
     toolsLead:
       "Two tools we've already built. Free, no sign-up, and working right now.",
     toolBadge: 'Live now',
-    workGloryTitle: 'Glory Points Calculator',
-    workGloryBody:
-      'Turn YeeTalk glory points into the coins, beans and gift value you need to reach your target.',
-    openGlory: 'Open the calculator',
+    workCalculatorsTitle: 'YeeTalk Calculators',
+    workCalculatorsBody:
+      "Work out the coins, beans and gift value behind a YeeTalk glory points target, or what a gift gives once it's received.",
+    openCalculators: 'Open the calculators',
     workClassroomTitle: 'Classroom Group Creator',
     workClassroomBody:
       'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
@@ -75,26 +75,14 @@ export const siteEn = {
     backHome: 'Back to the homepage',
   },
 
-  glory: {
-    title: 'Glory Points Calculator — Shyden',
+  calculators: {
+    title: 'YeeTalk Calculators — Shyden',
     description:
-      'Convert YeeTalk glory points into coins, beans and total gift value — instantly, in your browser.',
+      'Work out YeeTalk glory points, coins, beans and gift value — instantly, in your browser.',
     forYeetalk: 'For YeeTalk ↗',
-    heading: 'Glory Points Calculator',
-    lead: "Glory points are part of YeeTalk's in-app gifting. Enter the number of glory points you're aiming for and this companion tool, built by Shyden, works out the exact coins, beans and total gift value you need to reach it.",
-    howToHeading: 'How to use it',
-    howToSteps: [
-      'Enter the number of glory points you want to reach in the box below.',
-      'Select Calculate — or press Enter.',
-      'Read off the exact coins, beans and total gift value you need to hit that target.',
-    ],
-    inputLabel: 'Glory points',
-    calculate: 'Calculate',
-    resultLine: (coins: string, beans: string, gift: string) =>
-      `${coins} coins → ${beans} beans → ${gift} total gift value`,
+    heading: 'YeeTalk Calculators',
+    lead: "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.",
     needsJs: 'This calculator needs JavaScript enabled.',
-    assumptions:
-      'Assumes 1 coin per point, 0.9 coins per bean, and gifts converting to beans at 40%.',
     // Keyed to gloryPoints.ts's ERRORS so the calculator's own English copy —
     // asserted as a contract by its unit tests — stays untouched while the
     // Indonesian page still speaks Indonesian.
@@ -103,6 +91,21 @@ export const siteEn = {
       notWhole: 'Please enter a whole number.',
       zero: 'Enter a number greater than zero.',
       tooLarge: 'That number is too large.',
+    },
+    glory: {
+      heading: 'Glory Points Calculator',
+      howToHeading: 'How to use it',
+      howToSteps: [
+        'Enter the number of glory points you want to reach in the box below.',
+        'Select Calculate — or press Enter.',
+        'Read off the exact coins, beans and total gift value you need to hit that target.',
+      ],
+      inputLabel: 'Glory points',
+      calculate: 'Calculate',
+      resultLine: (coins: string, beans: string, gift: string) =>
+        `${coins} coins → ${beans} beans → ${gift} total gift value`,
+      assumptions:
+        'Assumes 1 coin per point, 0.9 coins per bean, and gifts converting to beans at 40%.',
     },
   },
 
@@ -194,10 +197,10 @@ export const siteId: SiteStrings = {
     toolsLead:
       'Dua alat yang sudah kami buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
     toolBadge: 'Aktif sekarang',
-    workGloryTitle: 'Kalkulator Glory Points',
-    workGloryBody:
-      'Ubah glory points YeeTalk menjadi koin, bean, dan nilai hadiah yang Anda butuhkan untuk mencapai target.',
-    openGlory: 'Buka kalkulator',
+    workCalculatorsTitle: 'Kalkulator YeeTalk',
+    workCalculatorsBody:
+      'Hitung koin, bean, dan nilai hadiah di balik target glory points YeeTalk, atau apa yang diberikan sebuah hadiah setelah diterima.',
+    openCalculators: 'Buka kalkulator',
     workClassroomTitle: 'Pembuat Kelompok Kelas',
     workClassroomBody:
       'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
@@ -214,31 +217,34 @@ export const siteId: SiteStrings = {
     backHome: 'Kembali ke beranda',
   },
 
-  glory: {
-    title: 'Kalkulator Glory Points — Shyden',
+  calculators: {
+    title: 'Kalkulator YeeTalk — Shyden',
     description:
-      'Ubah glory points YeeTalk menjadi koin, bean, dan total nilai hadiah — seketika, di peramban Anda.',
+      'Hitung glory points, koin, bean, dan nilai hadiah YeeTalk — seketika, di peramban Anda.',
     forYeetalk: 'Untuk YeeTalk ↗',
-    heading: 'Kalkulator Glory Points',
-    lead: 'Glory points adalah bagian dari fitur hadiah di dalam aplikasi YeeTalk. Masukkan jumlah glory points yang Anda tuju, dan alat pendamping buatan Shyden ini menghitung persis berapa koin, bean, dan total nilai hadiah yang Anda perlukan.',
-    howToHeading: 'Cara menggunakannya',
-    howToSteps: [
-      'Masukkan jumlah glory points yang ingin Anda capai pada kotak di bawah.',
-      'Pilih Hitung — atau tekan Enter.',
-      'Baca jumlah persis koin, bean, dan total nilai hadiah yang diperlukan untuk mencapai target itu.',
-    ],
-    inputLabel: 'Glory points',
-    calculate: 'Hitung',
-    resultLine: (coins: string, beans: string, gift: string) =>
-      `${coins} koin → ${beans} bean → ${gift} total nilai hadiah`,
+    heading: 'Kalkulator YeeTalk',
+    lead: 'Dua alat pendamping untuk fitur hadiah di dalam aplikasi YeeTalk, buatan Shyden. Hitung apa yang diperlukan untuk mencapai target glory points, atau berapa nilai sebuah hadiah setelah diterima.',
     needsJs: 'Kalkulator ini memerlukan JavaScript yang aktif.',
-    assumptions:
-      'Mengasumsikan 1 koin per poin, 0,9 koin per bean, dan hadiah dikonversi ke bean sebesar 40%.',
     errors: {
       empty: 'Silakan masukkan angka.',
       notWhole: 'Silakan masukkan bilangan bulat.',
       zero: 'Masukkan angka lebih besar dari nol.',
       tooLarge: 'Angka itu terlalu besar.',
+    },
+    glory: {
+      heading: 'Kalkulator Glory Points',
+      howToHeading: 'Cara menggunakannya',
+      howToSteps: [
+        'Masukkan jumlah glory points yang ingin Anda capai pada kotak di bawah.',
+        'Pilih Hitung — atau tekan Enter.',
+        'Baca jumlah persis koin, bean, dan total nilai hadiah yang diperlukan untuk mencapai target itu.',
+      ],
+      inputLabel: 'Glory points',
+      calculate: 'Hitung',
+      resultLine: (coins: string, beans: string, gift: string) =>
+        `${coins} koin → ${beans} bean → ${gift} total nilai hadiah`,
+      assumptions:
+        'Mengasumsikan 1 koin per poin, 0,9 koin per bean, dan hadiah dikonversi ke bean sebesar 40%.',
     },
   },
 
@@ -317,10 +323,10 @@ export const siteZh: SiteStrings = {
     toolsHeading: '等待期间，先试试这些。',
     toolsLead: '我们已经做好的两款工具。免费，无需注册，现在就能用。',
     toolBadge: '已上线',
-    workGloryTitle: 'Glory Points 计算器',
-    workGloryBody:
-      '把 YeeTalk 的 glory points 换算成达成目标所需的金币、bean 和礼物价值。',
-    openGlory: '打开计算器',
+    workCalculatorsTitle: 'YeeTalk 计算器',
+    workCalculatorsBody:
+      '算出 YeeTalk 的 glory points 目标背后的金币、bean 和礼物价值，或一份礼物在收到后能带来什么。',
+    openCalculators: '打开计算器',
     workClassroomTitle: '课堂小组创建器',
     workClassroomBody:
       '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
@@ -335,31 +341,34 @@ export const siteZh: SiteStrings = {
     body: '该页面不存在。',
     backHome: '返回首页',
   },
-  glory: {
-    title: 'Glory Points 计算器 — Shyden',
+  calculators: {
+    title: 'YeeTalk 计算器 — Shyden',
     description:
-      '将 YeeTalk 的 glory points 换算成金币、bean 和礼物总价值——在浏览器中即可即时完成。',
+      '在浏览器中即时计算 YeeTalk 的 glory points、金币、bean 和礼物价值。',
     forYeetalk: '适用于 YeeTalk ↗',
-    heading: 'Glory Points 计算器',
-    lead: 'Glory points 是 YeeTalk 应用内送礼功能的一部分。输入您想达到的 glory points，这款由 Shyden 开发的辅助工具会算出达到该目标所需的确切金币、bean 和礼物总价值。',
-    howToHeading: '如何使用',
-    howToSteps: [
-      '请在下方框中输入您想达到的 glory points。',
-      '选择“计算”——或按 Enter 键。',
-      '即可看到达到该目标所需的确切金币、bean 和礼物总价值。',
-    ],
-    inputLabel: 'Glory points',
-    calculate: '计算',
-    resultLine: (coins: string, beans: string, gift: string) =>
-      `${coins} 金币 → ${beans} bean → ${gift} 礼物总价值`,
+    heading: 'YeeTalk 计算器',
+    lead: '两款辅助 YeeTalk 应用内送礼功能的工具，由 Shyden 开发。可算出达到 glory points 目标需要什么，或一份礼物在收到后价值多少。',
     needsJs: '此计算器需要启用 JavaScript。',
-    assumptions:
-      '假设每 1 点需 1 枚金币，每个 bean 可兑换 0.9 枚金币，且礼物按 40% 的比例兑换成 bean。',
     errors: {
       empty: '请输入一个数字。',
       notWhole: '请输入一个整数。',
       zero: '请输入一个大于零的数字。',
       tooLarge: '这个数字太大了。',
+    },
+    glory: {
+      heading: 'Glory Points 计算器',
+      howToHeading: '如何使用',
+      howToSteps: [
+        '请在下方框中输入您想达到的 glory points。',
+        '选择“计算”——或按 Enter 键。',
+        '即可看到达到该目标所需的确切金币、bean 和礼物总价值。',
+      ],
+      inputLabel: 'Glory points',
+      calculate: '计算',
+      resultLine: (coins: string, beans: string, gift: string) =>
+        `${coins} 金币 → ${beans} bean → ${gift} 礼物总价值`,
+      assumptions:
+        '假设每 1 点需 1 枚金币，每个 bean 可兑换 0.9 枚金币，且礼物按 40% 的比例兑换成 bean。',
     },
   },
   language: {
@@ -438,10 +447,10 @@ export const siteVi: SiteStrings = {
     toolsLead:
       'Hai công cụ chúng tôi đã xây dựng. Miễn phí, không cần đăng ký, và dùng được ngay bây giờ.',
     toolBadge: 'Đang hoạt động',
-    workGloryTitle: 'Máy tính Glory Points',
-    workGloryBody:
-      'Chuyển glory points của YeeTalk thành số xu, bean và giá trị quà tặng bạn cần để đạt mục tiêu.',
-    openGlory: 'Mở máy tính',
+    workCalculatorsTitle: 'Máy tính YeeTalk',
+    workCalculatorsBody:
+      'Tính số xu, bean và giá trị quà tặng đằng sau mục tiêu glory points của YeeTalk, hoặc một món quà mang lại gì sau khi được nhận.',
+    openCalculators: 'Mở các máy tính',
     workClassroomTitle: 'Trình tạo nhóm trong lớp học',
     workClassroomBody:
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
@@ -456,31 +465,34 @@ export const siteVi: SiteStrings = {
     body: 'Trang đó không tồn tại.',
     backHome: 'Quay lại trang chủ',
   },
-  glory: {
-    title: 'Máy tính Glory Points — Shyden',
+  calculators: {
+    title: 'Máy tính YeeTalk — Shyden',
     description:
-      'Chuyển đổi glory points của YeeTalk thành xu, bean và tổng giá trị quà tặng — ngay lập tức, ngay trên trình duyệt của bạn.',
+      'Tính glory points, xu, bean và giá trị quà tặng trên YeeTalk — ngay lập tức, ngay trên trình duyệt của bạn.',
     forYeetalk: 'Dành cho YeeTalk ↗',
-    heading: 'Máy tính Glory Points',
-    lead: 'Glory points là một phần của tính năng tặng quà trong ứng dụng YeeTalk. Chỉ cần nhập số glory points mà bạn muốn đạt được, công cụ hỗ trợ này – do Shyden phát triển – sẽ tính toán chính xác số xu, bean và tổng giá trị quà tặng mà bạn cần để đạt được mục tiêu đó.',
-    howToHeading: 'Cách sử dụng',
-    howToSteps: [
-      'Hãy nhập số glory points mà bạn muốn đạt được vào ô bên dưới.',
-      'Chọn “Tính toán” — hoặc nhấn phím Enter.',
-      'Xem chính xác số xu, bean và tổng giá trị quà tặng mà bạn cần để đạt được mục tiêu đó.',
-    ],
-    inputLabel: 'Glory points',
-    calculate: 'Tính toán',
-    resultLine: (coins: string, beans: string, gift: string) =>
-      `${coins} xu → ${beans} bean → ${gift} tổng giá trị quà tặng`,
+    heading: 'Máy tính YeeTalk',
+    lead: 'Hai công cụ hỗ trợ cho tính năng tặng quà trong ứng dụng YeeTalk, do Shyden phát triển. Tính xem cần những gì để đạt mục tiêu glory points, hoặc một món quà có giá trị bao nhiêu sau khi được nhận.',
     needsJs: 'Trình tính này cần bật JavaScript.',
-    assumptions:
-      'Giả định mỗi điểm tương ứng với 1 xu, mỗi bean tương ứng với 0,9 xu, và quà tặng được quy đổi thành bean theo tỷ lệ 40%.',
     errors: {
       empty: 'Vui lòng nhập một số.',
       notWhole: 'Vui lòng nhập một số nguyên.',
       zero: 'Hãy nhập một số lớn hơn 0.',
       tooLarge: 'Con số đó quá lớn.',
+    },
+    glory: {
+      heading: 'Máy tính Glory Points',
+      howToHeading: 'Cách sử dụng',
+      howToSteps: [
+        'Hãy nhập số glory points mà bạn muốn đạt được vào ô bên dưới.',
+        'Chọn “Tính toán” — hoặc nhấn phím Enter.',
+        'Xem chính xác số xu, bean và tổng giá trị quà tặng mà bạn cần để đạt được mục tiêu đó.',
+      ],
+      inputLabel: 'Glory points',
+      calculate: 'Tính toán',
+      resultLine: (coins: string, beans: string, gift: string) =>
+        `${coins} xu → ${beans} bean → ${gift} tổng giá trị quà tặng`,
+      assumptions:
+        'Giả định mỗi điểm tương ứng với 1 xu, mỗi bean tương ứng với 0,9 xu, và quà tặng được quy đổi thành bean theo tỷ lệ 40%.',
     },
   },
   language: {
@@ -562,10 +574,10 @@ export const siteTh: SiteStrings = {
     toolsLead:
       'เครื่องมือสองอย่างที่เราทำไว้แล้ว ฟรี ไม่ต้องสมัคร และใช้ได้ทันที',
     toolBadge: 'พร้อมใช้งาน',
-    workGloryTitle: 'เครื่องคำนวณ Glory Points',
-    workGloryBody:
-      'แปลง glory points ของ YeeTalk เป็นจำนวนเหรียญ bean และมูลค่าของขวัญที่คุณต้องใช้เพื่อไปให้ถึงเป้าหมาย',
-    openGlory: 'เปิดเครื่องคำนวณ',
+    workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
+    workCalculatorsBody:
+      'คำนวณเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือของขวัญให้อะไรบ้างเมื่อได้รับแล้ว',
+    openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
       'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
@@ -580,31 +592,34 @@ export const siteTh: SiteStrings = {
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
   },
-  glory: {
-    title: 'เครื่องคำนวณ Glory Points — Shyden',
+  calculators: {
+    title: 'เครื่องคำนวณ YeeTalk — Shyden',
     description:
-      'แปลง glory points ของ YeeTalk เป็นเหรียญ bean และมูลค่ารวมของของขวัญ — ทันที ในเบราว์เซอร์ของคุณ',
+      'คำนวณ glory points, เหรียญ, bean และมูลค่าของขวัญของ YeeTalk — ทันที ในเบราว์เซอร์ของคุณ',
     forYeetalk: 'สำหรับ YeeTalk ↗',
-    heading: 'เครื่องคำนวณ Glory Points',
-    lead: 'Glory points เป็นส่วนหนึ่งของระบบการส่งของขวัญภายในแอป YeeTalk เพียงป้อนจำนวน glory points ที่คุณต้องการ เครื่องมือช่วยนี้ ซึ่งพัฒนาโดย Shyden จะคำนวณจำนวนเหรียญและ bean รวมถึงมูลค่ารวมของของขวัญที่คุณต้องใช้เพื่อให้ถึงเป้าหมายนั้น',
-    howToHeading: 'วิธีใช้',
-    howToSteps: [
-      'กรอกจำนวน glory points ที่คุณต้องการให้ถึงลงในช่องด้านล่าง',
-      'เลือก "คำนวณ" — หรือกด Enter',
-      'ดูจำนวนเหรียญและ bean ที่แน่นอน รวมถึงมูลค่ารวมของของขวัญที่คุณต้องใช้เพื่อให้ถึงเป้าหมายนั้น',
-    ],
-    inputLabel: 'Glory points',
-    calculate: 'คำนวณ',
-    resultLine: (coins: string, beans: string, gift: string) =>
-      `${coins} เหรียญ → ${beans} bean → ${gift} มูลค่ารวมของของขวัญ`,
+    heading: 'เครื่องคำนวณ YeeTalk',
+    lead: 'เครื่องมือช่วยสองชิ้นสำหรับระบบส่งของขวัญภายในแอป YeeTalk พัฒนาโดย Shyden ใช้คำนวณว่าต้องมีอะไรบ้างจึงจะถึงเป้าหมาย glory points หรือของขวัญชิ้นหนึ่งมีมูลค่าเท่าไรเมื่อได้รับแล้ว',
     needsJs: 'เครื่องคำนวณนี้ต้องเปิด JavaScript ไว้',
-    assumptions:
-      'สมมติว่า 1 คะแนนเท่ากับ 1 เหรียญ, 0.9 เหรียญต่อ bean และของขวัญจะถูกแปลงเป็น bean ในอัตรา 40%',
     errors: {
       empty: 'กรุณาป้อนตัวเลข',
       notWhole: 'กรุณาป้อนตัวเลขเต็ม',
       zero: 'กรอกตัวเลขที่มากกว่าศูนย์',
       tooLarge: 'ตัวเลขนั้นใหญ่เกินไป',
+    },
+    glory: {
+      heading: 'เครื่องคำนวณ Glory Points',
+      howToHeading: 'วิธีใช้',
+      howToSteps: [
+        'กรอกจำนวน glory points ที่คุณต้องการให้ถึงลงในช่องด้านล่าง',
+        'เลือก "คำนวณ" — หรือกด Enter',
+        'ดูจำนวนเหรียญและ bean ที่แน่นอน รวมถึงมูลค่ารวมของของขวัญที่คุณต้องใช้เพื่อให้ถึงเป้าหมายนั้น',
+      ],
+      inputLabel: 'Glory points',
+      calculate: 'คำนวณ',
+      resultLine: (coins: string, beans: string, gift: string) =>
+        `${coins} เหรียญ → ${beans} bean → ${gift} มูลค่ารวมของของขวัญ`,
+      assumptions:
+        'สมมติว่า 1 คะแนนเท่ากับ 1 เหรียญ, 0.9 เหรียญต่อ bean และของขวัญจะถูกแปลงเป็น bean ในอัตรา 40%',
     },
   },
   language: {

@@ -4,6 +4,7 @@ import { withoutAstroComments } from './source-text';
 import { join } from 'node:path';
 import { en } from '../../src/lib/i18n/en';
 import { siteEn } from '../../src/lib/i18n/site';
+import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { filesUnder, searched } from '../source-files';
 import { floorBreach } from '../floors';
 
@@ -114,24 +115,23 @@ describe('every translated string reaches a page', () => {
   });
 
   it('the site-wide copy defines nothing that no page renders', () => {
-    // Nested one level: `footer.companyNo`, `glory.needsJs`. The population
-    // is every name judged, a group and each key inside it, not the groups
-    // opened: a reader blind to the keys would open every group and pass.
-    const unused: string[] = [];
-    const judged: string[] = [];
-    for (const [group, value] of Object.entries(siteEn)) {
-      judged.push(group);
-      if (!isReferenced(group)) {
-        unused.push(group);
-        continue;
-      }
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        for (const key of Object.keys(value)) {
-          judged.push(`${group}.${key}`);
-          if (!isReferenced(key)) unused.push(`${group}.${key}`);
-        }
-      }
+    // Nested to any depth: `footer.companyNo`, `calculators.glory.inputLabel`.
+    // The population is every name judged, a group and each key inside it, not
+    // the groups opened: a reader blind to the keys would open every group and
+    // pass. It stopped at one level until #635 moved the Glory Points copy a
+    // level down (`glory.x` to `calculators.glory.x`), which took seven keys out
+    // of the population without a line of the guard changing.
+    // The shared walk (`catalogueLeaves`) reads the shape; every group and key
+    // on the way to a leaf is a name to judge, positions in a list excluded.
+    const names = new Set<string>();
+    for (const [leaf] of catalogueLeaves(siteEn)) {
+      const parts = leaf.replace(/\[\d+\]/g, '').split('.');
+      parts.forEach((_, i) => names.add(parts.slice(0, i + 1).join('.')));
     }
+    const judged = [...names];
+    const unused = judged.filter(
+      (name) => !isReferenced(name.slice(name.lastIndexOf('.') + 1)),
+    );
     expect(
       searched(unused, { of: judged, what: 'site copy groups and keys' }),
     ).toEqual([]);

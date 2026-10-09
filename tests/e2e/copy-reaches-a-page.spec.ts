@@ -144,10 +144,10 @@ const ABSENCE_RULES: ReadonlyArray<{
   {
     locales: LOCALES,
     paths: [
-      'glory.errors.empty',
-      'glory.errors.notWhole',
-      'glory.errors.zero',
-      'glory.errors.tooLarge',
+      'calculators.errors.empty',
+      'calculators.errors.notWhole',
+      'calculators.errors.zero',
+      'calculators.errors.tooLarge',
     ],
     why:
       'Validation messages the Glory Points script writes into the DOM in ' +

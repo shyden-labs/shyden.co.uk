@@ -62,8 +62,8 @@ test.describe('header + footer', () => {
     // The Header renders on every page via BaseLayout, but its section anchors
     // exist only on the homepage — so the nav hrefs must be root-relative (/#…) or
     // they dead-link on sub-pages. Regression guard for the cross-task defect the
-    // whole-branch review caught (nav was #shytalk → /glory-points#shytalk = dead).
-    await page.goto('/glory-points');
+    // whole-branch review caught (nav was #shytalk → /yeetalk-calculators#shytalk = dead).
+    await page.goto('/yeetalk-calculators');
     const hrefs = await page
       .locator('header nav a')
       .evaluateAll((els) => els.map((e) => e.getAttribute('href')));

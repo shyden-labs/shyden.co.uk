@@ -102,7 +102,7 @@ const SITE_ALLOWED_IDENTICAL: ReadonlyMap<string, string> = new Map([
   // "Glory points" is YeeTalk's in-app currency, a product name, not English
   // prose. Listed explicitly rather than loosening the check: the guard's
   // value is that every exception is a decision someone made on purpose.
-  ['glory.inputLabel', 'product name: the in-app currency'],
+  ['calculators.glory.inputLabel', 'product name: the in-app currency'],
   // "ShyTalk" is the product's name. A nav item that translated it would be
   // naming a different product. Identical in all five by design.
   ['nav.shytalk', 'product name'],
@@ -1740,7 +1740,7 @@ describe('the locale-aware paths', () => {
     ['/classroom-groups/', 'id', '/id/classroom-groups/'],
     ['/id/classroom-groups', 'en', '/classroom-groups'],
     ['/id/classroom-groups/', 'en', '/classroom-groups/'],
-    ['/glory-points', 'en', '/glory-points'],
+    ['/yeetalk-calculators', 'en', '/yeetalk-calculators'],
     // The anchoring that matters: /identity is not the Indonesian homepage.
     ['/identity', 'id', '/id/identity'],
     ['/identity', 'en', '/identity'],
@@ -1752,12 +1752,12 @@ describe('the locale-aware paths', () => {
 
   it.each([
     ['/', 'en'],
-    ['/glory-points', 'en'],
+    ['/yeetalk-calculators', 'en'],
     ['/identity', 'en'], // must NOT be read as the /id prefix
     ['/ideas', 'en'],
     ['/id', 'id'],
     ['/id/', 'id'],
-    ['/id/glory-points', 'id'],
+    ['/id/yeetalk-calculators', 'id'],
   ] as const)('localeFromPath(%s) -> %s', (path, locale) => {
     expect(localeFromPath(path)).toBe(locale);
   });
@@ -1765,7 +1765,7 @@ describe('the locale-aware paths', () => {
   it('a round trip through the other language returns to the same page', () => {
     for (const path of [
       '/',
-      '/glory-points',
+      '/yeetalk-calculators',
       '/classroom-groups',
       '/identity',
     ]) {
