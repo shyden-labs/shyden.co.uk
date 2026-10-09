@@ -267,7 +267,12 @@
     "Open the calculators": "打开计算器",
     "YeeTalk Calculators — Shyden": "YeeTalk 计算器 — Shyden",
     "Work out YeeTalk glory points, coins, beans and gift value — instantly, in your browser.": "在浏览器中即时计算 YeeTalk 的 glory points、金币、bean 和礼物价值。",
-    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "两款辅助 YeeTalk 应用内送礼功能的工具，由 Shyden 开发。可算出达到 glory points 目标需要什么，或一份礼物在收到后价值多少。"
+    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "两款辅助 YeeTalk 应用内送礼功能的工具，由 Shyden 开发。可算出达到 glory points 目标需要什么，或一份礼物在收到后价值多少。",
+    "Gift Value Calculator": "礼品价值计算器",
+    "Enter the value of the gift in the box below.": "请在下方框中输入礼物的价值。",
+    "Read off the beans the gift gives and the coins those beans redeem for.": "从豆子上读出礼物是什么，以及这些豆子能兑换哪些硬币。",
+    "Gift value": "礼品价值",
+    "Assumes gifts convert to beans at 40% and each bean redeems for 0.9 coins, rounded down to whole beans and coins.": "假设礼物按40%的比率转换为豆子，每颗豆子可兑换0.9枚金币，豆子和金币的数量均向下取整至整数。"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -537,7 +542,12 @@
     "Open the calculators": "Mở các máy tính",
     "YeeTalk Calculators — Shyden": "Máy tính YeeTalk — Shyden",
     "Work out YeeTalk glory points, coins, beans and gift value — instantly, in your browser.": "Tính glory points, xu, bean và giá trị quà tặng trên YeeTalk — ngay lập tức, ngay trên trình duyệt của bạn.",
-    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "Hai công cụ hỗ trợ cho tính năng tặng quà trong ứng dụng YeeTalk, do Shyden phát triển. Tính xem cần những gì để đạt mục tiêu glory points, hoặc một món quà có giá trị bao nhiêu sau khi được nhận."
+    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "Hai công cụ hỗ trợ cho tính năng tặng quà trong ứng dụng YeeTalk, do Shyden phát triển. Tính xem cần những gì để đạt mục tiêu glory points, hoặc một món quà có giá trị bao nhiêu sau khi được nhận.",
+    "Gift Value Calculator": "Công cụ tính giá trị quà tặng",
+    "Enter the value of the gift in the box below.": "Hãy nhập giá trị của món quà vào ô bên dưới.",
+    "Read off the beans the gift gives and the coins those beans redeem for.": "Hãy đọc tên những hạt đậu mà món quà mang lại và những đồng xu mà những hạt đậu đó có thể đổi lấy.",
+    "Gift value": "Giá trị quà tặng",
+    "Assumes gifts convert to beans at 40% and each bean redeems for 0.9 coins, rounded down to whole beans and coins.": "Giả định rằng quà tặng được quy đổi thành hạt với tỷ lệ 40% và mỗi hạt có thể đổi lấy 0,9 đồng xu, số lượng hạt và đồng xu được làm tròn xuống đến số nguyên gần nhất."
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -807,7 +817,12 @@
     "Open the calculators": "เปิดเครื่องคำนวณ",
     "YeeTalk Calculators — Shyden": "เครื่องคำนวณ YeeTalk — Shyden",
     "Work out YeeTalk glory points, coins, beans and gift value — instantly, in your browser.": "คำนวณ glory points, เหรียญ, bean และมูลค่าของขวัญของ YeeTalk — ทันที ในเบราว์เซอร์ของคุณ",
-    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "เครื่องมือช่วยสองชิ้นสำหรับระบบส่งของขวัญภายในแอป YeeTalk พัฒนาโดย Shyden ใช้คำนวณว่าต้องมีอะไรบ้างจึงจะถึงเป้าหมาย glory points หรือของขวัญชิ้นหนึ่งมีมูลค่าเท่าไรเมื่อได้รับแล้ว"
+    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "เครื่องมือช่วยสองชิ้นสำหรับระบบส่งของขวัญภายในแอป YeeTalk พัฒนาโดย Shyden ใช้คำนวณว่าต้องมีอะไรบ้างจึงจะถึงเป้าหมาย glory points หรือของขวัญชิ้นหนึ่งมีมูลค่าเท่าไรเมื่อได้รับแล้ว",
+    "Gift Value Calculator": "เครื่องคำนวณมูลค่าของขวัญ",
+    "Enter the value of the gift in the box below.": "กรอกมูลค่าของของขวัญลงในช่องด้านล่าง",
+    "Read off the beans the gift gives and the coins those beans redeem for.": "อ่านชื่อของของขวัญที่มอบให้และชื่อของเหรียญที่ของขวัญนั้นสามารถแลกได้",
+    "Gift value": "มูลค่าของขวัญ",
+    "Assumes gifts convert to beans at 40% and each bean redeems for 0.9 coins, rounded down to whole beans and coins.": "สมมติว่าของขวัญจะแปลงเป็นเมล็ดถั่วในอัตรา 40% และเมล็ดถั่วแต่ละเมล็ดสามารถแลกได้ 0.9 เหรียญ โดยจะปัดลงเป็นจำนวนเมล็ดถั่วและเหรียญที่ใกล้เคียงที่สุด"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",
@@ -960,6 +975,11 @@
     "Open the calculators": "Buka kalkulator",
     "YeeTalk Calculators — Shyden": "Kalkulator YeeTalk — Shyden",
     "Work out YeeTalk glory points, coins, beans and gift value — instantly, in your browser.": "Hitung glory points, koin, bean, dan nilai hadiah YeeTalk — seketika, di peramban Anda.",
-    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "Dua alat pendamping untuk fitur hadiah di dalam aplikasi YeeTalk, buatan Shyden. Hitung apa yang diperlukan untuk mencapai target glory points, atau berapa nilai sebuah hadiah setelah diterima."
+    "Two companion tools for YeeTalk's in-app gifting, built by Shyden. Work out what it takes to reach a glory points target, or what a gift is worth once it's received.": "Dua alat pendamping untuk fitur hadiah di dalam aplikasi YeeTalk, buatan Shyden. Hitung apa yang diperlukan untuk mencapai target glory points, atau berapa nilai sebuah hadiah setelah diterima.",
+    "Gift Value Calculator": "Kalkulator Nilai Hadiah",
+    "Enter the value of the gift in the box below.": "Masukkan nilai hadiah pada kotak di bawah ini.",
+    "Read off the beans the gift gives and the coins those beans redeem for.": "Baca daftar kacang yang diberikan sebagai hadiah dan koin yang bisa ditukarkan dengan kacang-kacang tersebut.",
+    "Gift value": "Nilai hadiah",
+    "Assumes gifts convert to beans at 40% and each bean redeems for 0.9 coins, rounded down to whole beans and coins.": "Asumsinya, hadiah dikonversi menjadi kacang dengan rasio 40%, dan setiap kacang dapat ditukarkan dengan 0,9 koin, dengan jumlah kacang dan koin dibulatkan ke bawah ke angka bulat."
   }
 }

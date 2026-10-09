@@ -8,21 +8,49 @@ import { localePaths } from './locale-sampling';
 const en = getSiteStrings('en').calculators;
 const id = getSiteStrings('id').calculators;
 
+/**
+ * The two calculators on the page, each behaving the same way: the same
+ * validation, the same Enter key, one result and one error line of its own.
+ * What they share is written once here; what is only one's (rounding, steps,
+ * the jump link) lives in its own spec.
+ */
+const CALCULATORS = [
+  {
+    name: 'glory points',
+    id: 'glory',
+    lineFor1000: en.glory.resultLine('1,000', '1,112', '2,780'),
+    enterInput: '9',
+    enterLine: en.glory.resultLine('9', '10', '25'),
+  },
+  {
+    name: 'gift value',
+    id: 'gift',
+    lineFor1000: en.gift.resultLine('1,000', '400', '360'),
+    enterInput: '5',
+    enterLine: en.gift.resultLine('5', '2', '1'),
+  },
+] as const;
+
 test.use(recorded);
 test.describe('glory points calculator', () => {
-  test('computes the exact breakdown for 1000', async ({ page }) => {
-    await page.goto('/yeetalk-calculators');
-    await page.fill('#glory-input', '1000');
-    await page.click('#glory-submit');
-    // The whole line, so each amount sits in its own place: three
-    // order-free substring checks passed with coins and beans swapped (#390
-    // F124). The amounts are literals, the sentence is the catalogue's.
-    await expectVisibleText(
-      page.locator('#glory-result'),
-      en.glory.resultLine('1,000', '1,112', '2,780'),
-    );
-    await expect(page.locator('#glory-error')).toBeEmpty(); // result & error are mutually exclusive
-  });
+  for (const calculator of CALCULATORS) {
+    test(`${calculator.name}: computes the exact breakdown for 1000`, async ({
+      page,
+    }) => {
+      await page.goto('/yeetalk-calculators');
+      await page.fill(`#${calculator.id}-input`, '1000');
+      await page.click(`#${calculator.id}-submit`);
+      // The whole line, so each amount sits in its own place: three
+      // order-free substring checks passed with coins and beans swapped (#390
+      // F124). The amounts are literals, the sentence is the catalogue's.
+      await expectVisibleText(
+        page.locator(`#${calculator.id}-result`),
+        calculator.lineFor1000,
+      );
+      // result & error are mutually exclusive
+      await expect(page.locator(`#${calculator.id}-error`)).toBeEmpty();
+    });
+  }
   test('the Indonesian calculator prints Indonesian numbers', async ({
     page,
   }) => {
@@ -53,16 +81,18 @@ test.describe('glory points calculator', () => {
     await expect(page.locator('#glory-result')).toBeEmpty();
   });
 
-  test('Enter key submits', async ({ page }) => {
-    await page.goto('/yeetalk-calculators');
-    await page.fill('#glory-input', '9');
-    await page.press('#glory-input', 'Enter');
-    await expectVisibleText(
-      page.locator('#glory-result'),
-      en.glory.resultLine('9', '10', '25'),
-    );
-    await expect(page.locator('#glory-error')).toBeEmpty();
-  });
+  for (const calculator of CALCULATORS) {
+    test(`${calculator.name}: Enter key submits`, async ({ page }) => {
+      await page.goto('/yeetalk-calculators');
+      await page.fill(`#${calculator.id}-input`, calculator.enterInput);
+      await page.press(`#${calculator.id}-input`, 'Enter');
+      await expectVisibleText(
+        page.locator(`#${calculator.id}-result`),
+        calculator.enterLine,
+      );
+      await expect(page.locator(`#${calculator.id}-error`)).toBeEmpty();
+    });
+  }
   test('shows YeeTalk attribution linking to the official site', async ({
     page,
   }) => {
@@ -77,21 +107,27 @@ test.describe('glory points calculator', () => {
   // on @playwright/test@1.61.1) — expanded into one test() per case via a for...of
   // loop, per this repo's existing convention (see homepage.spec.ts). Same four
   // cases, same assertions as the brief's test.each table.
-  for (const [input, message] of [
-    ['', 'Please enter a number.'],
-    ['abc', 'Please enter a whole number.'],
-    ['3.5', 'Please enter a whole number.'],
-    ['0', 'Enter a number greater than zero.'],
-  ] as const) {
-    test(`input ${JSON.stringify(input)} shows error ${JSON.stringify(message)}`, async ({
-      page,
-    }) => {
-      await page.goto('/yeetalk-calculators');
-      if (input) await page.fill('#glory-input', input);
-      await page.click('#glory-submit');
-      await expectVisibleText(page.locator('#glory-error'), message);
-      await expect(page.locator('#glory-result')).toBeEmpty();
-    });
+  for (const calculator of CALCULATORS) {
+    for (const [input, message] of [
+      ['', 'Please enter a number.'],
+      ['abc', 'Please enter a whole number.'],
+      ['3.5', 'Please enter a whole number.'],
+      ['0', 'Enter a number greater than zero.'],
+      ['1000000001', 'That number is too large.'],
+    ] as const) {
+      test(`${calculator.name}: input ${JSON.stringify(input)} shows error ${JSON.stringify(message)}`, async ({
+        page,
+      }) => {
+        await page.goto('/yeetalk-calculators');
+        if (input) await page.fill(`#${calculator.id}-input`, input);
+        await page.click(`#${calculator.id}-submit`);
+        await expectVisibleText(
+          page.locator(`#${calculator.id}-error`),
+          message,
+        );
+        await expect(page.locator(`#${calculator.id}-result`)).toBeEmpty();
+      });
+    }
   }
 });
 
@@ -114,17 +150,18 @@ test.describe('glory points — explains what it does and how to use it', () => 
     page,
   }) => {
     await page.goto('/yeetalk-calculators');
+    const section = page.locator('section#glory-points');
     await expect(
-      page.getByRole('heading', { name: /how to use it/i }),
+      section.getByRole('heading', { name: /how to use it/i }),
     ).toBeVisible();
     // The steps are a real list in the accessibility tree, named by the "How to
     // use it" heading (via aria-labelledby) — so a screen reader announces
     // "How to use it, list, 3 items". Asserting the ROLE (not just the CSS
     // selector) guards the native list semantics against a styling regression.
     await expect(
-      page.getByRole('list', { name: /how to use it/i }),
+      section.getByRole('list', { name: /how to use it/i }),
     ).toBeVisible();
-    const steps = page.locator('.how-to ol > li');
+    const steps = section.locator('.how-to ol > li');
     await expect(steps).toHaveCount(3);
     // 1) Enter the glory-point target.
     await expect(steps.nth(0)).toContainText(/glory points/i);

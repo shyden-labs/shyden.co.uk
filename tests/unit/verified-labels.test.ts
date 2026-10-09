@@ -746,20 +746,32 @@ describe('short labels that disagree with their own locale', () => {
  * has no labels to judge here.
  */
 const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
+  // #636: the Gift Value Calculator heading is new, drafted by DeepL and read
+  // back by LibreTranslate, and awaits the operator's read in every locale.
   id: [
+    'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
   ],
   zh: [
+    'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
   ],
   // #635: YeeTalk Calculators and "Open the calculators" are new English the
   // operator has not read in these two locales. Awaiting his read, then pinned.
-  vi: ['site.calculators.title', 'site.home.openCalculators'],
-  th: ['site.calculators.title', 'site.home.openCalculators'],
+  vi: [
+    'site.calculators.gift.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
+  th: [
+    'site.calculators.gift.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
 };
 
 // One id per locale: the search below runs once per locale over its own labels.

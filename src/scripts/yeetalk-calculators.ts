@@ -1,4 +1,5 @@
 import { calculateGlory, formatNumber, ERRORS } from '../lib/gloryPoints';
+import { calculateGiftValue } from '../lib/giftValue';
 import { getSiteStrings, isLocale, DEFAULT_LOCALE } from '../lib/i18n';
 import { enhanceReportForm } from './report-form';
 
@@ -26,35 +27,81 @@ const LOCALISED_ERROR = new Map<string, string>([
   [ERRORS.tooLarge, t.errors.tooLarge],
 ]);
 
-const input = document.querySelector<HTMLInputElement>('#glory-input');
-const submit = document.querySelector<HTMLButtonElement>('#glory-submit');
-const result = document.querySelector<HTMLElement>('#glory-result');
-const error = document.querySelector<HTMLElement>('#glory-error');
-
-function run(): void {
-  if (!input || !result || !error) return;
-  const outcome = calculateGlory(input.value);
-  if (!outcome.ok) {
-    result.textContent = '';
-    error.textContent = LOCALISED_ERROR.get(outcome.error) ?? outcome.error;
-    return;
-  }
-  error.textContent = '';
-  const { coinsNeeded, beansNeeded, totalGiftValue } = outcome.result;
-  result.textContent = t.glory.resultLine(
-    formatNumber(coinsNeeded, lang),
-    formatNumber(beansNeeded, lang),
-    formatNumber(totalGiftValue, lang),
-  );
+function localise(message: string): string {
+  return LOCALISED_ERROR.get(message) ?? message;
 }
 
-submit?.addEventListener('click', run);
-input?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    run();
+function wire(
+  ids: { input: string; submit: string; result: string; error: string },
+  show: (raw: string) => { text: string } | { error: string },
+): void {
+  const input = document.querySelector<HTMLInputElement>(ids.input);
+  const submit = document.querySelector<HTMLButtonElement>(ids.submit);
+  const result = document.querySelector<HTMLElement>(ids.result);
+  const error = document.querySelector<HTMLElement>(ids.error);
+
+  function run(): void {
+    if (!input || !result || !error) return;
+    const outcome = show(input.value);
+    if ('error' in outcome) {
+      result.textContent = '';
+      error.textContent = localise(outcome.error);
+      return;
+    }
+    error.textContent = '';
+    result.textContent = outcome.text;
   }
-});
+
+  submit?.addEventListener('click', run);
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      run();
+    }
+  });
+}
+
+wire(
+  {
+    input: '#glory-input',
+    submit: '#glory-submit',
+    result: '#glory-result',
+    error: '#glory-error',
+  },
+  (raw) => {
+    const outcome = calculateGlory(raw);
+    if (!outcome.ok) return { error: outcome.error };
+    const { coinsNeeded, beansNeeded, totalGiftValue } = outcome.result;
+    return {
+      text: t.glory.resultLine(
+        formatNumber(coinsNeeded, lang),
+        formatNumber(beansNeeded, lang),
+        formatNumber(totalGiftValue, lang),
+      ),
+    };
+  },
+);
+
+wire(
+  {
+    input: '#gift-input',
+    submit: '#gift-submit',
+    result: '#gift-result',
+    error: '#gift-error',
+  },
+  (raw) => {
+    const outcome = calculateGiftValue(raw);
+    if (!outcome.ok) return { error: outcome.error };
+    const { giftValue, beans, coins } = outcome.result;
+    return {
+      text: t.gift.resultLine(
+        formatNumber(giftValue, lang),
+        formatNumber(beans, lang),
+        formatNumber(coins, lang),
+      ),
+    };
+  },
+);
 
 // The footer's report form exists only in beta locales (#97).
 const reportForm =
