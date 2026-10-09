@@ -2786,11 +2786,18 @@ describe('wrangler comes from the lockfile (#97)', () => {
   });
 
   it('does not read the locked copy, or a global install of something else', () => {
+    const text =
+      'run: npx wrangler pages deploy dist\nrun: npm i -g pnpm && npx wrangler --version';
+    const lines = joinedLines(text);
     expect(
-      globalWranglerInstalls(
-        'run: npx wrangler pages deploy dist\nrun: npm i -g pnpm && npx wrangler --version',
-      ),
+      searched(globalWranglerInstalls(text), {
+        of: lines,
+        what: 'workflow lines',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/locked-copy-lines', lines.length),
+    ).toBeUndefined();
   });
 
   it('every deploy runs the locked copy', () => {

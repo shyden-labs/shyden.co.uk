@@ -335,8 +335,8 @@ function scan() {
 
 const result = scan();
 
-const CEILING_SITES = 63;
-const CEILING_SCOPES = 61;
+const CEILING_SITES = 44;
+const CEILING_SCOPES = 42;
 
 describe('absence assertions prove the population they searched', () => {
   // Separate from the verdict, and load-bearing: the verdict below is itself

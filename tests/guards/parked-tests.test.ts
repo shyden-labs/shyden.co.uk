@@ -7,6 +7,8 @@ import {
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
 import { declarationsIn, type Declaration } from '../playwright-declarations';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 
 /**
  * "Tracked, not hidden" has to be TRUE, not merely written.
@@ -113,6 +115,7 @@ export const findUnreferencedParkedTests = (
 describe('parked tests must name an issue', () => {
   const scan = (source: string) =>
     findUnreferencedParkedTests('synthetic.spec.ts', source);
+  const read = (source: string) => readParkedTests('synthetic.spec.ts', source);
 
   it('flags a test.fixme that names no issue', () => {
     const source = [
@@ -130,7 +133,13 @@ describe('parked tests must name an issue', () => {
       '  await measureFit(page);',
       '});',
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/preceding-comment-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('accepts a test.fixme whose own title names an issue', () => {
@@ -139,7 +148,13 @@ describe('parked tests must name an issue', () => {
       '  await measureFit(page);',
       '});',
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/title-names-issue-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('accepts a reference on the wrapped title line', () => {
@@ -150,7 +165,13 @@ describe('parked tests must name an issue', () => {
       '  async () => {},',
       ');',
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/wrapped-title-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('is blind to the runtime conditional overload, which needs no issue', () => {
@@ -162,7 +183,13 @@ describe('parked tests must name an issue', () => {
       '  );',
       '});',
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/runtime-overload-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('flags a bare test.describe.fixme, not just a single test', () => {
@@ -200,7 +227,16 @@ describe('parked tests must name an issue', () => {
       '// Parked by #32.',
       "test.fixme('the tool fits without scrolling at 320x568', async () => {});",
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'parked-tests/comment-block-above-declarations',
+        judged.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('does not treat a test.fixme quoted inside a comment as a declaration', () => {
@@ -211,7 +247,13 @@ describe('parked tests must name an issue', () => {
       '// with zero assertions.',
       "test('names who landed in a group of the other sex', async () => {});",
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/quoted-in-comment-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('names the file and line so a finding is actionable', () => {
@@ -238,7 +280,13 @@ describe('parked tests must name an issue', () => {
       '  const example = "test.fixme(\'parked\', async () => {})";',
       '});',
     ].join('\n');
-    expect(scan(source)).toEqual([]);
+    const { judged, findings } = read(source);
+    expect(
+      searched(findings, { of: judged, what: 'declarations read' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('parked-tests/spelled-in-string-declarations', judged.length),
+    ).toBeUndefined();
   });
 
   it('does not accept a reference only in a comment inside the body', () => {

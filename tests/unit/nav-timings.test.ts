@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import {
   collectNavigations,
   NAVIGATION_STEP_CATEGORY,
@@ -93,7 +95,15 @@ describe('collecting navigation steps out of a result tree', () => {
 
   it('ignores a test.step a human happened to title Navigate', () => {
     const tree = [step(NAVIGATION_STEP_TITLE, 'test.step', 99)];
-    expect(collectNavigations(tree)).toEqual([]);
+    expect(
+      searched(collectNavigations(tree), {
+        of: tree,
+        what: 'steps in the result tree',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('nav-timings/human-titled-navigate-steps', tree.length),
+    ).toBeUndefined();
   });
 
   it('ignores the other pw:api steps that surround every navigation', () => {
@@ -102,7 +112,15 @@ describe('collecting navigation steps out of a result tree', () => {
       step('Create context', NAVIGATION_STEP_CATEGORY, 5),
       step('Create page', NAVIGATION_STEP_CATEGORY, 183),
     ];
-    expect(collectNavigations(tree)).toEqual([]);
+    expect(
+      searched(collectNavigations(tree), {
+        of: tree,
+        what: 'steps in the result tree',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('nav-timings/surrounding-pw-api-steps', tree.length),
+    ).toBeUndefined();
   });
 
   it('flags a navigation that errored — the #44 shape', () => {
@@ -289,7 +307,17 @@ describe('which projects must navigate — read back out of the report', () => {
   it('excuses nothing when the report carries no project config', () => {
     // Fail closed: a report without the mark counts every project, which is
     // the behaviour before #355 rather than a silent pass.
-    expect([...excusedFromNavigating({})]).toEqual([]);
+    const projects = [{ name: 'chromium' }, { name: 'content' }];
+    expect(
+      searched([...excusedFromNavigating({ config: { projects } })], {
+        of: projects,
+        what: 'projects in the report',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('nav-timings/unmarked-report-projects', projects.length),
+    ).toBeUndefined();
+    expect(excusedFromNavigating({})).toEqual(new Set());
   });
 
   it('counts each project’s results, however deep the describe blocks, and never a skip', () => {

@@ -163,7 +163,16 @@ describe('a stored row is checked before it is printed (AC2)', () => {
   });
 
   it('reads an empty table as no reports', () => {
-    expect(reportRows(answer([]))).toEqual([]);
+    const statements = answer([]);
+    expect(
+      searched(reportRows(statements), {
+        of: statements,
+        what: 'statements in the answer',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('report-review/empty-table-statements', statements.length),
+    ).toBeUndefined();
   });
 
   it.each([
