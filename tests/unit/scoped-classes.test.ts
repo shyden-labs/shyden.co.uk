@@ -137,7 +137,15 @@ describe('scopedClassReport', () => {
       );
       const report = scopedClassReport(page);
       expect(report.named).toEqual(['menu', 'open']);
-      expect(report.dead).toEqual([]);
+      expect(
+        searched(report.dead, {
+          of: report.named,
+          what: 'classes the scoped styles name',
+        }),
+      ).toEqual([]);
+      expect(
+        floorBreach('scoped-classes/script-added-named', report.named.length),
+      ).toBeUndefined();
     },
   );
 
@@ -184,7 +192,15 @@ describe('scopedClassReport', () => {
     );
     const report = scopedClassReport(page);
     expect(report.named).toEqual(['frame']);
-    expect(report.dead).toEqual([]);
+    expect(
+      searched(report.dead, {
+        of: report.named,
+        what: 'classes the scoped styles name',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('scoped-classes/scoped-only-named', report.named.length),
+    ).toBeUndefined();
   });
 
   it('reads selectors, never declarations, conditions or attribute values', () => {
