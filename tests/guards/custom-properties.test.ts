@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { floorBreach } from '../floors';
-import { codeWithoutComments } from './source-text';
+import { codeWithoutComments } from '../unit/source-text';
 
 /**
  * Every custom property `src` reads is defined somewhere in `src` (#390 F62).
