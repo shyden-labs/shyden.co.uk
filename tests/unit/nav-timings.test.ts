@@ -225,15 +225,17 @@ describe('summarising navigations per project', () => {
   });
 
   it('survives a run that recorded nothing rather than dividing by zero', () => {
-    const inputs: unknown[][] = [[]];
+    const runs: { case: string; records: unknown[] }[] = [
+      { case: 'a run that recorded nothing', records: [] },
+    ];
     expect(
       searched(
-        inputs.flatMap((records) => navTimings(records)),
-        { of: inputs.length, what: 'runs handed to navTimings' },
+        runs.flatMap(({ records }) => navTimings(records)),
+        { of: runs, what: 'runs handed to navTimings' },
       ),
     ).toEqual([]);
     expect(
-      floorBreach('nav-timings/runs-that-recorded-nothing', inputs.length),
+      floorBreach('nav-timings/runs-that-recorded-nothing', runs.length),
     ).toBeUndefined();
   });
 });
@@ -316,15 +318,15 @@ describe('which projects must navigate — read back out of the report', () => {
   it('excuses nothing when the report carries no project config', () => {
     // Fail closed: a report without the mark counts every project, which is
     // the behaviour before #355 rather than a silent pass.
-    const inputs = [{}];
+    const reports = [{ case: 'a report with no project config', report: {} }];
     expect(
       searched(
-        inputs.flatMap((report) => [...excusedFromNavigating(report)]),
-        { of: inputs.length, what: 'reports handed to excusedFromNavigating' },
+        reports.flatMap(({ report }) => [...excusedFromNavigating(report)]),
+        { of: reports, what: 'reports handed to excusedFromNavigating' },
       ),
     ).toEqual([]);
     expect(
-      floorBreach('nav-timings/reports-without-config', inputs.length),
+      floorBreach('nav-timings/reports-without-config', reports.length),
     ).toBeUndefined();
   });
 
