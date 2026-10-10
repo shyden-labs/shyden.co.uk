@@ -861,14 +861,30 @@ test.describe('pause motion', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await expect(pauseControl(page, 'en')).not.toBeChecked();
-    const running = await page
+    // Reduced motion does not remove the band's animation: tokens.css makes
+    // it ONE 0.01 ms iteration, so it finishes at once (#390 F61). Until the
+    // next animation frame ticks it to its end it reads `running`, and the
+    // old count straight after goto could beat that frame on a loaded runner
+    // (#669, seen on #668's CI). Once finished (no `fill`) it leaves
+    // `getAnimations()` altogether, so the band's own declaration is the
+    // liveness probe, not the list. Wait for whatever is still there to
+    // finish -- a promise, never a timer; one that never finishes (motion
+    // not reduced) fails on the test's own budget -- and judge it then.
+    const band = await page
       .locator('.marquee-track')
-      .evaluate(
-        (element) =>
-          element.getAnimations().filter((a) => a.playState === 'running')
-            .length,
-      );
-    expect(running, 'animations running with motion reduced').toBe(0);
+      .evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((a) => a.finished));
+        return {
+          declared: getComputedStyle(element).animationName,
+          running: element
+            .getAnimations()
+            .filter((a) => a.playState === 'running').length,
+        };
+      });
+    expect(band.declared, 'the band declares its animation').toBe(
+      'marquee-slide',
+    );
+    expect(band.running, 'animations running with motion reduced').toBe(0);
   });
 
   // At 320px, in every locale: measured, because Thai and Vietnamese run long.
