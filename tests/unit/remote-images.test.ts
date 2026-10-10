@@ -176,8 +176,11 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * only for a URL matching image.domains or image.remotePatterns. Two facts are
  * checked on every version; the third, that the gate still stands, needs a
  * reader, so a new version fails here until someone has re-read it.
+ * Re-read on 7.3.6 (2026-10-10, Dependabot #656): generate.js, build/remote.js,
+ * utils/redirectValidation.js and the config schemas are byte-identical to
+ * 7.3.5's, and so is isRemoteAllowed in @astrojs/internal-helpers 0.12.0.
  */
-const ASTRO_READ = '7.3.5';
+const ASTRO_READ = '7.3.6';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {
