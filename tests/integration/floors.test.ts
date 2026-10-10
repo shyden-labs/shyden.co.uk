@@ -338,7 +338,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
       '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '(got --units)\n',
+        '[--retire <id>]... (got --units)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -348,7 +348,21 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
       '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '(got --unit --functions)\n',
+        '[--retire <id>]... (got --unit --functions)\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('refuses a retire when git cannot say what origin/develop holds, before running anything (#640)', () => {
+    // No git on the run's PATH: unknown is never read as "not on develop".
+    const run = recordWith({}, ['--unit', '--retire', 'planted/branch-only'], {
+      recorded: { 'planted/branch-only': 1 },
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n  planted/branch-only cannot be retired: ' +
+        'whether origin/develop holds it is unknown (the fetch of ' +
+        'origin/develop did not start: spawnSync git ENOENT)\n',
     );
     expect(run.stdout).toBe('');
   });
