@@ -278,7 +278,9 @@ describe('recordUntilSettled', () => {
   });
 
   it('stops at the first refusal, measuring nothing more', () => {
-    const { handed, measure } = suite(() => ({ a: 3, b: 1 }));
+    // No id added: a fall in a pass that adds ids is judged again over them
+    // (#640, tests/unit/record-floors.test.ts).
+    const { handed, measure } = suite(() => ({ a: 3 }));
     const { refusals, passes } = recordUntilSettled({
       recorded: { a: 4, self: 2 },
       measure,
@@ -340,6 +342,73 @@ describe('recordUntilSettled', () => {
     ]);
     expect(passes).toBe(3);
     expect(handed).toHaveLength(3);
+  });
+
+  // #640: the floors counting the record's ids are judged on the ids it writes.
+  it('records a retire plus its replacement in one run, with no refusal', () => {
+    const { handed, measure } = suite(() => ({ a: 4, fresh: 1 }));
+    expect(
+      recordUntilSettled({
+        recorded: { a: 4, old: 1, self: 3 },
+        retired: ['old'],
+        measure,
+      }),
+    ).toEqual({
+      next: { a: 4, fresh: 1, self: 3 },
+      refusals: [],
+      failure: undefined,
+      passes: 2,
+    });
+    expect(handed).toEqual([
+      { a: 4, self: 3 },
+      { a: 4, self: 3, fresh: 1 },
+    ]);
+  });
+
+  it('refuses a bare retire: the record holds one id fewer and adds none', () => {
+    const { handed, measure } = suite(() => ({ a: 4 }));
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, old: 1, self: 3 },
+      retired: ['old'],
+      measure,
+    });
+    expect(refusals).toEqual([
+      'self would fall from 3 to 2: a blind reader looks like this. If the ' +
+        'corpus really shrank, lower it in tests/floors.json by hand and say ' +
+        'why in the commit.',
+    ]);
+    expect(passes).toBe(1);
+    expect(handed).toHaveLength(1);
+  });
+
+  it('refuses a fall in a pass that added ids once the next pass reads it too', () => {
+    const { handed, measure } = suite(() => ({ a: 3, b: 1 }));
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, self: 2 },
+      measure,
+    });
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('a would fall from 4 to 3');
+    expect(passes).toBe(2);
+    expect(handed).toHaveLength(2);
+  });
+
+  it('stops at once on a refusal the record cannot cause, even in a pass that added ids', () => {
+    const { handed, measure } = suite(() => ({ b: 1 }));
+    const twice = (floors: Readonly<Record<string, number>>, pass: number) => [
+      ...measure(floors, pass),
+      at('a', 4, 'tests/unit/a.test.ts:1'),
+      at('a', 4, 'tests/unit/z.test.ts:9'),
+    ];
+    const { refusals, passes } = recordUntilSettled({
+      recorded: { a: 4, self: 2 },
+      measure: twice,
+    });
+    expect(refusals).toEqual([
+      'a is asserted from two places: tests/unit/a.test.ts:1, tests/unit/z.test.ts:9',
+    ]);
+    expect(passes).toBe(1);
+    expect(handed).toHaveLength(1);
   });
 
   it('carries what the pass it judges says to carry', () => {
