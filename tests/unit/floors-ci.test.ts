@@ -4,6 +4,7 @@ import { searched } from '../source-files';
 import {
   IN_IMAGE_ENV,
   RECORD_ENV,
+  childEnv,
   playwrightRecordArgs,
   playwrightRecordRun,
   recordsInImage,
@@ -227,5 +228,26 @@ describe('the measured commit keeps its message and gains the moves (#651)', () 
       '1 floor moved (full):',
       '- `a/one: 3 -> 4`',
     ]);
+  });
+});
+
+describe('a suite the recorder starts never inherits the in-image flag (#651)', () => {
+  // The first real dispatch (run 38022668233) failed 7 integration tests:
+  // they run record-floors.mjs as a child, and with the flag inherited the
+  // child believed it was the recorder in the image, so it skipped the
+  // refusal under CI and ran Playwright directly.
+  const parent = { [IN_IMAGE_ENV]: '1', CI: 'true', PATH: '/bin' };
+
+  it('drops the flag and names the record, keeping everything else', () => {
+    expect(childEnv(parent, '/tmp/unit-1.jsonl')).toEqual({
+      CI: 'true',
+      PATH: '/bin',
+      [RECORD_ENV]: '/tmp/unit-1.jsonl',
+    });
+  });
+
+  it('leaves the recorder its own flag', () => {
+    childEnv(parent, '/tmp/unit-1.jsonl');
+    expect(parent[IN_IMAGE_ENV]).toBe('1');
   });
 });
