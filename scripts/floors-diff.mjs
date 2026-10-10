@@ -59,12 +59,27 @@ const TRAILER = /^[A-Za-z][A-Za-z0-9-]*: \S/;
  * @param {string} mode `full`, `unit` or `functions`
  * @returns {string}
  */
-export const amendedMessage = (original, moves, mode) => {
+export const amendedMessage = (original, moves, mode) =>
+  withBlock(
+    original,
+    [
+      `Floors recorded in CI (${mode}), ${moves.length} moved:`,
+      ...moves.map(line),
+    ].join('\n'),
+  );
+
+/**
+ * A commit message with `block` added as its own paragraph ahead of the
+ * trailer paragraph, or last when there is none. The one home for how a bot
+ * that folds into a commit words it: the floor recorder (#651) and the visual
+ * capture (#654) both amend a commit they measured.
+ *
+ * @param {string} original
+ * @param {string} block
+ * @returns {string}
+ */
+export const withBlock = (original, block) => {
   const paragraphs = original.trimEnd().split(/\n{2,}/);
-  const block = [
-    `Floors recorded in CI (${mode}), ${moves.length} moved:`,
-    ...moves.map(line),
-  ].join('\n');
   const last = paragraphs.at(-1) ?? '';
   const trailers =
     paragraphs.length > 1 &&
