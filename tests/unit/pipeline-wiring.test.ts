@@ -1197,8 +1197,13 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
   it('never passes --update-snapshots, in any workflow', () => {
     // `workflowFileNames` refuses an empty read (#84), so this loop cannot
     // run over nothing and report success.
+    // The one exception is the dispatched capture (#654), which is never part
+    // of the gate and is pinned below; it must exist, so the exception cannot
+    // outlive the workflow it was made for.
+    expect(workflowFileNames()).toContain(CAPTURE_WORKFLOW);
     for (const name of workflowFileNames()) {
       if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
+      if (name === CAPTURE_WORKFLOW) continue;
       expect(
         withoutCommentLines(workflow(name), '#'),
         `${name} can rewrite the baseline it is checking against`,
@@ -3440,5 +3445,142 @@ describe('a docs-only pull request skips the browser jobs and nothing else (#582
       /docs_only|docs-only\.mjs/.test(withoutYamlComments(workflow(name))),
     );
     expect(readers).toEqual(['ci.yml']);
+  });
+});
+
+const CAPTURE_WORKFLOW = 'visual-capture.yml';
+
+describe('the visual capture commits only baselines to a branch and starts CI on it (#654)', () => {
+  // Operator 2026-10-09 (global): visual runs are CI's, never the laptop's.
+  // Baselines change ONE way: this workflow, dispatched by hand. Built on
+  // record-floors.yml's split (#651): the job that runs the branch's code has
+  // a read-only token, and the job that can write runs none of it.
+  type Step = {
+    id?: string;
+    run?: string;
+    uses?: string;
+    env?: Record<string, string>;
+  };
+  type Job = {
+    needs?: unknown;
+    if?: string;
+    permissions?: Record<string, string>;
+    container?: { image?: string; options?: string };
+    outputs?: Record<string, string>;
+    steps?: Step[];
+  };
+  type Parsed = {
+    on?: Record<string, { inputs?: Record<string, { required?: boolean }> }>;
+    permissions?: Record<string, string>;
+    jobs: Record<string, Job>;
+  };
+  const parsed = (file: string) =>
+    parseCleanYaml(workflow(file), file) as Parsed;
+  const capture = () => parsed(CAPTURE_WORKFLOW);
+  const job = (id: string) => {
+    const found = capture().jobs[id];
+    expect(found, `${CAPTURE_WORKFLOW} defines no job '${id}'`).toBeDefined();
+    return found!;
+  };
+  const runsOf = (id: string) =>
+    (job(id).steps ?? []).flatMap(({ run }) => run ?? []).join('\n');
+
+  it('starts on workflow_dispatch and on nothing else, naming the branch', () => {
+    expect(Object.keys(capture().on ?? {})).toEqual(['workflow_dispatch']);
+    expect(capture().on?.workflow_dispatch?.inputs?.branch?.required).toBe(
+      true,
+    );
+  });
+
+  it('is one job set of image, capture and commit, with no token by default', () => {
+    expect(Object.keys(capture().jobs)).toEqual(['image', 'capture', 'commit']);
+    expect(capture().permissions).toEqual({});
+  });
+
+  it('refuses develop and main before it reads anything', () => {
+    const refusal = runsOf('image');
+    expect(refusal).toMatch(/^\s*case "\$BRANCH" in$/m);
+    expect(refusal).toMatch(/^\s*develop \| main\)$/m);
+    expect(refusal).toMatch(/^\s*exit 1$/m);
+  });
+
+  it('picks its image the way ci.yml does, and captures in the visual gate’s own container', () => {
+    expect(runsOf('image')).toMatch(/^node scripts\/playwright-image\.mjs$/m);
+    const gate = parsed('ci.yml').jobs.visual;
+    expect(gate?.container).toBeDefined();
+    expect(job('capture').container).toEqual(gate?.container);
+  });
+
+  it('runs the visual suite with --update-snapshots=all, never the bare flag', () => {
+    const steps = job('capture').steps ?? [];
+    const capturing = steps.filter(({ run }) =>
+      /npx playwright test --project=visual --update-snapshots=all\b/.test(
+        run ?? '',
+      ),
+    );
+    expect(capturing).toHaveLength(1);
+    expect(capturing[0]?.env?.VISUAL).toBe('1');
+    expect(runsOf('capture')).not.toMatch(/--update-snapshots(?!=all\b)/);
+  });
+
+  it('gives the job that runs branch code a read-only token', () => {
+    expect(job('image').permissions).toEqual({ contents: 'read' });
+    expect(job('capture').permissions).toEqual({ contents: 'read' });
+  });
+
+  it('lets the capture script judge what changed, refusing anything that is not a baseline', () => {
+    expect(runsOf('capture')).toMatch(
+      /^\s*node scripts\/visual-capture\.mjs /m,
+    );
+  });
+
+  it('commits from a job that runs no branch code', () => {
+    expect(job('commit').needs).toBe('capture');
+    expect(job('commit').if).toBe("needs.capture.outputs.changed == 'true'");
+    expect(job('commit').permissions).toEqual({
+      contents: 'write',
+      actions: 'write',
+      'pull-requests': 'read',
+    });
+    expect(runsOf('commit')).not.toMatch(/(^|\s)(npm|npx|node)\s/m);
+  });
+
+  it('judges the artifact’s list again before it copies, and copies only what it lists', () => {
+    // The list comes from the job that ran branch code; the job that can
+    // write trusts none of it.
+    const commit = runsOf('commit');
+    expect(commit).toMatch(
+      /^\s*if grep -vxE 'tests\/e2e\/__screenshots__\/\[\^\/"\[:space:\]\]\+\[\.\]png' visual-capture\/baselines\.txt; then$/m,
+    );
+    expect(commit).toMatch(/^\s*cp "visual-capture\/files\/\$file" "\$file"$/m);
+    expect(commit).not.toMatch(/cp -R/);
+  });
+
+  it('folds the baselines into the captured commit and pushes leased to it', () => {
+    const commit = runsOf('commit');
+    expect(commit).toMatch(
+      /^\s*git commit --amend -F visual-capture\/message\.txt$/m,
+    );
+    expect(commit).toMatch(
+      /^\s*git -c "http\.https:\/\/github\.com\/\.extraheader=AUTHORIZATION: basic \$AUTH" push --force-with-lease="refs\/heads\/\$BRANCH:\$SHA" origin "HEAD:refs\/heads\/\$BRANCH"$/m,
+    );
+    expect(commit).toMatch(
+      /^\s*echo "::error::the amend changed the parents of \$SHA: nothing pushed"$/m,
+    );
+  });
+
+  it('starts ci.yml and the pull request’s closing-keywords on the new head', () => {
+    const commit = runsOf('commit');
+    expect(commit).toMatch(/^\s*gh workflow run ci\.yml --ref "\$BRANCH"$/m);
+    expect(commit).toMatch(
+      /^\s*gh workflow run pr-body\.yml --ref "\$BRANCH" -f pr="\$PR"$/m,
+    );
+  });
+
+  it('is not part of the gate: ci.yml does not call it and no check is named for it', () => {
+    const ci = runnableText(workflow('ci.yml'));
+    expect(workflowRefs(ci)).not.toContain(CAPTURE_WORKFLOW);
+    expect(workflowRefs(ci).length).toBeGreaterThan(0);
+    expect(REQUIRED_CHECKS).not.toContain('capture');
   });
 });
