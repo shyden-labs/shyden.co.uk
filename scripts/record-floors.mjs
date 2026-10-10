@@ -34,8 +34,14 @@
  * One id read two different values when its figure differs by engine, so
  * that refusal is also where a floor that needs one id per engine shows.
  *
- * CI never records, for the reason CI never passes `--update-snapshots`: a
- * run that can rewrite the figure it checks against asserts nothing.
+ * The gate never records, for the reason CI never passes
+ * `--update-snapshots`: a run that can rewrite the figure it checks against
+ * asserts nothing. Recording is `.github/workflows/record-floors.yml` (#651),
+ * dispatched on a branch, never triggered by a push or a pull request: it runs
+ * this script inside the pinned Playwright image (`FLOORS_RECORD_IN_IMAGE=1`,
+ * so no `docker run` wraps the Playwright command), commits the moved figures
+ * to the branch and dispatches `ci.yml` there, and the gate then judges that
+ * commit as it judges every other. Any other run under `CI` still refuses.
  */
 import { spawnSync } from 'node:child_process';
 import {
@@ -93,6 +99,20 @@ export const FLOORS_FILE = 'tests/floors.json';
  * to, instead of judging it (`tests/floors.ts`).
  */
 export const RECORD_ENV = 'FLOORS_RECORD';
+
+/**
+ * Set to `1` by the dispatched CI recorder (#651), which is already inside the
+ * pinned Playwright image: the Playwright command runs directly instead of
+ * through `docker run`, and the one refusal under `CI` is lifted.
+ */
+export const IN_IMAGE_ENV = 'FLOORS_RECORD_IN_IMAGE';
+
+/**
+ * @param {Readonly<Record<string, string | undefined>>} environment
+ * @returns {boolean}
+ */
+export const recordsInImage = (environment) =>
+  environment[IN_IMAGE_ENV] === '1';
 
 /**
  * @typedef {{ id: string, actual: number, site: string }} Observation
@@ -160,14 +180,7 @@ export const runRefusal = (suite, { status, error }) =>
  * @returns {string[]}
  */
 export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
-  const inside = relative(cwd, record);
-  if (inside === '' || inside.startsWith('..') || isAbsolute(inside))
-    throw new Error(
-      `${record} is outside ${cwd}, where the container cannot write it`,
-    );
-  // Never empty: Playwright reads no file filter as every spec.
-  if (specs.length === 0)
-    throw new Error('no Playwright spec calls floorBreach');
+  const inside = recordInside(cwd, record, specs);
   return containerArgs({
     image,
     cwd,
@@ -178,9 +191,62 @@ export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
     // out early in the journey. One at a time, WebKit's four passed in 1.5
     // minutes (measured 2026-10-05). The default count, derived from the
     // CPUs, has frozen this laptop before.
-    command: 'npx playwright test --workers=1 "$@"',
+    command: `${PLAYWRIGHT_TEST.join(' ')} "$@"`,
     operands: specs,
   });
+};
+
+/**
+ * The Playwright command both forms run: one worker. One home, so the
+ * container and the in-image run cannot differ on it.
+ */
+const PLAYWRIGHT_TEST = ['npx', 'playwright', 'test', '--workers=1'];
+
+/**
+ * @param {string} cwd
+ * @param {string} record
+ * @param {readonly string[]} specs
+ * @returns {string} the record's path relative to `cwd`
+ */
+function recordInside(cwd, record, specs) {
+  const inside = relative(cwd, record);
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside))
+    throw new Error(
+      `${record} is outside ${cwd}, where the container cannot write it`,
+    );
+  // Never empty: Playwright reads no file filter as every spec.
+  if (specs.length === 0)
+    throw new Error('no Playwright spec calls floorBreach');
+  return inside;
+}
+
+/**
+ * The process that records the Playwright floors: `docker run` of the pinned
+ * image on a laptop, or the same Playwright command run directly where the
+ * process is already inside that image (#651, the dispatched CI recorder).
+ *
+ * @param {object} options
+ * @param {boolean} options.inImage whether this process is in the image
+ * @param {string} options.image the pinned Playwright image
+ * @param {string} options.cwd the repo root
+ * @param {string} options.record the record file, inside `cwd`
+ * @param {readonly string[]} options.specs the specs that call floorBreach
+ * @returns {{ file: string, args: string[], env: Record<string, string> | undefined }}
+ */
+export const playwrightRecordRun = ({ inImage, ...options }) => {
+  if (!inImage)
+    return {
+      file: 'docker',
+      args: playwrightRecordArgs(options),
+      env: undefined,
+    };
+  recordInside(options.cwd, options.record, options.specs);
+  const [file, ...command] = PLAYWRIGHT_TEST;
+  return {
+    file,
+    args: [...command, ...options.specs],
+    env: { [RECORD_ENV]: options.record },
+  };
 };
 
 /**
@@ -400,7 +466,9 @@ export const floorsText = (floors) =>
  * @returns {void}
  */
 const main = () => {
-  if (env.CI) die('CI never records floors: run npm run floors:record locally');
+  const inImage = recordsInImage(env);
+  if (env.CI && !inImage)
+    die('CI never records floors: run npm run floors:record locally');
   const args = argv.slice(2);
   if (
     args.length > 1 ||
@@ -425,7 +493,7 @@ const main = () => {
   // Asked first, before minutes of unit suite: without Docker the Playwright
   // floors cannot be recorded, and they are never recorded on this machine.
   const docker =
-    unitOnly || functionsOnly
+    unitOnly || functionsOnly || inImage
       ? undefined
       : runRefusal(
           PLAYWRIGHT,
@@ -521,18 +589,24 @@ const main = () => {
           if (integrationRefusal !== undefined) return integrationRefusal;
         }
         if (pass === 1 && !unitOnly && !functionsOnly) {
-          const image = localImage();
+          const image = inImage ? 'the running container' : localImage();
           const e2e = join(dir, 'e2e.jsonl');
           console.log(
             `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
           );
+          const run = playwrightRecordRun({
+            inImage,
+            image,
+            cwd,
+            record: e2e,
+            specs,
+          });
           const e2eRefusal = runRefusal(
             PLAYWRIGHT,
-            spawnSync(
-              'docker',
-              playwrightRecordArgs({ image, cwd, record: e2e, specs }),
-              { stdio: 'inherit' },
-            ),
+            spawnSync(run.file, run.args, {
+              stdio: 'inherit',
+              env: run.env === undefined ? undefined : { ...env, ...run.env },
+            }),
           );
           if (e2eRefusal !== undefined) return e2eRefusal;
           e2eSeen = observationsIn(e2e);

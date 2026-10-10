@@ -169,8 +169,14 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: build-release-content.mjs',
   },
-  // CI never records the guards' floors, so under CI it refuses before it
-  // runs anything (#468).
+  // Without its four paths it prints its usage and refuses (#651).
+  'floors-diff.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: floors-diff.mjs',
+  },
+  // The gate never records the guards' floors, so under CI it refuses before
+  // it runs anything (#468), unless told it is the dispatched recorder (#651).
   'record-floors.mjs': {
     args: [],
     env: { CI: 'true' },
