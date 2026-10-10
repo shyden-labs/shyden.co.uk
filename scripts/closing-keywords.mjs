@@ -47,7 +47,7 @@ import { die, messageOf } from './errors.mjs';
  *
  * A full issue or pull request URL counts as a reference too. GitHub does not
  * document that form, so the rule does not rely on GitHub ignoring it.
- * The scheme's slashes are `\/{2}` because `tests/unit/one-home.test.ts`
+ * The scheme's slashes are `\/{2}` because `tests/guards/one-home.test.ts`
  * reads an escaped `//` as comment syntax.
  */
 const CLOSING_KEYWORD =

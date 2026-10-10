@@ -30,7 +30,7 @@ export const DOCS_TREE = 'docs/';
 /**
  * The parts of `docs/` that code reads by name, so a change there is not
  * documentation alone. Derived from the repository by
- * `tests/unit/docs-only.test.ts`, which fails when this disagrees with it.
+ * `tests/guards/docs-only.test.ts`, which fails when this disagrees with it.
  */
 export const DOCS_READ_BY_CODE = Object.freeze([
   'docs/releases/',

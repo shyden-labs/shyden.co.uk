@@ -385,7 +385,7 @@ test.describe('homepage content', () => {
       const btns = page.locator('.btn');
       await expect(btns.first()).toBeVisible();
       // Written inline rather than hoisted to a variable: the unproved-loop
-      // scanner in `tests/unit/event-collectors.test.ts` matches this exact
+      // scanner in `tests/guards/event-collectors.test.ts` matches this exact
       // shape, so hoisting makes the loop invisible to it and it silently
       // stops being checked for a liveness proof. Use the recognised idiom
       // instead of widening the guard to fit new code.

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { withoutCommentLines } from './source-text';
 
@@ -66,27 +65,6 @@ const packageJson = () =>
   };
 
 describe('the pre-push hook', () => {
-  it('is the hook directory git actually consults', () => {
-    // The seam. A hook script in a directory `core.hooksPath` does not name is
-    // an inert file, and every source-text assertion below would still pass.
-    // `git config` EXITS 1 when the key is unset, so this has to be caught:
-    // letting it throw reports a spawn failure and buries the actual finding.
-    let configured = '';
-    try {
-      configured = execFileSync('git', ['config', 'core.hooksPath'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-    } catch {
-      configured = '(unset)';
-    }
-    expect(
-      configured,
-      'git is not pointed at .githooks — run `npm install` to trigger the ' +
-        '`prepare` script, which is what installs the hook',
-    ).toBe('.githooks');
-  });
-
   it('is installed by `prepare`, so a fresh clone gets it', () => {
     // Without this, the check above passes forever on a machine where the
     // config was set once by hand, while a new contributor gets no hook at all.
@@ -115,7 +93,15 @@ describe('the pre-push hook', () => {
     // `typecheck` was that edit (#390). vitest strips types without checking
     // them, so a test indexing a union as a record passed the hook, was
     // pushed, and only `astro check` in CI could have refused it.
-    expect(invokedNpmScripts()).toEqual(['format', 'test:unit', 'typecheck']);
+    //
+    // `test:guards` was the next (#638): the whole-repo guards left the unit
+    // suite for their own, and the hook still has to run them.
+    expect(invokedNpmScripts()).toEqual([
+      'format',
+      'test:guards',
+      'test:unit',
+      'typecheck',
+    ]);
   });
 
   it('clears the repository git hands it before any check runs (#377)', () => {

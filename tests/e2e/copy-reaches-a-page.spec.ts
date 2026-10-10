@@ -83,7 +83,7 @@ let corpus: Corpus | undefined;
  * has built anything, so a module-scope walk made listing the suite depend on
  * a build already being there: on a fresh checkout every filtered run passed
  * its tests and then exited 1 on `ENOENT: scandir 'dist'`.
- * `tests/unit/collection-needs-no-build.test.ts` holds every spec to that.
+ * `tests/guards/collection-needs-no-build.test.ts` holds every spec to that.
  * Kept once read because five locale tests share one corpus.
  */
 const builtCorpus = (): Corpus => {

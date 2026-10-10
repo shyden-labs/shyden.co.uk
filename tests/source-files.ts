@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { nonEmpty } from '../scripts/errors.mjs';
+import { treeReading } from './tree-reading';
 
 /**
  * The one directory walk in the suite.
@@ -14,7 +14,7 @@ import { nonEmpty } from '../scripts/errors.mjs';
  * four hand-written `[tests/e2e, tests/device]` lists left the deploy gates
  * unscanned.
  *
- * `tests/unit/one-home.test.ts` fails if a tenth appears.
+ * `tests/guards/one-home.test.ts` fails if a tenth appears.
  */
 
 /**
@@ -93,24 +93,26 @@ export const specFilesUnder = (dir: string): string[] =>
  * The walk reads the filesystem, which also holds `dist/` and the test
  * reports: files nobody here wrote, on one machine and not the next. Asking
  * git keeps `.gitignore` the one statement of what is tracked, where a list
- * of directories copied into a guard would drift from it. `git check-ignore`
- * exits 1 when it ignores nothing, which is an ordinary answer, so the status
- * is read rather than thrown on.
+ * of directories copied into a guard would drift from it. A unit test starts
+ * no process (#631), so git is asked once per run, in the global setup
+ * (`tests/tree-reading-setup.ts`), about the paths in `ignoreQuestions()`
+ * (`tests/git-questions.ts`); this answers from that reading, and refuses a
+ * path nobody asked about rather than guess.
  *
  * Git does not report a TRACKED path as ignored, whatever the rules say. A
  * guard asking whether a rule would swallow a file must ask about a path git
  * does not track, or the answer is "no" for a reason unrelated to the rule.
  */
 export function ignoredByGit(paths: readonly string[]): Set<string> {
-  const run = spawnSync('git', ['check-ignore', '--stdin'], {
-    input: paths.join('\n'),
-    encoding: 'utf8',
-  });
-  if (run.status !== 0 && run.status !== 1)
+  const { ignored } = treeReading();
+  const unasked = paths.filter((path) => ignored[path] === undefined);
+  if (unasked.length > 0)
     throw new Error(
-      `git check-ignore failed (${run.status}): ${run.error ?? run.stderr}`,
+      `git was never asked whether it ignores ${unasked.join(', ')}: a unit ` +
+        'test starts no process, so the question belongs in ignoreQuestions() ' +
+        'in tests/git-questions.ts, answered once by tests/tree-reading-setup.ts',
     );
-  return new Set(run.stdout.split('\n').filter((line) => line !== ''));
+  return new Set(paths.filter((path) => ignored[path]));
 }
 
 /**
@@ -179,11 +181,12 @@ export function searched<T>(
  * see those files. `git ls-files` is the only list that cannot disagree with
  * what is committed.
  *
- * `-z` because a path may hold any byte but NUL, and `existsSync` because a
- * file deleted in the working tree is tracked until the deletion is staged.
+ * The listing is the run's one reading of `git ls-files -z` (#631), taken once
+ * in the global setup; `existsSync` stays here, per call, because a file
+ * deleted in the working tree is tracked until the deletion is staged.
  */
 export function trackedFiles(keep: (path: string) => boolean): string[] {
-  return gitListed([], keep, 'tracked files');
+  return gitListed('tracked', keep, 'tracked files');
 }
 
 /**
@@ -194,28 +197,16 @@ export function trackedFiles(keep: (path: string) => boolean): string[] {
  * machine's build output is not a finding on another.
  */
 export function committableFiles(keep: (path: string) => boolean): string[] {
-  return gitListed(
-    ['--others', '--exclude-standard', '--cached'],
-    keep,
-    'committable files',
-  );
+  return gitListed('committable', keep, 'committable files');
 }
 
 function gitListed(
-  options: readonly string[],
+  list: 'tracked' | 'committable',
   keep: (path: string) => boolean,
   what: string,
 ): string[] {
-  const run = spawnSync('git', ['ls-files', '-z', ...options], {
-    encoding: 'utf8',
-  });
-  if (run.status !== 0)
-    throw new Error(
-      `git ls-files failed (${run.status}): ${run.error ?? run.stderr}`,
-    );
-  const paths = run.stdout
-    .split('\0')
-    .filter((path) => keep(path) && existsSync(path))
+  const paths = treeReading()
+    [list].filter((path) => keep(path) && existsSync(path))
     .sort();
   return nonEmpty(paths, what);
 }

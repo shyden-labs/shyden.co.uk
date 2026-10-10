@@ -13,7 +13,7 @@
  * rebrand meant finding all of them and the test agreeing was a coincidence
  * rather than a consequence.
  *
- * `tests/unit/shytalk-brand.test.ts` asserts nothing else in the repo spells
+ * `tests/guards/shytalk-brand.test.ts` asserts nothing else in the repo spells
  * these values out, so the single home cannot quietly become four again.
  */
 export const SHYTALK_MARK = {

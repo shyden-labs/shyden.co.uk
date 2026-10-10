@@ -45,7 +45,7 @@ describe('the organisation is named Shyden Labs (#413)', () => {
 const HISTORY = 'docs/superpowers/';
 const OLD_HANDLE = ['Shyden', 'Ltd'].join('-');
 const KEPT = [
-  `tests/unit/release-inventory.test.ts:      'Merge pull request #347 from ${OLD_HANDLE}/97-report',`,
+  `tests/integration/release-inventory.test.ts:      'Merge pull request #347 from ${OLD_HANDLE}/97-report',`,
 ];
 
 describe("no live file names the org's old GitHub handle (#413)", () => {

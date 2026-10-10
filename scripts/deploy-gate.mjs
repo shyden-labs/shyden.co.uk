@@ -159,7 +159,7 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
 /**
  * The check-runs on `sha`, from the API the runner names in GITHUB_API_URL
- * (Actions sets it on every runner, and `tests/unit/deploy-gate-script.test.ts`
+ * (Actions sets it on every runner, and `tests/integration/deploy-gate-script.test.ts`
  * points it at a stand-in).
  *
  * Node's `fetch` rejects an unreachable host with only "fetch failed" and

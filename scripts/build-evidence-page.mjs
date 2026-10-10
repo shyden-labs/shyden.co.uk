@@ -13,7 +13,7 @@
  *    lede, sections, the mutation ledger -- arrives in a content file. The
  *    first of these pages was built by hand for #96 with its wording inline;
  *    reused as-is, it would have described the wrong feature with total
- *    confidence. `tests/unit/evidence-page.test.ts` asserts this file contains
+ *    confidence. `tests/guards/evidence-page.test.ts` asserts this file contains
  *    none of the prose it renders, derived from the example content rather
  *    than a blocklist somebody has to remember to extend.
  *
@@ -310,7 +310,7 @@ const mb = (n) => `${(n / 1048576).toFixed(2)}MB`;
  *
  * Literals, deliberately. A value derived from the code it guards moves with
  * the code and asserts nothing about the platform (#117); these are pinned
- * against the measurement and `tests/unit/evidence-page.test.ts` pins them
+ * against the measurement and `tests/guards/evidence-page.test.ts` pins them
  * again, so a platform change is a red test rather than a refused publish.
  */
 export const ASSET_MAX_FILES = 5000;

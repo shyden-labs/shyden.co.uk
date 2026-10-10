@@ -338,7 +338,7 @@ export default defineConfig({
     // That sentence was false twice -- the report first landed in a temp
     // directory that was deleted, then the recordings stayed in the root
     // `test-results/`, which the next run of any kind clears (#165). Both are
-    // pinned by the seam guards in `tests/unit/evidence-page.test.ts`.
+    // pinned by the seam guards in `tests/guards/evidence-page.test.ts`.
     video: 'off',
   },
   projects: [

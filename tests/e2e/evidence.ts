@@ -75,7 +75,7 @@ export const shoot = async (
 /**
  * How every assertion shot is taken.
  *
- * Exported so `tests/unit/evidence-page.test.ts` can pin the format without a
+ * Exported so `tests/guards/evidence-page.test.ts` can pin the format without a
  * browser: the quality is a judgement about legible Thai glyphs, and a
  * judgement that lives only inside a call nobody can reach is a judgement
  * nothing protects.
@@ -104,7 +104,7 @@ export const captureOptions = (path: string) => ({
  * never pays for a recording however many specs opt in.
  *
  * Which specs may declare this is neither a judgement nor a list:
- * `tests/unit/evidence-recording.test.ts` DERIVES it from each spec's own
+ * `tests/guards/evidence-recording.test.ts` DERIVES it from each spec's own
  * source -- a spec that acts must record, and a spec that records must act --
  * and fails in both directions. The declaration is only ever one half of a
  * pair, and the source is the authority.

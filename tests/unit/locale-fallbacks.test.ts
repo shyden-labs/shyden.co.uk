@@ -31,7 +31,7 @@ import { needsTranslation } from '../../src/lib/i18n/translate';
  * This file is the difference between those being TRACKED and merely being
  * true. The sets are asserted exactly: a new gap fails, and a gap somebody
  * closes also fails until they take it off the list. That is the same
- * contract tests/unit/parked-tests.test.ts holds `test.fixme` to, for the
+ * contract tests/guards/parked-tests.test.ts holds `test.fixme` to, for the
  * same reason — #32 shipped a real bug behind a comment claiming it was
  * tracked when no ticket existed.
  */

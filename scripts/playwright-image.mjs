@@ -117,7 +117,7 @@ export function localImage() {
 /**
  * The argument vector for `docker` that runs a Playwright command in `image`
  * over this checkout, built without running anything so a test can read it
- * (`tests/unit/visual-runner.test.ts`, `tests/unit/floors.test.ts`). One home
+ * (`tests/unit/visual-runner.test.ts`, `tests/guards/floors.test.ts`). One home
  * for the container both local runs use: the visual suite (`visual.mjs`) and
  * the floor recorder (`record-floors.mjs`, #475).
  *

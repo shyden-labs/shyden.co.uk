@@ -1945,7 +1945,7 @@ test.describe('the no-scroll rule, measured', () => {
   // dead weight, and the branch it fed is precisely what made "tracked, not
   // hidden" assertable without being true. `test(` is still written
   // literally, with its title inline as a template literal rather than
-  // hoisted to a variable, because tests/unit/viewport-tagging.test.ts scans
+  // hoisted to a variable, because tests/guards/viewport-tagging.test.ts scans
   // source text for exactly that shape and is blind to a title passed by
   // reference or reached through an aliased callee.
   for (const { width, height } of VIEWPORTS) {

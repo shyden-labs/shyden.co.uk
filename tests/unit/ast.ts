@@ -34,8 +34,25 @@ import { withoutTsComments } from './source-text';
  * text rather than a path so a detector can be handed a fixture that is not
  * on disk.
  */
-export const parseSource = (text: string, file = 'source.ts'): ts.SourceFile =>
-  ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+export const parseSource = (
+  text: string,
+  file = 'source.ts',
+): ts.SourceFile => {
+  // One parse per file name and text in a test file (#631): the meta-guards
+  // parse the same spec corpus in every test of a file, and parsing it is the
+  // cost (measured: 0.45-1.2 s CPU for the 310 files under tests/). Keyed by
+  // the text as well as the name, so an edited fixture is parsed afresh; no
+  // reader mutates the tree, so a shared one answers as a fresh one does.
+  const key = `${file}\0${text}`;
+  let parsed = parses.get(key);
+  if (parsed === undefined) {
+    parsed = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    parses.set(key, parsed);
+  }
+  return parsed;
+};
+
+const parses = new Map<string, ts.SourceFile>();
 
 /**
  * Every node in `sf`, at any depth, that `keep` accepts, in source order. The

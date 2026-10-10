@@ -33,3 +33,4 @@ fail() {
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'
 npm run test:unit || fail 'a unit test failed' 'npm run test:unit'
+npm run test:guards || fail 'a guard failed' 'npm run test:guards'

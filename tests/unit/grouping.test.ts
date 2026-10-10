@@ -1421,13 +1421,33 @@ describe('apart letters', () => {
 // buildConflicts or any other engine internal, so this cannot pass merely
 // because the test and the implementation share a bug).
 describe('apart letters — the guarantee holds broadly, not just on hand-picked rosters (debt a)', () => {
-  it('holds across a spread of class sizes, group-count and per-group modes, and seeds', () => {
-    const sizesToTry = [4, 6, 9, 12, 16, 20, 25, 30];
-    const letters = ['X', 'Y', 'Z'];
-    let successes = 0;
-    let attempts = 0;
-
-    for (const n of sizesToTry) {
+  // One test per class size (the one-test-per-case rule), each with eight
+  // seeds for every mode, the seeds `seeded(seed * 97 + n)` as before #638.
+  // Measured per size (attempts, successes): 4: 16, 16; 6, 9, 12, 16 and 20:
+  // 24, 24 each; 25: 24, 21; 30: 24, 22. Together the original 184 attempts and
+  // 179 successes. Each size must clear its own floor below (a margin under the
+  // measurement); the floors sum to 120 attempts and 133 successes, above the
+  // original sweep's > 100 and > 80, so no size can fail silently.
+  const apartSweepSizes: [
+    n: number,
+    minAttempts: number,
+    minSuccesses: number,
+  ][] = [
+    [4, 12, 12],
+    [6, 18, 18],
+    [9, 18, 18],
+    [12, 18, 18],
+    [16, 18, 18],
+    [20, 18, 18],
+    [25, 18, 15],
+    [30, 18, 16],
+  ];
+  it.each(apartSweepSizes)(
+    'holds across group-count and per-group modes and eight seeds for a class of %i',
+    (n, minAttempts, minSuccesses) => {
+      const letters = ['X', 'Y', 'Z'];
+      let successes = 0;
+      let attempts = 0;
       const students = Array.from({ length: n }, (_, i) =>
         student({ number: i + 1, apart: letters[i % letters.length] }),
       );
@@ -1467,16 +1487,12 @@ describe('apart letters — the guarantee holds broadly, not just on hand-picked
           }
         }
       }
-    }
-    // The invariant must actually be exercised on real successes, not hold
-    // vacuously because every attempt in the sweep happened to fail.
-    // Measured (see
-    // docs/superpowers/notes/2026-08-06-classroom-groups-v2-engine-measurements.md,
-    // "The guarantee holds broadly: two sweeps"): 184 attempts, 179
-    // successes.
-    expect(attempts).toBeGreaterThan(100);
-    expect(successes).toBeGreaterThan(80);
-  });
+      // The invariant must actually be exercised on real successes, not hold
+      // vacuously because every attempt for this size happened to fail.
+      expect(attempts).toBeGreaterThan(minAttempts);
+      expect(successes).toBeGreaterThan(minSuccesses);
+    },
+  );
 
   it('holds even when together-letters merge students into multi-student blocks', () => {
     // A pure apart-only sweep cannot see a block-index/student-index
