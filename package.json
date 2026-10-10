@@ -26,7 +26,7 @@
     "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
     "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
-    "test": "npm run test:unit && npm run test:guards && npm run test:integration && npm run test:e2e",
+    "test": "npm run format && npm run typecheck && npm run test:unit",
     "format": "prettier --check .",
     "i18n:scaffold": "node scripts/i18n-scaffold.mjs",
     "prepare": "node scripts/install-hooks.mjs"

@@ -1799,6 +1799,22 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(stood.some(({ runs }) => runs.some(runsTheE2eSuite))).toBe(true);
   });
 
+  // The laptop runs only format, typecheck and unit (operator, 2026-10-09, a
+  // global rule; #653), so CI is the one place each other vitest suite runs:
+  // a deleted step would leave it run nowhere, and the pre-push hook no longer
+  // stands behind the guards. One test per suite CI alone runs.
+  it.each(['test:guards', 'test:integration'])(
+    'runs %s in a job build-and-test stands for, the only place it runs',
+    (script) => {
+      const jobs = workflowJobs(workflow('ci.yml'), 'ci.yml');
+      const aggregate = jobNamed('ci.yml', 'build-and-test');
+      const stood = jobs.filter(({ id }) => aggregate.needs.includes(id));
+      expect(stood.some(({ runs }) => runs.includes(`npm run ${script}`))).toBe(
+        true,
+      );
+    },
+  );
+
   it('hands its verdict every job it needs, and every shard account', () => {
     const verdict = (ciParsed().jobs['build-and-test']?.steps ?? []).find(
       (step) => step.run?.includes('scripts/e2e-shards.mjs'),
