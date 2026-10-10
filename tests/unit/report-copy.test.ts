@@ -23,7 +23,8 @@ describe('the report copy is the approved English (#97)', () => {
       send: 'Send report',
       sent: 'Thank you. Your report has been sent.',
       notFound:
-        "We couldn't find those words on this page. Choose them from the list, or copy a shorter piece without any names or numbers.",
+        // #665: the site speaks as one person, and this line reports a fact.
+        "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.",
       rejected:
         "That report couldn't be sent. Please check the form and try again.",
       failed:
