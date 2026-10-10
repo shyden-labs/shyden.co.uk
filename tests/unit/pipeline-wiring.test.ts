@@ -328,6 +328,7 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(Object.keys(ci.on ?? {}).sort()).toEqual([
       'pull_request',
       'workflow_call',
+      'workflow_dispatch',
     ]);
     expect(jobNamed('deploy-dev.yml', 'test').uses).toBe(CI_WORKFLOW);
   });
@@ -901,11 +902,13 @@ describe('the deploy pipeline runs what it claims to', () => {
     // on one branch cancel a run on another. So a trigger other than a pull
     // request is allowed only because the key falls back to the run's own id,
     // a group of one that cancels nothing. The one such trigger is
-    // `workflow_call`, the dispatch path running this suite (#163).
+    // `workflow_call`, the dispatch path running this suite (#163), and
+    // `workflow_dispatch`, how the floor recorder starts CI on its commit
+    // (#651), which falls back the same way.
     expect(
       Object.keys(ci.on ?? {}).sort(),
       'a trigger besides pull_request needs a key no other run shares',
-    ).toEqual(['pull_request', 'workflow_call']);
+    ).toEqual(['pull_request', 'workflow_call', 'workflow_dispatch']);
 
     // Exactly these two, in any order. Every workflow in the repo shares one
     // namespace of groups, so the key names this workflow; it names the pull
@@ -3017,17 +3020,20 @@ describe('the waiting-reports count (#349)', () => {
   });
 });
 
-describe('CI never records the guards’ floors (#468)', () => {
-  it('runs neither npm run floors:record nor its script', () => {
+describe('CI never records the guards’ floors (#468), bar the dispatched recorder (#651)', () => {
+  it('runs neither npm run floors:record nor its script, outside record-floors.yml', () => {
     // A run that can raise the figure it checks against asserts nothing, for
     // the reason CI never passes --update-snapshots. The recorder refuses
-    // under CI itself (script-entry.test.ts probes it); this keeps a workflow
-    // from asking.
-    const runs = workflowYamlNames().flatMap((file) =>
-      workflowJobs(workflow(file), file).flatMap(({ runs }) =>
-        runs.map((run) => ({ file, run })),
-      ),
-    );
+    // under CI itself unless it is told it is in the image
+    // (script-entry.test.ts probes it); this keeps a workflow from asking.
+    // The one workflow that does is `workflow_dispatch` only (below).
+    const runs = workflowYamlNames()
+      .filter((file) => file !== RECORDER_WORKFLOW)
+      .flatMap((file) =>
+        workflowJobs(workflow(file), file).flatMap(({ runs }) =>
+          runs.map((run) => ({ file, run })),
+        ),
+      );
     const recording = runs
       .filter(({ run }) => /floors:record|record-floors/.test(run))
       .map(({ file, run }) => `${file}: ${run.trim().split('\n')[0]}`);
@@ -3037,6 +3043,313 @@ describe('CI never records the guards’ floors (#468)', () => {
     expect(
       floorBreach('pipeline-wiring/record-checked-run-steps', runs.length),
     ).toBeUndefined();
+  });
+});
+
+const RECORDER_WORKFLOW = 'record-floors.yml';
+
+/** Whether a parsed workflow can be started by hand, so by a bot's dispatch. */
+const dispatchable = (parsed: unknown): boolean => {
+  const trigger = (parsed as { on?: unknown } | null)?.on;
+  if (typeof trigger === 'string') return trigger === 'workflow_dispatch';
+  if (Array.isArray(trigger)) return trigger.includes('workflow_dispatch');
+  return (
+    typeof trigger === 'object' &&
+    trigger !== null &&
+    'workflow_dispatch' in trigger
+  );
+};
+
+describe('dispatchable reads the parsed trigger, not the text (#651)', () => {
+  it('accepts the mapping, string and list forms', () => {
+    expect(
+      dispatchable({ on: { pull_request: null, workflow_dispatch: null } }),
+    ).toBe(true);
+    expect(dispatchable({ on: 'workflow_dispatch' })).toBe(true);
+    expect(dispatchable({ on: ['pull_request', 'workflow_dispatch'] })).toBe(
+      true,
+    );
+  });
+
+  it('refuses a workflow without it, a commented one included', () => {
+    expect(
+      dispatchable({ on: { pull_request: null, workflow_call: null } }),
+    ).toBe(false);
+    expect(dispatchable({ on: 'pull_request' })).toBe(false);
+    expect(dispatchable({})).toBe(false);
+  });
+});
+
+describe('the floor recorder commits to a branch and starts CI on it (#651)', () => {
+  type Step = {
+    id?: string;
+    run?: string;
+    uses?: string;
+    env?: Record<string, string>;
+    with?: Record<string, unknown>;
+  };
+  type Job = {
+    needs?: unknown;
+    permissions?: Record<string, string>;
+    container?: { image?: string; options?: string };
+    steps?: Step[];
+  };
+  type Parsed = {
+    on?: Record<string, unknown>;
+    permissions?: Record<string, string>;
+    jobs: Record<string, Job>;
+  };
+  const parsed = (file: string) =>
+    parseCleanYaml(workflow(file), file) as Parsed;
+  const recorder = () => parsed(RECORDER_WORKFLOW);
+  const job = (id: string) => {
+    const found = recorder().jobs[id];
+    expect(found, `${RECORDER_WORKFLOW} defines no job '${id}'`).toBeDefined();
+    return found!;
+  };
+  const steps = (id: string) => job(id).steps ?? [];
+  const runsOf = (id: string) => steps(id).flatMap(({ run }) => run ?? []);
+
+  it('starts on workflow_dispatch and on nothing else', () => {
+    expect(Object.keys(recorder().on ?? {})).toEqual(['workflow_dispatch']);
+  });
+
+  it('is one job set of image, record and commit', () => {
+    expect(Object.keys(recorder().jobs)).toEqual(['image', 'record', 'commit']);
+  });
+
+  it('is not referenced by ci.yml, and no job of ci.yml needs it', () => {
+    // Comments stripped: ci.yml's prose may name the recorder, and only a
+    // `uses:` or a `gh workflow run` of it would wire the two together.
+    const ci = runnableText(workflow('ci.yml'));
+    expect(workflowRefs(ci)).not.toContain(RECORDER_WORKFLOW);
+    expect(workflowRefs(ci).length).toBeGreaterThan(0);
+    for (const { name, jobs } of workflowGraphs())
+      if (name !== RECORDER_WORKFLOW)
+        expect(
+          jobs.flatMap(({ uses }) => uses ?? []),
+          `${name} calls the recorder`,
+        ).not.toContain(`./.github/workflows/${RECORDER_WORKFLOW}`);
+    expect(REQUIRED_CHECKS).not.toContain('record');
+    expect(REQUIRED_CHECKS).not.toContain('commit');
+  });
+
+  it('makes ci.yml dispatchable, so a dispatched run can start on the commit', () => {
+    expect(dispatchable(parsed('ci.yml'))).toBe(true);
+    expect(jobNamed(RECORDER_WORKFLOW, 'commit').runs.join('\n')).toMatch(
+      /^gh workflow run ci\.yml --ref "\$BRANCH"$/m,
+    );
+  });
+
+  it('starts closing-keywords on the new head too: a token push starts no pull_request run', () => {
+    // `closing-keywords` is a required check and pr-body.yml starts only on
+    // pull_request events, so after the bot's commit it would never report.
+    const body = parsed('pr-body.yml') as Parsed & {
+      on?: { workflow_dispatch?: { inputs?: { pr?: { required?: boolean } } } };
+    };
+    expect(dispatchable(body)).toBe(true);
+    expect(body.on?.workflow_dispatch?.inputs?.pr?.required).toBe(true);
+    // The check keeps its context name, and judges with the same script.
+    expect(Object.keys(body.jobs)).toEqual(['closing-keywords']);
+    const bodyRuns = (body.jobs['closing-keywords']?.steps ?? [])
+      .flatMap(({ run }) => run ?? [])
+      .join('\n');
+    expect(bodyRuns).toMatch(/^\s*gh pr view "\$PR_NUMBER" --json body /m);
+    expect(bodyRuns).toMatch(/^\s*node scripts\/closing-keywords\.mjs /m);
+    // Read-only, scoped to the job; the workflow's own token stays contents: read.
+    expect(body.permissions).toEqual({ contents: 'read' });
+    expect(body.jobs['closing-keywords']?.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+    const dispatching = runsOf('commit').join('\n');
+    expect(dispatching).toMatch(
+      /^\s*PR="\$\(gh pr list --head "\$BRANCH" --state open --json number /m,
+    );
+    expect(dispatching).toMatch(
+      /^\s*gh workflow run pr-body\.yml --ref "\$BRANCH" -f pr="\$PR"$/m,
+    );
+  });
+
+  it('refuses a dispatched pr-body run whose pull request is not the one that owns the ref', () => {
+    // The check attaches to the dispatched ref's head; judging another pull
+    // request's clean body would turn that head green unread.
+    const body = parsed('pr-body.yml') as Parsed;
+    const bodySteps = (body.jobs['closing-keywords']?.steps ?? []) as (Step & {
+      if?: string;
+      name?: string;
+    })[];
+    const guardAt = bodySteps.findIndex(({ run }) =>
+      run?.includes('--json headRefName,headRefOid,state'),
+    );
+    const judgingAt = bodySteps.flatMap(({ run }, index) =>
+      run?.includes('node scripts/closing-keywords.mjs') ? [index] : [],
+    );
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(judgingAt).toHaveLength(2);
+    expect(judgingAt.every((index) => index > guardAt)).toBe(true);
+    const guard = bodySteps[guardAt]!;
+    expect(guard.if).toBe("github.event_name == 'workflow_dispatch'");
+    expect(guard.env).toMatchObject({
+      REF_NAME: '${{ github.ref_name }}',
+      SHA: '${{ github.sha }}',
+      PR_NUMBER: '${{ inputs.pr }}',
+    });
+    const run = guard.run ?? '';
+    expect(run).toMatch(/^\s*if \[ "\$STATE" != OPEN \]; then$/m);
+    expect(run).toMatch(/^\s*if \[ "\$HEAD_REF" != "\$REF_NAME" \]; then$/m);
+    expect(run).toMatch(/^\s*if \[ "\$HEAD_SHA" != "\$SHA" \]; then$/m);
+    expect(run.match(/::error::/g)).toHaveLength(3);
+    expect(run.match(/exit 1/g)).toHaveLength(3);
+    expect(run).not.toContain('${{');
+  });
+
+  it('keeps the visual check reporting on a dispatched ci.yml: it has no event condition', () => {
+    const ci = parsed('ci.yml') as Parsed & {
+      jobs: Record<string, Job & { if?: string }>;
+    };
+    expect(ci.jobs.visual).toBeDefined();
+    expect(ci.jobs.visual?.if).toBeUndefined();
+    expect(jobNamed('ci.yml', 'visual').condition).toBeUndefined();
+  });
+
+  it('refuses develop and main as the branch, before it checks anything out', () => {
+    const [first, ...rest] = steps('image');
+    expect(first?.run).toMatch(/develop \| main\)/);
+    expect(first?.run).toMatch(/exit 1/);
+    expect(first?.env).toEqual({ BRANCH: '${{ inputs.branch }}' });
+    expect(rest[0]?.uses).toMatch(/^actions\/checkout@/);
+  });
+
+  it('never interpolates an input into a script', () => {
+    const scripts = ['image', 'record', 'commit'].flatMap(runsOf);
+    expect(
+      searched(
+        scripts.filter((run) => run.includes('${{')),
+        { of: scripts, what: 'run scripts in the recorder' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/recorder-run-scripts', scripts.length),
+    ).toBeUndefined();
+  });
+
+  it('holds a workflow token of nothing, a read-only record, and a commit job that writes', () => {
+    expect(recorder().permissions).toEqual({});
+    expect(job('image').permissions).toEqual({ contents: 'read' });
+    expect(job('record').permissions).toEqual({ contents: 'read' });
+    expect(job('commit').permissions).toEqual({
+      contents: 'write',
+      actions: 'write',
+      'pull-requests': 'read',
+    });
+  });
+
+  it('runs no branch code in the job that can write', () => {
+    const scripts = runsOf('commit');
+    expect(scripts.length).toBeGreaterThan(0);
+    expect(
+      searched(
+        scripts.filter((run) => /\b(npm|npx|node|yarn|pnpm)\b/.test(run)),
+        { of: scripts, what: 'commit job scripts' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/commit-job-scripts', scripts.length),
+    ).toBeUndefined();
+  });
+
+  // The figures are folded into the commit they were measured on (operator
+  // 2026-10-10, "Bot folds into the head"), so every commit stays green on
+  // its own. The amend replaces exactly that commit: the push is leased to
+  // the SHA `record` measured, so a branch that moved since is refused, not
+  // overwritten, and the amended commit must keep that commit's parents.
+  it('folds the figures into the commit it measured, and leases the push to that commit alone', () => {
+    const lines = runsOf('commit')
+      .join('\n')
+      .split('\n')
+      .map((line) => line.trim());
+    // Each set exactly, so a second commit or a dropped check is seen too.
+    expect(lines.filter((line) => /^git commit\b/.test(line))).toEqual([
+      'git commit --amend -F floors-record/message.txt',
+    ]);
+    expect(lines.filter((line) => line.includes('PARENTS'))).toEqual([
+      'PARENTS="$(git log -1 --format=%P HEAD)"',
+      'if [ "$(git log -1 --format=%P HEAD)" != "$PARENTS" ]; then',
+    ]);
+    const pushLines = lines.filter(
+      (line) => /\bpush\b/.test(line) && line.includes('git'),
+    );
+    expect(pushLines).toEqual([
+      // The token reaches the push alone, never .git/config (#395).
+      'git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"',
+    ]);
+    const amend = steps('commit').find(({ run }) => run?.includes('--amend'));
+    expect(amend?.env?.SHA).toBe('${{ needs.record.outputs.sha }}');
+    expect(lines.filter((line) => line.startsWith('git config '))).toEqual([
+      "git config user.name 'github-actions[bot]'",
+      "git config user.email '41898282+github-actions[bot]@users.noreply.github.com'",
+    ]);
+    const checkout = steps('commit')[0];
+    expect(checkout?.with?.ref).toBe('${{ needs.record.outputs.sha }}');
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
+    // Depth 1 would make the measured commit shallow, and an amend of a
+    // shallow commit has NO parents: the push would orphan the branch.
+    expect(checkout?.with?.['fetch-depth']).toBe(2);
+  });
+
+  it('never forces a push any other way', () => {
+    const pushLines = runsOf('commit')
+      .join('\n')
+      .split('\n')
+      .filter((line) => /\bpush\b/.test(line) && line.includes('git'));
+    // A forcing refspec is `+` at the start of a word, quoted or not
+    // (`+HEAD:…`, `"+HEAD:…"`).
+    const forced = pushLines.filter((line) =>
+      /(?:\s--force|\s-f)(?=\s|$)|(?:^|[\s"'])\+|--force-with-lease(?!="refs\/heads\/\$BRANCH:\$SHA")/.test(
+        line,
+      ),
+    );
+    expect(
+      searched(forced, { of: pushLines, what: 'push lines in the commit job' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/commit-job-push-lines', pushLines.length),
+    ).toBeUndefined();
+  });
+
+  it('composes the amended message where the branch code runs, never where the token is', () => {
+    const record = runsOf('record')
+      .join('\n')
+      .split('\n')
+      .map((line) => line.trim());
+    expect(record.filter((line) => line.startsWith('git log '))).toEqual([
+      'git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"',
+    ]);
+  });
+
+  it('records in the image CI runs the e2e suite in, with the recorder told so', () => {
+    const ci = parsed('ci.yml');
+    expect(job('record').container).toEqual(ci.jobs.e2e?.container);
+    expect(job('record').container?.image).toBe(
+      '${{ needs.image.outputs.ref }}',
+    );
+    expect(
+      runsOf('image').filter((run) => run.includes('playwright-image')),
+    ).toEqual(['node scripts/playwright-image.mjs']);
+    expect(runsOf('image').at(-1)).toBe(
+      ci.jobs.image?.steps?.find(({ id }) => id === 'pick')?.run,
+    );
+    const record = steps('record').find(({ run }) =>
+      run?.includes('floors:record'),
+    );
+    expect(record?.env?.FLOORS_RECORD_IN_IMAGE).toBe('1');
+  });
+
+  it('lists the figures it moved from the JSON diff', () => {
+    expect(runsOf('record').join('\n')).toMatch(
+      /^node scripts\/floors-diff\.mjs /m,
+    );
   });
 });
 
