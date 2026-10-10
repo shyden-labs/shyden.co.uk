@@ -466,7 +466,7 @@ main:focus {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation-iteration-count: infinite !important;
     transition-duration: 0.01ms !important;
   }
 }
