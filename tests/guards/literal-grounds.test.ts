@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { filesUnder, searched } from '../source-files';
 import { floorBreach } from '../floors';
-import { stylesheetCss } from './source-text';
+import { stylesheetCss } from '../unit/source-text';
 import {
   colourLiterals,
   cssRules,
   onPaper,
   type CssDeclaration,
-} from './css-rules';
+} from '../unit/css-rules';
 
 /**
  * A ground written as a literal carries its own ink (#332).

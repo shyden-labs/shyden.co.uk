@@ -6,7 +6,7 @@ import {
   withoutCommentLines,
   withoutTsComments,
   withoutYamlComments,
-} from './source-text';
+} from '../unit/source-text';
 import { nonEmpty, searched, trackedFiles } from '../source-files';
 import type { Project } from '@playwright/test';
 import playwrightConfig, {
@@ -27,7 +27,7 @@ import {
   type DeclaredPermissions,
   type WorkflowJob,
 } from '../workflow-jobs';
-import { parseFile } from './ast';
+import { parseFile } from '../unit/ast';
 import { declarationsIn } from '../playwright-declarations';
 import { REQUIRED_CHECKS } from '../../scripts/deploy-gate.mjs';
 import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';

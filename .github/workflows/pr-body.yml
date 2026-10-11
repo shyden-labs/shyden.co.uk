@@ -68,7 +68,7 @@ jobs:
   closing-keywords:
     runs-on: ubuntu-26.04
     # Seconds of work. A budget so a hung job cannot burn the runner's
-    # 360-minute default; pinned by tests/unit/pipeline-wiring.test.ts.
+    # 360-minute default; pinned by tests/guards/pipeline-wiring.test.ts.
     timeout-minutes: 5
     # `gh pr view` on a dispatched run reads the pull request; nothing writes.
     permissions:

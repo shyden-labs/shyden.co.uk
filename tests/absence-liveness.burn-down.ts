@@ -73,7 +73,7 @@ export const ABSENCE_BURN_DOWN: Readonly<Record<string, number>> = {
   'tests/guards/parked-tests.test.ts › does not treat a test.fixme quoted inside a comment as a declaration': 1,
   'tests/guards/parked-tests.test.ts › is blind to the runtime conditional overload, which needs no issue': 1,
   'tests/guards/parked-tests.test.ts › is not fooled by a parked declaration spelled inside a string': 1,
-  'tests/unit/pipeline-wiring.test.ts › does not read the locked copy, or a global install of something else': 1,
+  'tests/guards/pipeline-wiring.test.ts › does not read the locked copy, or a global install of something else': 1,
   'tests/unit/remote-images.test.ts › finds nothing in a config that authorises no remote image': 1,
   'tests/unit/remote-images.test.ts › is not satisfied, nor refused, by a comment naming a domain': 1,
   'tests/unit/report-review.test.ts › reads an empty table as no reports': 1,

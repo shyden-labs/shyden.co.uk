@@ -4,7 +4,7 @@
 # Pinned here rather than in the workflow because Dependabot reads no image
 # out of a workflow file: this is the one place it can bump the digest, and
 # the tag beside it is what makes that bump reviewable. Both are held by
-# tests/unit/supply-chain.test.ts.
+# tests/guards/supply-chain.test.ts.
 #
 # Run it locally the same way CI does:
 #
