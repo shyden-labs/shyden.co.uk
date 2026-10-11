@@ -26,26 +26,5 @@ export default class UnitCpuReporter implements Reporter {
           });
       }
     process.stdout.write(`\n${cpuReport(rows, unmeasured).join('\n')}\n`);
-    // Loading each file (#688): a file that ran a test and carries no figure is
-    // unmeasured, so a setup that stopped stamping is seen.
-    const loads: CpuRow[] = [];
-    let unloaded = 0;
-    for (const testModule of testModules) {
-      const ran = testModule.children
-        .allTests()
-        .some((test) => ['passed', 'failed'].includes(test.result().state));
-      if (!ran) continue;
-      const microseconds = testModule.meta().loadCpuMicroseconds;
-      if (microseconds === undefined) unloaded++;
-      else
-        loads.push({
-          name: `loaded in ${Math.round(testModule.meta().loadWallMilliseconds ?? 0)} ms of wall`,
-          file: testModule.relativeModuleId,
-          microseconds,
-        });
-    }
-    process.stdout.write(
-      `\n${cpuReport(loads, unloaded, undefined, 'Own CPU of loading each unit file (#688)').join('\n')}\n`,
-    );
   }
 }

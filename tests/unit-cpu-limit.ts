@@ -79,7 +79,7 @@ declare module 'vitest' {
   interface TaskMeta {
     /** The test's own CPU in microseconds, stamped by `unit-cpu-setup.ts`. */
     ownCpuMicroseconds?: number;
-    /** A file's CPU to load, in microseconds, stamped by `unit-load-setup.ts` (#688). */
+    /** A file's CPU to load, in microseconds, stamped by `load-setup.ts` (#688, #696). */
     loadCpuMicroseconds?: number;
     /** A file's wall time to load, in milliseconds, stamped beside it. */
     loadWallMilliseconds?: number;

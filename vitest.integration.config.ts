@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config.ts';
-import { SHARED_SETUP } from './tests/setup-files.ts';
+import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The integration suite (#630): every test that starts a process (a script run
@@ -15,7 +15,16 @@ import { SHARED_SETUP } from './tests/setup-files.ts';
 export default defineConfig({
   test: {
     include: ['tests/integration/**/*.test.ts'],
-    setupFiles: [...SHARED_SETUP],
+    // The shared setup, then the measurement of loading each file (#696):
+    // reported by the reporter below, not limited, since a limit for this
+    // suite's loading is the operator's to set from those figures.
+    setupFiles: [...SHARED_SETUP, LOAD_SETUP],
+    // The verbose listing its command once named (a reporter on the command
+    // line replaces this whole list), then what loading each file cost.
+    reporters: [
+      'verbose',
+      ['./tests/load-reporter.ts', { suite: 'integration' }],
+    ],
     globalSetup: unit.test?.globalSetup,
   },
 });

@@ -54,20 +54,19 @@ const SUITES = [
   {
     suite: 'guards',
     config: guards,
-    command:
-      'vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=25000',
+    command: 'vitest run --config vitest.guards.config.ts --testTimeout=25000',
   },
   {
     suite: 'simulation',
     config: simulation,
     command:
-      'vitest run --config vitest.simulation.config.ts --reporter=verbose --testTimeout=700',
+      'vitest run --config vitest.simulation.config.ts --testTimeout=700',
   },
   {
     suite: 'integration',
     config: integration,
     command:
-      'vitest run --config vitest.integration.config.ts --reporter=verbose --testTimeout=30000',
+      'vitest run --config vitest.integration.config.ts --testTimeout=30000',
   },
 ] as const;
 
@@ -96,12 +95,16 @@ describe.each(SUITES)(
       expect(config.test?.include).toEqual([`tests/${suite}/**/*.test.ts`]);
     });
 
-    it("has the shared setup files and the unit suite's global setup, so a run is as isolated", () => {
+    it("has the shared setup files and the unit suite's global setup, so a run is as isolated, then measures loading (#696)", () => {
       expect({
         setup: config.test?.setupFiles,
         global: config.test?.globalSetup,
       }).toEqual({
-        setup: ['tests/git-env-setup.ts', 'tests/temporary-files-setup.ts'],
+        setup: [
+          'tests/git-env-setup.ts',
+          'tests/temporary-files-setup.ts',
+          'tests/load-setup.ts',
+        ],
         global: unit.test?.globalSetup,
       });
     });

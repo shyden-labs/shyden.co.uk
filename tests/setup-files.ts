@@ -21,10 +21,18 @@ export const UNIT_ONLY_SETUP: readonly string[] = [
 ];
 
 /**
- * The unit suite's last setup file (#688): it measures loading the test file,
- * so it must run after every other setup file and just before the import.
+ * Every suite's last setup file but for the unit judge below (#688, #696): it
+ * measures loading the test file, so it runs after every other setup file and
+ * just before the import.
  */
-export const UNIT_LOAD_SETUP = 'tests/unit-load-setup.ts';
+export const LOAD_SETUP = 'tests/load-setup.ts';
+
+/**
+ * The unit suite's judge of that measurement (#688): it fails a file over the
+ * unit load limit, so it runs straight after `LOAD_SETUP`. The other suites
+ * report their loading and are not limited by it (#696).
+ */
+export const UNIT_LOAD_LIMIT_SETUP = 'tests/unit-load-limit-setup.ts';
 
 /**
  * The parser project's setup (#688): loads `typescript` before the load
