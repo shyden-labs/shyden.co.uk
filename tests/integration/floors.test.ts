@@ -32,6 +32,14 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
   const DOCKER_VERSION_ONLY =
     '#!/bin/sh\n[ "$1" = --version ] && exit 0\nexit 9\n';
   const PASSING_NPX = '#!/bin/sh\nexit 0\n';
+  /**
+   * A `git` that answers the untracked-file listing the recorder asks for
+   * first (#547) with nothing, and fails anything else: every test below that
+   * plants no `git` of its own has a tree with nothing untracked, and no other
+   * git question can be answered by accident.
+   */
+  const NOTHING_UNTRACKED_GIT =
+    '#!/bin/sh\n[ "$1" = ls-files ] && exit 0\nexit 9\n';
 
   /**
    * A `docker` that answers `--version`, then appends `lines` to the record
@@ -118,10 +126,13 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       functionsIds = [],
       recorded = {},
       writes = false,
+      prepare = () => {},
     }: {
       functionsIds?: readonly string[];
       recorded?: Readonly<Record<string, number>>;
       writes?: boolean;
+      /** Runs in the scratch checkout, once it holds its copies (#547). */
+      prepare?: (checkout: string) => void;
     } = {},
   ) => {
     const dir = mkdtempSync(join(tmpdir(), 'floors-path-'));
@@ -153,11 +164,15 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       join(checkout, FLOORS_FILE),
       floorsText({ ...JSON.parse(sitting.toString('utf8')), ...recorded }),
     );
+    prepare(checkout);
     const before = readFileSync(join(checkout, FLOORS_FILE));
     // Equal bytes cannot show a write that restored them: the time is held too.
     const writtenAt = statSync(FLOORS_FILE).mtimeMs;
     try {
-      for (const [name, script] of Object.entries(bin))
+      for (const [name, script] of Object.entries({
+        git: NOTHING_UNTRACKED_GIT,
+        ...bin,
+      }))
         writeFileSync(join(dir, name), script, { mode: 0o755 });
       const run = spawnSync(process.execPath, [RECORDER, ...args], {
         cwd: checkout,
@@ -354,7 +369,8 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
   });
 
   it('refuses a retire when git cannot say what origin/develop holds, before running anything (#640)', () => {
-    // No git on the run's PATH: unknown is never read as "not on develop".
+    // A git that answers only the untracked listing (#547): unknown is never
+    // read as "not on develop".
     const run = recordWith({}, ['--unit', '--retire', 'planted/branch-only'], {
       recorded: { 'planted/branch-only': 1 },
     });
@@ -362,9 +378,90 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.stderr).toBe(
       '✗ nothing recorded:\n  planted/branch-only cannot be retired: ' +
         'whether origin/develop holds it is unknown (the fetch of ' +
-        'origin/develop did not start: spawnSync git ENOENT)\n',
+        'origin/develop failed in record mode (exit 9): nothing recorded)\n',
     );
     expect(run.stdout).toBe('');
+  });
+
+  it('refuses a tree with an untracked file before running anything, naming it (#547)', () => {
+    const run = recordWith({
+      git: "#!/bin/sh\nprintf 'tests/new.ts\\0'\n",
+      docker: DOCKER_VERSION_ONLY,
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded: 1 untracked file, which the guards that read git ' +
+        'would not count and CI, with it committed, would (#547). ' +
+        "Stage it first:\n  git add -N -- 'tests/new.ts'\n",
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('refuses when git cannot list the untracked files, never reading that as none (#547)', () => {
+    const run = recordWith({ git: '#!/bin/sh\nexit 128\n' }, ['--unit']);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the untracked-file listing failed in record mode (exit 128): nothing recorded\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  // Real git in a scratch repository, the one place `--others
+  // --exclude-standard` means what it means (#547): an untracked file is
+  // refused, and the same file staged with `git add -N` is not.
+  describe('with real git', () => {
+    const realGit = (process.env.PATH ?? '')
+      .split(':')
+      .map((entry) => join(entry, 'git'))
+      .find((candidate) => existsSync(candidate));
+    const gitIn = (checkout: string, ...args: string[]) => {
+      const run = spawnSync(realGit ?? 'git', args, {
+        cwd: checkout,
+        encoding: 'utf8',
+      });
+      expect(run.status, `git ${args.join(' ')}: ${run.stderr}`).toBe(0);
+    };
+    const withNewFile = (checkout: string) => {
+      gitIn(checkout, 'init', '--quiet');
+      gitIn(checkout, 'add', '--all');
+      writeFileSync(join(checkout, 'tests', 'new.ts'), 'export {};\n');
+    };
+
+    it('finds git on the PATH to run', () => {
+      expect(realGit).toMatch(/\/git$/);
+    });
+
+    it('refuses a new file left untracked', () => {
+      const run = recordWith(
+        { git: `#!/bin/sh\nexec '${realGit}' "$@"\n` },
+        ['--unit'],
+        { prepare: withNewFile },
+      );
+      expect(run.status).toBe(1);
+      expect(run.stderr).toBe(
+        '✗ nothing recorded: 1 untracked file, which the guards that read git ' +
+          'would not count and CI, with it committed, would (#547). ' +
+          "Stage it first:\n  git add -N -- 'tests/new.ts'\n",
+      );
+    });
+
+    it('lets the same file through once it is staged with git add -N', () => {
+      const run = recordWith(
+        { git: `#!/bin/sh\nexec '${realGit}' "$@"\n` },
+        ['--unit'],
+        {
+          prepare: (checkout) => {
+            withNewFile(checkout);
+            gitIn(checkout, 'add', '-N', 'tests/new.ts');
+          },
+        },
+      );
+      // Past the check, to the next refusal: the unit suite, which no npx on
+      // this PATH can start.
+      expect(run.stderr).toBe(
+        '✗ the unit suite did not start: spawnSync npx ENOENT\n',
+      );
+    });
   });
 
   it('refuses a functions suite that did not start, naming why (#610)', () => {

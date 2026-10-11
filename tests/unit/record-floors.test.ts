@@ -3,6 +3,8 @@ import {
   describeMoves,
   recordArguments,
   retireRefusals,
+  untrackedRefusal,
+  untrackedTreeRefusal,
 } from '../../scripts/record-floors.mjs';
 
 /**
@@ -137,6 +139,86 @@ describe('recordArguments reads the mode and the ids to retire', () => {
     expect(recordArguments(['--units'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
         '[--retire <id>]... (got --units)',
+    );
+  });
+});
+
+/**
+ * A record never counts a tree CI will not see (#547). The guards that read
+ * git count tracked files only, so a record taken with a new file untracked
+ * writes a figure the committed tree beats: five times, the last in #696,
+ * where three floors were each 3 short at the pre-push run. `untrackedRefusal`
+ * reads `git ls-files --others --exclude-standard -z`; the run itself is held
+ * in `tests/integration/floors.test.ts`.
+ */
+describe('untrackedRefusal: a record waits until every new file is staged', () => {
+  it('passes a tree git reports nothing untracked in', () => {
+    expect(untrackedRefusal('')).toBeUndefined();
+  });
+
+  it('refuses each untracked file by name, with the command that stages it', () => {
+    expect(
+      untrackedRefusal('tests/load-reporter.ts\0tests/unit/a b.test.ts\0'),
+    ).toBe(
+      'nothing recorded: 2 untracked files, which the guards that read git ' +
+        'would not count and CI, with them committed, would (#547). ' +
+        'Stage each first:\n' +
+        "  git add -N -- 'tests/load-reporter.ts'\n" +
+        "  git add -N -- 'tests/unit/a b.test.ts'",
+    );
+  });
+
+  it('says file, not files, for one', () => {
+    expect(untrackedRefusal('tests/x.ts\0')).toBe(
+      'nothing recorded: 1 untracked file, which the guards that read git ' +
+        'would not count and CI, with it committed, would (#547). ' +
+        'Stage it first:\n' +
+        "  git add -N -- 'tests/x.ts'",
+    );
+  });
+});
+
+describe('untrackedTreeRefusal asks git, with the process stood in (#547)', () => {
+  type Answer = { status: number | null; error?: Error; stdout: string };
+  /** A `run` that answers `answer` and keeps what it was asked. */
+  const asking = (answer: Answer) => {
+    const asked: string[][] = [];
+    const run = (command: string, args: readonly string[]) => {
+      asked.push([command, ...args]);
+      return answer;
+    };
+    return { asked, run };
+  };
+
+  it('asks git for untracked files that are not ignored, NUL-separated, once', () => {
+    const { asked, run } = asking({ status: 0, stdout: '' });
+    expect(untrackedTreeRefusal(run)).toBeUndefined();
+    expect(asked).toEqual([
+      ['git', 'ls-files', '--others', '--exclude-standard', '-z'],
+    ]);
+  });
+
+  it('refuses the files git names', () => {
+    const { run } = asking({ status: 0, stdout: 'tests/x.ts\0' });
+    expect(untrackedTreeRefusal(run)).toBe(untrackedRefusal('tests/x.ts\0'));
+    expect(untrackedRefusal('tests/x.ts\0')).toContain("'tests/x.ts'");
+  });
+
+  it('refuses a listing that failed, never reading it as none', () => {
+    const { run } = asking({ status: 128, stdout: '' });
+    expect(untrackedTreeRefusal(run)).toBe(
+      'the untracked-file listing failed in record mode (exit 128): nothing recorded',
+    );
+  });
+
+  it('refuses a listing that never started, naming why', () => {
+    const { run } = asking({
+      status: null,
+      error: new Error('spawnSync git ENOENT'),
+      stdout: '',
+    });
+    expect(untrackedTreeRefusal(run)).toBe(
+      'the untracked-file listing did not start: spawnSync git ENOENT',
     );
   });
 });
