@@ -3,8 +3,8 @@ import { extname } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { floorBreach } from '../floors';
-import { commentsIn, parseSource } from './ast';
-import { astroCodeViews } from './source-text';
+import { commentsIn, parseSource } from '../unit/ast';
+import { astroCodeViews } from '../unit/source-text';
 import { SOURCE_FILE, walkedSource } from '../git-questions';
 import { ignoredByGit, searched, trackedFiles } from '../source-files';
 

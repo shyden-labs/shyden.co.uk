@@ -38,7 +38,7 @@ name: visual-capture
 #            then dispatches `ci.yml` and `pr-body.yml` (a token push starts no
 #            run of its own).
 #
-# `tests/unit/pipeline-wiring.test.ts` pins all of this.
+# `tests/guards/pipeline-wiring.test.ts` pins all of this.
 on:
   workflow_dispatch:
     inputs:

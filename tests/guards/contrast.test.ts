@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { floorBreach } from '../floors';
 import { filesUnder, nonEmpty, searched } from '../source-files';
-import { stylesheetCss } from './source-text';
+import { stylesheetCss } from '../unit/source-text';
 import { contrast, parseColour } from '../wcag';
 import {
   ATMOSPHERE,

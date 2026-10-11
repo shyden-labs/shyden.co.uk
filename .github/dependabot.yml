@@ -4,7 +4,7 @@ version: 2
 #
 # Two ecosystems, and the second is the one that is easy to forget: the
 # actions that RUN ci are themselves dependencies, pinned to immutable commit
-# SHAs (see tests/unit/supply-chain.test.ts). A SHA cannot be repointed under
+# SHAs (see tests/guards/supply-chain.test.ts). A SHA cannot be repointed under
 # us, which is the point — but it also cannot pick up a security fix on its
 # own, so without Dependabot watching "github-actions" the pins silently rot.
 # This repo sat three majors behind on both of its actions before this file

@@ -3,7 +3,7 @@
    is defined on bare :root. Aurora (#17), the dark one, redefines the same
    tokens, and only the tokens, in the two screen-only blocks below it. Every
    value is derived against the ground it sits on and ASSERTED, in both
-   themes, in tests/unit/contrast.test.ts — a comment claiming a ratio is not
+   themes, in tests/guards/contrast.test.ts — a comment claiming a ratio is not
    a control, which is how a 1.17:1 control boundary shipped to production
    (#133). */
 @import '@fontsource-variable/bricolage-grotesque';
