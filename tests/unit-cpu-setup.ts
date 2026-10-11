@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect } from 'vitest';
 import { cpuBreach, startOwnCpu } from './unit-cpu-limit';
 
 /**
- * In every unit worker: fail a test whose own CPU passes 1 s (#632).
+ * In every unit worker: fail a test whose own CPU passes 0.3 s (#632, #645).
  *
  * A worker is a forked process running one test at a time on one thread, so
  * that thread's CPU across a test is the test's own (`startOwnCpu`), with the
@@ -23,6 +23,10 @@ beforeEach(({ task }) => {
 });
 
 afterEach(({ task }) => {
-  const breach = cpuBreach(elapsed(), task.name);
+  const used = elapsed();
+  // Carried to the main process on the task, where unit-cpu-reporter.ts
+  // prints the heaviest (#645).
+  task.meta.ownCpuMicroseconds = used;
+  const breach = cpuBreach(used, task.name);
   expect(breach, breach).toBeUndefined();
 });
