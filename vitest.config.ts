@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { SHARED_SETUP, UNIT_ONLY_SETUP } from './tests/setup-files';
+import { SHARED_SETUP, UNIT_ONLY_SETUP } from './tests/setup-files.ts';
 
 export default defineConfig({
   test: {
