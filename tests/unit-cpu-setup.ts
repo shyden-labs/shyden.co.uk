@@ -23,6 +23,10 @@ beforeEach(({ task }) => {
 });
 
 afterEach(({ task }) => {
-  const breach = cpuBreach(elapsed(), task.name);
+  const used = elapsed();
+  // Carried to the main process on the task, where unit-cpu-reporter.ts
+  // prints the heaviest (#645).
+  task.meta.ownCpuMicroseconds = used;
+  const breach = cpuBreach(used, task.name);
   expect(breach, breach).toBeUndefined();
 });

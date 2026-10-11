@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cpuBreach, startOwnCpu } from '../unit-cpu-limit';
+import { cpuBreach, cpuReport, startOwnCpu } from '../unit-cpu-limit';
 
 /**
  * The unit suite fails a test whose own CPU passes 1 s (#632). The figures are
@@ -59,5 +59,49 @@ describe('the CPU a unit test is charged with', () => {
     const whole = vi.spyOn(process, 'cpuUsage');
     startOwnCpu()();
     expect(whole).not.toHaveBeenCalled();
+  });
+});
+
+describe('the report of every unit test own CPU (#645)', () => {
+  const row = (name: string, microseconds: number) => ({
+    name,
+    file: 'tests/unit/a.test.ts',
+    microseconds,
+  });
+
+  it('lists the heaviest first, as many as asked for, each named with its file and figure', () => {
+    expect(
+      cpuReport(
+        [row('light', 1_000), row('heavy', 193_400), row('middle', 50_000)],
+        0,
+        2,
+      ).slice(1),
+    ).toEqual([
+      '     193 ms  tests/unit/a.test.ts > heavy',
+      '      50 ms  tests/unit/a.test.ts > middle',
+    ]);
+  });
+
+  it('counts the tests over 300 ms and over 200 ms, and exactly 300 ms is not over', () => {
+    expect(
+      cpuReport(
+        [
+          row('a', 300_001),
+          row('b', 300_000),
+          row('c', 200_001),
+          row('d', 200_000),
+        ],
+        0,
+        0,
+      ),
+    ).toEqual([
+      'Own CPU of each unit test (#645): 4 measured, 0 unmeasured; over 300 ms: 1; over 200 ms: 3; the heaviest 0:',
+    ]);
+  });
+
+  it('says how many tests that ran carried no figure, so a report missing its tests is seen', () => {
+    expect(cpuReport([row('a', 10)], 7, 0)[0]).toContain(
+      '1 measured, 7 unmeasured',
+    );
   });
 });

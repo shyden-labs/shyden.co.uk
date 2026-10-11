@@ -25,5 +25,8 @@ export default defineConfig({
     // Each worker a process of its own, its tests on its main thread: the
     // ground the CPU check and the refusals were measured on (#632).
     pool: 'forks',
+    // The default reporter, then the own CPU of the heaviest tests, so every
+    // run shows its headroom under the CPU limit (#645).
+    reporters: ['default', './tests/unit-cpu-reporter.ts'],
   },
 });
