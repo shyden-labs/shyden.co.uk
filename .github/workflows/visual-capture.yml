@@ -24,12 +24,21 @@ name: visual-capture
 #   image    picks the pinned Playwright image, as ci.yml's `image` job does.
 #   capture  runs the visual suite with `--update-snapshots=all` in the visual
 #            gate's own container, with a read-only token, then
-#            `scripts/visual-capture.mjs` reads `git status`: the changed
-#            baselines go to the next job as an artifact, and any other change
-#            fails the job (a capture changes baselines and nothing else).
-#            `all`, never `changed`: `changed` leaves a stale-but-passing
-#            baseline in place (#134), and the render is byte-identical where
-#            nothing moved, so only real changes reach the commit.
+#            `scripts/visual-capture.mjs` reads `git status`: a rewritten
+#            baseline goes to the next job as an artifact only when MORE THAN
+#            60 PIXELS differ from the committed one at zero tolerance (or it
+#            is new, or its size changed), and any change that is not a
+#            baseline fails the job (a capture changes baselines and nothing
+#            else). `all`, never `changed`: `changed` leaves a stale-but-
+#            passing baseline in place (#134). The render is NOT byte-identical
+#            where nothing moved: run 38122176791 rewrote four pages its change
+#            never touched, by 1 to 17 pixels. The rule is the operator's
+#            (2026-10-11, #678), from every baseline rewrite on develop (294
+#            over 31 commits): untouched pages 1 to 17 pixels, every real
+#            change 210 or more. Neither the largest channel step nor the
+#            gate's own threshold separated them (#371's dot grid moved up to
+#            8,584 pixels and the gate saw none). The step summary names every
+#            page committed and every page kept out, each with its count.
 #   commit   with `contents: write`, `actions: write` and `pull-requests: read`,
 #            runs no branch code: folds the baselines into the commit `capture`
 #            measured (`--amend`, author and parents kept, as the floor
