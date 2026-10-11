@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
-import unit from './vitest.config';
-import { SHARED_SETUP } from './tests/setup-files';
+import unit from './vitest.config.ts';
+import { SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The integration suite (#630): every test that starts a process (a script run

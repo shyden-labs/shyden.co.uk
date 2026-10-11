@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
-import unit from './vitest.config';
-import { SHARED_SETUP } from './tests/setup-files';
+import unit from './vitest.config.ts';
+import { SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The simulation suite (#650): every test whose real case is a run of the

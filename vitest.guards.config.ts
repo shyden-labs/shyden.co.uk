@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
-import unit from './vitest.config';
-import { SHARED_SETUP } from './tests/setup-files';
+import unit from './vitest.config.ts';
+import { SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The guards suite (#638): every test whose cost is reading or parsing the
