@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
+import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 
 /**
@@ -37,6 +38,17 @@ describe('the setup files of each suite', () => {
     ]);
   });
 
+  it('give the simulation suite the shared pair and nothing that refuses', () => {
+    expect(simulation.test?.setupFiles).toEqual([
+      'tests/git-env-setup.ts',
+      'tests/temporary-files-setup.ts',
+    ]);
+  });
+
+  it('give the simulation suite the unit suite global setup (#650)', () => {
+    expect(simulation.test?.globalSetup).toEqual(unit.test?.globalSetup);
+  });
+
   it('give the guards suite the unit suite global setup', () => {
     expect(guards.test?.globalSetup).toEqual(unit.test?.globalSetup);
   });
@@ -47,6 +59,12 @@ describe('the setup files of each suite', () => {
 });
 
 describe('the CPU limit', () => {
+  it('is not asked of the simulation suite (#650)', () => {
+    expect(simulation.test?.setupFiles).not.toContain(
+      'tests/unit-cpu-setup.ts',
+    );
+  });
+
   it('is not asked of the integration suite', () => {
     expect(integration.test?.setupFiles).not.toContain(
       'tests/unit-cpu-setup.ts',

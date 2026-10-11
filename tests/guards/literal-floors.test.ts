@@ -242,8 +242,6 @@ const PRODUCT_VALUES: Readonly<Record<string, string>> = {
     'a refusal reason long enough to say something: a property of the text',
   'tests/unit/grouping.test.ts: arrangements.size':
     'shuffling gives more than one arrangement: the algorithm behaving randomly',
-  'tests/unit/grouping.test.ts: attempts':
-    'how many searches the grouping ran: a statistic of the algorithm',
   'tests/unit/grouping.test.ts: g.length':
     'every group holds at least the size asked for: the grouping rule itself',
   'tests/unit/grouping.test.ts: partitions.size':
