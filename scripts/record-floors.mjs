@@ -38,6 +38,14 @@
  * functions id is new, the unit suite runs once more, as in every mode, for the
  * floor that counts the record's ids; the Playwright figures are carried.
  *
+ * `npm run floors:record -- --retire <id>` (#640, any mode, repeatable) drops
+ * an id the branch itself created and no test spells any more, in the same run
+ * that records its replacement: the floors that count the record's ids are
+ * judged on the ids it writes, not before them. An id `origin/develop` holds is
+ * refused, as is any id when develop cannot be read. A hand edit of
+ * `tests/floors.json` is still the operator's in two cases only: a landed
+ * floor that falls, and a landed id that leaves; say why in the commit.
+ *
  * One id read two different values when its figure differs by engine, so
  * that refusal is also where a floor that needs one id per engine shows.
  *
@@ -394,6 +402,21 @@ const observationsIn = (file) =>
  * @returns {{ next: Record<string, number>, refusals: string[] }}
  */
 export const decideRecord = (recorded, seen, carried = []) => {
+  const { next, refusals } = judgeRecord(recorded, seen, carried);
+  return { next, refusals };
+};
+
+/**
+ * `decideRecord`, also naming the refusals that are falls (#640): those are
+ * the only ones the record's own ids can cause, so a pass that added ids
+ * measures again before calling them final.
+ *
+ * @param {Readonly<Record<string, number>>} recorded
+ * @param {readonly Observation[]} seen
+ * @param {readonly string[]} carried
+ * @returns {{ next: Record<string, number>, refusals: string[], falls: number }}
+ */
+const judgeRecord = (recorded, seen, carried) => {
   /** @type {Map<string, Observation[]>} */
   const byId = new Map();
   for (const observation of seen)
@@ -406,6 +429,7 @@ export const decideRecord = (recorded, seen, carried = []) => {
   const next = { ...recorded };
   /** @type {string[]} */
   const refusals = [];
+  let falls = 0;
   for (const [id, observations] of byId) {
     const sites = [...new Set(observations.map(({ site }) => site))];
     const values = [...new Set(observations.map(({ actual }) => actual))];
@@ -425,6 +449,7 @@ export const decideRecord = (recorded, seen, carried = []) => {
           `like this. If the corpus really shrank, lower it in ${FLOORS_FILE} ` +
           `by hand and say why in the commit.`,
       );
+      falls++;
       continue;
     }
     next[id] = actual;
@@ -435,7 +460,79 @@ export const decideRecord = (recorded, seen, carried = []) => {
         `${id} is recorded but no test asserted it: remove it from ` +
           `${FLOORS_FILE} with the floor that used it, or run the whole suite`,
       );
-  return { next, refusals };
+  return { next, refusals, falls };
+};
+
+/**
+ * Why each id named to `--retire` may not leave the record, or nothing (#640).
+ *
+ * Only a branch-only id leaves this way: one `origin/develop`'s record does not
+ * hold and no file under `tests/` spells. A landed floor is the operator's to
+ * drop, by hand with the reason in the commit, as a fall is. A develop record
+ * that could not be read refuses every id: unknown is never "not on develop".
+ *
+ * @param {readonly string[]} ids the ids to retire
+ * @param {{
+ *   recorded: Readonly<Record<string, number>>,
+ *   develop: Readonly<Record<string, number>> | string,
+ *   spelledIn: (id: string) => readonly string[],
+ * }} facts `develop` is origin/develop's record, or why it could not be read;
+ *   `spelledIn` names the files under `tests/` that spell an id
+ * @returns {string[]}
+ */
+export const retireRefusals = (ids, { recorded, develop, spelledIn }) =>
+  ids.flatMap((id) => {
+    if (!Object.hasOwn(recorded, id))
+      return [`${id} is not in ${FLOORS_FILE}: nothing to retire`];
+    if (typeof develop === 'string')
+      return [
+        `${id} cannot be retired: whether origin/develop holds it is unknown ` +
+          `(${develop})`,
+      ];
+    if (Object.hasOwn(develop, id))
+      return [
+        `${id} is on origin/develop: a landed floor leaves the record only by ` +
+          `the operator's ruling, as a hand edit of ${FLOORS_FILE} with the ` +
+          'reason in the commit',
+      ];
+    const files = spelledIn(id);
+    return files.length > 0
+      ? [
+          `${id} is still spelled in ${files.join(', ')}: retire it with the ` +
+            'floor that used it',
+        ]
+      : [];
+  });
+
+const RETIRE = '--retire';
+
+/**
+ * The record's mode (`--unit`, `--functions`, `--unit-suite`, or the full
+ * record) and the ids
+ * to retire, or the usage line naming what was given.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ mode: string | undefined, retired: string[] } | string}
+ */
+export const recordArguments = (args) => {
+  const usage =
+    `usage: npm run floors:record [-- ${MODES.join(' | ')}] ` +
+    `[${RETIRE} <id>]... (got ${args.join(' ')})`;
+  /** @type {string[]} */
+  const modes = [];
+  /** @type {string[]} */
+  const retired = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === RETIRE) {
+      const id = args[i + 1];
+      if (id === undefined || id.startsWith('-')) return usage;
+      retired.push(id);
+      i++;
+    } else if (MODES.includes(arg)) modes.push(arg);
+    else return usage;
+  }
+  return modes.length > 1 ? usage : { mode: modes[0], retired };
 };
 
 /** Passes a record may take before its ids are called unsettled. */
@@ -443,6 +540,12 @@ export const MAX_PASSES = 3;
 
 /**
  * Measure and decide until a pass adds no id, then return that pass's figures.
+ *
+ * `retired` ids (#640) leave the record before the first pass, so every pass
+ * reads the record the run would write. A pass that adds ids reads the floors
+ * counting them short, so its falls are judged again over the ids it added;
+ * any other refusal is final at once, and a pass that adds nothing is judged
+ * whole. A bare retire therefore still reads as a fall and is refused.
  *
  * A floor may count the record itself: literal-floors' `recorded-ids` floors
  * the ids it holds. One pass reads the record before its new ids are in it,
@@ -458,6 +561,7 @@ export const MAX_PASSES = 3;
  *
  * @param {{
  *   recorded: Readonly<Record<string, number>>,
+ *   retired?: readonly string[],
  *   measure: (floors: Readonly<Record<string, number>>, pass: number) => readonly Observation[] | string,
  *   carry?: (seen: readonly Observation[]) => readonly string[],
  *   maxPasses?: number,
@@ -466,19 +570,25 @@ export const MAX_PASSES = 3;
  */
 export const recordUntilSettled = ({
   recorded,
+  retired = [],
   measure,
   carry = () => [],
   maxPasses = MAX_PASSES,
 }) => {
-  let floors = { ...recorded };
+  let floors = Object.fromEntries(
+    Object.entries(recorded).filter(([id]) => !retired.includes(id)),
+  );
   for (let pass = 1; pass <= maxPasses; pass++) {
     const seen = measure(floors, pass);
     if (typeof seen === 'string')
       return { next: floors, refusals: [], failure: seen, passes: pass };
-    const { next, refusals } = decideRecord(floors, seen, [...carry(seen)]);
+    const { next, refusals, falls } = judgeRecord(floors, seen, [
+      ...carry(seen),
+    ]);
+    const added = Object.keys(next).length > Object.keys(floors).length;
     if (
-      refusals.length > 0 ||
-      Object.keys(next).length === Object.keys(floors).length
+      (refusals.length > 0 && !(added && falls === refusals.length)) ||
+      !added
     )
       return { next, refusals, failure: undefined, passes: pass };
     floors = next;
@@ -496,7 +606,7 @@ export const recordUntilSettled = ({
 
 /**
  * One line per figure that moved, largest move first: `id: 100 -> 125 (+25)`,
- * or `id: new, 3`.
+ * or `id: new, 3`; then one per retired id (#640): `id: retired, was 3`.
  *
  * Printed because a raise is accepted on its direction alone. A change that
  * adds five units and quietly makes the reader miss three records +2, and
@@ -518,6 +628,12 @@ export const describeMoves = (recorded, next) =>
       recorded[id] === undefined
         ? `${id}: new, ${next[id]}`
         : `${id}: ${recorded[id]} -> ${next[id]} (+${next[id] - recorded[id]})`,
+    )
+    .concat(
+      Object.keys(recorded)
+        .filter((id) => !Object.hasOwn(next, id))
+        .sort()
+        .map((id) => `${id}: retired, was ${recorded[id]}`),
     );
 
 /**
@@ -537,28 +653,81 @@ export const floorsText = (floors) =>
   ) + '\n';
 
 /**
+ * `origin/develop`'s record, fetched first so a stale ref cannot answer "not
+ * on develop", or why it could not be read.
+ *
+ * @returns {Record<string, number> | string}
+ */
+const developRecord = () => {
+  const fetch = spawnSync('git', ['fetch', '--quiet', 'origin', 'develop'], {
+    encoding: 'utf8',
+  });
+  const fetchRefusal = runRefusal('fetch of origin/develop', fetch);
+  if (fetchRefusal !== undefined) return fetchRefusal;
+  const show = spawnSync('git', ['show', `origin/develop:${FLOORS_FILE}`], {
+    encoding: 'utf8',
+  });
+  const showRefusal = runRefusal(`read of origin/develop:${FLOORS_FILE}`, show);
+  if (showRefusal !== undefined) return showRefusal;
+  try {
+    return JSON.parse(show.stdout);
+  } catch (error) {
+    return `origin/develop:${FLOORS_FILE} is not JSON: ${messageOf(error)}`;
+  }
+};
+
+/**
+ * The source files under `tests/` that spell `id` as a string, in any quote:
+ * where `literal-floors.test.ts` reads every id from.
+ *
+ * @param {string} id
+ * @returns {string[]}
+ */
+const spelledUnderTests = (id) =>
+  nonEmpty(
+    readdirSync('tests', { recursive: true, encoding: 'utf8' }).filter((name) =>
+      /\.(?:tsx?|mjs|js)$/.test(name),
+    ),
+    'source files under tests/',
+  )
+    .map((name) => join('tests', name))
+    .filter((file) =>
+      ["'", '"', '`'].some((quote) =>
+        readFileSync(file, 'utf8').includes(`${quote}${id}${quote}`),
+      ),
+    )
+    .sort();
+
+/**
  * @returns {void}
  */
 const main = () => {
   const inImage = recordsInImage(env);
   if (env.CI && !inImage)
     die('CI never records floors: run npm run floors:record locally');
-  const args = argv.slice(2);
-  if (args.length > 1 || (args.length === 1 && !MODES.includes(args[0])))
-    die(
-      `usage: npm run floors:record [-- ${MODES.join(' | ')}] ` +
-        `(got ${args.join(' ')})`,
-    );
+  const parsed = recordArguments(argv.slice(2));
+  if (typeof parsed === 'string') die(parsed);
+  const { mode, retired } = parsed;
   // `--unit` skips the container (#548), about five minutes a record;
   // `--functions` the hours of a whole record (#610); `--unit-suite` every
   // suite but the one the laptop runs (#658).
-  const mode = args[0];
   const firstPass = recordSuites(mode, 1);
 
   /** @type {Readonly<Record<string, number>>} */
   const recorded = existsSync(FLOORS_FILE)
     ? JSON.parse(readFileSync(FLOORS_FILE, 'utf8'))
     : {};
+
+  // Judged before any suite runs: a refused retire costs nothing.
+  if (retired.length > 0) {
+    const refusals = retireRefusals(retired, {
+      recorded,
+      develop: developRecord(),
+      spelledIn: spelledUnderTests,
+    });
+    if (refusals.length > 0)
+      die(`nothing recorded:\n  ${refusals.join('\n  ')}`);
+  }
 
   // Asked first, before minutes of unit suite: without Docker the Playwright
   // floors cannot be recorded, and they are never recorded on this machine.
@@ -593,8 +762,20 @@ const main = () => {
   let functionsSeen = [];
   let settled;
   try {
+    // The first pass reads the record the run would write: without the
+    // retired ids, which no test spells any more.
+    if (retired.length > 0)
+      writeFileSync(
+        FLOORS_FILE,
+        floorsText(
+          Object.fromEntries(
+            Object.entries(recorded).filter(([id]) => !retired.includes(id)),
+          ),
+        ),
+      );
     settled = recordUntilSettled({
       recorded,
+      retired,
       carry: (seen) => {
         read = seen.length;
         const asserted = new Set(seen.map(({ id }) => id));
@@ -709,8 +890,8 @@ const main = () => {
 
   const { next, refusals, failure, passes } = settled;
   if (failure !== undefined || refusals.length > 0) {
-    // A later pass ran over a record this run wrote: put back what it found.
-    if (passes > 1)
+    // A later pass, or a retire, wrote the record: put back what it found.
+    if (passes > 1 || retired.length > 0)
       if (original === undefined) rmSync(FLOORS_FILE, { force: true });
       else writeFileSync(FLOORS_FILE, original);
     die(failure ?? `nothing recorded:\n  ${refusals.join('\n  ')}`);
