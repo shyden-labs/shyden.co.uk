@@ -340,8 +340,13 @@ test.describe('homepage content', () => {
 
   test('contact section CTA links to the support mailbox', async ({ page }) => {
     await page.goto('/');
+    // The label from the catalogue, not a copy of it: #665 changed "Email us"
+    // to "Email me", and a literal here went red on copy it does not judge.
     await expect(
-      page.locator('#contact').getByRole('link', { name: /email us/i }),
+      page.locator('#contact').getByRole('link', {
+        name: getSiteStrings('en').home.emailMe,
+        exact: true,
+      }),
     ).toHaveAttribute('href', 'mailto:support@shyden.co.uk');
   });
 

@@ -133,7 +133,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'Impor / ekspor',
     sectionSoundHeading: 'Suara dan animasi',
     'site.glory.forYeetalk': 'Untuk YeeTalk ↗',
-    'site.home.emailUs': 'Kirim email',
+    'site.home.emailMe': 'Kirim email',
     'site.home.exploreShytalk': 'Jelajahi ShyTalk',
     'site.home.exploreYaweloIdle': 'Jelajahi Yawelo Idle',
     'site.home.openGlory': 'Buka kalkulator',
@@ -266,7 +266,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: '导入 / 导出',
     sectionSoundHeading: '声音和动画',
     'site.glory.forYeetalk': '适用于 YeeTalk ↗',
-    'site.home.emailUs': '给我们发邮件',
+    'site.home.emailMe': '给我发邮件',
     'site.home.exploreShytalk': '了解 ShyTalk',
     'site.home.exploreYaweloIdle': '了解 Yawelo Idle',
     'site.home.openGlory': '打开计算器',
@@ -392,7 +392,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'Nhập / xuất',
     sectionSoundHeading: 'Âm thanh và hoạt ảnh',
     'site.glory.forYeetalk': 'Dành cho YeeTalk ↗',
-    'site.home.emailUs': 'Gửi email cho chúng tôi',
+    'site.home.emailMe': 'Gửi email cho tôi',
     'site.home.exploreShytalk': 'Khám phá ShyTalk',
     'site.home.exploreYaweloIdle': 'Khám phá Yawelo Idle',
     'site.home.openGlory': 'Mở máy tính',
@@ -537,7 +537,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'นำเข้า / ส่งออก',
     sectionSoundHeading: 'เสียงและภาพเคลื่อนไหว',
     'site.glory.forYeetalk': 'สำหรับ YeeTalk ↗',
-    'site.home.emailUs': 'ส่งอีเมลให้เรา',
+    'site.home.emailMe': 'ส่งอีเมล',
     'site.home.exploreShytalk': 'สำรวจ ShyTalk',
     'site.home.exploreYaweloIdle': 'สำรวจ Yawelo Idle',
     'site.home.openGlory': 'เปิดเครื่องคำนวณ',
@@ -683,10 +683,10 @@ describe('the copy the operator read and approved', () => {
 const AWAITING_READ: Record<Locale, readonly string[]> = {
   en: [],
   id: [],
-  // #97's report form gave `Contact` its first zh witness: the note hint's
-  // "contact details" is 联系方式, where the nav link says 联系我们 ("contact
-  // us"), the usual wording for that link. Flagged, not pinned, until read.
-  zh: ['site.nav.contact'],
+  // `site.nav.contact` waited here from #97 (联系我们, "contact us", against
+  // the note hint's 联系方式) until #665 made the site speak as one person
+  // and the link plain 联系, which agrees with its witness.
+  zh: [],
   vi: [],
   th: [],
 };

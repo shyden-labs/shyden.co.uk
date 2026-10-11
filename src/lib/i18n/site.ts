@@ -53,7 +53,7 @@ export const siteEn = {
     visitYaweloIdle: 'Visit the Yawelo Idle site',
     toolsHeading: "While you're waiting, try these.",
     toolsLead:
-      "Two tools we've already built. Free, no sign-up, and working right now.",
+      "Two tools I've already built. Free, no sign-up, and working right now.",
     toolBadge: 'Live now',
     workGloryTitle: 'Glory Points Calculator',
     workGloryBody:
@@ -63,7 +63,7 @@ export const siteEn = {
     workClassroomBody:
       'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
     openClassroom: 'Open the group creator',
-    emailUs: 'Email us',
+    emailMe: 'Email me',
     pauseMotion: 'Pause motion',
   },
 
@@ -116,7 +116,7 @@ export const siteEn = {
     // text is BETA_BADGE and is deliberately NOT translated (it labels a
     // language the reader may not speak). This label and the notice ARE.
     betaLabel: 'beta translation',
-    betaNotice: 'Translations may not be accurate. If you notice it, tell us.',
+    betaNotice: 'Translations may not be accurate. If you notice it, tell me.',
   },
 
   // The footer's "report a translation problem" form (#97). The English is
@@ -136,7 +136,7 @@ export const siteEn = {
     send: 'Send report',
     sent: 'Thank you. Your report has been sent.',
     notFound:
-      "We couldn't find those words on this page. Choose them from the list, or copy a shorter piece without any names or numbers.",
+      "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.",
     rejected:
       "That report couldn't be sent. Please check the form and try again.",
     failed:
@@ -192,7 +192,7 @@ export const siteId: SiteStrings = {
     visitYaweloIdle: 'Kunjungi situs Yawelo Idle',
     toolsHeading: 'Sambil menunggu, coba ini.',
     toolsLead:
-      'Dua alat yang sudah kami buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
+      'Dua alat yang sudah saya buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
     toolBadge: 'Aktif sekarang',
     workGloryTitle: 'Kalkulator Glory Points',
     workGloryBody:
@@ -202,7 +202,7 @@ export const siteId: SiteStrings = {
     workClassroomBody:
       'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
     openClassroom: 'Buka pembuat kelompok',
-    emailUs: 'Kirim email',
+    emailMe: 'Kirim email',
     pauseMotion: 'Jeda gerakan',
   },
 
@@ -246,7 +246,7 @@ export const siteId: SiteStrings = {
     label: 'Bahasa',
     betaLabel: 'terjemahan beta',
     betaNotice:
-      'Terjemahan mungkin tidak akurat. Jika Anda melihatnya, beri tahu kami.',
+      'Terjemahan mungkin tidak akurat. Jika Anda melihatnya, beri tahu saya.',
   },
 
   report: {
@@ -262,7 +262,7 @@ export const siteId: SiteStrings = {
     send: 'Kirim laporan',
     sent: 'Terima kasih. Laporan Anda telah dikirim.',
     notFound:
-      'Kami tidak dapat menemukan kata-kata itu di halaman ini. Pilih dari daftar, atau salin bagian yang lebih pendek tanpa nama atau angka.',
+      'Kata-kata itu tidak ada di halaman ini. Pilih dari daftar, atau salin bagian yang lebih pendek tanpa nama atau angka.',
     rejected:
       'Laporan itu tidak dapat dikirim. Silakan periksa formulir dan coba lagi.',
     failed:
@@ -280,7 +280,7 @@ export const siteZh: SiteStrings = {
     shytalk: 'ShyTalk',
     yaweloIdle: 'Yawelo Idle',
     tools: '工具',
-    contact: '联系我们',
+    contact: '联系',
   },
   menuLabel: '切换导航菜单',
   themeDarkMode: '深色模式',
@@ -315,7 +315,7 @@ export const siteZh: SiteStrings = {
     yaweloIdleFeature4: '哪怕错过一天，也不会有什么损失。没人会被强迫学习。',
     visitYaweloIdle: '访问 Yawelo Idle 网站',
     toolsHeading: '等待期间，先试试这些。',
-    toolsLead: '我们已经做好的两款工具。免费，无需注册，现在就能用。',
+    toolsLead: '我已经开发了两个工具。免费、无需注册，而且现在就可以使用。',
     toolBadge: '已上线',
     workGloryTitle: 'Glory Points 计算器',
     workGloryBody:
@@ -325,7 +325,7 @@ export const siteZh: SiteStrings = {
     workClassroomBody:
       '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
     openClassroom: '打开小组创建器',
-    emailUs: '给我们发邮件',
+    emailMe: '给我发邮件',
     pauseMotion: '暂停动画',
   },
   notFound: {
@@ -365,7 +365,7 @@ export const siteZh: SiteStrings = {
   language: {
     label: '语言',
     betaLabel: '测试版翻译',
-    betaNotice: '翻译可能不准确。如果您发现问题，请告诉我们。',
+    betaNotice: '翻译可能不够准确。如果您发现问题，请告诉我。',
   },
 
   report: {
@@ -380,7 +380,7 @@ export const siteZh: SiteStrings = {
     send: '发送报告',
     sent: '谢谢。您的报告已发送。',
     notFound:
-      '我们在此页面上找不到这些文字。请从列表中选择，或复制一段较短且不含任何姓名或数字的文字。',
+      '这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。',
     rejected: '该报告无法发送。请检查表单后重试。',
     failed: '出现问题，您的报告未能发送。请稍后再试。',
   },
@@ -436,7 +436,7 @@ export const siteVi: SiteStrings = {
     visitYaweloIdle: 'Truy cập trang Yawelo Idle',
     toolsHeading: 'Trong lúc chờ, hãy thử những công cụ này.',
     toolsLead:
-      'Hai công cụ chúng tôi đã xây dựng. Miễn phí, không cần đăng ký, và dùng được ngay bây giờ.',
+      'Hai công cụ mà tôi đã phát triển. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.',
     toolBadge: 'Đang hoạt động',
     workGloryTitle: 'Máy tính Glory Points',
     workGloryBody:
@@ -446,7 +446,7 @@ export const siteVi: SiteStrings = {
     workClassroomBody:
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
     openClassroom: 'Mở trình tạo nhóm',
-    emailUs: 'Gửi email cho chúng tôi',
+    emailMe: 'Gửi email cho tôi',
     pauseMotion: 'Tạm dừng chuyển động',
   },
   notFound: {
@@ -487,7 +487,7 @@ export const siteVi: SiteStrings = {
     label: 'Ngôn ngữ',
     betaLabel: 'bản dịch beta',
     betaNotice:
-      'Bản dịch có thể không chính xác. Nếu bạn phát hiện lỗi, hãy cho chúng tôi biết.',
+      'Bản dịch có thể không chính xác. Nếu bạn phát hiện ra điều đó, hãy cho tôi biết.',
   },
 
   report: {
@@ -503,7 +503,7 @@ export const siteVi: SiteStrings = {
     send: 'Gửi báo cáo',
     sent: 'Cảm ơn bạn. Báo cáo của bạn đã được gửi.',
     notFound:
-      'Chúng tôi không tìm thấy những từ đó trên trang này. Hãy chọn chúng từ danh sách, hoặc sao chép một đoạn ngắn hơn không có tên hay con số nào.',
+      'Những từ đó không có trên trang này. Hãy chọn chúng từ danh sách, hoặc sao chép một đoạn văn ngắn hơn mà không có tên hay số nào.',
     rejected:
       'Không thể gửi báo cáo đó. Vui lòng kiểm tra biểu mẫu và thử lại.',
     failed:
@@ -560,7 +560,7 @@ export const siteTh: SiteStrings = {
     visitYaweloIdle: 'เยี่ยมชมเว็บไซต์ Yawelo Idle',
     toolsHeading: 'ระหว่างที่รอ ลองสิ่งเหล่านี้ดู',
     toolsLead:
-      'เครื่องมือสองอย่างที่เราทำไว้แล้ว ฟรี ไม่ต้องสมัคร และใช้ได้ทันที',
+      'เครื่องมือสองตัวที่พัฒนาไว้แล้ว ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',
     toolBadge: 'พร้อมใช้งาน',
     workGloryTitle: 'เครื่องคำนวณ Glory Points',
     workGloryBody:
@@ -570,7 +570,7 @@ export const siteTh: SiteStrings = {
     workClassroomBody:
       'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
-    emailUs: 'ส่งอีเมลให้เรา',
+    emailMe: 'ส่งอีเมล',
     pauseMotion: 'หยุดภาพเคลื่อนไหว',
   },
   notFound: {
@@ -610,7 +610,7 @@ export const siteTh: SiteStrings = {
   language: {
     label: 'ภาษา',
     betaLabel: 'คำแปลเวอร์ชันเบต้า',
-    betaNotice: 'คำแปลอาจไม่ถูกต้อง หากคุณพบข้อผิดพลาด โปรดแจ้งให้เราทราบ',
+    betaNotice: 'การแปลอาจไม่ถูกต้อง หากคุณสังเกตเห็น โปรดแจ้งให้ทราบ',
   },
 
   report: {
@@ -625,7 +625,7 @@ export const siteTh: SiteStrings = {
     send: 'ส่งรายงาน',
     sent: 'ขอบคุณ รายงานของคุณถูกส่งแล้ว',
     notFound:
-      'เราไม่พบคำเหล่านั้นในหน้านี้ เลือกคำจากรายการ หรือคัดลอกข้อความที่สั้นลงโดยไม่มีชื่อหรือตัวเลข',
+      'คำเหล่านั้นไม่มีอยู่ในหน้านี้ ให้เลือกจากรายชื่อ หรือคัดลอกข้อความที่สั้นกว่า ซึ่งไม่มีชื่อหรือตัวเลขใดๆ',
     rejected: 'ไม่สามารถส่งรายงานนั้นได้ โปรดตรวจสอบแบบฟอร์มแล้วลองอีกครั้ง',
     failed: 'เกิดข้อผิดพลาด รายงานของคุณยังไม่ได้ส่ง โปรดลองอีกครั้งในภายหลัง',
   },
