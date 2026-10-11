@@ -1,10 +1,13 @@
 /**
- * The unit suite's per-test CPU limit (#632): 1 s of the test's own CPU, user
- * plus system, in microseconds, of the thread that ran it. Wall time
- * stretches under load and CPU time does not, so this is the limit that a slow
- * test breaks on a quiet machine and a fast one never breaks on a busy one.
+ * The unit suite's per-test CPU limit: 0.3 s of the test's own CPU, user plus
+ * system, in microseconds, of the thread that ran it. Wall time stretches
+ * under load and CPU time does not, so this is the limit that a slow test
+ * breaks on a quiet machine and a fast one never breaks on a busy one. #632
+ * set it at 1 s; #645 lowered it to 0.3 s (operator rule 2026-10-08: clock
+ * time ran up to 3.14x past CPU under load, so 0.3 s of CPU is what keeps a
+ * test under the 1 s clock limit on a loaded machine).
  */
-export const CPU_LIMIT_MICROSECONDS = 1_000_000;
+export const CPU_LIMIT_MICROSECONDS = 300_000;
 
 /**
  * Start a test's CPU clock; the function it returns reads the microseconds
@@ -29,7 +32,7 @@ export function cpuBreach(
   if (cpuMicroseconds <= CPU_LIMIT_MICROSECONDS) return undefined;
   return (
     `"${testName}" used ${Math.round(cpuMicroseconds / 1000)} ms of its own CPU, ` +
-    `over the unit limit of ${CPU_LIMIT_MICROSECONDS / 1000} ms (#632). ` +
+    `over the unit limit of ${CPU_LIMIT_MICROSECONDS / 1000} ms (#632, #645). ` +
     'Cut the work the test does; a unit test is never given more time.'
   );
 }

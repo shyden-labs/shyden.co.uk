@@ -2,25 +2,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cpuBreach, cpuReport, startOwnCpu } from '../unit-cpu-limit';
 
 /**
- * The unit suite fails a test whose own CPU passes 1 s (#632). The figures are
+ * The unit suite fails a test whose own CPU passes 0.3 s (#632, #645). The figures are
  * literals: a limit asserted against the constant it was computed from pins
  * nothing. The wiring (a real test that burns CPU goes RED) is planted by hand
  * and recorded in the pull request, since a permanent failing test cannot live
  * in the suite.
  */
 describe('the CPU limit of one unit test', () => {
-  it('passes a test that used 999 999 microseconds', () => {
-    expect(cpuBreach(999_999, 'a test')).toBeUndefined();
+  it('passes a test that used 299 999 microseconds', () => {
+    expect(cpuBreach(299_999, 'a test')).toBeUndefined();
   });
 
-  it('passes a test that used exactly 1 000 000 microseconds', () => {
-    expect(cpuBreach(1_000_000, 'a test')).toBeUndefined();
+  it('passes a test that used exactly 300 000 microseconds', () => {
+    expect(cpuBreach(300_000, 'a test')).toBeUndefined();
   });
 
-  it('fails a test that used 1 000 001 microseconds, naming the test and the figure', () => {
-    const breach = cpuBreach(1_000_001, 'a slow test');
-    expect(breach).toContain('"a slow test"');
-    expect(breach).toContain('1000 ms');
+  it('fails a test that used 300 001 microseconds, naming the test, the figure and the limit', () => {
+    expect(cpuBreach(300_001, 'a slow test')).toBe(
+      '"a slow test" used 300 ms of its own CPU, over the unit limit of 300 ms (#632, #645). ' +
+        'Cut the work the test does; a unit test is never given more time.',
+    );
   });
 
   it('names the figure in milliseconds, rounded', () => {
