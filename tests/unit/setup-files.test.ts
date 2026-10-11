@@ -15,12 +15,13 @@ import unit from '../../vitest.config';
  * the constant the config was built from would move with it and pin nothing.
  */
 describe('the setup files of each suite', () => {
-  it('give the unit suite the refusal and the CPU check, then the shared pair', () => {
+  it('give the unit suite the refusal and the CPU check, then the shared pair, then the load measurement last (#688)', () => {
     expect(unit.test?.setupFiles).toEqual([
       'tests/unit-refusal-setup.ts',
       'tests/unit-cpu-setup.ts',
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
+      'tests/unit-load-setup.ts',
     ]);
   });
 

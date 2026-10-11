@@ -100,6 +100,19 @@ describe('the report of every unit test own CPU (#645)', () => {
     ]);
   });
 
+  it('heads a report of loading each file with its own words (#688)', () => {
+    expect(
+      cpuReport(
+        [row('a', 210_000)],
+        0,
+        0,
+        'Own CPU of loading each unit file (#688)',
+      )[0],
+    ).toBe(
+      'Own CPU of loading each unit file (#688): 1 measured, 0 unmeasured; over 300 ms: 0; over 200 ms: 1; the heaviest 0:',
+    );
+  });
+
   it('says how many tests that ran carried no figure, so a report missing its tests is seen', () => {
     expect(cpuReport([row('a', 10)], 7, 0)[0]).toContain(
       '1 measured, 7 unmeasured',

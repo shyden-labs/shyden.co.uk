@@ -19,3 +19,9 @@ export const UNIT_ONLY_SETUP: readonly string[] = [
   'tests/unit-refusal-setup.ts',
   'tests/unit-cpu-setup.ts',
 ];
+
+/**
+ * The unit suite's last setup file (#688): it measures loading the test file,
+ * so it must run after every other setup file and just before the import.
+ */
+export const UNIT_LOAD_SETUP = 'tests/unit-load-setup.ts';

@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
-import { SHARED_SETUP, UNIT_ONLY_SETUP } from './tests/setup-files.ts';
+import {
+  SHARED_SETUP,
+  UNIT_LOAD_SETUP,
+  UNIT_ONLY_SETUP,
+} from './tests/setup-files.ts';
 
 export default defineConfig({
   test: {
@@ -9,7 +13,9 @@ export default defineConfig({
     // TMPDIR is not the run's own (#390 F56); then, for the unit suite alone,
     // refuse every process and every connection off this machine and check
     // each test's own CPU (#632).
-    setupFiles: [...UNIT_ONLY_SETUP, ...SHARED_SETUP],
+    // Last, the cost of loading each test file, which no per-test clock sees
+    // (#688).
+    setupFiles: [...UNIT_ONLY_SETUP, ...SHARED_SETUP, UNIT_LOAD_SETUP],
     // A temporary directory of the run's own: anything a test leaves in it
     // fails the run, and it is removed either way (#390 F56). Then the run's
     // one reading of the tree, which every test reads in place of starting git
