@@ -45,7 +45,7 @@ name: record-floors
 #           and a dispatched run's checks attach to the new head, which is what
 #           branch protection reads by name.
 #
-# `tests/unit/pipeline-wiring.test.ts` pins all of this.
+# `tests/guards/pipeline-wiring.test.ts` pins all of this.
 on:
   workflow_dispatch:
     inputs:

@@ -91,7 +91,7 @@ jobs:
   # job, and every job it calls carries its own. A called workflow's token can
   # only be narrowed, so this job grants what ci.yml's jobs ask for -- `issues:
   # read` for the dependabot-label check -- and
-  # tests/unit/pipeline-wiring.test.ts fails if they part.
+  # tests/guards/pipeline-wiring.test.ts fails if they part.
   test:
     name: Comprehensive web tests
     if: github.event_name != 'push'

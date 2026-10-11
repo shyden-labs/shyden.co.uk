@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { withoutAstroComments } from './source-text';
+import { withoutAstroComments } from '../unit/source-text';
 import { join } from 'node:path';
 import { en } from '../../src/lib/i18n/en';
 import { siteEn } from '../../src/lib/i18n/site';

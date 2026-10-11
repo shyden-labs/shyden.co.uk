@@ -19,7 +19,7 @@ name: CI
 # Widening costs nothing on the merge path: a PR into develop or main already
 # ran exactly one run, and a stacked PR had none to add to. Which checks BLOCK
 # a merge still lives where it belongs, in `required_status_checks.contexts`,
-# and `tests/unit/pipeline-wiring.test.ts` pins the job name that list matches.
+# and `tests/guards/pipeline-wiring.test.ts` pins the job name that list matches.
 #
 # `pull_request`, never `pull_request_target`: a fork PR must not see secrets.
 #
@@ -69,7 +69,7 @@ concurrency:
 # AC2) -- and so is build-and-test's download of this run's own artifacts.
 #
 # Changing the repository default is administration, and so the operator's.
-# `tests/unit/pipeline-wiring.test.ts` derives this rule from the filesystem,
+# `tests/guards/pipeline-wiring.test.ts` derives this rule from the filesystem,
 # so a workflow added later is covered the day it appears rather than the day
 # someone remembers (#24, #49, #80).
 permissions:
@@ -141,7 +141,7 @@ jobs:
     # read` is restated beside it; labels live under the issues scope, which
     # is what `issues: read` buys. deploy-dev.yml's dispatch path calls this
     # workflow and must grant the same, since a called workflow's token can
-    # only be narrowed (tests/unit/pipeline-wiring.test.ts).
+    # only be narrowed (tests/guards/pipeline-wiring.test.ts).
     permissions:
       contents: read
       issues: read
@@ -196,7 +196,7 @@ jobs:
     # that every shard was skipped rather than adding up accounts.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The e2e policy, restated per shard: tests/unit/pipeline-wiring.test.ts
+    # The e2e policy, restated per shard: tests/guards/pipeline-wiring.test.ts
     # pins it and fails if any job running the suite carries another.
     timeout-minutes: 20
     # The pinned Playwright image (#431): browsers and their system packages

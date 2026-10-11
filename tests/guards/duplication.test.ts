@@ -8,10 +8,10 @@ import {
   duplicatePairs,
   similarity,
   type DuplicatePair,
-} from './duplication';
+} from '../unit/duplication';
 import { searched, trackedFiles } from '../source-files';
 import { floorBreach } from '../floors';
-import { nodesIn, parseSource } from './ast';
+import { nodesIn, parseSource } from '../unit/ast';
 
 /**
  * Every file a duplicate could live in, from git rather than a list.

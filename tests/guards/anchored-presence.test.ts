@@ -393,7 +393,10 @@ describe('presence assertions over source text are stripped or anchored', () => 
     expect(readers.reaches('tests/floors.ts', 'floorBreach')).toBe(false);
     // A raw reader the suite really has, so the closure is not merely empty.
     expect(
-      readers.reaches('tests/unit/literal-grounds.test.ts', 'groundsUnderSrc'),
+      readers.reaches(
+        'tests/guards/literal-grounds.test.ts',
+        'groundsUnderSrc',
+      ),
     ).toBe(true);
   });
 
