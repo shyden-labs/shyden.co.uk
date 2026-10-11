@@ -52,7 +52,7 @@ export function dockerArgs({ image, cwd, update, forwarded }) {
     // for a bare `--update-snapshots`, which rewrites only baselines whose
     // comparison FAILED and leaves a stale-but-passing one in place -- the drift
     // #134 exists to stop. The zero-allowance evidence in
-    // `tests/unit/browser-matrix.test.ts` was gathered with `all` by hand,
+    // `tests/guards/browser-matrix.test.ts` was gathered with `all` by hand,
     // through a flag this script did not pass (#152).
     update ? '--update-snapshots=all' : '',
     // Chromium is memory-hungry and the host has under 4 GiB; the default

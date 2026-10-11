@@ -408,7 +408,7 @@ jobs:
   # anything.
   #
   # `image` tracks the `@playwright/test` version in package.json, and
-  # `tests/unit/browser-matrix.test.ts` fails if the two drift apart -- a
+  # `tests/guards/browser-matrix.test.ts` fails if the two drift apart -- a
   # library and a browser bundle from different releases is the one mismatch
   # this job cannot report clearly.
   #

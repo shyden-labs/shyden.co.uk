@@ -5,7 +5,7 @@ import {
   astroCodeViews,
   astroTemplate,
   withoutTsComments,
-} from './source-text';
+} from '../unit/source-text';
 import { floorBreach } from '../floors';
 
 /**

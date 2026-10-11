@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { floorBreach } from '../floors';
-import { scopedClassReport } from './scoped-classes';
+import { scopedClassReport } from '../unit/scoped-classes';
 
 /**
  * A scoped rule reaches only the elements its own file builds (#331).
@@ -28,7 +28,7 @@ describe('scopedClassReport', () => {
     // `lang` is a prop, an argument and a component's attribute, never a class.
     const header = astro(
       '---',
-      "import LanguageSwitcher from './LanguageSwitcher.astro';",
+      "import LanguageSwitcher from '../unit/LanguageSwitcher.astro';",
       'interface Props {',
       '  lang: Locale;',
       '}',
