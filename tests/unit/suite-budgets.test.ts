@@ -26,7 +26,14 @@ import { unitProject } from '../vitest-suite-dirs';
  * every file under tests/), the next 4.3s. On a laptop running the whole
  * suite the same test took 7.6s, the next 2.5s. 25s is 3.3x the laptop's worst
  * and 3.5x the runner's, below the 30s the unit suite once allowed these same
- * tests, so moving them raises nothing.
+ * tests, so moving them raises nothing. LOADING a file is outside this limit
+ * (a per-test timer starts in a hook): measured on two CI runs (#696, runs
+ * 38150963027 and 38153506290), `duplication.test.ts` spends 27.5 to 28.2 s of
+ * its own CPU loading, more than the whole 25s, and the next three guard
+ * files 3.2 to 4.8 s. The suite reports every file's load (`load-reporter.ts`)
+ * and sets no load limit yet: operator, 2026-10-11, "After #700, from new
+ * data", since a limit set now would have to sit above the defect #700 cuts.
+ * integration and simulation load in at most 370 ms and 14 ms.
  *
  * simulation (#650). A simulation is a real run of the engine over many seeded
  * inputs; the unit suite keeps a stand-in that meets its 1 s and 0.3 s of CPU
