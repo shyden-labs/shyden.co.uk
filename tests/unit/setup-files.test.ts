@@ -3,6 +3,7 @@ import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
+import { unitProject } from '../vitest-suite-dirs';
 
 /**
  * Which setup files each suite takes (#632).
@@ -15,15 +16,29 @@ import unit from '../../vitest.config';
  * the constant the config was built from would move with it and pin nothing.
  */
 describe('the setup files of each suite', () => {
-  it('give the unit suite the refusal and the CPU check, then the shared pair, then the load measurement last (#688)', () => {
+  it('give the unit suite the refusal and the CPU check, then the shared pair', () => {
     expect(unit.test?.setupFiles).toEqual([
       'tests/unit-refusal-setup.ts',
       'tests/unit-cpu-setup.ts',
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
-      'tests/unit-load-setup.ts',
     ]);
   });
+
+  // A project's setup files run after the root's (#688), so the load
+  // measurement is last in both, and the parser loads before its clock starts.
+  it.each([
+    ['unit', ['tests/unit-load-setup.ts']],
+    [
+      'unit-parser',
+      ['tests/typescript-preload-setup.ts', 'tests/unit-load-setup.ts'],
+    ],
+  ] as const)(
+    'give the %s project its own setup after the shared lists (#688)',
+    (name, setup) => {
+      expect(unitProject(name).setupFiles).toEqual(setup);
+    },
+  );
 
   it('give the guards suite the shared pair and nothing that refuses', () => {
     expect(guards.test?.setupFiles).toEqual([

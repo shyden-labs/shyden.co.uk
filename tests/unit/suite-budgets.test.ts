@@ -5,6 +5,7 @@ import integration from '../../vitest.integration.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import { workflowJobs } from '../workflow-jobs';
+import { unitProject } from '../vitest-suite-dirs';
 
 /**
  * The per-test budget of each suite that is not the unit suite: one table, so
@@ -109,7 +110,12 @@ describe.each(SUITES)(
 
 describe('the suites beside the unit suite', () => {
   it('are not read by the unit suite', () => {
-    expect(unit.test?.include).toEqual(['tests/unit/**/*.test.ts']);
+    expect({
+      unit: unitProject('unit').include,
+      parser: unitProject('unit-parser').include?.every((file) =>
+        file.startsWith('tests/unit/'),
+      ),
+    }).toEqual({ unit: ['tests/unit/**/*.test.ts'], parser: true });
   });
 
   // Only unit tests, formatters and type checks run on the laptop; every other

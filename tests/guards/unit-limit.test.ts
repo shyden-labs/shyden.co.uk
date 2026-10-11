@@ -50,7 +50,12 @@ const THE_LIMIT = 1_000;
 /** The one place the CPU limit is written, and the one value it may take (#645). */
 const CPU_HOME = 'tests/unit-cpu-limit.ts';
 const CPU_NAME = 'CPU_LIMIT_MICROSECONDS';
-const THE_CPU_LIMIT = 300_000;
+const LOAD_NAME = 'LOAD_LIMIT_MICROSECONDS';
+/** Each limit written in `CPU_HOME`, with the one value it may take (#645, #688). */
+const HOME_LIMITS: Readonly<Record<string, number>> = {
+  [CPU_NAME]: 300_000,
+  [LOAD_NAME]: 500_000,
+};
 
 /** The identifier a callee chain starts from: `it.each([…]).only` -> `it`. */
 function rootName(node: ts.Expression): string | undefined {
@@ -168,8 +173,9 @@ export function readLimits(
   const refuse = (node: ts.Node, what: string): void => {
     findings.push(
       `${where(sf, node)} -- ${what}. The unit limit is 1 s, written once in ` +
-        `${CONFIG}, and 0.3 s of a test's own CPU, written once in ` +
-        `${CPU_HOME}; a unit test is never given more time (#632, #645).`,
+        `${CONFIG}, and 0.3 s of a test's own CPU and 0.5 s to load a file, ` +
+        `written once in ${CPU_HOME}; a unit test is never given more time ` +
+        `(#632, #645, #688).`,
     );
   };
   let calls = 0;
@@ -271,19 +277,21 @@ export function readLimits(
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
-      node.name.text === CPU_NAME
+      Object.hasOwn(HOME_LIMITS, node.name.text)
     ) {
-      judged.push(`${where(sf, node)} ${CPU_NAME}`);
+      const name = node.name.text;
+      const theLimit = HOME_LIMITS[name];
+      judged.push(`${where(sf, node)} ${name}`);
       const value =
         node.initializer === undefined
           ? undefined
           : valueOf(sf, node.initializer);
       if (file !== CPU_HOME)
-        refuse(node, `\`${CPU_NAME}\` declared outside ${CPU_HOME}`);
-      else if (value !== THE_CPU_LIMIT)
+        refuse(node, `\`${name}\` declared outside ${CPU_HOME}`);
+      else if (value !== theLimit)
         refuse(
           node,
-          `\`${CPU_NAME}\` is ${value === undefined ? 'a value that cannot be resolved to a number' : value}, not ${THE_CPU_LIMIT}`,
+          `\`${name}\` is ${value === undefined ? 'a value that cannot be resolved to a number' : value}, not ${theLimit}`,
         );
     }
     if (
@@ -534,6 +542,16 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     expect(found(`const ${CPU_NAME} = 300_000;`)).toHaveLength(1);
   });
 
+  it('refuses a load limit above 500 000 in its home (#688)', () => {
+    expect(
+      found(`export const ${LOAD_NAME} = 600_000;`, CPU_HOME),
+    ).toHaveLength(1);
+  });
+
+  it('refuses the load limit declared outside its home (#688)', () => {
+    expect(found(`const ${LOAD_NAME} = 500_000;`)).toHaveLength(1);
+  });
+
   it('refuses a value in the config home that cannot be resolved', () => {
     expect(
       found(
@@ -611,6 +629,21 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     expect(reading.judged).toHaveLength(1);
     expect(
       floorBreach('unit-limit/allowed-cpu', reading.judged.length),
+    ).toBeUndefined();
+  });
+
+  it('allows the load limit as its home spells it (#688)', () => {
+    const reading = readLimits(
+      CPU_HOME,
+      `export const ${LOAD_NAME} = 500_000;`,
+      false,
+    );
+    expect(
+      searched(reading.findings, { of: reading.judged, what: 'limit units' }),
+    ).toEqual([]);
+    expect(reading.judged).toHaveLength(1);
+    expect(
+      floorBreach('unit-limit/allowed-load', reading.judged.length),
     ).toBeUndefined();
   });
 
@@ -697,13 +730,16 @@ describe('the unit population holds no raised limit (#632)', () => {
     expect(properties).toEqual([{ file: CONFIG, count: 2 }]);
   });
 
-  it('finds the CPU limit once, in its home, and nowhere else (#645)', () => {
-    const declarations = readAll()
-      .map(({ file, judged }) => ({
-        file,
-        count: judged.filter((unit) => unit.endsWith(` ${CPU_NAME}`)).length,
-      }))
-      .filter(({ count }) => count > 0);
-    expect(declarations).toEqual([{ file: CPU_HOME, count: 1 }]);
-  });
+  it.each(Object.keys(HOME_LIMITS))(
+    'finds %s once, in its home, and nowhere else (#645, #688)',
+    (name) => {
+      const declarations = readAll()
+        .map(({ file, judged }) => ({
+          file,
+          count: judged.filter((unit) => unit.endsWith(` ${name}`)).length,
+        }))
+        .filter(({ count }) => count > 0);
+      expect(declarations).toEqual([{ file: CPU_HOME, count: 1 }]);
+    },
+  );
 });

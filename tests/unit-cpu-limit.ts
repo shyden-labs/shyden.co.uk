@@ -29,12 +29,50 @@ export function cpuBreach(
   cpuMicroseconds: number,
   testName: string,
 ): string | undefined {
-  if (cpuMicroseconds <= CPU_LIMIT_MICROSECONDS) return undefined;
-  return (
-    `"${testName}" used ${Math.round(cpuMicroseconds / 1000)} ms of its own CPU, ` +
-    `over the unit limit of ${CPU_LIMIT_MICROSECONDS / 1000} ms (#632, #645). ` +
-    'Cut the work the test does; a unit test is never given more time.'
+  return overLimit(
+    cpuMicroseconds,
+    CPU_LIMIT_MICROSECONDS,
+    (used, limit) =>
+      `"${testName}" used ${used} ms of its own CPU, over the unit limit of ${limit} ms (#632, #645). ` +
+      'Cut the work the test does; a unit test is never given more time.',
   );
+}
+
+/**
+ * The unit suite's limit on loading one test file (#688): 0.5 s of the worker
+ * thread's CPU from just before the file is imported to its first hook, its
+ * imports and module-scope work included, which no per-test clock sees.
+ * Operator 2026-10-11 ("500 ms, keep isolation"): the runner's heaviest was
+ * 340 ms, every one of the ten files over 200 ms reaching `typescript`, which
+ * costs ~135 ms to load in each isolated file; the limit sits above that
+ * floor and catches heavy work at the top of a file (an 11.4 s whole-tree
+ * scan loaded unseen before #684 moved it).
+ */
+export const LOAD_LIMIT_MICROSECONDS = 500_000;
+
+/** The failure for a file that took `cpuMicroseconds` to load, or nothing within the limit. */
+export function loadBreach(
+  cpuMicroseconds: number,
+  file: string,
+): string | undefined {
+  return overLimit(
+    cpuMicroseconds,
+    LOAD_LIMIT_MICROSECONDS,
+    (used, limit) =>
+      `"${file}" used ${used} ms of its own CPU to load, over the unit load limit of ${limit} ms (#688). ` +
+      'Cut what it does at the top of the file, or move a whole-tree scan to the guards suite.',
+  );
+}
+
+/** `said(used ms, limit ms)` when `microseconds` passes `limit`, or nothing. */
+function overLimit(
+  microseconds: number,
+  limit: number,
+  said: (usedMs: number, limitMs: number) => string,
+): string | undefined {
+  return microseconds <= limit
+    ? undefined
+    : said(Math.round(microseconds / 1000), limit / 1000);
 }
 
 declare module 'vitest' {

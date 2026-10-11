@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cpuBreach, cpuReport, startOwnCpu } from '../unit-cpu-limit';
+import {
+  cpuBreach,
+  cpuReport,
+  loadBreach,
+  startOwnCpu,
+} from '../unit-cpu-limit';
 
 /**
  * The unit suite fails a test whose own CPU passes 0.3 s (#632, #645). The figures are
@@ -8,6 +13,23 @@ import { cpuBreach, cpuReport, startOwnCpu } from '../unit-cpu-limit';
  * and recorded in the pull request, since a permanent failing test cannot live
  * in the suite.
  */
+describe('the CPU limit of loading one unit file (#688)', () => {
+  it('passes a file that used 499 999 microseconds to load', () => {
+    expect(loadBreach(499_999, 'tests/unit/a.test.ts')).toBeUndefined();
+  });
+
+  it('passes a file that used exactly 500 000 microseconds to load', () => {
+    expect(loadBreach(500_000, 'tests/unit/a.test.ts')).toBeUndefined();
+  });
+
+  it('fails a file that used 500 001 microseconds to load, naming the file, the figure and the limit', () => {
+    expect(loadBreach(500_001, 'tests/unit/heavy.test.ts')).toBe(
+      '"tests/unit/heavy.test.ts" used 500 ms of its own CPU to load, over the unit load limit of 500 ms (#688). ' +
+        'Cut what it does at the top of the file, or move a whole-tree scan to the guards suite.',
+    );
+  });
+});
+
 describe('the CPU limit of one unit test', () => {
   it('passes a test that used 299 999 microseconds', () => {
     expect(cpuBreach(299_999, 'a test')).toBeUndefined();

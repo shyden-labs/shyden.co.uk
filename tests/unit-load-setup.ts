@@ -1,5 +1,5 @@
-import { beforeAll } from 'vitest';
-import { startOwnCpu } from './unit-cpu-limit';
+import { beforeAll, expect } from 'vitest';
+import { loadBreach, startOwnCpu } from './unit-cpu-limit';
 
 /**
  * In every unit worker, LAST of the setup files: measure what loading the test
@@ -12,6 +12,8 @@ import { startOwnCpu } from './unit-cpu-limit';
  * The figures go on the file's own meta, which Vitest carries from the worker
  * to the main process, where `unit-cpu-reporter.ts` prints the heaviest. A
  * file whose tests are all skipped runs no `beforeAll` and so carries none.
+ * A file over `LOAD_LIMIT_MICROSECONDS` fails here, naming itself and its
+ * figure, so every test in it fails with that reason.
  */
 const elapsed = startOwnCpu();
 const started = performance.now();
@@ -21,6 +23,9 @@ let stamped = false;
 beforeAll(({}, suite) => {
   if (stamped) return;
   stamped = true;
-  suite.meta.loadCpuMicroseconds = elapsed();
+  const used = elapsed();
+  suite.meta.loadCpuMicroseconds = used;
   suite.meta.loadWallMilliseconds = performance.now() - started;
+  const breach = loadBreach(used, suite.name);
+  expect(breach, breach).toBeUndefined();
 });

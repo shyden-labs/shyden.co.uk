@@ -25,3 +25,9 @@ export const UNIT_ONLY_SETUP: readonly string[] = [
  * so it must run after every other setup file and just before the import.
  */
 export const UNIT_LOAD_SETUP = 'tests/unit-load-setup.ts';
+
+/**
+ * The parser project's setup (#688): loads `typescript` before the load
+ * measurement starts, once per worker, since that project shares modules.
+ */
+export const TYPESCRIPT_PRELOAD_SETUP = 'tests/typescript-preload-setup.ts';

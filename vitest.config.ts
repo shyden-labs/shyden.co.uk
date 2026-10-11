@@ -1,21 +1,24 @@
 import { defineConfig } from 'vitest/config';
+import { parserTestFiles } from './tests/parser-files.ts';
 import {
   SHARED_SETUP,
+  TYPESCRIPT_PRELOAD_SETUP,
   UNIT_LOAD_SETUP,
   UNIT_ONLY_SETUP,
 } from './tests/setup-files.ts';
 
+// The unit files that load the TypeScript parser, read from their imports
+// (#688): ~135 ms of CPU to load it again in every isolated file.
+const PARSER_FILES = parserTestFiles();
+
 export default defineConfig({
   test: {
-    include: ['tests/unit/**/*.test.ts'],
     // In every worker: forget the repository the run was handed, so no git
     // process a test starts can act on it (#377), and refuse a worker whose
     // TMPDIR is not the run's own (#390 F56); then, for the unit suite alone,
     // refuse every process and every connection off this machine and check
-    // each test's own CPU (#632).
-    // Last, the cost of loading each test file, which no per-test clock sees
-    // (#688).
-    setupFiles: [...UNIT_ONLY_SETUP, ...SHARED_SETUP, UNIT_LOAD_SETUP],
+    // each test's own CPU (#632). Each project below adds its own after these.
+    setupFiles: [...UNIT_ONLY_SETUP, ...SHARED_SETUP],
     // A temporary directory of the run's own: anything a test leaves in it
     // fails the run, and it is removed either way (#390 F56). Then the run's
     // one reading of the tree, which every test reads in place of starting git
@@ -34,5 +37,29 @@ export default defineConfig({
     // The default reporter, then the own CPU of the heaviest tests, so every
     // run shows its headroom under the CPU limit (#645).
     reporters: ['default', './tests/unit-cpu-reporter.ts'],
+    // The unit suite in two projects (#688; operator 2026-10-11, "500 ms,
+    // share the parser first"). A project inherits everything above and adds
+    // its setup files after the shared ones, so the load measurement is last
+    // in both. The parser files run with isolation off and load the parser in
+    // setup, once per worker, before their load clock starts; every other
+    // file keeps its own fresh modules. Pinned by parser-project.test.ts.
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.ts'],
+          exclude: PARSER_FILES,
+          setupFiles: [UNIT_LOAD_SETUP],
+        },
+      },
+      {
+        test: {
+          name: 'unit-parser',
+          include: PARSER_FILES,
+          isolate: false,
+          setupFiles: [TYPESCRIPT_PRELOAD_SETUP, UNIT_LOAD_SETUP],
+        },
+      },
+    ],
   },
 });
