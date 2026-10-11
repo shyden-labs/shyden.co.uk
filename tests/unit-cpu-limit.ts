@@ -29,18 +29,60 @@ export function cpuBreach(
   cpuMicroseconds: number,
   testName: string,
 ): string | undefined {
-  if (cpuMicroseconds <= CPU_LIMIT_MICROSECONDS) return undefined;
-  return (
-    `"${testName}" used ${Math.round(cpuMicroseconds / 1000)} ms of its own CPU, ` +
-    `over the unit limit of ${CPU_LIMIT_MICROSECONDS / 1000} ms (#632, #645). ` +
-    'Cut the work the test does; a unit test is never given more time.'
+  return overLimit(
+    cpuMicroseconds,
+    CPU_LIMIT_MICROSECONDS,
+    (used, limit) =>
+      `"${testName}" used ${used} ms of its own CPU, over the unit limit of ${limit} ms (#632, #645). ` +
+      'Cut the work the test does; a unit test is never given more time.',
   );
+}
+
+/**
+ * The unit suite's limit on loading one test file (#688): 0.5 s of the worker
+ * thread's CPU from just before the file is imported to its first hook, its
+ * imports and module-scope work included, which no per-test clock sees.
+ * Operator 2026-10-11 ("500 ms, keep isolation"): the runner's heaviest was
+ * 340 ms, every one of the ten files over 200 ms reaching `typescript`, which
+ * costs ~135 ms to load in each isolated file; the limit sits above that
+ * floor and catches heavy work at the top of a file (an 11.4 s whole-tree
+ * scan loaded unseen before #684 moved it).
+ */
+export const LOAD_LIMIT_MICROSECONDS = 500_000;
+
+/** The failure for a file that took `cpuMicroseconds` to load, or nothing within the limit. */
+export function loadBreach(
+  cpuMicroseconds: number,
+  file: string,
+): string | undefined {
+  return overLimit(
+    cpuMicroseconds,
+    LOAD_LIMIT_MICROSECONDS,
+    (used, limit) =>
+      `"${file}" used ${used} ms of its own CPU to load, over the unit load limit of ${limit} ms (#688). ` +
+      'Cut what it does at the top of the file, or move a whole-tree scan to the guards suite.',
+  );
+}
+
+/** `said(used ms, limit ms)` when `microseconds` passes `limit`, or nothing. */
+function overLimit(
+  microseconds: number,
+  limit: number,
+  said: (usedMs: number, limitMs: number) => string,
+): string | undefined {
+  return microseconds <= limit
+    ? undefined
+    : said(Math.round(microseconds / 1000), limit / 1000);
 }
 
 declare module 'vitest' {
   interface TaskMeta {
     /** The test's own CPU in microseconds, stamped by `unit-cpu-setup.ts`. */
     ownCpuMicroseconds?: number;
+    /** A file's CPU to load, in microseconds, stamped by `unit-load-setup.ts` (#688). */
+    loadCpuMicroseconds?: number;
+    /** A file's wall time to load, in milliseconds, stamped beside it. */
+    loadWallMilliseconds?: number;
   }
 }
 
@@ -66,6 +108,7 @@ export function cpuReport(
   rows: readonly CpuRow[],
   unmeasured: number,
   top = CPU_REPORT_TOP,
+  heading = 'Own CPU of each unit test (#645)',
 ): string[] {
   const over = (microseconds: number) =>
     rows.filter((row) => row.microseconds > microseconds).length;
@@ -73,7 +116,7 @@ export function cpuReport(
     .sort((a, b) => b.microseconds - a.microseconds)
     .slice(0, top);
   return [
-    `Own CPU of each unit test (#645): ${rows.length} measured, ${unmeasured} unmeasured; ` +
+    `${heading}: ${rows.length} measured, ${unmeasured} unmeasured; ` +
       `over 300 ms: ${over(300_000)}; over 200 ms: ${over(200_000)}; the heaviest ${heaviest.length}:`,
     ...heaviest.map(
       (row) =>
