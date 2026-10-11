@@ -26,12 +26,17 @@ describe('the setup files of each suite', () => {
   });
 
   // A project's setup files run after the root's (#688), so the load
-  // measurement is last in both, and the parser loads before its clock starts.
+  // measurement is last but for its judge in both, and the parser loads
+  // before its clock starts.
   it.each([
-    ['unit', ['tests/unit-load-setup.ts']],
+    ['unit', ['tests/load-setup.ts', 'tests/unit-load-limit-setup.ts']],
     [
       'unit-parser',
-      ['tests/typescript-preload-setup.ts', 'tests/unit-load-setup.ts'],
+      [
+        'tests/typescript-preload-setup.ts',
+        'tests/load-setup.ts',
+        'tests/unit-load-limit-setup.ts',
+      ],
     ],
   ] as const)(
     'give the %s project its own setup after the shared lists (#688)',
@@ -40,24 +45,27 @@ describe('the setup files of each suite', () => {
     },
   );
 
-  it('give the guards suite the shared pair and nothing that refuses', () => {
+  it('give the guards suite the shared pair, then the load measurement, and nothing that refuses (#696)', () => {
     expect(guards.test?.setupFiles).toEqual([
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
+      'tests/load-setup.ts',
     ]);
   });
 
-  it('give the integration suite the shared pair and nothing that refuses', () => {
+  it('give the integration suite the shared pair, then the load measurement, and nothing that refuses (#696)', () => {
     expect(integration.test?.setupFiles).toEqual([
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
+      'tests/load-setup.ts',
     ]);
   });
 
-  it('give the simulation suite the shared pair and nothing that refuses', () => {
+  it('give the simulation suite the shared pair, then the load measurement, and nothing that refuses (#696)', () => {
     expect(simulation.test?.setupFiles).toEqual([
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
+      'tests/load-setup.ts',
     ]);
   });
 
@@ -84,6 +92,21 @@ describe('the CPU limit', () => {
   it('is not asked of the integration suite', () => {
     expect(integration.test?.setupFiles).not.toContain(
       'tests/unit-cpu-setup.ts',
+    );
+  });
+});
+
+// The unit load limit (#688) is the unit suite's alone: the other suites
+// measure their loading (#696) and are judged by their one measured limit at
+// their CI step, and a limit for their loading is the operator's to set.
+describe('the load limit', () => {
+  it.each([
+    ['guards', guards],
+    ['integration', integration],
+    ['simulation', simulation],
+  ] as const)('is not asked of the %s suite (#696)', (_name, config) => {
+    expect(config.test?.setupFiles).not.toContain(
+      'tests/unit-load-limit-setup.ts',
     );
   });
 });

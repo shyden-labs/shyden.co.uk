@@ -2,8 +2,9 @@ import { defineConfig } from 'vitest/config';
 import { parserTestFiles } from './tests/parser-files.ts';
 import {
   SHARED_SETUP,
+  LOAD_SETUP,
   TYPESCRIPT_PRELOAD_SETUP,
-  UNIT_LOAD_SETUP,
+  UNIT_LOAD_LIMIT_SETUP,
   UNIT_ONLY_SETUP,
 } from './tests/setup-files.ts';
 
@@ -35,12 +36,17 @@ export default defineConfig({
     // ground the CPU check and the refusals were measured on (#632).
     pool: 'forks',
     // The default reporter, then the own CPU of the heaviest tests, so every
-    // run shows its headroom under the CPU limit (#645).
-    reporters: ['default', './tests/unit-cpu-reporter.ts'],
+    // run shows its headroom under the CPU limit (#645), then that of loading
+    // the heaviest files (#688), from the reporter every suite shares (#696).
+    reporters: [
+      'default',
+      './tests/unit-cpu-reporter.ts',
+      ['./tests/load-reporter.ts', { suite: 'unit' }],
+    ],
     // The unit suite in two projects (#688; operator 2026-10-11, "500 ms,
     // share the parser first"). A project inherits everything above and adds
-    // its setup files after the shared ones, so the load measurement is last
-    // in both. The parser files run with isolation off and load the parser in
+    // its setup files after the shared ones, so the load measurement and its
+    // judge are last in both. The parser files run with isolation off and load the parser in
     // setup, once per worker, before their load clock starts; every other
     // file keeps its own fresh modules. Pinned by parser-project.test.ts.
     projects: [
@@ -49,7 +55,7 @@ export default defineConfig({
           name: 'unit',
           include: ['tests/unit/**/*.test.ts'],
           exclude: PARSER_FILES,
-          setupFiles: [UNIT_LOAD_SETUP],
+          setupFiles: [LOAD_SETUP, UNIT_LOAD_LIMIT_SETUP],
         },
       },
       {
@@ -57,7 +63,11 @@ export default defineConfig({
           name: 'unit-parser',
           include: PARSER_FILES,
           isolate: false,
-          setupFiles: [TYPESCRIPT_PRELOAD_SETUP, UNIT_LOAD_SETUP],
+          setupFiles: [
+            TYPESCRIPT_PRELOAD_SETUP,
+            LOAD_SETUP,
+            UNIT_LOAD_LIMIT_SETUP,
+          ],
         },
       },
     ],
