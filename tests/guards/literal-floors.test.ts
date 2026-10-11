@@ -236,7 +236,7 @@ const keyOf = ({ file, subject }: { file: string; subject: string }) =>
  * keyed `file: subject`, each with its reason.
  */
 const PRODUCT_VALUES: Readonly<Record<string, string>> = {
-  'tests/unit/browser-matrix.test.ts: all':
+  'tests/guards/browser-matrix.test.ts: all':
     'more than one engine is configured, or scoping a spec to one is trivially satisfied: a fact about the config',
   'tests/unit/deploy-gate.test.ts: r.reason.trim().length':
     'a refusal reason long enough to say something: a property of the text',
