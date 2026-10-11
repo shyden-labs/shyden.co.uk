@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { filesUnder, searched } from '../source-files';
-import { codeWithoutComments } from './source-text';
-import { cssRules, type CssRule } from './css-rules';
+import { codeWithoutComments } from '../unit/source-text';
+import { cssRules, type CssRule } from '../unit/css-rules';
 import {
   customProperties,
   darkBlocks,

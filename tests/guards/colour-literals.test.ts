@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
-import { astroCode, codeWithoutComments, stylesheetCss } from './source-text';
+import {
+  astroCode,
+  codeWithoutComments,
+  stylesheetCss,
+} from '../unit/source-text';
 import {
   codeColourLiterals,
   colourLiterals,
   cssRules,
   onPaper,
-} from './css-rules';
+} from '../unit/css-rules';
 import { TOKENS_FILE } from '../palette';
 
 /**

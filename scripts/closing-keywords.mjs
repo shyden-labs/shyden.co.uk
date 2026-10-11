@@ -125,5 +125,5 @@ const main = async () => {
 
 // Only when run, never when imported: the unit suite imports the detector.
 // Matching the entry file's NAME would run `main()` for any entry file whose
-// name ended the same way (#221, `tests/unit/script-entry.test.ts`).
+// name ended the same way (#221, `tests/guards/script-entry.test.ts`).
 if (import.meta.main) await main();

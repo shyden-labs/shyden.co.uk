@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
-import { codeWithoutComments } from './source-text';
+import { codeWithoutComments } from '../unit/source-text';
 import { filesUnder, searched } from '../source-files';
 import { floorBreach } from '../floors';
 

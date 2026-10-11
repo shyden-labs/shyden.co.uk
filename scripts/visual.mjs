@@ -149,7 +149,7 @@ function main() {
 // can read `dockerArgs` without starting a container. A check that stopped
 // matching would make `npm run test:visual` exit 0 having compared nothing,
 // and comparing `process.argv[1]` with this file's path did exactly that from
-// a checkout reached through a symlink (#221). `tests/unit/script-entry.test.ts`
+// a checkout reached through a symlink (#221). `tests/guards/script-entry.test.ts`
 // runs this file as a script from such checkouts and watches it refuse
 // without Docker.
 if (import.meta.main) main();
