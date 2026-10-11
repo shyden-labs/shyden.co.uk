@@ -31,9 +31,9 @@ import { withoutTsComments } from '../unit/source-text';
  * `vitest`, and a `const` initialised from one (`const check = it`,
  * `const base = test.extend({...})`), resolved to a fixed point.
  *
- * Not judged here: the guards and integration suites' limits, which live on
- * their package.json commands (`guards-budget` and `integration-budget` pin
- * them), and the unit command itself (`unit-budget` pins it).
+ * Not judged here: the guards, simulation and integration suites' limits,
+ * which live on their package.json commands (`suite-budgets` pins them), and
+ * the unit command itself (`unit-budget` pins it).
  */
 
 const TEST_ROOTS = new Set(['it', 'test', 'describe', 'suite']);

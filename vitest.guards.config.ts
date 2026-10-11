@@ -11,7 +11,7 @@ import { SHARED_SETUP } from './tests/setup-files';
  * whose population is the repository cannot, and its cost is the tree, not a
  * defect to cut. The two share the repo's setup files. There is NO time limit
  * in this file: the suite's one measured limit is on the command that runs it
- * (`npm run test:guards`), pinned by `tests/unit/guards-budget.test.ts`.
+ * (`npm run test:guards`), pinned by `tests/unit/suite-budgets.test.ts`.
  */
 export default defineConfig({
   test: {
