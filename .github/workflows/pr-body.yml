@@ -34,9 +34,24 @@ name: PR body
 # #284. Requiring a name nothing reports is not a weak gate: it hangs every
 # pull request on a check its base cannot produce, and only an administrator
 # can undo it. Pinned by pipeline-wiring.test.ts, which derives both sides.
+#
+# `workflow_dispatch` TAKES A PULL REQUEST NUMBER (#651). The floor recorder's
+# commit job pushes with the job token, and a push by that token starts no
+# `pull_request` run, so after its commit this check would never report on the
+# new head and the pull request could not merge (`closing-keywords` is
+# required). The recorder dispatches this workflow for the branch's open pull
+# request instead; the dispatched run reports under the same job name, on the
+# branch's head. It reads the body with `gh pr view` and judges it, and the
+# commits, with the very same script.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The pull request whose body and commits are checked
+        required: true
+        type: number
 
 # Read-only, and nothing else. The job reads no secret and writes nothing.
 permissions:
@@ -46,7 +61,7 @@ permissions:
 # shares one namespace of concurrency groups, so the key names this workflow
 # as well as the pull request.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
 
 jobs:
@@ -55,6 +70,10 @@ jobs:
     # Seconds of work. A budget so a hung job cannot burn the runner's
     # 360-minute default; pinned by tests/unit/pipeline-wiring.test.ts.
     timeout-minutes: 5
+    # `gh pr view` on a dispatched run reads the pull request; nothing writes.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,6 +84,36 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      - name: A dispatched run judges only the pull request that owns its head
+        # The check attaches to the dispatched ref's head, so the body and the
+        # commits judged must be that head's own pull request: a clean body
+        # from another pull request must never turn this head green (#651).
+        # Refused before either check below can pass. Through the environment,
+        # never expanded into the script.
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PR_NUMBER: ${{ inputs.pr }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          PR_JSON="$(gh pr view "$PR_NUMBER" --json headRefName,headRefOid,state)"
+          STATE="$(jq -r .state <<< "$PR_JSON")"
+          HEAD_REF="$(jq -r .headRefName <<< "$PR_JSON")"
+          HEAD_SHA="$(jq -r .headRefOid <<< "$PR_JSON")"
+          if [ "$STATE" != OPEN ]; then
+            echo "::error::pull request #$PR_NUMBER is $STATE, not OPEN: nothing to judge"
+            exit 1
+          fi
+          if [ "$HEAD_REF" != "$REF_NAME" ]; then
+            echo "::error::pull request #$PR_NUMBER is on branch $HEAD_REF, but this run is on $REF_NAME"
+            exit 1
+          fi
+          if [ "$HEAD_SHA" != "$SHA" ]; then
+            echo "::error::pull request #$PR_NUMBER head is $HEAD_SHA, but this run is on $SHA"
+            exit 1
+          fi
       - name: A pull request body must not close an issue by accident
         # Through the ENVIRONMENT, never expanded into the script. A body is
         # written by whoever opened the pull request, including on a fork;
@@ -73,8 +122,16 @@ jobs:
         # Here it is only ever data. Pinned by closing-keywords.test.ts.
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          printenv PR_BODY > "${RUNNER_TEMP}/pr-body.txt" || true
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            gh pr view "$PR_NUMBER" --json body --jq .body > "${RUNNER_TEMP}/pr-body.txt"
+          else
+            printenv PR_BODY > "${RUNNER_TEMP}/pr-body.txt" || true
+          fi
           node scripts/closing-keywords.mjs "${RUNNER_TEMP}/pr-body.txt" "this pull request body"
       - name: No commit message in it may close an issue by accident either
         # THE OTHER MEDIUM A MERGE ACTS ON. A closing keyword in a commit
@@ -92,10 +149,23 @@ jobs:
         # and the synthetic merge is left out. Merge commits the branch
         # carries are read like any other, since they land on the base with
         # their messages; `--no-merges` skipped them (#390).
+        #
+        # A dispatched run checks out the branch itself, so its tip is HEAD,
+        # and the base comes from the pull request (#651). The pull_request
+        # tip is the `git log` line's own default, so that line read alone is
+        # the pull request's range (`closing-keywords.test.ts` runs it so).
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          git log --format=%B "origin/${BASE_REF}..HEAD^2" > "${RUNNER_TEMP}/commits.txt"
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            TIP='HEAD'
+            BASE_REF="$(gh pr view "$PR_NUMBER" --json baseRefName --jq .baseRefName)"
+          fi
+          git log --format=%B "origin/${BASE_REF}..${TIP:-HEAD^2}" > "${RUNNER_TEMP}/commits.txt"
           # An empty range would pass this check for free, and would look
           # exactly like a clean pull request. An open one always adds at
           # least one commit, so nothing here is the range being wrong.

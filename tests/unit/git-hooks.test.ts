@@ -94,14 +94,10 @@ describe('the pre-push hook', () => {
     // them, so a test indexing a union as a record passed the hook, was
     // pushed, and only `astro check` in CI could have refused it.
     //
-    // `test:guards` was the next (#638): the whole-repo guards left the unit
-    // suite for their own, and the hook still has to run them.
-    expect(invokedNpmScripts()).toEqual([
-      'format',
-      'test:guards',
-      'test:unit',
-      'typecheck',
-    ]);
+    // `test:guards` was the next (#638), and it left again (#653): only unit
+    // tests, formatters and type checks run on the laptop; every other suite
+    // is CI's (operator, 2026-10-09, a global rule).
+    expect(invokedNpmScripts()).toEqual(['format', 'test:unit', 'typecheck']);
   });
 
   it('clears the repository git hands it before any check runs (#377)', () => {

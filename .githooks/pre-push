@@ -10,8 +10,10 @@
 # slip no longer skips them -- it still turns `build-and-test` red, and the
 # push still costs a whole run to find out.
 #
-# e2e is deliberately NOT here — ~7.3 minutes would make pushing unusable, and
-# a hook people bypass every time is worse than no hook. CI remains its gate.
+# Nothing else is here, deliberately: only unit tests, formatters and type
+# checks run on the laptop, and every other suite (guards, integration, e2e,
+# visual, sanity) runs in CI alone (operator, 2026-10-09, a global rule; #653).
+# The guards ran here from #638 until then.
 #
 # Installed by `scripts/install-hooks.mjs` via `prepare`, which points
 # `core.hooksPath` at this directory. Bypass a single push with --no-verify.
@@ -33,4 +35,3 @@ fail() {
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'
 npm run test:unit || fail 'a unit test failed' 'npm run test:unit'
-npm run test:guards || fail 'a guard failed' 'npm run test:guards'

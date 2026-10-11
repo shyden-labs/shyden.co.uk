@@ -59,17 +59,12 @@ describe('the guards suite budget', () => {
     });
   });
 
-  it('is run by npm test, after the unit suite', () => {
+  // Only unit tests, formatters and type checks run on the laptop; the guards
+  // run in CI alone (operator, 2026-10-09, a global rule; #653). `npm test` is
+  // the laptop's whole check, so it runs exactly those three, in this order.
+  it('is not run by npm test, which runs only what the laptop may run', () => {
     expect(scripts()['test']).toBe(
-      'npm run test:unit && npm run test:guards && npm run test:integration && npm run test:e2e',
+      'npm run format && npm run typecheck && npm run test:unit',
     );
-  });
-
-  it('is run by the pre-push hook, right after the unit suite', () => {
-    const hook = readFileSync('.githooks/pre-push', 'utf8');
-    const unitAt = hook.indexOf('npm run test:unit ||');
-    const guardsAt = hook.indexOf('npm run test:guards ||');
-    expect(unitAt).toBeGreaterThan(-1);
-    expect(guardsAt).toBeGreaterThan(unitAt);
   });
 });

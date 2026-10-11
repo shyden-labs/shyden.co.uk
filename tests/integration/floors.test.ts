@@ -321,11 +321,24 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.stdout).toBe('');
   });
 
+  it('with --unit-suite, runs the unit suite and nothing else (#658)', () => {
+    // No docker and no npm on PATH: the Playwright run or the functions
+    // suite, had either been asked for, would have refused the record.
+    const run = recordWith({ npx: '#!/bin/sh\necho "ran: $*"\nexit 0\n' }, [
+      '--unit-suite',
+    ]);
+    expect(
+      run.stdout.split('\n').filter((line) => line.startsWith('ran: ')),
+    ).toEqual(['ran: vitest run']);
+    expect(run.status).toBe(0);
+  });
+
   it('refuses an argument it does not know, before running anything (#548)', () => {
     const run = recordWith({}, ['--units']);
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ usage: npm run floors:record [-- --unit | --functions] (got --units)\n',
+      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
+        '[--retire <id>]... (got --units)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -334,8 +347,22 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     const run = recordWith({}, ['--unit', '--functions']);
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ usage: npm run floors:record [-- --unit | --functions] ' +
-        '(got --unit --functions)\n',
+      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
+        '[--retire <id>]... (got --unit --functions)\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('refuses a retire when git cannot say what origin/develop holds, before running anything (#640)', () => {
+    // No git on the run's PATH: unknown is never read as "not on develop".
+    const run = recordWith({}, ['--unit', '--retire', 'planted/branch-only'], {
+      recorded: { 'planted/branch-only': 1 },
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n  planted/branch-only cannot be retired: ' +
+        'whether origin/develop holds it is unknown (the fetch of ' +
+        'origin/develop did not start: spawnSync git ENOENT)\n',
     );
     expect(run.stdout).toBe('');
   });

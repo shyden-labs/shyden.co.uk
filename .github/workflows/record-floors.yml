@@ -1,0 +1,249 @@
+name: record-floors
+
+# Records the guards' liveness floors on a branch and commits them back (#651).
+#
+# Why this exists: a floor measured on the laptop ties up the laptop for
+# hours, and a Playwright figure measured there is measured on the wrong
+# architecture. The gate (`ci.yml`) still never records; it judges
+# `tests/floors.json` by equality, as it always did. This workflow is the one
+# place a record runs in CI, and it runs only when somebody dispatches it:
+#
+#   gh workflow run record-floors.yml --ref develop -f branch=<your-branch>
+#
+# then wait for it, and take the bot's amended head with
+# `git fetch origin <branch> && git reset --keep origin/<branch>` (it rewrote
+# the head, so a plain `git pull` would merge the old one back in), and read
+# what moved in the head's message.
+#
+# `workflow_dispatch` ONLY, so no push or pull request can start a run that
+# rewrites the figure it is checked against. It is dispatched from the default
+# branch (GitHub runs only a workflow that exists there) and names the branch
+# to record in an input. `develop` and `main` are refused: floors reach them
+# through a pull request like everything else.
+#
+# Three jobs, so the token that can write is never in the job that runs the
+# branch's code:
+#
+#   image   picks the pinned Playwright image, as ci.yml's `image` job does.
+#   record  runs the recorder inside that image (FLOORS_RECORD_IN_IMAGE=1, so
+#           it runs Playwright directly instead of through `docker run`), with
+#           a read-only token. Hands the new tests/floors.json and the commit
+#           message to the next job as an artifact. The recorder's own refusals
+#           (a fall, an unasserted or double-asserted id, a failed run) fail
+#           this job, with their text in the job summary.
+#   commit  with `contents: write`, `actions: write` and `pull-requests: read`, runs
+#           no branch code: it applies the artifact and folds it into the
+#           commit `record` measured (`--amend`, author and parents kept, as
+#           github-actions[bot] committing; operator 2026-10-10, "Bot folds
+#           into the head", so every commit stays green on its own), pushes
+#           leased to that commit's SHA (a branch that moved since `record`
+#           read it is refused, not overwritten), then
+#           dispatches `ci.yml` on the branch, and `pr-body.yml` for its open
+#           pull request (`closing-keywords` is required and a token push
+#           starts no `pull_request` run). A commit pushed with the job
+#           token starts no run of its own (GitHub's rule, so no recursion),
+#           and a dispatched run's checks attach to the new head, which is what
+#           branch protection reads by name.
+#
+# `tests/unit/pipeline-wiring.test.ts` pins all of this.
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The branch to record on (never develop or main)
+        required: true
+        type: string
+      mode:
+        description: full records every floor; unit and functions record their suites alone
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - unit
+          - functions
+
+# One record per branch at a time, queued and never cancelled: a cancelled
+# record would leave the branch as it was, but a second one running beside the
+# first would race it to the push.
+concurrency:
+  group: record-floors-${{ inputs.branch }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - name: Refuse a protected branch
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          case "$BRANCH" in
+            develop | main)
+              echo "::error::floors are not recorded on $BRANCH: record on a feature branch and merge it"
+              exit 1
+              ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
+  record:
+    needs: image
+    runs-on: ubuntu-26.04
+    # The recorder runs the unit, guards and integration suites, the Playwright
+    # specs on every project, and the Functions suite. Set to the e2e policy's
+    # ceiling until a first real dispatch measures it.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    # The same pinned image and options as ci.yml's e2e shards, so a figure
+    # measured here is the figure the gate reads.
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      # The commit the record is made on. `commit` checks out exactly this, so
+      # a branch that moved while this ran is a rejected push, not a lost one.
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: cp tests/floors.json "$RUNNER_TEMP/floors-before.json"
+      - name: Record the floors
+        shell: bash
+        env:
+          FLOORS_RECORD_IN_IMAGE: '1'
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            full) flag='' ;;
+            unit) flag='--unit' ;;
+            functions) flag='--functions' ;;
+            *) echo "::error::unknown mode $MODE"; exit 1 ;;
+          esac
+          npm run floors:record -- $flag 2>&1 | tee "$RUNNER_TEMP/record.log"
+      - name: Put the recorder's refusal in the summary
+        if: failure()
+        run: |
+          {
+            echo '### The recorder refused or failed'
+            echo
+            echo '```'
+            tail -n 60 "$RUNNER_TEMP/record.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The amended message is composed here, where the branch's code already
+      # runs with a read-only token, so the job that can write runs none.
+      - id: diff
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"
+          node scripts/floors-diff.mjs "$RUNNER_TEMP/floors-before.json" tests/floors.json "$MODE" "$RUNNER_TEMP/head-message.txt" "$RUNNER_TEMP/message.txt"
+      - name: Keep the figures for the commit job
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          mkdir floors-record
+          cp tests/floors.json floors-record/floors.json
+          cp "$RUNNER_TEMP/message.txt" floors-record/message.txt
+      - if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: floors-record
+          path: floors-record
+          retention-days: 7
+          if-no-files-found: error
+
+  commit:
+    needs: record
+    if: needs.record.outputs.changed == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+      # To find the branch's open pull request (`gh pr list`), read-only.
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.record.outputs.sha }}
+          # The measured commit's parents too: at depth 1 it would be shallow,
+          # and an amend of a shallow commit has NO parents, so the push
+          # would orphan the branch's history.
+          fetch-depth: 2
+          # The token is handed to the one push below and kept nowhere else:
+          # .git/config would leave it for every later step (#395).
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: floors-record
+          path: floors-record
+      # Folded into the commit they were measured on (operator 2026-10-10,
+      # "Bot folds into the head"), so every commit stays green on its own.
+      # The amend keeps the commit's author and parents; the push is leased
+      # to the measured SHA, so a branch that moved since is refused.
+      - name: Fold the figures into the measured commit and push it, leased to that commit
+        env:
+          BRANCH: ${{ inputs.branch }}
+          SHA: ${{ needs.record.outputs.sha }}
+          TOKEN: ${{ github.token }}
+        run: |
+          cp floors-record/floors.json tests/floors.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          PARENTS="$(git log -1 --format=%P HEAD)"
+          git add tests/floors.json
+          git commit --amend -F floors-record/message.txt
+          if [ "$(git log -1 --format=%P HEAD)" != "$PARENTS" ]; then
+            echo "::error::the amend changed the parents of $SHA: nothing pushed"
+            exit 1
+          fi
+          AUTH="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"
+      - name: Start CI on the new head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          {
+            echo "Folded the figures into the head of \`$BRANCH\` and dispatched \`ci.yml\` there."
+            echo "Take it with git fetch and git reset --keep, then read the head's message for what moved."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # `closing-keywords` is a required check and comes from pr-body.yml,
+          # which a push by the job token does not start: dispatch it for the
+          # branch's open pull request, which reports under the same name.
+          PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR" ]; then
+            gh workflow run pr-body.yml --ref "$BRANCH" -f pr="$PR"
+            echo "Dispatched \`pr-body.yml\` for pull request #$PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No open pull request for \`$BRANCH\`: \`pr-body.yml\` was not dispatched." >> "$GITHUB_STEP_SUMMARY"
+          fi

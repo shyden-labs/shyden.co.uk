@@ -1,0 +1,222 @@
+name: visual-capture
+
+# Captures the visual baselines on a branch and commits the changed ones back
+# (#654). Operator 2026-10-09 (global): visual runs are CI's, never the
+# laptop's, so baselines change ONE way: this workflow, dispatched by hand.
+#
+#   gh workflow run visual-capture.yml --ref develop -f branch=<your-branch>
+#
+# then wait for it, take the bot's amended head with
+# `git fetch origin <branch> && git reset --keep origin/<branch>`, and read
+# the baselines it changed in the head's message. Look at every one: the gate
+# compares against them from then on.
+#
+# `workflow_dispatch` ONLY: the gate (`ci.yml`'s `visual`) never passes
+# `--update-snapshots`, because a run that can rewrite the baseline it checks
+# against asserts nothing. This is never part of the gate and never required.
+# It is dispatched from the default branch (GitHub runs only a workflow that
+# exists there) and names the branch in an input; `develop` and `main` are
+# refused, since baselines reach them through a pull request.
+#
+# Built on record-floors.yml's split (#651), so the token that can write is
+# never in a job that runs the branch's code:
+#
+#   image    picks the pinned Playwright image, as ci.yml's `image` job does.
+#   capture  runs the visual suite with `--update-snapshots=all` in the visual
+#            gate's own container, with a read-only token, then
+#            `scripts/visual-capture.mjs` reads `git status`: the changed
+#            baselines go to the next job as an artifact, and any other change
+#            fails the job (a capture changes baselines and nothing else).
+#            `all`, never `changed`: `changed` leaves a stale-but-passing
+#            baseline in place (#134), and the render is byte-identical where
+#            nothing moved, so only real changes reach the commit.
+#   commit   with `contents: write`, `actions: write` and `pull-requests: read`,
+#            runs no branch code: folds the baselines into the commit `capture`
+#            measured (`--amend`, author and parents kept, as the floor
+#            recorder does: "Bot folds into the head", operator 2026-10-10, so
+#            every commit stays green on its own), pushes leased to that SHA,
+#            then dispatches `ci.yml` and `pr-body.yml` (a token push starts no
+#            run of its own).
+#
+# `tests/unit/pipeline-wiring.test.ts` pins all of this.
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The branch to capture on (never develop or main)
+        required: true
+        type: string
+      grep:
+        description: Optional Playwright --grep, to capture only matching screenshots
+        required: false
+        default: ''
+        type: string
+
+# One capture per branch at a time, queued and never cancelled, so two never
+# race each other to the push.
+concurrency:
+  group: visual-capture-${{ inputs.branch }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - name: Refuse a protected branch
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          case "$BRANCH" in
+            develop | main)
+              echo "::error::baselines are not captured on $BRANCH: capture on a feature branch and merge it"
+              exit 1
+              ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
+  capture:
+    needs: image
+    runs-on: ubuntu-26.04
+    # The visual gate's last green runs took at most 91 s (#431); a capture
+    # rewrites every baseline it renders, so it gets double the gate's bound.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # The visual gate's own container, so a baseline captured here is
+    # rendered exactly as the gate renders what it compares.
+    container:
+      image: ${{ needs.image.outputs.ref }}
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      # The commit the capture is made on. `commit` checks out exactly this, so
+      # a branch that moved while this ran is a rejected push, not a lost one.
+      # The container runs as another user than the checkout's owner, which
+      # git refuses to read without being told the directory is safe.
+      - id: head
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Capture the baselines
+        env:
+          VISUAL: '1'
+          GREP: ${{ inputs.grep }}
+        run: |
+          if [ -n "$GREP" ]; then
+            npx playwright test --project=visual --update-snapshots=all --grep "$GREP"
+          else
+            npx playwright test --project=visual --update-snapshots=all
+          fi
+      - id: diff
+        run: |
+          git status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/status.txt"
+          git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"
+          node scripts/visual-capture.mjs "$RUNNER_TEMP/status.txt" "$RUNNER_TEMP/head-message.txt" "$RUNNER_TEMP/message.txt" "$RUNNER_TEMP/baselines.txt"
+      - name: Keep the baselines for the commit job
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          mkdir -p visual-capture/files
+          cp "$RUNNER_TEMP/message.txt" "$RUNNER_TEMP/baselines.txt" visual-capture/
+          xargs -a "$RUNNER_TEMP/baselines.txt" cp --parents -t visual-capture/files
+      - if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-capture
+          path: visual-capture
+          retention-days: 7
+          if-no-files-found: error
+
+  commit:
+    needs: capture
+    if: needs.capture.outputs.changed == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+      # To find the branch's open pull request (`gh pr list`), read-only.
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.capture.outputs.sha }}
+          # The measured commit's parents too: an amend of a shallow commit has
+          # NO parents, so the push would orphan the branch's history.
+          fetch-depth: 2
+          # The token is handed to the one push below and kept nowhere else.
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: visual-capture
+          path: visual-capture
+      - name: Fold the baselines into the captured commit and push it, leased to that commit
+        env:
+          BRANCH: ${{ inputs.branch }}
+          SHA: ${{ needs.capture.outputs.sha }}
+          TOKEN: ${{ github.token }}
+        # The list came from the job that ran branch code, so it is judged
+        # again here, by this job's own pattern, and only the listed baselines
+        # are copied: nothing else in the artifact reaches the commit.
+        run: |
+          if grep -vxE 'tests/e2e/__screenshots__/[^/"[:space:]]+[.]png' visual-capture/baselines.txt; then
+            echo "::error::the capture listed paths that are not baselines (above): nothing committed"
+            exit 1
+          fi
+          while IFS= read -r file; do
+            cp "visual-capture/files/$file" "$file"
+          done < visual-capture/baselines.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          PARENTS="$(git log -1 --format=%P HEAD)"
+          xargs -a visual-capture/baselines.txt git add --
+          git commit --amend -F visual-capture/message.txt
+          if [ "$(git log -1 --format=%P HEAD)" != "$PARENTS" ]; then
+            echo "::error::the amend changed the parents of $SHA: nothing pushed"
+            exit 1
+          fi
+          AUTH="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"
+      - name: Start CI on the new head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          {
+            echo "Folded the baselines into the head of \`$BRANCH\` and dispatched \`ci.yml\` there."
+            echo "Take it with git fetch and git reset --keep, then look at every baseline the head's message names."
+          } >> "$GITHUB_STEP_SUMMARY"
+          PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR" ]; then
+            gh workflow run pr-body.yml --ref "$BRANCH" -f pr="$PR"
+            echo "Dispatched \`pr-body.yml\` for pull request #$PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No open pull request for \`$BRANCH\`: \`pr-body.yml\` was not dispatched." >> "$GITHUB_STEP_SUMMARY"
+          fi
