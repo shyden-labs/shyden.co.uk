@@ -200,6 +200,57 @@ export const runRefusal = (suite, { status, error }) =>
       : undefined;
 
 /**
+ * Why a record must wait for the files git lists as untracked, or nothing
+ * when it lists none (#547). The guards that read git count tracked files
+ * only, so a record taken with a new file untracked writes a figure the
+ * committed tree beats, and CI fails on it: five times before this check, the
+ * last in #696. Staging with `git add -N` is enough: an intent-to-add file is
+ * tracked to `git ls-files` and still leaves the commit to its author. A
+ * guard that walks the filesystem instead of git sees the file either way, so
+ * this changes nothing for it.
+ *
+ * @param {string} listing `git ls-files --others --exclude-standard -z`
+ * @returns {string | undefined}
+ */
+export const untrackedRefusal = (listing) => {
+  const files = listing.split('\0').filter((file) => file !== '');
+  if (files.length === 0) return undefined;
+  const one = files.length === 1;
+  return (
+    `nothing recorded: ${files.length} untracked ${one ? 'file' : 'files'}, ` +
+    'which the guards that read git would not count and CI, with ' +
+    `${one ? 'it' : 'them'} committed, would (#547). ` +
+    `Stage ${one ? 'it' : 'each'} first:\n` +
+    files.map((file) => `  git add -N -- '${file}'`).join('\n')
+  );
+};
+
+/** What the recorder asks git for its untracked files (#547). */
+export const UNTRACKED_LISTING = [
+  'ls-files',
+  '--others',
+  '--exclude-standard',
+  '-z',
+];
+
+/**
+ * Why a record cannot start in this tree, asked of `git` through `run`
+ * (`spawnSync` in the recorder, a stand-in in its unit tests): a listing that
+ * did not start or failed is refused, never read as "nothing untracked", and
+ * a listing that names any file is refused by `untrackedRefusal`.
+ *
+ * @param {(command: string, args: readonly string[]) => { status: number | null, error?: Error, stdout: string }} run
+ * @returns {string | undefined}
+ */
+export const untrackedTreeRefusal = (run) => {
+  const listing = run('git', UNTRACKED_LISTING);
+  return (
+    runRefusal('untracked-file listing', listing) ??
+    untrackedRefusal(listing.stdout)
+  );
+};
+
+/**
  * The argument vector for `docker` that records the Playwright floors: every
  * project over `specs`, in the image CI runs the e2e suite in, with
  * `RECORD_ENV` naming `record` as the container sees it. A layout count
@@ -708,6 +759,13 @@ const main = () => {
   const parsed = recordArguments(argv.slice(2));
   if (typeof parsed === 'string') die(parsed);
   const { mode, retired } = parsed;
+
+  // Before anything runs, and before anything is asked of Docker (#547): a
+  // record of a tree holding an untracked file is a figure CI will not read.
+  const untracked = untrackedTreeRefusal((command, args) =>
+    spawnSync(command, args, { encoding: 'utf8' }),
+  );
+  if (untracked !== undefined) die(untracked);
   // `--unit` skips the container (#548), about five minutes a record;
   // `--functions` the hours of a whole record (#610); `--unit-suite` every
   // suite but the one the laptop runs (#658).
