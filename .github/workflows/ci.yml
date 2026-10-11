@@ -170,10 +170,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       # Every guard that reads the whole tree (#638). One limit, measured, on the command
-      # itself (tests/unit/guards-budget.test.ts).
+      # itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:guards
+      # Every real run of the engine over many seeded inputs (#650); the unit
+      # suite keeps a stand-in of each. One limit, measured, on the command
+      # itself (tests/unit/suite-budgets.test.ts).
+      - run: npm run test:simulation
       # Every test that starts a process (#630). The unit suite starts none.
-      # One limit, measured, on the command itself (tests/unit/integration-budget.test.ts).
+      # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7

@@ -13,6 +13,7 @@ import {
 } from '../../src/lib/grouping';
 import * as grouping from '../../src/lib/grouping';
 import { student, shape, groupOf, seeded } from './factories';
+import { apartSweep } from '../apart-sweep';
 // Fix round 1, F-2: closing the reviewer's named gap -- nothing in this
 // file, before this fix, ever piped a `separate`-mode failure through
 // `renderError`, so a structurally-correct error code with a wrong-number
@@ -1420,77 +1421,42 @@ describe('apart letters', () => {
 // invariant re-checked directly against the raw `apart` field (never via
 // buildConflicts or any other engine internal, so this cannot pass merely
 // because the test and the implementation share a bug).
-describe('apart letters — the guarantee holds broadly, not just on hand-picked rosters (debt a)', () => {
-  // One test per class size (the one-test-per-case rule), each with eight
-  // seeds for every mode, the seeds `seeded(seed * 97 + n)` as before #638.
-  // Measured per size (attempts, successes): 4: 16, 16; 6, 9, 12, 16 and 20:
-  // 24, 24 each; 25: 24, 21; 30: 24, 22. Together the original 184 attempts and
-  // 179 successes. Each size must clear its own floor below (a margin under the
-  // measurement); the floors sum to 120 attempts and 133 successes, above the
-  // original sweep's > 100 and > 80, so no size can fail silently.
-  const apartSweepSizes: [
+describe('apart letters — a stand-in for the broad sweep, which runs in the simulation suite (debt a, #650)', () => {
+  // The real sweep (every size, eight seeds for each of three modes) is
+  // `tests/simulation/grouping-apart-sweep.test.ts`; its logic is
+  // `tests/apart-sweep.ts`, shared. It cannot fit here for two sizes: measured
+  // on 2026-10-09 the seeds that fail at 25 (from the fourth) and at 30 (from
+  // the third) run the search to its budget, 110 ms and 85 ms of own CPU for
+  // the size, against 0 to 3 ms for every seed that succeeds. This stand-in
+  // runs the same logic with the seeds that succeed: eight for every size up
+  // to 20, three for 25 and two for 30, every case under 0.1 s of own CPU.
+  // One test per class size (the one-test-per-case rule). Measured (attempts,
+  // successes): 4: 16, 16; 6, 9, 12, 16 and 20: 24, 24 each; 25: 9, 9; 30:
+  // 6, 6. Each size's whole result is pinned in one verdict, the attempts and
+  // successes beside the empty breach list, so none can pass on an empty run.
+  const apartStandInSizes: [
     n: number,
-    minAttempts: number,
-    minSuccesses: number,
+    seeds: number,
+    attempts: number,
+    successes: number,
   ][] = [
-    [4, 12, 12],
-    [6, 18, 18],
-    [9, 18, 18],
-    [12, 18, 18],
-    [16, 18, 18],
-    [20, 18, 18],
-    [25, 18, 15],
-    [30, 18, 16],
+    [4, 8, 16, 16],
+    [6, 8, 24, 24],
+    [9, 8, 24, 24],
+    [12, 8, 24, 24],
+    [16, 8, 24, 24],
+    [20, 8, 24, 24],
+    [25, 3, 9, 9],
+    [30, 2, 6, 6],
   ];
-  it.each(apartSweepSizes)(
-    'holds across group-count and per-group modes and eight seeds for a class of %i',
-    (n, minAttempts, minSuccesses) => {
-      const letters = ['X', 'Y', 'Z'];
-      let successes = 0;
-      let attempts = 0;
-      const students = Array.from({ length: n }, (_, i) =>
-        student({ number: i + 1, apart: letters[i % letters.length] }),
-      );
-      // Cyclic assignment balances each letter's membership to
-      // ceil(n/3) at most, so this is the largest clique the search can
-      // ever meet for this roster -- used to keep every mode comfortably
-      // feasible (a few groups of slack) rather than accidentally
-      // constructing a SECOND pathological-search fixture here; that is
-      // debt (b)'s job, deliberately, in its own dedicated test below.
-      const largestLetterGroup = Math.ceil(n / letters.length);
-      const modes: Mode[] = [
-        { kind: 'groupCount', count: largestLetterGroup + 2 },
-        { kind: 'groupCount', count: largestLetterGroup + 4 },
-        {
-          kind: 'perGroup',
-          size: Math.max(2, Math.floor(n / (largestLetterGroup + 3))),
-        },
-      ];
-      for (const mode of modes) {
-        if (mode.kind === 'groupCount' && mode.count > n) continue;
-        for (let seed = 1; seed <= 8; seed++) {
-          attempts++;
-          const out = buildGroups(
-            base({ students, mode, random: seeded(seed * 97 + n) }),
-          );
-          if (!out.ok) continue;
-          successes++;
-          // The invariant, re-derived from `apart` directly rather than
-          // trusting any engine internal: no group holds two present
-          // students who share a non-null apart letter.
-          for (const g of out.result.groups) {
-            for (const letter of letters) {
-              expect(
-                g.filter((s) => s.apart === letter).length,
-              ).toBeLessThanOrEqual(1);
-            }
-          }
-        }
-      }
-      // The invariant must actually be exercised on real successes, not hold
-      // vacuously because every attempt for this size happened to fail.
-      expect(attempts).toBeGreaterThan(minAttempts);
-      expect(successes).toBeGreaterThan(minSuccesses);
+  it.each(apartStandInSizes)(
+    'holds across group-count and per-group modes for a class of %i, over the seeds the unit limit affords',
+    (n, seeds, attempts, successes) => {
+      expect(apartSweep(n, seeds)).toEqual({
+        attempts,
+        successes,
+        breaches: [],
+      });
     },
   );
 

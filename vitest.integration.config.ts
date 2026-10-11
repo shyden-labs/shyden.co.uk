@@ -10,7 +10,7 @@ import { SHARED_SETUP } from './tests/setup-files';
  * process here is as isolated from the checkout as one was there. There is NO
  * time limit in this file: the suite's one measured limit is on the command
  * that runs it (`npm run test:integration`), pinned by
- * `tests/unit/integration-budget.test.ts`.
+ * `tests/unit/suite-budgets.test.ts`.
  */
 export default defineConfig({
   test: {
