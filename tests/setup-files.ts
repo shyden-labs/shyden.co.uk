@@ -5,7 +5,7 @@
  * integration): forget the repository the run was handed, and refuse a worker
  * whose TMPDIR is not the run's own. `UNIT_ONLY_SETUP` runs in the unit suite
  * alone: it refuses every process and every connection off this machine, and
- * fails a test whose own CPU passes 1 s. The integration suite exists to start
+ * fails a test whose own CPU passes 0.3 s. The integration suite exists to start
  * processes and the guards suite reads the whole tree over 1 s, so neither may
  * take the unit-only list. `tests/unit/setup-files.test.ts` pins the split from
  * the three configs' own objects.
