@@ -3113,6 +3113,7 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
     needs?: unknown;
     permissions?: Record<string, string>;
     container?: { image?: string; options?: string };
+    'timeout-minutes'?: unknown;
     steps?: Step[];
   };
   type Parsed = {
@@ -3372,6 +3373,14 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
       /^node scripts\/floors-diff\.mjs /m,
     );
   });
+
+  it('holds record to a budget measured on its own full runs (#663)', () => {
+    // MEASURED 2026-10-12: the `record` job of all ten full records that had
+    // succeeded took 31.2 to 46.9 minutes (longest: run 38088077407); the
+    // unit and functions modes took 1.5 to 3.4. The 120 it replaced was the
+    // e2e policy's ceiling, set before any record had run.
+    expect(job('record')['timeout-minutes']).toBe(60);
+  });
 });
 
 describe('a docs-only pull request skips the browser jobs and nothing else (#582)', () => {
@@ -3583,4 +3592,46 @@ describe('the visual capture commits only baselines to a branch and starts CI on
     expect(workflowRefs(ci).length).toBeGreaterThan(0);
     expect(REQUIRED_CHECKS).not.toContain('capture');
   });
+});
+
+/**
+ * A head pushed with a workflow's own token has its `pull_request` runs held.
+ *
+ * MEASURED 2026-10-10 to 2026-10-12 (#663): after `record-floors.yml` or
+ * `visual-capture.yml` folds its commit into a branch with an open pull
+ * request, every `pull_request` run on the new head (CI, PR body,
+ * back-translation) waits as `action_required`, and the pull request stays
+ * BLOCKED although the dispatched checks pass on the same SHA. Re-running the
+ * held runs as the App let them run, and #703 merged on them. The operator
+ * ruled that re-run the standard step (2026-10-12 01:03Z), written where each
+ * workflow's usage is: its header, read here as the documentation it is.
+ */
+describe('a bot-pushed head’s held runs are re-run as the App (#663)', () => {
+  /** The comment block a workflow opens with, above its `on:`. */
+  const header = (file: string) => {
+    const lines = workflow(file).split('\n');
+    const end = lines.findIndex((line) => /^on:/.test(line));
+    expect(end, `${file} has no top-level on:`).toBeGreaterThan(0);
+    return lines.slice(0, end).join('\n');
+  };
+
+  it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
+    '%s documents listing the held runs on the bot’s head',
+    (file) => {
+      expect(header(file)).toMatch(
+        /^#\s+gh run list --branch <branch> --status action_required \\$/m,
+      );
+      expect(header(file)).toMatch(
+        /^#\s+--json databaseId,headSha --jq '\.\[\] \| select\(\.headSha == "<sha>"\) \| \.databaseId'$/m,
+      );
+    },
+  );
+
+  it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
+    '%s documents re-running each one as the App',
+    (file) => {
+      expect(header(file)).toMatch(/^#\s+gh run rerun <id>$/m);
+      expect(header(file)).toMatch(/^#.*\bas the App\b/m);
+    },
+  );
 });
