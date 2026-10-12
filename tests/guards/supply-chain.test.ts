@@ -400,6 +400,28 @@ describe('TypeScript is held at 6 until it can move', () => {
   });
 });
 
+/**
+ * `@types/node` follows `.nvmrc`, not the newest Node (#646, global rule
+ * 2026-10-08). Every Node major ships its types the day it ships, odd and
+ * even alike, so without a hold Dependabot would move the types to a Node this
+ * repo does not run, and a type check would pass over an API CI never has.
+ * The major moves by hand, with `.nvmrc` (`node-contract.test.ts` pins that
+ * the two agree). Majors only, so 26.x patches and minors still arrive.
+ */
+describe('@types/node is held to the Node major .nvmrc names', () => {
+  it('ignores @types/node majors, and only majors', () => {
+    expect(
+      npmIgnoresFor('@types/node'),
+      'without it, Node 27 types would arrive while CI runs Node 26',
+    ).toEqual([
+      {
+        'dependency-name': '@types/node',
+        'update-types': ['version-update:semver-major'],
+      },
+    ]);
+  });
+});
+
 describe('admittedMajors reads a caret peer range, and refuses any other', () => {
   it('reads each caret term to its major', () => {
     expect(admittedMajors('^5.0.0 || ^6.0.0')).toEqual([5, 6]);
