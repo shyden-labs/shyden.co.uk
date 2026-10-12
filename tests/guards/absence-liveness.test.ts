@@ -18,7 +18,14 @@ import {
   searched,
   walkDisagreements,
 } from '../source-files';
-import { bindFiles, callGraph, parseFile, parseSource } from '../unit/ast';
+import {
+  bind,
+  bindFiles,
+  callGraph,
+  parseFile,
+  parseSource,
+  seededClosure,
+} from '../unit/ast';
 
 /**
  * An absence assertion must prove its POPULATION was live (#118).
@@ -165,18 +172,25 @@ describe('absence assertions prove the population they searched', () => {
   it('judges a subject that is not routed through searched, whatever its shape', () => {
     // Planted (#609). Written out, never generated from `unproved`'s own
     // branches: a plant built from the reader's list cannot see it drop one.
+    // The fixture is bound on its own, closures seeded: judged against the
+    // real tree, its subjects derived from that tree's file reads, and the
+    // presence reader counted five raw-source assertions here (#662).
     const reasonFor = (subject: string): string | null => {
-      const sf = ts.createSourceFile(
-        'fixture.test.ts',
-        `expect(${subject}).toEqual([]);`,
-        ts.ScriptTarget.Latest,
-        true,
+      const fixture = bind(
+        new Map([['fixture.test.ts', `expect(${subject}).toEqual([]);`]]),
       );
+      const sf = fixture.files.get('fixture.test.ts')!;
       let why: string | null = 'no absence read';
       const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node)) {
           const read = absenceSubject(node);
-          if (read) why = unproved(read, 'fixture.test.ts', bound, discoverers);
+          if (read)
+            why = unproved(
+              read,
+              'fixture.test.ts',
+              fixture,
+              seededClosure(...DISCOVERY),
+            );
         }
         ts.forEachChild(node, visit);
       };

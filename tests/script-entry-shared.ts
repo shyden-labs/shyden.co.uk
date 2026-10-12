@@ -157,6 +157,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'install-hooks.mjs takes no arguments',
   },
+  // It reads the branch's own diff and takes nothing else, so an argument is a
+  // mistake it refuses before reading anything (#662).
+  'lint-changed-tests.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: 'usage: node scripts/lint-changed-tests.mjs (takes no arguments)',
+  },
   // With no range and no --tests it has nothing to read, so it refuses (#362).
   'release-inventory.mjs': {
     args: [],

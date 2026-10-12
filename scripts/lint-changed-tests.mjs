@@ -74,6 +74,12 @@ export function lintReport(base, changed, lint) {
 }
 
 async function main() {
+  if (process.argv.length > 2) {
+    console.error(
+      'usage: node scripts/lint-changed-tests.mjs (takes no arguments)',
+    );
+    process.exit(1);
+  }
   /** @param {string[]} args */
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
   const mergeBase = git(['merge-base', BASE, 'HEAD']).trim();
