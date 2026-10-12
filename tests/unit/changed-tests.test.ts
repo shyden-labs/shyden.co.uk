@@ -106,6 +106,26 @@ describe('lintChangedTests judges only the changed files, as the guards would', 
     ).toEqual(['absence.test.ts']);
   });
 
+  it('leaves a listed scope in an unchanged file to the guards', () => {
+    expect(
+      lintChangedTests(['absence.test.ts'], TREE, {
+        floorless: { 'floorless.test.ts › no floor': 1 },
+        absence: { 'clean.test.ts › clean': 1 },
+      }).findings.map((finding) => finding.split(':')[0]),
+    ).toEqual(['absence.test.ts']);
+  });
+
+  it('names a floorless listed scope that now reads fewer', () => {
+    expect(
+      lintChangedTests(['clean.test.ts'], TREE, {
+        floorless: { 'clean.test.ts › clean': 1 },
+        absence: {},
+      }).findings,
+    ).toEqual([
+      'clean.test.ts › clean: floorless-searches: 0 read, 1 listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.',
+    ]);
+  });
+
   it('names a listed scope that now reads fewer, so its entry is lowered', () => {
     expect(
       lintChangedTests(['clean.test.ts', 'absence.test.ts'], TREE, {
