@@ -105,11 +105,18 @@ function scanDocblocks(file: string, text: string): DocblockScan {
   return { docblocks, stranded };
 }
 
-/** Each scanned file, its text, and what the detector found in it. */
-const SCANS = scannedSource().map((file) => {
+/** One scanned file, its text, and what the detector found in it. */
+const scanFile = (file: string) => {
   const text = readFileSync(file, 'utf8');
   return { file, text, ...scanDocblocks(file, text) };
-});
+};
+
+// The scan of every file, run ONCE, by the first test that asks for it
+// (#708, as #700 did for the duplication scan). At module scope it ran while
+// the file loaded, where no limit sees it: 2,017 / 1,907 ms of CPU on the
+// runner (#696). In a test it runs under the guards' 25 s per-test limit.
+let scanned: ReturnType<typeof scanFile>[] | undefined;
+const scans = () => (scanned ??= scannedSource().map(scanFile));
 
 /** What the detector finds stranded in `source`, read as `file`. */
 const strandedIn = (source: string, file = 'fixture.ts'): readonly string[] =>
@@ -118,7 +125,7 @@ const strandedIn = (source: string, file = 'fixture.ts'): readonly string[] =>
 describe('no docblock in tracked source sits directly on another', () => {
   it('reads every source file git tracks', () => {
     const tracked = trackedSource();
-    const read = new Set(SCANS.map((scan) => scan.file));
+    const read = new Set(scans().map((scan) => scan.file));
     expect(
       searched(
         tracked.filter((path) => !read.has(path)),
@@ -158,11 +165,11 @@ describe('no docblock in tracked source sits directly on another', () => {
     // Two independent readers. The raw bytes over-count, since a string can
     // spell a docblock, so a kind they find and the parser does not is a kind
     // the scan has gone blind to: an `.astro` reader returning no regions.
-    const kindsOf = (scans: typeof SCANS) => [
-      ...new Set(scans.map((scan) => extname(scan.file))),
+    const kindsOf = (from: ReturnType<typeof scans>) => [
+      ...new Set(from.map((scan) => extname(scan.file))),
     ];
-    const read = kindsOf(SCANS.filter((scan) => scan.docblocks.length > 0));
-    const held = kindsOf(SCANS.filter((scan) => scan.text.includes('/**')));
+    const read = kindsOf(scans().filter((scan) => scan.docblocks.length > 0));
+    const held = kindsOf(scans().filter((scan) => scan.text.includes('/**')));
     expect(
       searched(
         held.filter((kind) => !read.includes(kind)),
@@ -175,10 +182,10 @@ describe('no docblock in tracked source sits directly on another', () => {
   });
 
   it('finds none sitting directly on another', () => {
-    const docblocks = SCANS.flatMap((scan) => scan.docblocks);
+    const docblocks = scans().flatMap((scan) => scan.docblocks);
     expect(
       searched(
-        SCANS.flatMap((scan) => scan.stranded),
+        scans().flatMap((scan) => scan.stranded),
         {
           of: docblocks,
           what: 'docblocks in tracked source',

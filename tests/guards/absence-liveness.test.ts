@@ -80,12 +80,20 @@ import {
  */
 
 const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
-const discoverers = callGraph(tsFiles).close(DISCOVERY);
+
+// The parse, binding and call graph over those files, run ONCE, by the first
+// test that asks for it (#706, as #700 did for the duplication scan). At
+// module scope it ran while the file loaded, where no limit sees it: 2,411 /
+// 2,412 ms of CPU on the runner (#696). In a test it runs under the guards'
+// 25 s per-test limit. Listing the files stays above: a walk, with no parse.
+let scanned: ReturnType<typeof scanAbsences> | undefined;
 
 /** Bound once: each name resolves in its own scope, not by name (#184). */
-const bound = bindFiles(tsFiles);
-
-const result = scanAbsences(bound, discoverers);
+const scan = () =>
+  (scanned ??= scanAbsences(
+    bindFiles(tsFiles),
+    callGraph(tsFiles).close(DISCOVERY),
+  ));
 
 const CEILING_SITES = 107;
 const CEILING_SCOPES = 103;
@@ -96,6 +104,7 @@ describe('absence assertions prove the population they searched', () => {
   // matching would report zero findings over zero absences -- and only one of
   // those is good news. This is the shape `event-collectors.test.ts` settled.
   it('finds the absence assertions it is meant to be judging', () => {
+    const result = scan();
     // Ratcheted (#468): exact against tests/floors.json, so one file short
     // fails, and so does one more until it is recorded.
     expect(
@@ -323,6 +332,7 @@ describe('absence assertions prove the population they searched', () => {
     const written = new Map(
       tsFiles.map((file) => [file, absencesWritten(parseFile(file))]),
     );
+    const result = scan();
     const disagree = tsFiles
       .filter((file) => (result.perFile.get(file) ?? 0) !== written.get(file))
       .map(
@@ -349,6 +359,7 @@ describe('absence assertions prove the population they searched', () => {
     // them. Equality both ways: a converted site leaves its key too high and
     // is red until the list is lowered, and a new unjudged site is red by
     // name. Nothing is exempt by shape, label or reason.
+    const result = scan();
     const mismatched = burnDownBreaches(result.unjudged, ABSENCE_BURN_DOWN).map(
       ({ key, read, listed }) =>
         read > listed
