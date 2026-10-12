@@ -39,6 +39,9 @@ import { withoutCommentLines } from './source-text';
  * E2E IS NOT IN THE HOOK. ~7.3 minutes locally would make pushing unusable, so
  * CI remains its gate. Asserted, not merely intended: a well-meaning addition
  * of `test:e2e` here fails this suite.
+ *
+ * NOR IS ANY OTHER SUITE, unit included (#713, operator 2026-10-12): the hook
+ * runs format, typecheck and the changed-test lint, and nothing else.
  */
 
 const HOOK = '.githooks/pre-push';
@@ -101,11 +104,38 @@ describe('the pre-push hook', () => {
     // `lint:tests` joined in #662: the three test-code meta-guards' finders
     // over the test files the branch changed. A static read, so a lint the
     // laptop may run (operator ruling 2026-10-12); the guards stay CI's.
-    expect(invokedNpmScripts()).toEqual([
-      'format',
-      'lint:tests',
-      'test:unit',
-      'typecheck',
+    //
+    // And `test:unit` left (#713): no test suite runs at push, not even unit
+    // (operator, 2026-10-12, a global rule). A branch that adds a floor fails
+    // the unit suite until `record-floors.yml` records it on the pushed
+    // branch, so a unit run here refused the push the record needs.
+    expect(invokedNpmScripts()).toEqual(['format', 'lint:tests', 'typecheck']);
+  });
+
+  it('executes nothing but its checks, in order (#713)', () => {
+    // The set above sees `npm run ...` lines only, so `npx vitest run` or
+    // `npm test` would slip past it. This is every command the hook
+    // executes, first word each (an `npm run` keeps its script), in order.
+    const commands = withoutCommentLines(hookSource(), '#')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+      .map(
+        (line) =>
+          /^npm run \S+/.exec(line)?.[0] ?? line.split(/\s+/, 1)[0] ?? '',
+      );
+    expect(commands).toEqual([
+      'set',
+      'unset',
+      'fail()',
+      'printf',
+      'printf',
+      'printf',
+      'exit',
+      '}',
+      'npm run format',
+      'npm run typecheck',
+      'npm run lint:tests',
     ]);
   });
 

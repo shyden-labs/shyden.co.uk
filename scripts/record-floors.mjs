@@ -27,8 +27,9 @@
  * `npm run floors:record -- --unit-suite` runs the unit suite alone, on every
  * pass, and carries every floor it did not see asserted (#658): the laptop runs
  * only the unit suite (operator rule 2026-10-09), and a branch that merged
- * develop in needs its unit floors right before its pre-push hook lets it
- * reach `record-floors.yml`, which records the rest.
+ * develop in settles its unit floors with it before the unit suite is run by
+ * hand ahead of a push (the pre-push hook runs no suite since #713);
+ * `record-floors.yml` records the rest.
  *
  * `npm run floors:record -- --functions` runs the Functions-runtime suite
  * alone (#610): `npm run test:functions`, which builds and serves the site on
