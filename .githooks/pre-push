@@ -38,11 +38,22 @@ set -u
 unset $(git rev-parse --local-env-vars)
 
 fail() {
+  code=$?
+  # A check whose tool is missing exits 127, which is not the failure the check
+  # looks for, so it is never reported as one (#717: a missing prettier read as
+  # "files that are not formatted", with a fix that reformats the whole tree).
+  if [ "$code" -eq 127 ]; then
+    set -- 'a check could not start its tool (exit 127, command not found), so it checked nothing' 'npm ci'
+  fi
   printf '\npre-push blocked: %s\n' "$1"
   printf '  fix:  %s\n' "$2"
   printf '  skip: git push --no-verify   (CI still runs every check)\n\n'
   exit 1
 }
+
+# A checkout with no installed dependencies can run no check at all, and every
+# new worktree starts that way (#717).
+[ -d node_modules/.bin ] || fail 'this checkout has no installed dependencies, so no check can run' 'npm ci'
 
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'

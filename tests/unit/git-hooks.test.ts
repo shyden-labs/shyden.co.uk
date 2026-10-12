@@ -124,18 +124,58 @@ describe('the pre-push hook', () => {
         (line) =>
           /^npm run \S+/.exec(line)?.[0] ?? line.split(/\s+/, 1)[0] ?? '',
       );
+    // #717 added the exit-127 branch in fail() and the dependency check
+    // before the first check.
     expect(commands).toEqual([
       'set',
       'unset',
       'fail()',
+      'code=$?',
+      'if',
+      'set',
+      'fi',
       'printf',
       'printf',
       'printf',
       'exit',
       '}',
+      '[',
       'npm run format',
       'npm run typecheck',
       'npm run lint:tests',
+    ]);
+  });
+
+  it('refuses a checkout with no installed dependencies before any check (#717)', () => {
+    // Every new worktree starts without node_modules, and a check whose tool
+    // is missing reported "Prettier found files that are not formatted".
+    const lines = withoutCommentLines(hookSource(), '#').split('\n');
+    const refusal = lines.findIndex((line) =>
+      /^\[ -d node_modules\/\.bin \] \|\| fail '[^']+' 'npm ci'$/.test(line),
+    );
+    const firstCheck = lines.findIndex((line) => /^npm run /.test(line));
+    expect(firstCheck, 'the hook runs a check').toBeGreaterThanOrEqual(0);
+    expect(
+      refusal,
+      'the hook checks for node_modules/.bin',
+    ).toBeGreaterThanOrEqual(0);
+    expect(refusal).toBeLessThan(firstCheck);
+  });
+
+  it('reports a check whose tool is missing as a missing tool, not as its failure (#717)', () => {
+    // `npm run` passes a missing command's exit 127 through (measured
+    // 2026-10-12), and fail() reads the status of the check it follows
+    // before running anything else, so that status is still the check's.
+    const lines = withoutCommentLines(hookSource(), '#')
+      .split('\n')
+      .map((line) => line.trim());
+    const start = lines.indexOf('fail() {');
+    expect(start, 'the hook defines fail()').toBeGreaterThanOrEqual(0);
+    expect(lines.slice(start + 1, start + 5)).toEqual([
+      'code=$?',
+      'if [ "$code" -eq 127 ]; then',
+      "set -- 'a check could not start its tool (exit 127, command not found), so it checked nothing' 'npm ci'",
+      'fi',
     ]);
   });
 
