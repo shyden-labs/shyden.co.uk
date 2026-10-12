@@ -700,42 +700,39 @@ const WITNESSED_FLOOR: Readonly<Record<string, string>> = {
 };
 
 describe('short labels that disagree with their own locale', () => {
-  it("every one is pinned or awaiting the operator's read", () => {
-    const unread = Object.fromEntries(
-      LOCALES.map((locale) => {
-        const labels = checkLabels(backTranslationUnits(locale), locale);
-        const flagged = labels
-          .filter(
-            ({ status, variants }) =>
-              status === 'disagrees' || variants.length > 0,
-          )
-          .map(({ key }) => key)
-          .filter((key) => !Object.hasOwn(VERIFIED[locale], key));
-        // A check that stopped finding witnesses would flag nothing, and an
-        // emptied list would then agree with it. Only English has no labels.
-        const witnessed = labels
-          .filter(({ status }) => status !== 'unchecked')
-          .map(({ key }) => key);
-        if (locale === DEFAULT_LOCALE) return [locale, flagged];
-        const awaiting = [
+  // One test per locale (#714): the five in one test reached 71 ms of own CPU
+  // on the runner, over the 70 ms cut line under the 0.1 s limit.
+  for (const locale of LOCALES)
+    it(`${locale}: every one is pinned or awaiting the operator's read`, () => {
+      const labels = checkLabels(backTranslationUnits(locale), locale);
+      const flagged = labels
+        .filter(
+          ({ status, variants }) =>
+            status === 'disagrees' || variants.length > 0,
+        )
+        .map(({ key }) => key)
+        .filter((key) => !Object.hasOwn(VERIFIED[locale], key));
+      if (locale === DEFAULT_LOCALE) {
+        expect(flagged).toEqual([...AWAITING_READ[locale]].sort());
+        return;
+      }
+      // A check that stopped finding witnesses would flag nothing, and an
+      // emptied list would then agree with it. Only English has no labels.
+      const witnessed = labels
+        .filter(({ status }) => status !== 'unchecked')
+        .map(({ key }) => key);
+      expect(
+        [
           ...searched(flagged, {
             of: witnessed,
             what: `${locale} labels with a witness`,
           }),
-        ].sort();
-        expect(
-          floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
-        ).toBeUndefined();
-        return [locale, awaiting];
-      }),
-    );
-
-    expect(unread).toEqual(
-      Object.fromEntries(
-        LOCALES.map((locale) => [locale, [...AWAITING_READ[locale]].sort()]),
-      ),
-    );
-  });
+        ].sort(),
+      ).toEqual([...AWAITING_READ[locale]].sort());
+      expect(
+        floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
+      ).toBeUndefined();
+    });
 });
 
 /**

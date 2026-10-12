@@ -3,7 +3,7 @@ import { buildGroups, ERROR_CODES } from '../../src/lib/grouping';
 import { student, seeded } from '../unit/factories';
 
 /**
- * The real-budget runs of the unit suite's two heaviest gave-up tests (#714).
+ * The real-budget runs of the unit suite's three heaviest gave-up tests (#714).
  * In `tests/unit/grouping.test.ts` each passes `GAVE_UP_TEST_NODE_CAP` and
  * proves the logic: the search reports "gave up", never "impossible", once
  * its budget is spent. Here the same rosters meet the real budget, 200,000
@@ -48,6 +48,28 @@ describe('the search gives up under the real budget, and says so (#714)', () => 
     });
     expect(out.ok ? 'placed' : out.error).toEqual({
       code: ERROR_CODES.keepApartSearchGaveUp,
+    });
+  });
+
+  it('fifteen buddy pairs into 10 groups exhaust the together-block search', () => {
+    // The unit stand-in reached 68 ms of own CPU at the real budget, 2 ms
+    // from the cut line, over 8 CI runs (#714).
+    const pairs = Array.from({ length: 30 }, (_, i) =>
+      student({
+        number: i + 1,
+        together: String.fromCharCode(65 + Math.floor(i / 2)),
+      }),
+    );
+    const out = buildGroups({
+      students: pairs,
+      mode: { kind: 'groupCount', count: 10 },
+      leftovers: 'spread',
+      sexMode: 'off',
+      pinned: [],
+      random: seeded(1),
+    });
+    expect(out.ok ? 'placed' : out.error).toEqual({
+      code: ERROR_CODES.togetherSearchGaveUp,
     });
   });
 });
