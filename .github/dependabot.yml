@@ -39,6 +39,13 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           - 'version-update:semver-major'
+      # @types/node follows .nvmrc's major, not the newest Node (#646): every
+      # Node major ships its types the day it ships, so without this the types
+      # would describe a Node CI does not run. The major moves by hand, with
+      # .nvmrc (node-contract.test.ts pins that the two agree).
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       patch-updates:
         update-types:
