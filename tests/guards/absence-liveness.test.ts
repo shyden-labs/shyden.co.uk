@@ -1,8 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import ts from 'typescript';
 import { floorBreach } from '../floors';
-import { scopeOf, testBodiesIn } from '../floorless-searches';
+import {
+  DISCOVERY,
+  absenceSubject,
+  absencesWritten,
+  scanAbsences,
+  unclassified,
+  unproved,
+} from '../absence-liveness';
 import { ABSENCE_BURN_DOWN } from '../absence-liveness.burn-down';
+import { burnDownBreaches } from '../burn-down';
 import {
   committableFiles,
   filesUnder,
@@ -10,15 +18,7 @@ import {
   searched,
   walkDisagreements,
 } from '../source-files';
-import {
-  bindFiles,
-  callGraph,
-  codeWithoutLiterals,
-  derivationOf,
-  parseFile,
-  parseSource,
-  where,
-} from '../unit/ast';
+import { bindFiles, callGraph, parseFile, parseSource } from '../unit/ast';
 
 /**
  * An absence assertion must prove its POPULATION was live (#118).
@@ -72,268 +72,13 @@ import {
  * including for your own guard.
  */
 
-/** Reaching any of these means the subject came from outside the test. */
-const DISCOVERY = new Set([
-  'readFileSync',
-  'readdirSync',
-  'filesUnder',
-  'listSourceFiles',
-]);
-
-/** Shapes that accumulate: emptiness is meaningless without the source. */
-const DERIVING = new Set(['filter', 'flatMap']);
-
 const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
 const discoverers = callGraph(tsFiles).close(DISCOVERY);
 
 /** Bound once: each name resolves in its own scope, not by name (#184). */
 const bound = bindFiles(tsFiles);
 
-const EQUALITY = new Set(['toEqual', 'toStrictEqual', 'toBe']);
-
-const isZero = (arg: ts.Expression | undefined): boolean =>
-  arg !== undefined && ts.isNumericLiteral(arg) && arg.text === '0';
-
-/**
- * The call an absence matcher hangs off -- `expect(x)` in
- * `expect(x).toEqual([])` -- for every spelling of "this is empty":
- * `.toEqual([])`, `.toStrictEqual([])`, `.toHaveLength(0)`, and anything held
- * equal to 0. Null for any other matcher, and for a `.not` inverse.
- */
-function absenceRoot(
-  node: ts.CallExpression,
-): { root: ts.Expression; zeroCount: boolean } | null {
-  if (!ts.isPropertyAccessExpression(node.expression)) return null;
-  const matcher = node.expression.name.text;
-  const arg = node.arguments[0];
-  const emptyList =
-    (matcher === 'toEqual' || matcher === 'toStrictEqual') &&
-    arg !== undefined &&
-    ts.isArrayLiteralExpression(arg) &&
-    arg.elements.length === 0;
-  const noLength = matcher === 'toHaveLength' && isZero(arg);
-  const zeroCount = EQUALITY.has(matcher) && isZero(arg);
-  if (!emptyList && !noLength && !zeroCount) return null;
-
-  // Walk back through any modifier chain (`.not`, `.resolves`). A `.not`
-  // anywhere in it inverts the claim, so the assertion is not an absence one.
-  let target: ts.Expression = node.expression.expression;
-  while (ts.isPropertyAccessExpression(target)) {
-    if (target.name.text === 'not') return null;
-    target = target.expression;
-  }
-  return { root: target, zeroCount };
-}
-
-/** `expect(x)` or `expect.soft(x)`: both assert, so both are read. */
-function isExpectCall(root: ts.Expression): root is ts.CallExpression {
-  if (!ts.isCallExpression(root)) return false;
-  const callee = root.expression;
-  if (ts.isIdentifier(callee)) return callee.text === 'expect';
-  return (
-    ts.isPropertyAccessExpression(callee) &&
-    ts.isIdentifier(callee.expression) &&
-    callee.expression.text === 'expect' &&
-    callee.name.text === 'soft'
-  );
-}
-
-/**
- * What an absence assertion asserts empty. For a count held to 0 the subject
- * is what the count is OF: `expect(found.length).toBe(0)` asserts `found`
- * empty (#390 F159).
- */
-function absenceSubject(node: ts.CallExpression): ts.Expression | null {
-  const shape = absenceRoot(node);
-  if (!shape || !isExpectCall(shape.root)) return null;
-  const subject = shape.root.arguments[0];
-  if (subject === undefined) return null;
-  if (!shape.zeroCount) return subject;
-  // A bare number held to 0 is a value, not a population.
-  return ts.isPropertyAccessExpression(subject) &&
-    (subject.name.text === 'length' || subject.name.text === 'size')
-    ? subject.expression
-    : null;
-}
-
-/** Why this subject needs a control, or null if it carries its own. */
-function unproved(subject: ts.Expression, file: string): string | null {
-  // Already routed through the helper: the population is in the expression.
-  if (
-    ts.isCallExpression(subject) &&
-    ts.isIdentifier(subject.expression) &&
-    subject.expression.text === 'searched'
-  )
-    return null;
-
-  // A derivation written in the subject itself: `expect(xs.filter(...))`.
-  // `derivationOf` reads the initialisers of the names a subject uses, never
-  // the subject's own receiver chain, so this was read as self-contained (#609).
-  for (let at: ts.Expression = subject; ;) {
-    if (ts.isParenthesizedExpression(at) || ts.isAwaitExpression(at)) {
-      at = at.expression;
-    } else if (ts.isCallExpression(at)) {
-      at = at.expression;
-    } else if (ts.isPropertyAccessExpression(at)) {
-      if (
-        DERIVING.has(at.name.text) &&
-        ts.isCallExpression(at.parent) &&
-        at.parent.expression === at
-      )
-        return `derived by .${at.name.text}() over a population`;
-      at = at.expression;
-    } else break;
-  }
-
-  const { names, initializers } = derivationOf(subject, bound);
-  if (names.some((name) => discoverers.reaches(file, name)))
-    return 'derives from the filesystem';
-
-  // No filesystem question inside the loop: every identifier in a followed
-  // initializer is already one of `names`, which the check above has asked.
-  for (const init of initializers) {
-    if (ts.isArrayLiteralExpression(init) && init.elements.length === 0)
-      return 'a collector: initialised empty and accumulated into';
-    if (
-      ts.isNewExpression(init) &&
-      ts.isIdentifier(init.expression) &&
-      (init.expression.text === 'Set' || init.expression.text === 'Map') &&
-      (init.arguments?.length ?? 0) === 0
-    )
-      return `a collector: an empty ${init.expression.text}`;
-    if (
-      ts.isCallExpression(init) &&
-      ts.isPropertyAccessExpression(init.expression) &&
-      DERIVING.has(init.expression.name.text)
-    )
-      return `derived by .${init.expression.name.text}() over a population`;
-  }
-  // Anything else is a finding too (#609, #534: no exceptions). An assertion
-  // over a call whose input is written beside it has no population in the
-  // verdict and no floor, so nothing would notice a reader that stopped
-  // reading part of it.
-  return 'self-contained: no population in the verdict';
-}
-
-/**
- * An absence matcher on a root the reader cannot classify -- `expect.poll`,
- * an aliased `expect`, a helper returning a matcher -- named, so the scan
- * refuses it rather than skipping it: skipped, it is an absence nobody judges
- * (#446, control d).
- */
-function unclassified(node: ts.CallExpression): string | null {
-  const shape = absenceRoot(node);
-  if (!shape || isExpectCall(shape.root)) return null;
-  if (shape.zeroCount && !countsAPopulation(shape.root)) return null;
-  return shape.root.getText().replace(/\s+/g, ' ').slice(0, 70);
-}
-
-/**
- * Whether a count held to 0 on an unread root is a population's size. A bare
- * value held to 0 is not an absence, as `absenceSubject` says of
- * `expect(k).toBe(0)`. A polled function is judged by what it returns
- * (`evidence-page.spec.ts` polls an in-flight counter to 0), and one whose
- * return cannot be read from here counts as a population, so it is refused.
- */
-function countsAPopulation(root: ts.Expression): boolean {
-  if (!ts.isCallExpression(root)) return true;
-  let counted: ts.Expression | undefined = root.arguments[0];
-  const callee = root.expression;
-  const polled =
-    ts.isPropertyAccessExpression(callee) &&
-    ts.isIdentifier(callee.expression) &&
-    callee.expression.text === 'expect' &&
-    callee.name.text === 'poll';
-  if (polled) {
-    if (
-      counted === undefined ||
-      !ts.isArrowFunction(counted) ||
-      ts.isBlock(counted.body)
-    )
-      return true;
-    counted = counted.body;
-  }
-  while (counted !== undefined && ts.isParenthesizedExpression(counted))
-    counted = counted.expression;
-  return (
-    counted === undefined ||
-    (ts.isPropertyAccessExpression(counted) &&
-      (counted.name.text === 'length' || counted.name.text === 'size'))
-  );
-}
-
-/**
- * An absence matcher as text, for the cross-check: no AST walk, so a reader
- * blind to one file or one spelling disagrees with it. Matched in code with
- * its literals and comments removed (`codeWithoutLiterals`), then with all
- * whitespace and every trailing comma gone, so a matcher prettier split over
- * lines reads as one. A count held to 0 is read only on a `.length` or
- * `.size` written inside `expect(`, as `absenceSubject` reads it: on a bare
- * value, or on arithmetic, it is plainly not an absence. A `.not` directly
- * before the matcher inverts it.
- */
-const ABSENCE_TEXT = new RegExp(
-  [
-    String.raw`(?<!\.not)\.(?:toEqual|toStrictEqual)\(\[\]\)`,
-    String.raw`(?<!\.not)\.toHaveLength\(0\)`,
-    String.raw`expect(?:\.soft)?\([\w$.()[\]]+?\.(?:length|size)(?:,"")?\)\.(?:toBe|toEqual|toStrictEqual)\(0\)`,
-  ].join('|'),
-  'g',
-);
-
-/** How many absence matchers `sf` writes, counted as text (#477). */
-function absencesWritten(sf: ts.SourceFile): number {
-  const code = codeWithoutLiterals(sf)
-    .replace(/\s+/g, '')
-    .replace(/,\)/g, ')')
-    .replace(/,\]/g, ']');
-  return code.match(ABSENCE_TEXT)?.length ?? 0;
-}
-
-function scan() {
-  const findings: string[] = [];
-  const sites: string[] = [];
-  const perFile = new Map<string, number>();
-  /** Unjudged absences by `file › test title as written` (#609). */
-  const unjudged = new Map<string, number>();
-  let proved = 0;
-  for (const [file, sf] of bound.files) {
-    const bodies = testBodiesIn(sf);
-    const check = (node: ts.Node) => {
-      if (ts.isCallExpression(node)) {
-        const root = unclassified(node);
-        if (root)
-          findings.push(
-            `${where(sf, node)} — an absence on a root the reader cannot classify: ${root}`,
-          );
-        const subject = absenceSubject(node);
-        if (subject) {
-          sites.push(where(sf, node));
-          perFile.set(file, (perFile.get(file) ?? 0) + 1);
-          const why = unproved(subject, file);
-          if (why === null) proved += 1;
-          else {
-            const scope = scopeOf(bodies, node);
-            // Fail closed: a site the reader cannot place cannot be listed.
-            if (scope === undefined)
-              findings.push(
-                `${where(sf, node)} — an absence in no test and no named function`,
-              );
-            else {
-              const key = `${file} › ${scope.label}`;
-              unjudged.set(key, (unjudged.get(key) ?? 0) + 1);
-            }
-          }
-        }
-      }
-      ts.forEachChild(node, check);
-    };
-    check(sf);
-  }
-  return { sites, perFile, proved, findings, unjudged };
-}
-
-const result = scan();
+const result = scanAbsences(bound, discoverers);
 
 const CEILING_SITES = 107;
 const CEILING_SCOPES = 103;
@@ -431,7 +176,7 @@ describe('absence assertions prove the population they searched', () => {
       const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node)) {
           const read = absenceSubject(node);
-          if (read) why = unproved(read, 'fixture.test.ts');
+          if (read) why = unproved(read, 'fixture.test.ts', bound, discoverers);
         }
         ts.forEachChild(node, visit);
       };
@@ -590,24 +335,12 @@ describe('absence assertions prove the population they searched', () => {
     // them. Equality both ways: a converted site leaves its key too high and
     // is red until the list is lowered, and a new unjudged site is red by
     // name. Nothing is exempt by shape, label or reason.
-    const keys = new Set([
-      ...result.unjudged.keys(),
-      ...Object.keys(ABSENCE_BURN_DOWN),
-    ]);
-    const mismatched = [...keys]
-      .filter(
-        (key) =>
-          (result.unjudged.get(key) ?? 0) !== (ABSENCE_BURN_DOWN[key] ?? 0),
-      )
-      .map((key) => {
-        const [listed, read] = [
-          ABSENCE_BURN_DOWN[key] ?? 0,
-          result.unjudged.get(key) ?? 0,
-        ];
-        return read > listed
+    const mismatched = burnDownBreaches(result.unjudged, ABSENCE_BURN_DOWN).map(
+      ({ key, read, listed }) =>
+        read > listed
           ? `${key}: ${read} absences with no population in the verdict, ${listed} listed. Route each through searched() and check a floor.`
-          : `${key}: ${read} unjudged, ${listed} listed. Lower the entry in tests/absence-liveness.burn-down.ts: the list only shrinks.`;
-      });
+          : `${key}: ${read} unjudged, ${listed} listed. Lower the entry in tests/absence-liveness.burn-down.ts: the list only shrinks.`,
+    );
     expect(
       searched(result.findings, {
         of: result.sites,

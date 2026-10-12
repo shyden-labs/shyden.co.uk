@@ -77,7 +77,7 @@ describe('the pre-push hook', () => {
     expect(() => accessSync(HOOK, constants.X_OK)).not.toThrow();
   });
 
-  it('invokes exactly the three fastest checks of the CI checks job', () => {
+  it('invokes exactly the checks the laptop may run', () => {
     // COMMANDS ACTUALLY INVOKED, not strings present in the file. Asserting
     // `toContain('npm run test:unit')` passed while the hook did NOT run it:
     // the string survived inside the failure hint the hook prints to tell you
@@ -97,7 +97,31 @@ describe('the pre-push hook', () => {
     // `test:guards` was the next (#638), and it left again (#653): only unit
     // tests, formatters and type checks run on the laptop; every other suite
     // is CI's (operator, 2026-10-09, a global rule).
-    expect(invokedNpmScripts()).toEqual(['format', 'test:unit', 'typecheck']);
+    //
+    // `lint:tests` joined in #662: the three test-code meta-guards' finders
+    // over the test files the branch changed. A static read, so a lint the
+    // laptop may run (operator ruling 2026-10-12); the guards stay CI's.
+    expect(invokedNpmScripts()).toEqual([
+      'format',
+      'lint:tests',
+      'test:unit',
+      'typecheck',
+    ]);
+  });
+
+  it('lints the changed test files after the type check (#662)', () => {
+    // After typecheck, so a type error is named by the checker that reads
+    // types rather than by a finder parsing a file that does not compile.
+    const lines = withoutCommentLines(hookSource(), '#').split('\n');
+    const at = (script: string) =>
+      lines.findIndex((line) =>
+        new RegExp(`^\\s*npm run ${script}\\b`).test(line),
+      );
+    expect(at('typecheck'), 'the hook type-checks').toBeGreaterThanOrEqual(0);
+    expect(at('lint:tests')).toBeGreaterThan(at('typecheck'));
+    expect(packageJson().scripts['lint:tests']).toBe(
+      'node scripts/lint-changed-tests.mjs',
+    );
   });
 
   it('clears the repository git hands it before any check runs (#377)', () => {

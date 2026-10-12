@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { floorBreach } from '../floors';
+import { burnDownBreaches } from '../burn-down';
 import { FLOORLESS } from '../floorless-searches.burn-down';
 import {
   searchesWritten,
@@ -312,16 +313,12 @@ const floorlessNow = (): Map<string, number> => {
 
 describe('every search checks a floor, or is listed (#515, #534)', () => {
   it('finds every scope holding exactly the floorless searches listed', () => {
-    const now = floorlessNow();
-    const keys = new Set([...now.keys(), ...Object.keys(FLOORLESS)]);
-    const findings = [...keys]
-      .filter((key) => (now.get(key) ?? 0) !== (FLOORLESS[key] ?? 0))
-      .map((key) => {
-        const [listed, read] = [FLOORLESS[key] ?? 0, now.get(key) ?? 0];
-        return read > listed
+    const findings = burnDownBreaches(floorlessNow(), FLOORLESS).map(
+      ({ key, read, listed }) =>
+        read > listed
           ? `${key}: ${read} searched with no floor, ${listed} listed. Check a recorded floor in the same test.`
-          : `${key}: ${read} floorless, ${listed} listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.`;
-      });
+          : `${key}: ${read} floorless, ${listed} listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.`,
+    );
     const refused = READINGS.flatMap(({ refused }) => refused);
     expect(
       searched(refused, { of: SITES, what: 'searched sites under tests/' }),
