@@ -39,6 +39,15 @@ const base = (over: Partial<GroupingInput> = {}): GroupingInput => ({
   ...over,
 });
 
+/**
+ * The node budget a unit test that must exhaust the search passes instead of
+ * the real one (#714). The real budget is 200,000 nodes per pass, and the
+ * gave-up tests below spent 124-145 ms of own CPU exhausting it, over the
+ * 0.1 s rule; at this budget the same rosters give up the same way, and their
+ * real-budget runs are in tests/simulation/grouping-gave-up.test.ts.
+ */
+const GAVE_UP_TEST_NODE_CAP = 2_000;
+
 const ok = (input: GroupingInput) => {
   const out = buildGroups(input);
   if (!out.ok) throw new Error(`expected success, got ${out.error.code}`);
@@ -1584,7 +1593,12 @@ describe('apart letters — exhausting the search budget is never reported as "n
     expect(students).toHaveLength(100);
 
     const out = buildGroups(
-      base({ students, mode: { kind: 'groupCount', count: 20 } }),
+      base({
+        students,
+        mode: { kind: 'groupCount', count: 20 },
+        // The real budget's run of this roster: tests/simulation/ (#714).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
 
     expect(out.ok).toBe(false);
@@ -4602,6 +4616,8 @@ describe('pinned groups', () => {
           students: [...students, ...pinnedPair],
           mode: { kind: 'groupCount', count: 21 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#714).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -5294,5 +5310,28 @@ describe('leftovers, against the new constraints', () => {
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       expect(shape(boysGroups)).toEqual([5, 5, 4]);
     });
+  });
+});
+
+describe('the search budget is injected, so a unit test reaches "gave up" without spending the real one (#714)', () => {
+  // Twelve students under three keep-apart letters, four groups of three:
+  // the real budget places them, so a one-node budget giving up on the same
+  // roster proves the budget the search reads is the one passed in. The
+  // gave-up tests above lean on this: they pass a small budget, and their
+  // real-budget versions run in tests/simulation/.
+  const roster = Array.from({ length: 12 }, (_, i) =>
+    student({ number: i + 1, apart: ['X', 'Y', 'Z'][i % 3] }),
+  );
+  const input = base({ students: roster, mode: { kind: 'perGroup', size: 3 } });
+
+  it('places the roster under the real budget', () => {
+    expect(shape(ok(input).groups)).toEqual([3, 3, 3, 3]);
+  });
+
+  it('gives up on the same roster under a one-node budget, and says so', () => {
+    const out = buildGroups({ ...input, searchNodeCap: 1 });
+    expect(out.ok ? 'placed' : out.error.code).toBe(
+      ERROR_CODES.keepApartSearchGaveUp,
+    );
   });
 });

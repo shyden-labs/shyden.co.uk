@@ -51,9 +51,9 @@ const THE_LIMIT = 1_000;
 const CPU_HOME = 'tests/unit-cpu-limit.ts';
 const CPU_NAME = 'CPU_LIMIT_MICROSECONDS';
 const LOAD_NAME = 'LOAD_LIMIT_MICROSECONDS';
-/** Each limit written in `CPU_HOME`, with the one value it may take (#645, #688). */
+/** Each limit written in `CPU_HOME`, with the one value it may take (#645, #688, #714). */
 const HOME_LIMITS: Readonly<Record<string, number>> = {
-  [CPU_NAME]: 300_000,
+  [CPU_NAME]: 100_000,
   [LOAD_NAME]: 500_000,
 };
 
@@ -173,7 +173,7 @@ export function readLimits(
   const refuse = (node: ts.Node, what: string): void => {
     findings.push(
       `${where(sf, node)} -- ${what}. The unit limit is 1 s, written once in ` +
-        `${CONFIG}, and 0.3 s of a test's own CPU and 0.5 s to load a file, ` +
+        `${CONFIG}, and 0.1 s of a test's own CPU and 0.5 s to load a file, ` +
         `written once in ${CPU_HOME}; a unit test is never given more time ` +
         `(#632, #645, #688).`,
     );
@@ -517,16 +517,22 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     ).toHaveLength(1);
   });
 
-  it('refuses a CPU limit above 300 000 in its home (#645)', () => {
-    expect(found(`export const ${CPU_NAME} = 400_000;`, CPU_HOME)).toHaveLength(
+  it('refuses a CPU limit above 100 000 in its home (#645, #714)', () => {
+    expect(found(`export const ${CPU_NAME} = 150_000;`, CPU_HOME)).toHaveLength(
       1,
     );
   });
 
-  it('refuses a CPU limit through a named constant above 300 000 in its home', () => {
+  it('refuses the old 0.3 s CPU limit in its home (#714)', () => {
+    expect(found(`export const ${CPU_NAME} = 300_000;`, CPU_HOME)).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses a CPU limit through a named constant above 100 000 in its home', () => {
     expect(
       found(
-        `const RAISED = 400_000;\nexport const ${CPU_NAME} = RAISED;`,
+        `const RAISED = 150_000;\nexport const ${CPU_NAME} = RAISED;`,
         CPU_HOME,
       ),
     ).toHaveLength(1);
@@ -534,12 +540,12 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
 
   it('refuses a CPU limit in its home that cannot be resolved', () => {
     expect(
-      found(`export const ${CPU_NAME} = 300_000 * 2;`, CPU_HOME),
+      found(`export const ${CPU_NAME} = 100_000 * 2;`, CPU_HOME),
     ).toHaveLength(1);
   });
 
   it('refuses the CPU limit declared outside its home', () => {
-    expect(found(`const ${CPU_NAME} = 300_000;`)).toHaveLength(1);
+    expect(found(`const ${CPU_NAME} = 100_000;`)).toHaveLength(1);
   });
 
   it('refuses a load limit above 500 000 in its home (#688)', () => {
@@ -617,10 +623,10 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     ).toBeUndefined();
   });
 
-  it('allows the CPU limit as its home spells it (#645)', () => {
+  it('allows the CPU limit as its home spells it (#645, #714)', () => {
     const reading = readLimits(
       CPU_HOME,
-      `export const ${CPU_NAME} = 300_000;`,
+      `export const ${CPU_NAME} = 100_000;`,
       false,
     );
     expect(

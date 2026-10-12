@@ -48,6 +48,13 @@ export interface GroupingInput {
   pinned: Student[][];
   /** Injected so results are reproducible in tests. */
   random: () => number;
+  /**
+   * The search's node budget per pass, injected like `random` so a unit test
+   * reaches the "gave up" path without spending the real budget (#714). The
+   * page never sets it: the default is `SEARCH_NODE_CAP`, and the real-budget
+   * runs live in `tests/simulation/`.
+   */
+  searchNodeCap?: number;
 }
 
 export const ERROR_CODES = {
@@ -834,13 +841,13 @@ function buildConflicts(present: Student[], blocks: Block[]): Set<number>[] {
  * and this function is never used to draw it. So exhaustion costs precision,
  * never correctness: the caller simply falls through to the real search.
  */
-function largestMutualConflict(adj: Set<number>[]): number[] {
+function largestMutualConflict(adj: Set<number>[], nodeCap: number): number[] {
   let best: number[] = [];
   let nodes = 0;
   const n = adj.length;
 
   const extend = (clique: number[], candidates: number[]): void => {
-    if (++nodes > SEARCH_NODE_CAP) return;
+    if (++nodes > nodeCap) return;
     if (clique.length > best.length) best = clique.slice();
     // Bound: even taking every remaining candidate cannot beat the best found.
     if (clique.length + candidates.length <= best.length) return;
@@ -884,6 +891,7 @@ function assign(
   blocks: Block[],
   sizes: number[],
   adj: Set<number>[], // conflicts BETWEEN BLOCKS
+  nodeCap: number,
 ): { groups: number[][] | null; gaveUp: boolean } {
   const groups: number[][] = sizes.map(() => []); // holds block indices
   let nodes = 0;
@@ -892,7 +900,7 @@ function assign(
 
   const place = (idx: number): boolean => {
     if (idx === order.length) return true;
-    if (++nodes > SEARCH_NODE_CAP) {
+    if (++nodes > nodeCap) {
       // Not "no arrangement exists" — "I stopped looking". Collapsing the two
       // is how a tool ends up telling a teacher a falsehood with confidence.
       gaveUp = true;
@@ -1166,6 +1174,7 @@ function placeBlocks(
   random: () => number,
   present: Student[],
   sexMode: SexMode,
+  nodeCap: number,
 ): { groups: number[][] | null; gaveUp: boolean } {
   const shuffledOrder = shuffled(
     blocks.map((_, i) => i),
@@ -1176,13 +1185,13 @@ function placeBlocks(
       ? weaveBySex(blocks, present, shuffledOrder)
       : shuffledOrder;
 
-  const pass1 = assign(order, blocks, sizes, adj);
+  const pass1 = assign(order, blocks, sizes, adj, nodeCap);
   if (pass1.groups !== null || !pass1.gaveUp) return pass1;
 
   const ffdOrder = order
     .slice()
     .sort((a, b) => blocks[b].length - blocks[a].length);
-  return assign(ffdOrder, blocks, sizes, adj);
+  return assign(ffdOrder, blocks, sizes, adj, nodeCap);
 }
 
 /**
@@ -1450,6 +1459,7 @@ function placeSexSide(
   localAdj: Set<number>[],
   present: Student[],
   random: () => number,
+  nodeCap: number,
 ): { ok: true; groups: number[][] } | { ok: false; error: GroupingError } {
   const largestGroup = Math.max(...localSizes);
   for (const block of localBlocks) {
@@ -1468,7 +1478,7 @@ function placeSexSide(
 
   const apartInPlay = localAdj.some((conflicts) => conflicts.size > 0);
   if (apartInPlay) {
-    const clique = largestMutualConflict(localAdj);
+    const clique = largestMutualConflict(localAdj, nodeCap);
     if (clique.length > localSizes.length) {
       return {
         ok: false,
@@ -1493,6 +1503,7 @@ function placeSexSide(
     random,
     present,
     'separate',
+    nodeCap,
   );
 
   if (placed === null) {
@@ -1582,6 +1593,7 @@ function buildSeparateGroups(
   mode: Mode,
   leftovers: Leftovers,
   random: () => number,
+  nodeCap: number,
 ): GroupingOutcome {
   const sexOfBlock = (b: number): 'M' | 'F' =>
     present[blocks[b][0]].sex as 'M' | 'F';
@@ -1690,6 +1702,7 @@ function buildSeparateGroups(
         localAdj,
         present,
         random,
+        nodeCap,
       );
       if (!outcome.ok) return { ok: false, error: outcome.error };
       for (const g of outcome.groups) {
@@ -1974,6 +1987,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   }
 
   const { mode, leftovers, random } = input;
+  const nodeCap = input.searchNodeCap ?? SEARCH_NODE_CAP;
   if (
     mode.kind === 'perGroup' &&
     (!Number.isInteger(mode.size) || mode.size < 1)
@@ -2311,7 +2325,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   // attempt's own local adjacency and sizes -- see `placeSexSide`. (Task 9:
   // `poolSizes`, same reasoning as togetherUnitTooLarge above.)
   if (input.sexMode !== 'separate' && apartInPlay) {
-    const clique = largestMutualConflict(adj);
+    const clique = largestMutualConflict(adj, nodeCap);
     if (clique.length > poolSizes.length) {
       return fail({
         code: ERROR_CODES.keepApartImpossible,
@@ -2372,6 +2386,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
       poolMode,
       leftovers,
       random,
+      nodeCap,
     );
     if (!outcome.ok) {
       // Whole-branch review, C-1. See `restoreWholeClassCount`'s own doc
@@ -2400,6 +2415,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
     random,
     pool,
     input.sexMode,
+    nodeCap,
   );
   if (placed === null) {
     // Two different failures, and the difference is everything. The search
