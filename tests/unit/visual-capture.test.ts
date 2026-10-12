@@ -226,4 +226,34 @@ describe('captureSummary names every page committed and every page kept', () => 
       ].join('\n'),
     );
   });
+
+  it('says one pixel differs, not one pixels differ (#704)', () => {
+    expect(
+      captureSummary({
+        commit: [],
+        kept: [{ file: png('home-en'), differing: 1 }],
+      }),
+    ).toBe(
+      [
+        '0 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
+        '1 rewrite kept out (60 pixels or fewer differ):',
+        `- \`${png('home-en')}\`: 1 pixel differs`,
+      ].join('\n'),
+    );
+  });
+
+  it('says zero pixels differ in the plural (#704)', () => {
+    expect(
+      captureSummary({
+        commit: [],
+        kept: [{ file: png('home-en'), differing: 0 }],
+      }),
+    ).toBe(
+      [
+        '0 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
+        '1 rewrite kept out (60 pixels or fewer differ):',
+        `- \`${png('home-en')}\`: 0 pixels differ`,
+      ].join('\n'),
+    );
+  });
 });

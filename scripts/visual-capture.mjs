@@ -132,7 +132,7 @@ const judgedLine = ({ file, differing }) =>
       ? 'new'
       : differing === 'size'
         ? 'size changed'
-        : `${differing} pixels differ`
+        : plural(differing, 'pixel differs', 'pixels differ')
   }`;
 
 /**
