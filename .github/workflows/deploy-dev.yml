@@ -232,13 +232,14 @@ jobs:
   # package code, so no `npm ci`.
   report-failure:
     name: Report a failed deploy
-    needs: [gate, test, deploy-dev, verify-dev]
+    needs: [gate, test, deploy-dev]
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
       actions: read
+      deployments: read
       issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -252,4 +253,5 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/deploy-failure.mjs
+          EXTRA: x
+        run: node scripts/deploy-failure.mjs --x
