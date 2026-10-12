@@ -11,10 +11,14 @@ import {
   bindFiles,
   callGraph,
   parseFile,
-  type Closure,
+  seededClosure,
 } from '../unit/ast';
 import { presenceOverRawText } from '../unit/presence-text';
-import { scanPresence, type PresenceClosures } from '../unit/presence-detector';
+import {
+  presenceClosures,
+  scanPresence,
+  type PresenceClosures,
+} from '../unit/presence-detector';
 import { floorBreach } from '../floors';
 /**
  * A presence assertion over source text must be STRIPPED or ANCHORED.
@@ -64,20 +68,6 @@ import { floorBreach } from '../floors';
  *    a read that also reaches the subject around its parse is scanned (#225).
  */
 
-const READS_CONTENT = new Set(['readFileSync']);
-const STRIPPERS = new Set([
-  'withoutTsComments',
-  'withoutMarkupComments',
-  'withoutCommentLines',
-  'withoutYamlComments',
-  'withoutIniComments',
-  'blankCommentLines',
-  'withoutAstroComments',
-  'withoutSqlComments',
-  'withoutYamlQuotes',
-]);
-const COMMENT_READERS = new Set(['isMarkerCommentLine', 'commentsIn']);
-
 const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
 
 /**
@@ -85,11 +75,8 @@ const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
  * over the whole of `tests/**` -- see `./ast`, which #118 extracted from here
  * so a second meta-guard could reason the same way without a second copy.
  */
-const graph = callGraph(tsFiles);
-// Raw text is a read no JSON.parse stands on, here as in the detector (#570).
-const readers = graph.close(READS_CONTENT, { parsedIsData: true });
-const strippers = graph.close(STRIPPERS);
-const commentReaders = graph.close(COMMENT_READERS);
+const closures = presenceClosures(callGraph(tsFiles));
+const { readers } = closures;
 
 /**
  * Every file bound into one program, so a local name resolves to the
@@ -99,17 +86,12 @@ const commentReaders = graph.close(COMMENT_READERS);
  */
 const bound = bindFiles(tsFiles);
 
-const result = scanPresence(bound, { readers, strippers, commentReaders });
-
-/** A closure whose seeds are the whole answer, so a fixture needs no graph. */
-const seeded = (...names: string[]): Closure => ({
-  reaches: (_file, name) => names.includes(name),
-});
+const result = scanPresence(bound, closures);
 
 const FIXTURE_CLOSURES: PresenceClosures = {
-  readers: seeded('readFileSync'),
-  strippers: seeded('withoutTsComments'),
-  commentReaders: seeded('isMarkerCommentLine', 'commentsIn'),
+  readers: seededClosure('readFileSync'),
+  strippers: seededClosure('withoutTsComments'),
+  commentReaders: seededClosure('isMarkerCommentLine', 'commentsIn'),
 };
 
 /**
@@ -290,7 +272,7 @@ describe('the detector exempts a read only where JSON.parse stands between it an
     // so the fixture seeds it as the graph would.
     const closures = {
       ...FIXTURE_CLOSURES,
-      readers: seeded('readFileSync', 'readJson'),
+      readers: seededClosure('readFileSync', 'readJson'),
     };
     expect(
       scanPresence(bind(new Map([['fixture.test.ts', source]])), closures),

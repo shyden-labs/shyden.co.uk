@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Runs the three fastest checks of ci.yml's `checks` job, so a two-second
+# Runs the three fastest checks of ci.yml's `checks` job, and since #662 the
+# test-code lint below, so a two-second
 # problem cannot cost a CI round trip. Typecheck joined in #390 (about ten
 # seconds): vitest strips types without checking them, so a type error passed
 # this hook and reached a pushed commit. PR #34 failed on a single over-long line in a
@@ -13,7 +14,11 @@
 # Nothing else is here, deliberately: only unit tests, formatters and type
 # checks run on the laptop, and every other suite (guards, integration, e2e,
 # visual, sanity) runs in CI alone (operator, 2026-10-09, a global rule; #653).
-# The guards ran here from #638 until then.
+# The guards ran here from #638 until then. `lint:tests` (#662) is not a
+# suite: it applies three of the guards' finders (floorless-searches,
+# absence-liveness, anchored-presence) to the test files this branch changed,
+# a static read the operator ruled a lint (2026-10-12), so a new test meets
+# them here rather than one CI round trip later.
 #
 # Installed by `scripts/install-hooks.mjs` via `prepare`, which points
 # `core.hooksPath` at this directory. Bypass a single push with --no-verify.
@@ -28,10 +33,11 @@ unset $(git rev-parse --local-env-vars)
 fail() {
   printf '\npre-push blocked: %s\n' "$1"
   printf '  fix:  %s\n' "$2"
-  printf '  skip: git push --no-verify   (CI still runs all three)\n\n'
+  printf '  skip: git push --no-verify   (CI still runs every check)\n\n'
   exit 1
 }
 
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'
+npm run lint:tests || fail 'a changed test file breaks a test-code meta-guard' 'npm run lint:tests'
 npm run test:unit || fail 'a unit test failed' 'npm run test:unit'
