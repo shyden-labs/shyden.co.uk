@@ -8,6 +8,7 @@ import {
   duplicatePairs,
   similarity,
   type DuplicatePair,
+  type FunctionBody,
 } from '../unit/duplication';
 import { searched, trackedFiles } from '../source-files';
 import { floorBreach } from '../floors';
@@ -24,8 +25,22 @@ const SCANNED = trackedFiles(
   (path) => /^(src|tests|scripts)\//.test(path) && /\.(ts|mjs)$/.test(path),
 );
 
-const DECLARATIONS = SCANNED.flatMap(functionBodiesIn);
-const PAIRS = duplicatePairs(DECLARATIONS);
+/**
+ * The scan of those files, run ONCE, by the first test that asks for it
+ * (#700). At module scope it ran while the file loaded, where no limit sees
+ * it: 28 s of CPU on the runner, longer than the suite's whole 25 s per-test
+ * limit. In a test it runs under that limit. Listing the files stays above:
+ * it costs 3 ms, and the presence guard reads `SCANNED` as a list of paths.
+ */
+let scanned:
+  { declarations: FunctionBody[]; pairs: DuplicatePair[] } | undefined;
+const scan = () => {
+  if (scanned === undefined) {
+    const declarations = SCANNED.flatMap(functionBodiesIn);
+    scanned = { declarations, pairs: duplicatePairs(declarations) };
+  }
+  return scanned;
+};
 
 /** `file:name <-> file:name`, without line numbers, which drift. */
 const keyOf = (pair: DuplicatePair): string =>
@@ -122,32 +137,36 @@ const SEPARATE: ReadonlyMap<string, string> = new Map([
 describe('a function body has one home across files', () => {
   it('scans the whole tracked tree, not a list', () => {
     // Anti-vacuity: an empty scan satisfies every assertion below.
+    const { declarations } = scan();
     expect(floorBreach('duplication/files', SCANNED.length)).toBeUndefined();
     expect(SCANNED).toContain('src/lib/grouping.ts');
     expect(SCANNED).toContain('scripts/test-devices.mjs');
     expect(
-      floorBreach('duplication/declarations', DECLARATIONS.length),
+      floorBreach('duplication/declarations', declarations.length),
     ).toBeUndefined();
   });
 
   it('finds no cross-file duplicate that has not been given a verdict', () => {
-    const findings = PAIRS.filter((pair) => !SEPARATE.has(keyOf(pair))).map(
-      (pair) =>
-        `${pair.ratio.toFixed(3)}  ${pair.a.name} ${pair.a.at}  <->  ${pair.b.name} ${pair.b.at}`,
-    );
+    const { declarations, pairs } = scan();
+    const findings = pairs
+      .filter((pair) => !SEPARATE.has(keyOf(pair)))
+      .map(
+        (pair) =>
+          `${pair.ratio.toFixed(3)}  ${pair.a.name} ${pair.a.at}  <->  ${pair.b.name} ${pair.b.at}`,
+      );
     expect(
-      searched(findings, { of: DECLARATIONS, what: 'function bodies' }),
+      searched(findings, { of: declarations, what: 'function bodies' }),
       findings.join('\n'),
     ).toEqual([]);
     expect(
-      floorBreach('duplication/judged-declarations', DECLARATIONS.length),
+      floorBreach('duplication/judged-declarations', declarations.length),
     ).toBeUndefined();
   });
 
   it('carries no verdict for a pair that no longer exists', () => {
     // An allow-list entry outliving its code is how a guard stops guarding:
     // the next duplicate between those two files inherits the excuse.
-    const live = new Set(PAIRS.map(keyOf));
+    const live = new Set(scan().pairs.map(keyOf));
     const recorded = [...SEPARATE.keys()];
     // The population sits inside the assertion (#118): an empty `SEPARATE`
     // has nothing to outlive, and would satisfy a bare filter for free.
@@ -170,7 +189,7 @@ describe('a function body has one home across files', () => {
     // under `anonymous <-> anonymous` (#477). Names alone cannot rule that
     // out, since two tests may share a title, so the count is checked here.
     const pairsPerKey = new Map<string, number>();
-    for (const key of PAIRS.map(keyOf))
+    for (const key of scan().pairs.map(keyOf))
       pairsPerKey.set(key, (pairsPerKey.get(key) ?? 0) + 1);
     const recorded = [...SEPARATE.keys()];
     const shared = recorded.filter((key) => (pairsPerKey.get(key) ?? 0) > 1);
