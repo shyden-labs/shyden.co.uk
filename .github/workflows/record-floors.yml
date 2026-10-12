@@ -15,6 +15,16 @@ name: record-floors
 # the head, so a plain `git pull` would merge the old one back in), and read
 # what moved in the head's message.
 #
+# If the branch has an open pull request, every `pull_request` run on the
+# bot's head is held `action_required` (GitHub holds the runs of a head a
+# workflow token pushed), and the pull request stays BLOCKED although the
+# dispatched checks pass on that SHA. Re-run each held run as the App, as part
+# of the merge (operator 2026-10-12, #663; measured on #703, which merged):
+#
+#   gh run list --branch <branch> --status action_required \
+#     --json databaseId,headSha --jq '.[] | select(.headSha == "<sha>") | .databaseId'
+#   gh run rerun <id>
+#
 # `workflow_dispatch` ONLY, so no push or pull request can start a run that
 # rewrites the figure it is checked against. It is dispatched from the default
 # branch (GitHub runs only a workflow that exists there) and names the branch
@@ -105,9 +115,13 @@ jobs:
     needs: image
     runs-on: ubuntu-26.04
     # The recorder runs the unit, guards and integration suites, the Playwright
-    # specs on every project, and the Functions suite. Set to the e2e policy's
-    # ceiling until a first real dispatch measures it.
-    timeout-minutes: 120
+    # specs on every project, and the Functions suite. Measured 2026-10-12
+    # (#663): this job took 31.2 to 46.9 minutes on all ten full records that
+    # had succeeded (longest: run 38088077407), and 1.5 to 3.4 in the unit and
+    # functions modes. 60 is the longest full record and a quarter more; a
+    # record that needs longer has grown, which is a finding, not a reason to
+    # raise this.
+    timeout-minutes: 60
     permissions:
       contents: read
     # The same pinned image and options as ci.yml's e2e shards, so a figure

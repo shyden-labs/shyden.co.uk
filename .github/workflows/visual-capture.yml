@@ -11,6 +11,15 @@ name: visual-capture
 # the baselines it changed in the head's message. Look at every one: the gate
 # compares against them from then on.
 #
+# If the branch has an open pull request, every `pull_request` run on the
+# bot's head is held `action_required`, as after a floor record, and the pull
+# request stays BLOCKED until they run. Re-run each held run as the App, as
+# part of the merge (operator 2026-10-12, #663):
+#
+#   gh run list --branch <branch> --status action_required \
+#     --json databaseId,headSha --jq '.[] | select(.headSha == "<sha>") | .databaseId'
+#   gh run rerun <id>
+#
 # `workflow_dispatch` ONLY: the gate (`ci.yml`'s `visual`) never passes
 # `--update-snapshots`, because a run that can rewrite the baseline it checks
 # against asserts nothing. This is never part of the gate and never required.
