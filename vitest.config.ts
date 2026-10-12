@@ -27,7 +27,7 @@ export default defineConfig({
     globalSetup: ['tests/temporary-files.ts', 'tests/tree-reading-setup.ts'],
     // One second a test and a hook, never raised (#632): a unit test that
     // needs more has its work cut. Wall time stretches under load, so
-    // `tests/unit-cpu-setup.ts` also fails a test whose own CPU passes 0.3 s.
+    // `tests/unit-cpu-setup.ts` also fails a test whose own CPU passes 0.1 s.
     // Pinned by tests/unit/unit-budget.test.ts, and any raise is refused by
     // tests/guards/unit-limit.test.ts.
     testTimeout: 1_000,

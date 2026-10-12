@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect } from 'vitest';
 import { cpuBreach, startOwnCpu } from './unit-cpu-limit';
 
 /**
- * In every unit worker: fail a test whose own CPU passes 0.3 s (#632, #645).
+ * In every unit worker: fail a test whose own CPU passes 0.1 s (#632, #645, #714).
  *
  * A worker is a forked process running one test at a time on one thread, so
  * that thread's CPU across a test is the test's own (`startOwnCpu`), with the

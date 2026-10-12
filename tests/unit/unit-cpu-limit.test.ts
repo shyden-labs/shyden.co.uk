@@ -7,7 +7,7 @@ import {
 } from '../unit-cpu-limit';
 
 /**
- * The unit suite fails a test whose own CPU passes 0.3 s (#632, #645). The figures are
+ * The unit suite fails a test whose own CPU passes 0.1 s (#632, #645, #714). The figures are
  * literals: a limit asserted against the constant it was computed from pins
  * nothing. The wiring (a real test that burns CPU goes RED) is planted by hand
  * and recorded in the pull request, since a permanent failing test cannot live
@@ -31,17 +31,17 @@ describe('the CPU limit of loading one unit file (#688)', () => {
 });
 
 describe('the CPU limit of one unit test', () => {
-  it('passes a test that used 299 999 microseconds', () => {
-    expect(cpuBreach(299_999, 'a test')).toBeUndefined();
+  it('passes a test that used 99 999 microseconds', () => {
+    expect(cpuBreach(99_999, 'a test')).toBeUndefined();
   });
 
-  it('passes a test that used exactly 300 000 microseconds', () => {
-    expect(cpuBreach(300_000, 'a test')).toBeUndefined();
+  it('passes a test that used exactly 100 000 microseconds', () => {
+    expect(cpuBreach(100_000, 'a test')).toBeUndefined();
   });
 
-  it('fails a test that used 300 001 microseconds, naming the test, the figure and the limit', () => {
-    expect(cpuBreach(300_001, 'a slow test')).toBe(
-      '"a slow test" used 300 ms of its own CPU, over the unit limit of 300 ms (#632, #645). ' +
+  it('fails a test that used 100 001 microseconds, naming the test, the figure and the limit', () => {
+    expect(cpuBreach(100_001, 'a slow test')).toBe(
+      '"a slow test" used 100 ms of its own CPU, over the unit limit of 100 ms (#632, #645, #714). ' +
         'Cut the work the test does; a unit test is never given more time.',
     );
   });
@@ -105,30 +105,31 @@ describe('the report of every unit test own CPU (#645)', () => {
     ]);
   });
 
-  it('counts the tests over 300 ms and over 200 ms, and exactly 300 ms is not over', () => {
+  it('counts the tests over the 100 ms limit and over the 70 ms cut line, and exactly 100 ms is not over (#714)', () => {
     expect(
       cpuReport(
         [
-          row('a', 300_001),
-          row('b', 300_000),
-          row('c', 200_001),
-          row('d', 200_000),
+          row('a', 100_001),
+          row('b', 100_000),
+          row('c', 70_001),
+          row('d', 70_000),
         ],
         0,
         0,
       ),
     ).toEqual([
-      'Own CPU of each unit test (#645): 4 measured, 0 unmeasured; over 300 ms: 1; over 200 ms: 3; the heaviest 0:',
+      'Own CPU of each unit test (#645): 4 measured, 0 unmeasured; over 100 ms: 1; over 70 ms: 3; the heaviest 0:',
     ]);
   });
 
-  it('heads a report of loading each file with its own words (#688)', () => {
+  it('heads a report of loading each file with its own words and its own lines (#688)', () => {
     expect(
       cpuReport(
         [row('a', 210_000)],
         0,
         0,
         'Own CPU of loading each unit file (#688)',
+        [300_000, 200_000],
       )[0],
     ).toBe(
       'Own CPU of loading each unit file (#688): 1 measured, 0 unmeasured; over 300 ms: 0; over 200 ms: 1; the heaviest 0:',

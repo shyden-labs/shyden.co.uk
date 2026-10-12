@@ -7,7 +7,7 @@ import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
  * whole tree to check a rule across it (a scan over every tracked file, every
  * spec, every catalogue).
  *
- * The unit suite holds tests that meet 1 s and 0.3 s of their own CPU; a guard
+ * The unit suite holds tests that meet 1 s and 0.1 s of their own CPU; a guard
  * whose population is the repository cannot, and its cost is the tree, not a
  * defect to cut. The two share the repo's setup files. There is NO time limit
  * in this file: the suite's one measured limit is on the command that runs it

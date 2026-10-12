@@ -39,7 +39,7 @@ export default class LoadReporter implements Reporter {
         });
     }
     process.stdout.write(
-      `\n${cpuReport(loads, unloaded, undefined, `Own CPU of loading each ${this.suite} file (#688)`).join('\n')}\n`,
+      `\n${cpuReport(loads, unloaded, undefined, `Own CPU of loading each ${this.suite} file (#688)`, [300_000, 200_000]).join('\n')}\n`,
     );
   }
 }

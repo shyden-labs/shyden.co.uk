@@ -1,13 +1,22 @@
 /**
- * The unit suite's per-test CPU limit: 0.3 s of the test's own CPU, user plus
+ * The unit suite's per-test CPU limit: 0.1 s of the test's own CPU, user plus
  * system, in microseconds, of the thread that ran it. Wall time stretches
  * under load and CPU time does not, so this is the limit that a slow test
  * breaks on a quiet machine and a fast one never breaks on a busy one. #632
  * set it at 1 s; #645 lowered it to 0.3 s (operator rule 2026-10-08: clock
- * time ran up to 3.14x past CPU under load, so 0.3 s of CPU is what keeps a
- * test under the 1 s clock limit on a loaded machine).
+ * time ran up to 3.14x past CPU under load); #714 lowered it to 0.1 s
+ * (operator rule 2026-10-12, yawelo-idle #536: a busy laptop ran wall up to
+ * 12x past CPU, so 0.1 s of CPU is what keeps a test under the 1 s clock).
  */
-export const CPU_LIMIT_MICROSECONDS = 300_000;
+export const CPU_LIMIT_MICROSECONDS = 100_000;
+
+/**
+ * The cut line under the limit (#714): one test's CPU varies up to 2x run to
+ * run, so a test whose heaviest measured run passes 70 ms is cut to it, and
+ * the check at the limit never trips at random. Every unit run reports how
+ * many tests are over each.
+ */
+export const CPU_CUT_MICROSECONDS = 70_000;
 
 /**
  * Start a test's CPU clock; the function it returns reads the microseconds
@@ -33,7 +42,7 @@ export function cpuBreach(
     cpuMicroseconds,
     CPU_LIMIT_MICROSECONDS,
     (used, limit) =>
-      `"${testName}" used ${used} ms of its own CPU, over the unit limit of ${limit} ms (#632, #645). ` +
+      `"${testName}" used ${used} ms of its own CPU, over the unit limit of ${limit} ms (#632, #645, #714). ` +
       'Cut the work the test does; a unit test is never given more time.',
   );
 }
@@ -98,26 +107,32 @@ export const CPU_REPORT_TOP = 20;
 
 /**
  * The lines the unit run prints about its tests' own CPU (#645): a count of
- * those over 300 ms and over 200 ms, beside how many tests carried no figure
- * (a report that lost its tests reads as a quiet one otherwise), then the
- * heaviest `top`, each named with its file and rounded to the millisecond.
- * Printed on every run, laptop and CI alike, so the headroom under the limit
- * is measured where the limit is judged rather than estimated.
+ * those over each of two lines, by default the limit and the cut line under
+ * it (#714), beside how many tests carried no figure (a report that lost its
+ * tests reads as a quiet one otherwise), then the heaviest `top`, each named
+ * with its file and rounded to the millisecond. Printed on every run, laptop
+ * and CI alike, so the headroom under the limit is measured where the limit
+ * is judged rather than estimated. The load report passes its own lines.
  */
 export function cpuReport(
   rows: readonly CpuRow[],
   unmeasured: number,
   top = CPU_REPORT_TOP,
   heading = 'Own CPU of each unit test (#645)',
+  lines: readonly [number, number] = [
+    CPU_LIMIT_MICROSECONDS,
+    CPU_CUT_MICROSECONDS,
+  ],
 ): string[] {
   const over = (microseconds: number) =>
     rows.filter((row) => row.microseconds > microseconds).length;
   const heaviest = [...rows]
     .sort((a, b) => b.microseconds - a.microseconds)
     .slice(0, top);
+  const [upper, lower] = lines;
   return [
     `${heading}: ${rows.length} measured, ${unmeasured} unmeasured; ` +
-      `over 300 ms: ${over(300_000)}; over 200 ms: ${over(200_000)}; the heaviest ${heaviest.length}:`,
+      `over ${upper / 1000} ms: ${over(upper)}; over ${lower / 1000} ms: ${over(lower)}; the heaviest ${heaviest.length}:`,
     ...heaviest.map(
       (row) =>
         `${String(Math.round(row.microseconds / 1000)).padStart(8)} ms  ${row.file} > ${row.name}`,

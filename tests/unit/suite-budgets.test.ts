@@ -19,7 +19,7 @@ import { unitProject } from '../vitest-suite-dirs';
  * against the script it was read from would move with it and pin nothing.
  *
  * guards (#638). A guard reads or parses the whole tree, so its cost is the
- * tree's size and load stretches it; it cannot meet the unit suite's 0.3 s and
+ * tree's size and load stretches it; it cannot meet the unit suite's 0.1 s and
  * is not a unit test (operator, 2026-10-08: "Own 'guards' suite").
  * Measurement (2026-10-08, the 597 tests as moved): the slowest test on the CI
  * runner took 7.2s (run 37798571160, `collection-needs-no-build`: it parses
@@ -36,7 +36,7 @@ import { unitProject } from '../vitest-suite-dirs';
  * integration and simulation load in at most 370 ms and 14 ms.
  *
  * simulation (#650). A simulation is a real run of the engine over many seeded
- * inputs; the unit suite keeps a stand-in that meets its 1 s and 0.3 s of CPU
+ * inputs; the unit suite keeps a stand-in that meets its 1 s and 0.1 s of CPU
  * and the real case lives in `tests/simulation/` (operator, 2026-10-09: "New
  * 'simulation' suite"). Measurement (2026-10-09, laptop, the eight
  * apart-letters cases, in the unit suite with coverage off, three samples
