@@ -281,14 +281,19 @@ describe('the deploy pipeline runs what it claims to', () => {
     ).toBeUndefined();
   });
 
-  it('the one job excused from asking for success is build-and-test, which judges in a step (#582)', () => {
+  it('the jobs excused from asking for success are the two that judge in a step (#582, #725)', () => {
     // An aggregate is excused from the rule above because a step judges every
     // need instead. That is true of build-and-test (scripts/e2e-shards.mjs,
-    // pinned below) and must not quietly become true of anything else.
+    // pinned below) and of deploy-dev's report-failure, which must run
+    // BECAUSE a need failed (scripts/deploy-failure.mjs, pinned below), and
+    // must not quietly become true of anything else.
     const aggregates = workflowGraphs().flatMap(({ name, jobs }) =>
       jobs.filter(isAggregate).map(({ id }) => `${name} ${id}`),
     );
-    expect(aggregates).toEqual(['ci.yml build-and-test']);
+    expect(aggregates).toEqual([
+      'ci.yml build-and-test',
+      'deploy-dev.yml report-failure',
+    ]);
   });
 
   it('the push path proves the tree instead of re-running the suite', () => {
@@ -2956,6 +2961,66 @@ describe('browsers come with the pinned Playwright image, never a download (#431
     expect(
       floorBreach('pipeline-wiring/playwright-image-jobs', judged.length),
     ).toBeUndefined();
+  });
+});
+
+// ---- a failed develop deploy reaches the operator (#725) ------------------
+//
+// Run 38219259063 failed on Cloudflare's 524 and nothing said so: dev sat
+// behind develop with `dev-verified` merely absent. The report job runs after
+// every other job whatever they did, and its script opens or comments on one
+// issue when one of them failed on develop. Read PARSED, so a YAML comment can
+// neither trip nor satisfy it.
+describe('a failed develop deploy reaches the operator (#725)', () => {
+  const FILE = 'deploy-dev.yml';
+  type Step = {
+    uses?: string;
+    run?: string;
+    if?: string;
+    env?: Record<string, string>;
+  };
+  type DeployWorkflow = {
+    jobs?: Record<string, { permissions?: unknown; steps?: Step[] }>;
+  };
+  const parsed = () => parseCleanYaml(workflow(FILE), FILE) as DeployWorkflow;
+  const steps = () => parsed().jobs?.['report-failure']?.steps ?? [];
+
+  it('runs after every other job of the file, whatever they did', () => {
+    const others = workflowJobs(workflow(FILE), FILE)
+      .map(({ id }) => id)
+      .filter((id) => id !== 'report-failure');
+    expect(others).toEqual(['gate', 'test', 'deploy-dev', 'verify-dev']);
+    const report = jobNamed(FILE, 'report-failure');
+    expect(report.needs).toEqual(others);
+    expect(report.condition).toBe('always()');
+  });
+
+  it('reads the run and writes issues, and names no environment', () => {
+    const report = jobNamed(FILE, 'report-failure');
+    expect(report.environment).toBeUndefined();
+    expect(parsed().jobs?.['report-failure']?.permissions).toEqual({
+      contents: 'read',
+      actions: 'read',
+      issues: 'write',
+    });
+  });
+
+  it('runs no npm package code: checkout, setup-node and the script, nothing else', () => {
+    expect(steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null)).toEqual(
+      ['actions/checkout', 'actions/setup-node', null],
+    );
+    expect(jobNamed(FILE, 'report-failure').runs).toEqual([
+      'node scripts/deploy-failure.mjs',
+    ]);
+  });
+
+  it("hands the script every need's result and the workflow token, under always()", () => {
+    const [, , reporting] = steps();
+    expect(reporting.if).toBe('always()');
+    expect(reporting.env).toEqual({
+      NEEDS: '${{ toJSON(needs) }}',
+      GITHUB_TOKEN: '${{ github.token }}',
+    });
   });
 });
 
