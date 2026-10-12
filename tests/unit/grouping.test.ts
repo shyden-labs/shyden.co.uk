@@ -1109,7 +1109,13 @@ describe('together letters', () => {
       }),
     );
     const out = buildGroups(
-      base({ students: pairs, mode: { kind: 'groupCount', count: 10 } }),
+      base({
+        students: pairs,
+        mode: { kind: 'groupCount', count: 10 },
+        // The real budget's run of this roster: tests/simulation/ (#714:
+        // heaviest 68 ms of own CPU over 8 runs, 2 ms from the cut line).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
