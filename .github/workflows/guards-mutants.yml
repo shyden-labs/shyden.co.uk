@@ -1,0 +1,29 @@
+# AC3 of #706, #708, #709 and #710, a MEASURING branch: never merged.
+# Each of the four guards has its scan handed an empty file list inside its
+# run-once getter or reader; this runs those four files as the guards suite
+# does, so every liveness control and floor that counts what the scan read is
+# read RED by name.
+name: Guards mutants (#706-#710 AC3)
+
+on:
+  push:
+    branches: [guards-mutants]
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx vitest run --config vitest.guards.config.ts --testTimeout=25000 tests/guards/absence-liveness.test.ts tests/guards/stranded-docblocks.test.ts tests/guards/floorless-searches.test.ts tests/guards/literal-floors.test.ts

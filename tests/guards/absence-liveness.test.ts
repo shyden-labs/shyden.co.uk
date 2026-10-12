@@ -91,8 +91,8 @@ let scanned: ReturnType<typeof scanAbsences> | undefined;
 /** Bound once: each name resolves in its own scope, not by name (#184). */
 const scan = () =>
   (scanned ??= scanAbsences(
-    bindFiles(tsFiles),
-    callGraph(tsFiles).close(DISCOVERY),
+    bindFiles(tsFiles.slice(0, 0)),
+    callGraph(tsFiles.slice(0, 0)).close(DISCOVERY),
   ));
 
 const CEILING_SITES = 107;
