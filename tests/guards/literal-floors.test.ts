@@ -221,13 +221,24 @@ const regexTextsIn = (sf: ts.SourceFile): string[] => {
 
 /** Every TypeScript file either runner reads: unit tests, specs and helpers. */
 const FILES = tsFilesUnder('tests');
-const READINGS = FILES.map((file) => ({
-  file,
-  ...floorSitesIn(parseFile(file)),
-}));
-const SITES = READINGS.flatMap(({ file, sites }) =>
-  sites.map((site) => ({ file, ...site })),
-);
+
+// The parse of those files, run ONCE, by the first test that asks for it
+// (#710, as #700 did for the duplication scan). At module scope it ran while
+// the file loaded, where no limit sees it: 1,173 / 1,143 ms of CPU on the
+// runner (#696). In a test it runs under the guards' 25 s per-test limit.
+// Listing the files stays above: a walk, with no parse.
+const readFloorSites = () => {
+  const readings = FILES.map((file) => ({
+    file,
+    ...floorSitesIn(parseFile(file)),
+  }));
+  const sites = readings.flatMap(({ file, sites }) =>
+    sites.map((site) => ({ file, ...site })),
+  );
+  return { readings, sites };
+};
+let scanned: ReturnType<typeof readFloorSites> | undefined;
+const scan = () => (scanned ??= readFloorSites());
 const keyOf = ({ file, subject }: { file: string; subject: string }) =>
   `${file}: ${subject}`;
 
@@ -299,21 +310,24 @@ const GROUP_5: Readonly<Record<string, string>> = {
 
 describe('every floor demanding two or more is ratcheted (#468)', () => {
   it('finds none written as a literal or handed in by a parameter', () => {
-    const findings = SITES.filter(
-      (site) =>
-        (site.kind === 'counted' || site.kind === 'forwarded') &&
-        !(keyOf(site) in PRODUCT_VALUES) &&
-        !(keyOf(site) in GROUP_5),
-    ).map(
-      ({ file, line, kind, demands, subject }) =>
-        `${file}:${line} ${kind}${demands === undefined ? '' : ` ${demands}`} expect(${subject})`,
-    );
+    const { sites } = scan();
+    const findings = sites
+      .filter(
+        (site) =>
+          (site.kind === 'counted' || site.kind === 'forwarded') &&
+          !(keyOf(site) in PRODUCT_VALUES) &&
+          !(keyOf(site) in GROUP_5),
+      )
+      .map(
+        ({ file, line, kind, demands, subject }) =>
+          `${file}:${line} ${kind}${demands === undefined ? '' : ` ${demands}`} expect(${subject})`,
+      );
     expect(
-      searched(findings, { of: SITES, what: 'floors read under tests/' }),
+      searched(findings, { of: sites, what: 'floors read under tests/' }),
       findings.join('\n'),
     ).toEqual([]);
     expect(
-      floorBreach('literal-floors/judged-sites', SITES.length),
+      floorBreach('literal-floors/judged-sites', sites.length),
     ).toBeUndefined();
   });
 });
@@ -327,16 +341,19 @@ describe('the floor reader proves what it read (#468)', () => {
     // no number to drift.
     const MATCHER = /\.toBeGreaterThan(?:OrEqual)?\(/g;
     const count = (text: string) => text.match(MATCHER)?.length ?? 0;
-    const misread = READINGS.filter(({ file, sites, refused }) => {
-      const code = withoutTsComments(readFileSync(file, 'utf8'));
-      const sf = parseFile(file);
-      const spelled = [...stringTextsIn(sf), ...regexTextsIn(sf)].reduce(
-        (sum, text) => sum + count(text),
-        0,
-      );
-      const matchers = sites.filter(({ form }) => form === undefined);
-      return count(code) - spelled !== matchers.length + refused.length;
-    }).map(({ file }) => file);
+    const { readings } = scan();
+    const misread = readings
+      .filter(({ file, sites, refused }) => {
+        const code = withoutTsComments(readFileSync(file, 'utf8'));
+        const sf = parseFile(file);
+        const spelled = [...stringTextsIn(sf), ...regexTextsIn(sf)].reduce(
+          (sum, text) => sum + count(text),
+          0,
+        );
+        const matchers = sites.filter(({ form }) => form === undefined);
+        return count(code) - spelled !== matchers.length + refused.length;
+      })
+      .map(({ file }) => file);
     expect(
       searched(misread, { of: FILES, what: 'TypeScript files under tests/' }),
     ).toEqual([]);
@@ -364,19 +381,21 @@ describe('the floor reader proves what it read (#468)', () => {
   });
 
   it('refuses nothing it could not classify', () => {
-    const refused = READINGS.flatMap(({ refused }) => refused);
+    const { readings, sites } = scan();
+    const refused = readings.flatMap(({ refused }) => refused);
     expect(
-      searched(refused, { of: SITES, what: 'floors read under tests/' }),
+      searched(refused, { of: sites, what: 'floors read under tests/' }),
       refused.join('\n'),
     ).toEqual([]);
-    expect(floorBreach('literal-floors/sites', SITES.length)).toBeUndefined();
+    expect(floorBreach('literal-floors/sites', sites.length)).toBeUndefined();
   });
 
   it('lists no product value or Group 5 floor that is gone', () => {
+    const { sites } = scan();
     const live = new Set(
-      SITES.filter(
-        ({ kind }) => kind === 'counted' || kind === 'forwarded',
-      ).map(keyOf),
+      sites
+        .filter(({ kind }) => kind === 'counted' || kind === 'forwarded')
+        .map(keyOf),
     );
     const listed = [...Object.keys(PRODUCT_VALUES), ...Object.keys(GROUP_5)];
     const stale = listed.filter((key) => !live.has(key));
