@@ -38,6 +38,14 @@ import { inFixtureTestDir } from '../vitest-suite-dirs';
 const found = (source: string): readonly LoopedCase[] =>
   loopedCases(parseSource(source, 'fixture.spec.ts'));
 
+/** The loops the detector refuses in `source`, with the tests it read there. */
+const judgedIn = (
+  source: string,
+): { cases: readonly LoopedCase[]; read: string[] } => {
+  const sf = parseSource(source, 'fixture.spec.ts');
+  return { cases: loopedCases(sf), read: testsRead(sf) };
+};
+
 describe('the detector', () => {
   it('refuses a loop inside a test that navigates on each pass', () => {
     expect(
@@ -57,13 +65,17 @@ describe('the detector', () => {
   });
 
   it('passes the same cases generated as one test each', () => {
-    expect(
-      found(`
+    const { cases, read } = judgedIn(`
         for (const locale of LOCALES)
           test(\`\${locale}: one case\`, async ({ page }) => {
             await page.goto(localisePath('/', locale));
-          });`),
+          });`);
+    expect(
+      searched(cases, { of: read, what: 'tests the detector read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('one-test-per-case/generated-tests-read', read.length),
+    ).toBeUndefined();
   });
 
   it('refuses a loop that navigates through a WebDriver session helper', () => {
@@ -141,7 +153,16 @@ describe('the detector', () => {
       });`,
       'fixture.spec.ts',
     );
-    expect(loopedCases(spec).map((site) => site.test)).toEqual([]);
+    const read = testsRead(spec);
+    expect(
+      searched(
+        loopedCases(spec).map((site) => site.test),
+        { of: read, what: 'tests the detector read' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('one-test-per-case/shared-helper-tests-read', read.length),
+    ).toBeUndefined();
     expect(loopedCases(spec, shared).map((site) => site.test)).toEqual([
       'both',
     ]);
@@ -165,23 +186,34 @@ describe('the detector', () => {
   });
 
   it('passes a loop that changes no page state', () => {
-    expect(
-      found(`
+    const { cases, read } = judgedIn(`
         test('links', async ({ page }) => {
           await page.goto('/');
           for (const a of await page.locator('a').all()) await atLeast44(a);
-        });`),
+        });`);
+    expect(
+      searched(cases, { of: read, what: 'tests the detector read' }),
     ).toEqual([]);
+    expect(
+      floorBreach('one-test-per-case/stateless-loop-tests-read', read.length),
+    ).toBeUndefined();
   });
 
   it('passes a runtime population that says so in a comment', () => {
-    expect(
-      found(`
+    const { cases, read } = judgedIn(`
         test('disclosures', async ({ page }) => {
           // runtime population: the toggles this page rendered
           for (const id of ids) await page.goto(path);
-        });`),
+        });`);
+    expect(
+      searched(cases, { of: read, what: 'tests the detector read' }),
     ).toEqual([]);
+    expect(
+      floorBreach(
+        'one-test-per-case/runtime-population-tests-read',
+        read.length,
+      ),
+    ).toBeUndefined();
   });
 
   // An ordinary comment sits above the loop on purpose. Without one, a

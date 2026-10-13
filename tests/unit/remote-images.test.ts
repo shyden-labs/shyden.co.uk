@@ -112,7 +112,15 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
       'build',
       'build.format',
     ]);
-    expect(findings).toEqual([]);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'remote-images/no-remote-image-properties',
+        properties.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('is not satisfied, nor refused, by a comment naming a domain', () => {
@@ -120,7 +128,12 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
       config("  // image: { domains: ['cdn.x.test'] },"),
     );
     expect(properties).toEqual(['site']);
-    expect(findings).toEqual([]);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('remote-images/comment-only-properties', properties.length),
+    ).toBeUndefined();
   });
 
   it('refuses a config with no defineConfig object to read', () => {

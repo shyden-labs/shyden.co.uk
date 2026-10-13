@@ -95,8 +95,8 @@ const scan = () =>
     callGraph(tsFiles).close(DISCOVERY),
   ));
 
-const CEILING_SITES = 63;
-const CEILING_SCOPES = 61;
+const CEILING_SITES = 43;
+const CEILING_SCOPES = 41;
 
 describe('absence assertions prove the population they searched', () => {
   // Separate from the verdict, and load-bearing: the verdict below is itself
