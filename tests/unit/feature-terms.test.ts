@@ -423,17 +423,17 @@ describe('on the live catalogues', () => {
   it('zh PINNED_MIXED_SEX seeded back to "the tag" is flagged for the pin', () => {
     const units = backTranslationUnits('zh');
     const seeded = units.map((one) =>
-      one.key === 'warnings.PINNED_MIXED_SEX'
+      one.key === 'warnings.PINNED_MIXED_SEX [howMany=other]'
         ? { ...one, translation: PINNED_MIXED_SEX_ZH_BEFORE }
         : one,
     );
     // Watch the seed apply: exactly one unit differs, and it is this one.
     expect(
       seeded.filter((one, index) => one !== units[index]).map(({ key }) => key),
-    ).toEqual(['warnings.PINNED_MIXED_SEX']);
+    ).toEqual(['warnings.PINNED_MIXED_SEX [howMany=other]']);
 
     const verdict = checkFeatureTerms(seeded, 'zh', GLOSSARY.zh).find(
-      ({ key }) => key === 'warnings.PINNED_MIXED_SEX',
+      ({ key }) => key === 'warnings.PINNED_MIXED_SEX [howMany=other]',
     );
     expect(verdict?.missing).toContain('pin');
   });
@@ -493,7 +493,7 @@ describe('on the live catalogues', () => {
   it('the corrected zh PINNED_MIXED_SEX is not flagged, and says 固定', () => {
     const units = backTranslationUnits('zh');
     const corrected = nonEmpty(
-      units.filter(({ key }) => key === 'warnings.PINNED_MIXED_SEX'),
+      units.filter(({ key }) => key.startsWith('warnings.PINNED_MIXED_SEX')),
       'zh warnings.PINNED_MIXED_SEX',
     );
     expect(corrected.map(({ translation }) => translation)).not.toContain(

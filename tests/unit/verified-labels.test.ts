@@ -212,7 +212,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       '这里的“在一起”和“分开”字母太多，无法在把男孩和女孩分到不同组的同时完成分组。请尝试减少字母数量，或者关闭此模式。',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
-      '{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。',
+      '{howMany, select, two {{names} 已被标记为“保持在一起”，但它们并非同性，因此无法组成单一性别的小组。请从其中一个名称中移除“在一起”字样，或关闭此模式。} other {{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。}}',
     'errors.TOGETHER_SEARCH_GAVE_UP':
       '这里的“在一起”字母太多，难以逐一处理。请尝试减少字母数量，或者扩大小组。',
     'errors.TOGETHER_UNIT_TOO_LARGE':
@@ -223,7 +223,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printWhatGroups: '分组结果',
     rosterClashMessage: '{names} 被放在一起，因此无法再把他们分开。',
     'warnings.PINNED_MIXED_SEX':
-      '{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。',
+      '{howMany, select, two {{names} 被一起固定为一个组，但组内成员性别不同，因此该组并未像其他组那样按性别划分。这正是该固定操作的要求，并非需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): 否, a form's no, where 不 was.
     'csv.absentNo': '否',
@@ -347,7 +347,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     rosterClashMessage:
       '{names} được xếp cùng nhau, nên không thể đồng thời tách biệt các em.',
     'warnings.PINNED_MIXED_SEX':
-      '{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.',
+      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là yêu cầu của ghim, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     // #603's sheet, read by the operator on 2026-10-07 (every short label no
     // check could judge, https://claude.ai/artifact/AgCDjpCJ2AQkKmdSC4cznm).
     // Values are as they stand AFTER the twelve changes he agreed there.
@@ -478,7 +478,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       'ที่นี่มีตัวอักษร "ด้วยกัน" และ "แยก" มากเกินไปจนไม่สามารถจัดการได้ พร้อมกับต้องแบ่งเด็กชายและเด็กหญิงเป็นกลุ่มต่างกัน ลองใช้ตัวอักษรน้อยลง หรือปิดโหมดนี้ไป',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
-      '{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่ทั้งหมดเป็นเพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้',
+      '{howMany, select, two {{names} ถูกกำหนดให้อยู่ด้วยกัน แต่ไม่ใช่เพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากชื่อของหนึ่งในนั้น หรือปิดโหมดนี้} other {{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่ทั้งหมดเป็นเพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้}}',
     'errors.TOGETHER_NO_ARRANGEMENT':
       'ไม่มีวิธีใดที่จะจัดชั้นเรียนของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงให้ทุกคนที่จำเป็นต้องอยู่ด้วยกันอยู่ด้วยกันได้ ให้ขยายขนาดกลุ่มให้ใหญ่ขึ้น หรือให้ตัวอักษรแต่ละตัวกับนักเรียนจำนวนน้อยลง',
     'errors.TOGETHER_SEARCH_GAVE_UP':
@@ -489,7 +489,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printShowLetters: 'แสดงเพศ และตัวอักษร "ด้วยกัน"/"แยก"',
     rosterClashMessage: '{names} ถูกจัดให้อยู่ด้วยกัน จึงไม่สามารถแยกกันได้',
     'warnings.PINNED_MIXED_SEX':
-      '{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข',
+      '{howMany, select, two {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข} other {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): ไม่ใช่, a form's no, where ไม่ was.
     'csv.absentNo': 'ไม่ใช่',
