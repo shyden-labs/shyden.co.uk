@@ -97,6 +97,53 @@ function withListDecision(
   return before.replace(oldForms[0], () => after);
 }
 
+/**
+ * A SECOND intended change, applied here in the open (#505, F176): a message
+ * about exactly two students says "both" / "the same sex", where the function
+ * era said "all" / "all the same sex". Three or more, and one, are unchanged.
+ * The approved renderings are literals, keyed by message and language.
+ */
+const TWO_NAMES_AFTER_DECISION: Record<
+  string,
+  Readonly<Record<'en' | 'id', readonly [string, string]>>
+> = {
+  'errors.KEEP_APART_IMPOSSIBLE': {
+    en: [' all need to be kept apart', ' both need to be kept apart'],
+    id: [' semuanya harus dipisahkan', ' keduanya harus dipisahkan'],
+  },
+  'errors.SEX_SEPARATE_SPLITS_UNIT': {
+    en: ['but are not all the same sex', 'but are not the same sex'],
+    id: ['tidak semuanya berjenis', 'tidak berjenis'],
+  },
+  'warnings.PINNED_MIXED_SEX': {
+    en: ['but are not all the same sex', 'but are not the same sex'],
+    id: ['tidak semuanya berjenis', 'tidak berjenis'],
+  },
+};
+
+const namesOf = (params: MessageParams) =>
+  Array.isArray(params.names) ? (params.names as readonly string[]) : [];
+
+/** The `howMany` slot the engine fills from the number of names (#505). */
+function withHowMany(path: string, params: MessageParams): MessageParams {
+  if (!(path in TWO_NAMES_AFTER_DECISION)) return params;
+  return { ...params, howMany: namesOf(params).length === 2 ? 'two' : 'more' };
+}
+
+function withTwoNamesDecision(
+  before: string,
+  path: string,
+  params: MessageParams,
+  locale: 'en' | 'id',
+): string {
+  const decision = TWO_NAMES_AFTER_DECISION[path]?.[locale];
+  if (!decision || namesOf(params).length !== 2) return before;
+  const [old, now] = decision;
+  if (before.split(old).length !== 2)
+    throw new Error(`expected ${JSON.stringify(old)} once in ${before}`);
+  return before.replace(old, () => now);
+}
+
 const messageAt = (table: unknown, path: string) =>
   path
     .split('.')
@@ -133,9 +180,14 @@ describe('messages render what the function-era catalogues rendered (#136)', () 
                   } as GroupingError,
                   strings,
                 )
-              : messageAt(strings, path)(c.params);
+              : messageAt(strings, path)(withHowMany(path, c.params));
           expect(actual, JSON.stringify(c.params)).toBe(
-            withListDecision(c[locale], c.params, locale),
+            withTwoNamesDecision(
+              withListDecision(c[locale], c.params, locale),
+              path,
+              c.params,
+              locale,
+            ),
           );
         }
       });
