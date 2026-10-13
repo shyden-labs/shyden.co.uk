@@ -221,7 +221,9 @@ describe('the deploy pipeline runs what it claims to', () => {
     // Read, a requested id that is already live is refused by name.
     const live = runStep(find, { ...dry, TARGET_ID: 'live-4' }, cloudflare);
     expect(live.status).not.toBe(0);
-    expect(live.log).toContain('is the live deployment');
+    expect(live.log).toMatch(
+      /^✗ deployment_id live-4 is the live deployment \(canonical live-4\): rolling back to it would change nothing\.$/m,
+    );
     expect(live.outputs).toBe('');
     // No id: the newest successful production deployment before the live one.
     const chosen = runStep(find, { ...real, TARGET_ID: '' }, cloudflare);
