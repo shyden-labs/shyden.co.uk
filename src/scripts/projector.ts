@@ -74,10 +74,23 @@ export interface ProjectorHandlers {
    * same instruction — the caller collapses them.
    */
   animates?: () => boolean;
+  /**
+   * Called as the board opens, before the results move onto it, and as it
+   * closes, after they are back (#743): a board opened before any shuffle
+   * shows the empty cards and the waiting list, and leaves the page as it
+   * found it. The results are still one element with one render path.
+   */
+  onEnter?: () => void;
+  onLeave?: () => void;
 }
 
 export interface Projector {
   setAvailable: (available: boolean) => void;
+  /**
+   * The board's Shuffle says what it will do: the page's own words before
+   * the first deal, "Shuffle again" after it (#743).
+   */
+  setShuffleLabel: (label: string) => void;
   /** Re-measure — after a shuffle changes how much there is to show. */
   refit: () => void;
 }
@@ -300,6 +313,7 @@ export function renderProjector(
     if (open) return;
     if (handlers.refuseReason?.()) return;
     open = true;
+    handlers.onEnter?.();
     stage.appendChild(results);
     board.hidden = false;
     doc.documentElement.classList.add('cg-board-open-page');
@@ -382,6 +396,7 @@ export function renderProjector(
     // Back exactly where it came from, before the board is hidden, so the
     // page is never briefly missing its results.
     placeholder.parentElement?.insertBefore(results, placeholder);
+    handlers.onLeave?.();
     board.hidden = true;
     doc.documentElement.classList.remove('cg-board-open-page');
     stage.style.removeProperty('font-size');
@@ -455,6 +470,9 @@ export function renderProjector(
   window.addEventListener('resize', refit);
 
   return {
+    setShuffleLabel: (label: string) => {
+      shuffle.textContent = label;
+    },
     setAvailable: (available: boolean) => {
       openButton.hidden = !available;
       if (!available) void leave();

@@ -266,7 +266,8 @@
     "Two tools I've already built. Free, no sign-up, and working right now.": "我已经开发了两个工具。免费、无需注册，而且现在就可以使用。",
     "Email me": "给我发邮件",
     "Translations may not be accurate. If you notice it, tell me.": "翻译可能不够准确。如果您发现问题，请告诉我。",
-    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。"
+    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。",
+    "Waiting to be grouped": "等待分组"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -535,7 +536,8 @@
     "Two tools I've already built. Free, no sign-up, and working right now.": "Hai công cụ mà tôi đã phát triển. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.",
     "Email me": "Gửi email cho tôi",
     "Translations may not be accurate. If you notice it, tell me.": "Bản dịch có thể không chính xác. Nếu bạn phát hiện ra điều đó, hãy cho tôi biết.",
-    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "Những từ đó không có trên trang này. Hãy chọn chúng từ danh sách, hoặc sao chép một đoạn văn ngắn hơn mà không có tên hay số nào."
+    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "Những từ đó không có trên trang này. Hãy chọn chúng từ danh sách, hoặc sao chép một đoạn văn ngắn hơn mà không có tên hay số nào.",
+    "Waiting to be grouped": "Đang chờ được phân nhóm"
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -804,7 +806,8 @@
     "Two tools I've already built. Free, no sign-up, and working right now.": "เครื่องมือสองตัวที่ผมได้พัฒนาไว้แล้ว ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที",
     "Email me": "ส่งอีเมลให้ผม",
     "Translations may not be accurate. If you notice it, tell me.": "การแปลอาจไม่ถูกต้อง หากคุณสังเกตเห็น โปรดแจ้งให้ผมทราบ",
-    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "คำเหล่านั้นไม่มีอยู่ในหน้านี้ครับ ให้เลือกจากรายชื่อ หรือคัดลอกข้อความที่สั้นกว่า ซึ่งไม่มีชื่อหรือตัวเลขใดๆ"
+    "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "คำเหล่านั้นไม่มีอยู่ในหน้านี้ครับ ให้เลือกจากรายชื่อ หรือคัดลอกข้อความที่สั้นกว่า ซึ่งไม่มีชื่อหรือตัวเลขใดๆ",
+    "Waiting to be grouped": "กำลังรอการจัดกลุ่ม"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",

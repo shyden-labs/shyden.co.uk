@@ -94,6 +94,10 @@ describe('the module surface', () => {
         // #277 — a second definition of what an empty field means.
         'anonymousStudent',
         'buildGroups',
+        // The deal's own groups before it runs, reached by the page script's
+        // waiting board, which shows one empty card per group before the
+        // first shuffle (#743).
+        'plannedGroups',
         // Exported ONLY so 'weaveBySex never drops a block, whatever `sex`
         // holds' below can call it directly. `buildGroups`'s own public
         // surface cannot exercise this guarantee with bad data: the

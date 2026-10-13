@@ -223,6 +223,7 @@ export const vi: Catalogue = {
   boardOpen: 'Toàn màn hình',
   boardExit: 'Thoát chế độ toàn màn hình',
   boardShuffle: 'Trộn lại',
+  boardWaiting: 'Đang chờ được phân nhóm',
   staleRefuseExport:
     'Các nhóm này đã lỗi thời. Hãy trộn lại trước khi lưu chúng.',
   staleRefusePrint:

@@ -218,6 +218,7 @@ export const th: Catalogue = {
   boardOpen: 'เต็มหน้าจอ',
   boardExit: 'ปิดโหมดเต็มหน้าจอ',
   boardShuffle: 'สับใหม่',
+  boardWaiting: 'กำลังรอการจัดกลุ่ม',
   staleRefuseExport: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนที่จะบันทึก',
   staleRefusePrint: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนพิมพ์',
   staleRefuseBoard: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนที่จะแสดงออกมา',
