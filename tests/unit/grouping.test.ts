@@ -3260,10 +3260,10 @@ describe('sex mode: separate', () => {
       expect(out.ok).toBe(false);
       if (out.ok) return;
       expect(renderError(out.error, en)).toBe(
-        'Student 1 and Student 2 are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
     });
 
@@ -3292,11 +3292,11 @@ describe('sex mode: separate', () => {
       if (out.ok) return;
       const enMsg = renderError(out.error, en);
       expect(enMsg).toBe(
-        'Student 1 and Student 5 all need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
+        'Student 1 and Student 5 both need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
       );
       const idMsg = renderError(out.error, id);
       expect(idMsg).toBe(
-        'Siswa 1 dan Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 2 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+        'Siswa 1 dan Siswa 5 keduanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 2 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
       );
     });
   });
@@ -4337,15 +4337,15 @@ describe('pinned groups', () => {
       ]);
       const [warning] = out.result.warnings;
       expect(renderWarning(warning, en)).toBe(
-        'Student 1 and Student 4 are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Student 1 and Student 4 are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
       expect(renderWarning(warning, id)).toBe(
-        'Siswa 1 dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
+        'Siswa 1 dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(
         renderWarning(warning, en, (n) => (n === 1 ? 'Dewi' : 'Eko')),
       ).toBe(
-        'Dewi and Eko are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Dewi and Eko are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
     };
 
@@ -4772,15 +4772,15 @@ describe('pinned groups', () => {
         students: [1, 2],
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 1 and Student 2 are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
       expect(
         renderError(out.error, en, (n) => (n === 1 ? 'Ika' : 'Joko')),
       ).toBe(
-        'Ika and Joko are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Ika and Joko are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
     };
 
@@ -5342,6 +5342,80 @@ describe('the search budget is injected, so a unit test reaches "gave up" withou
     const out = buildGroups({ ...input, searchNodeCap: 1 });
     expect(out.ok ? 'placed' : out.error.code).toBe(
       ERROR_CODES.keepApartSearchGaveUp,
+    );
+  });
+});
+
+// #505 (F176): a message about exactly two students reads "both" / "the same
+// sex"; three or more keep "all". Each case is its own test.
+describe('a message about two students, or three, agrees with how many it names (#505)', () => {
+  const enMsg = getStrings('en');
+  const idMsg = getStrings('id');
+  const apart = (students: number[]) => ({
+    code: ERROR_CODES.keepApartImpossible,
+    students,
+    groupsNeeded: 3,
+  });
+  const splits = (students: number[]) => ({
+    code: ERROR_CODES.sexSeparateSplitsUnit,
+    students,
+  });
+  const pinned = (students: number[]) => ({
+    code: WARNING_CODES.pinnedMixedSex,
+    students,
+  });
+
+  it('keep-apart: two students read "both"', () => {
+    expect(renderError(apart([1, 5]), enMsg)).toBe(
+      'Student 1 and Student 5 both need to be kept apart from each other, so you would need at least 3 groups. Either make more groups or remove one of the rules.',
+    );
+    expect(renderError(apart([1, 5]), idMsg)).toBe(
+      'Siswa 1 dan Siswa 5 keduanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 3 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+    );
+  });
+
+  it('keep-apart: three students keep "all"', () => {
+    expect(renderError(apart([3, 4, 5]), enMsg)).toBe(
+      'Student 3, Student 4 and Student 5 all need to be kept apart from each other, so you would need at least 3 groups. Either make more groups or remove one of the rules.',
+    );
+    expect(renderError(apart([3, 4, 5]), idMsg)).toBe(
+      'Siswa 3, Siswa 4, dan Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 3 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+    );
+  });
+
+  it('split-by-sex unit: two students are "not the same sex"', () => {
+    expect(renderError(splits([1, 2]), enMsg)).toContain(
+      'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form',
+    );
+    expect(renderError(splits([1, 2]), idMsg)).toContain(
+      'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga',
+    );
+  });
+
+  it('split-by-sex unit: three students keep "not all the same sex"', () => {
+    expect(renderError(splits([1, 2, 3]), enMsg)).toContain(
+      'Student 1, Student 2 and Student 3 are marked to stay together, but are not all the same sex, so they cannot form',
+    );
+    expect(renderError(splits([1, 2, 3]), idMsg)).toContain(
+      'Siswa 1, Siswa 2, dan Siswa 3 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga',
+    );
+  });
+
+  it('pinned mixed sex: two students are "not the same sex"', () => {
+    expect(renderWarning(pinned([1, 4]), enMsg)).toContain(
+      'Student 1 and Student 4 are pinned together as one group, but are not the same sex, so this group',
+    );
+    expect(renderWarning(pinned([1, 4]), idMsg)).toContain(
+      'Siswa 1 dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama,',
+    );
+  });
+
+  it('pinned mixed sex: three students keep "not all the same sex"', () => {
+    expect(renderWarning(pinned([1, 2, 4]), enMsg)).toContain(
+      'Student 1, Student 2 and Student 4 are pinned together as one group, but are not all the same sex, so this group',
+    );
+    expect(renderWarning(pinned([1, 2, 4]), idMsg)).toContain(
+      'Siswa 1, Siswa 2, dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama,',
     );
   });
 });
