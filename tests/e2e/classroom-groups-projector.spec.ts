@@ -980,6 +980,69 @@ test.describe('the projector board never hides a name', () => {
     );
   }
 
+  test('the stage scrolls exactly when its sheet overflows, before and after the fonts land', async ({
+    page,
+  }) => {
+    // #674. Measured on CI (firefox, 8 students in pairs, fonts not yet
+    // landed): a 705px sheet in a 705px stage with `.scrolls` ON at
+    // 37.6875px. `refit` took its verdict while the stage was still
+    // `overflow: hidden`, where Firefox read the exact fit as overflowing.
+    // The invariant holds for any shape in any engine: the class is on
+    // exactly when the stage, as rendered, has more sheet than box. The font
+    // files are held back until the board is open and measured, so the first
+    // reading is of the fallback face by construction.
+    let held = 0;
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/*.woff2', async (route) => {
+      held += 1;
+      await released;
+      await route.continue();
+    });
+    await page.goto('/classroom-groups', { waitUntil: 'domcontentloaded' });
+    await makeGroups(page, '8', '2');
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await page
+      .getByRole('button', { name: /Full screen|Layar penuh/ })
+      .first()
+      .click();
+    await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+
+    // Liveness: the first reading really is taken with fonts outstanding.
+    expect(held, 'no font request was held back').toBeGreaterThan(0);
+    expect(
+      await page.evaluate(() => document.fonts.status),
+      'the fonts had already loaded when the board opened',
+    ).toBe('loading');
+
+    const where = (seen: Awaited<ReturnType<typeof boardGeometry>>) =>
+      `${seen.rows} row(s) at ${seen.font}: a ${seen.scrollHeight}px sheet ` +
+      `in a ${seen.clientHeight}px stage with overflow-y: ${seen.overflowY}`;
+
+    const fallback = await boardGeometry(page);
+    expect(
+      fallback.scrollable,
+      `${where(fallback)} -- fonts held back; the stage scrolls only if the sheet overflows`,
+    ).toBe(fallback.scrollHeight > fallback.clientHeight);
+
+    release();
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    const landed = await boardGeometry(page);
+    expect(
+      landed.scrollable,
+      `${where(landed)} -- fonts landed; the stage scrolls only if the sheet overflows`,
+    ).toBe(landed.scrollHeight > landed.clientHeight);
+    await shoot(
+      page,
+      `the stage scrolls only when the sheet overflows: ${landed.font} after the fonts landed`,
+      page.locator('#cg-board'),
+    );
+  });
+
   test('nothing is out of reach when the fullscreen grant is refused', async ({
     page,
   }) => {
