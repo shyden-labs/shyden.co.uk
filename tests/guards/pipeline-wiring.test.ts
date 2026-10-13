@@ -711,6 +711,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   type RollbackStep = {
     id?: string;
     name?: string;
+    uses?: string;
     if?: unknown;
     run?: unknown;
     env?: Record<string, unknown>;
@@ -743,12 +744,19 @@ describe('the deploy pipeline runs what it claims to', () => {
     );
   });
 
+  // A setup step is unnamed, as everywhere in this repo, so it is read by
+  // the action it uses: every step is in the list, in order, named or not.
   it('the rollback checks its secrets first and skips only the promote on a dry run (#241)', () => {
     const steps = rollbackSteps();
     expect(
-      steps.map((step) => `${step.name}: ${stepCondition(step) || 'always'}`),
+      steps.map(
+        (step) =>
+          `${step.name ?? step.uses?.split('@')[0]}: ${stepCondition(step) || 'always'}`,
+      ),
     ).toEqual([
       'Check the secrets are set: always',
+      'actions/checkout: always',
+      'actions/setup-node: always',
       'Find the deployment to roll back to: always',
       'Promote it: !inputs.dry_run',
     ]);
