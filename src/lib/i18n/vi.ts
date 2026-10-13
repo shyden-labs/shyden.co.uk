@@ -261,7 +261,7 @@ export const vi: Catalogue = {
     SEX_NEEDS_ALL_SET:
       '{names} chưa được chỉ định giới tính, do đó chế độ này sẽ không thể hoạt động cho đến khi tất cả học sinh đều được chỉ định. Hãy chỉ định giới tính cho từng em hoặc tắt tính năng này đi.',
     SEX_SEPARATE_SPLITS_UNIT:
-      '{howMany, select, two {{names} được đánh dấu để ở cùng nhau, nhưng không cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy xóa chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.} other {{names} được đánh dấu để ở cùng nhau, nhưng không phải tất cả đều cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy gỡ bỏ chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.}}',
+      '{howMany, select, two {{names} được đánh dấu để ở cùng nhau, nhưng không cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy gỡ bỏ chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.} other {{names} được đánh dấu để ở cùng nhau, nhưng không phải tất cả đều cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy gỡ bỏ chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.}}',
     SEX_SEPARATE_IMPOSSIBLE:
       'Không thể chia các em trai và em gái thành các nhóm riêng biệt trong {groupsRequested} nhóm mà vẫn đảm bảo tuân thủ các quy tắc khác của bạn. Hệ thống tìm kiếm không thể xác định được quy tắc nào là nguyên nhân gây ra vấn đề, vì vậy hãy thử một trong hai cách khắc phục sau: yêu cầu số lượng nhóm khác hoặc tắt chế độ này.',
     SEX_SEPARATE_SEARCH_GAVE_UP:
@@ -279,7 +279,7 @@ export const vi: Catalogue = {
     SEX_SPILLOVER:
       '{sex, select, M {{names} đã gia nhập một nhóm các bạn nữ vì không có đủ bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là do tỷ lệ giới tính như vậy, chứ không phải là một sai lầm cần khắc phục.} other {{names} đã gia nhập một nhóm các cậu bé vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.}}',
     PINNED_MIXED_SEX:
-      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là yêu cầu của ghim, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
+      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     SEX_BOTH_TOO_SMALL:
       '{names} đã được xếp vào một nhóm chung vì số lượng của cả hai giới đều không đủ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia theo số lượng, chứ không phải là một sai sót cần sửa chữa.',
   },

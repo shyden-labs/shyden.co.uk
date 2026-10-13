@@ -223,7 +223,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printWhatGroups: '分组结果',
     rosterClashMessage: '{names} 被放在一起，因此无法再把他们分开。',
     'warnings.PINNED_MIXED_SEX':
-      '{howMany, select, two {{names} 被一起固定为一个组，但组内成员性别不同，因此该组并未像其他组那样按性别划分。这正是该固定操作的要求，并非需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
+      '{howMany, select, two {{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): 否, a form's no, where 不 was.
     'csv.absentNo': '否',
@@ -347,7 +347,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     rosterClashMessage:
       '{names} được xếp cùng nhau, nên không thể đồng thời tách biệt các em.',
     'warnings.PINNED_MIXED_SEX':
-      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là yêu cầu của ghim, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
+      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     // #603's sheet, read by the operator on 2026-10-07 (every short label no
     // check could judge, https://claude.ai/artifact/AgCDjpCJ2AQkKmdSC4cznm).
     // Values are as they stand AFTER the twelve changes he agreed there.
