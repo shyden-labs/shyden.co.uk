@@ -11,6 +11,7 @@ import {
   openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { FLOOR_PX } from '../../src/scripts/projector';
 import { measureBoard } from '../board-geometry';
 import { recorded, shoot } from './evidence';
@@ -707,7 +708,10 @@ test.describe('the projector board holds a real name', () => {
   }) => {
     // Every student carries a sex: "Make Groups" does not enable until they
     // all do (operator, 2026-08-13). This test is about how a long NAME wraps
-    // on the board, so the sex is just the price of reaching the board.
+    // on the board, so the sex is just the price of reaching the board. The
+    // board opens as the overlay: a granted fullscreen resizes Firefox's
+    // window after it opens, mid-measurement (#758).
+    await refuseFullscreen(page);
     await buildRoster(page, [
       ['M', 'Christopher Wetherington-Smythe'],
       ['M', 'Bob'],
@@ -817,6 +821,12 @@ const boardOf = async (
   count: string,
   size: string,
 ) => {
+  // Geometry, not fullscreen, is the subject, so the board opens as the
+  // overlay (`refuseFullscreen`): granted, Firefox grows the window to the
+  // runner's screen after the board has opened, and a reading taken in that
+  // gap describes neither layout (#758). The granted path keeps its own
+  // test, which waits for the grant to settle.
+  await refuseFullscreen(page);
   await page.goto('/classroom-groups');
   await makeGroups(page, count, size);
   await expect(page.locator('#cg-results .group').first()).toBeVisible();
@@ -854,7 +864,24 @@ const boardGeometry = async (page: import('@playwright/test').Page) =>
 const expectNothingOutOfReach = async (
   page: import('@playwright/test').Page,
   what: string,
+  named?: { width: number; height: number },
 ) => {
+  // A reading means what it says only at the viewport the test names (#758).
+  // Granted fullscreen, Firefox grows the window to the runner's whole screen
+  // (1366x768 on CI, from a 740x360 phone), asynchronously, and no context
+  // option holds it: measured in every engine on run 38376192900. The size
+  // is handed in by a test that set it, never read from `page.viewportSize()`,
+  // which is null on a real phone (`viewport-tagging.test.ts`).
+  if (named) {
+    const at = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
+    expect(
+      at,
+      `${what}: measured at ${at.width}x${at.height}, not the viewport the test names`,
+    ).toEqual(named);
+  }
   const seen = await boardGeometry(page);
   const where =
     `${seen.rows} row(s) at ${seen.font}: a ${seen.scrollHeight}px sheet ` +
@@ -927,6 +954,7 @@ test.describe('the projector board never hides a name', () => {
     test(`nothing waiting is out of reach -- ${shape.what}`, async ({
       page,
     }) => {
+      await refuseFullscreen(page);
       await openWaitingBoard(page, shape.count, shape.size);
       await expectNothingOutOfReach(page, 'the waiting board');
     });
@@ -938,8 +966,13 @@ test.describe('the projector board never hides a name', () => {
       { tag: '@emulated-viewport' },
       async ({ page }) => {
         await page.setViewportSize(shape.viewport);
+        await refuseFullscreen(page);
         await openWaitingBoard(page, shape.count, shape.size);
-        await expectNothingOutOfReach(page, 'the waiting board, short');
+        await expectNothingOutOfReach(
+          page,
+          'the waiting board, short',
+          shape.viewport,
+        );
       },
     );
   }
@@ -948,7 +981,9 @@ test.describe('the projector board never hides a name', () => {
     'the waiting board does not scroll sideways at 320px',
     { tag: '@emulated-viewport' },
     async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 568 });
+      const narrow = { width: 320, height: 568 };
+      await page.setViewportSize(narrow);
+      await refuseFullscreen(page);
       await openWaitingBoard(page, '25', '5');
       const stage = page.locator('#cg-board-stage');
       const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
@@ -957,7 +992,7 @@ test.describe('the projector board never hides a name', () => {
       }));
       expect(clientWidth).toBeGreaterThan(0);
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-      await expectNothingOutOfReach(page, 'the waiting board at 320px');
+      await expectNothingOutOfReach(page, 'the waiting board at 320px', narrow);
     },
   );
 
@@ -975,7 +1010,11 @@ test.describe('the projector board never hides a name', () => {
       async ({ page }) => {
         await page.setViewportSize(shape.viewport);
         await boardOf(page, shape.count, shape.size);
-        await expectNothingOutOfReach(page, 'group cards on a short board');
+        await expectNothingOutOfReach(
+          page,
+          'group cards on a short board',
+          shape.viewport,
+        );
       },
     );
   }
@@ -999,6 +1038,9 @@ test.describe('the projector board never hides a name', () => {
       await released;
       await route.continue();
     });
+    // The overlay, so both readings are of the viewport the test sets and
+    // not of a window Firefox is still growing into fullscreen (#758).
+    await refuseFullscreen(page);
     await page.goto('/classroom-groups', { waitUntil: 'domcontentloaded' });
     await makeGroups(page, '8', '2');
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
@@ -1054,6 +1096,88 @@ test.describe('the projector board never hides a name', () => {
     await expectNothingOutOfReach(
       page,
       'group cards on the refused-grant board',
+    );
+  });
+
+  test('a granted fullscreen settles with nothing out of reach and no needless scrollbar', async ({
+    page,
+  }) => {
+    // #758. Granted, Firefox grows the window to the runner's screen
+    // (740x360 -> 1366x768 on CI) AFTER the board has opened: its
+    // `fullscreenchange` arrives with the old `scrolls`, and the `resize`
+    // that refits the board comes ~30 ms later (run 38376192900). The
+    // reading is therefore taken once the grant has resolved AND, if the
+    // window changed size, once a resize has followed -- a condition of the
+    // race itself, never a delay. A refused or unavailable grant (iOS) is
+    // settled at once: that board is the overlay.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __grant?: string; __resized?: boolean };
+      addEventListener('resize', () => (w.__resized = true));
+      const real = Element.prototype.requestFullscreen;
+      if (!real) {
+        w.__grant = 'unavailable';
+        return;
+      }
+      Element.prototype.requestFullscreen = function (
+        this: Element,
+        ...args: Parameters<Element['requestFullscreen']>
+      ) {
+        w.__grant = 'pending';
+        const asked = real.apply(this, args);
+        asked.then(
+          () => (w.__grant = 'granted'),
+          () => (w.__grant = 'refused'),
+        );
+        return asked;
+      };
+    });
+    await page.goto('/classroom-groups');
+    await makeGroups(page, '25', '5');
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    const before = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
+    await page
+      .getByRole('button', { name: /Full screen|Layar penuh/ })
+      .first()
+      .click();
+    await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+    const grant = await page.waitForFunction(({ width, height }) => {
+      const w = window as unknown as { __grant?: string; __resized?: boolean };
+      if (w.__grant === 'refused' || w.__grant === 'unavailable')
+        return w.__grant;
+      if (w.__grant !== 'granted') return false;
+      const sameSize = innerWidth === width && innerHeight === height;
+      return sameSize || w.__resized === true ? w.__grant : false;
+    }, before);
+    // Two frames, so the refit the last resize ran has been laid out.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+
+    const seen = await boardGeometry(page);
+    const where =
+      `${await grant.jsonValue()} grant, ${seen.rows} row(s) at ${seen.font}: ` +
+      `a ${seen.scrollHeight}px sheet in a ${seen.clientHeight}px stage, overflow-y: ${seen.overflowY}`;
+    expect(
+      searched(seen.unreachable, { of: seen.cards, what: 'group cards' }),
+      where,
+    ).toEqual([]);
+    expect(
+      floorBreach('projector/settled-grant-cards', seen.cards.length),
+    ).toBeUndefined();
+    expect(
+      seen.scrollable,
+      `${where} -- the stage scrolls exactly when its sheet overflows`,
+    ).toBe(seen.scrollHeight > seen.clientHeight);
+    await shoot(
+      page,
+      `a settled ${await grant.jsonValue()} board: nothing out of reach, scrolls only if it overflows`,
+      page.locator('#cg-board'),
     );
   });
 });
