@@ -12,6 +12,8 @@
 import {
   anonymousStudent,
   buildGroups,
+  plannedGroups,
+  type GroupingInput,
   type Student,
   type Mode,
   type Leftovers,
@@ -787,6 +789,9 @@ if (form) {
    * `updateRosterValidation` therefore hands the decision here rather than
    * setting the property itself.
    */
+  // Filled once the board exists (#743): its button follows this same fact,
+  // and `updateGoButton` first runs during set-up, before the board does.
+  let onShuffleReadinessChanged: (() => void) | null = null;
   const updateGoButton = () => {
     // Copied, not passed straight through: `getRoster()` hands back a
     // `readonly Student[]` and `rosterProblems` takes a mutable one, which
@@ -810,6 +815,7 @@ if (form) {
     } else {
       goButton.removeAttribute('aria-describedby');
     }
+    onShuffleReadinessChanged?.();
   };
 
   /**
@@ -1517,9 +1523,25 @@ if (form) {
     // it to `skip` -- one fact, read once, rather than two checks that
     // could disagree.
     animates: () => speedSelect.value !== 'skip',
+    // #743: opened before the first deal, the board waits with empty cards;
+    // closed without one, the page is left as it was (AC4).
+    onEnter: () => {
+      if (lastGroups === null) showWaiting();
+    },
+    onLeave: () => {
+      if (lastGroups !== null) return;
+      hideWaiting();
+      tables.textContent = '';
+      results.hidden = true;
+    },
   });
+  // #743 AC1: the board opens whenever the page's own Shuffle can run, to
+  // deal with the class watching, as well as once groups exist. It reads
+  // `goButton.disabled` itself, the fact `updateGoButton` alone writes.
   const refreshBoardAvailability = () =>
-    projector?.setAvailable(lastGroups !== null);
+    projector?.setAvailable(lastGroups !== null || !goButton.disabled);
+  onShuffleReadinessChanged = refreshBoardAvailability;
+  refreshBoardAvailability();
 
   const ioBody = $<HTMLElement>('cg-io-body');
   const io = ioBody
@@ -2162,6 +2184,69 @@ if (form) {
   //
   // Neither disables the button. Pressing "Shuffle again" during a deal
   // starts a new one from the top, which is what the button says it does.
+  // ── the waiting board (#743) ────────────────────────────────────────────
+  const waiting = $<HTMLElement>('cg-waiting')!;
+  const waitingList = $<HTMLUListElement>('cg-waiting-list')!;
+  const waitingError = $<HTMLParagraphElement>('cg-waiting-error')!;
+
+  /**
+   * A board opened before the first deal: the heading, one card per group
+   * the deal will make (`plannedGroups`, the deal's own code, so the count
+   * cannot disagree), and every student the deal will place, numbered, with
+   * the name beside the number where the roster has one. Rendered into
+   * `#cg-results` through the same `render` a deal uses: one element, one
+   * render path (AC2).
+   */
+  const showWaiting = () => {
+    const input = dealInput();
+    const pinned = new Set(input.pinned.flat().map((s) => s.number));
+    const pool = (
+      typeof input.students === 'number'
+        ? Array.from({ length: input.students }, (_, i) =>
+            anonymousStudent(i + 1),
+          )
+        : input.students.filter((s) => !s.absent)
+    ).filter((s) => !pinned.has(s.number));
+
+    resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
+    render(plannedGroups(input) ?? []);
+    // A pinned member is already in place: nothing deals it in.
+    tables
+      .querySelectorAll('.student')
+      .forEach((c) => c.classList.add('dealt'));
+    waitingList.textContent = '';
+    for (const student of pool) {
+      const li = document.createElement('li');
+      li.className = 'waiting-student';
+      li.dataset.number = String(student.number);
+      const number = document.createElement('span');
+      number.className = 'number';
+      number.textContent = String(student.number);
+      li.appendChild(number);
+      const name = rosterNames.get(student.number);
+      if (name) {
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = name; // the untrusted value, set as TEXT
+        li.appendChild(who);
+      }
+      waitingList.appendChild(li);
+    }
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+    waiting.hidden = false;
+    results.hidden = false;
+    projector?.setShuffleLabel(t.makeGroups);
+  };
+
+  /** The waiting board is gone: by a deal, or by leaving without one. */
+  const hideWaiting = () => {
+    waiting.hidden = true;
+    waitingList.textContent = '';
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+  };
+
   let dealToken = 0;
   let dealSkip = false;
   const finishDealNow = () => {
@@ -2202,13 +2287,12 @@ if (form) {
     sfx.done();
   };
 
-  // ── submit ──────────────────────────────────────────────────────────────
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    errorBox.hidden = true;
-
-    const mode = readMode();
-
+  /**
+   * What the deal is asked to group, read from the form: the ONE reading,
+   * shared by the deal and by the waiting board's plan (#743), so the cards
+   * shown before a shuffle are the cards the shuffle fills.
+   */
+  const dealInput = (): Omit<GroupingInput, 'random' | 'searchNodeCap'> => {
     const count = readCount();
     // The roster takes over the moment it is non-empty; `count` is the
     // fallback for the case where a teacher never opens Student details at
@@ -2228,17 +2312,37 @@ if (form) {
       roster.length > 0
         ? roster
         : studentsForInput(count, readNumberFields().fields);
-    const outcome = buildGroups({
+    return {
       students,
-      mode,
+      mode: readMode(),
       leftovers: readLeftovers(),
       sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
       pinned: [], // a later stage wires the pins
-      random: Math.random,
-    });
+    };
+  };
+
+  // ── submit ──────────────────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+
+    const input = dealInput();
+    const { students } = input;
+    const outcome = buildGroups({ ...input, random: Math.random });
 
     if (!outcome.ok) {
-      results.hidden = true;
+      // From the waiting board the cards and the list stay up, and the
+      // reason is said there as well as on the page (#743 AC5).
+      if (waiting.hidden) {
+        results.hidden = true;
+      } else {
+        waitingError.hidden = false;
+        waitingError.textContent = renderError(
+          outcome.error,
+          t,
+          resolveStudent,
+        );
+      }
       // The sheet is gone, so "Export groups" must go with it -- otherwise
       // it stays offering the arrangement from before the refusal, which is
       // not on screen any more.
@@ -2264,6 +2368,8 @@ if (form) {
     }
 
     const { groups, warnings } = outcome.result;
+    hideWaiting();
+    projector?.setShuffleLabel(t.boardShuffle);
     // What the sheet is showing, for "Export groups" -- see `lastGroups`'s
     // own comment where it is declared.
     lastGroups = groups;

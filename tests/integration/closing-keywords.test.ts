@@ -65,6 +65,63 @@ describe('the closing-keyword command line', () => {
 });
 
 /**
+ * A branch shaped like a pull request's: one commit of its own and a merge of
+ * the base that moved on, `origin/develop` at the base's head, `feature`
+ * checked out. Returns the repository and its git.
+ */
+function aPullRequestBranch(): {
+  dir: string;
+  git: ReturnType<typeof scratchGit>;
+} {
+  const dir = scratchDir('pr-range-');
+  const git = scratchGit(dir);
+  const commit = (message: string) =>
+    git(['commit', '-q', '--allow-empty', '-m', message]);
+  git(['init', '-q', '-b', 'develop']);
+  git(['config', 'user.email', 'fixture@example.test']);
+  git(['config', 'user.name', 'Fixture']);
+  git(['config', 'commit.gpgsign', 'false']);
+  commit('already on the base');
+  git(['checkout', '-q', '-b', 'feature']);
+  commit('the branch work');
+  git(['checkout', '-q', 'develop']);
+  commit('the base moves on');
+  git(['update-ref', 'refs/remotes/origin/develop', 'develop']);
+  git(['checkout', '-q', 'feature']);
+  git(['merge', '-q', '--no-ff', 'develop', '-m', 'Merge develop, closes #5']);
+  return { dir, git };
+}
+
+/**
+ * Runs the workflow's own `git log` line in `dir` with `env` added, and
+ * returns every message it wrote, sorted.
+ */
+function messagesTheRangeReads(
+  dir: string,
+  env: Record<string, string>,
+): string[] {
+  const [only] = workflowsRunningTheRule();
+  const [range] = (only?.commands ?? []).filter((command) =>
+    command.startsWith('git log'),
+  );
+  expect(range, 'the step reads no commit range').toBeDefined();
+  const out = scratchDir('pr-range-out-');
+  execFileSync('bash', ['-c', range!], {
+    cwd: dir,
+    env: {
+      ...withoutLocalGit(process.env),
+      BASE_REF: 'develop',
+      RUNNER_TEMP: out,
+      ...env,
+    },
+  });
+  return readFileSync(join(out, 'commits.txt'), 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .sort();
+}
+
+/**
  * The medium that actually caused the second incident.
  *
  * `gh pr create` runs no git hook, so a pull request body never meets
@@ -81,54 +138,28 @@ describe('the rule covers a pull request body, not only a commit message', () =>
     // at HEAD. `--no-merges` left that one out, and with it every merge commit
     // the branch carries, which lands on develop, the default branch, with
     // its message intact (#390). The workflow's own command runs here,
-    // against a branch shaped like that.
-    const [only] = workflowsRunningTheRule();
-    const [range] = (only?.commands ?? []).filter((command) =>
-      command.startsWith('git log'),
-    );
-    expect(range, 'the step reads no commit range').toBeDefined();
-
-    const dir = scratchDir('pr-range-');
-    const git = scratchGit(dir);
-    const commit = (message: string) =>
-      git(['commit', '-q', '--allow-empty', '-m', message]);
-    git(['init', '-q', '-b', 'develop']);
-    git(['config', 'user.email', 'fixture@example.test']);
-    git(['config', 'user.name', 'Fixture']);
-    git(['config', 'commit.gpgsign', 'false']);
-    commit('already on the base');
-    git(['checkout', '-q', '-b', 'feature']);
-    commit('the branch work');
-    git(['checkout', '-q', 'develop']);
-    commit('the base moves on');
-    git(['update-ref', 'refs/remotes/origin/develop', 'develop']);
-    git(['checkout', '-q', 'feature']);
-    git([
-      'merge',
-      '-q',
-      '--no-ff',
-      'develop',
-      '-m',
-      'Merge develop, closes #5',
-    ]);
+    // against a branch shaped like that, with nothing but what a
+    // pull_request run sets: the tip is the line's own default.
+    const { dir, git } = aPullRequestBranch();
     git(['checkout', '-q', '--detach', 'develop']);
     git(['merge', '-q', '--no-ff', 'feature', '-m', 'the checkout merge']);
 
-    const out = scratchDir('pr-range-out-');
-    execFileSync('bash', ['-c', range!], {
-      cwd: dir,
-      env: {
-        ...withoutLocalGit(process.env),
-        BASE_REF: 'develop',
-        RUNNER_TEMP: out,
-      },
-    });
     // Every message, whole: the base's commit and the checkout's merge are
     // absent, and the branch's merge is present.
-    const messages = readFileSync(join(out, 'commits.txt'), 'utf8')
-      .split('\n')
-      .filter((line) => line !== '')
-      .sort();
-    expect(messages).toEqual(['Merge develop, closes #5', 'the branch work']);
+    expect(messagesTheRangeReads(dir, {})).toEqual([
+      'Merge develop, closes #5',
+      'the branch work',
+    ]);
+  });
+
+  it('reads the same commits on a dispatched run, which checks the branch out itself (#651)', () => {
+    // A dispatched run (the floor recorder's, after its commit) has no
+    // synthetic merge: HEAD is the branch, and the step sets TIP to it.
+    const { dir } = aPullRequestBranch();
+
+    expect(messagesTheRangeReads(dir, { TIP: 'HEAD' })).toEqual([
+      'Merge develop, closes #5',
+      'the branch work',
+    ]);
   });
 });

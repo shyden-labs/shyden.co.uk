@@ -10,6 +10,7 @@ import {
   checkLabels,
   checkNamedLabels,
   renderedOn,
+  wholeWordIndexes,
 } from '../../src/lib/i18n/label-check';
 
 /**
@@ -36,6 +37,52 @@ const SEX_SENTENCE = unit(
   'Mix the groups by sex so each one is balanced',
   'Trộn các nhóm theo giới tính để mỗi nhóm cân bằng',
 );
+
+/**
+ * Where a label stands in copy as whole words (#686). It replaced a regular
+ * expression compiled per label with Unicode-property lookarounds, which cost
+ * the first test in each worker ~75 ms while V8 compiled one per label.
+ */
+describe('wholeWordIndexes: where a label stands as whole words', () => {
+  it.each([
+    ['a word between spaces', 'press Calculate now', 'Calculate', [6]],
+    ['the start and the end of the text', 'sex', 'sex', [0]],
+    ['not inside a longer word', 'Essex', 'sex', []],
+    ['not before a letter', 'sexes', 'sex', []],
+    ['not after a digit', '2sex', 'sex', []],
+    ['beside punctuation', '"Sound off."', 'Sound off', [1]],
+    [
+      'every occurrence, left to right',
+      'Dark mode or Dark mode',
+      'Dark mode',
+      [0, 13],
+    ],
+    [
+      'an occurrence that fails its boundary, then one that holds',
+      'Darkmode Dark mode',
+      'Dark mode',
+      [9],
+    ],
+    ['not overlapping, as a global match scans', 'a a a', 'a a', [0]],
+    ['an astral letter is a letter', '\u{10400}sex', 'sex', []],
+    ['an astral symbol is not', '\u{1F600}sex', 'sex', [2]],
+  ] as const)('%s', (_case, text, needle, expected) => {
+    expect(wholeWordIndexes(text, needle)).toEqual(expected);
+  });
+
+  it.each([
+    ['a plural s', 'both labels', 'label', [5]],
+    ['a plural es', 'both sexes', 'sex', [5]],
+    ['no plural without asking for one', 'both sexes', 'sex', null],
+    ['a plural is still a whole word', 'labelsx', 'label', []],
+  ] as const)('with a plural allowed: %s', (_case, text, needle, expected) => {
+    expect(
+      expected === null
+        ? wholeWordIndexes(text, needle)
+        : wholeWordIndexes(text, needle, { plural: true }),
+    ).toEqual(expected ?? []);
+  });
+});
 
 describe('checkLabels: a label against the rest of its locale', () => {
   it('a label its own sentences use agrees', () => {
@@ -299,7 +346,15 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
       'No class list arrived. Go back to the other tab and try again.',
       '没有收到名单。',
     );
-    expect(checkNamedLabels([list, common], 'zh')).toEqual([]);
+    // What the check walks: the label unit and the sentence that holds its
+    // common words.
+    const units = [list, common];
+    expect(
+      searched(checkNamedLabels(units, 'zh'), { of: units, what: 'units' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('label-check/common-words-units', units.length),
+    ).toBeUndefined();
   });
 
   // #403. English capitalises a language's name wherever it stands, so the

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { nonEmpty } from '../source-files';
+import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 import { withoutIniComments, withoutYamlComments } from './source-text';
 
 /**
@@ -50,29 +51,50 @@ const nvmrcMajor = (): number => {
 const packageJson = (): Record<string, unknown> =>
   JSON.parse(readFileSync('package.json', 'utf8'));
 
-/**
- * The FLOOR expressed by `engines.node`, as `[major, minor, patch]`.
- *
- * Deliberately tolerant of how the range is written (`>=24`, `>= 24.0.0`,
- * `^24.0.0`) but strict that a floor exists at all: a range with no lower
- * bound states no contract and must not pass. A part the range leaves out
- * reads as 0, the way npm reads `>=24`.
- */
-const enginesFloor = (): [number, number, number] => {
+/** `engines.node` as written. */
+const enginesRange = (): string => {
   const engines = packageJson().engines as { node?: string } | undefined;
   const range = engines?.node;
   if (typeof range !== 'string') {
     throw new Error('package.json has no engines.node');
   }
-  const floor = range.match(/(?:>=|\^|~)?\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
-  if (!floor) {
-    throw new Error(`engines.node states no floor: ${JSON.stringify(range)}`);
-  }
-  return [Number(floor[1]), Number(floor[2] ?? 0), Number(floor[3] ?? 0)];
+  return range;
 };
 
-/** The floor's major, which `.nvmrc` has to agree with. */
-const enginesFloorMajor = (): number => enginesFloor()[0];
+/**
+ * The FLOOR of each alternative `engines.node` admits, as
+ * `[major, minor, patch]`, in the order written.
+ *
+ * A range may hold alternatives (`^24.16.0 || >=26.3.0`, #646: Dependabot's
+ * npm updater installs on Node 24, so 24 stays admitted while `.nvmrc` moves
+ * to 26). Each one is read on its own. Deliberately tolerant of how a floor is
+ * written (`>=24`, `>= 24.0.0`, `^24.0.0`) but strict that every alternative
+ * states one: an alternative with no lower bound states no contract and must
+ * not pass. A part the range leaves out reads as 0, the way npm reads `>=24`.
+ */
+const enginesFloors = (): [number, number, number][] => {
+  const range = enginesRange();
+  return range.split('||').map((alternative) => {
+    const floor = alternative
+      .trim()
+      .match(/^(?:>=|\^|~)?\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+    if (!floor) {
+      throw new Error(
+        `engines.node alternative ${JSON.stringify(alternative.trim())} states no floor: ${JSON.stringify(range)}`,
+      );
+    }
+    return [Number(floor[1]), Number(floor[2] ?? 0), Number(floor[3] ?? 0)];
+  });
+};
+
+/** The major of a caret or exact version (`^26.6.5`, `26.6.5`). */
+const majorOf = (version: string): number => {
+  const major = version.match(/^\^?(\d+)\.\d+\.\d+$/);
+  if (!major) {
+    throw new Error(`not a caret or exact version: ${JSON.stringify(version)}`);
+  }
+  return Number(major[1]);
+};
 
 /** Negative, zero or positive as version `a` is below, at or above `b`. */
 const compareVersions = (a: readonly number[], b: readonly number[]): number =>
@@ -108,7 +130,20 @@ const workflowBodies = (): [string, string][] =>
 describe('the Node version contract is stated once and agreed everywhere', () => {
   it('declares engines.node in package.json', () => {
     expect(packageJson().engines).toBeDefined();
-    expect(enginesFloorMajor()).toBeTypeOf('number');
+    expect(enginesFloors().length).toBeGreaterThan(0);
+  });
+
+  // The levels themselves, as literals (#646, global rule 2026-10-08: every
+  // project on Node 26, 26.3 or later). A figure asserted against the file it
+  // was read from would move with it and pin nothing.
+  it('runs on Node 26 (#646)', () => {
+    expect(nvmrcMajor()).toBe(26);
+  });
+
+  it('admits Node 26.3 or later, and the 24 line Dependabot installs on (#646)', () => {
+    // dependabot-core's npm_and_yarn image installs on Node 24, and
+    // engine-strict would refuse an install there if 24 left the range.
+    expect(enginesRange()).toBe('^24.16.0 || >=26.3.0');
   });
 
   it('enforces engines at install time via .npmrc engine-strict', () => {
@@ -117,21 +152,50 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
     expect(npmrc().get('engine-strict')).toBe('true');
   });
 
-  it('keeps engines.node and .nvmrc on the same major, in both directions', () => {
+  it('keeps the highest engines.node floor and .nvmrc on the same major, in both directions', () => {
     // One assertion, two failure modes: bumping either file alone breaks it.
-    expect(enginesFloorMajor()).toBe(nvmrcMajor());
+    // The highest floor is the line CI runs; a lower alternative (#646's 24)
+    // stays admitted for installers that cannot move yet.
+    const majors = enginesFloors().map(([major]) => major);
+    expect(Math.max(...majors)).toBe(nvmrcMajor());
   });
 
-  it('names a floor that ships import.meta.main, which every entry script relies on (#221)', () => {
+  it('names floors that ship import.meta.main, which every entry script relies on (#221)', () => {
     // From Node's changelog, not from memory: v24.2.0 (2025-06-09) lists
     // "import.meta.main is now available", commit adef9af3ae, nodejs/node#57804.
     // Below it the expression is `undefined`, so every script that asks it
     // would skip `main()` and exit 0 without a word (`script-entry.test.ts`).
-    const floor = enginesFloor();
+    // Every alternative is a Node npm will install on, so every one is judged.
+    const floors = enginesFloors();
+    const below = floors
+      .filter((floor) => compareVersions(floor, [24, 2, 0]) < 0)
+      .map((floor) => floor.join('.'));
     expect(
-      compareVersions(floor, [24, 2, 0]),
-      `engines.node floor ${floor.join('.')}`,
-    ).toBeGreaterThanOrEqual(0);
+      searched(below, { of: floors, what: 'engines.node alternatives' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('node-contract/engine-alternatives', floors.length),
+    ).toBeUndefined();
+  });
+
+  // The types describe the Node CI runs, not the newest one, nor the older
+  // one npm would otherwise resolve through vitest and vite (#646, operator
+  // 2026-10-09: declare it).
+  it('declares @types/node on the major .nvmrc names (#646)', () => {
+    const declared = (
+      packageJson().devDependencies as Record<string, string> | undefined
+    )?.['@types/node'];
+    expect(declared, 'devDependencies["@types/node"]').toBeTypeOf('string');
+    expect(majorOf(declared ?? '')).toBe(nvmrcMajor());
+  });
+
+  it('installs @types/node on the major .nvmrc names (#646)', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+      packages?: Record<string, { version?: string }>;
+    };
+    const installed = lock.packages?.['node_modules/@types/node']?.version;
+    expect(installed, 'the lock installs @types/node').toBeTypeOf('string');
+    expect(majorOf(installed ?? '')).toBe(nvmrcMajor());
   });
 
   it('reads Node from .nvmrc in every workflow that sets Node up', () => {

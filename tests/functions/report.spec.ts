@@ -44,7 +44,7 @@ test.describe('with JavaScript disabled', () => {
       await page.getByRole('button', { name: vi.send }).click();
       await expect(page).toHaveURL(/\/vi\/#report-sent$/);
       await expect(page.locator('#report-sent')).toBeVisible();
-      const rows = reportsWithNote(note);
+      const rows = await reportsWithNote(note);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         locale: 'vi',
@@ -63,7 +63,7 @@ test.describe('with JavaScript disabled', () => {
     async ({ page }) => {
       const stem = noteFor('not-found');
       const note = `${stem} refused`;
-      plantReport(`${stem} control`);
+      await plantReport(`${stem} control`);
       await page.goto(pagePath('home', 'vi'));
       await fillReport(page, 'on no page at all, anywhere', note);
       await page.getByRole('button', { name: vi.send }).click();
@@ -71,9 +71,9 @@ test.describe('with JavaScript disabled', () => {
       await expect(page.locator('#report-not-found')).toBeVisible();
       // Drawn from the table's own rows under this test's stem: the planted
       // control, which the endpoint did not write. One row, on every engine.
-      const stored = reportsStartingWith(stem);
+      const stored = await reportsStartingWith(stem);
       expect(
-        searched(reportsWithNote(note), {
+        searched(await reportsWithNote(note), {
           of: stored,
           what: 'reports stored under this test',
         }),
@@ -101,7 +101,7 @@ test.describe('with JavaScript disabled', () => {
         await block.getByRole('button', { name: t.report.send }).click();
         await expect(page).toHaveURL(new RegExp(`/404#report-${locale}-sent$`));
         await expect(page.locator(`#report-${locale}-sent`)).toBeVisible();
-        const rows = reportsWithNote(note);
+        const rows = await reportsWithNote(note);
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({
           locale,
@@ -119,7 +119,7 @@ test.describe('with JavaScript disabled', () => {
     async ({ page }) => {
       const stem = noteFor('404 cross-block');
       const note = `${stem} refused`;
-      plantReport(`${stem} control`);
+      await plantReport(`${stem} control`);
       const block = page.locator('details[data-report][lang="vi"]');
       await page.goto('/404');
       await block.locator('summary').click();
@@ -131,9 +131,9 @@ test.describe('with JavaScript disabled', () => {
       await expect(page).toHaveURL(/\/404#report-vi-not-found$/);
       await expect(page.locator('#report-vi-not-found')).toBeVisible();
       // The planted control is the only row under this test's stem.
-      const stored = reportsStartingWith(stem);
+      const stored = await reportsStartingWith(stem);
       expect(
-        searched(reportsWithNote(note), {
+        searched(await reportsWithNote(note), {
           of: stored,
           what: 'reports stored under this test',
         }),
@@ -150,7 +150,7 @@ test('a cross-origin POST is refused and stores nothing', async ({
 }) => {
   const stem = noteFor('cross-origin');
   const note = `${stem} refused`;
-  plantReport(`${stem} control`);
+  await plantReport(`${stem} control`);
   const response = await request.post('/api/report', {
     headers: {
       Origin: 'https://evil.example',
@@ -166,9 +166,9 @@ test('a cross-origin POST is refused and stores nothing', async ({
   });
   expect(response.status()).toBe(403);
   // The planted control is the only row under this test's stem.
-  const stored = reportsStartingWith(stem);
+  const stored = await reportsStartingWith(stem);
   expect(
-    searched(reportsWithNote(note), {
+    searched(await reportsWithNote(note), {
       of: stored,
       what: 'reports stored under this test',
     }),
@@ -206,7 +206,7 @@ test.describe('on a tool page', () => {
     await expect(page.getByLabel(vi.quoteLabel, { exact: true })).toHaveValue(
       '',
     );
-    expect(reportsWithNote(note)).toHaveLength(1);
+    expect(await reportsWithNote(note)).toHaveLength(1);
   });
 
   test('a double click stores one report', async ({ page }) => {
@@ -215,7 +215,7 @@ test.describe('on a tool page', () => {
     await fillReport(page, vi.open, note);
     await page.getByRole('button', { name: vi.send }).dblclick();
     await expect(page.locator('#report-sent')).toBeVisible();
-    expect(reportsWithNote(note)).toHaveLength(1);
+    expect(await reportsWithNote(note)).toHaveLength(1);
   });
 
   test('a later outcome replaces the earlier one', async ({ page }) => {
@@ -244,6 +244,6 @@ test.describe('on a tool page', () => {
     await expect(page.locator('#report-sent')).toBeVisible();
     await expect(page.locator('#report-not-found')).toBeHidden();
     await expect(page.locator('.report-status:visible')).toHaveCount(1);
-    expect(reportsWithNote(note)).toHaveLength(1);
+    expect(await reportsWithNote(note)).toHaveLength(1);
   });
 });

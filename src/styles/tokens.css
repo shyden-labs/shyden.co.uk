@@ -3,7 +3,7 @@
    is defined on bare :root. Aurora (#17), the dark one, redefines the same
    tokens, and only the tokens, in the two screen-only blocks below it. Every
    value is derived against the ground it sits on and ASSERTED, in both
-   themes, in tests/unit/contrast.test.ts — a comment claiming a ratio is not
+   themes, in tests/guards/contrast.test.ts — a comment claiming a ratio is not
    a control, which is how a 1.17:1 control boundary shipped to production
    (#133). */
 @import '@fontsource-variable/bricolage-grotesque';
@@ -71,7 +71,7 @@
      tones were made for a dark ground and measure 1.28:1 and 1.70:1 on
      white, so in light it sits on ShyTalk's own tile colour, like a logo
      badge: 15.02:1 and 11.32:1. The same value as SHYTALK_MARK.tile, held
-     equal by tests/unit/tokens.test.ts, because the colour now lives in two
+     equal by tests/guards/tokens.test.ts, because the colour now lives in two
      files. */
   --wordmark-tile: #0f0d15;
   --wordmark-pad: 0.12em 0.42em 0.18em;
@@ -104,7 +104,7 @@
    Both copies are screen-only, and that is load-bearing for print. Their
    selectors outrank the print block's bare :root, so on paper they would put
    Aurora's near-white ink on white paper: the blank sheet of 2026-09-11.
-   tests/unit/tokens.test.ts finds every block that declares
+   tests/guards/tokens.test.ts finds every block that declares
    `color-scheme: dark`, keeps each screen-only, and proves them identical. */
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {

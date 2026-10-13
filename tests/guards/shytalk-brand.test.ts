@@ -36,7 +36,7 @@ const SCAN = ['src', 'tests'];
  * the theme, not the component, decides whether the mark sits on it, so
  * tokens.css declares `--wordmark-tile` with the tile's hex on bare `:root`.
  * That file may spell the tile and nothing else of the mark, and only once;
- * tests/unit/tokens.test.ts holds the value equal to SHYTALK_MARK.tile.
+ * tests/guards/tokens.test.ts holds the value equal to SHYTALK_MARK.tile.
  */
 const TOKEN_HOME = 'src/styles/tokens.css';
 const TOKEN_FORM = SHYTALK_MARK.tile.toLowerCase();

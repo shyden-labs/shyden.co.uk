@@ -31,9 +31,9 @@ import { withoutTsComments } from '../unit/source-text';
  * `vitest`, and a `const` initialised from one (`const check = it`,
  * `const base = test.extend({...})`), resolved to a fixed point.
  *
- * Not judged here: the guards and integration suites' limits, which live on
- * their package.json commands (`guards-budget` and `integration-budget` pin
- * them), and the unit command itself (`unit-budget` pins it).
+ * Not judged here: the guards, simulation and integration suites' limits,
+ * which live on their package.json commands (`suite-budgets` pins them), and
+ * the unit command itself (`unit-budget` pins it).
  */
 
 const TEST_ROOTS = new Set(['it', 'test', 'describe', 'suite']);
@@ -47,6 +47,15 @@ const LIMIT_KEYS = new Set(['testTimeout', 'hookTimeout']);
 /** The one place a limit is written, and the one value it may take. */
 const CONFIG = 'vitest.config.ts';
 const THE_LIMIT = 1_000;
+/** The one place the CPU limit is written, and the one value it may take (#645). */
+const CPU_HOME = 'tests/unit-cpu-limit.ts';
+const CPU_NAME = 'CPU_LIMIT_MICROSECONDS';
+const LOAD_NAME = 'LOAD_LIMIT_MICROSECONDS';
+/** Each limit written in `CPU_HOME`, with the one value it may take (#645, #688, #714). */
+const HOME_LIMITS: Readonly<Record<string, number>> = {
+  [CPU_NAME]: 100_000,
+  [LOAD_NAME]: 500_000,
+};
 
 /** The identifier a callee chain starts from: `it.each([…]).only` -> `it`. */
 function rootName(node: ts.Expression): string | undefined {
@@ -164,7 +173,9 @@ export function readLimits(
   const refuse = (node: ts.Node, what: string): void => {
     findings.push(
       `${where(sf, node)} -- ${what}. The unit limit is 1 s, written once in ` +
-        `${CONFIG}; a unit test is never given more time (#632).`,
+        `${CONFIG}, and 0.1 s of a test's own CPU and 0.5 s to load a file, ` +
+        `written once in ${CPU_HOME}; a unit test is never given more time ` +
+        `(#632, #645, #688).`,
     );
   };
   let calls = 0;
@@ -264,6 +275,26 @@ export function readLimits(
       }
     }
     if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      Object.hasOwn(HOME_LIMITS, node.name.text)
+    ) {
+      const name = node.name.text;
+      const theLimit = HOME_LIMITS[name];
+      judged.push(`${where(sf, node)} ${name}`);
+      const value =
+        node.initializer === undefined
+          ? undefined
+          : valueOf(sf, node.initializer);
+      if (file !== CPU_HOME)
+        refuse(node, `\`${name}\` declared outside ${CPU_HOME}`);
+      else if (value !== theLimit)
+        refuse(
+          node,
+          `\`${name}\` is ${value === undefined ? 'a value that cannot be resolved to a number' : value}, not ${theLimit}`,
+        );
+    }
+    if (
       ts.isPropertyAssignment(node) ||
       ts.isShorthandPropertyAssignment(node)
     ) {
@@ -321,10 +352,14 @@ const configFiles = (): string[] =>
     )
     .sort();
 
-/** The unit population: every `.ts` file under `tests/unit` and every vitest config. */
+/**
+ * The unit population: every `.ts` file under `tests/unit`, every vitest
+ * config, and the CPU limit's home (#645).
+ */
 const population = (): string[] => [
   ...filesUnder('tests/unit', (path) => /\.[cm]?tsx?$/.test(path)),
   ...configFiles(),
+  CPU_HOME,
 ];
 
 const readAll = () =>
@@ -482,6 +517,47 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     ).toHaveLength(1);
   });
 
+  it('refuses a CPU limit above 100 000 in its home (#645, #714)', () => {
+    expect(found(`export const ${CPU_NAME} = 150_000;`, CPU_HOME)).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses the old 0.3 s CPU limit in its home (#714)', () => {
+    expect(found(`export const ${CPU_NAME} = 300_000;`, CPU_HOME)).toHaveLength(
+      1,
+    );
+  });
+
+  it('refuses a CPU limit through a named constant above 100 000 in its home', () => {
+    expect(
+      found(
+        `const RAISED = 150_000;\nexport const ${CPU_NAME} = RAISED;`,
+        CPU_HOME,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('refuses a CPU limit in its home that cannot be resolved', () => {
+    expect(
+      found(`export const ${CPU_NAME} = 100_000 * 2;`, CPU_HOME),
+    ).toHaveLength(1);
+  });
+
+  it('refuses the CPU limit declared outside its home', () => {
+    expect(found(`const ${CPU_NAME} = 100_000;`)).toHaveLength(1);
+  });
+
+  it('refuses a load limit above 500 000 in its home (#688)', () => {
+    expect(
+      found(`export const ${LOAD_NAME} = 600_000;`, CPU_HOME),
+    ).toHaveLength(1);
+  });
+
+  it('refuses the load limit declared outside its home (#688)', () => {
+    expect(found(`const ${LOAD_NAME} = 500_000;`)).toHaveLength(1);
+  });
+
   it('refuses a value in the config home that cannot be resolved', () => {
     expect(
       found(
@@ -544,6 +620,36 @@ describe('every form of a raised unit limit is read from the parse tree', () => 
     expect(reading.judged).toHaveLength(2);
     expect(
       floorBreach('unit-limit/allowed-constant', reading.judged.length),
+    ).toBeUndefined();
+  });
+
+  it('allows the CPU limit as its home spells it (#645, #714)', () => {
+    const reading = readLimits(
+      CPU_HOME,
+      `export const ${CPU_NAME} = 100_000;`,
+      false,
+    );
+    expect(
+      searched(reading.findings, { of: reading.judged, what: 'limit units' }),
+    ).toEqual([]);
+    expect(reading.judged).toHaveLength(1);
+    expect(
+      floorBreach('unit-limit/allowed-cpu', reading.judged.length),
+    ).toBeUndefined();
+  });
+
+  it('allows the load limit as its home spells it (#688)', () => {
+    const reading = readLimits(
+      CPU_HOME,
+      `export const ${LOAD_NAME} = 500_000;`,
+      false,
+    );
+    expect(
+      searched(reading.findings, { of: reading.judged, what: 'limit units' }),
+    ).toEqual([]);
+    expect(reading.judged).toHaveLength(1);
+    expect(
+      floorBreach('unit-limit/allowed-load', reading.judged.length),
     ).toBeUndefined();
   });
 
@@ -629,4 +735,17 @@ describe('the unit population holds no raised limit (#632)', () => {
       }));
     expect(properties).toEqual([{ file: CONFIG, count: 2 }]);
   });
+
+  it.each(Object.keys(HOME_LIMITS))(
+    'finds %s once, in its home, and nowhere else (#645, #688)',
+    (name) => {
+      const declarations = readAll()
+        .map(({ file, judged }) => ({
+          file,
+          count: judged.filter((unit) => unit.endsWith(` ${name}`)).length,
+        }))
+        .filter(({ count }) => count > 0);
+      expect(declarations).toEqual([{ file: CPU_HOME, count: 1 }]);
+    },
+  );
 });

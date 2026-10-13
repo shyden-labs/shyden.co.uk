@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { floorBreach } from '../floors';
+import { burnDownBreaches } from '../burn-down';
 import { FLOORLESS } from '../floorless-searches.burn-down';
 import {
   searchesWritten,
@@ -61,7 +62,15 @@ describe('searchSitesIn', () => {
     ],
   ])('reads a site in %s as floorless in its test', (_, source) => {
     const { sites, refused } = read(source);
-    expect(refused).toEqual([]);
+    // The searches the reader met in the source: each is read as a site or
+    // refused, so the two together are what a refusal count is judged over.
+    const met = [...sites, ...refused];
+    expect(
+      searched(refused, { of: met, what: 'searches the reader met' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/test-form-searches', met.length),
+    ).toBeUndefined();
     expect(sites).toEqual([
       expect.objectContaining({ scope: 'test', label: 't', floored: false }),
     ]);
@@ -148,7 +157,13 @@ describe('searchSitesIn', () => {
     ],
   ])('reads a site in %s by the function name', (_, source) => {
     const { sites, refused } = read(source);
-    expect(refused).toEqual([]);
+    const met = [...sites, ...refused];
+    expect(
+      searched(refused, { of: met, what: 'searches the reader met' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/function-form-searches', met.length),
+    ).toBeUndefined();
     expect(sites).toEqual([
       expect.objectContaining({
         scope: 'function',
@@ -288,21 +303,32 @@ describe('searchesWritten', () => {
 
 /** Every TypeScript file either runner reads: unit tests, specs and helpers. */
 const FILES = tsFilesUnder('tests');
-const READINGS = FILES.map((file) => {
-  const sf = parseFile(file);
-  return { file, sf, ...searchSitesIn(sf) };
-});
-const SITES = READINGS.flatMap(({ file, sites }) =>
-  sites.map((site) => ({ file, ...site })),
-);
-const TESTS = READINGS.flatMap(({ file, tests }) =>
-  tests.map((title) => `${file} › ${title}`),
-);
+
+// The parse of those files, run ONCE, by the first test that asks for it
+// (#709, as #700 did for the duplication scan). At module scope it ran while
+// the file loaded, where no limit sees it: 1,241 / 1,280 ms of CPU on the
+// runner (#696). In a test it runs under the guards' 25 s per-test limit.
+// Listing the files stays above: a walk, with no parse.
+const readSearchSites = () => {
+  const readings = FILES.map((file) => {
+    const sf = parseFile(file);
+    return { file, sf, ...searchSitesIn(sf) };
+  });
+  const sites = readings.flatMap(({ file, sites }) =>
+    sites.map((site) => ({ file, ...site })),
+  );
+  const tests = readings.flatMap(({ file, tests }) =>
+    tests.map((title) => `${file} › ${title}`),
+  );
+  return { readings, sites, tests };
+};
+let scanned: ReturnType<typeof readSearchSites> | undefined;
+const scan = () => (scanned ??= readSearchSites());
 
 /** How many floorless sites each scope holds today, by `file › label`. */
 const floorlessNow = (): Map<string, number> => {
   const counts = new Map<string, number>();
-  for (const site of SITES)
+  for (const site of scan().sites)
     if (!site.floored) {
       const key = `${site.file} › ${site.label}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -312,27 +338,24 @@ const floorlessNow = (): Map<string, number> => {
 
 describe('every search checks a floor, or is listed (#515, #534)', () => {
   it('finds every scope holding exactly the floorless searches listed', () => {
-    const now = floorlessNow();
-    const keys = new Set([...now.keys(), ...Object.keys(FLOORLESS)]);
-    const findings = [...keys]
-      .filter((key) => (now.get(key) ?? 0) !== (FLOORLESS[key] ?? 0))
-      .map((key) => {
-        const [listed, read] = [FLOORLESS[key] ?? 0, now.get(key) ?? 0];
-        return read > listed
+    const { readings, sites } = scan();
+    const findings = burnDownBreaches(floorlessNow(), FLOORLESS).map(
+      ({ key, read, listed }) =>
+        read > listed
           ? `${key}: ${read} searched with no floor, ${listed} listed. Check a recorded floor in the same test.`
-          : `${key}: ${read} floorless, ${listed} listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.`;
-      });
-    const refused = READINGS.flatMap(({ refused }) => refused);
+          : `${key}: ${read} floorless, ${listed} listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.`,
+    );
+    const refused = readings.flatMap(({ refused }) => refused);
     expect(
-      searched(refused, { of: SITES, what: 'searched sites under tests/' }),
+      searched(refused, { of: sites, what: 'searched sites under tests/' }),
       refused.join('\n'),
     ).toEqual([]);
     expect(
-      searched(findings, { of: SITES, what: 'searched sites under tests/' }),
+      searched(findings, { of: sites, what: 'searched sites under tests/' }),
       findings.join('\n'),
     ).toEqual([]);
     expect(
-      floorBreach('floorless-searches/sites', SITES.length),
+      floorBreach('floorless-searches/sites', sites.length),
     ).toBeUndefined();
   });
 
@@ -344,7 +367,20 @@ describe('every search checks a floor, or is listed (#515, #534)', () => {
     const counts = Object.values(FLOORLESS);
     expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(48);
     expect(counts.length).toBeLessThanOrEqual(45);
-    expect(counts.filter((n) => !Number.isInteger(n) || n < 1)).toEqual([]);
+    // The entries judged are the list's own: the floor falls with it, by hand,
+    // in the conversion that removes an entry.
+    expect(
+      searched(
+        counts.filter((n) => !Number.isInteger(n) || n < 1),
+        {
+          of: counts,
+          what: 'burn-down entries',
+        },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('floorless-searches/burn-down-entries', counts.length),
+    ).toBeUndefined();
   });
 });
 
@@ -354,13 +390,16 @@ describe('the search reader proves what it read (#515)', () => {
     // file's code with literals and comments removed, against the sites and
     // refusals the reader returned for that file. The walk is checked against
     // git's own list, since both sides of the count are computed over it.
-    const misread = READINGS.filter(
-      ({ sf, sites, refused }) =>
-        searchesWritten(sf) !== sites.length + refused.length,
-    ).map(
-      ({ file, sf, sites, refused }) =>
-        `${file}: ${searchesWritten(sf)} written, ${sites.length + refused.length} read`,
-    );
+    const { readings } = scan();
+    const misread = readings
+      .filter(
+        ({ sf, sites, refused }) =>
+          searchesWritten(sf) !== sites.length + refused.length,
+      )
+      .map(
+        ({ file, sf, sites, refused }) =>
+          `${file}: ${searchesWritten(sf)} written, ${sites.length + refused.length} read`,
+      );
     expect(
       searched(misread, { of: FILES, what: 'TypeScript files under tests/' }),
       misread.join('\n'),
@@ -383,22 +422,25 @@ describe('the search reader proves what it read (#515)', () => {
     // A site's scope is the test around it, so a test form the reader cannot
     // see sends its sites elsewhere: counted as text per file, vitest's and
     // Playwright's forms both (#477).
-    const misread = READINGS.filter(
-      ({ sf, tests }) =>
-        testsWritten(sf) + vitestTestsWritten(sf) !== tests.length,
-    ).map(
-      ({ file, sf, tests }) =>
-        `${file}: ${testsWritten(sf) + vitestTestsWritten(sf)} written, ${tests.length} read`,
-    );
+    const { readings, tests } = scan();
+    const misread = readings
+      .filter(
+        ({ sf, tests }) =>
+          testsWritten(sf) + vitestTestsWritten(sf) !== tests.length,
+      )
+      .map(
+        ({ file, sf, tests }) =>
+          `${file}: ${testsWritten(sf) + vitestTestsWritten(sf)} written, ${tests.length} read`,
+      );
     // Judged over the tests read, which is what the floor below counts: a
     // floor on one population and a search over another check nothing
     // together (#534).
     expect(
-      searched(misread, { of: TESTS, what: 'tests read under tests/' }),
+      searched(misread, { of: tests, what: 'tests read under tests/' }),
       misread.join('\n'),
     ).toEqual([]);
     expect(
-      floorBreach('floorless-searches/tests', TESTS.length),
+      floorBreach('floorless-searches/tests', tests.length),
     ).toBeUndefined();
   });
 });
