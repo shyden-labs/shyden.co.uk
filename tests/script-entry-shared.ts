@@ -120,6 +120,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: npm run reports:review <shyden-reports-dev|shyden-reports>',
   },
+  // Refuses before it reads a file, so no Pages API answer is needed (#406).
+  'rollback-target.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/rollback-target.mjs',
+  },
   'i18n-back-translate.mjs': {
     args: [],
     env: { BACK_TRANSLATE_URL: undefined },
