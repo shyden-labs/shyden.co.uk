@@ -74,14 +74,19 @@ describe('the deploy pipeline runs what it claims to', () => {
     const outputs = join(dir, 'outputs');
     writeFileSync(outputs, '');
     const bin = join(dir, 'bin');
+    // Apart from RUNNER_TEMP's own files: the step writes its answers to
+    // `$RUNNER_TEMP/project.json`, and a shell redirect empties that file
+    // before the stand-in could read a canned copy kept at the same path.
+    const api = join(dir, 'api');
     if (cloudflare !== undefined) {
       mkdirSync(bin);
+      mkdirSync(api);
       writeFileSync(
-        join(dir, 'project.json'),
+        join(api, 'project.json'),
         JSON.stringify(cloudflare.project),
       );
       writeFileSync(
-        join(dir, 'deployments.json'),
+        join(api, 'deployments.json'),
         JSON.stringify(cloudflare.deployments),
       );
       writeFileSync(
@@ -90,8 +95,8 @@ describe('the deploy pipeline runs what it claims to', () => {
           '#!/bin/bash',
           'for arg; do url=$arg; done',
           'case "$url" in',
-          `  */deployments*) cat '${join(dir, 'deployments.json')}' ;;`,
-          `  *) cat '${join(dir, 'project.json')}' ;;`,
+          `  */deployments*) cat '${join(api, 'deployments.json')}' ;;`,
+          `  *) cat '${join(api, 'project.json')}' ;;`,
           'esac',
           '',
         ].join('\n'),
