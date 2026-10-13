@@ -209,12 +209,19 @@ describe('settleFont', () => {
 
   it('a sheet that rewraps past the first solve is fitted by the second', () => {
     // 3 px over at the first solve's font, then linear again.
-    const measure = (font: number) =>
-      font > 37.5 ? 12.7778 * font + 180 : 650;
+    const readings: number[] = [];
+    const measure = (font: number) => {
+      readings.push(font);
+      return font > 37.5 ? 12.7778 * font + 180 : 650;
+    };
     const font = settleFont(657, atBase, atApplied, 24, measure, 4);
-    expect(measure(font)).toBeLessThanOrEqual(657);
-    expect(font).toBeLessThan(37.5739);
-    expect(font).toBeGreaterThan(24);
+    // The first solve lands at 37.57px, still over; the second, solved from
+    // the two latest readings, lands at 37.18px, where the sheet is 650px.
+    expect(readings).toEqual([
+      expect.closeTo(37.5739, 4),
+      expect.closeTo(37.1753, 4),
+    ]);
+    expect(font).toBeCloseTo(37.1753, 4);
   });
 
   it('a sheet only the floor answers ends at the floor', () => {
