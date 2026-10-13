@@ -240,6 +240,14 @@ export function renderProjector(
     // describes is what left five group cards unreachable; this one is taken
     // from the box that is actually on the screen, so "it does not fit" and
     // "it can be scrolled to" cannot disagree.
+    //
+    // ...and taken under the overflow it will produce (#674). Read while the
+    // stage was `overflow: hidden`, Firefox reported an exact fit as
+    // overflowing (CI, fonts not yet landed: 705px sheet, 705px stage,
+    // `scrolls` left on at 37.6875px), and the board then offered a scrollbar
+    // it did not need. So the class goes on first, the stage is read as
+    // `overflow: auto`, and the class stays only if that reading overflows.
+    board.classList.add('scrolls');
     board.classList.toggle('scrolls', stage.scrollHeight > stage.clientHeight);
   };
 
@@ -453,6 +461,12 @@ export function renderProjector(
   });
 
   window.addEventListener('resize', refit);
+
+  // A web font that lands after the board opened changes the sheet's height
+  // without any resize, so the verdict `refit` took against the fallback face
+  // went stale: `scrolls` stayed on for a sheet that then fitted exactly (#674).
+  // Like `resize` above, this stays wired and `refit` ignores it while closed.
+  doc.fonts?.addEventListener('loadingdone', refit);
 
   return {
     setAvailable: (available: boolean) => {
