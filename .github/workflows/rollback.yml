@@ -72,24 +72,45 @@ jobs:
           done
           [ "$missing" -eq 0 ]
 
+      # The selection is a pure function the unit suite drives
+      # (scripts/rollback-target.mjs, #406), so this run needs the repo and
+      # the project's Node.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
       - name: Find the deployment to roll back to
         id: find
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TARGET_ID: ${{ inputs.deployment_id }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          target="${TARGET_ID}"
-          if [ -z "$target" ]; then
-            echo "No deployment ID given, so finding the previous production deployment."
-            # Production deployments are returned newest-first: [0] is the
-            # current live one, [1] the previous. Roll back to [1]. On a dry
-            # run, this read-only call is the proof that the token reaches
-            # shyden-site.
-            target="$(curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/shyden-site/deployments?per_page=25" \
-              | jq -r '[.result[] | select(.environment == "production")] | .[1].id // ""')"
+          if [ -n "${TARGET_ID}" ] && [ "${DRY_RUN}" != "true" ]; then
+            # The fallback, fast: a deployment the operator names goes
+            # straight to the promote, with no read first. A read would only
+            # delay it, or, while Cloudflare's API is failing, stop the one
+            # call that matters (operator 2026-10-13). Its shape is still
+            # checked below.
+            target="${TARGET_ID}"
+          else
+            # What is live is the project's canonical_deployment, not the
+            # newest entry: after one rollback the newest entry is the bad
+            # build, and `[1]` the live one (#406). On a dry run these reads
+            # are the proof that the token reaches shyden-site.
+            API="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/shyden-site"
+            curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${API}" > "${RUNNER_TEMP}/project.json"
+            curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${API}/deployments?per_page=25" > "${RUNNER_TEMP}/deployments.json"
+            if [ -z "${TARGET_ID}" ]; then
+              echo "No deployment ID given, so finding the newest successful production deployment before the live one."
+            fi
+            # Refuses, naming them, a requested target that is already live,
+            # and a default with nothing before the live deployment.
+            target="$(REQUESTED="${TARGET_ID}" node scripts/rollback-target.mjs "${RUNNER_TEMP}/project.json" "${RUNNER_TEMP}/deployments.json")"
           fi
           if [ -z "$target" ]; then
             echo "::error::No previous production deployment found to roll back to."
