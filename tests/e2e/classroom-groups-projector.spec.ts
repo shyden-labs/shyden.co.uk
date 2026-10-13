@@ -87,6 +87,12 @@ test.describe('the projector view', () => {
     page,
   }) => {
     const open = page.getByRole('button', { name: 'Full screen' });
+    // getByRole leaves hidden elements out, so a hidden button can never
+    // count 1 through `open`; the absence checks read it through this one.
+    const openEvenHidden = page.getByRole('button', {
+      name: 'Full screen',
+      includeHidden: true,
+    });
     const go = page.locator('#cg-go');
     await page.goto('/classroom-groups');
     await expect(go).toBeEnabled();
@@ -94,8 +100,8 @@ test.describe('the projector view', () => {
     await page.fill('#cg-count', '25');
     await page.fill('#cg-numbers-absent', '26');
     await expect(go).toBeDisabled();
-    await expect(open).toHaveCount(1);
-    await expect(open).toBeHidden();
+    await expect(openEvenHidden).toHaveCount(1);
+    await expect(openEvenHidden).toBeHidden();
     await page.fill('#cg-numbers-absent', '7');
     await expect(go).toBeEnabled();
     await expect(open).toBeVisible();

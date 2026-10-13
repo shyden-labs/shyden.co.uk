@@ -1,5 +1,5 @@
 import type { Strings } from '../lib/i18n';
-import { fitScale, fontThatFits } from '../lib/fit';
+import { fitScale, settleFont } from '../lib/fit';
 import { button } from './dom';
 
 /**
@@ -33,6 +33,9 @@ const FADE_AFTER_MS = 2500;
  * tested; these are the two numbers it is given.
  */
 const BASE_PX = 40;
+
+/** Readings `settleFont` may take before it ends at the floor (#743). */
+const SETTLE_READINGS = 4;
 
 /** How long between one group appearing and the next. */
 const REVEAL_STEP_MS = 220;
@@ -230,7 +233,7 @@ export function renderProjector(
     // 24px. One reading taken before the scale therefore describes a layout
     // that no longer exists once the scale lands.
     //
-    // The correction SOLVES rather than nudges. `fontThatFits` is handed the
+    // The correction SOLVES rather than nudges. `settleFont` (from `fontThatFits`, then a reading at each answer) is handed the
     // two readings already taken -- the sheet at the base font and the sheet
     // at the applied one -- and returns the font where the line through them
     // meets the box, clamped at the readable floor. A ratio correction only
@@ -241,11 +244,17 @@ export function renderProjector(
     // There is nothing left to shrink, so the second measurement is skipped
     // rather than taken and ignored.
     if (!onTheFloor && stage.scrollHeight > stage.clientHeight) {
-      stage.style.fontSize = `${fontThatFits(
+      const measure = (font: number): number => {
+        stage.style.fontSize = `${font}px`;
+        return stage.scrollHeight;
+      };
+      stage.style.fontSize = `${settleFont(
         stage.clientHeight,
         atBase,
         { font: applied, height: stage.scrollHeight },
         FLOOR_PX,
+        measure,
+        SETTLE_READINGS,
       )}px`;
     }
 

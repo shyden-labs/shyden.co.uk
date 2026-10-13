@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitScale, fontThatFits } from '../../src/lib/fit';
+import { fitScale, fontThatFits, settleFont } from '../../src/lib/fit';
 
 /**
  * Stage 5, Task 4. Z-07, Z-08, Z-09.
@@ -175,5 +175,66 @@ describe('fontThatFits', () => {
       expect(Number.isFinite(answer)).toBe(true);
       expect(answer).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * #743: one solve along the line through two readings lands a few px over when
+ * the layout rewraps between them, and the board then scrolled above the
+ * floor. `settleFont` takes a reading at each answer and solves again from the
+ * two most recent, ending at the floor when the cap is hit.
+ */
+describe('settleFont', () => {
+  const atBase = { font: 40, height: 688 };
+  const atApplied = { font: 38.2, height: 665 };
+
+  it('a linear sheet is settled by the first solve', () => {
+    // height = 10 * font exactly, so the solve lands on the box with no residue.
+    const measured: number[] = [];
+    const measure = (font: number) => {
+      measured.push(font);
+      return 10 * font;
+    };
+    const font = settleFont(
+      250,
+      { font: 40, height: 400 },
+      { font: 30, height: 300 },
+      24,
+      measure,
+      4,
+    );
+    expect(font).toBe(25);
+    expect(measured).toEqual([25]);
+  });
+
+  it('a sheet that rewraps past the first solve is fitted by the second', () => {
+    // 3 px over at the first solve's font, then linear again.
+    const measure = (font: number) =>
+      font > 37.5 ? 12.7778 * font + 180 : 650;
+    const font = settleFont(657, atBase, atApplied, 24, measure, 4);
+    expect(measure(font)).toBeLessThanOrEqual(657);
+    expect(font).toBeLessThan(37.5739);
+    expect(font).toBeGreaterThan(24);
+  });
+
+  it('a sheet only the floor answers ends at the floor', () => {
+    expect(settleFont(100, atBase, atApplied, 24, () => 5000, 4)).toBe(24);
+  });
+
+  it('a sheet that never fits above the floor stops at the cap, on the floor', () => {
+    const measured: number[] = [];
+    const measure = (font: number) => {
+      measured.push(font);
+      return 1000;
+    };
+    expect(settleFont(657, atBase, atApplied, 24, measure, 3)).toBe(24);
+    expect(measured).toHaveLength(3);
+  });
+
+  it('a sheet that already fits is left at the applied font unmeasured', () => {
+    const measure = () => {
+      throw new Error('no reading is needed');
+    };
+    expect(settleFont(700, atBase, atApplied, 24, measure, 4)).toBe(38.2);
   });
 });
