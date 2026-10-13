@@ -24,7 +24,8 @@ import {
 import { isMessageTemplate } from '../../src/lib/i18n/message';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { renderedOn } from '../../src/lib/i18n/label-check';
-import { nonEmpty } from '../source-files';
+import { nonEmpty, searched } from '../source-files';
+import { floorBreach } from '../floors';
 
 const ELLIPSIS = String.fromCharCode(0x2026);
 const keysOn = (page: PageId, locale: Locale) =>
@@ -111,9 +112,16 @@ describe('a page offers its own sections plus the chrome', () => {
         'site.glory leaves',
       ))
         expect(keys, key).toContain(key);
-      expect([...keys].filter((key) => key.startsWith('site.home.'))).toEqual(
-        [],
-      );
+      const offered = [...keys];
+      expect(
+        searched(
+          offered.filter((key) => key.startsWith('site.home.')),
+          { of: offered, what: 'keys offered on glory-points' },
+        ),
+      ).toEqual([]);
+      expect(
+        floorBreach('report/glory-points-keys', offered.length),
+      ).toBeUndefined();
     },
   );
 
@@ -132,12 +140,18 @@ describe('a page offers its own sections plus the chrome', () => {
   );
 
   it('no footer page offers the 404 copy', () => {
-    for (const page of FOOTER_PAGE_IDS)
-      expect(
-        [...keysOn(page, 'vi')].filter((key) =>
-          key.startsWith('site.notFound.'),
-        ),
-      ).toEqual([]);
+    const offered = FOOTER_PAGE_IDS.flatMap((page) =>
+      [...keysOn(page, 'vi')].map((key) => ({ page, key })),
+    );
+    expect(
+      searched(
+        offered.filter(({ key }) => key.startsWith('site.notFound.')),
+        { of: offered, what: 'keys offered on the footer pages' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('report/footer-page-keys-vi', offered.length),
+    ).toBeUndefined();
   });
 
   it.each(LOCALES.filter(isBetaLocale))(
@@ -334,7 +348,16 @@ describe('matching a quote (spec 5)', () => {
 
   it('rule 2 refuses one character and accepts two', () => {
     const text = vi.report.open;
-    expect(matchingKeys(text.slice(0, 1), 'home', 'vi')).toEqual([]);
+    const strings = reportableStrings('home', 'vi');
+    expect(
+      searched(matchingKeys(text.slice(0, 1), 'home', 'vi'), {
+        of: strings,
+        what: 'strings reportable on home',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('report/home-strings-one-character', strings.length),
+    ).toBeUndefined();
     expect(matchingKeys(text.slice(0, 2), 'home', 'vi').length).toBeGreaterThan(
       0,
     );
@@ -354,7 +377,16 @@ describe('matching a quote (spec 5)', () => {
       ),
       'multi-code-point Thai clusters with a successor',
     )[0];
-    expect(matchingKeys(clusters[at], 'home', 'th')).toEqual([]);
+    const strings = reportableStrings('home', 'th');
+    expect(
+      searched(matchingKeys(clusters[at], 'home', 'th'), {
+        of: strings,
+        what: 'strings reportable on home in Thai',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('report/home-strings-thai-graphemes', strings.length),
+    ).toBeUndefined();
     expect(
       matchingKeys(clusters[at] + clusters[at + 1], 'home', 'th'),
     ).toContain('site.report.open');
@@ -402,7 +434,16 @@ describe('matching a quote (spec 5)', () => {
         f.runs[1].trim().length > 3,
     )!;
     const spanning = `${form.runs[0].slice(-3)}30${form.runs[1].slice(0, 3)}`;
-    expect(matchingKeys(spanning, 'classroom-groups', 'vi')).toEqual([]);
+    const strings = reportableStrings('classroom-groups', 'vi');
+    expect(
+      searched(matchingKeys(spanning, 'classroom-groups', 'vi'), {
+        of: strings,
+        what: 'strings reportable on classroom-groups',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('report/classroom-groups-spanning-fragment', strings.length),
+    ).toBeUndefined();
   });
 
   it('stores every key a quote matches', () => {
@@ -421,10 +462,22 @@ describe('matching a quote (spec 5)', () => {
   });
 
   it('matches nothing for text that is not on the page', () => {
+    const strings = reportableStrings('home', 'vi');
     expect(
-      matchingKeys('this sentence is on no page at all', 'home', 'vi'),
+      searched(
+        matchingKeys('this sentence is on no page at all', 'home', 'vi'),
+        { of: strings, what: 'strings reportable on home' },
+      ),
     ).toEqual([]);
-    expect(matchingKeys('   ', 'home', 'vi')).toEqual([]);
+    expect(
+      searched(matchingKeys('   ', 'home', 'vi'), {
+        of: strings,
+        what: 'strings reportable on home',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('report/home-strings-absent-text', strings.length),
+    ).toBeUndefined();
   });
 
   it('rule 3 needs two characters of fixed wording (clarification 6)', () => {
@@ -453,16 +506,39 @@ describe('matching a quote (spec 5)', () => {
     expect(matchesForm('a1c2b', form, 'vi')).toBe(false);
   });
 
-  it('a nonsense quote matches nothing on any page in any locale', () => {
-    // Clarification 6: a form made only of slots would match every quote
-    // through rule 3. This holds on the live catalogues whatever they gain.
-    for (const locale of PREFIXED_LOCALES)
-      for (const page of PAGE_IDS)
-        expect(
-          matchingKeys('zq7 xv9 wk3 on no page', page, locale),
-          `${page} ${locale}`,
-        ).toEqual([]);
-  });
+  // One id per locale: each reads its own catalogue's strings.
+  const NONSENSE_QUOTE_FLOOR: Readonly<Record<string, string>> = {
+    id: 'report/nonsense-quote-strings-id',
+    zh: 'report/nonsense-quote-strings-zh',
+    vi: 'report/nonsense-quote-strings-vi',
+    th: 'report/nonsense-quote-strings-th',
+  };
+  it.each(PREFIXED_LOCALES)(
+    '%s: a nonsense quote matches nothing on any page',
+    (locale) => {
+      // Clarification 6: a form made only of slots would match every quote
+      // through rule 3. This holds on the live catalogues whatever they gain.
+      const strings = PAGE_IDS.flatMap((page) =>
+        reportableStrings(page, locale),
+      );
+      expect(
+        searched(
+          PAGE_IDS.flatMap((page) =>
+            matchingKeys('zq7 xv9 wk3 on no page', page, locale).map(
+              (key) => `${page} ${locale}: ${key}`,
+            ),
+          ),
+          {
+            of: strings,
+            what: `strings reportable on every page in ${locale}`,
+          },
+        ),
+      ).toEqual([]);
+      expect(
+        floorBreach(NONSENSE_QUOTE_FLOOR[locale], strings.length),
+      ).toBeUndefined();
+    },
+  );
 
   it('offers only its own page: a home string is not found on glory-points', () => {
     const homeOnly = nonEmpty(
@@ -472,7 +548,19 @@ describe('matching a quote (spec 5)', () => {
       ),
       'long home-only displays',
     )[0];
-    expect(matchingKeys(homeOnly, 'glory-points', 'vi')).toEqual([]);
+    const strings = reportableStrings('glory-points', 'vi');
+    expect(
+      searched(matchingKeys(homeOnly, 'glory-points', 'vi'), {
+        of: strings,
+        what: 'strings reportable on glory-points',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'report/glory-points-strings-home-only-quote',
+        strings.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('answers a 1000-unit quote against every classroom-groups form promptly', () => {

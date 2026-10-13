@@ -22,6 +22,8 @@ import {
   withoutTsComments,
   withoutMarkupComments,
 } from './source-text';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 
 /**
  * The stripper the source-text guards depend on. #24.
@@ -317,7 +319,21 @@ describe('astroCodeViews reads only the code an .astro file holds', () => {
   });
 
   it('finds no code in a file with no frontmatter and no script', () => {
-    expect(astroCodeViews('<p>only markup</p>')).toEqual([]);
+    const cases = [
+      {
+        case: 'markup only, no frontmatter, no script',
+        page: '<p>only markup</p>',
+      },
+    ];
+    expect(
+      searched(
+        cases.flatMap(({ page }) => astroCodeViews(page)),
+        { of: cases, what: 'files handed to astroCodeViews' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('source-text/files-without-code', cases.length),
+    ).toBeUndefined();
   });
 });
 
@@ -373,7 +389,21 @@ describe('astroStyleViews reads only the CSS an .astro file holds', () => {
   });
 
   it('finds no CSS in a file with no style', () => {
-    expect(astroStyleViews('---\nconst a = 1;\n---\n<p>b</p>')).toEqual([]);
+    const cases = [
+      {
+        case: 'frontmatter and markup, no style',
+        page: '---\nconst a = 1;\n---\n<p>b</p>',
+      },
+    ];
+    expect(
+      searched(
+        cases.flatMap(({ page }) => astroStyleViews(page)),
+        { of: cases, what: 'files handed to astroStyleViews' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('source-text/files-without-a-style', cases.length),
+    ).toBeUndefined();
   });
 });
 
@@ -535,7 +565,21 @@ describe('cssComments', () => {
   });
 
   it('finds none where comment syntax is quoted', () => {
-    expect(cssComments("a { content: '/* not a comment */'; }")).toEqual([]);
+    const cases = [
+      {
+        case: 'comment syntax inside a quoted string',
+        css: "a { content: '/* not a comment */'; }",
+      },
+    ];
+    expect(
+      searched(
+        cases.flatMap(({ css }) => cssComments(css)),
+        { of: cases, what: 'stylesheets handed to cssComments' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('source-text/quoted-comment-syntax', cases.length),
+    ).toBeUndefined();
   });
 
   it('and the code it keeps is the code the stripper keeps', () => {
