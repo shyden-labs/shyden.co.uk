@@ -39,6 +39,9 @@ import { withoutCommentLines } from './source-text';
  * E2E IS NOT IN THE HOOK. ~7.3 minutes locally would make pushing unusable, so
  * CI remains its gate. Asserted, not merely intended: a well-meaning addition
  * of `test:e2e` here fails this suite.
+ *
+ * NOR IS ANY OTHER SUITE, unit included (#713, operator 2026-10-12): the hook
+ * runs format, typecheck and the changed-test lint, and nothing else.
  */
 
 const HOOK = '.githooks/pre-push';
@@ -77,7 +80,7 @@ describe('the pre-push hook', () => {
     expect(() => accessSync(HOOK, constants.X_OK)).not.toThrow();
   });
 
-  it('invokes exactly the three fastest checks of the CI checks job', () => {
+  it('invokes exactly the checks the laptop may run', () => {
     // COMMANDS ACTUALLY INVOKED, not strings present in the file. Asserting
     // `toContain('npm run test:unit')` passed while the hook did NOT run it:
     // the string survived inside the failure hint the hook prints to tell you
@@ -94,14 +97,101 @@ describe('the pre-push hook', () => {
     // them, so a test indexing a union as a record passed the hook, was
     // pushed, and only `astro check` in CI could have refused it.
     //
-    // `test:guards` was the next (#638): the whole-repo guards left the unit
-    // suite for their own, and the hook still has to run them.
-    expect(invokedNpmScripts()).toEqual([
-      'format',
-      'test:guards',
-      'test:unit',
-      'typecheck',
+    // `test:guards` was the next (#638), and it left again (#653): only unit
+    // tests, formatters and type checks run on the laptop; every other suite
+    // is CI's (operator, 2026-10-09, a global rule).
+    //
+    // `lint:tests` joined in #662: the three test-code meta-guards' finders
+    // over the test files the branch changed. A static read, so a lint the
+    // laptop may run (operator ruling 2026-10-12); the guards stay CI's.
+    //
+    // And `test:unit` left (#713): no test suite runs at push, not even unit
+    // (operator, 2026-10-12, a global rule). A branch that adds a floor fails
+    // the unit suite until `record-floors.yml` records it on the pushed
+    // branch, so a unit run here refused the push the record needs.
+    expect(invokedNpmScripts()).toEqual(['format', 'lint:tests', 'typecheck']);
+  });
+
+  it('executes nothing but its checks, in order (#713)', () => {
+    // The set above sees `npm run ...` lines only, so `npx vitest run` or
+    // `npm test` would slip past it. This is every command the hook
+    // executes, first word each (an `npm run` keeps its script), in order.
+    const commands = withoutCommentLines(hookSource(), '#')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '')
+      .map(
+        (line) =>
+          /^npm run \S+/.exec(line)?.[0] ?? line.split(/\s+/, 1)[0] ?? '',
+      );
+    // #717 added the exit-127 branch in fail() and the dependency check
+    // before the first check.
+    expect(commands).toEqual([
+      'set',
+      'unset',
+      'fail()',
+      'code=$?',
+      'if',
+      'set',
+      'fi',
+      'printf',
+      'printf',
+      'printf',
+      'exit',
+      '}',
+      '[',
+      'npm run format',
+      'npm run typecheck',
+      'npm run lint:tests',
     ]);
+  });
+
+  it('refuses a checkout with no installed dependencies before any check (#717)', () => {
+    // Every new worktree starts without node_modules, and a check whose tool
+    // is missing reported "Prettier found files that are not formatted".
+    const lines = withoutCommentLines(hookSource(), '#').split('\n');
+    const refusal = lines.findIndex((line) =>
+      /^\[ -d node_modules\/\.bin \] \|\| fail '[^']+' 'npm ci'$/.test(line),
+    );
+    const firstCheck = lines.findIndex((line) => /^npm run /.test(line));
+    expect(firstCheck, 'the hook runs a check').toBeGreaterThanOrEqual(0);
+    expect(
+      refusal,
+      'the hook checks for node_modules/.bin',
+    ).toBeGreaterThanOrEqual(0);
+    expect(refusal).toBeLessThan(firstCheck);
+  });
+
+  it('reports a check whose tool is missing as a missing tool, not as its failure (#717)', () => {
+    // `npm run` passes a missing command's exit 127 through (measured
+    // 2026-10-12), and fail() reads the status of the check it follows
+    // before running anything else, so that status is still the check's.
+    const lines = withoutCommentLines(hookSource(), '#')
+      .split('\n')
+      .map((line) => line.trim());
+    const start = lines.indexOf('fail() {');
+    expect(start, 'the hook defines fail()').toBeGreaterThanOrEqual(0);
+    expect(lines.slice(start + 1, start + 5)).toEqual([
+      'code=$?',
+      'if [ "$code" -eq 127 ]; then',
+      "set -- 'a check could not start its tool (exit 127, command not found), so it checked nothing' 'npm ci'",
+      'fi',
+    ]);
+  });
+
+  it('lints the changed test files after the type check (#662)', () => {
+    // After typecheck, so a type error is named by the checker that reads
+    // types rather than by a finder parsing a file that does not compile.
+    const lines = withoutCommentLines(hookSource(), '#').split('\n');
+    const at = (script: string) =>
+      lines.findIndex((line) =>
+        new RegExp(`^\\s*npm run ${script}\\b`).test(line),
+      );
+    expect(at('typecheck'), 'the hook type-checks').toBeGreaterThanOrEqual(0);
+    expect(at('lint:tests')).toBeGreaterThan(at('typecheck'));
+    expect(packageJson().scripts['lint:tests']).toBe(
+      'node scripts/lint-changed-tests.mjs',
+    );
   });
 
   it('clears the repository git hands it before any check runs (#377)', () => {

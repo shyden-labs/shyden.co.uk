@@ -24,6 +24,7 @@
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
+import { endpoint, setting } from './settings.mjs';
 import {
   COUNT_SQL,
   FAILURE_NOTICE,
@@ -36,36 +37,6 @@ import {
   postedToday,
   startOfUtcDay,
 } from '../src/lib/waiting-reports.ts';
-
-/**
- * An environment variable, refused unless it matches `shape`, since each one
- * ends up in a URL, a header, a comment or a timeout.
- *
- * @param {string} name
- * @param {RegExp} shape
- * @returns {string}
- */
-const setting = (name, shape) => {
-  const value = process.env[name] ?? '';
-  if (!shape.test(value))
-    die(`${name} is not set, or not in its expected shape`);
-  return value;
-};
-
-/**
- * An environment variable holding an http(s) URL, without a trailing slash.
- *
- * @param {string} name
- * @param {string} [fallback]
- * @returns {string}
- */
-const endpoint = (name, fallback) => {
-  const value = process.env[name] ?? fallback ?? '';
-  const url = URL.canParse(value) ? new URL(value) : undefined;
-  if (url?.protocol !== 'https:' && url?.protocol !== 'http:')
-    die(`${name} is not set, or not an http(s) URL`);
-  return value.replace(/\/+$/, '');
-};
 
 const timeoutMs = () =>
   process.env.WAITING_REPORTS_TIMEOUT_MS === undefined

@@ -19,9 +19,17 @@
  *   sharing a figure would let either go blind behind the other;
  * - either run failed or did not start, Docker included.
  *
- * `npm run floors:record -- --unit` runs the unit suite alone (#548) and
- * carries every Playwright floor unchanged, naming them: for a change that
- * moves no browser floor, which CI then judges as it judges every floor.
+ * `npm run floors:record -- --unit` runs the unit, guards and integration
+ * suites (#548) and carries every Playwright and functions floor unchanged,
+ * naming them: for a change that moves no browser floor, which CI then judges
+ * as it judges every floor. It is CI's mode, not the laptop's.
+ *
+ * `npm run floors:record -- --unit-suite` runs the unit suite alone, on every
+ * pass, and carries every floor it did not see asserted (#658): the laptop runs
+ * only the unit suite (operator rule 2026-10-09), and a branch that merged
+ * develop in settles its unit floors with it before the unit suite is run by
+ * hand ahead of a push (the pre-push hook runs no suite since #713);
+ * `record-floors.yml` records the rest.
  *
  * `npm run floors:record -- --functions` runs the Functions-runtime suite
  * alone (#610): `npm run test:functions`, which builds and serves the site on
@@ -31,11 +39,25 @@
  * functions id is new, the unit suite runs once more, as in every mode, for the
  * floor that counts the record's ids; the Playwright figures are carried.
  *
+ * `npm run floors:record -- --retire <id>` (#640, any mode, repeatable) drops
+ * an id the branch itself created and no test spells any more, in the same run
+ * that records its replacement: the floors that count the record's ids are
+ * judged on the ids it writes, not before them. An id `origin/develop` holds is
+ * refused, as is any id when develop cannot be read. A hand edit of
+ * `tests/floors.json` is still the operator's in two cases only: a landed
+ * floor that falls, and a landed id that leaves; say why in the commit.
+ *
  * One id read two different values when its figure differs by engine, so
  * that refusal is also where a floor that needs one id per engine shows.
  *
- * CI never records, for the reason CI never passes `--update-snapshots`: a
- * run that can rewrite the figure it checks against asserts nothing.
+ * The gate never records, for the reason CI never passes
+ * `--update-snapshots`: a run that can rewrite the figure it checks against
+ * asserts nothing. Recording is `.github/workflows/record-floors.yml` (#651),
+ * dispatched on a branch, never triggered by a push or a pull request: it runs
+ * this script inside the pinned Playwright image (`FLOORS_RECORD_IN_IMAGE=1`,
+ * so no `docker run` wraps the Playwright command), commits the moved figures
+ * to the branch and dispatches `ci.yml` there, and the gate then judges that
+ * commit as it judges every other. Any other run under `CI` still refuses.
  */
 import { spawnSync } from 'node:child_process';
 import {
@@ -59,6 +81,8 @@ const PLAYWRIGHT = 'Playwright run';
 const FUNCTIONS = 'functions suite';
 const UNIT_ONLY = '--unit';
 const FUNCTIONS_ONLY = '--functions';
+const UNIT_SUITE_ONLY = '--unit-suite';
+const MODES = [UNIT_ONLY, FUNCTIONS_ONLY, UNIT_SUITE_ONLY];
 
 /**
  * A suite's command, read from the `test:<name>` script that carries its one
@@ -93,6 +117,37 @@ export const FLOORS_FILE = 'tests/floors.json';
  * to, instead of judging it (`tests/floors.ts`).
  */
 export const RECORD_ENV = 'FLOORS_RECORD';
+
+/**
+ * Set to `1` by the dispatched CI recorder (#651), which is already inside the
+ * pinned Playwright image: the Playwright command runs directly instead of
+ * through `docker run`, and the one refusal under `CI` is lifted.
+ */
+export const IN_IMAGE_ENV = 'FLOORS_RECORD_IN_IMAGE';
+
+/**
+ * @param {Readonly<Record<string, string | undefined>>} environment
+ * @returns {boolean}
+ */
+export const recordsInImage = (environment) =>
+  environment[IN_IMAGE_ENV] === '1';
+
+/**
+ * The environment a suite the recorder starts runs in: the recorder's own,
+ * less the in-image flag, with `record` as the file its floors are written to.
+ * The flag is an instruction to this script alone. An integration test that
+ * runs this script as a child would otherwise inherit it, believe it was the
+ * recorder in the image, and skip the refusal under CI it exists to check
+ * (#651: seven such failures on the first real dispatch).
+ *
+ * @param {Readonly<Record<string, string | undefined>>} environment
+ * @param {string} record
+ * @returns {Record<string, string | undefined>}
+ */
+export const childEnv = (environment, record) => {
+  const { [IN_IMAGE_ENV]: _flag, ...rest } = environment;
+  return { ...rest, [RECORD_ENV]: record };
+};
 
 /**
  * @typedef {{ id: string, actual: number, site: string }} Observation
@@ -146,6 +201,57 @@ export const runRefusal = (suite, { status, error }) =>
       : undefined;
 
 /**
+ * Why a record must wait for the files git lists as untracked, or nothing
+ * when it lists none (#547). The guards that read git count tracked files
+ * only, so a record taken with a new file untracked writes a figure the
+ * committed tree beats, and CI fails on it: five times before this check, the
+ * last in #696. Staging with `git add -N` is enough: an intent-to-add file is
+ * tracked to `git ls-files` and still leaves the commit to its author. A
+ * guard that walks the filesystem instead of git sees the file either way, so
+ * this changes nothing for it.
+ *
+ * @param {string} listing `git ls-files --others --exclude-standard -z`
+ * @returns {string | undefined}
+ */
+export const untrackedRefusal = (listing) => {
+  const files = listing.split('\0').filter((file) => file !== '');
+  if (files.length === 0) return undefined;
+  const one = files.length === 1;
+  return (
+    `nothing recorded: ${files.length} untracked ${one ? 'file' : 'files'}, ` +
+    'which the guards that read git would not count and CI, with ' +
+    `${one ? 'it' : 'them'} committed, would (#547). ` +
+    `Stage ${one ? 'it' : 'each'} first:\n` +
+    files.map((file) => `  git add -N -- '${file}'`).join('\n')
+  );
+};
+
+/** What the recorder asks git for its untracked files (#547). */
+export const UNTRACKED_LISTING = [
+  'ls-files',
+  '--others',
+  '--exclude-standard',
+  '-z',
+];
+
+/**
+ * Why a record cannot start in this tree, asked of `git` through `run`
+ * (`spawnSync` in the recorder, a stand-in in its unit tests): a listing that
+ * did not start or failed is refused, never read as "nothing untracked", and
+ * a listing that names any file is refused by `untrackedRefusal`.
+ *
+ * @param {(command: string, args: readonly string[]) => { status: number | null, error?: Error, stdout: string }} run
+ * @returns {string | undefined}
+ */
+export const untrackedTreeRefusal = (run) => {
+  const listing = run('git', UNTRACKED_LISTING);
+  return (
+    runRefusal('untracked-file listing', listing) ??
+    untrackedRefusal(listing.stdout)
+  );
+};
+
+/**
  * The argument vector for `docker` that records the Playwright floors: every
  * project over `specs`, in the image CI runs the e2e suite in, with
  * `RECORD_ENV` naming `record` as the container sees it. A layout count
@@ -160,14 +266,7 @@ export const runRefusal = (suite, { status, error }) =>
  * @returns {string[]}
  */
 export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
-  const inside = relative(cwd, record);
-  if (inside === '' || inside.startsWith('..') || isAbsolute(inside))
-    throw new Error(
-      `${record} is outside ${cwd}, where the container cannot write it`,
-    );
-  // Never empty: Playwright reads no file filter as every spec.
-  if (specs.length === 0)
-    throw new Error('no Playwright spec calls floorBreach');
+  const inside = recordInside(cwd, record, specs);
   return containerArgs({
     image,
     cwd,
@@ -178,9 +277,62 @@ export const playwrightRecordArgs = ({ image, cwd, record, specs }) => {
     // out early in the journey. One at a time, WebKit's four passed in 1.5
     // minutes (measured 2026-10-05). The default count, derived from the
     // CPUs, has frozen this laptop before.
-    command: 'npx playwright test --workers=1 "$@"',
+    command: `${PLAYWRIGHT_TEST.join(' ')} "$@"`,
     operands: specs,
   });
+};
+
+/**
+ * The Playwright command both forms run: one worker. One home, so the
+ * container and the in-image run cannot differ on it.
+ */
+const PLAYWRIGHT_TEST = ['npx', 'playwright', 'test', '--workers=1'];
+
+/**
+ * @param {string} cwd
+ * @param {string} record
+ * @param {readonly string[]} specs
+ * @returns {string} the record's path relative to `cwd`
+ */
+function recordInside(cwd, record, specs) {
+  const inside = relative(cwd, record);
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside))
+    throw new Error(
+      `${record} is outside ${cwd}, where the container cannot write it`,
+    );
+  // Never empty: Playwright reads no file filter as every spec.
+  if (specs.length === 0)
+    throw new Error('no Playwright spec calls floorBreach');
+  return inside;
+}
+
+/**
+ * The process that records the Playwright floors: `docker run` of the pinned
+ * image on a laptop, or the same Playwright command run directly where the
+ * process is already inside that image (#651, the dispatched CI recorder).
+ *
+ * @param {object} options
+ * @param {boolean} options.inImage whether this process is in the image
+ * @param {string} options.image the pinned Playwright image
+ * @param {string} options.cwd the repo root
+ * @param {string} options.record the record file, inside `cwd`
+ * @param {readonly string[]} options.specs the specs that call floorBreach
+ * @returns {{ file: string, args: string[], env: Record<string, string> | undefined }}
+ */
+export const playwrightRecordRun = ({ inImage, ...options }) => {
+  if (!inImage)
+    return {
+      file: 'docker',
+      args: playwrightRecordArgs(options),
+      env: undefined,
+    };
+  recordInside(options.cwd, options.record, options.specs);
+  const [file, ...command] = PLAYWRIGHT_TEST;
+  return {
+    file,
+    args: [...command, ...options.specs],
+    env: { [RECORD_ENV]: options.record },
+  };
 };
 
 /**
@@ -226,6 +378,54 @@ export const carriedOutside = (ids, functionsTexts, asserted) =>
   );
 
 /**
+ * The suites a record runs on `pass`, by mode (#658). A later pass runs only
+ * to settle the ids the pass before it added, so it reruns the Vitest suites
+ * and never Playwright or the functions suite; `--unit-suite` reruns the unit
+ * suite alone, since the laptop runs nothing else.
+ *
+ * @param {string | undefined} mode the one argument, or none for a full record
+ * @param {number} pass
+ * @returns {{ unit: boolean, guards: boolean, integration: boolean, playwright: boolean, functions: boolean }}
+ */
+export const recordSuites = (mode, pass) => {
+  const vitest = pass > 1 || mode !== FUNCTIONS_ONLY;
+  const unitAlone = mode === UNIT_SUITE_ONLY;
+  return {
+    unit: vitest,
+    guards: vitest && !unitAlone,
+    integration: vitest && !unitAlone,
+    playwright: pass === 1 && mode === undefined,
+    functions: pass === 1 && (mode === undefined || mode === FUNCTIONS_ONLY),
+  };
+};
+
+/**
+ * The recorded ids a mode carries unmeasured, given the ids the run asserted
+ * (#658): `--unit` those a Playwright or functions spec spells (#548);
+ * `--functions` every one no functions spec spells (#610); a full record
+ * none. In those modes an id its own suite spells and the run did not assert
+ * is a floor that lost its test, and is refused. `--unit-suite` carries every
+ * id the unit run did not assert: telling a unit floor that lost its test from
+ * a guards one would take a second walk of `tests/` beside the one home in
+ * `tests/source-files.ts`, and `record-floors.yml` refuses a lost test anyway,
+ * since its full record carries nothing.
+ *
+ * @param {string | undefined} mode
+ * @param {readonly string[]} ids the recorded ids
+ * @param {ReadonlySet<string>} asserted
+ * @param {{ specTexts: readonly string[], functionsTexts: readonly string[] }} texts
+ * @returns {string[]}
+ */
+export const carriedFor = (mode, ids, asserted, texts) =>
+  mode === UNIT_ONLY
+    ? carriedIds(ids, [...texts.specTexts, ...texts.functionsTexts], asserted)
+    : mode === FUNCTIONS_ONLY
+      ? carriedOutside(ids, texts.functionsTexts, asserted)
+      : mode === UNIT_SUITE_ONLY
+        ? ids.filter((id) => !asserted.has(id))
+        : [];
+
+/**
  * What a record run wrote, one observation per line; nothing when it wrote
  * no file.
  *
@@ -254,6 +454,21 @@ const observationsIn = (file) =>
  * @returns {{ next: Record<string, number>, refusals: string[] }}
  */
 export const decideRecord = (recorded, seen, carried = []) => {
+  const { next, refusals } = judgeRecord(recorded, seen, carried);
+  return { next, refusals };
+};
+
+/**
+ * `decideRecord`, also naming the refusals that are falls (#640): those are
+ * the only ones the record's own ids can cause, so a pass that added ids
+ * measures again before calling them final.
+ *
+ * @param {Readonly<Record<string, number>>} recorded
+ * @param {readonly Observation[]} seen
+ * @param {readonly string[]} carried
+ * @returns {{ next: Record<string, number>, refusals: string[], falls: number }}
+ */
+const judgeRecord = (recorded, seen, carried) => {
   /** @type {Map<string, Observation[]>} */
   const byId = new Map();
   for (const observation of seen)
@@ -266,6 +481,7 @@ export const decideRecord = (recorded, seen, carried = []) => {
   const next = { ...recorded };
   /** @type {string[]} */
   const refusals = [];
+  let falls = 0;
   for (const [id, observations] of byId) {
     const sites = [...new Set(observations.map(({ site }) => site))];
     const values = [...new Set(observations.map(({ actual }) => actual))];
@@ -285,6 +501,7 @@ export const decideRecord = (recorded, seen, carried = []) => {
           `like this. If the corpus really shrank, lower it in ${FLOORS_FILE} ` +
           `by hand and say why in the commit.`,
       );
+      falls++;
       continue;
     }
     next[id] = actual;
@@ -295,7 +512,79 @@ export const decideRecord = (recorded, seen, carried = []) => {
         `${id} is recorded but no test asserted it: remove it from ` +
           `${FLOORS_FILE} with the floor that used it, or run the whole suite`,
       );
-  return { next, refusals };
+  return { next, refusals, falls };
+};
+
+/**
+ * Why each id named to `--retire` may not leave the record, or nothing (#640).
+ *
+ * Only a branch-only id leaves this way: one `origin/develop`'s record does not
+ * hold and no file under `tests/` spells. A landed floor is the operator's to
+ * drop, by hand with the reason in the commit, as a fall is. A develop record
+ * that could not be read refuses every id: unknown is never "not on develop".
+ *
+ * @param {readonly string[]} ids the ids to retire
+ * @param {{
+ *   recorded: Readonly<Record<string, number>>,
+ *   develop: Readonly<Record<string, number>> | string,
+ *   spelledIn: (id: string) => readonly string[],
+ * }} facts `develop` is origin/develop's record, or why it could not be read;
+ *   `spelledIn` names the files under `tests/` that spell an id
+ * @returns {string[]}
+ */
+export const retireRefusals = (ids, { recorded, develop, spelledIn }) =>
+  ids.flatMap((id) => {
+    if (!Object.hasOwn(recorded, id))
+      return [`${id} is not in ${FLOORS_FILE}: nothing to retire`];
+    if (typeof develop === 'string')
+      return [
+        `${id} cannot be retired: whether origin/develop holds it is unknown ` +
+          `(${develop})`,
+      ];
+    if (Object.hasOwn(develop, id))
+      return [
+        `${id} is on origin/develop: a landed floor leaves the record only by ` +
+          `the operator's ruling, as a hand edit of ${FLOORS_FILE} with the ` +
+          'reason in the commit',
+      ];
+    const files = spelledIn(id);
+    return files.length > 0
+      ? [
+          `${id} is still spelled in ${files.join(', ')}: retire it with the ` +
+            'floor that used it',
+        ]
+      : [];
+  });
+
+const RETIRE = '--retire';
+
+/**
+ * The record's mode (`--unit`, `--functions`, `--unit-suite`, or the full
+ * record) and the ids
+ * to retire, or the usage line naming what was given.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ mode: string | undefined, retired: string[] } | string}
+ */
+export const recordArguments = (args) => {
+  const usage =
+    `usage: npm run floors:record [-- ${MODES.join(' | ')}] ` +
+    `[${RETIRE} <id>]... (got ${args.join(' ')})`;
+  /** @type {string[]} */
+  const modes = [];
+  /** @type {string[]} */
+  const retired = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === RETIRE) {
+      const id = args[i + 1];
+      if (id === undefined || id.startsWith('-')) return usage;
+      retired.push(id);
+      i++;
+    } else if (MODES.includes(arg)) modes.push(arg);
+    else return usage;
+  }
+  return modes.length > 1 ? usage : { mode: modes[0], retired };
 };
 
 /** Passes a record may take before its ids are called unsettled. */
@@ -303,6 +592,12 @@ export const MAX_PASSES = 3;
 
 /**
  * Measure and decide until a pass adds no id, then return that pass's figures.
+ *
+ * `retired` ids (#640) leave the record before the first pass, so every pass
+ * reads the record the run would write. A pass that adds ids reads the floors
+ * counting them short, so its falls are judged again over the ids it added;
+ * any other refusal is final at once, and a pass that adds nothing is judged
+ * whole. A bare retire therefore still reads as a fall and is refused.
  *
  * A floor may count the record itself: literal-floors' `recorded-ids` floors
  * the ids it holds. One pass reads the record before its new ids are in it,
@@ -318,6 +613,7 @@ export const MAX_PASSES = 3;
  *
  * @param {{
  *   recorded: Readonly<Record<string, number>>,
+ *   retired?: readonly string[],
  *   measure: (floors: Readonly<Record<string, number>>, pass: number) => readonly Observation[] | string,
  *   carry?: (seen: readonly Observation[]) => readonly string[],
  *   maxPasses?: number,
@@ -326,19 +622,25 @@ export const MAX_PASSES = 3;
  */
 export const recordUntilSettled = ({
   recorded,
+  retired = [],
   measure,
   carry = () => [],
   maxPasses = MAX_PASSES,
 }) => {
-  let floors = { ...recorded };
+  let floors = Object.fromEntries(
+    Object.entries(recorded).filter(([id]) => !retired.includes(id)),
+  );
   for (let pass = 1; pass <= maxPasses; pass++) {
     const seen = measure(floors, pass);
     if (typeof seen === 'string')
       return { next: floors, refusals: [], failure: seen, passes: pass };
-    const { next, refusals } = decideRecord(floors, seen, [...carry(seen)]);
+    const { next, refusals, falls } = judgeRecord(floors, seen, [
+      ...carry(seen),
+    ]);
+    const added = Object.keys(next).length > Object.keys(floors).length;
     if (
-      refusals.length > 0 ||
-      Object.keys(next).length === Object.keys(floors).length
+      (refusals.length > 0 && !(added && falls === refusals.length)) ||
+      !added
     )
       return { next, refusals, failure: undefined, passes: pass };
     floors = next;
@@ -356,7 +658,7 @@ export const recordUntilSettled = ({
 
 /**
  * One line per figure that moved, largest move first: `id: 100 -> 125 (+25)`,
- * or `id: new, 3`.
+ * or `id: new, 3`; then one per retired id (#640): `id: retired, was 3`.
  *
  * Printed because a raise is accepted on its direction alone. A change that
  * adds five units and quietly makes the reader miss three records +2, and
@@ -378,6 +680,12 @@ export const describeMoves = (recorded, next) =>
       recorded[id] === undefined
         ? `${id}: new, ${next[id]}`
         : `${id}: ${recorded[id]} -> ${next[id]} (+${next[id] - recorded[id]})`,
+    )
+    .concat(
+      Object.keys(recorded)
+        .filter((id) => !Object.hasOwn(next, id))
+        .sort()
+        .map((id) => `${id}: retired, was ${recorded[id]}`),
     );
 
 /**
@@ -397,35 +705,93 @@ export const floorsText = (floors) =>
   ) + '\n';
 
 /**
+ * `origin/develop`'s record, fetched first so a stale ref cannot answer "not
+ * on develop", or why it could not be read.
+ *
+ * @returns {Record<string, number> | string}
+ */
+const developRecord = () => {
+  const fetch = spawnSync('git', ['fetch', '--quiet', 'origin', 'develop'], {
+    encoding: 'utf8',
+  });
+  const fetchRefusal = runRefusal('fetch of origin/develop', fetch);
+  if (fetchRefusal !== undefined) return fetchRefusal;
+  const show = spawnSync('git', ['show', `origin/develop:${FLOORS_FILE}`], {
+    encoding: 'utf8',
+  });
+  const showRefusal = runRefusal(`read of origin/develop:${FLOORS_FILE}`, show);
+  if (showRefusal !== undefined) return showRefusal;
+  try {
+    return JSON.parse(show.stdout);
+  } catch (error) {
+    return `origin/develop:${FLOORS_FILE} is not JSON: ${messageOf(error)}`;
+  }
+};
+
+/**
+ * The source files under `tests/` that spell `id` as a string, in any quote:
+ * where `literal-floors.test.ts` reads every id from.
+ *
+ * @param {string} id
+ * @returns {string[]}
+ */
+const spelledUnderTests = (id) =>
+  nonEmpty(
+    readdirSync('tests', { recursive: true, encoding: 'utf8' }).filter((name) =>
+      /\.(?:tsx?|mjs|js)$/.test(name),
+    ),
+    'source files under tests/',
+  )
+    .map((name) => join('tests', name))
+    .filter((file) =>
+      ["'", '"', '`'].some((quote) =>
+        readFileSync(file, 'utf8').includes(`${quote}${id}${quote}`),
+      ),
+    )
+    .sort();
+
+/**
  * @returns {void}
  */
 const main = () => {
-  if (env.CI) die('CI never records floors: run npm run floors:record locally');
-  const args = argv.slice(2);
-  if (
-    args.length > 1 ||
-    (args.length === 1 && ![UNIT_ONLY, FUNCTIONS_ONLY].includes(args[0]))
-  )
-    die(
-      `usage: npm run floors:record [-- ${UNIT_ONLY} | ${FUNCTIONS_ONLY}] ` +
-        `(got ${args.join(' ')})`,
-    );
-  // The unit floors alone (#548): a change that moves no Playwright floor
-  // need not pay for the container, about five minutes a record.
-  const unitOnly = args[0] === UNIT_ONLY;
-  // The functions floors alone (#610): the suite takes minutes, the whole
-  // record hours.
-  const functionsOnly = args[0] === FUNCTIONS_ONLY;
+  const inImage = recordsInImage(env);
+  if (env.CI && !inImage)
+    die('CI never records floors: run npm run floors:record locally');
+  const parsed = recordArguments(argv.slice(2));
+  if (typeof parsed === 'string') die(parsed);
+  const { mode, retired } = parsed;
+
+  // Before anything runs, and before anything is asked of Docker (#547): a
+  // record of a tree holding an untracked file is a figure CI will not read.
+  const untracked = untrackedTreeRefusal((command, args) =>
+    spawnSync(command, args, { encoding: 'utf8' }),
+  );
+  if (untracked !== undefined) die(untracked);
+  // `--unit` skips the container (#548), about five minutes a record;
+  // `--functions` the hours of a whole record (#610); `--unit-suite` every
+  // suite but the one the laptop runs (#658).
+  const firstPass = recordSuites(mode, 1);
 
   /** @type {Readonly<Record<string, number>>} */
   const recorded = existsSync(FLOORS_FILE)
     ? JSON.parse(readFileSync(FLOORS_FILE, 'utf8'))
     : {};
 
+  // Judged before any suite runs: a refused retire costs nothing.
+  if (retired.length > 0) {
+    const refusals = retireRefusals(retired, {
+      recorded,
+      develop: developRecord(),
+      spelledIn: spelledUnderTests,
+    });
+    if (refusals.length > 0)
+      die(`nothing recorded:\n  ${refusals.join('\n  ')}`);
+  }
+
   // Asked first, before minutes of unit suite: without Docker the Playwright
   // floors cannot be recorded, and they are never recorded on this machine.
   const docker =
-    unitOnly || functionsOnly
+    !firstPass.playwright || inImage
       ? undefined
       : runRefusal(
           PLAYWRIGHT,
@@ -455,31 +821,36 @@ const main = () => {
   let functionsSeen = [];
   let settled;
   try {
+    // The first pass reads the record the run would write: without the
+    // retired ids, which no test spells any more.
+    if (retired.length > 0)
+      writeFileSync(
+        FLOORS_FILE,
+        floorsText(
+          Object.fromEntries(
+            Object.entries(recorded).filter(([id]) => !retired.includes(id)),
+          ),
+        ),
+      );
     settled = recordUntilSettled({
       recorded,
+      retired,
       carry: (seen) => {
         read = seen.length;
         const asserted = new Set(seen.map(({ id }) => id));
-        const functionsTexts = functionsSpecs.map((spec) =>
-          readFileSync(spec, 'utf8'),
-        );
-        carried = unitOnly
-          ? carriedIds(
-              Object.keys(recorded),
-              [...specs, ...functionsSpecs].map((spec) =>
-                readFileSync(spec, 'utf8'),
-              ),
-              asserted,
-            )
-          : functionsOnly
-            ? carriedOutside(Object.keys(recorded), functionsTexts, asserted)
-            : [];
+        const textsOf = (/** @type {readonly string[]} */ files) =>
+          files.map((file) => readFileSync(file, 'utf8'));
+        carried = carriedFor(mode, Object.keys(recorded), asserted, {
+          specTexts: textsOf(specs),
+          functionsTexts: textsOf(functionsSpecs),
+        });
         return carried;
       },
       measure: (floors, pass) => {
         // A later pass reads the record the one before it decided. Only the
-        // unit suite runs again: no Playwright or functions test reads the
+        // Vitest suites run again: no Playwright or functions test reads the
         // record's ids.
+        const suites = recordSuites(mode, pass);
         if (pass > 1) {
           writeFileSync(FLOORS_FILE, floorsText(floors));
           console.log(
@@ -490,54 +861,67 @@ const main = () => {
         const unit = join(dir, `unit-${pass}.jsonl`);
         // `--functions` measures the functions suite alone; the unit suite
         // runs only to settle the ids that pass added.
-        if (!functionsOnly || pass > 1) {
+        if (suites.unit) {
           const unitRefusal = runRefusal(
             UNIT,
             spawnSync('npx', ['vitest', 'run'], {
               stdio: 'inherit',
-              env: { ...env, [RECORD_ENV]: unit },
+              env: childEnv(env, unit),
             }),
           );
           if (unitRefusal !== undefined) return unitRefusal;
+        }
+        if (suites.guards) {
           // The guards suite asserts most of the floors (#638), so it runs into
           // the same record, with the limit its own script carries.
           const guardsRefusal = runRefusal(
             GUARDS,
             spawnSync('npx', guardsArguments(), {
               stdio: 'inherit',
-              env: { ...env, [RECORD_ENV]: unit },
+              env: childEnv(env, unit),
             }),
           );
           if (guardsRefusal !== undefined) return guardsRefusal;
+        }
+        if (suites.integration) {
           // The integration suite asserts floors too (#630), so it runs into
           // the same record, with the limit its own script carries.
           const integrationRefusal = runRefusal(
             INTEGRATION,
             spawnSync('npx', integrationArguments(), {
               stdio: 'inherit',
-              env: { ...env, [RECORD_ENV]: unit },
+              env: childEnv(env, unit),
             }),
           );
           if (integrationRefusal !== undefined) return integrationRefusal;
         }
-        if (pass === 1 && !unitOnly && !functionsOnly) {
-          const image = localImage();
+        if (suites.playwright) {
+          const image = inImage ? 'the running container' : localImage();
           const e2e = join(dir, 'e2e.jsonl');
           console.log(
             `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
           );
+          const run = playwrightRecordRun({
+            inImage,
+            image,
+            cwd,
+            record: e2e,
+            specs,
+          });
           const e2eRefusal = runRefusal(
             PLAYWRIGHT,
-            spawnSync(
-              'docker',
-              playwrightRecordArgs({ image, cwd, record: e2e, specs }),
-              { stdio: 'inherit' },
-            ),
+            spawnSync(run.file, run.args, {
+              stdio: 'inherit',
+              env:
+                run.env === undefined
+                  ? undefined
+                  : childEnv(env, run.env[RECORD_ENV]),
+            }),
           );
           if (e2eRefusal !== undefined) return e2eRefusal;
           e2eSeen = observationsIn(e2e);
         }
-        if (pass === 1 && !unitOnly) {
+        if (suites.functions) {
           const functions = join(dir, 'functions.jsonl');
           console.log(
             `Recording the functions floors: ${functionsSpecs.join(' ')}`,
@@ -546,7 +930,7 @@ const main = () => {
             FUNCTIONS,
             spawnSync('npm', ['run', 'test:functions'], {
               stdio: 'inherit',
-              env: { ...env, [RECORD_ENV]: functions },
+              env: childEnv(env, functions),
             }),
           );
           if (functionsRefusal !== undefined) return functionsRefusal;
@@ -565,15 +949,15 @@ const main = () => {
 
   const { next, refusals, failure, passes } = settled;
   if (failure !== undefined || refusals.length > 0) {
-    // A later pass ran over a record this run wrote: put back what it found.
-    if (passes > 1)
+    // A later pass, or a retire, wrote the record: put back what it found.
+    if (passes > 1 || retired.length > 0)
       if (original === undefined) rmSync(FLOORS_FILE, { force: true });
       else writeFileSync(FLOORS_FILE, original);
     die(failure ?? `nothing recorded:\n  ${refusals.join('\n  ')}`);
   }
   if (carried.length > 0)
     console.log(
-      `${unitOnly ? UNIT_ONLY : FUNCTIONS_ONLY}: not measured, carried ` +
+      `${mode}: not measured, carried ` +
         'unchanged for CI to judge: ' +
         carried.join(', '),
     );

@@ -143,7 +143,7 @@ skips the e2e shards, `sanity-on-build` and `functions`; `build-and-test` still
 runs and passes only when exactly those were skipped and everything else
 succeeded.
 
-`tests/unit/pipeline-wiring.test.ts` holds this shape up. It exists because the
+`tests/guards/pipeline-wiring.test.ts` holds this shape up. It exists because the
 dev sanity suite and its config were both written and then referenced by nothing
 in CI, so "deployed to dev" only meant `wrangler` had not errored.
 
