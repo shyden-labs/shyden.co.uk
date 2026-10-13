@@ -358,7 +358,7 @@
   "release-inventory/capture-lines": 90,
   "release-inventory/capture-scanned-modules": 129,
   "release-inventory/helper-modules": 129,
-  "release-prose/phrases": 120,
+  "release-prose/phrases": 324,
   "remote-images/config-properties": 4,
   "report-form/report-send-requests": 12,
   "report-review/no-engine-requests": 1,
