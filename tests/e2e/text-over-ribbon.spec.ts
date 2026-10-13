@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { visibleLinesReaderScript } from '../visible-text';
 import { shoot } from './evidence';
 import { captureAfterPaint } from './painted';
 import { filesUnder, searched } from '../source-files';
@@ -68,7 +69,12 @@ const scoreRuns = async (
   page: Page,
   path: string,
 ): Promise<{ runs: Run[]; seen: number }> => {
-  const { found: runs, seen } = await page.evaluate(() => {
+  const { found: runs, seen } = await page.evaluate((readerScript) => {
+    // What a visitor can see of a text node (`tests/visible-text.ts`): a
+    // clipped screen-reader name shows nothing, so it is not scored.
+    const visibleLines = new Function(readerScript)() as (
+      node: Text,
+    ) => DOMRect[];
     const opaque = (el: Element) => {
       const c = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
       return c !== null && (c.length === 3 || Number(c[3]) === 1);
@@ -108,17 +114,8 @@ const scoreRuns = async (
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const parent = node.parentElement;
       if (!parent || !node.textContent?.trim()) continue;
-      if (
-        !parent.checkVisibility({
-          opacityProperty: true,
-          visibilityProperty: true,
-        })
-      )
-        continue;
       if (!onRibbon(parent)) continue;
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const readable = [...range.getClientRects()].filter(
+      const readable = visibleLines(node as Text).filter(
         (r) => r.width > 4 && r.height > 4 && r.bottom <= innerHeight,
       );
       if (readable.length) seen += 1;
@@ -138,7 +135,7 @@ const scoreRuns = async (
       '* { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }';
     document.head.append(hide);
     return { found, seen };
-  });
+  }, visibleLinesReaderScript());
   // In CSS pixels: the mobile and Safari projects emulate a 2-3x display,
   // and a device-pixel image read at CSS coordinates samples the wrong
   // place (it reported 1.82:1 for text chromium measured at 6:1). Taken after

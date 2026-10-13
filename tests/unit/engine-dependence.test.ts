@@ -256,7 +256,8 @@ describe('the default name set', () => {
     // Operator decision, 2026-09-18. Playwright can read layout with no DOM
     // call at all (`toBeInViewport`), and a spec that asks `browserName` has
     // said its verdict depends on the engine. Removing a name here re-opens
-    // the boundary for every spec that uses it.
+    // the boundary for every spec that uses it. The shipped readers (#619)
+    // read layout inside the page, so naming one is reading layout.
     expect(new Set(ENGINE_DEPENDENT_NAMES)).toEqual(
       new Set([
         ...['setViewportSize', 'viewport', 'isMobile', 'hasTouch'],
@@ -268,6 +269,9 @@ describe('the default name set', () => {
         ...['boundingBox', 'toBeInViewport', 'isVisible', 'toBeVisible'],
         ...['isHidden', 'toBeHidden', 'scrollIntoViewIfNeeded', 'viewportSize'],
         ...['useInnerText', 'toHaveScreenshot', 'browserName'],
+        ...['measureBoard', 'measureBoardScript', 'measureTypedFields'],
+        ...['measureTypedFieldsScript', 'visibleLinesReader'],
+        ...['visibleLinesReaderScript'],
       ]),
     );
   });
