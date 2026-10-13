@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nonEmpty } from '../source-files';
@@ -47,10 +54,17 @@ describe('the deploy pipeline runs what it claims to', () => {
   };
 
   // A step's script as the runner runs it: bash with -eo pipefail and no
-  // profile, given only the env named here. `https_proxy` points at a closed
-  // port, so a script that reaches for the network fails on the spot rather
-  // than calling Cloudflare.
-  const runStep = (step: RollbackStep, env: Record<string, string>) => {
+  // profile, given only the env named here and a RUNNER_TEMP of its own.
+  // `https_proxy` points at a closed port, so a script that reaches for the
+  // network fails on the spot rather than calling Cloudflare. Given
+  // `cloudflare`, a stand-in `curl` ahead on PATH answers the Pages API with
+  // it instead: the deployments list for a URL naming them, the project for
+  // any other (#406).
+  const runStep = (
+    step: RollbackStep,
+    env: Record<string, string>,
+    cloudflare?: { project: unknown; deployments: unknown },
+  ) => {
     const script = String(step.run ?? '');
     expect(script, `${step.name} runs no script`).not.toBe('');
     expect(script, 'an expression reaches a script through env').not.toMatch(
@@ -59,6 +73,31 @@ describe('the deploy pipeline runs what it claims to', () => {
     const dir = mkdtempSync(join(tmpdir(), 'rollback-step-'));
     const outputs = join(dir, 'outputs');
     writeFileSync(outputs, '');
+    const bin = join(dir, 'bin');
+    if (cloudflare !== undefined) {
+      mkdirSync(bin);
+      writeFileSync(
+        join(dir, 'project.json'),
+        JSON.stringify(cloudflare.project),
+      );
+      writeFileSync(
+        join(dir, 'deployments.json'),
+        JSON.stringify(cloudflare.deployments),
+      );
+      writeFileSync(
+        join(bin, 'curl'),
+        [
+          '#!/bin/bash',
+          'for arg; do url=$arg; done',
+          'case "$url" in',
+          `  */deployments*) cat '${join(dir, 'deployments.json')}' ;;`,
+          `  *) cat '${join(dir, 'project.json')}' ;;`,
+          'esac',
+          '',
+        ].join('\n'),
+      );
+      chmodSync(join(bin, 'curl'), 0o755);
+    }
     try {
       const run = spawnSync(
         'bash',
@@ -67,10 +106,11 @@ describe('the deploy pipeline runs what it claims to', () => {
           encoding: 'utf8',
           timeout: 10_000,
           env: {
-            PATH: process.env.PATH ?? '',
+            PATH: `${cloudflare === undefined ? '' : `${bin}:`}${process.env.PATH ?? ''}`,
             https_proxy: 'http://127.0.0.1:9',
             HTTPS_PROXY: 'http://127.0.0.1:9',
             GITHUB_OUTPUT: outputs,
+            RUNNER_TEMP: dir,
             ...env,
           },
         },
@@ -128,12 +168,44 @@ describe('the deploy pipeline runs what it claims to', () => {
       CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
     };
     const id = '6f1c2a3b-0d4e-4f5a-9b6c-7d8e9f0a1b2c';
-    const given = runStep(find, { ...credentials, TARGET_ID: id });
+    // Live is the newest; the one before it failed its build, and a preview
+    // sits between: the target is the successful production one before them.
+    const deployment = (
+      deploymentId: string,
+      createdOn: string,
+      environment = 'production',
+      status = 'success',
+    ) => ({
+      id: deploymentId,
+      environment,
+      created_on: createdOn,
+      latest_stage: { status },
+    });
+    const cloudflare = {
+      project: { result: { canonical_deployment: { id: 'live-4' } } },
+      deployments: {
+        result: [
+          deployment('live-4', '2026-10-13T04:00:00Z'),
+          deployment('preview-3', '2026-10-13T03:00:00Z', 'preview'),
+          deployment(
+            'failed-2',
+            '2026-10-13T02:00:00Z',
+            'production',
+            'failure',
+          ),
+          deployment('good-1', '2026-10-13T01:00:00Z'),
+        ],
+      },
+    };
+    const given = runStep(find, { ...credentials, TARGET_ID: id }, cloudflare);
     expect(given.status, given.log).toBe(0);
     expect(given.outputs).toBe(`target=${id}\n`);
+    const chosen = runStep(find, { ...credentials, TARGET_ID: '' }, cloudflare);
+    expect(chosen.status, chosen.log).toBe(0);
+    expect(chosen.outputs).toBe('target=good-1\n');
     // A path that climbs out of the project, a second output line, a space.
     for (const bad of ['../../dns_records', `${id}\ntarget=other`, 'a b']) {
-      const run = runStep(find, { ...credentials, TARGET_ID: bad });
+      const run = runStep(find, { ...credentials, TARGET_ID: bad }, cloudflare);
       expect(run.status, JSON.stringify(bad)).not.toBe(0);
       expect(run.outputs, JSON.stringify(bad)).toBe('');
     }
