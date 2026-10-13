@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { searched } from '../source-files';
 import { test, expect } from './fixtures';
-import { openRoster } from './helpers';
+import { openRoster, openWaitingBoard } from './helpers';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
 
@@ -208,6 +208,29 @@ for (const theme of THEMES) {
           // The full-page pictures above hold it in flow, so this is the only
           // picture of the docked look. It is viewport-only, and a viewport capture
           // never resizes the view, which is the step that moved the bar's label.
+          // #743: the board put up before the first shuffle, waiting with
+          // its empty cards and the class listed. A fixed overlay, so the
+          // viewport is the picture.
+          test('classroom-groups board waiting for a shuffle renders the same pixels', async ({
+            page,
+          }) => {
+            await openWaitingBoard(page, '10', '4');
+            await expectTheme(page, theme);
+            await expect(page.locator('#cg-board .group')).toHaveCount(2);
+            // The bar fades on a product timer (FADE_AFTER_MS, 2500ms): the
+            // settled board is the faded one, so wait for that class rather
+            // than catch the bar mid-fade. Generous for a loaded machine.
+            await expect(page.locator('#cg-board-bar')).toHaveClass(/faded/, {
+              timeout: 15000,
+            });
+            await settle(page);
+            await expectSamePixels(
+              page,
+              `classroom-groups-board-waiting-${label}${suffix}.png`,
+              { fullPage: false },
+            );
+          });
+
           test('classroom-groups with the action bar docked renders the same pixels', async ({
             page,
           }) => {

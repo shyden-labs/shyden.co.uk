@@ -178,6 +178,13 @@ export const localeFromPath = (pathname: string): Locale => {
 export type ResolveStudentLabel = (studentNumber: number) => string;
 
 /**
+ * Whether a message names exactly two students, which three of its sentences
+ * word differently ("both", "are not the same sex") from three or more (#505).
+ */
+const howMany = (students: readonly number[]): 'two' | 'more' =>
+  students.length === 2 ? 'two' : 'more';
+
+/**
  * Turn an engine error into a sentence in the page's language.
  *
  * The engine deliberately returns a code plus data instead of prose, so this
@@ -236,6 +243,7 @@ export function renderError(
     case ERROR_CODES.keepApartImpossible:
       return e.KEEP_APART_IMPOSSIBLE({
         names: error.students.map(resolveStudent),
+        howMany: howMany(error.students),
         groupsNeeded: error.groupsNeeded,
       });
     case ERROR_CODES.keepApartNoArrangement:
@@ -256,6 +264,7 @@ export function renderError(
     case ERROR_CODES.sexSeparateSplitsUnit:
       return e.SEX_SEPARATE_SPLITS_UNIT({
         names: error.students.map(resolveStudent),
+        howMany: howMany(error.students),
       });
     // Fix round 1, F-2. Carries `groupsRequested: number`, never a student
     // list -- no resolver needed, unlike every other `separate`-mode code
@@ -348,6 +357,7 @@ export function renderWarning(
     case WARNING_CODES.pinnedMixedSex:
       return w.PINNED_MIXED_SEX({
         names: warning.students.map(resolveStudent),
+        howMany: howMany(warning.students),
       });
     // Whole-branch review, I-2. Carries `students: number[]`, same resolver
     // pattern as sexSpillover/pinnedMixedSex above -- no `sex` field to pass

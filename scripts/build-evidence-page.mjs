@@ -1693,5 +1693,5 @@ const build = ({
 // Only when run, never when imported: the tests import the functions above.
 // Node answers "was I run directly?" itself. Comparing `import.meta.url` with
 // the raw path skipped the build, in silence, from any checkout whose path held
-// a space (#221, `tests/unit/script-entry.test.ts`).
+// a space (#221, `tests/guards/script-entry.test.ts`).
 if (import.meta.main) main();

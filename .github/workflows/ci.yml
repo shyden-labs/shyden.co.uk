@@ -19,16 +19,24 @@ name: CI
 # Widening costs nothing on the merge path: a PR into develop or main already
 # ran exactly one run, and a stacked PR had none to add to. Which checks BLOCK
 # a merge still lives where it belongs, in `required_status_checks.contexts`,
-# and `tests/unit/pipeline-wiring.test.ts` pins the job name that list matches.
+# and `tests/guards/pipeline-wiring.test.ts` pins the job name that list matches.
 #
 # `pull_request`, never `pull_request_target`: a fork PR must not see secrets.
 #
 # `workflow_call` is the one other trigger, and it is not a push: it is how
 # deploy-dev.yml's dispatch path runs THIS suite on a branch that has no pull
 # request, rather than a copy of it that could drift (#163).
+#
+# `workflow_dispatch` is the other, and it exists for one reason: a commit
+# pushed with a workflow's own `GITHUB_TOKEN` starts no run, so the commit the
+# floor recorder makes (`record-floors.yml`, #651) would sit on a branch with
+# no checks. The recorder dispatches this workflow on the branch afterwards,
+# and the dispatched run's checks attach to the new head, which is what branch
+# protection reads by name.
 on:
   pull_request:
   workflow_call:
+  workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
 # that could no longer merge. The key names this workflow, because every
@@ -61,7 +69,7 @@ concurrency:
 # AC2) -- and so is build-and-test's download of this run's own artifacts.
 #
 # Changing the repository default is administration, and so the operator's.
-# `tests/unit/pipeline-wiring.test.ts` derives this rule from the filesystem,
+# `tests/guards/pipeline-wiring.test.ts` derives this rule from the filesystem,
 # so a workflow added later is covered the day it appears rather than the day
 # someone remembers (#24, #49, #80).
 permissions:
@@ -133,7 +141,7 @@ jobs:
     # read` is restated beside it; labels live under the issues scope, which
     # is what `issues: read` buys. deploy-dev.yml's dispatch path calls this
     # workflow and must grant the same, since a called workflow's token can
-    # only be narrowed (tests/unit/pipeline-wiring.test.ts).
+    # only be narrowed (tests/guards/pipeline-wiring.test.ts).
     permissions:
       contents: read
       issues: read
@@ -162,10 +170,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       # Every guard that reads the whole tree (#638). One limit, measured, on the command
-      # itself (tests/unit/guards-budget.test.ts).
+      # itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:guards
+      # Every real run of the engine over many seeded inputs (#650); the unit
+      # suite keeps a stand-in of each. One limit, measured, on the command
+      # itself (tests/unit/suite-budgets.test.ts).
+      - run: npm run test:simulation
       # Every test that starts a process (#630). The unit suite starts none.
-      # One limit, measured, on the command itself (tests/unit/integration-budget.test.ts).
+      # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
@@ -184,7 +196,7 @@ jobs:
     # that every shard was skipped rather than adding up accounts.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The e2e policy, restated per shard: tests/unit/pipeline-wiring.test.ts
+    # The e2e policy, restated per shard: tests/guards/pipeline-wiring.test.ts
     # pins it and fails if any job running the suite carries another.
     timeout-minutes: 20
     # The pinned Playwright image (#431): browsers and their system packages
@@ -396,7 +408,7 @@ jobs:
   # anything.
   #
   # `image` tracks the `@playwright/test` version in package.json, and
-  # `tests/unit/browser-matrix.test.ts` fails if the two drift apart -- a
+  # `tests/guards/browser-matrix.test.ts` fails if the two drift apart -- a
   # library and a browser bundle from different releases is the one mismatch
   # this job cannot report clearly.
   #

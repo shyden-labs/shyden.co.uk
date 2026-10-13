@@ -63,6 +63,26 @@ export const openRoster = async (page: Page, path = '/classroom-groups') => {
 };
 
 /**
+ * The board put up before any shuffle (#743): `count` students by `size`,
+ * waiting with their empty cards. A helper, as `openRoster` is, so a spec
+ * that only captures the result (`visual.spec.ts`) acts through it.
+ */
+export const openWaitingBoard = async (
+  page: Page,
+  count: string,
+  size: string,
+) => {
+  await page.goto('/classroom-groups');
+  await page.fill('#cg-count', count);
+  await page.fill('#cg-size', size);
+  await page.getByRole('button', { name: 'Full screen' }).click();
+  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+  await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
+    Number(count),
+  );
+};
+
+/**
  * `expected` with its list of names joined the way THIS browser joins them.
  *
  * Messages are rendered here in Node, and the page joins a list with its own
