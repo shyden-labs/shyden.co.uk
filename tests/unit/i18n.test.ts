@@ -370,6 +370,7 @@ describe('every engine error can be rendered in every language', () => {
               strings.studentNumber({ n: 1 }),
               strings.studentNumber({ n: 2 }),
             ],
+            howMany: 'two',
             groupsNeeded: 2,
           }),
         );
@@ -418,7 +419,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana and Budi all need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
+        'Ana and Budi both need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -607,6 +608,7 @@ describe('every engine error can be rendered in every language', () => {
               strings.studentNumber({ n: 1 }),
               strings.studentNumber({ n: 2 }),
             ],
+            howMany: 'two',
           }),
         );
         expect(msg).toContain(strings.studentNumber({ n: 1 }));
@@ -639,7 +641,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana and Budi are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Ana and Budi are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -652,7 +654,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana dan Budi ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Ana dan Budi ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
       expect(msg).not.toContain('Siswa');
     });
@@ -1385,6 +1387,7 @@ describe('every engine warning can be rendered in every language', () => {
               strings.studentNumber({ n: 1 }),
               strings.studentNumber({ n: 4 }),
             ],
+            howMany: 'two',
           }),
         );
         expect(msg).toContain(strings.studentNumber({ n: 1 }));
@@ -1400,7 +1403,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana and Budi are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Ana and Budi are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
       expect(msg).not.toContain('Student');
       expect(msg).toContain('not a mistake');
@@ -1413,7 +1416,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana dan Budi dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
+        'Ana dan Budi dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(msg).not.toContain('Siswa');
       expect(msg).toContain('bukan kesalahan');
