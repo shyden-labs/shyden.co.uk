@@ -51,6 +51,17 @@ const stringsOf = (page: Page): Strings =>
  * same reason, rather than reproduced verbatim into a helper every later
  * stage would then inherit.
  */
+export const openRoster = async (page: Page, path = '/classroom-groups') => {
+  await page.goto(path);
+  await page.locator('#cg-students-toggle').click();
+  await page
+    .getByRole('button', {
+      name: stringsOf(page).rosterAddStudent,
+      exact: true,
+    })
+    .click();
+};
+
 /**
  * The board put up before any shuffle (#743): `count` students by `size`,
  * waiting with their empty cards. A helper, as `openRoster` is, so a spec
@@ -69,17 +80,6 @@ export const openWaitingBoard = async (
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
   );
-};
-
-export const openRoster = async (page: Page, path = '/classroom-groups') => {
-  await page.goto(path);
-  await page.locator('#cg-students-toggle').click();
-  await page
-    .getByRole('button', {
-      name: stringsOf(page).rosterAddStudent,
-      exact: true,
-    })
-    .click();
 };
 
 /**
