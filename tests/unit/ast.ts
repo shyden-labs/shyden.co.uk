@@ -472,6 +472,11 @@ export interface Closure {
   reaches(file: string, name: string): boolean;
 }
 
+/** A closure whose seeds are the whole answer, so a fixture needs no graph. */
+export const seededClosure = (...names: string[]): Closure => ({
+  reaches: (_file, name) => names.includes(name),
+});
+
 export interface CloseOptions {
   /**
    * Count a call that is the first argument of `JSON.parse(...)` as data, not

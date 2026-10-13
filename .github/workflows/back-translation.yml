@@ -51,8 +51,10 @@ jobs:
         run: docker build --tag back-translation-engine docker/libretranslate
       - name: Start the engine
         run: docker run --detach --name engine --publish 5000:5000 back-translation-engine
-      # The engine downloads its models on first start and answers
-      # GET /languages only once they are loaded.
+      # The models are in the image (#666): the build downloads them, checks
+      # all eight directions and translates once in each, so a start loads
+      # them from disk and downloads nothing. GET /languages answers once
+      # they are loaded, 6-9 s measured offline.
       - name: Wait for the engine to load its models
         timeout-minutes: 15
         run: |

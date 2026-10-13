@@ -1,6 +1,5 @@
-import { describe, it, expect, afterEach, onTestFinished } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,8 +31,24 @@ const LISTENS_AFTER_A_MOMENT = [
   "    .listen(port, '127.0.0.1');",
   '}, 300);',
 ].join('\n');
-const RUNS_WITHOUT_ANSWERING =
-  "require('node:fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(() => undefined, 1_000);";
+const RUNS_WITHOUT_ANSWERING = 'setInterval(() => undefined, 1_000);';
+
+// Every child `startServerProcess` spawns, kept as `spawn` returned it. Its
+// pid is set the moment the process exists, before Node inside it has run a
+// line, so a case that must find the child after the wait gave up does not
+// depend on how long the child takes to start (#655: a pid file the child
+// wrote itself was missing on a loaded machine, where Node took longer than
+// the 500 ms wait). `spawn` itself is the real one.
+const spawned = vi.hoisted((): ChildProcess[] => []);
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:child_process')>();
+  const keep = (...args: Parameters<typeof real.spawn>): ChildProcess => {
+    const child = real.spawn(...args);
+    spawned.push(child);
+    return child;
+  };
+  return { ...real, spawn: keep as typeof real.spawn };
+});
 
 // Awaits each child's `close`, so whatever a server's end sets off happens
 // inside the test that started it, not after the file has finished.
@@ -228,13 +243,10 @@ describe('startServerProcess', () => {
   });
 
   it('stops a server that never answers once the wait gives up on it', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'server-process-'));
-    onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-    const pidFile = join(dir, 'pid');
-
+    spawned.splice(0);
     const outcome = await startServerProcess(
       node,
-      ['-e', RUNS_WITHOUT_ANSWERING, pidFile],
+      ['-e', RUNS_WITHOUT_ANSWERING],
       {
         isReady: async () => false,
         timeout: 500,
@@ -245,11 +257,11 @@ describe('startServerProcess', () => {
     expect(messageOf(outcome)).toContain(
       'Timed out after 500ms waiting for: a server that never answers.',
     );
-    const pid = Number(readFileSync(pidFile, 'utf8'));
-    expect(
-      pid,
-      'the server wrote its pid before the wait gave up',
-    ).toBeGreaterThan(0);
+    // Whatever the outcome, a child left running is stopped after the test.
+    running.push(...spawned);
+    expect(spawned, 'the one server this case started').toHaveLength(1);
+    const pid = spawned[0]?.pid ?? 0;
+    expect(pid, 'the server was spawned with a pid').toBeGreaterThan(0);
     await expect.poll(() => isRunning(pid), { timeout: 5_000 }).toBe(false);
   });
 

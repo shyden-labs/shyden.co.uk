@@ -109,6 +109,44 @@ export function fontThatFits(
   );
 }
 
+/**
+ * Settle on a font that FITS, reading the sheet at each answer (#743).
+ *
+ * `fontThatFits` is exact only within one column regime; where the layout
+ * rewraps between the readings, its answer can land a few px over, and the
+ * board then scrolled above the floor. Here every answer is measured, and an
+ * overflowing one is solved again from the two most recent readings. It stops
+ * when a reading fits, or at the floor; after `cap` readings that still do not
+ * fit it ends AT the floor, the one size that is always allowed to scroll.
+ *
+ * `measure` sets the font and returns the sheet's height there. Pure otherwise.
+ */
+export function settleFont(
+  available: number,
+  atBase: { font: number; height: number },
+  atApplied: { font: number; height: number },
+  floor: number,
+  measure: (font: number) => number,
+  cap: number,
+): number {
+  const low = usable(floor);
+  let previous = atBase;
+  let current = atApplied;
+  for (let reading = 0; reading < cap; reading += 1) {
+    if (current.height <= available) return current.font;
+    if (current.font <= low) return low;
+    let next = fontThatFits(available, previous, current, low);
+    // No progress (an unsolvable line): fall back to the ratio, which is
+    // strictly smaller for any sheet that overflows.
+    if (next >= current.font) {
+      next = Math.max(low, current.font * (available / usable(current.height)));
+    }
+    previous = current;
+    current = { font: next, height: measure(next) };
+  }
+  return current.height <= available ? current.font : low;
+}
+
 /** A size that can actually be divided by. Anything else is 1. */
 const usable = (value: number): number =>
   Number.isFinite(value) && value > 0 ? value : 1;
