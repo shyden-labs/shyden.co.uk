@@ -532,6 +532,8 @@ const DECORATIVE_SELECTORS = [
   'components/Header.astro :: .menu[open] ~ nav',
   'components/pages/GloryPointsPage.astro :: .card',
   'components/pages/ClassroomGroupsPage.astro :: #cg-results .group',
+  // #743: the outline of a waiting student's chip, never a control.
+  'components/pages/ClassroomGroupsPage.astro :: #cg-results .waiting-student',
   'components/pages/ClassroomGroupsPage.astro :: #cg-roster .cg-student',
   'components/pages/ClassroomGroupsPage.astro :: #cg-roster td',
   'components/pages/ClassroomGroupsPage.astro :: #cg-roster .cg-student > td',

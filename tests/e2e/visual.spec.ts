@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { searched } from '../source-files';
 import { test, expect } from './fixtures';
-import { openRoster } from './helpers';
+import { openRoster, openWaitingBoard } from './helpers';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
 
@@ -214,14 +214,8 @@ for (const theme of THEMES) {
           test('classroom-groups board waiting for a shuffle renders the same pixels', async ({
             page,
           }) => {
-            await page.goto('/classroom-groups');
+            await openWaitingBoard(page, '10', '4');
             await expectTheme(page, theme);
-            await page.fill('#cg-count', '10');
-            await page.fill('#cg-size', '4');
-            await page.getByRole('button', { name: 'Full screen' }).click();
-            await expect(
-              page.locator('#cg-board .waiting-student'),
-            ).toHaveCount(10);
             await expect(page.locator('#cg-board .group')).toHaveCount(2);
             // The bar fades on a product timer (FADE_AFTER_MS, 2500ms): the
             // settled board is the faded one, so wait for that class rather

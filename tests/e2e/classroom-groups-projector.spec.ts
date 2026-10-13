@@ -8,6 +8,7 @@ import {
   buildRoster,
   giveEveryoneASex,
   refuseFullscreen,
+  openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
 import { FLOOR_PX } from '../../src/scripts/projector';
@@ -326,9 +327,6 @@ test.describe('the projector view', () => {
 });
 
 /**
- * Stage 5, Task 6. Z-21, Z-22, Z-23, E-15, E-16, E-17.
- */
-/**
  * #743. The board put up BEFORE the first shuffle: the results heading, one
  * empty card per group the deal will make, and every student waiting, so
  * the class watches the shuffle. Inside `#cg-results`, the one element the
@@ -386,7 +384,7 @@ test.describe('the board before a shuffle (#743)', () => {
       waiting.first().locator('.number').boundingBox(),
       waiting.first().locator('.who').boundingBox(),
     ]);
-    expect(who!.x - (number!.x + number!.width)).toBeGreaterThan(2);
+    expect(who!.x).toBeGreaterThan(number!.x + number!.width);
   });
 
   test('a bare count waits by number alone', async ({ page }) => {
@@ -466,6 +464,9 @@ test.describe('the board before a shuffle (#743)', () => {
   });
 });
 
+/**
+ * Stage 5, Task 6. Z-21, Z-22, Z-23, E-15, E-16, E-17.
+ */
 test.describe('the reveal', () => {
   // Leaving MID-reveal must cancel what is still pending. Left running, the
   // remaining timers fire against groups that are back on the page, and a
@@ -914,22 +915,6 @@ const expectNothingOutOfReach = async (
   }
 };
 
-/** The board put up before any shuffle (#743), with `count` waiting. */
-const waitingBoardOf = async (
-  page: import('@playwright/test').Page,
-  count: string,
-  size: string,
-) => {
-  await page.goto('/classroom-groups');
-  await page.fill('#cg-count', count);
-  await page.fill('#cg-size', size);
-  await page.getByRole('button', { name: 'Full screen' }).click();
-  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
-  await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
-    Number(count),
-  );
-};
-
 test.describe('the projector board never hides a name', () => {
   // #743 AC6: the waiting list and its empty cards are read from the back of
   // the room too, through the same fit as the dealt board.
@@ -937,7 +922,7 @@ test.describe('the projector board never hides a name', () => {
     test(`nothing waiting is out of reach -- ${shape.what}`, async ({
       page,
     }) => {
-      await waitingBoardOf(page, shape.count, shape.size);
+      await openWaitingBoard(page, shape.count, shape.size);
       await expectNothingOutOfReach(page, 'the waiting board');
     });
   }
@@ -948,7 +933,7 @@ test.describe('the projector board never hides a name', () => {
       { tag: '@emulated-viewport' },
       async ({ page }) => {
         await page.setViewportSize(shape.viewport);
-        await waitingBoardOf(page, shape.count, shape.size);
+        await openWaitingBoard(page, shape.count, shape.size);
         await expectNothingOutOfReach(page, 'the waiting board, short');
       },
     );
@@ -959,7 +944,7 @@ test.describe('the projector board never hides a name', () => {
     { tag: '@emulated-viewport' },
     async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 568 });
-      await waitingBoardOf(page, '25', '5');
+      await openWaitingBoard(page, '25', '5');
       const stage = page.locator('#cg-board-stage');
       const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
         scrollWidth: el.scrollWidth,

@@ -1901,7 +1901,7 @@ export function plannedGroups(
     {
       ...input,
       random: () => {
-        throw new Error('a plan never reaches placement (#743)');
+        throw new Error('a plan never reaches placement');
       },
     },
     true,
