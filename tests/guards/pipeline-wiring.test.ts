@@ -9,10 +9,6 @@ import {
 } from '../unit/source-text';
 import { nonEmpty, searched, trackedFiles } from '../source-files';
 import type { Project } from '@playwright/test';
-import playwrightConfig, {
-  VISUAL_MEASURE_PROJECT,
-  VISUAL_PROJECT,
-} from '../../playwright.config';
 import {
   checkoutSteps,
   inheritedPermissionsFindings,
@@ -27,8 +23,6 @@ import {
   type DeclaredPermissions,
   type WorkflowJob,
 } from '../workflow-jobs';
-import { parseFile } from '../unit/ast';
-import { declarationsIn } from '../playwright-declarations';
 import { REQUIRED_CHECKS } from '../../scripts/deploy-gate.mjs';
 import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
@@ -36,6 +30,24 @@ import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { floorBreach } from '../floors';
 
 const WORKFLOWS = '.github/workflows';
+
+/*
+ * The Playwright config and the TypeScript parser are loaded by the tests that
+ * read them, never while this file loads (#730). Measured on the runner (run
+ * 38304695925, nine loads): `@playwright/test`, which the config imports, and
+ * `typescript`, which the parser imports, were 67-86% of loading this file,
+ * and its load stood at 527-870 ms of own CPU against the 700 ms the guards
+ * files are cut to. A dynamic import is cached by the module system, so the
+ * first test to await one pays for it and the rest find it loaded.
+ */
+const loadPlaywrightConfig = () => import('../../playwright.config');
+const loadParser = async () => {
+  const [{ parseFile }, { declarationsIn }] = await Promise.all([
+    import('../unit/ast'),
+    import('../playwright-declarations'),
+  ]);
+  return { parseFile, declarationsIn };
+};
 const workflow = (name: string) => readFileSync(join(WORKFLOWS, name), 'utf8');
 
 /**
@@ -43,10 +55,12 @@ const workflow = (name: string) => readFileSync(join(WORKFLOWS, name), 'utf8');
  * commented out, or spelled inside a string, is not one: counting `test(` in
  * the raw text counted both (#218).
  */
-const plainTestsIn = (spec: string) =>
-  declarationsIn(parseFile(spec)).filter(
+const plainTestsIn = async (spec: string) => {
+  const { parseFile, declarationsIn } = await loadParser();
+  return declarationsIn(parseFile(spec)).filter(
     ({ kind, modifier }) => kind === 'test' && modifier === '',
   );
+};
 
 /**
  * A workflow's text with its COMMENT LINES REMOVED.
@@ -219,13 +233,13 @@ describe('the deploy pipeline runs what it claims to', () => {
     ).not.toEqual([]);
   });
 
-  it('the dev sanity suite exists and is more than a stub', () => {
+  it('the dev sanity suite exists and is more than a stub', async () => {
     // A guard that only checked the workflow REFERENCES the config would pass
     // against an emptied suite.
     expect(
       floorBreach(
         'pipeline-wiring/dev-sanity-tests',
-        plainTestsIn('tests/dev/dev-sanity.spec.ts').length,
+        (await plainTestsIn('tests/dev/dev-sanity.spec.ts')).length,
       ),
     ).toBeUndefined();
   });
@@ -1088,11 +1102,11 @@ describe('the deploy pipeline runs what it claims to', () => {
     );
   });
 
-  it('the prod sanity suite exists and is more than a stub', () => {
+  it('the prod sanity suite exists and is more than a stub', async () => {
     expect(
       floorBreach(
         'pipeline-wiring/prod-sanity-tests',
-        plainTestsIn('tests/prod/prod-sanity.spec.ts').length,
+        (await plainTestsIn('tests/prod/prod-sanity.spec.ts')).length,
       ),
     ).toBeUndefined();
   });
@@ -1123,7 +1137,7 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
     expect(existsSync('scripts/test-e2e.mjs')).toBe(true);
   });
 
-  it('is not bypassed by any workflow calling Playwright directly', () => {
+  it('is not bypassed by any workflow calling Playwright directly', async () => {
     // The deployed-site smoke suites legitimately call Playwright with their
     // own config (playwright.dev/prod.config.ts) and are not the full corpus.
     // Anything invoking the DEFAULT config, though, is the full suite and must
@@ -1140,6 +1154,7 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
     //
     // `--project=` alone is NOT enough to be exempt. `--project=chromium`
     // would run a fifth of the real corpus with nobody counting it.
+    const { VISUAL_PROJECT } = await loadPlaywrightConfig();
     const subset = new RegExp(`--project=${VISUAL_PROJECT.name}\\b`);
     const files = workflowFileNames();
     const bypasses = files
@@ -2221,17 +2236,26 @@ describe('the drift measurement reports, and never gates (#224)', () => {
   // Run 35772454043 failed on 528 pixels, and its artifact held one image
   // set: the measurement's, with a single differing pixel.
 
-  /** Where a project's run writes, and so what the start of its run deletes. */
-  const outputDirOf = (project: Project): string =>
-    resolve(project.outputDir ?? playwrightConfig.outputDir ?? 'test-results');
+  /**
+   * Where each visual project's run writes, and so what the start of its run
+   * deletes: the gate's and the measurement's.
+   */
+  const visualOutputDirs = async () => {
+    const config = await loadPlaywrightConfig();
+    const outputDirOf = (project: Project): string =>
+      resolve(project.outputDir ?? config.default.outputDir ?? 'test-results');
+    return {
+      gate: outputDirOf(config.VISUAL_PROJECT),
+      measure: outputDirOf(config.VISUAL_MEASURE_PROJECT),
+    };
+  };
 
   /** Whether deleting, or uploading, `dir` reaches `path`. */
   const reaches = (dir: string, path: string): boolean =>
     path === dir || path.startsWith(dir + sep);
 
-  it('measures into a folder of its own, so its start cannot delete the gate diff (#311)', () => {
-    const gate = outputDirOf(VISUAL_PROJECT);
-    const measure = outputDirOf(VISUAL_MEASURE_PROJECT);
+  it('measures into a folder of its own, so its start cannot delete the gate diff (#311)', async () => {
+    const { gate, measure } = await visualOutputDirs();
     expect(
       reaches(measure, gate),
       `the measure step clears ${measure} as it starts, and the gate's diff is in ${gate}`,
@@ -2244,7 +2268,7 @@ describe('the drift measurement reports, and never gates (#224)', () => {
     ).toBe(false);
   });
 
-  it('uploads the gate diff and the measurement diff together (#311)', () => {
+  it('uploads the gate diff and the measurement diff together (#311)', async () => {
     const uploads = nonEmpty(
       visualSteps().filter(
         (step) =>
@@ -2276,8 +2300,7 @@ describe('the drift measurement reports, and never gates (#224)', () => {
 
     const keeps = (dir: string) =>
       paths.some((path) => reaches(resolve(path), dir));
-    const gate = outputDirOf(VISUAL_PROJECT);
-    const measure = outputDirOf(VISUAL_MEASURE_PROJECT);
+    const { gate, measure } = await visualOutputDirs();
     expect(
       keeps(gate),
       `the gate's diff is written to ${gate}, which no upload path reaches`,
