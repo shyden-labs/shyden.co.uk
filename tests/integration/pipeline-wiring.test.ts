@@ -167,6 +167,7 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(find.env).toEqual({
       ...CLOUDFLARE_ENV,
       TARGET_ID: '${{ inputs.deployment_id }}',
+      DRY_RUN: '${{ inputs.dry_run }}',
     });
     const credentials = {
       CLOUDFLARE_API_TOKEN: TOKEN,
@@ -202,20 +203,39 @@ describe('the deploy pipeline runs what it claims to', () => {
         ],
       },
     };
-    const given = runStep(find, { ...credentials, TARGET_ID: id }, cloudflare);
-    expect(given.status, given.log).toBe(0);
-    expect(given.outputs).toBe(`target=${id}\n`);
-    const chosen = runStep(find, { ...credentials, TARGET_ID: '' }, cloudflare);
+    const real = { ...credentials, DRY_RUN: 'false' };
+    const dry = { ...credentials, DRY_RUN: 'true' };
+    // The fast fallback: a named deployment on a real run reads nothing, so
+    // it goes through with Cloudflare's API shut off entirely.
+    const named = runStep(find, { ...real, TARGET_ID: id });
+    expect(named.status, named.log).toBe(0);
+    expect(named.outputs).toBe(`target=${id}\n`);
+    // A dry run reads, as the proof that the token reaches the project: shut
+    // off it fails, and given the API it passes.
+    const dryShut = runStep(find, { ...dry, TARGET_ID: id });
+    expect(dryShut.status).not.toBe(0);
+    expect(dryShut.outputs).toBe('');
+    const dryRead = runStep(find, { ...dry, TARGET_ID: id }, cloudflare);
+    expect(dryRead.status, dryRead.log).toBe(0);
+    expect(dryRead.outputs).toBe(`target=${id}\n`);
+    // Read, a requested id that is already live is refused by name.
+    const live = runStep(find, { ...dry, TARGET_ID: 'live-4' }, cloudflare);
+    expect(live.status).not.toBe(0);
+    expect(live.log).toContain('is the live deployment');
+    expect(live.outputs).toBe('');
+    // No id: the newest successful production deployment before the live one.
+    const chosen = runStep(find, { ...real, TARGET_ID: '' }, cloudflare);
     expect(chosen.status, chosen.log).toBe(0);
     expect(chosen.outputs).toBe('target=good-1\n');
-    // A path that climbs out of the project, a second output line, a space.
+    // A path that climbs out of the project, a second output line, a space:
+    // refused by shape on the fast path, with nothing read.
     for (const bad of ['../../dns_records', `${id}\ntarget=other`, 'a b']) {
-      const run = runStep(find, { ...credentials, TARGET_ID: bad }, cloudflare);
+      const run = runStep(find, { ...real, TARGET_ID: bad });
       expect(run.status, JSON.stringify(bad)).not.toBe(0);
       expect(run.outputs, JSON.stringify(bad)).toBe('');
     }
     // No id and no Cloudflare: the lookup fails, and no target is handed on.
-    const unreachable = runStep(find, { ...credentials, TARGET_ID: '' });
+    const unreachable = runStep(find, { ...real, TARGET_ID: '' });
     expect(unreachable.status).not.toBe(0);
     expect(unreachable.outputs).toBe('');
   });
