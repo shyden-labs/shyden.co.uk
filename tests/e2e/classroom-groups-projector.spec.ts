@@ -86,13 +86,12 @@ test.describe('the projector view', () => {
   test('the button is there whenever the page Shuffle can run, and not otherwise', async ({
     page,
   }) => {
-    const open = page.getByRole('button', { name: 'Full screen' });
+    const open = page.getByRole('button', { name: 'Full screen', exact: true });
     // getByRole leaves hidden elements out, so a hidden button can never
-    // count 1 through `open`; the absence checks read it through this one.
-    const openEvenHidden = page.getByRole('button', {
-      name: 'Full screen',
-      includeHidden: true,
-    });
+    // count 1 through `open`; the absence checks read the page's own button
+    // by id. A name match with includeHidden also finds the closed board's
+    // "Exit full screen", since names match by substring unless exact.
+    const openEvenHidden = page.locator('#cg-board-open');
     const go = page.locator('#cg-go');
     await page.goto('/classroom-groups');
     await expect(go).toBeEnabled();
