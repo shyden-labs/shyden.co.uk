@@ -384,7 +384,7 @@ export const id: Catalogue = {
     TOGETHER_SEARCH_GAVE_UP:
       'Huruf yang harus disatukan di sini terlalu banyak untuk dihitung. Coba gunakan lebih sedikit huruf, atau perbesar kelompoknya.',
     KEEP_APART_IMPOSSIBLE:
-      '{names} semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal {groupsNeeded} kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+      '{names} {howMany, select, two {keduanya} other {semuanya}} harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal {groupsNeeded} kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
     // Bahasa Indonesia tidak mengubah bentuk kata untuk jamak, jadi tidak ada
     // percabangan tunggal/jamak di sini — berbeda dengan versi Inggrisnya.
     KEEP_APART_NO_ARRANGEMENT:
@@ -430,7 +430,7 @@ export const id: Catalogue = {
     // TOGETHER_APART_CLASH di atas, Bahasa Indonesia tidak mengubah bentuk
     // kata untuk jamak.
     SEX_SEPARATE_SPLITS_UNIT:
-      '{names} ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+      '{names} ditandai untuk disatukan, tetapi {howMany, select, two {tidak berjenis kelamin sama} other {tidak semuanya berjenis kelamin sama}}, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
     // Fix round 1, F-2. Lihat komentar pada versi Inggrisnya (en.ts) untuk
     // alasan lengkap. Tidak ada percabangan tunggal/jamak di sini -- sama
     // seperti KEEP_APART_NO_ARRANGEMENT di atas, Bahasa Indonesia tidak
@@ -504,7 +504,7 @@ export const id: Catalogue = {
     // di atas -- tidak ada satu pihak yang "meluap" ke pihak lain, seluruh
     // kelompok memang campuran karena guru menguncinya seperti itu.
     PINNED_MIXED_SEX:
-      '{names} dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
+      '{names} dikunci bersama dalam satu kelompok, tetapi {howMany, select, two {tidak berjenis kelamin sama} other {tidak semuanya berjenis kelamin sama}}, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
     // Whole-branch review, I-2. Lihat komentar pada versi Inggrisnya (en.ts)
     // untuk alasan lengkap. Tidak ada bidang `sex` di sini -- tidak ada
     // pihak yang jadi "tuan rumah" dan tidak ada pihak yang "meluap",

@@ -221,7 +221,7 @@ export const zh: Catalogue = {
     TOGETHER_SEARCH_GAVE_UP:
       '这里的“在一起”字母太多，难以逐一处理。请尝试减少字母数量，或者扩大小组。',
     KEEP_APART_IMPOSSIBLE:
-      '{names} 都需要彼此分开，因此你至少需要 {groupsNeeded} 个组。要么增加组数，要么删除其中一条规则。',
+      '{howMany, select, two {{names} 都需要彼此分开，因此你至少需要 {groupsNeeded} 个组。要么增加组数，要么删除其中一条规则。} other {{names} 都需要彼此分开，因此你至少需要 {groupsNeeded} 个组。要么增加组数，要么删除其中一条规则。}}',
     KEEP_APART_NO_ARRANGEMENT:
       '无法将你的班级分成 {groupsTried} 个小组，同时把所有需要分开的学生都分到不同组。要么增加小组数量，要么取消其中一条规则。',
     KEEP_APART_SEARCH_GAVE_UP:
@@ -233,7 +233,7 @@ export const zh: Catalogue = {
     SEX_NEEDS_ALL_SET:
       '{names} 未设置性别，因此在此模式下，必须先为每位学生设置性别，该模式才能运行。请为每位学生设置性别，或关闭此功能。',
     SEX_SEPARATE_SPLITS_UNIT:
-      '{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。',
+      '{howMany, select, two {{names} 已被标记为“在一起”，但并非同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。} other {{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。}}',
     SEX_SEPARATE_IMPOSSIBLE:
       '在 {groupsRequested} 个小组中，无法同时满足将男生和女生分在不同小组以及您设定的其他规则的要求。搜索功能无法确定是哪条规则导致了问题，因此请尝试以下任一解决方法：指定不同数量的小组，或者关闭此模式。',
     SEX_SEPARATE_SEARCH_GAVE_UP:
@@ -251,7 +251,7 @@ export const zh: Catalogue = {
     SEX_SPILLOVER:
       '{sex, select, M {{names}加入了一个女生组，因为男生人数不足，无法单独组成一个组。这纯粹是人数分配的结果，并非需要纠正的错误。} other {{names} 加入了一个男孩小组，因为女孩人数不足，无法单独组成一个小组。这只是人数分配的结果，并非需要纠正的错误。}}',
     PINNED_MIXED_SEX:
-      '{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。',
+      '{howMany, select, two {{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     SEX_BOTH_TOO_SMALL:
       '{names} 被归入一个合并组，是因为无论哪一性别的人数都不够多，无法单独组成一个组。这只是人数分布的自然结果，并非需要更正的错误。',
   },
