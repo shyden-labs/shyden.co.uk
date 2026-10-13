@@ -1,5 +1,4 @@
 import { isLabel, type BackTranslationUnit } from './back-translate.ts';
-import { escapeForRegExp } from './translate.ts';
 import { LOCALES, type Locale } from './locales.ts';
 import type { SiteStrings } from './site.ts';
 
@@ -77,14 +76,73 @@ export const partsOf = (text: string, locale: Locale): string[] =>
 export const wordsOf = (text: string, locale: Locale): string =>
   partsOf(text, locale).join(' ');
 
+/** A letter or a digit, in any script: what a whole word may not touch. */
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
+/** The code point that ends where `index` starts, or '' at the start. */
+const codePointBefore = (text: string, index: number): string => {
+  if (index === 0) return '';
+  const low = text.charCodeAt(index - 1);
+  const high = index >= 2 ? text.charCodeAt(index - 2) : 0;
+  return low >= 0xdc00 && low <= 0xdfff && high >= 0xd800 && high <= 0xdbff
+    ? text.slice(index - 2, index)
+    : text.slice(index - 1, index);
+};
+
+/** The code point that starts at `index`, or '' at the end. */
+const codePointAt = (text: string, index: number): string => {
+  const point = text.codePointAt(index);
+  return point === undefined ? '' : String.fromCodePoint(point);
+};
+
+const boundaryBefore = (text: string, index: number): boolean =>
+  !WORD_CHARACTER.test(codePointBefore(text, index));
+
+const boundaryAt = (text: string, index: number): boolean =>
+  !WORD_CHARACTER.test(codePointAt(text, index));
+
 /**
- * Whether English copy uses a label's English: as whole words, allowing a
- * plural on the last one. `sex` is in "both sexes" and not in "Essex". The
- * English needs no escaping, because `partsOf` removed every character a
- * regular expression treats specially.
+ * Every index where `needle` stands in `text` as whole words: no letter or
+ * digit, in any script, touches it on either side. `sex` is in "both sex"
+ * and not in "Essex". With `plural`, an `s` or `es` may follow it ("both
+ * sexes"). Occurrences are found left to right without overlapping, as a
+ * global regular expression scans.
+ *
+ * It replaced one regular expression per label with Unicode-property
+ * lookarounds: V8 compiled one for every label on the first call in each
+ * worker, about 75 ms that landed on whichever test ran first (#686). Here
+ * the needle is found with `indexOf` and only its neighbours are judged, by
+ * one expression compiled once.
  */
-const uses = (english: string): RegExp =>
-  new RegExp(`(?<![\\p{L}\\p{N}])${english}(?:e?s)?(?![\\p{L}\\p{N}])`, 'u');
+export function wholeWordIndexes(
+  text: string,
+  needle: string,
+  { plural = false }: { plural?: boolean } = {},
+): number[] {
+  const found: number[] = [];
+  let from = 0;
+  while (from <= text.length) {
+    const index = text.indexOf(needle, from);
+    if (index === -1) break;
+    const end = index + needle.length;
+    const length = !boundaryBefore(text, index)
+      ? -1
+      : plural && text.startsWith('es', end) && boundaryAt(text, end + 2)
+        ? needle.length + 2
+        : plural && text.startsWith('s', end) && boundaryAt(text, end + 1)
+          ? needle.length + 1
+          : boundaryAt(text, end)
+            ? needle.length
+            : -1;
+    if (length === -1) {
+      from = index + Math.max(1, codePointAt(text, index).length);
+      continue;
+    }
+    found.push(index);
+    from = index + Math.max(length, codePointAt(text, index).length || 1);
+  }
+  return found;
+}
 
 /**
  * Whether `outer`'s rendering carries every part of `inner`'s. `[].every` is
@@ -118,14 +176,17 @@ export function checkLabels(
     .filter(({ one }) => isLabel(one.english))
     .map(({ one: label, english }) => {
       const others = copy.filter(({ one }) => one !== label);
-      const pattern = uses(english);
       // An empty English would find the lone `s` of a possessive everywhere.
       const witnesses =
         english === ''
           ? []
           : others
               .filter((other) => other.english !== english)
-              .filter((other) => pattern.test(other.english))
+              .filter(
+                (other) =>
+                  wholeWordIndexes(other.english, english, { plural: true })
+                    .length > 0,
+              )
               .map(({ one }) => one);
       const variants = others
         .filter((other) => other.english === english)
@@ -153,13 +214,6 @@ export interface LabelReference {
   readonly carried: boolean;
 }
 
-/** A regular expression matching `text` exactly, as whole words. */
-const asWholeWords = (text: string): RegExp =>
-  new RegExp(
-    `(?<![\\p{L}\\p{N}])${escapeForRegExp(text)}(?![\\p{L}\\p{N}])`,
-    'gu',
-  );
-
 /**
  * Whether English copy names a label: holds its English with the label's own
  * capitals, where a capital is not simply the start of a sentence. A label of
@@ -167,8 +221,8 @@ const asWholeWords = (text: string): RegExp =>
  * after a lower-case word, as in "Select Calculate".
  */
 const namesLabel = (sentence: string, label: string): boolean =>
-  [...sentence.matchAll(asWholeWords(label))].some(
-    ({ index }) =>
+  wholeWordIndexes(sentence, label).some(
+    (index) =>
       label.includes(' ') || /[\p{Ll},]\s$/u.test(sentence.slice(0, index)),
   );
 

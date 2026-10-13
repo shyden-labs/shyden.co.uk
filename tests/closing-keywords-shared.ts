@@ -37,6 +37,11 @@ export function workflowsRunningTheRule() {
   );
   return files.flatMap((file) => {
     const text = readFileSync(`${WORKFLOWS}/${file}`, 'utf8');
+    // Only a workflow whose text holds the invocation can run it, since the
+    // check below needs a command starting `node ${SCRIPT}`: every other one
+    // is skipped before its YAML is parsed, which was this helper's whole
+    // cost (#714, 55-83 ms of own CPU for the first test that calls it).
+    if (!text.includes(`node ${SCRIPT}`)) return [];
     const jobs = workflowJobs(text, file);
     const runs = jobs.flatMap((job) => job.runs);
     const commands = runs.flatMap(commandsIn);

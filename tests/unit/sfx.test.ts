@@ -1035,10 +1035,16 @@ describe('generateReverbImpulseResponse (the synthesised reverb tail -- no audio
   });
 
   it('is finite everywhere in both channels -- no NaN, no Infinity', () => {
+    // One verdict per channel, not one `expect` per sample: 14,400 calls cost
+    // 63-136 ms of own CPU, over the 0.1 s rule (#714). 8000 Hz for 0.9 s is
+    // 7200 samples a channel, held as a literal so an empty buffer cannot pass.
     const ir = generateReverbImpulseResponse(8000, createPrng(2));
-    for (const channel of [ir.left, ir.right]) {
-      for (const sample of channel) expect(Number.isFinite(sample)).toBe(true);
-    }
+    const finite = (channel: Float64Array) =>
+      channel.filter(Number.isFinite).length;
+    expect({
+      left: [ir.left.length, finite(ir.left)],
+      right: [ir.right.length, finite(ir.right)],
+    }).toEqual({ left: [7200, 7200], right: [7200, 7200] });
   });
 
   it("decays to near-silence -- the last tenth of the buffer's own peak is far below the first tenth's", () => {

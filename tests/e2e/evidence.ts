@@ -7,6 +7,7 @@ import {
   captureFile,
   manifestRow,
 } from '../../scripts/evidence-files.mjs';
+import { captureAfterPaint } from './painted';
 
 /**
  * Capture, as a journey runs, what an operator needs to believe it ran.
@@ -61,7 +62,9 @@ export const shoot = async (
   mkdirSync(dirname(join(DIR, file)), { recursive: true });
 
   const shot = target ?? page;
-  await shot.screenshot(captureOptions(join(DIR, file)));
+  await captureAfterPaint(page, () =>
+    shot.screenshot(captureOptions(join(DIR, file))),
+  );
 
   appendFileSync(
     join(DIR, EVIDENCE_MANIFEST),

@@ -120,6 +120,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: npm run reports:review <shyden-reports-dev|shyden-reports>',
   },
+  // Refuses before it reads a file, so no Pages API answer is needed (#406).
+  'rollback-target.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/rollback-target.mjs',
+  },
   'i18n-back-translate.mjs': {
     args: [],
     env: { BACK_TRANSLATE_URL: undefined },
@@ -157,6 +163,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'install-hooks.mjs takes no arguments',
   },
+  // It reads the branch's own diff and takes nothing else, so an argument is a
+  // mistake it refuses before reading anything (#662).
+  'lint-changed-tests.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: 'usage: node scripts/lint-changed-tests.mjs (takes no arguments)',
+  },
   // With no range and no --tests it has nothing to read, so it refuses (#362).
   'release-inventory.mjs': {
     args: [],
@@ -169,8 +182,20 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: build-release-content.mjs',
   },
-  // CI never records the guards' floors, so under CI it refuses before it
-  // runs anything (#468).
+  // Without its four paths it prints its usage and refuses (#651).
+  'floors-diff.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: floors-diff.mjs',
+  },
+  // Without its four paths it prints its usage and refuses (#654).
+  'visual-capture.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: visual-capture.mjs',
+  },
+  // The gate never records the guards' floors, so under CI it refuses before
+  // it runs anything (#468), unless told it is the dispatched recorder (#651).
   'record-floors.mjs': {
     args: [],
     env: { CI: 'true' },

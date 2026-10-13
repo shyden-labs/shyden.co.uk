@@ -8,6 +8,7 @@ import {
   buildRoster,
   giveEveryoneASex,
   refuseFullscreen,
+  openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
 import { FLOOR_PX } from '../../src/scripts/projector';
@@ -79,15 +80,30 @@ const clickable = async (
 };
 
 test.describe('the projector view', () => {
-  test('the button appears only once groups exist', async ({ page }) => {
+  // #743 AC1: the board can be put up before a shuffle, to deal with the
+  // class watching, so its button follows the page's own Shuffle -- the
+  // same fact, both ways -- rather than waiting for groups to exist.
+  test('the button is there whenever the page Shuffle can run, and not otherwise', async ({
+    page,
+  }) => {
+    const open = page.getByRole('button', { name: 'Full screen', exact: true });
+    // getByRole leaves hidden elements out, so a hidden button can never
+    // count 1 through `open`; the absence checks read the page's own button
+    // by id. A name match with includeHidden also finds the closed board's
+    // "Exit full screen", since names match by substring unless exact.
+    const openEvenHidden = page.locator('#cg-board-open');
+    const go = page.locator('#cg-go');
     await page.goto('/classroom-groups');
-    await expect(
-      page.getByRole('button', { name: 'Full screen' }),
-    ).toBeHidden();
-    await withGroups(page);
-    await expect(
-      page.getByRole('button', { name: 'Full screen' }),
-    ).toBeVisible();
+    await expect(go).toBeEnabled();
+    await expect(open).toBeVisible();
+    await page.fill('#cg-count', '25');
+    await page.fill('#cg-numbers-absent', '26');
+    await expect(go).toBeDisabled();
+    await expect(openEvenHidden).toHaveCount(1);
+    await expect(openEvenHidden).toBeHidden();
+    await page.fill('#cg-numbers-absent', '7');
+    await expect(go).toBeEnabled();
+    await expect(open).toBeVisible();
   });
 
   test('a refused requestFullscreen lands in the overlay, not in nothing', async ({
@@ -312,6 +328,144 @@ test.describe('the projector view', () => {
     await expect(
       bar(page).getByRole('button', { name: 'Keluar dari layar penuh' }),
     ).toBeVisible();
+  });
+});
+
+/**
+ * #743. The board put up BEFORE the first shuffle: the results heading, one
+ * empty card per group the deal will make, and every student waiting, so
+ * the class watches the shuffle. Inside `#cg-results`, the one element the
+ * board ever shows.
+ */
+test.describe('the board before a shuffle (#743)', () => {
+  const board = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board #cg-results');
+
+  test('a named roster waits: empty cards, and every student by number and name', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+      ['M', 'Eli'],
+      ['F', 'Fay'],
+    ]);
+    await page.fill('#cg-size', '3');
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    await expect(board(page)).toBeVisible();
+    await expect(board(page).locator('#cg-results-h')).toHaveText(
+      'Your groups',
+    );
+    await expect(board(page).locator('.group h3')).toHaveText([
+      'Group 1',
+      'Group 2',
+    ]);
+    await expect(board(page).locator('.group .student')).toHaveCount(0);
+    await expect(
+      board(page).getByRole('heading', { name: 'Waiting to be grouped' }),
+    ).toBeVisible();
+    const waiting = board(page).locator('.waiting-student');
+    await expect(waiting.locator('.number')).toHaveText([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    await expect(waiting.locator('.who')).toHaveText([
+      'Ada',
+      'Ben',
+      'Cleo',
+      'Dev',
+      'Eli',
+      'Fay',
+    ]);
+    // The number and the name sit apart on screen, not only in the text: a
+    // flex row discards a space between its children (the page's CLAUDE.md).
+    const [number, who] = await Promise.all([
+      waiting.first().locator('.number').boundingBox(),
+      waiting.first().locator('.who').boundingBox(),
+    ]);
+    expect(who!.x).toBeGreaterThan(number!.x + number!.width);
+  });
+
+  test('a bare count waits by number alone', async ({ page }) => {
+    await page.goto('/classroom-groups');
+    await page.fill('#cg-count', '10');
+    await page.fill('#cg-size', '4');
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    await expect(board(page).locator('.group h3')).toHaveText([
+      'Group 1',
+      'Group 2',
+    ]);
+    const waiting = board(page).locator('.waiting-student');
+    await expect(waiting.locator('.number')).toHaveText(
+      Array.from({ length: 10 }, (_, i) => String(i + 1)),
+    );
+    await expect(waiting.locator('.who')).toHaveCount(0);
+  });
+
+  test('the board Shuffle fills the waiting cards, and the page shows them on exit', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await page.fill('#cg-count', '10');
+    await page.fill('#cg-size', '4');
+    await chooseSpeed(page, 'skip');
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    // Nothing has been shuffled yet, so the board's button says what the
+    // page's does, not "again".
+    await bar(page).getByRole('button', { name: 'Make Groups' }).click();
+    await expect(board(page).locator('.group')).toHaveCount(2);
+    await expect(board(page).locator('.group .student.dealt')).toHaveCount(10);
+    await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
+    await expect(board(page).locator('#cg-waiting')).toBeHidden();
+    await expect(
+      bar(page).getByRole('button', { name: 'Shuffle again' }),
+    ).toBeVisible();
+    const onBoard = await board(page).innerText();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-results')).toBeVisible();
+    expect(await page.locator('#cg-results').innerText()).toBe(onBoard);
+  });
+
+  test('leaving without a shuffle leaves the page as it was', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await page.fill('#cg-count', '10');
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    await expect(board(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    await expect(page.locator('#cg-results')).toHaveCount(1);
+    await expect(page.locator('#cg-results')).toBeHidden();
+    await expect(page.locator('#cg-results .group')).toHaveCount(0);
+    await expect(page.locator('#cg-waiting-list li')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Full screen' }),
+    ).toBeVisible();
+  });
+
+  test('a refused deal keeps the waiting board up and says why on it', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await page.fill('#cg-count', '0');
+    await page.fill('#cg-size', '4');
+    await chooseSpeed(page, 'skip');
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    await bar(page).getByRole('button', { name: 'Make Groups' }).click();
+    const said = board(page).locator('#cg-waiting-error');
+    await expect(said).toBeVisible();
+    await expect(said).toHaveText(
+      (await page.locator('#cg-error').textContent()) ?? '',
+    );
+    await expect(said).not.toHaveText('');
+    await expect(board(page).locator('#cg-waiting')).toBeVisible();
   });
 });
 
@@ -767,6 +921,46 @@ const expectNothingOutOfReach = async (
 };
 
 test.describe('the projector board never hides a name', () => {
+  // #743 AC6: the waiting list and its empty cards are read from the back of
+  // the room too, through the same fit as the dealt board.
+  for (const shape of BOARD_SHAPES) {
+    test(`nothing waiting is out of reach -- ${shape.what}`, async ({
+      page,
+    }) => {
+      await openWaitingBoard(page, shape.count, shape.size);
+      await expectNothingOutOfReach(page, 'the waiting board');
+    });
+  }
+
+  for (const shape of SHORT_BOARDS) {
+    test(
+      `nothing waiting is out of reach on ${shape.what}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize(shape.viewport);
+        await openWaitingBoard(page, shape.count, shape.size);
+        await expectNothingOutOfReach(page, 'the waiting board, short');
+      },
+    );
+  }
+
+  test(
+    'the waiting board does not scroll sideways at 320px',
+    { tag: '@emulated-viewport' },
+    async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 568 });
+      await openWaitingBoard(page, '25', '5');
+      const stage = page.locator('#cg-board-stage');
+      const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(clientWidth).toBeGreaterThan(0);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+      await expectNothingOutOfReach(page, 'the waiting board at 320px');
+    },
+  );
+
   for (const shape of BOARD_SHAPES) {
     test(`nothing is out of reach -- ${shape.what}`, async ({ page }) => {
       await boardOf(page, shape.count, shape.size);
@@ -785,6 +979,69 @@ test.describe('the projector board never hides a name', () => {
       },
     );
   }
+
+  test('the stage scrolls exactly when its sheet overflows, before and after the fonts land', async ({
+    page,
+  }) => {
+    // #674. Measured on CI (firefox, 8 students in pairs, fonts not yet
+    // landed): a 705px sheet in a 705px stage with `.scrolls` ON at
+    // 37.6875px. `refit` took its verdict while the stage was still
+    // `overflow: hidden`, where Firefox read the exact fit as overflowing.
+    // The invariant holds for any shape in any engine: the class is on
+    // exactly when the stage, as rendered, has more sheet than box. The font
+    // files are held back until the board is open and measured, so the first
+    // reading is of the fallback face by construction.
+    let held = 0;
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/*.woff2', async (route) => {
+      held += 1;
+      await released;
+      await route.continue();
+    });
+    await page.goto('/classroom-groups', { waitUntil: 'domcontentloaded' });
+    await makeGroups(page, '8', '2');
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await page
+      .getByRole('button', { name: /Full screen|Layar penuh/ })
+      .first()
+      .click();
+    await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+
+    // Liveness: the first reading really is taken with fonts outstanding.
+    expect(held, 'no font request was held back').toBeGreaterThan(0);
+    expect(
+      await page.evaluate(() => document.fonts.status),
+      'the fonts had already loaded when the board opened',
+    ).toBe('loading');
+
+    const where = (seen: Awaited<ReturnType<typeof boardGeometry>>) =>
+      `${seen.rows} row(s) at ${seen.font}: a ${seen.scrollHeight}px sheet ` +
+      `in a ${seen.clientHeight}px stage with overflow-y: ${seen.overflowY}`;
+
+    const fallback = await boardGeometry(page);
+    expect(
+      fallback.scrollable,
+      `${where(fallback)} -- fonts held back; the stage scrolls only if the sheet overflows`,
+    ).toBe(fallback.scrollHeight > fallback.clientHeight);
+
+    release();
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    const landed = await boardGeometry(page);
+    expect(
+      landed.scrollable,
+      `${where(landed)} -- fonts landed; the stage scrolls only if the sheet overflows`,
+    ).toBe(landed.scrollHeight > landed.clientHeight);
+    await shoot(
+      page,
+      `the stage scrolls only when the sheet overflows: ${landed.font} after the fonts landed`,
+      page.locator('#cg-board'),
+    );
+  });
 
   test('nothing is out of reach when the fullscreen grant is refused', async ({
     page,
