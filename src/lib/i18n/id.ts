@@ -350,6 +350,7 @@ export const id: Catalogue = {
   boardOpen: 'Layar penuh',
   boardExit: 'Keluar dari layar penuh',
   boardShuffle: 'Acak lagi',
+  boardWaiting: 'Menunggu dikelompokkan',
 
   // Lihat komentar pada versi Inggrisnya (en.ts). Terjemahan pelaksana --
   // PERLU DITINJAU.

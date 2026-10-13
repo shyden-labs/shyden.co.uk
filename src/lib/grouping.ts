@@ -1594,6 +1594,7 @@ function buildSeparateGroups(
   leftovers: Leftovers,
   random: () => number,
   nodeCap: number,
+  planOnly: boolean,
 ): GroupingOutcome {
   const sexOfBlock = (b: number): 'M' | 'F' =>
     present[blocks[b][0]].sex as 'M' | 'F';
@@ -1692,6 +1693,14 @@ function buildSeparateGroups(
       }
     }
 
+    // A plan stops here, with every size decided and nobody placed (#743).
+    if (planOnly) {
+      return {
+        ok: true,
+        groups: attempts.flatMap((a) => a.sizes.map((): Student[] => [])),
+        warnings,
+      };
+    }
     const resultGroups: Student[][] = [];
     for (const attempt of attempts) {
       const localBlocks = attempt.idx.map((b) => blocks[b]);
@@ -1722,6 +1731,7 @@ function buildSeparateGroups(
     groups: Student[][];
     warnings: GroupingWarning[];
   }): GroupingOutcome => {
+    if (planOnly) return succeed(attempt.groups, attempt.warnings);
     const slots = shuffled(
       attempt.groups.map((_, i) => i),
       random,
@@ -1874,7 +1884,41 @@ function restoreWholeClassCount(
   }
 }
 
+/**
+ * The groups the deal will make from `input`, known before it runs (#743):
+ * each pinned group with its members, then one EMPTY group per group the
+ * deal would place, so the board can show a card for each while it waits for
+ * the first shuffle. `null` where the deal refuses before it places anyone.
+ * It is the deal's own code stopped at the placement boundary, so the count
+ * shown and the count dealt cannot disagree; a refusal only placing can find
+ * (a search that gives up, no arrangement that keeps the rules) is the
+ * deal's to report.
+ */
+export function plannedGroups(
+  input: Omit<GroupingInput, 'random' | 'searchNodeCap'>,
+): Student[][] | null {
+  const planned = deal(
+    {
+      ...input,
+      random: () => {
+        throw new Error('a plan never reaches placement');
+      },
+    },
+    true,
+  );
+  return planned.ok ? planned.result.groups : null;
+}
+
 export function buildGroups(input: GroupingInput): GroupingOutcome {
+  return deal(input, false);
+}
+
+/**
+ * The deal. With `planOnly` it stops where placement starts and returns the
+ * pinned groups followed by one EMPTY group per group it would place, having
+ * drawn nothing from `random` (#743).
+ */
+function deal(input: GroupingInput, planOnly: boolean): GroupingOutcome {
   // Counted before it is built. Past this line the roster exists in memory,
   // so this is the only place the size can still be refused cheaply.
   if (requestedSize(input.students) > MAX_STUDENTS) {
@@ -2387,6 +2431,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
       leftovers,
       random,
       nodeCap,
+      planOnly,
     );
     if (!outcome.ok) {
       // Whole-branch review, C-1. See `restoreWholeClassCount`'s own doc
@@ -2408,6 +2453,13 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   // Fix round 1's sort caused). `adj` is real now: a block-vs-block conflict
   // can and does turn away a placement that capacity alone would have
   // allowed, in both passes. (Task 9: pool and poolSizes, not present/sizes.)
+  if (planOnly) {
+    return succeed(
+      [...pinnedGroups, ...poolSizes.map((): Student[] => [])],
+      warnings,
+    );
+  }
+
   const { groups: placed, gaveUp } = placeBlocks(
     blocks,
     poolSizes,

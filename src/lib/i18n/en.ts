@@ -696,6 +696,11 @@ export const en = {
   // board this is the only control besides Exit, and "Shuffle again" is
   // what the results section already calls it.
   boardShuffle: 'Shuffle again',
+  // #743. Heads the list of students on a board opened before the first
+  // shuffle: everyone the deal will place, waiting for their group. Before
+  // that deal the board's Shuffle reads `makeGroups`, the page's own words,
+  // since nothing has been shuffled yet to do "again".
+  boardWaiting: 'Waiting to be grouped',
 
   // Design spec section 8's rule, applied at the three places groups LEAVE
   // the screen. Three separate sentences, not one: each names the thing the

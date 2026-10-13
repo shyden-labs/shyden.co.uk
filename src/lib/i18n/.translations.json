@@ -269,7 +269,8 @@
     "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。",
     "{names} both need to be kept apart from each other, so you would need at least {groupsNeeded} groups. Either make more groups or remove one of the rules.": "{names} 都需要彼此分开，因此你至少需要 {groupsNeeded} 个组。要么增加组数，要么删除其中一条规则。",
     "{names} are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.": "{names} 已被标记为“保持在一起”，但它们并非同性，因此无法组成单一性别的小组。请从其中一个名称中移除“在一起”字样，或关闭此模式。",
-    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} 被固定为一个组，但组内成员性别不同，因此该组并未像其他组那样按性别划分。这正是该固定操作的要求，并非需要更正的错误。"
+    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} 被固定为一个组，但组内成员性别不同，因此该组并未像其他组那样按性别划分。这正是该固定操作的要求，并非需要更正的错误。",
+    "Waiting to be grouped": "等待分组"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -541,7 +542,8 @@
     "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "Những từ đó không có trên trang này. Hãy chọn chúng từ danh sách, hoặc sao chép một đoạn văn ngắn hơn mà không có tên hay số nào.",
     "{names} both need to be kept apart from each other, so you would need at least {groupsNeeded} groups. Either make more groups or remove one of the rules.": "{names} đều cần được tách biệt với nhau, do đó bạn sẽ cần ít nhất {groupsNeeded} nhóm. Hãy tạo thêm nhóm hoặc loại bỏ một trong các quy tắc.",
     "{names} are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.": "{names} được đánh dấu để ở cùng nhau, nhưng không cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy xóa chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.",
-    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} được ghim lại thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là yêu cầu của ghim, chứ không phải là một sai sót cần sửa."
+    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} được ghim lại thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là yêu cầu của ghim, chứ không phải là một sai sót cần sửa.",
+    "Waiting to be grouped": "Đang chờ được phân nhóm"
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -813,7 +815,8 @@
     "Those words aren't on this page. Choose them from the list, or copy a shorter piece without any names or numbers.": "คำเหล่านั้นไม่มีอยู่ในหน้านี้ครับ ให้เลือกจากรายชื่อ หรือคัดลอกข้อความที่สั้นกว่า ซึ่งไม่มีชื่อหรือตัวเลขใดๆ",
     "{names} both need to be kept apart from each other, so you would need at least {groupsNeeded} groups. Either make more groups or remove one of the rules.": "{names} ทั้งสองต้องถูกแยกออกจากกัน ดังนั้นคุณจึงจำเป็นต้องมีกลุ่มอย่างน้อย {groupsNeeded} กลุ่ม คุณสามารถสร้างกลุ่มเพิ่มเติม หรือลบกฎหนึ่งข้อออกไป",
     "{names} are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.": "{names} ถูกกำหนดให้อยู่ด้วยกัน แต่ไม่ใช่เพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร \"together\" ออกจากชื่อของหนึ่งในนั้น หรือปิดโหมดนี้",
-    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} ถูกรวมเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่คำอธิบายในป้ายระบุไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข"
+    "{names} are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.": "{names} ถูกรวมเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่คำอธิบายในป้ายระบุไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข",
+    "Waiting to be grouped": "กำลังรอการจัดกลุ่ม"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",

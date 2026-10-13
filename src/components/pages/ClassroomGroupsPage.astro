@@ -930,6 +930,25 @@ const sexWhyText = sexWhy(roster, t);
            the announcement actually fire. */}
       <ul class="warnings" id="cg-warnings" role="status" hidden></ul>
 
+      {/* #743. Shown only on a board opened before the first shuffle: every
+           student the deal will place, above the empty cards it will fill,
+           so the class watches the shuffle happen. Filled and emptied by
+           classroom-groups.ts as the board opens and closes; a deal hides
+           it. The heading is visible on purpose: it is read from the back of
+           the room, and it names the list for a screen reader too. */}
+      <section
+        class="waiting"
+        id="cg-waiting"
+        aria-labelledby="cg-waiting-h"
+        hidden
+      >
+        <h3 id="cg-waiting-h">{t.boardWaiting}</h3>
+        {/* A deal refused from the waiting board says why ON the board
+             (#743 AC5); #cg-error, on the page, says it too. */}
+        <p class="error" id="cg-waiting-error" role="alert" hidden></p>
+        <ul class="waiting-list" id="cg-waiting-list"></ul>
+      </section>
+
       <div class="tables" id="cg-tables"></div>
     </section>
   </section>
@@ -1094,6 +1113,39 @@ const sexWhyText = sexWhy(roster, t);
   #cg-results .who {
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+  /* #743. The waiting board's students, above the empty cards they will
+     move into: chips that wrap, the number then the name. The two sit apart
+     by `gap`, never a space between them, which a flex container discards
+     (this file's own CLAUDE.md note on `display: flex`). Tokens only, so the
+     theme and dark mode carry it. The section itself keeps no `display`, so
+     its `hidden` attribute still hides it. */
+  #cg-results .waiting {
+    margin-block-end: 1rem;
+  }
+  #cg-results .waiting h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+  }
+  #cg-results .waiting-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+  }
+  #cg-results .waiting-student {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.2em 0.75em;
+  }
+  #cg-results .waiting-student .number {
+    font-variant-numeric: tabular-nums;
   }
   /* `.stale` on #cg-results, toggled by classroom-groups.ts's own
      `updateStaleness` (design spec section 8: "dimmed and badged"). Only

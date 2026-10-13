@@ -201,6 +201,7 @@ export const zh: Catalogue = {
   boardOpen: '全屏',
   boardExit: '退出全屏模式',
   boardShuffle: '重新洗牌',
+  boardWaiting: '等待分组',
   staleRefuseExport: '这些分组已经过时了。保存前请重新洗牌。',
   staleRefusePrint: '这些分组已经过时了。打印前请重新洗牌。',
   staleRefuseBoard: '这些分组已经过时了。显示前请重新洗牌。',
