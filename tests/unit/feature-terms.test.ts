@@ -132,6 +132,14 @@ const unit = (
   translation: string,
 ): BackTranslationUnit => ({ key, english, translation });
 
+/**
+ * The features each unit's English names: what `checkFeatureTerms` weighs the
+ * rendering against, so what a clean verdict on those units was reached over.
+ */
+const featuresNamedIn = (
+  units: readonly BackTranslationUnit[],
+): FeatureTerm[] => units.flatMap(({ english }) => featuresNamed(english));
+
 /** A glossary approving one word per feature, for the fixtures below. */
 const ONE_WORD: Glossary = {
   pin: ['ghim'],
@@ -187,7 +195,14 @@ describe('featuresNamed: the features a piece of English copy names', () => {
     // "mixture" holds m-i-x, and a dough left overnight is not a leftover.
     'A mixture of flour and water, left overnight.',
   ])('%j names no feature', (english) => {
-    expect(featuresNamed(english)).toEqual([]);
+    // `featuresNamed` tests the copy against every feature; those are the
+    // units it walks, the same for every case.
+    expect(
+      searched(featuresNamed(english), { of: FEATURES, what: 'features' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/features-tested', FEATURES.length),
+    ).toBeUndefined();
   });
 });
 
@@ -198,7 +213,16 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
       '{names} are to be kept apart, but a pinned group puts them in one group.',
       '{names} cần được tách biệt, nhưng một nhóm được ghim lại xếp các em vào cùng một nhóm.',
     );
-    expect(checkFeatureTerms([copy], 'vi', ONE_WORD)).toEqual([]);
+    const named = featuresNamedIn([copy]);
+    expect(
+      searched(checkFeatureTerms([copy], 'vi', ONE_WORD), {
+        of: named,
+        what: 'features the copy names',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/carried-features', named.length),
+    ).toBeUndefined();
   });
 
   it('copy naming a feature with none of its approved words is returned, naming the feature', () => {
@@ -227,7 +251,16 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
       'Mark who is kept apart',
       'Đánh dấu ai được tách biệt',
     );
-    expect(checkFeatureTerms([control, column], 'vi', glossary)).toEqual([]);
+    const named = featuresNamedIn([control, column]);
+    expect(
+      searched(checkFeatureTerms([control, column], 'vi', glossary), {
+        of: named,
+        what: 'features the copy names',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/alternative-words', named.length),
+    ).toBeUndefined();
   });
 
   it('each feature is judged on its own: carrying one does not excuse another', () => {
@@ -254,7 +287,17 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
 
   it('copy whose English names no feature is never returned, whatever its rendering', () => {
     const copy = unit('title', 'Classroom tools', 'bài đăng');
-    expect(checkFeatureTerms([copy], 'vi', ONE_WORD)).toEqual([]);
+    // The copy names nothing, so the population is the features it was tested
+    // against: every one of them, and none was found.
+    expect(
+      searched(checkFeatureTerms([copy], 'vi', ONE_WORD), {
+        of: FEATURES,
+        what: 'features',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/features-unnamed-copy', FEATURES.length),
+    ).toBeUndefined();
   });
 
   it('an approved word must appear whole: cùng is not cùng nhau', () => {
@@ -278,20 +321,36 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
     ).toEqual(['b']);
   });
 
-  it('neither letter case nor Unicode composition decides it', () => {
+  it('letter case does not decide it, whatever the composition', () => {
     const copy = unit('x', 'Kept apart', 'Được TÁCH BIỆT'.normalize('NFD'));
-    expect(checkFeatureTerms([copy], 'vi', ONE_WORD)).toEqual([]);
+    const named = featuresNamedIn([copy]);
+    expect(
+      searched(checkFeatureTerms([copy], 'vi', ONE_WORD), {
+        of: named,
+        what: 'features the copy names',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/case-features', named.length),
+    ).toBeUndefined();
+  });
+
+  it('Unicode composition does not decide it, whatever the glossary spells', () => {
     const decomposed: Glossary = {
       ...ONE_WORD,
       apart: ['tách biệt'.normalize('NFD')],
     };
+    const copy = unit('y', 'Kept apart', 'Được tách biệt');
+    const named = featuresNamedIn([copy]);
     expect(
-      checkFeatureTerms(
-        [unit('y', 'Kept apart', 'Được tách biệt')],
-        'vi',
-        decomposed,
-      ),
+      searched(checkFeatureTerms([copy], 'vi', decomposed), {
+        of: named,
+        what: 'features the copy names',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/composition-features', named.length),
+    ).toBeUndefined();
   });
 
   it('a slot in the rendering carries no word, even one spelled like an approved word', () => {
@@ -319,21 +378,32 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
     ).toEqual([['printWhatGroups', ['group']]]);
   });
 
-  it('Chinese and Thai are searched without word breaks: 固定 inside 取消固定 counts', () => {
+  it('Chinese is searched without word breaks: 固定 inside 取消固定 counts', () => {
+    const copy = unit('zh', 'Unpin that group', '请取消固定那个组');
+    const named = featuresNamedIn([copy]);
     expect(
-      checkFeatureTerms(
-        [unit('zh', 'Unpin that group', '请取消固定那个组')],
-        'zh',
-        GLOSSARY.zh,
-      ),
+      searched(checkFeatureTerms([copy], 'zh', GLOSSARY.zh), {
+        of: named,
+        what: 'features the copy names',
+      }),
     ).toEqual([]);
     expect(
-      checkFeatureTerms(
-        [unit('th', 'Unpin that group', 'เลิกปักหมุดกลุ่มนั้น')],
-        'th',
-        GLOSSARY.th,
-      ),
+      floorBreach('feature-terms/unbroken-zh-features', named.length),
+    ).toBeUndefined();
+  });
+
+  it('Thai is searched without word breaks: ปักหมุด inside เลิกปักหมุด counts', () => {
+    const copy = unit('th', 'Unpin that group', 'เลิกปักหมุดกลุ่มนั้น');
+    const named = featuresNamedIn([copy]);
+    expect(
+      searched(checkFeatureTerms([copy], 'th', GLOSSARY.th), {
+        of: named,
+        what: 'features the copy names',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/unbroken-th-features', named.length),
+    ).toBeUndefined();
   });
 });
 
@@ -502,8 +572,15 @@ describe('on the live catalogues', () => {
     expect(
       corrected.every(({ translation }) => translation.includes('固定')),
     ).toBe(true);
+    const named = featuresNamedIn(corrected);
     expect(
-      checkFeatureTerms(corrected, 'zh', GLOSSARY.zh).map(({ key }) => key),
+      searched(
+        checkFeatureTerms(corrected, 'zh', GLOSSARY.zh).map(({ key }) => key),
+        { of: named, what: 'features the corrected copy names' },
+      ),
     ).toEqual([]);
+    expect(
+      floorBreach('feature-terms/corrected-features', named.length),
+    ).toBeUndefined();
   });
 });
