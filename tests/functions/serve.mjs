@@ -51,7 +51,17 @@ const server = spawn(
     // machine hands its secrets (the DeepL key) to the code under test.
     // Naming an --env-file does not stop that; this switch does (measured,
     // #97 Task 10: the startup banner then lists DEV_PASSWORD alone).
-    env: { ...process.env, CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false' },
+    //
+    // The tests reach D1 through this server's own D1 object, on miniflare's
+    // local explorer (`query` in local.mjs, #737). wrangler turns it on by
+    // default; saying so here keeps it on if that default changes. Were
+    // wrangler to drop the explorer, the first query would fail in the
+    // server's own words, never quietly fall back to a second process.
+    env: {
+      ...process.env,
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
+      X_LOCAL_EXPLORER: 'true',
+    },
   },
 );
 for (const signal of /** @type {const} */ (['SIGINT', 'SIGTERM']))

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { shoot } from './evidence';
+import { captureAfterPaint } from './painted';
 import { filesUnder, searched } from '../source-files';
 import { THEMES, ribbonLayers, tokensCss } from '../palette';
 import { emulateTheme } from '../themes';
@@ -140,8 +141,12 @@ const scoreRuns = async (
   });
   // In CSS pixels: the mobile and Safari projects emulate a 2-3x display,
   // and a device-pixel image read at CSS coordinates samples the wrong
-  // place (it reported 1.82:1 for text chromium measured at 6:1).
-  const shot = (await page.screenshot({ scale: 'css' })).toString('base64');
+  // place (it reported 1.82:1 for text chromium measured at 6:1). Taken after
+  // a painted frame: the `<style>` above was just appended, and capturing
+  // before a frame shows it is what Chromium twice refused (#676).
+  const shot = (
+    await captureAfterPaint(page, () => page.screenshot({ scale: 'css' }))
+  ).toString('base64');
   // Every colour in the photograph behind each run, packed as 0xRRGGBB.
   const grounds = await page.evaluate(
     async ({ shot, boxes }) => {

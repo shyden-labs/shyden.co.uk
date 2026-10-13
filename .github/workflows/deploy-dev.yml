@@ -91,7 +91,7 @@ jobs:
   # job, and every job it calls carries its own. A called workflow's token can
   # only be narrowed, so this job grants what ci.yml's jobs ask for -- `issues:
   # read` for the dependabot-label check -- and
-  # tests/unit/pipeline-wiring.test.ts fails if they part.
+  # tests/guards/pipeline-wiring.test.ts fails if they part.
   test:
     name: Comprehensive web tests
     if: github.event_name != 'push'
@@ -213,3 +213,43 @@ jobs:
             -f "description=Dev deployed + verified (run ${{ github.run_id }})" \
             -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "Posted dev-verified=success on ${{ github.sha }}"
+
+  # ---- Tell the operator when a develop deploy failed (#725) --------------
+  # Run 38219259063 failed on Cloudflare's own 524 and nothing said so: dev
+  # sat behind develop with `dev-verified` merely absent. This job runs after
+  # every other one, WHATEVER they did, and its script opens one issue
+  # assigned to the operator (or comments on the one still open) when any of
+  # them failed on develop. A dispatched branch's failure is its dispatcher's
+  # to read, so the script sends nothing for one.
+  #
+  # It must run because a need FAILED, so it cannot ask for success the way
+  # every other downstream job here does. It is therefore written as an
+  # aggregate (tests/workflow-jobs.ts `isAggregate`): `if: always()`, and a
+  # step handed every need's result, which judges them in the script.
+  #
+  # No environment: it reads no secret but its own token, which may read the
+  # run's jobs and logs and write issues, nothing else. It runs no npm
+  # package code, so no `npm ci`.
+  report-failure:
+    name: Report a failed deploy
+    needs: [gate, test, deploy-dev, verify-dev]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Open or comment on the failed-deploy issue, if a job failed
+        if: always()
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/deploy-failure.mjs

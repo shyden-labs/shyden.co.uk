@@ -130,15 +130,21 @@ export function dependentsOf(lock: string, name: string): string[] {
     .sort();
 }
 
+/**
+ * Whether `source` names `name` as a module specifier. Any quoted specifier,
+ * so a dynamic import or a require counts as surely as a static import; a
+ * comment naming it over-reports, which fails safe.
+ */
+export function namesModule(source: string, name: string): boolean {
+  return new RegExp(
+    `['"\`]${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`,
+  ).test(source);
+}
+
 /** Every script under `dir` that names `name` as a module specifier, relative to `dir`, sorted. */
 export function importersIn(dir: string, name: string): string[] {
-  // Any quoted specifier, so a dynamic import or a require counts as surely
-  // as a static import; a comment naming it over-reports, which fails safe.
-  const specifier = new RegExp(
-    `['"\`]${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`,
-  );
   // The one walk home, which also refuses an empty walk (one-home.test.ts).
   return filesUnder(dir, (path) => /\.(m|c)?js$/.test(path))
-    .filter((path) => specifier.test(readFileSync(path, 'utf8')))
+    .filter((path) => namesModule(readFileSync(path, 'utf8'), name))
     .map((path) => relative(dir, path));
 }

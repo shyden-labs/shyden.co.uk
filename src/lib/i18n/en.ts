@@ -696,6 +696,11 @@ export const en = {
   // board this is the only control besides Exit, and "Shuffle again" is
   // what the results section already calls it.
   boardShuffle: 'Shuffle again',
+  // #743. Heads the list of students on a board opened before the first
+  // shuffle: everyone the deal will place, waiting for their group. Before
+  // that deal the board's Shuffle reads `makeGroups`, the page's own words,
+  // since nothing has been shuffled yet to do "again".
+  boardWaiting: 'Waiting to be grouped',
 
   // Design spec section 8's rule, applied at the three places groups LEAVE
   // the screen. Three separate sentences, not one: each names the thing the
@@ -766,8 +771,9 @@ export const en = {
     TOGETHER_SEARCH_GAVE_UP:
       'There are too many together-letters here to work through. Try using fewer letters, or make the groups bigger.',
     KEEP_APART_IMPOSSIBLE:
-      '{names} all need to be kept apart from each other, so you would need at least {groupsNeeded} groups. Either make more groups or remove one of the rules.' as Message<{
+      '{names} {howMany, select, two {both need} other {all need}} to be kept apart from each other, so you would need at least {groupsNeeded} groups. Either make more groups or remove one of the rules.' as Message<{
         names: string[];
+        howMany: 'two' | 'more';
         groupsNeeded: number;
       }>,
     // Says only what an exhaustive search proved: not that any particular
@@ -820,8 +826,9 @@ export const en = {
     // `sex` field itself, not about a group a teacher is looking at, unlike
     // SEX_SPILLOVER).
     SEX_SEPARATE_SPLITS_UNIT:
-      '{names} are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.' as Message<{
+      '{names} are marked to stay together, but {howMany, select, two {are not the same sex} other {are not all the same sex}}, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.' as Message<{
         names: string[];
+        howMany: 'two' | 'more';
       }>,
     // Fix round 1, F-2. Carries `groupsRequested: number` -- the number the
     // TEACHER typed, never a side's own smaller allocation (see the doc
@@ -961,8 +968,9 @@ export const en = {
     // that point -- see WARNING_CODES.pinnedMixedSex's doc comment in
     // grouping.ts for the decision this is the honest wording of.
     PINNED_MIXED_SEX:
-      '{names} are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.' as Message<{
+      '{names} are pinned together as one group, but {howMany, select, two {are not the same sex} other {are not all the same sex}}, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.' as Message<{
         names: string[];
+        howMany: 'two' | 'more';
       }>,
     // Whole-branch review, I-2. Carries `students: number[]` -- everyone in
     // the one merged group, both sexes -- and no `sex` field, unlike

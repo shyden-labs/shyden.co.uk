@@ -82,7 +82,7 @@ const half = run.repeat(2);
     background: var(--accent);
     /* Not --ink: --ink is the page's text colour, and on the accent ground
        it fails AA in both themes (the dark theme's mint is a LIGHT ground).
-       --on-accent exists for exactly this (#17); tests/unit/contrast.test.ts
+       --on-accent exists for exactly this (#17); tests/guards/contrast.test.ts
        scores it against --accent, so no ratio is written here. */
     color: var(--on-accent);
     box-shadow: 0 0 50px var(--accent-glow);
@@ -111,7 +111,7 @@ const half = run.repeat(2);
      so `top: 50%` is the strip's middle. It paints above the strip's text
      (z-index 3 over the strip's 2) and BELOW the sticky header (10, #599), so
      the header still covers it after scrolling. A solid --surface ground with
-     its own --ink: tests/unit/contrast.test.ts scores that pair. The label is
+     its own --ink: tests/guards/contrast.test.ts scores that pair. The label is
      the touch target: 44px tall. The ring is the site's global
      :focus-visible one, on the input. */
   .band {

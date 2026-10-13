@@ -924,5 +924,5 @@ export function resultsByProject(report) {
 // Only when run, never when imported: the unit tests import the functions
 // above. Comparing `process.argv[1]` with this file's path skipped the whole
 // run, exit 0, from a checkout reached through a symlink (#221,
-// `tests/unit/script-entry.test.ts`).
+// `tests/guards/script-entry.test.ts`).
 if (import.meta.main) main();
