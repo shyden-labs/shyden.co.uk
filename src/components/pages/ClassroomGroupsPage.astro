@@ -1096,6 +1096,24 @@ const sexWhyText = sexWhy(roster, t);
       opacity 220ms ease-out,
       transform 220ms ease-out;
   }
+  /* #744: a row flying from the waiting list to its seat. The flight's
+     transform is Element.animate's own, so the resting transform above is
+     cleared BEFORE the seat is measured; above its neighbours while it flies
+     (no card makes a stacking context). */
+  #cg-results .student.travelling {
+    position: relative;
+    z-index: 1;
+    transform: none;
+  }
+  /* Landed by a flight: already at full opacity, so no fade on top of it. */
+  #cg-results .student.landed {
+    transition: none;
+  }
+  /* A chip whose student has left: its box stays, which is the gap the list
+     keeps until the fold (operator ruling 2026-10-14). */
+  #cg-results .waiting-student.left {
+    visibility: hidden;
+  }
   #cg-results .avatar {
     width: 34px;
     height: 34px;

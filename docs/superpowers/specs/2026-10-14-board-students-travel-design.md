@@ -99,8 +99,13 @@ On each row's `finished`, the row takes `.dealt` (with no transition, so the
 class and the fill agree and nothing flashes), the chip takes a class that
 keeps it hidden, and both fills are cancelled, so no animation is left
 holding a style. While it flies the row sits above other content
-(`position: relative`, a `z-index`, removed on landing). The stage is the only
-clipping box, so a flight stays on the board.
+(`position: relative`, a `z-index`, removed on landing). A row is seat-wide
+and its chip often narrower, so a row drawn from a chip near the right edge
+would start past the stage, which overflows it sideways even under `overflow:
+hidden` and scrolls it once `refit` sets `.scrolls` (review pass 2, F10). The
+start is therefore held inside the stage's content box (`flightStartX`, pure,
+in `src/lib/travel.ts`): moved in only as far as the edge demands, where the
+row still covers the whole chip.
 
 ### Order and timings: pure, in `src/lib/travel.ts`
 

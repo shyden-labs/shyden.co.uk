@@ -291,6 +291,13 @@ test.describe('the projector view', () => {
     // on the deal button's own enabled state, never a sleep.
     await expect(page.locator('#cg-go')).toBeEnabled();
     await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
+    // #744: a board Shuffle deals by travelling from the waiting list, which
+    // it shows again first; read the board once that list has folded away,
+    // or its heading is among the names.
+    const listOnBoard = page.locator('#cg-board #cg-waiting');
+    await expect(listOnBoard).toBeVisible();
+    await expect(listOnBoard).toHaveCount(1);
+    await expect(listOnBoard).toBeHidden();
     // `#cg-board #cg-results`, not the whole board: `namesIn` matches any
     // Capitalised word, and the bar's own "Exit full screen" contributes
     // "Exit". Reading the results element compares like with like.
