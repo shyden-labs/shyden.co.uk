@@ -73,7 +73,7 @@
   "colour-literals/allowance-literals": 50,
   "colour-literals/judged-literals": 50,
   "colour-literals/screen-control": 1,
-  "config-imports/environment-homes": 18,
+  "config-imports/environment-homes": 16,
   "config-imports/relative-imports": 8,
   "contrast/border-usages-classified": 19,
   "contrast/border-usages-for-decorative": 19,
