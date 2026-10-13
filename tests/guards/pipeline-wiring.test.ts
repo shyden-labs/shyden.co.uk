@@ -760,10 +760,16 @@ describe('the deploy pipeline runs what it claims to', () => {
       'Find the deployment to roll back to: always',
       'Promote it: !inputs.dry_run',
     ]);
-    // The call that changes what prod serves lives in the skipped step alone.
+    // The call that changes what prod serves lives in the skipped step alone:
+    // the endpoint, `/deployments/<id>/rollback`, not a word that merely
+    // starts with it, as `scripts/rollback-target.mjs` does (#406).
     expect(
       steps
-        .filter((step) => /\/rollback\b/.test(String(step.run ?? '')))
+        .filter((step) =>
+          /\/deployments\/[^/\s]+\/rollback(?![\w-])/.test(
+            String(step.run ?? ''),
+          ),
+        )
         .map((step) => step.name),
     ).toEqual(['Promote it']);
   });
