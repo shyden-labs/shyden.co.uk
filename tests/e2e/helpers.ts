@@ -17,6 +17,7 @@ import {
   type Strings,
 } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
+import { chooseSpeed } from '../make-groups';
 
 /**
  * The catalogue of the language the page is showing, read off its URL.
@@ -71,10 +72,14 @@ export const openWaitingBoard = async (
   page: Page,
   count: string,
   size: string,
+  speed?: 'normal' | 'fast' | 'skip',
 ) => {
   await page.goto('/classroom-groups');
   await page.fill('#cg-count', count);
   await page.fill('#cg-size', size);
+  // #744: a board Shuffle travels unless the speed is Skip, so a test that
+  // presses it says which it means; left out, the page's default stands.
+  if (speed) await chooseSpeed(page, speed);
   await page.getByRole('button', { name: 'Full screen' }).click();
   await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(

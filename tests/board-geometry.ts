@@ -69,6 +69,9 @@ export const measureBoard = () => {
     clientHeight: stage.clientHeight,
     font: cs.fontSize,
     overflowY: cs.overflowY,
+    // How far the stage's content reaches past its width: the sideways
+    // scroll a student in flight could open at 320px (#744).
+    overflowX: stage.scrollWidth - stage.clientWidth,
   };
 };
 

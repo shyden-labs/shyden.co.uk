@@ -80,6 +80,8 @@ import { sexWhy, sexWhyReturning } from '../lib/sexOptions';
 import { renderIo } from './io-ui';
 import { renderPrintPanel } from './print-ui';
 import { renderProjector } from './projector';
+import { travel } from './board-travel';
+import { travelOrder, travelSchedule } from '../lib/travel';
 import { todayISO } from '../lib/csv';
 import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
@@ -1529,6 +1531,7 @@ if (form) {
       if (lastGroups === null) showWaiting();
     },
     onLeave: () => {
+      finishDealNow(); // #744: a deal still travelling lands at once
       if (lastGroups !== null) return;
       hideWaiting();
       tables.textContent = '';
@@ -2189,31 +2192,20 @@ if (form) {
   const waitingList = $<HTMLUListElement>('cg-waiting-list')!;
   const waitingError = $<HTMLParagraphElement>('cg-waiting-error')!;
 
-  /**
-   * A board opened before the first deal: the heading, one card per group
-   * the deal will make (`plannedGroups`, the deal's own code, so the count
-   * cannot disagree), and every student the deal will place, numbered, with
-   * the name beside the number where the roster has one. Rendered into
-   * `#cg-results` through the same `render` a deal uses: one element, one
-   * render path (AC2).
-   */
-  const showWaiting = () => {
-    const input = dealInput();
+  /** Everyone the deal will place who is not already seated (#743). */
+  const waitingPool = (input: ReturnType<typeof dealInput>): Student[] => {
     const pinned = new Set(input.pinned.flat().map((s) => s.number));
-    const pool = (
+    return (
       typeof input.students === 'number'
         ? Array.from({ length: input.students }, (_, i) =>
             anonymousStudent(i + 1),
           )
         : input.students.filter((s) => !s.absent)
     ).filter((s) => !pinned.has(s.number));
+  };
 
-    resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
-    render(plannedGroups(input) ?? []);
-    // A pinned member is already in place: nothing deals it in.
-    tables
-      .querySelectorAll('.student')
-      .forEach((c) => c.classList.add('dealt'));
+  /** The waiting list, shown: every student in `pool`, numbered (#743). */
+  const showList = (pool: readonly Student[]) => {
     waitingList.textContent = '';
     for (const student of pool) {
       const li = document.createElement('li');
@@ -2235,6 +2227,25 @@ if (form) {
     waitingError.hidden = true;
     waitingError.textContent = '';
     waiting.hidden = false;
+  };
+
+  /**
+   * A board opened before the first deal: the heading, one card per group
+   * the deal will make (`plannedGroups`, the deal's own code, so the count
+   * cannot disagree), and every student the deal will place, numbered, with
+   * the name beside the number where the roster has one. Rendered into
+   * `#cg-results` through the same `render` a deal uses: one element, one
+   * render path (AC2).
+   */
+  const showWaiting = () => {
+    const input = dealInput();
+    resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
+    render(plannedGroups(input) ?? []);
+    // A pinned member is already in place: nothing deals it in.
+    tables
+      .querySelectorAll('.student')
+      .forEach((c) => c.classList.add('dealt'));
+    showList(waitingPool(input));
     results.hidden = false;
     projector?.setShuffleLabel(t.makeGroups);
   };
@@ -2249,8 +2260,12 @@ if (form) {
 
   let dealToken = 0;
   let dealSkip = false;
+  // #744: the travelling deal's way out. `finish` lands everyone now (a
+  // detail changed, or the board closed); `superseded` is a newer deal.
+  let travelling: AbortController | null = null;
   const finishDealNow = () => {
     dealSkip = true;
+    travelling?.abort('finish');
   };
 
   const animate = async (speed: string) => {
@@ -2321,6 +2336,45 @@ if (form) {
     };
   };
 
+  /** The board's travelling deal (#744): order, schedule, then the flights. */
+  const travelDeal = async (
+    groups: Student[][],
+    input: ReturnType<typeof dealInput>,
+  ) => {
+    ++dealToken; // a page deal still running stops, as a newer deal says
+    const pinned = new Set(input.pinned.flat().map((s) => s.number));
+    for (const row of tables.querySelectorAll<HTMLElement>('.student'))
+      if (pinned.has(Number(row.dataset.number))) row.classList.add('dealt');
+    const order = travelOrder(groups, pinned);
+    const schedule = travelSchedule(
+      order.length,
+      speedSelect.value === 'fast' ? 'fast' : 'normal',
+    );
+    if (!schedule) {
+      tables
+        .querySelectorAll('.student')
+        .forEach((c) => c.classList.add('dealt'));
+      hideWaiting();
+      projector?.refit();
+      return;
+    }
+    const controller = new AbortController();
+    travelling = controller;
+    sfx.shuffle();
+    const outcome = await travel({
+      list: waitingList,
+      tables,
+      order,
+      schedule,
+      signal: controller.signal,
+      hideList: hideWaiting,
+      refit: () => projector?.refit(),
+      onLand: (i) => sfx.land(i),
+    });
+    if (travelling === controller) travelling = null;
+    if (outcome === 'dealt') sfx.done();
+  };
+
   // ── submit ──────────────────────────────────────────────────────────────
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2368,7 +2422,15 @@ if (form) {
     }
 
     const { groups, warnings } = outcome.result;
-    hideWaiting();
+    // #744: on the board with animation on, the deal travels from the list,
+    // so the list is (re)shown for it; ruling 2 brings everyone back to it
+    // on a second Shuffle too. Anywhere else the list goes, as before.
+    const travels =
+      (projector?.isOpen() ?? false) && speedSelect.value !== 'skip';
+    travelling?.abort('superseded');
+    travelling = null;
+    if (travels) showList(waitingPool(input));
+    else hideWaiting();
     projector?.setShuffleLabel(t.boardShuffle);
     // What the sheet is showing, for "Export groups" -- see `lastGroups`'s
     // own comment where it is declared.
@@ -2476,7 +2538,8 @@ if (form) {
     updateStaleness();
 
     try {
-      await animate(speedSelect.value);
+      if (travels) await travelDeal(groups, input);
+      else await animate(speedSelect.value);
     } finally {
       // The deal no longer disables this button at all (see `animate`), so
       // this is not an "undo the disable" step — it re-derives the button's

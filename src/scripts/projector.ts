@@ -96,6 +96,8 @@ export interface Projector {
   setShuffleLabel: (label: string) => void;
   /** Re-measure — after a shuffle changes how much there is to show. */
   refit: () => void;
+  /** Whether the board is up, so a deal knows it may travel (#744). */
+  isOpen: () => boolean;
 }
 
 export function renderProjector(
@@ -430,9 +432,11 @@ export function renderProjector(
     // cards the second render has already detached.
     if (handlers.busy?.()) return;
     handlers.onShuffle();
-    // The cards were rebuilt by that shuffle, so they carry neither class
-    // -- reveal them again rather than leaving a board of invisible groups.
-    reveal();
+    // With animation on, the deal travels from the waiting list into cards
+    // that are already up (#744), so the groups are not faded in on top of
+    // it; with animation off, `reveal` shows them at once, as before.
+    if (handlers.animates?.() === false) reveal();
+    else stopReveal();
     // …and there may be more or less of them than before. Without this a
     // board shuffle never re-measured at all, so a taller arrangement was
     // sized to the previous one and lost its bottom group off the board.
@@ -501,5 +505,6 @@ export function renderProjector(
       if (!available) void leave();
     },
     refit,
+    isOpen: () => open,
   };
 }
