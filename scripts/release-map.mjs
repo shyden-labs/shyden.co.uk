@@ -100,6 +100,11 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
         `release-map: ${sha} is classified but is not a visitor-facing commit of this release (stale)`,
       );
 
+  // Every cited title this run does not hold, gathered across every entry and
+  // refused together below: one refusal at a time took a capture per title
+  // (#765, where 64 of them waited behind each other).
+  /** @type {string[]} */
+  const unknown = [];
   /** @type {Row[]} */
   const rows = visitor.map((entry) => {
     const given = release.entries[entry.sha];
@@ -136,10 +141,10 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
     const titles = [];
     for (const title of cited) {
       if (typeof title !== 'string' || !journeys.has(title))
-        throw new Error(
-          `release-map: ${JSON.stringify(title)}, cited by ${entry.sha}, is not a journey of this run`,
+        unknown.push(
+          `  ${JSON.stringify(title)}, cited by ${entry.sha}, is not a journey of this run`,
         );
-      titles.push(title);
+      else titles.push(title);
     }
     const flagged =
       statuses === null
@@ -153,6 +158,10 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
           });
     return { entry, classification: { kind, journeys: titles }, flagged };
   });
+  if (unknown.length)
+    throw new Error(
+      `release-map: ${unknown.length} cited titles are not journeys of this run:\n${unknown.join('\n')}`,
+    );
 
   /** @type {Map<string, number>} */
   const areas = new Map();

@@ -5,20 +5,23 @@
  *
  * Two modes. Building reads a capture's report and manifest, and refuses a
  * head whose `dev-verified` is not success, because the page describes the
- * tree on dev. `--check` reads a Playwright listing before the merge, when
- * the release head is still a branch with no `dev-verified` and no capture
- * exists. It validates the release file and writes nothing, so a mistyped
- * title surfaces before the merge instead of after a capture.
+ * tree on dev. `--check` validates the release file and writes nothing, so a
+ * wrong citation surfaces before the content merges.
  *
- * A listing cannot say which tests capture, so `--check` passes a title that
- * runs but shoots nothing, such as a looped test's `/` case that returns
- * before its `shoot`. Only building sees that, from the manifest, and it
- * refuses (#362: `palette-controls`' homepage case, cited for #337).
+ * `--check --manifest` reads the release's one capture (operator 2026-10-14,
+ * #765: the code merges, the laptop captures once, then the content is
+ * checked against that capture and merged). It refuses every cited title no
+ * row of this run carries, all of them in one refusal, each with its entry.
+ * A listing cannot say which tests capture: a looped test's case that
+ * returns before its `shoot` runs, passes, and is listed, which let 64 such
+ * citations through in v4 (#765; #362's `palette-controls` case before it).
+ * So a check against a listing alone says so, and is refused unless
+ * `--listing-only` asks for it by name.
  */
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { capturesOfThisRun, flattenReport } from './build-evidence-page.mjs';
 import { EVIDENCE_MANIFEST, EVIDENCE_REPORT } from './evidence-files.mjs';
@@ -52,12 +55,19 @@ export const listedTitles = (listing) => {
 };
 
 /**
+ * What a listing-only check proves, said wherever one runs (#765).
+ */
+export const LISTING_CAVEAT =
+  'a listing proves each cited title RUNS, not that it CAPTURES: check against the capture with --manifest <dir>/manifest.jsonl';
+
+/**
  * @param {object} input
  * @param {import('./release-map.mjs').Release} input.release
  * @param {{ base: string, head: string, entries: import('./release-inventory.mjs').Entry[] }} input.inventory
- * @param {any} input.report the capture's report, or a listing when checking
- * @param {any[] | null} input.manifest the capture's manifest rows, or null when checking
+ * @param {any} input.report the capture's report, or a listing when there is no manifest
+ * @param {any[] | null} input.manifest the capture's manifest rows, or null for a listing-only check
  * @param {string | null} input.devVerified the head's dev-verified state
+ * @param {boolean} [input.check] validate the release file and write nothing
  */
 export const releaseContentOf = ({
   release,
@@ -65,30 +75,37 @@ export const releaseContentOf = ({
   report,
   manifest,
   devVerified,
+  check = false,
 }) => {
-  const checking = manifest === null;
-  if (!checking && devVerified !== 'success')
+  if (!check && manifest === null)
+    throw new Error(
+      "build-release-content: building reads a capture's manifest, and none was given",
+    );
+  if (!check && devVerified !== 'success')
     throw new Error(
       `build-release-content: ${inventory.head} reads dev-verified=${devVerified ?? 'absent'}; a release page describes a tree dev has verified`,
     );
   /** @type {Map<string, string[]>} */
   const statuses = new Map();
-  if (!checking)
+  if (!check)
     for (const row of flattenReport(report))
       statuses.set(row.title, [...(statuses.get(row.title) ?? []), row.status]);
   const map = changeMapOf({
     inventory,
     release,
-    journeys: checking
-      ? listedTitles(report)
-      : new Set(
-          capturesOfThisRun(manifest, report).current.map(
-            (/** @type {{ title: string }} */ r) => r.title,
+    // A manifest is what a capture recorded, so it answers which titles
+    // CAPTURE; a listing answers only which run (#765).
+    journeys:
+      manifest === null
+        ? listedTitles(report)
+        : new Set(
+            capturesOfThisRun(manifest, report).current.map(
+              (/** @type {{ title: string }} */ r) => r.title,
+            ),
           ),
-        ),
-    statuses: checking ? null : statuses,
+    statuses: check ? null : statuses,
   });
-  if (checking) return null;
+  if (check) return null;
   const { changeMap, others } = renderChangeMap(map);
   const head7 = inventory.head.slice(0, 7);
   return {
@@ -125,7 +142,49 @@ export const releaseContentOf = ({
 };
 
 const USAGE =
-  'usage: build-release-content.mjs --release <file.json> --head <sha> (--evidence <dir> --out <content.json> | --check --listing <listing.json>)';
+  'usage: build-release-content.mjs --release <file.json> --head <sha> (--evidence <dir> --out <content.json> | --check --manifest <dir>/manifest.jsonl | --check --listing <listing.json> --listing-only)';
+
+/**
+ * @typedef {{ release?: string, head?: string, evidence?: string, out?: string, check?: boolean, listing?: string, listingOnly?: boolean, manifest?: string }} Options
+ */
+
+/**
+ * What the command line asks for (#765). A check reads a capture's manifest;
+ * a check against a listing alone proves only that each title runs, so it is
+ * refused unless `--listing-only` asks for exactly that.
+ *
+ * @param {Options} values
+ * @returns {'build' | 'manifest' | 'listing' | 'listing-refused' | 'usage'}
+ */
+export const modeOf = (values) => {
+  if (!values.release || !values.head) return 'usage';
+  if (!values.check)
+    return values.evidence &&
+      values.out &&
+      !values.listing &&
+      !values.listingOnly &&
+      !values.manifest
+      ? 'build'
+      : 'usage';
+  if (values.evidence || values.out) return 'usage';
+  if (values.manifest)
+    return values.listing || values.listingOnly ? 'usage' : 'manifest';
+  if (!values.listing) return 'usage';
+  return values.listingOnly ? 'listing' : 'listing-refused';
+};
+
+/**
+ * A capture's manifest, one JSON row per line.
+ *
+ * @param {string} file
+ * @returns {any[]}
+ */
+const manifestRows = (file) =>
+  readFileSync(file, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 
 /** @param {string} sha */
 const devVerifiedOf = (sha) => {
@@ -143,10 +202,10 @@ const devVerifiedOf = (sha) => {
 };
 
 const main = () => {
-  /** @type {{ release?: string, head?: string, evidence?: string, out?: string, check?: boolean, listing?: string }} */
+  /** @type {Options} */
   let values;
   try {
-    ({ values } = parseArgs({
+    const { values: given } = parseArgs({
       options: {
         release: { type: 'string' },
         head: { type: 'string' },
@@ -154,43 +213,69 @@ const main = () => {
         out: { type: 'string' },
         check: { type: 'boolean' },
         listing: { type: 'string' },
+        'listing-only': { type: 'boolean' },
+        manifest: { type: 'string' },
       },
-    }));
+    });
+    values = { ...given, listingOnly: given['listing-only'] };
   } catch (error) {
     console.error(`build-release-content: ${messageOf(error)}`);
     console.error(USAGE);
     process.exit(2);
   }
-  const checking = values.check === true;
-  if (
-    !values.release ||
-    !values.head ||
-    (checking ? !values.listing : !values.evidence || !values.out)
-  ) {
+  const mode = modeOf(values);
+  const { release: releaseFile, head } = values;
+  // `modeOf` refuses both missing; read here too, so the checker sees it.
+  if (mode === 'usage' || !releaseFile || !head) {
     console.error(USAGE);
     process.exit(2);
   }
+  if (mode === 'listing-refused') {
+    console.error(`build-release-content: ${LISTING_CAVEAT}`);
+    console.error(
+      'build-release-content: pass --listing-only to run the weaker check by name',
+    );
+    process.exit(2);
+  }
   try {
-    const release = releaseOf(JSON.parse(readFileSync(values.release, 'utf8')));
+    const release = releaseOf(JSON.parse(readFileSync(releaseFile, 'utf8')));
     const inventory = inventoryFor({
       base: release.base,
-      head: values.head,
+      head,
       git: (args) =>
         execFileSync('git', args, {
           encoding: 'utf8',
           maxBuffer: 256 * 1024 * 1024,
         }),
     });
-    if (checking) {
+    if (mode === 'listing') {
       releaseContentOf({
         release,
         inventory,
         report: JSON.parse(readFileSync(values.listing ?? '', 'utf8')),
         manifest: null,
         devVerified: null,
+        check: true,
       });
       console.log(
-        `build-release-content: ${values.release} holds for ${inventory.head}`,
+        `build-release-content: ${values.release} holds for ${inventory.head}, as a listing: ${LISTING_CAVEAT}`,
+      );
+      return;
+    }
+    if (mode === 'manifest') {
+      // The report beside the manifest tells this run's rows from an earlier
+      // run's, as building does: a capture directory gains rows run by run.
+      const dir = dirname(values.manifest ?? '');
+      releaseContentOf({
+        release,
+        inventory,
+        report: JSON.parse(readFileSync(join(dir, EVIDENCE_REPORT), 'utf8')),
+        manifest: manifestRows(values.manifest ?? ''),
+        devVerified: null,
+        check: true,
+      });
+      console.log(
+        `build-release-content: ${values.release} holds for ${inventory.head}: every cited journey captured in ${values.manifest}`,
       );
       return;
     }
@@ -199,11 +284,7 @@ const main = () => {
       release,
       inventory,
       report: JSON.parse(readFileSync(join(dir, EVIDENCE_REPORT), 'utf8')),
-      manifest: readFileSync(join(dir, EVIDENCE_MANIFEST), 'utf8')
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line)),
+      manifest: manifestRows(join(dir, EVIDENCE_MANIFEST)),
       devVerified: devVerifiedOf(inventory.head),
     });
     writeFileSync(values.out ?? '', `${JSON.stringify(content, null, 2)}\n`);
