@@ -333,6 +333,14 @@ const PRODUCT_VALUES: Readonly<Record<string, string>> = {
   'tests/e2e/homepage.spec.ts: Math.round(box!.width)': 'the 44px touch target',
   'tests/e2e/homepage.spec.ts: Math.round(box!.height)':
     'the 44px touch target',
+  'tests/e2e/homepage.spec.ts: at.target.w': 'the 44px touch target',
+  'tests/e2e/homepage.spec.ts: at.target.h': 'the 44px touch target',
+  'tests/e2e/homepage.spec.ts: iconRatio':
+    'WCAG 1.4.11 non-text contrast, 3:1: the pause icon on its disc',
+  'tests/e2e/homepage.spec.ts: contrast(disc!.rgb, strip!.rgb)':
+    'WCAG 1.4.11 non-text contrast, 3:1: the pause disc against the strip',
+  'tests/e2e/homepage.spec.ts: contrast(colour!.rgb, ground!.rgb)':
+    'WCAG 1.4.11 non-text contrast, 3:1: the focus ring on the pause disc',
   'tests/prod/prod-smoke.spec.ts: page.body.length':
     'a served page is a page, not an error stub',
   'tests/viewport.ts: Math.round(rect.width)': 'the 44px touch target',

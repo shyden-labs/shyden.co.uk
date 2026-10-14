@@ -31,6 +31,7 @@ let CONTENT_ONLY_SPECS: PlaywrightConfigModule['CONTENT_ONLY_SPECS'];
 let VISUAL_PROJECT: PlaywrightConfigModule['VISUAL_PROJECT'];
 let VISUAL_MEASURE_PROJECT: PlaywrightConfigModule['VISUAL_MEASURE_PROJECT'];
 let engineDependence: (typeof import('../unit/engine-dependence'))['engineDependence'];
+let ENGINE_DEPENDENT_NAMES: (typeof import('../unit/engine-dependence'))['ENGINE_DEPENDENT_NAMES'];
 
 beforeAll(async () => {
   const [playwright, parser] = await Promise.all([
@@ -39,7 +40,7 @@ beforeAll(async () => {
   ]);
   config = playwright.default;
   ({ CONTENT_ONLY_SPECS, VISUAL_PROJECT, VISUAL_MEASURE_PROJECT } = playwright);
-  ({ engineDependence } = parser);
+  ({ engineDependence, ENGINE_DEPENDENT_NAMES } = parser);
 });
 
 /**
@@ -178,14 +179,53 @@ describe('the content-only project', () => {
     // The positive control for the absence above: the spec #198 moved out
     // reads layout, and a detector gone blind would find nothing anywhere.
     // Exact, so a detector that starts reporting prose shows up here too.
+    // Its clip reading moved into a reader shipped into the page (#619), so
+    // the reader's name is one of what it reads.
     expect(engineDependence(read('rendered-text.spec.ts'))).toEqual([
-      'checkVisibility',
       'clientWidth',
-      'getBoundingClientRect',
-      'getClientRects',
-      'getComputedStyle',
       'innerText',
+      'visibleLinesReaderScript',
     ]);
+  });
+
+  it('counts a reader shipped into the page as text as a layout read (#619)', () => {
+    // A module guarded by `expectClosesOverNothing` is shipped into the page
+    // and makes its DOM calls there, so a spec that names only the reader
+    // reads layout through it, and would otherwise sit on the content-only
+    // side, measured on one engine. Derived from the guards that ship them,
+    // so a reader is covered the day its guard is written.
+    const guards = trackedFiles((path) =>
+      /^tests\/guards\/.+\.test\.ts$/.test(path),
+    );
+    const shipped = [
+      ...new Set(
+        guards.flatMap((path) =>
+          [
+            ...withoutTsComments(readFileSync(path, 'utf8')).matchAll(
+              /expectClosesOverNothing\(\s*'([^']+)'/g,
+            ),
+          ].map((match) => match[1]),
+        ),
+      ),
+    ].sort();
+    const readers = shipped.flatMap((path) =>
+      [
+        ...withoutTsComments(readFileSync(path, 'utf8')).matchAll(
+          /^export (?:const|function) ([a-z]\w*)/gm,
+        ),
+      ].map((match) => match[1]),
+    );
+    expect(
+      searched(
+        readers.filter((name) => !ENGINE_DEPENDENT_NAMES.has(name)),
+        { of: readers, what: 'readers shipped into the page' },
+      ),
+      'a shipped reader the detector does not name hides every layout read ' +
+        'it makes from the content-only boundary',
+    ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/shipped-readers', readers.length),
+    ).toBeUndefined();
   });
 
   it('runs those specs on exactly one project', () => {

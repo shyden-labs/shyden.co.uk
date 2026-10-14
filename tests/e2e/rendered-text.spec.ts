@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { searched } from '../source-files';
-import { LOCALES, getSiteStrings } from '../../src/lib/i18n';
+import { visibleLinesReaderScript } from '../visible-text';
 import {
   PUBLISHED_ROUTES,
   publishedPaths,
@@ -109,16 +109,6 @@ const INTENTIONAL_JOINS: Array<{ left: RegExp; right: RegExp; why: string }> = [
       'a full-width stop carries its own space: Chinese sets the next ' +
       'sentence straight after it (#390 F65)',
   },
-  // The Pause motion pill is laid ON the language strip, so its words sit over
-  // the strip's first words, not beside them (#606). One entry per locale,
-  // naming that locale's own label exactly.
-  ...LOCALES.map((locale) => ({
-    left: new RegExp(
-      `^${getSiteStrings(locale).home.pauseMotion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-    ),
-    right: /^\S+ ✱ /,
-    why: 'the pause pill is drawn over the language strip, not beside it (#606)',
-  })),
 ];
 
 /**
@@ -149,104 +139,16 @@ const INTENTIONAL_JOINS: Array<{ left: RegExp; right: RegExp; why: string }> = [
  * text either side of it is compared directly.
  */
 const visualJoins = (page: Page) =>
-  page.evaluate(() => {
+  page.evaluate((readerScript) => {
+    // What a visitor can see of a text node, read in its one home
+    // (`tests/visible-text.ts`) and shipped in as text.
+    const visibleLines = new Function(readerScript)() as (
+      node: Text,
+    ) => DOMRect[];
     const out: Array<{ left: string; right: string; tag: string }> = [];
     const skip = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT']);
 
-    type Edges = { left: number; top: number; right: number; bottom: number };
     type Seen = { text: string; lines: DOMRect[] };
-
-    // A computed length in px: `4px`, or `50%` of `size`. NaN for anything
-    // else (a calc(), say), so a clip this cannot read is never applied.
-    const px = (value: string, size: number) =>
-      /^-?[\d.]+px$/.test(value)
-        ? parseFloat(value)
-        : /^-?[\d.]+%$/.test(value)
-          ? (parseFloat(value) / 100) * size
-          : NaN;
-
-    // What an element's `clip-path: inset()` and `clip: rect()` leave showing.
-    // Both cut the element and everything inside it, which is how an `.sr`
-    // label keeps its layout and shows nothing. Other clip-path shapes are not
-    // read, so they cut nothing here: a clip this misreads can only add a
-    // join, never hide one.
-    const clipCache = new Map<Element, Edges[]>();
-    const clipsOf = (el: Element): Edges[] => {
-      const cached = clipCache.get(el);
-      if (cached) return cached;
-      const style = getComputedStyle(el);
-      const box = el.getBoundingClientRect();
-      const clips: Edges[] = [];
-
-      const inset = /^inset\(([^)]*)\)/.exec(style.clipPath);
-      if (inset) {
-        const [t, r = t, b = t, l = r] = inset[1]
-          .split(' round ')[0]
-          .trim()
-          .split(/\s+/);
-        clips.push({
-          left: box.left + px(l, box.width),
-          top: box.top + px(t, box.height),
-          right: box.right - px(r, box.width),
-          bottom: box.bottom - px(b, box.height),
-        });
-      }
-
-      const rect = /^rect\(([^)]*)\)/.exec(style.getPropertyValue('clip'));
-      if (rect && ['absolute', 'fixed'].includes(style.position)) {
-        const [t, r, b, l] = rect[1].split(/,\s*|\s+/);
-        const offset = (value: string, auto: number) =>
-          value === 'auto' ? auto : px(value, 0);
-        clips.push({
-          left: box.left + offset(l, 0),
-          top: box.top + offset(t, 0),
-          right: box.left + offset(r, box.width),
-          bottom: box.top + offset(b, box.height),
-        });
-      }
-
-      const readable = clips.filter((clip) =>
-        Object.values(clip).every(Number.isFinite),
-      );
-      clipCache.set(el, readable);
-      return readable;
-    };
-
-    // A line of text cut down to what every clip above it leaves showing, or
-    // null when that is nothing.
-    const showing = (line: DOMRect, parent: Element): DOMRect | null => {
-      let { left, top, right, bottom } = line;
-      for (let el: Element | null = parent; el; el = el.parentElement) {
-        for (const clip of clipsOf(el)) {
-          left = Math.max(left, clip.left);
-          top = Math.max(top, clip.top);
-          right = Math.min(right, clip.right);
-          bottom = Math.min(bottom, clip.bottom);
-        }
-      }
-      return right > left && bottom > top
-        ? new DOMRect(left, top, right - left, bottom - top)
-        : null;
-    };
-
-    // The rest of the ways to keep text in the layout and paint none of it:
-    // inside a closed <details>, `visibility: hidden`, `opacity: 0`. Each
-    // option is passed under both of its names, because Safari shipped the
-    // older ones first.
-    const painted = (el: Element) => {
-      if (typeof el.checkVisibility !== 'function') {
-        throw new Error(
-          'Element.checkVisibility() is missing, so this browser cannot say ' +
-            'which text a visitor sees. Every join it reported would be a guess.',
-        );
-      }
-      return el.checkVisibility({
-        opacityProperty: true,
-        visibilityProperty: true,
-        checkOpacity: true,
-        checkVisibilityCSS: true,
-      });
-    };
 
     // What a visitor sees of a node: its text, and the lines that text sits
     // on, in document order. Only text nodes have lines, so an element's own
@@ -258,16 +160,8 @@ const visualJoins = (page: Page) =>
       let result: Seen = { text: '', lines: [] };
 
       if (node instanceof Text) {
-        const parent = node.parentElement;
-        if (parent && painted(parent)) {
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          const lines = [...range.getClientRects()]
-            .filter((r) => r.width > 0)
-            .map((r) => showing(r, parent))
-            .filter((r): r is DOMRect => r !== null);
-          if (lines.length) result = { text: node.data, lines };
-        }
+        const lines = visibleLines(node);
+        if (lines.length) result = { text: node.data, lines };
       } else if (node instanceof Element && !skip.has(node.tagName)) {
         const parts = [...node.childNodes].map(seen);
         result = {
@@ -306,7 +200,7 @@ const visualJoins = (page: Page) =>
 
     walk(document.body);
     return out;
-  });
+  }, visibleLinesReaderScript());
 
 /**
  * Cases for the join detector itself.
