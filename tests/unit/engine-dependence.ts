@@ -71,6 +71,16 @@ export const ENGINE_DEPENDENT_NAMES: ReadonlySet<string> = new Set([
   'toHaveScreenshot',
   // Asks which engine it is on.
   'browserName',
+  // Reads layout through a reader shipped into the page as text (#619): the
+  // DOM calls live in the shared module, so the spec names only the reader.
+  // `tests/guards/browser-matrix.test.ts` derives these from the guards that
+  // ship them, so the next one cannot be left off.
+  'measureBoard',
+  'measureBoardScript',
+  'measureTypedFields',
+  'measureTypedFieldsScript',
+  'visibleLinesReader',
+  'visibleLinesReaderScript',
 ]);
 
 /**

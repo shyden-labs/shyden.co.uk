@@ -148,6 +148,20 @@ const PAIRS: Pair[] = [
     where: 'the label on a filled button, hovered',
   },
   {
+    fg: ['--accent'],
+    bg: ['--on-accent'],
+    level: 'ui',
+    where:
+      "the homepage pause icon, and the site's focus ring drawn on it, on the pause disc (#619)",
+  },
+  {
+    fg: ['--on-accent'],
+    bg: ['--accent'],
+    level: 'ui',
+    where:
+      'the homepage pause disc against the language strip it sits on (#619)',
+  },
+  {
     fg: ['--danger'],
     bg: ['--bg'],
     level: 'body',
