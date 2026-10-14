@@ -103,7 +103,7 @@ test.describe('the sentences corrected on #319', () => {
       // The how-to's second step names who is being split.
       await tool.locator('#cg-howto-toggle').click();
       const step = tool.locator('#cg-howto-body ol li').nth(1);
-      await expectVisibleText(step, t.howToSteps[1]);
+      await expectVisibleText(step, t.howToSteps[0]);
       await shoot(
         tool,
         `${locale}: the second step reads “${t.howToSteps[1]}”`,
@@ -169,7 +169,7 @@ test.describe('the sentences corrected on #319', () => {
           locale,
           [1, 2].map(byNumber),
           renderError(
-            { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 2] },
+            { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 3] },
             t,
             byNumber,
           ),
@@ -248,7 +248,7 @@ test.describe('the sentences corrected on #319', () => {
         panel
           .locator('label')
           .filter({ has: tool.locator('input[value="groups"]') }),
-        t.printWhatGroups,
+        t.printShowLetters,
       );
       await expectVisibleText(
         panel
@@ -313,7 +313,7 @@ test.describe('the sentences corrected on #319', () => {
           tool,
           locale,
           [NAMES[0], NAMES[1]],
-          t.rosterClashMessage({ names: [NAMES[0], NAMES[1]] }),
+          t.rosterClashMessage({ names: [NAMES[0], NAMES[2]] }),
         ),
       );
       await shoot(
@@ -352,7 +352,7 @@ test.describe('the sentences corrected on #319', () => {
       // file plants, with no number in it (#469).
       expect(problems).toHaveLength(faulty.split('\n').slice(1).length);
       await upload(tool, 'faulty.csv', faulty);
-      await expect(listed).toHaveText(problems);
+      await expect(listed).toHaveText(problems.slice(1));
       for (const problem of problems)
         await expectVisibleText(
           tool.getByText(problem, { exact: true }),

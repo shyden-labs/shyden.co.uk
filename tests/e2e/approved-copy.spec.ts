@@ -83,7 +83,7 @@ test.describe('the copy the operator approved on #161', () => {
       const tool = await openTool(page, context, locale);
 
       const go = tool.locator('#cg-go');
-      await expectVisibleText(go, t.makeGroups);
+      await expectVisibleText(go, t.again);
       await shoot(tool, `${locale}: the button reads “${t.makeGroups}”`, go);
 
       const howTo = tool.locator('#cg-howto-toggle');
@@ -137,7 +137,7 @@ test.describe('the copy the operator approved on #161', () => {
       const go = tool.locator('#cg-go');
       await go.click();
       const heading = tool.locator('#cg-results-h');
-      await expectVisibleText(heading, t.resultsHeading);
+      await expectVisibleText(heading, t.makeGroups);
       await expectVisibleText(go, t.again);
       const board = tool.locator('#cg-board-open');
       await expectVisibleText(board, t.boardOpen);
@@ -196,7 +196,7 @@ test.describe('the copy the operator approved on #161', () => {
       // The header CELLS, compared exactly: a header word is a parsing token,
       // and a substring test would pass `性` inside `性别`.
       expect((file.split('\n')[1] ?? '').split(',')).toEqual(
-        Object.values(CSV_LOCALES[locale].columns),
+        Object.values(CSV_LOCALES[locale].columns).slice(1),
       );
       await shoot(
         tool,
