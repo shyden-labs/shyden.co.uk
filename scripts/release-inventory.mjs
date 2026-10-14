@@ -168,14 +168,27 @@ const capturingLines = (file, source) => {
     true,
     ts.ScriptKind.TS,
   );
-  /** @param {ts.Node} root */
+  /**
+   * The names `root` calls: every bare callee, and `shoot` reached through a
+   * namespace import (`evidence.shoot(`, #465). Any other property call is
+   * left out, so `page.once(` never stands for a helper named `once`.
+   *
+   * @param {ts.Node} root
+   */
   const callsIn = (root) => {
     /** @type {Set<string>} */
     const names = new Set();
     /** @param {ts.Node} node */
     const visit = (node) => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression))
-        names.add(node.expression.text);
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        if (ts.isIdentifier(callee)) names.add(callee.text);
+        else if (
+          ts.isPropertyAccessExpression(callee) &&
+          callee.name.text === 'shoot'
+        )
+          names.add('shoot');
+      }
       ts.forEachChild(node, visit);
     };
     visit(root);
