@@ -312,15 +312,12 @@ describe.each(LOCALES)(
         `students captured before the second shuffle (${locale})`,
       ).toBe(20);
 
-      // The button disables itself for the duration of the deal animation
-      // (src/scripts/classroom-groups.ts: `goButton.disabled = true` right
-      // after render(), cleared only in the `finally` once `animate()`
-      // resolves) -- a disabled button's `.click()` is a genuine no-op, not
-      // a delayed one. Discovered by this test's own first real run:
-      // without this wait, the second click below landed while the FIRST
-      // shuffle's animation was still running, was silently swallowed, and
-      // the arrangement never changed inside the 20s timeout -- see the
-      // report for the real failure text this produced.
+      // A disabled button's `.click()` is a genuine no-op, not a delayed
+      // one. The button once disabled itself for the whole deal, and this
+      // test's first real run had its second click swallowed that way. A
+      // deal no longer disables it (operator, 2026-08-13: a press mid-deal
+      // starts a new deal from the top, superseded by `dealToken`), so this
+      // wait now only confirms the roster can still be dealt.
       await waitFor(
         async () => {
           const disabled = await go.property('disabled');
@@ -328,7 +325,7 @@ describe.each(LOCALES)(
         },
         {
           timeout: 20_000,
-          describe: `#cg-go to re-enable once the first shuffle's deal animation finishes (${locale}, mode: ${session.mode})`,
+          describe: `#cg-go to be enabled, the roster dealable (${locale}, mode: ${session.mode})`,
         },
       );
 
