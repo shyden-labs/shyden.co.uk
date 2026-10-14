@@ -138,11 +138,4 @@ jobs:
             echo "::error::No deployment to roll back to: the find step handed on none."
             exit 1
           fi
-          API="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/shyden-site"
-          echo "Rolling shyden-site back to deployment: ${TARGET}"
-          resp="$(curl -fsS -X POST -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${API}/deployments/${TARGET}/rollback")"
-          if [ "$(jq -r '.success' <<<"$resp")" != "true" ]; then
-            echo "::error::Rollback failed: $(jq -c '.errors' <<<"$resp")"
-            exit 1
-          fi
-          echo "Rollback OK. Live deployment is now $(jq -r '.result.id' <<<"$resp") ($(jq -r '.result.url' <<<"$resp"))"
+          node scripts/pages.mjs rollback shyden-site "${TARGET}"

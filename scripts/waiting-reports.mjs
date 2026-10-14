@@ -24,7 +24,7 @@
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
-import { endpoint, setting } from './settings.mjs';
+import { endpoint, setting, timeoutMs } from './settings.mjs';
 import {
   COUNT_SQL,
   FAILURE_NOTICE,
@@ -37,11 +37,6 @@ import {
   postedToday,
   startOfUtcDay,
 } from '../src/lib/waiting-reports.ts';
-
-const timeoutMs = () =>
-  process.env.WAITING_REPORTS_TIMEOUT_MS === undefined
-    ? REQUEST_TIMEOUT_MS
-    : Number(setting('WAITING_REPORTS_TIMEOUT_MS', /^[1-9]\d*$/));
 
 /**
  * The parsed JSON a request answers with. Any failure to get a 2xx JSON
@@ -56,7 +51,9 @@ const timeoutMs = () =>
 const answerOf = async (what, url, init) => {
   const response = await fetch(url, {
     ...init,
-    signal: AbortSignal.timeout(timeoutMs()),
+    signal: AbortSignal.timeout(
+      timeoutMs('WAITING_REPORTS_TIMEOUT_MS', REQUEST_TIMEOUT_MS),
+    ),
   });
   const text = await response.text();
   /** @type {unknown} */

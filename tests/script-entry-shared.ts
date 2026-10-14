@@ -126,6 +126,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/rollback-target.mjs',
   },
+  // With no command it has nothing to read or promote, so it refuses with
+  // the usage before any setting or request (#748).
+  'pages.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/pages.mjs live <project>',
+  },
   'i18n-back-translate.mjs': {
     args: [],
     env: { BACK_TRANSLATE_URL: undefined },

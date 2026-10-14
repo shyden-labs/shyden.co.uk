@@ -17,6 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { argv, env } from 'node:process';
 import { die, messageOf } from './errors.mjs';
+import { liveDeploymentOf } from '../src/lib/pages.ts';
 
 /**
  * @typedef {{ id: string, environment: string, created_on: string, latest_stage?: { status?: string } }} Deployment
@@ -81,7 +82,7 @@ const main = async () => {
     const list = JSON.parse(readFileSync(deploymentsFile, 'utf8'));
     const target = rollbackTarget({
       deployments: list.result ?? [],
-      canonicalId: project.result?.canonical_deployment?.id ?? '',
+      canonicalId: liveDeploymentOf(project),
       requested: env.REQUESTED || undefined,
     });
     process.stdout.write(`${target}\n`);
