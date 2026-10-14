@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
+import { standInApi, type Reply } from './stand-in-api';
 
 /**
  * `scripts/deploy-failure.mjs` as a real process (#725), as the
@@ -42,13 +41,7 @@ const FAILED_NEEDS = JSON.stringify({
   'verify-dev': { result: 'skipped', outputs: {} },
 });
 
-type Received = { method: string; url: string; body: string; auth: string };
-type Reply = { status: number; body: unknown; location?: string } | null;
-
-const received: Received[] = [];
-let routes: Record<string, Reply>;
-let server: Server;
-let api = '';
+const stand = standInApi();
 
 /** The answers of a deploy that failed in its Cloudflare step. */
 const failedDeploy = (): Record<string, Reply> => ({
@@ -95,49 +88,11 @@ const failedDeploy = (): Record<string, Reply> => ({
   [`POST ${REPO}/issues/726/comments`]: { status: 201, body: {} },
 });
 
-beforeAll(async () => {
-  server = createServer((request, response) => {
-    let body = '';
-    request.on('data', (chunk) => (body += chunk));
-    request.on('end', () => {
-      const got = {
-        method: request.method ?? '',
-        url: request.url ?? '',
-        body,
-        auth: request.headers.authorization ?? '',
-      };
-      received.push(got);
-      const key = `${got.method} ${got.url}`;
-      // `null` is a route that never answers, so presence is read with `in`.
-      const reply =
-        key in routes
-          ? routes[key]
-          : { status: 404, body: { message: 'Not Found' } };
-      if (reply === null) return; // never answer: the script must time out
-      response.writeHead(reply.status, {
-        'content-type': 'application/json',
-        ...(reply.location === undefined ? {} : { location: reply.location }),
-      });
-      response.end(
-        typeof reply.body === 'string'
-          ? reply.body
-          : JSON.stringify(reply.body),
-      );
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  api = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-});
-afterAll(
-  () =>
-    new Promise<void>((resolve) => {
-      server.closeAllConnections();
-      server.close(() => resolve());
-    }),
-);
+beforeAll(() => stand.start());
+afterAll(() => stand.stop());
 beforeEach(() => {
-  received.length = 0;
-  routes = failedDeploy();
+  stand.received.length = 0;
+  stand.routes = failedDeploy();
 });
 
 /** Run the script with only the variables the workflow gives it. */
@@ -149,13 +104,15 @@ const run = (
     const child = spawn(process.execPath, [SCRIPT, ...args], {
       env: {
         PATH: process.env.PATH,
-        GITHUB_API_URL: api,
+        GITHUB_API_URL: stand.url,
         GITHUB_SERVER_URL: 'https://github.com',
         GITHUB_REPOSITORY: 'shyden-labs/shyden.co.uk',
         GITHUB_RUN_ID: RUN,
         GITHUB_SHA: SHA,
         GITHUB_TOKEN: 'gh-token',
         GITHUB_REF_NAME: 'develop',
+        PIPELINE: 'dev',
+        REPORT: 'failure',
         NEEDS: FAILED_NEEDS,
         ...overrides,
       },
@@ -166,11 +123,11 @@ const run = (
     child.on('close', (code) => resolve({ code, out }));
   });
 
-const asked = () => received.map(({ method, url }) => `${method} ${url}`);
+const asked = () => stand.received.map(({ method, url }) => `${method} ${url}`);
 
 /** The JSON body of the one request GitHub received at `method url`. */
 const posted = (method: string, url: string) => {
-  const matching = received.filter(
+  const matching = stand.received.filter(
     (request) => request.method === method && request.url === url,
   );
   expect(matching.length, `requests at ${method} ${url}`).toBe(1);
@@ -208,7 +165,7 @@ describe('a failed deploy with no open notice', () => {
 
   it('asks GitHub with the workflow token', async () => {
     await run();
-    expect(received[0].auth).toBe('Bearer gh-token');
+    expect(stand.received[0].auth).toBe('Bearer gh-token');
   });
 });
 
@@ -245,7 +202,7 @@ describe('only a failure on develop is reported', () => {
 
 describe('a notice still open', () => {
   it("the bot's open notice gets a comment, and no second issue is opened", async () => {
-    routes[`GET ${ISSUES}`] = {
+    stand.routes[`GET ${ISSUES}`] = {
       status: 200,
       body: [
         {
@@ -271,7 +228,7 @@ describe('a notice still open', () => {
   });
 
   it("a stranger's issue carrying the title is passed over for a new issue", async () => {
-    routes[`GET ${ISSUES}`] = {
+    stand.routes[`GET ${ISSUES}`] = {
       status: 200,
       body: [
         {
@@ -290,7 +247,10 @@ describe('a notice still open', () => {
 
 describe('what cannot be read is named in the notice, never a reason to send none', () => {
   it('a jobs list GitHub refuses', async () => {
-    routes[`GET ${JOBS}`] = { status: 500, body: { message: 'Server Error' } };
+    stand.routes[`GET ${JOBS}`] = {
+      status: 500,
+      body: { message: 'Server Error' },
+    };
     const { code, out } = await run();
     expect(code, out).toBe(0);
     expect(asked()).toEqual([
@@ -308,7 +268,7 @@ describe('what cannot be read is named in the notice, never a reason to send non
   });
 
   it('a log GitHub has not got', async () => {
-    routes[`GET ${STORED_LOG}`] = {
+    stand.routes[`GET ${STORED_LOG}`] = {
       status: 404,
       body: { message: 'Not Found' },
     };
@@ -324,7 +284,10 @@ describe('what cannot be read is named in the notice, never a reason to send non
   });
 
   it('an issue list GitHub refuses opens a new notice', async () => {
-    routes[`GET ${ISSUES}`] = { status: 403, body: { message: 'Forbidden' } };
+    stand.routes[`GET ${ISSUES}`] = {
+      status: 403,
+      body: { message: 'Forbidden' },
+    };
     const { code, out } = await run();
     expect(code, out).toBe(0);
     expect(asked().at(-1)).toBe(`POST ${NEW_ISSUE}`);
@@ -336,7 +299,7 @@ describe('what cannot be read is named in the notice, never a reason to send non
 
 describe('a notice that does not reach the operator is a failure', () => {
   it('a notice GitHub refuses exits 1, naming the status', async () => {
-    routes[`POST ${NEW_ISSUE}`] = {
+    stand.routes[`POST ${NEW_ISSUE}`] = {
       status: 403,
       body: { message: 'Resource not accessible by integration' },
     };
@@ -346,7 +309,7 @@ describe('a notice that does not reach the operator is a failure', () => {
   });
 
   it('a notice opened without its assignee exits 1', async () => {
-    routes[`POST ${NEW_ISSUE}`] = {
+    stand.routes[`POST ${NEW_ISSUE}`] = {
       status: 201,
       body: { number: 731, assignees: [] },
     };
@@ -356,7 +319,7 @@ describe('a notice that does not reach the operator is a failure', () => {
   });
 
   it('a GitHub that never answers the notice times out, rather than outliving the job', async () => {
-    routes[`POST ${NEW_ISSUE}`] = null;
+    stand.routes[`POST ${NEW_ISSUE}`] = null;
     const { code, out } = await run({ DEPLOY_FAILURE_TIMEOUT_MS: '300' });
     expect(code).toBe(1);
     expect(out).toMatch(/aborted|timeout/i);
@@ -376,5 +339,150 @@ describe('what the script is given', () => {
     const { code, out } = await run({}, ['report']);
     expect(code).toBe(2);
     expect(out).toContain('usage: node scripts/deploy-failure.mjs');
+  });
+});
+
+describe('a failed production release (#748)', () => {
+  const RUN_URL = `https://github.com/shyden-labs/shyden.co.uk/actions/runs/${RUN}`;
+  const COMMENT = `${REPO}/issues/801/comments`;
+  const DEPLOYED = {
+    id: 11,
+    name: 'Deploy to Prod (needs approval)',
+    conclusion: 'success',
+    steps: [{ name: 'Read the live deployment', conclusion: 'success' }],
+  };
+  const CHECK_FAILED = {
+    id: 12,
+    name: 'Post-prod smoke + prod-verified',
+    conclusion: 'failure',
+    steps: [
+      { name: 'Smoke and verify the live prod site', conclusion: 'failure' },
+    ],
+  };
+  const rollbackJob = (conclusion: string | null, steps: object[]) => ({
+    id: 13,
+    name: 'Roll prod back to the deployment before this release',
+    conclusion,
+    steps,
+  });
+  const jobsWith = (rollback: object) => ({
+    total_count: 3,
+    jobs: [DEPLOYED, CHECK_FAILED, rollback],
+  });
+  // A job behind approval lists no steps while it waits, nor ever once refused.
+  const WAITING = rollbackJob(null, []);
+  const ROLLED_BACK = rollbackJob('success', [
+    { name: 'Check the secrets are set', conclusion: 'success' },
+    {
+      name: 'Roll back to the deployment before this deploy',
+      conclusion: 'success',
+    },
+  ]);
+  const OPEN_NOTICE = [
+    {
+      number: 801,
+      state: 'open',
+      user: { login: 'github-actions[bot]' },
+      title: 'A production release failed',
+    },
+  ];
+  const failureStage = {
+    PIPELINE: 'prod',
+    REPORT: 'failure',
+    GITHUB_REF_NAME: 'main',
+    NEEDS: JSON.stringify({
+      'deploy-prod': { result: 'success', outputs: { before: 'd-prev' } },
+      'smoke-and-verify': { result: 'failure', outputs: {} },
+    }),
+  };
+  const rollbackStage = (result: string) => ({
+    PIPELINE: 'prod',
+    REPORT: 'rollback',
+    GITHUB_REF_NAME: 'main',
+    NEEDS: JSON.stringify({
+      'deploy-prod': { result: 'success', outputs: { before: 'd-prev' } },
+      'rollback-prod': { result, outputs: {} },
+    }),
+  });
+
+  beforeEach(() => {
+    stand.routes[`GET ${JOBS}`] = { status: 200, body: jobsWith(WAITING) };
+    stand.routes[`GET ${REPO}/actions/jobs/12/logs`] = {
+      status: 200,
+      body: '2026-10-14T00:00:00.0000000Z ##[error]1 failed\n',
+    };
+    stand.routes[`POST ${COMMENT}`] = { status: 201, body: {} };
+  });
+
+  it('opens "A production release failed" for ShydenMcM at once, naming the rollback that waits for approval', async () => {
+    const { code, out } = await run(failureStage);
+    expect(code, out).toBe(0);
+    const issue = posted('POST', NEW_ISSUE);
+    expect(issue.title).toBe('A production release failed');
+    expect(issue.assignees).toEqual(['ShydenMcM']);
+    expect(String(issue.body).split('\n')).toEqual([
+      'A production release of `main` failed.',
+      '',
+      `- Run: ${RUN_URL}`,
+      `- Commit: \`${SHA}\``,
+      '- Failed: Post-prod smoke + prod-verified › Smoke and verify the live prod site',
+      '- Last error line: `1 failed`',
+      `- Rollback: waiting for your approval. Approve it in ${RUN_URL} to put production back to deployment \`d-prev\`, the one before this release, or reject it to keep this release live. Until you do, this run holds the production lock: a fix pushed to \`main\` waits behind it, and a manual \`rollback.yml\` cancels it.`,
+      '',
+      'This issue is retired by hand once production serves a release that passed its live check (`prod-verified` on its commit).',
+    ]);
+  });
+
+  it('adds a rolled-back outcome to the open notice, saying main and the live site differ', async () => {
+    stand.routes[`GET ${ISSUES}`] = { status: 200, body: OPEN_NOTICE };
+    stand.routes[`GET ${JOBS}`] = { status: 200, body: jobsWith(ROLLED_BACK) };
+    const { code, out } = await run(rollbackStage('success'));
+    expect(code, out).toBe(0);
+    expect(String(posted('POST', COMMENT).body).split('\n')[6]).toBe(
+      `- Rollback: production now serves deployment \`d-prev\`, the one before this release. \`main\` (commit \`${SHA}\`) and the live site now differ. Next: fix forward and redeploy \`main\`, or revert the release on \`main\`.`,
+    );
+    expect(out).toContain('Commented on the open notice, #801.');
+  });
+
+  it('adds "did not run" to the open notice when the approval was refused and the job never started', async () => {
+    stand.routes[`GET ${ISSUES}`] = { status: 200, body: OPEN_NOTICE };
+    stand.routes[`GET ${JOBS}`] = {
+      status: 200,
+      body: jobsWith(rollbackJob('failure', [])),
+    };
+    const { code, out } = await run(rollbackStage('failure'));
+    expect(code, out).toBe(0);
+    expect(String(posted('POST', COMMENT).body).split('\n')[6]).toBe(
+      '- Rollback: did not run (its approval was refused or expired), so production still serves the release that failed its check. Roll back by hand with `rollback.yml` (deployment `d-prev`).',
+    );
+  });
+
+  it('with no rollback queued, the outcome report stops before any request', async () => {
+    const { code, out } = await run(rollbackStage('skipped'));
+    expect(code).toBe(0);
+    expect(out).toBe('No rollback was queued: nothing to add.\n');
+  });
+
+  it('a production failure on another branch sends nothing', async () => {
+    const { code, out } = await run({
+      ...failureStage,
+      GITHUB_REF_NAME: 'develop',
+    });
+    expect(code, out).toBe(0);
+    expect(out).toBe(
+      'Failed: smoke-and-verify.\nA failure on develop, not main: no notice.\n',
+    );
+  });
+
+  it('no pipeline stops before any request, naming it', async () => {
+    const { code, out } = await run({ PIPELINE: '' });
+    expect(code).toBe(1);
+    expect(out).toBe('✗ PIPELINE is "", not dev or prod\n');
+  });
+
+  it('no report stops before any request, naming it', async () => {
+    const { code, out } = await run({ REPORT: '' });
+    expect(code).toBe(1);
+    expect(out).toBe('✗ REPORT is "", not failure or rollback\n');
   });
 });

@@ -1,49 +1,58 @@
 #!/usr/bin/env node
 /**
- * Tell the operator a develop deploy failed (#725). Run by the
- * `report-failure` job of `.github/workflows/deploy-dev.yml` after every other
- * job, whatever they did, handed their results in `NEEDS`
- * (`${{ toJSON(needs) }}`). It sends nothing unless one of them failed on
- * `develop`: a dispatched branch's failure is its dispatcher's to read.
+ * Tell the operator a deploy failed: develop to dev (#725), or main to
+ * production (#748). Run by the `report-failure` job of
+ * `.github/workflows/deploy-dev.yml` and of `deploy-prod.yml`, after every
+ * other job it needs, whatever those did, handed their results in `NEEDS`
+ * (`${{ toJSON(needs) }}`); and by `deploy-prod.yml`'s `report-rollback`
+ * once the rollback that waits for the operator's approval has run or been
+ * refused. It sends nothing unless a job failed on the pipeline's own branch
+ * (a dispatched branch's failure is its dispatcher's to read), or, for the
+ * rollback's outcome, unless a rollback was queued.
  *
  *   node scripts/deploy-failure.mjs
  *
  * Opens one issue assigned to `NOTICE_ASSIGNEE`, naming the run, the commit,
- * the failed job and step, and the failed job's last error line; or, while
- * such a notice is still open, comments the same on it.
+ * the failed job and step, the failed job's last error line and what became
+ * of the rollback; or, while such a notice is still open, comments the same
+ * on it.
  *
  * The notice is the one thing that must not fail. A jobs list or a log this
  * cannot read is named in the notice instead of stopping it, and an issue
  * list it cannot read means a new issue: a second notice beats none. Only a
  * notice GitHub refuses, or one opened without its assignee, exits 1.
  *
- * Reads `NEEDS`, `GITHUB_REF_NAME`, `GITHUB_API_URL`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`,
- * `GITHUB_RUN_ID` and `GITHUB_SHA` (all set by Actions) and `GITHUB_TOKEN`,
- * which needs `actions: read` and `issues: write`. `DEPLOY_FAILURE_TIMEOUT_MS`
- * shortens the request timeout, so the tests can point it at a local
- * stand-in that never answers. Imports nothing from `node_modules`. Exits 2
- * on an argument, 1 on any failure.
+ * Reads `PIPELINE` (`dev` or `prod`) and `REPORT` (`failure`, or `rollback`
+ * for the rollback's outcome), both set by the workflow; `NEEDS`;
+ * `GITHUB_REF_NAME`, `GITHUB_API_URL`, `GITHUB_SERVER_URL`,
+ * `GITHUB_REPOSITORY`, `GITHUB_RUN_ID` and `GITHUB_SHA` (all set by
+ * Actions); and `GITHUB_TOKEN`, which needs `actions: read` and
+ * `issues: write`. `DEPLOY_FAILURE_TIMEOUT_MS` shortens the request timeout,
+ * so the tests can point it at a local stand-in that never answers. Imports
+ * nothing from `node_modules`. Exits 2 on an argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
-import { endpoint, setting } from './settings.mjs';
+import { endpoint, setting, timeoutMs } from './settings.mjs';
 import {
   NOTICE_ASSIGNEE,
   NOTICE_AUTHOR,
-  NOTICE_TITLE,
+  PIPELINES,
+  beforeOf,
   failedNeeds,
   failureOf,
   lastErrorLine,
   noticeBody,
   openNoticeOf,
+  pipelineOf,
+  reportOf,
+  rollbackAfter,
+  rollbackOf,
+  rollbackQueued,
+  rollbackWaits,
 } from '../src/lib/deploy-failure.ts';
 
 /** Each GitHub request gives up after this long. */
 const REQUEST_TIMEOUT_MS = 30_000;
-
-const timeoutMs = () =>
-  process.env.DEPLOY_FAILURE_TIMEOUT_MS === undefined
-    ? REQUEST_TIMEOUT_MS
-    : Number(setting('DEPLOY_FAILURE_TIMEOUT_MS', /^[1-9]\d*$/));
 
 /** A client for this repository's part of the GitHub API. */
 const github = () => {
@@ -72,7 +81,9 @@ const github = () => {
           ? headers
           : { ...headers, 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs()),
+      signal: AbortSignal.timeout(
+        timeoutMs('DEPLOY_FAILURE_TIMEOUT_MS', REQUEST_TIMEOUT_MS),
+      ),
     });
     const answer = await response.text();
     if (!response.ok)
@@ -98,20 +109,35 @@ const github = () => {
 const report = async () => {
   /** @type {string[]} */
   const unread = [];
+  const pipeline = pipelineOf(process.env.PIPELINE);
+  const notice = PIPELINES[pipeline];
+  const stage = reportOf(process.env.REPORT);
   const ref = setting('GITHUB_REF_NAME', /^\S+$/);
+  /** @type {unknown} */
+  let needs;
   try {
-    const failed = failedNeeds(JSON.parse(process.env.NEEDS ?? ''));
-    if (failed.length === 0) {
-      console.log('Nothing failed: no notice.');
-      return;
+    needs = JSON.parse(process.env.NEEDS ?? '');
+    if (stage === 'rollback') {
+      // After the approval nothing need have failed: a rollback that
+      // succeeded is still news, so the question is only whether one ran.
+      if (!rollbackQueued(needs)) {
+        console.log('No rollback was queued: nothing to add.');
+        return;
+      }
+    } else {
+      const failed = failedNeeds(needs);
+      if (failed.length === 0) {
+        console.log('Nothing failed: no notice.');
+        return;
+      }
+      console.log(`Failed: ${failed.join(', ')}.`);
     }
-    console.log(`Failed: ${failed.join(', ')}.`);
   } catch (error) {
     // Unreadable is never "nothing failed": the notice goes, saying so.
     unread.push(`the run's needs (${messageOf(error)})`);
   }
-  if (ref !== 'develop') {
-    console.log(`A failure on ${ref}, not develop: no notice.`);
+  if (ref !== notice.ref) {
+    console.log(`A failure on ${ref}, not ${notice.ref}: no notice.`);
     return;
   }
 
@@ -123,10 +149,19 @@ const report = async () => {
 
   /** @type {import('../src/lib/deploy-failure.ts').Failure | undefined} */
   let failure;
+  // A rollback behind approval waits from the moment its condition holds,
+  // whatever the jobs answer says: read from the needs, before any request.
+  /** @type {import('../src/lib/deploy-failure.ts').Rollback | undefined} */
+  let rollback =
+    stage === 'failure' && rollbackWaits(needs, pipeline)
+      ? 'waiting'
+      : undefined;
   try {
-    failure = failureOf(
-      await json(`/actions/runs/${run}/jobs?filter=latest&per_page=100`),
+    const jobs = await json(
+      `/actions/runs/${run}/jobs?filter=latest&per_page=100`,
     );
+    failure = failureOf(jobs);
+    rollback ??= stage === 'rollback' ? rollbackAfter(jobs) : rollbackOf(jobs);
   } catch (error) {
     unread.push(`the run's jobs (${messageOf(error)})`);
   }
@@ -142,6 +177,9 @@ const report = async () => {
     }
   }
   const body = noticeBody({
+    pipeline,
+    rollback,
+    before: beforeOf(needs, pipeline),
     runUrl: `${server}/${repository}/actions/runs/${run}`,
     sha,
     failure,
@@ -156,6 +194,7 @@ const report = async () => {
       await json(
         `/issues?state=open&creator=${encodeURIComponent(NOTICE_AUTHOR)}&per_page=100`,
       ),
+      notice.title,
     );
   } catch (error) {
     console.log(
@@ -169,7 +208,7 @@ const report = async () => {
     return;
   }
   const opened = await json('/issues', {
-    title: NOTICE_TITLE,
+    title: notice.title,
     body,
     assignees: [NOTICE_ASSIGNEE],
   });

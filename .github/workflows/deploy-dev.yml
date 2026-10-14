@@ -118,6 +118,9 @@ jobs:
     environment:
       name: dev
       url: https://dev.shyden.co.uk
+    # What production served before this release, for verify-dev's rollback step (#748).
+    outputs:
+      before: ${{ steps.live.outputs.before }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,6 +129,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # What production serves now, read before anything changes it (#748):
+      # the deployment verify-dev's rollback step returns to if this deploy fails its
+      # live check. Assigned, never inlined into the echo: `bash -e` stops on
+      # a failed assignment, but not on a failed `$(...)` inside an argument.
+      # A failed read stops the release, with nothing to fall back to.
+      - name: Read the live deployment
+        id: live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          before="$(node scripts/pages.mjs live shyden-site-dev)"
+          echo "before=${before}" >> "$GITHUB_OUTPUT"
+          echo "Live before this deploy: ${before}"
       - run: npm ci
       - name: Build (dev — outbound ShyTalk and Yawelo Idle links → DEV, never prod)
         env:
@@ -213,6 +230,18 @@ jobs:
             -f "description=Dev deployed + verified (run ${{ github.run_id }})" \
             -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "Posted dev-verified=success on ${{ github.sha }}"
+      # The deploy failed its live check (#748): dev goes back to what it
+      # served before, by the same command as production's rollback. Here
+      # because verify-dev is already in `dev`, which holds the dev pair; a
+      # job of its own would sit below two conditional jobs, where the
+      # skipped-upstream rule (tests/workflow-jobs.ts) requires success.
+      - name: Roll back to the deployment before this deploy
+        if: failure()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BEFORE: ${{ needs.deploy-dev.outputs.before }}
+        run: node scripts/pages.mjs rollback shyden-site-dev "${BEFORE}"
 
   # ---- Tell the operator when a develop deploy failed (#725) --------------
   # Run 38219259063 failed on Cloudflare's own 524 and nothing said so: dev
@@ -252,4 +281,6 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
           GITHUB_TOKEN: ${{ github.token }}
+          PIPELINE: dev
+          REPORT: failure
         run: node scripts/deploy-failure.mjs

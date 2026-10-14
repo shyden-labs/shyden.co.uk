@@ -3,12 +3,21 @@ import {
   ERROR_LINE_LIMIT,
   NOTICE_ASSIGNEE,
   NOTICE_AUTHOR,
-  NOTICE_TITLE,
+  PIPELINES,
+  ROLLBACK_JOB,
+  ROLLBACK_STEP,
+  beforeOf,
   failureOf,
   failedNeeds,
   lastErrorLine,
   noticeBody,
   openNoticeOf,
+  pipelineOf,
+  reportOf,
+  rollbackAfter,
+  rollbackOf,
+  rollbackQueued,
+  rollbackWaits,
 } from '../../src/lib/deploy-failure';
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
@@ -48,8 +57,22 @@ describe('the constants are pinned to their literal values', () => {
     expect(NOTICE_AUTHOR).toBe('github-actions[bot]');
   });
 
-  it('the notice is titled for what it means, and found again by that title', () => {
-    expect(NOTICE_TITLE).toBe('The dev deploy failed: dev is behind develop');
+  it('each pipeline names its notice for what it means', () => {
+    expect([PIPELINES.dev.title, PIPELINES.prod.title]).toEqual([
+      'The dev deploy failed: dev is behind develop',
+      'A production release failed',
+    ]);
+  });
+  it('each pipeline reports for its own branch', () => {
+    expect([PIPELINES.dev.ref, PIPELINES.prod.ref]).toEqual([
+      'develop',
+      'main',
+    ]);
+  });
+  it('both workflows roll back in one step name the notice finds', () => {
+    expect(ROLLBACK_STEP).toBe(
+      'Roll back to the deployment before this deploy',
+    );
   });
 
   it('an error line is cut at 300 characters', () => {
@@ -231,6 +254,9 @@ describe('noticeBody', () => {
   it('names the run, the commit, the step and the error line', () => {
     expect(
       noticeBody({
+        pipeline: 'dev',
+        rollback: 'none',
+        before: undefined,
         runUrl: RUN,
         sha: SHA,
         failure: {
@@ -257,6 +283,9 @@ describe('noticeBody', () => {
 
   it('says what could not be read instead of leaving it out', () => {
     const body = noticeBody({
+      pipeline: 'dev',
+      rollback: 'none',
+      before: undefined,
       runUrl: RUN,
       sha: SHA,
       failure: undefined,
@@ -272,6 +301,9 @@ describe('noticeBody', () => {
 
   it('a job with no failed step is named alone', () => {
     const body = noticeBody({
+      pipeline: 'dev',
+      rollback: 'none',
+      before: undefined,
       runUrl: RUN,
       sha: SHA,
       failure: {
@@ -289,6 +321,9 @@ describe('noticeBody', () => {
 
   it('a backtick in the error line cannot end its code span', () => {
     const body = noticeBody({
+      pipeline: 'dev',
+      rollback: 'none',
+      before: undefined,
       runUrl: RUN,
       sha: SHA,
       failure: undefined,
@@ -310,46 +345,409 @@ describe('openNoticeOf', () => {
     extra: Record<string, unknown> = {},
   ) => ({ number, state: 'open', user: { login }, title, ...extra });
 
+  it('finds the prod notice by its own title, not the dev one', () => {
+    expect(
+      openNoticeOf(
+        [
+          issue(726, 'github-actions[bot]', TITLE),
+          issue(801, 'github-actions[bot]', 'A production release failed'),
+        ],
+        'A production release failed',
+      ),
+    ).toBe(801);
+  });
+
   it("answers the bot's open issue carrying the notice's title", () => {
     expect(
-      openNoticeOf([
-        issue(360, 'github-actions[bot]', 'Translation reports are waiting'),
-        issue(726, 'github-actions[bot]', TITLE),
-      ]),
+      openNoticeOf(
+        [
+          issue(360, 'github-actions[bot]', 'Translation reports are waiting'),
+          issue(726, 'github-actions[bot]', TITLE),
+        ],
+        TITLE,
+      ),
     ).toBe(726);
   });
 
   it("a stranger's issue carrying the title is not the notice", () => {
-    expect(openNoticeOf([issue(727, 'someone-else', TITLE)])).toBeUndefined();
+    expect(
+      openNoticeOf([issue(727, 'someone-else', TITLE)], TITLE),
+    ).toBeUndefined();
   });
 
   it('a pull request carrying the title is not the notice', () => {
     expect(
-      openNoticeOf([
-        issue(728, 'github-actions[bot]', TITLE, {
-          pull_request: { url: 'x' },
-        }),
-      ]),
+      openNoticeOf(
+        [
+          issue(728, 'github-actions[bot]', TITLE, {
+            pull_request: { url: 'x' },
+          }),
+        ],
+        TITLE,
+      ),
     ).toBeUndefined();
   });
 
   it("a title that only begins with the notice's is not the notice", () => {
     expect(
-      openNoticeOf([issue(729, 'github-actions[bot]', `${TITLE} (again)`)]),
+      openNoticeOf(
+        [issue(729, 'github-actions[bot]', `${TITLE} (again)`)],
+        TITLE,
+      ),
     ).toBeUndefined();
   });
 
   it('a closed issue is not the notice', () => {
     expect(
-      openNoticeOf([
-        issue(730, 'github-actions[bot]', TITLE, { state: 'closed' }),
-      ]),
+      openNoticeOf(
+        [issue(730, 'github-actions[bot]', TITLE, { state: 'closed' })],
+        TITLE,
+      ),
     ).toBeUndefined();
   });
 
   it('an answer that is not a list throws', () => {
-    expect(() => openNoticeOf({ message: 'Bad credentials' })).toThrow(
+    expect(() => openNoticeOf({ message: 'Bad credentials' }, TITLE)).toThrow(
       'the open issues are not a list',
     );
+  });
+});
+
+describe('pipelineOf', () => {
+  it('reads dev', () => {
+    expect(pipelineOf('dev')).toBe('dev');
+  });
+  it('reads prod', () => {
+    expect(pipelineOf('prod')).toBe('prod');
+  });
+  it('refuses anything else, naming it', () => {
+    expect(() => pipelineOf('production')).toThrow(
+      'PIPELINE is "production", not dev or prod',
+    );
+  });
+  it('refuses an unset pipeline', () => {
+    expect(() => pipelineOf(undefined)).toThrow(
+      'PIPELINE is undefined, not dev or prod',
+    );
+  });
+});
+
+describe('reportOf', () => {
+  it('reads failure', () => {
+    expect(reportOf('failure')).toBe('failure');
+  });
+  it('reads rollback', () => {
+    expect(reportOf('rollback')).toBe('rollback');
+  });
+  it('refuses anything else, naming it', () => {
+    expect(() => reportOf('outcome')).toThrow(
+      'REPORT is "outcome", not failure or rollback',
+    );
+  });
+  it('refuses an unset report', () => {
+    expect(() => reportOf(undefined)).toThrow(
+      'REPORT is undefined, not failure or rollback',
+    );
+  });
+});
+
+describe('rollbackWaits', () => {
+  const needs = (deploy: string, check: string) => ({
+    'deploy-prod': { result: deploy, outputs: {} },
+    'smoke-and-verify': { result: check, outputs: {} },
+  });
+  it('names the results rollback-prod runs under', () => {
+    expect(PIPELINES.prod.rollbackWhen).toEqual({
+      'deploy-prod': 'success',
+      'smoke-and-verify': 'failure',
+    });
+  });
+  it('waits after a deploy that succeeded and a check that failed', () => {
+    expect(rollbackWaits(needs('success', 'failure'), 'prod')).toBe(true);
+  });
+  it('does not wait after a check that passed', () => {
+    expect(rollbackWaits(needs('success', 'success'), 'prod')).toBe(false);
+  });
+  it('does not wait after a deploy that failed, which changed nothing live', () => {
+    expect(rollbackWaits(needs('failure', 'skipped'), 'prod')).toBe(false);
+  });
+  it('never waits on dev, whose rollback is a step that has already run', () => {
+    expect(
+      rollbackWaits(
+        {
+          'deploy-dev': { result: 'success', outputs: {} },
+          'verify-dev': { result: 'failure', outputs: {} },
+        },
+        'dev',
+      ),
+    ).toBe(false);
+  });
+  it('does not wait on needs that are not an object', () => {
+    expect(rollbackWaits('not json', 'prod')).toBe(false);
+  });
+});
+
+describe('rollbackQueued', () => {
+  it('reads the job it names', () => {
+    expect(ROLLBACK_JOB).toBe('rollback-prod');
+  });
+  it('a skipped rollback job was never queued', () => {
+    expect(
+      rollbackQueued({ 'rollback-prod': { result: 'skipped', outputs: {} } }),
+    ).toBe(false);
+  });
+  it('a rollback job that failed was queued', () => {
+    expect(
+      rollbackQueued({ 'rollback-prod': { result: 'failure', outputs: {} } }),
+    ).toBe(true);
+  });
+  it('a rollback job that succeeded was queued', () => {
+    expect(
+      rollbackQueued({ 'rollback-prod': { result: 'success', outputs: {} } }),
+    ).toBe(true);
+  });
+  it('needs that do not name it count as queued: a notice too many beats none', () => {
+    expect(rollbackQueued({})).toBe(true);
+  });
+});
+
+describe('rollbackOf', () => {
+  const rolling = (conclusion: string | null, jobConclusion: string) => ({
+    jobs: [
+      job(1, 'Post-prod smoke + prod-verified', 'failure', [
+        { name: 'Smoke and verify the live prod site', conclusion: 'failure' },
+      ]),
+      job(
+        2,
+        'Roll prod back to the deployment before this release',
+        jobConclusion,
+        [
+          {
+            name: 'Check the secrets are set',
+            conclusion: conclusion === null ? 'failure' : 'success',
+          },
+          {
+            name: 'Roll back to the deployment before this deploy',
+            conclusion,
+          },
+        ],
+      ),
+    ],
+  });
+  it('a rollback step that succeeded rolled back', () => {
+    expect(rollbackOf(rolling('success', 'success'))).toBe('rolled-back');
+  });
+  it('a rollback step that failed failed', () => {
+    expect(rollbackOf(rolling('failure', 'failure'))).toBe('failed');
+  });
+  it('a failed job whose rollback step never ran failed (its secrets were missing)', () => {
+    expect(rollbackOf(rolling(null, 'failure'))).toBe('failed');
+  });
+  it('a rollback job skipped whole, listing no steps, is none', () => {
+    expect(
+      rollbackOf({
+        jobs: [
+          job(
+            2,
+            'Roll prod back to the deployment before this release',
+            'skipped',
+            [],
+          ),
+        ],
+      }),
+    ).toBe('none');
+  });
+  it('a run with no rollback step at all is none', () => {
+    expect(
+      rollbackOf({
+        jobs: [
+          job(2, 'Deploy to Dev', 'failure', [
+            { name: 'Build (dev)', conclusion: 'failure' },
+          ]),
+        ],
+      }),
+    ).toBe('none');
+  });
+  it('a skipped rollback step in a job that passed is none', () => {
+    expect(rollbackOf(rolling('skipped', 'success'))).toBe('none');
+  });
+  it('an answer holding no jobs list throws', () => {
+    expect(() => rollbackOf({})).toThrow(
+      "the run's jobs answer holds no list of jobs",
+    );
+  });
+});
+
+describe('rollbackAfter', () => {
+  const after = (
+    conclusion: string,
+    steps: { name: string; conclusion: string | null }[],
+  ) =>
+    rollbackAfter({
+      jobs: [
+        job(
+          13,
+          'Roll prod back to the deployment before this release',
+          conclusion,
+          steps,
+        ),
+      ],
+    });
+  it('a job that never started, listing no steps, did not run (its approval was refused or expired)', () => {
+    expect(after('failure', [])).toBe('not-run');
+  });
+  it('a rollback step that succeeded rolled back', () => {
+    expect(
+      after('success', [{ name: ROLLBACK_STEP, conclusion: 'success' }]),
+    ).toBe('rolled-back');
+  });
+  it('a rollback step that failed failed', () => {
+    expect(
+      after('failure', [{ name: ROLLBACK_STEP, conclusion: 'failure' }]),
+    ).toBe('failed');
+  });
+});
+
+describe('beforeOf', () => {
+  it("reads the deploy job's before output", () => {
+    expect(
+      beforeOf(
+        { 'deploy-prod': { result: 'success', outputs: { before: 'd-prev' } } },
+        'prod',
+      ),
+    ).toBe('d-prev');
+  });
+  it("reads dev's from deploy-dev", () => {
+    expect(
+      beforeOf(
+        { 'deploy-dev': { result: 'success', outputs: { before: 'd-dev' } } },
+        'dev',
+      ),
+    ).toBe('d-dev');
+  });
+  it('a deploy job that recorded nothing gives undefined', () => {
+    expect(
+      beforeOf({ 'deploy-prod': { result: 'failure', outputs: {} } }, 'prod'),
+    ).toBeUndefined();
+  });
+  it('an output of another shape gives undefined, never reaching the notice', () => {
+    expect(
+      beforeOf(
+        { 'deploy-prod': { result: 'success', outputs: { before: 'a`b' } } },
+        'prod',
+      ),
+    ).toBeUndefined();
+  });
+  it('needs that are not an object give undefined', () => {
+    expect(beforeOf('not json', 'prod')).toBeUndefined();
+  });
+});
+
+describe('noticeBody, for a release and its rollback (#748)', () => {
+  const RUN =
+    'https://github.com/shyden-labs/shyden.co.uk/actions/runs/38500000001';
+  const SHA = 'cedea2695eebcb93da9ec1c7277ff71b4363cb8f';
+  const SMOKE = {
+    jobId: 12,
+    job: 'Post-prod smoke + prod-verified',
+    step: 'Smoke and verify the live prod site',
+  };
+  const body = (
+    pipeline: 'dev' | 'prod',
+    rollback: 'rolled-back' | 'failed' | 'waiting' | 'not-run' | 'none',
+    before: string | undefined,
+  ) =>
+    noticeBody({
+      pipeline,
+      runUrl: RUN,
+      sha: SHA,
+      failure: SMOKE,
+      errorLine: '1 failed',
+      unread: [],
+      rollback,
+      before,
+    });
+
+  it('a rolled-back release says what is live, that main differs, and what to do', () => {
+    expect(body('prod', 'rolled-back', 'd-prev')).toBe(
+      [
+        'A production release of `main` failed.',
+        '',
+        `- Run: ${RUN}`,
+        `- Commit: \`${SHA}\``,
+        '- Failed: Post-prod smoke + prod-verified › Smoke and verify the live prod site',
+        '- Last error line: `1 failed`',
+        `- Rollback: production now serves deployment \`d-prev\`, the one before this release. \`main\` (commit \`${SHA}\`) and the live site now differ. Next: fix forward and redeploy \`main\`, or revert the release on \`main\`.`,
+        '',
+        'This issue is retired by hand once production serves a release that passed its live check (`prod-verified` on its commit).',
+      ].join('\n'),
+    );
+  });
+  it('a failed rollback says production still serves the failing release', () => {
+    expect(body('prod', 'failed', 'd-prev').split('\n')[6]).toBe(
+      '- Rollback: the rollback FAILED, so production still serves the release that failed its check. Roll back by hand with `rollback.yml` (deployment `d-prev`).',
+    );
+  });
+  it('no rollback, with the live deployment read, names it', () => {
+    expect(body('prod', 'none', 'd-prev').split('\n')[6]).toBe(
+      '- Rollback: none. Nothing was deployed, or the deploy itself failed, so production should still serve deployment `d-prev`: check https://shyden.co.uk.',
+    );
+  });
+  it('no rollback, with nothing read, says the live deployment was not read', () => {
+    expect(body('prod', 'none', undefined).split('\n')[6]).toBe(
+      '- Rollback: none, and the live deployment was not read before the deploy: check https://shyden.co.uk.',
+    );
+  });
+  it('a dev rollback says dev now serves the deployment before, and develop differs', () => {
+    expect(body('dev', 'rolled-back', 'd-dev').split('\n')[6]).toBe(
+      `- Rollback: dev now serves deployment \`d-dev\`, the one before this deploy, so \`develop\` (commit \`${SHA}\`) and dev differ.`,
+    );
+  });
+  it('a failed dev rollback says dev still serves the deploy that failed', () => {
+    expect(body('dev', 'failed', 'd-dev').split('\n')[6]).toBe(
+      '- Rollback: the automatic rollback failed, so dev still serves the deploy that failed its check (the one before it is `d-dev`).',
+    );
+  });
+  it('dev with no rollback adds no line: its notice is as before', () => {
+    expect(body('dev', 'none', 'd-dev').split('\n')).toHaveLength(8);
+  });
+  it('a waiting rollback names the run to approve it in, and what holding the lock means', () => {
+    expect(body('prod', 'waiting', 'd-prev').split('\n')[6]).toBe(
+      `- Rollback: waiting for your approval. Approve it in ${RUN} to put production back to deployment \`d-prev\`, the one before this release, or reject it to keep this release live. Until you do, this run holds the production lock: a fix pushed to \`main\` waits behind it, and a manual \`rollback.yml\` cancels it.`,
+    );
+  });
+  it('a rollback that never started says production still serves the failing release', () => {
+    expect(body('prod', 'not-run', 'd-prev').split('\n')[6]).toBe(
+      '- Rollback: did not run (its approval was refused or expired), so production still serves the release that failed its check. Roll back by hand with `rollback.yml` (deployment `d-prev`).',
+    );
+  });
+  it('dev has no waiting rollback, and refuses one rather than sending a notice without it', () => {
+    expect(() => body('dev', 'waiting', 'd-dev')).toThrow(
+      'the dev notice has no "waiting" rollback line',
+    );
+  });
+  it('an unread rollback adds no line: the unread jobs are already named', () => {
+    expect(
+      noticeBody({
+        pipeline: 'prod',
+        runUrl: RUN,
+        sha: SHA,
+        failure: undefined,
+        errorLine: undefined,
+        unread: ["the run's jobs (GitHub answered HTTP 500)"],
+        rollback: undefined,
+        before: 'd-prev',
+      }).split('\n'),
+    ).toEqual([
+      'A production release of `main` failed.',
+      '',
+      `- Run: ${RUN}`,
+      `- Commit: \`${SHA}\``,
+      '- Failed: not named by the run',
+      '- Last error line: none read',
+      "- Could not be read: the run's jobs (GitHub answered HTTP 500)",
+      '',
+      'This issue is retired by hand once production serves a release that passed its live check (`prod-verified` on its commit).',
+    ]);
   });
 });

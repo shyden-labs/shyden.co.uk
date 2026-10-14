@@ -28,6 +28,11 @@ import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { floorBreach } from '../floors';
+import {
+  PIPELINES,
+  ROLLBACK_JOB,
+  ROLLBACK_STEP,
+} from '../../src/lib/deploy-failure';
 
 const WORKFLOWS = '.github/workflows';
 
@@ -185,9 +190,16 @@ const workflowGraphs = () =>
 // must END at `shyden-site`, so `shyden-site-dev` is not prod.
 const deploysProd = (scripts: string) =>
   /--project-name[= ]+shyden-site(?![\w.-])/.test(scripts);
-const rollsProdBack = (scripts: string) =>
-  /\/pages\/projects\/shyden-site(?![\w.-])/.test(scripts) &&
-  /\/rollback\b/.test(scripts);
+// Rolling a project back is the one command that does it (#748), as a whole
+// command line: a shell comment naming it is not a rollback, and neither is
+// the inline URL rollback.yml once spelled out.
+const rollsBack = (project: string) => (scripts: string) =>
+  new RegExp(
+    String.raw`^[ \t]*node scripts/pages\.mjs rollback ${project}(?![\w.-])`,
+    'm',
+  ).test(scripts);
+const rollsProdBack = rollsBack('shyden-site');
+const rollsDevBack = rollsBack('shyden-site-dev');
 // Reading the production reports count (#349): the script's count mode, with
 // no argument, as a whole command line. A shell comment naming it is not a
 // reader, and neither is `report-failure`, which never reads Cloudflare.
@@ -307,6 +319,8 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(aggregates).toEqual([
       'ci.yml build-and-test',
       'deploy-dev.yml report-failure',
+      'deploy-prod.yml report-failure',
+      'deploy-prod.yml report-rollback',
     ]);
   });
 
@@ -584,7 +598,15 @@ describe('the deploy pipeline runs what it claims to', () => {
       in: (scripts: string) =>
         /--project-name[= ]+shyden-site-dev(?![\w.-])/.test(scripts),
     },
+    // Dev rolls back in verify-dev, which is already in `dev` (#748).
+    {
+      does: 'rolls shyden-site-dev back',
+      environment: 'dev',
+      in: rollsDevBack,
+    },
     { does: 'deploys shyden-site', environment: 'prod', in: deploysProd },
+    // By hand (rollback.yml, #241) or once its own release failed its live
+    // check (rollback-prod, #748): either way behind the operator's approval.
     {
       does: 'rolls shyden-site back',
       environment: 'prod-rollback',
@@ -761,12 +783,13 @@ describe('the deploy pipeline runs what it claims to', () => {
       'Promote it: !inputs.dry_run',
     ]);
     // The call that changes what prod serves lives in the skipped step alone:
-    // the endpoint, `/deployments/<id>/rollback`, not a word that merely
-    // starts with it, as `scripts/rollback-target.mjs` does (#406).
+    // `scripts/pages.mjs rollback`, the command a failed release's automatic
+    // rollback runs too (#748), not `live`, which only reads, and not
+    // `scripts/rollback-target.mjs`, whose name merely holds the word (#406).
     expect(
       steps
         .filter((step) =>
-          /\/deployments\/[^/\s]+\/rollback(?![\w-])/.test(
+          /\bscripts\/pages\.mjs rollback(?![\w-])/.test(
             String(step.run ?? ''),
           ),
         )
@@ -3009,56 +3032,225 @@ describe('browsers come with the pinned Playwright image, never a download (#431
 // every other job whatever they did, and its script opens or comments on one
 // issue when one of them failed on develop. Read PARSED, so a YAML comment can
 // neither trip nor satisfy it.
-describe('a failed develop deploy reaches the operator (#725)', () => {
-  const FILE = 'deploy-dev.yml';
+describe.each([
+  {
+    FILE: 'deploy-dev.yml',
+    PIPELINE: 'dev',
+    OTHERS: ['gate', 'test', 'deploy-dev', 'verify-dev'],
+    AFTER: [] as string[],
+  },
+  {
+    FILE: 'deploy-prod.yml',
+    PIPELINE: 'prod',
+    OTHERS: ['deploy-prod', 'smoke-and-verify'],
+    // Behind the operator's approval, so the notice never waits on them.
+    AFTER: ['rollback-prod', 'report-rollback'],
+  },
+])(
+  'a failed deploy in $FILE reaches the operator (#725, #748)',
+  ({ FILE, PIPELINE, OTHERS, AFTER }) => {
+    type Step = {
+      uses?: string;
+      run?: string;
+      if?: string;
+      env?: Record<string, string>;
+    };
+    type DeployWorkflow = {
+      jobs?: Record<string, { permissions?: unknown; steps?: Step[] }>;
+    };
+    const parsed = () => parseCleanYaml(workflow(FILE), FILE) as DeployWorkflow;
+    const steps = () => parsed().jobs?.['report-failure']?.steps ?? [];
+
+    it('runs after every other job of the file, whatever they did, but those that wait for approval', () => {
+      const jobs = workflowJobs(workflow(FILE), FILE)
+        .map(({ id }) => id)
+        .filter((id) => id !== 'report-failure');
+      const others = jobs.filter((id) => !AFTER.includes(id));
+      expect([others, jobs.filter((id) => AFTER.includes(id))]).toEqual([
+        OTHERS,
+        AFTER,
+      ]);
+      const report = jobNamed(FILE, 'report-failure');
+      expect(report.needs).toEqual(others);
+      expect(report.condition).toBe('always()');
+    });
+
+    it('reads the run and writes issues, and names no environment', () => {
+      const report = jobNamed(FILE, 'report-failure');
+      expect(report.environment).toBeUndefined();
+      expect(parsed().jobs?.['report-failure']?.permissions).toEqual({
+        contents: 'read',
+        actions: 'read',
+        issues: 'write',
+      });
+    });
+
+    it('runs no npm package code: checkout, setup-node and the script, nothing else', () => {
+      expect(
+        steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null),
+      ).toEqual(['actions/checkout', 'actions/setup-node', null]);
+      expect(jobNamed(FILE, 'report-failure').runs).toEqual([
+        'node scripts/deploy-failure.mjs',
+      ]);
+    });
+
+    it("hands the script every need's result and the workflow token, under always()", () => {
+      const [, , reporting] = steps();
+      expect(reporting.if).toBe('always()');
+      expect(reporting.env).toEqual({
+        NEEDS: '${{ toJSON(needs) }}',
+        GITHUB_TOKEN: '${{ github.token }}',
+        PIPELINE,
+        REPORT: 'failure',
+      });
+    });
+  },
+);
+
+// ---- a release that fails its live check is rolled back (#748) ----------
+//
+// Read PARSED (tests/workflow-jobs.ts), so a YAML comment can neither trip
+// nor satisfy it. The rollback promotes what the deploy job read as live
+// before it changed anything; dev does it in verify-dev's last step, prod
+// in its own job, and the step is the same command in both.
+describe('a release that fails its live check is rolled back (#748)', () => {
   type Step = {
+    id?: string;
+    name?: string;
     uses?: string;
     run?: string;
     if?: string;
     env?: Record<string, string>;
   };
-  type DeployWorkflow = {
-    jobs?: Record<string, { permissions?: unknown; steps?: Step[] }>;
+  type Job = { outputs?: Record<string, string>; steps?: Step[] };
+  const jobOf = (file: string, id: string): Job =>
+    (parseCleanYaml(workflow(file), file) as { jobs?: Record<string, Job> })
+      .jobs?.[id] ?? {};
+  const stepsOf = (file: string, id: string) => jobOf(file, id).steps ?? [];
+
+  const CLOUDFLARE_PAIR = {
+    CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+    CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
   };
-  const parsed = () => parseCleanYaml(workflow(FILE), FILE) as DeployWorkflow;
-  const steps = () => parsed().jobs?.['report-failure']?.steps ?? [];
 
-  it('runs after every other job of the file, whatever they did', () => {
-    const others = workflowJobs(workflow(FILE), FILE)
-      .map(({ id }) => id)
-      .filter((id) => id !== 'report-failure');
-    expect(others).toEqual(['gate', 'test', 'deploy-dev', 'verify-dev']);
-    const report = jobNamed(FILE, 'report-failure');
-    expect(report.needs).toEqual(others);
-    expect(report.condition).toBe('always()');
-  });
-
-  it('reads the run and writes issues, and names no environment', () => {
-    const report = jobNamed(FILE, 'report-failure');
-    expect(report.environment).toBeUndefined();
-    expect(parsed().jobs?.['report-failure']?.permissions).toEqual({
-      contents: 'read',
-      actions: 'read',
-      issues: 'write',
+  describe.each([
+    { FILE: 'deploy-prod.yml', JOB: 'deploy-prod', PROJECT: 'shyden-site' },
+    { FILE: 'deploy-dev.yml', JOB: 'deploy-dev', PROJECT: 'shyden-site-dev' },
+  ])('$FILE $JOB', ({ FILE, JOB, PROJECT }) => {
+    it('reads the live deployment before npm ci, assigning it so a failed read stops the job', () => {
+      const steps = stepsOf(FILE, JOB);
+      const read = steps.findIndex(({ id }) => id === 'live');
+      const install = steps.findIndex(({ run }) => run === 'npm ci');
+      expect([read > -1, install > -1, read < install]).toEqual([
+        true,
+        true,
+        true,
+      ]);
+      expect(steps[read]).toEqual({
+        name: 'Read the live deployment',
+        id: 'live',
+        env: CLOUDFLARE_PAIR,
+        run: [
+          `before="$(node scripts/pages.mjs live ${PROJECT})"`,
+          'echo "before=${before}" >> "$GITHUB_OUTPUT"',
+          'echo "Live before this deploy: ${before}"',
+          '',
+        ].join('\n'),
+      });
+    });
+    it('hands the live deployment on as its before output', () => {
+      expect(jobOf(FILE, JOB).outputs).toEqual({
+        before: '${{ steps.live.outputs.before }}',
+      });
     });
   });
 
-  it('runs no npm package code: checkout, setup-node and the script, nothing else', () => {
-    expect(steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null)).toEqual(
-      ['actions/checkout', 'actions/setup-node', null],
-    );
-    expect(jobNamed(FILE, 'report-failure').runs).toEqual([
-      'node scripts/deploy-failure.mjs',
+  it('dev rolls back as the last step of verify-dev, only when it failed', () => {
+    const steps = stepsOf('deploy-dev.yml', 'verify-dev');
+    expect(steps.at(-1)).toEqual({
+      name: ROLLBACK_STEP,
+      if: 'failure()',
+      env: {
+        ...CLOUDFLARE_PAIR,
+        BEFORE: '${{ needs.deploy-dev.outputs.before }}',
+      },
+      run: 'node scripts/pages.mjs rollback shyden-site-dev "${BEFORE}"',
+    });
+  });
+
+  it('prod rolls back in its own job, on main, only when the deploy succeeded and the check failed', () => {
+    const job = jobNamed('deploy-prod.yml', 'rollback-prod');
+    expect([job.needs, job.condition, job.environment]).toEqual([
+      ['deploy-prod', 'smoke-and-verify'],
+      "!cancelled() && github.ref == 'refs/heads/main' && needs.deploy-prod.result == 'success' && needs.smoke-and-verify.result == 'failure'",
+      'prod-rollback',
     ]);
   });
 
-  it("hands the script every need's result and the workflow token, under always()", () => {
-    const [, , reporting] = steps();
-    expect(reporting.if).toBe('always()');
-    expect(reporting.env).toEqual({
+  it("the notice reads a rollback as waiting under exactly rollback-prod's condition", () => {
+    const when = Object.entries(PIPELINES.prod.rollbackWhen ?? {});
+    const job = jobNamed('deploy-prod.yml', ROLLBACK_JOB);
+    expect([job.needs, job.condition]).toEqual([
+      when.map(([need]) => need),
+      [
+        '!cancelled()',
+        "github.ref == 'refs/heads/main'",
+        ...when.map(([need, result]) => `needs.${need}.result == '${result}'`),
+      ].join(' && '),
+    ]);
+  });
+
+  it("prod reports the rollback's outcome in its own aggregate, once the approval is given or refused", () => {
+    const job = jobNamed('deploy-prod.yml', 'report-rollback');
+    expect([job.needs, job.condition, job.environment, job.runs]).toEqual([
+      ['deploy-prod', ROLLBACK_JOB],
+      'always()',
+      undefined,
+      ['node scripts/deploy-failure.mjs'],
+    ]);
+    expect(stepsOf('deploy-prod.yml', 'report-rollback').at(-1)?.env).toEqual({
       NEEDS: '${{ toJSON(needs) }}',
       GITHUB_TOKEN: '${{ github.token }}',
+      PIPELINE: 'prod',
+      REPORT: 'rollback',
     });
+  });
+
+  it('runs no npm package code beside the production token: the check, checkout, setup-node, the rollback', () => {
+    const steps = stepsOf('deploy-prod.yml', 'rollback-prod');
+    expect(
+      steps.map(({ name, uses }) => name ?? uses?.replace(/@.*/, '')),
+    ).toEqual([
+      'Check the secrets are set',
+      'actions/checkout',
+      'actions/setup-node',
+      ROLLBACK_STEP,
+    ]);
+    expect(steps.at(-1)).toEqual({
+      name: ROLLBACK_STEP,
+      env: {
+        ...CLOUDFLARE_PAIR,
+        BEFORE: '${{ needs.deploy-prod.outputs.before }}',
+      },
+      run: 'node scripts/pages.mjs rollback shyden-site "${BEFORE}"',
+    });
+  });
+
+  it('the manual rollback promotes through the same script', () => {
+    const promote = stepsOf('rollback.yml', 'rollback').find(
+      ({ name }) => name === 'Promote it',
+    );
+    expect(promote?.run).toBe(
+      [
+        'set -euo pipefail',
+        'if [ -z "${TARGET}" ]; then',
+        '  echo "::error::No deployment to roll back to: the find step handed on none."',
+        '  exit 1',
+        'fi',
+        'node scripts/pages.mjs rollback shyden-site "${TARGET}"',
+        '',
+      ].join('\n'),
+    );
   });
 });
 

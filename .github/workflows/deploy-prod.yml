@@ -37,6 +37,9 @@ jobs:
     environment:
       name: prod
       url: https://shyden.co.uk
+    # What production served before this release, for rollback-prod (#748).
+    outputs:
+      before: ${{ steps.live.outputs.before }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +48,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # What production serves now, read before anything changes it (#748):
+      # the deployment rollback-prod returns to if this release fails its
+      # live check. Assigned, never inlined into the echo: `bash -e` stops on
+      # a failed assignment, but not on a failed `$(...)` inside an argument.
+      # A failed read stops the release, with nothing to fall back to.
+      - name: Read the live deployment
+        id: live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          before="$(node scripts/pages.mjs live shyden-site)"
+          echo "before=${before}" >> "$GITHUB_OUTPUT"
+          echo "Live before this deploy: ${before}"
       - run: npm ci
       - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
         run: npm run build
@@ -141,3 +158,116 @@ jobs:
             -f "description=Prod deployed + browser-verified (run ${{ github.run_id }})" \
             -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "Posted prod-verified=success on ${{ github.sha }}"
+
+  # ---- A release that fails its live check is rolled back (#748) ------
+  # Only when THIS run deployed (deploy-prod succeeded) and its check failed:
+  # a bare failure() is also true after a refused approval or a failed
+  # build, which changed nothing live. !cancelled(): a manual rollback.yml
+  # cancels this run, and this job then stays out of its way. It runs in
+  # `prod-rollback`, behind the operator's approval (#748 ruling 2026-10-14),
+  # holds the prod Pages token, and runs no npm package code: never a step
+  # of smoke-and-verify, which runs npm ci and Playwright.
+  rollback-prod:
+    name: Roll prod back to the deployment before this release
+    needs: [deploy-prod, smoke-and-verify]
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.deploy-prod.result == 'success' &&
+      needs.smoke-and-verify.result == 'failure'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment:
+      name: prod-rollback
+      url: https://shyden.co.uk
+    steps:
+      # Present or absent, never the value, as rollback.yml checks them: a
+      # secret removed from prod-rollback is named here, not met by curl.
+      - name: Check the secrets are set
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -n "${!name:-}" ]; then
+              echo "${name}: present"
+            else
+              echo "::error::${name}: absent. It belongs in the prod-rollback environment."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Roll back to the deployment before this deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BEFORE: ${{ needs.deploy-prod.outputs.before }}
+        run: node scripts/pages.mjs rollback shyden-site "${BEFORE}"
+
+  # ---- Every failed release reaches the operator (#748) -----------------
+  # As deploy-dev.yml's report-failure (#725): an aggregate, `if: always()`,
+  # handed its needs' results; the script sends nothing unless one failed on
+  # main. It does not need rollback-prod: that job waits for the operator's
+  # approval, and the notice is how he learns there is one to give. No
+  # environment: it reads its own token alone. No npm package code.
+  report-failure:
+    name: Report a failed release
+    needs: [deploy-prod, smoke-and-verify]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Open or comment on the failed-release issue, if a job failed
+        if: always()
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PIPELINE: prod
+          REPORT: failure
+        run: node scripts/deploy-failure.mjs
+
+  # ---- The rollback's outcome reaches the same issue (#748) -------------
+  # Once rollback-prod has run or been refused. An aggregate too: the script
+  # sends nothing unless a rollback was queued, and otherwise comments the
+  # outcome on the open notice.
+  report-rollback:
+    name: Report the rollback's outcome
+    needs: [deploy-prod, rollback-prod]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Add the rollback's outcome to the failed-release issue
+        if: always()
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PIPELINE: prod
+          REPORT: rollback
+        run: node scripts/deploy-failure.mjs
