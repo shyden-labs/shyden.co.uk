@@ -13,7 +13,9 @@ import { floorBreach } from '../floors';
  * (#95): reached from a page, it would put all five on every page.
  * `label-check.ts` reads its units from `back-translate.ts` (#161), so it
  * carries the same five, and `feature-terms.ts` builds on `label-check.ts`
- * (#319).
+ * (#319). `read-back.ts` builds on `back-translate.ts` too, and `verified.ts`
+ * is the approved copy it reads first (#754). `arm-drift.ts` measures the
+ * units `back-translate.ts` reads (#754 AC1).
  *
  * The guard this replaces looked for the SUBSTRING `i18n/translate` in each
  * shipped file. A sibling in `src/lib/i18n/` importing `./translate` never
@@ -25,6 +27,9 @@ const CLI_ONLY = [
   'src/lib/i18n/back-translate.ts',
   'src/lib/i18n/label-check.ts',
   'src/lib/i18n/feature-terms.ts',
+  'src/lib/i18n/read-back.ts',
+  'src/lib/i18n/verified.ts',
+  'src/lib/i18n/arm-drift.ts',
   'src/lib/report-review.ts',
 ];
 
