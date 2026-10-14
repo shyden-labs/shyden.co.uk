@@ -77,7 +77,7 @@ const statuses: ReadonlyArray<[Outcome, string]> = [
         <p id={id('note-hint')} class="hint">
           {t.noteHint}
         </p>
-        <div class="hp" aria-hidden="true">
+        <div class="visually-hidden" aria-hidden="true">
           <label for={id('website')}>{t.honeypotLabel}</label>
           <input
             id={id('website')}
@@ -115,6 +115,10 @@ const statuses: ReadonlyArray<[Outcome, string]> = [
     color: var(--accent);
   }
   .report form {
+    /* Contains the honeypot, which wears `.visually-hidden` (tokens.css):
+       never `display: none`, which some bots skip, and positioned against
+       this form, never the page, so it cannot make sideways scroll. */
+    position: relative;
     display: grid;
     gap: 0.5rem;
     margin-top: 0.5rem;
@@ -150,16 +154,6 @@ const statuses: ReadonlyArray<[Outcome, string]> = [
     border: 0;
     border-radius: 6px;
     cursor: pointer;
-  }
-  /* Visually hidden in a 1px box in normal flow. Never display: none, which
-     some bots skip; never positioned, which is how BetaBadge once produced
-     sideways scroll at 320px. */
-  .hp {
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
   /* A status shows when it is the fragment's target (the homepage, after its
      303) or when the tool-page script marks it. Outside the <details>, which

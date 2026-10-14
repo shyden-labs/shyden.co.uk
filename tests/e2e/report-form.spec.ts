@@ -114,7 +114,7 @@ for (const locale of PREFIXED_LOCALES)
         expect(column, 'the footer column has a box').not.toBeNull();
         const boxes = await page
           .locator(
-            '[data-report] form > *:not(.hp):not(input[type="hidden"]):not(datalist)',
+            '[data-report] form > *:not(.visually-hidden):not(input[type="hidden"]):not(datalist)',
           )
           .evaluateAll((els) =>
             els.map((el) => ({
