@@ -176,6 +176,15 @@ export const functionBodiesIn = (file: string): FunctionBody[] =>
  *
  * The common prefix and suffix are trimmed first, which is what makes the
  * near-identical pairs — the ones worth finding — the cheap ones.
+ *
+ * Only the band is ever written, and only the cells just outside it are ever
+ * read: a row's left neighbour at `lo - 1`, which holds a value from two rows
+ * earlier and so is reset, and `prev[hi]` for the next row, which no earlier
+ * row's band ever reached (each reaches one cell further right) and so still
+ * holds the `beyond` it was filled with (#700). Resetting the whole row on
+ * every row made each comparison cost x*(y+1) cells rather than the band's:
+ * measured on the runner, 43.2 G cells filled against 12.3 G in the band,
+ * 25.1 s of the guard's 29.2.
  */
 const boundedDistance = (a: string, b: string, max: number): number => {
   let head = 0;
@@ -200,8 +209,8 @@ const boundedDistance = (a: string, b: string, max: number): number => {
   for (let i = 1; i <= x.length; i++) {
     const lo = Math.max(1, i - max);
     const hi = Math.min(y.length, i + max);
-    row.fill(beyond);
     row[0] = i <= max ? i : beyond;
+    if (lo > 1) row[lo - 1] = beyond;
     let best = beyond;
     for (let j = lo; j <= hi; j++) {
       const value = Math.min(
@@ -247,37 +256,88 @@ const histogramDistance = (a: Int32Array, b: Int32Array): number => {
   return surplus / 2;
 };
 
-/** The ratio, with both cheap bounds applied first. `0` means "below". */
-const boundedSimilarity = (
-  a: string,
-  b: string,
-  ha: Int32Array,
-  hb: Int32Array,
-  minRatio: number,
-): number => {
-  const longest = Math.max(a.length, b.length);
+/**
+ * A trigram profile: how many times each run of three characters occurs,
+ * hashed into `TRIGRAM_BUCKETS` (#700). One edit changes at most three
+ * trigrams on each side (a substitution removes three and adds three; an
+ * insertion or a deletion five in all), so the L1 distance between two
+ * profiles is at most 6 per edit, and a sixth of it is a lower bound on the
+ * edit distance. Hashing merges counts, which can only make the L1 SMALLER,
+ * so the bound stays a bound: it can lose time, never a finding.
+ *
+ * The character histogram above passes large bodies of different code,
+ * because code shares its letters in much the same proportions; trigrams
+ * tell such bodies apart. Measured on the runner: 10,145 pairs passed the
+ * histogram and reached the edit distance, and 9 were duplicates.
+ */
+const TRIGRAM_BUCKETS = 2048;
+
+const trigrams = (text: string): Int32Array => {
+  const counts = new Int32Array(TRIGRAM_BUCKETS);
+  for (let i = 0; i + 2 < text.length; i++)
+    counts[
+      (text.charCodeAt(i) * 961 +
+        text.charCodeAt(i + 1) * 31 +
+        text.charCodeAt(i + 2)) %
+        TRIGRAM_BUCKETS
+    ]++;
+  return counts;
+};
+
+const trigramDistance = (a: Int32Array, b: Int32Array): number => {
+  let surplus = 0;
+  for (let i = 0; i < TRIGRAM_BUCKETS; i++) surplus += Math.abs(a[i] - b[i]);
+  return surplus / 6;
+};
+
+/** The fewest edits that could turn `a` into `b`, by their trigrams alone. */
+export const trigramBound = (a: string, b: string): number =>
+  trigramDistance(trigrams(a), trigrams(b));
+
+/** One side of a comparison: its text, its histogram, its trigrams on demand. */
+interface Scored {
+  readonly text: string;
+  readonly histogram: Int32Array;
+  readonly trigrams: () => Int32Array;
+}
+
+/** `text` ready to be compared, its trigram profile built once, when asked. */
+const scored = (text: string): Scored => {
+  let profile: Int32Array | undefined;
+  return {
+    text,
+    histogram: histogram(text),
+    trigrams: () => (profile ??= trigrams(text)),
+  };
+};
+
+/** The ratio, with the three cheap bounds applied first. `0` means "below". */
+const boundedSimilarity = (a: Scored, b: Scored, minRatio: number): number => {
+  const longest = Math.max(a.text.length, b.text.length);
   if (longest === 0) return 1;
   // The edit distance can never be less than the difference in length.
-  if (Math.min(a.length, b.length) / longest < minRatio) return 0;
-  if (1 - histogramDistance(ha, hb) / longest < minRatio) return 0;
+  if (Math.min(a.text.length, b.text.length) / longest < minRatio) return 0;
+  if (1 - histogramDistance(a.histogram, b.histogram) / longest < minRatio)
+    return 0;
   // The largest distance a pair at `minRatio` may have, so the band below is
   // exactly as wide as the question being asked and no wider.
   const allowed = Math.floor((1 - minRatio) * longest);
-  const apart = boundedDistance(a, b, allowed);
+  if (trigramDistance(a.trigrams(), b.trigrams()) > allowed) return 0;
+  const apart = boundedDistance(a.text, b.text, allowed);
   return apart > allowed ? 0 : 1 - apart / longest;
 };
 
 /**
  * How alike two printed bodies are, in [0, 1]. `1` is character-identical.
  *
- * One home with the sweep below, which passes histograms it has already
+ * One home with the sweep below, which passes profiles it has already
  * built rather than computing them again.
  */
 export const similarity = (
   a: string,
   b: string,
   minRatio = DUPLICATE_RATIO,
-): number => boundedSimilarity(a, b, histogram(a), histogram(b), minRatio);
+): number => boundedSimilarity(scored(a), scored(b), minRatio);
 
 const encloses = (outer: FunctionBody, inner: FunctionBody): boolean =>
   outer.file === inner.file &&
@@ -303,20 +363,14 @@ export function duplicatePairs(
   // short enough either, and the sweep stops instead of running to the end.
   const bySize = [...declarations]
     .sort((a, b) => a.text.length - b.text.length)
-    .map((decl) => ({ decl, hist: histogram(decl.text) }));
+    .map((decl) => ({ decl, score: scored(decl.text) }));
   const pairs: DuplicatePair[] = [];
   for (let i = 0; i < bySize.length; i++)
     for (let j = i + 1; j < bySize.length; j++) {
       const [a, b] = [bySize[i], bySize[j]];
       if (b.decl.text.length > a.decl.text.length / minRatio) break;
       if (a.decl.file === b.decl.file) continue;
-      const ratio = boundedSimilarity(
-        a.decl.text,
-        b.decl.text,
-        a.hist,
-        b.hist,
-        minRatio,
-      );
+      const ratio = boundedSimilarity(a.score, b.score, minRatio);
       if (ratio > 0) pairs.push({ ratio, a: a.decl, b: b.decl });
     }
   const bySpan = [...pairs].sort(

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { floorBreach } from '../floors';
 import {
   dependentsOf,
-  importersIn,
   maxStaleBranch,
+  namesModule,
   remoteImageAllowances,
 } from '../remote-images';
 import { searched } from '../source-files';
@@ -112,7 +112,15 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
       'build',
       'build.format',
     ]);
-    expect(findings).toEqual([]);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'remote-images/no-remote-image-properties',
+        properties.length,
+      ),
+    ).toBeUndefined();
   });
 
   it('is not satisfied, nor refused, by a comment naming a domain', () => {
@@ -120,7 +128,12 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
       config("  // image: { domains: ['cdn.x.test'] },"),
     );
     expect(properties).toEqual(['site']);
-    expect(findings).toEqual([]);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('remote-images/comment-only-properties', properties.length),
+    ).toBeUndefined();
   });
 
   it('refuses a config with no defineConfig object to read', () => {
@@ -176,8 +189,11 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * only for a URL matching image.domains or image.remotePatterns. Two facts are
  * checked on every version; the third, that the gate still stands, needs a
  * reader, so a new version fails here until someone has re-read it.
+ * Re-read on 7.3.6 (2026-10-10, Dependabot #656): generate.js, build/remote.js,
+ * utils/redirectValidation.js and the config schemas are byte-identical to
+ * 7.3.5's, and so is isRemoteAllowed in @astrojs/internal-helpers 0.12.0.
  */
-const ASTRO_READ = '7.3.5';
+const ASTRO_READ = '7.3.6';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {
@@ -189,10 +205,39 @@ describe('the path into http-cache-semantics is the one #457 read', () => {
     ).toEqual(['node_modules/astro']);
   });
 
-  it("inside astro, only the build's remote-image cache imports it", () => {
-    expect(
-      importersIn('node_modules/astro/dist', 'http-cache-semantics'),
-    ).toEqual(['assets/build/remote.js']);
+  // The walk of astro's whole dist that answers "who imports it" is a guard
+  // now (#718: a fresh checkout's cold disk took it past the 1 s unit limit
+  // at 153 ms of CPU): tests/guards/remote-images-importers.test.ts. What
+  // stays here is the reading each file of that walk gets.
+  it.each([
+    [
+      'a static import',
+      "import CachePolicy from 'http-cache-semantics';",
+      true,
+    ],
+    [
+      'a dynamic import',
+      'const p = await import("http-cache-semantics");',
+      true,
+    ],
+    [
+      'a require in backticks',
+      'const p = require(`http-cache-semantics`);',
+      true,
+    ],
+    [
+      'a longer name it begins',
+      "import x from 'http-cache-semantics-extra';",
+      false,
+    ],
+    [
+      'a longer name it ends',
+      "import x from 'not-http-cache-semantics';",
+      false,
+    ],
+    ['the name unquoted', 'const s = http.cache.semantics;', false],
+  ])('%s (%s) names the module: %s', (_form, source, names) => {
+    expect(namesModule(source, 'http-cache-semantics')).toBe(names);
   });
 
   it('fails on any Astro version whose remote-image path nobody has re-read', () => {

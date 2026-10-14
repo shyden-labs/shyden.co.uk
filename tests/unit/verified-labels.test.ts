@@ -133,7 +133,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'Impor / ekspor',
     sectionSoundHeading: 'Suara dan animasi',
     'site.calculators.forYeetalk': 'Untuk YeeTalk ↗',
-    'site.home.emailUs': 'Kirim email',
+    'site.home.emailMe': 'Kirim email',
     'site.home.exploreShytalk': 'Jelajahi ShyTalk',
     'site.home.exploreYaweloIdle': 'Jelajahi Yawelo Idle',
     'site.home.pauseMotion': 'Jeda gerakan',
@@ -211,7 +211,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       '这里的“在一起”和“分开”字母太多，无法在把男孩和女孩分到不同组的同时完成分组。请尝试减少字母数量，或者关闭此模式。',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
-      '{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。',
+      '{howMany, select, two {{names} 已被标记为“在一起”，但并非同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。} other {{names} 已被标记为“在一起”，但并非全是同一性别，因此无法组成单一性别的小组。请从其中一人身上移除“在一起”字母，或关闭此模式。}}',
     'errors.TOGETHER_SEARCH_GAVE_UP':
       '这里的“在一起”字母太多，难以逐一处理。请尝试减少字母数量，或者扩大小组。',
     'errors.TOGETHER_UNIT_TOO_LARGE':
@@ -222,7 +222,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printWhatGroups: '分组结果',
     rosterClashMessage: '{names} 被放在一起，因此无法再把他们分开。',
     'warnings.PINNED_MIXED_SEX':
-      '{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。',
+      '{howMany, select, two {{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): 否, a form's no, where 不 was.
     'csv.absentNo': '否',
@@ -265,7 +265,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: '导入 / 导出',
     sectionSoundHeading: '声音和动画',
     'site.calculators.forYeetalk': '适用于 YeeTalk ↗',
-    'site.home.emailUs': '给我们发邮件',
+    'site.home.emailMe': '给我发邮件',
     'site.home.exploreShytalk': '了解 ShyTalk',
     'site.home.exploreYaweloIdle': '了解 Yawelo Idle',
     'site.home.pauseMotion': '暂停动画',
@@ -343,7 +343,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     rosterClashMessage:
       '{names} được xếp cùng nhau, nên không thể đồng thời tách biệt các em.',
     'warnings.PINNED_MIXED_SEX':
-      '{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.',
+      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     // #603's sheet, read by the operator on 2026-10-07 (every short label no
     // check could judge, https://claude.ai/artifact/AgCDjpCJ2AQkKmdSC4cznm).
     // Values are as they stand AFTER the twelve changes he agreed there.
@@ -388,7 +388,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'Nhập / xuất',
     sectionSoundHeading: 'Âm thanh và hoạt ảnh',
     'site.calculators.forYeetalk': 'Dành cho YeeTalk ↗',
-    'site.home.emailUs': 'Gửi email cho chúng tôi',
+    'site.home.emailMe': 'Gửi email cho tôi',
     'site.home.exploreShytalk': 'Khám phá ShyTalk',
     'site.home.exploreYaweloIdle': 'Khám phá Yawelo Idle',
     'site.home.pauseMotion': 'Tạm dừng chuyển động',
@@ -471,7 +471,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       'ที่นี่มีตัวอักษร "ด้วยกัน" และ "แยก" มากเกินไปจนไม่สามารถจัดการได้ พร้อมกับต้องแบ่งเด็กชายและเด็กหญิงเป็นกลุ่มต่างกัน ลองใช้ตัวอักษรน้อยลง หรือปิดโหมดนี้ไป',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
-      '{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่ทั้งหมดเป็นเพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้',
+      '{howMany, select, two {{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่เพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้} other {{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่ทั้งหมดเป็นเพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้}}',
     'errors.TOGETHER_NO_ARRANGEMENT':
       'ไม่มีวิธีใดที่จะจัดชั้นเรียนของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงให้ทุกคนที่จำเป็นต้องอยู่ด้วยกันอยู่ด้วยกันได้ ให้ขยายขนาดกลุ่มให้ใหญ่ขึ้น หรือให้ตัวอักษรแต่ละตัวกับนักเรียนจำนวนน้อยลง',
     'errors.TOGETHER_SEARCH_GAVE_UP':
@@ -482,7 +482,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     printShowLetters: 'แสดงเพศ และตัวอักษร "ด้วยกัน"/"แยก"',
     rosterClashMessage: '{names} ถูกจัดให้อยู่ด้วยกัน จึงไม่สามารถแยกกันได้',
     'warnings.PINNED_MIXED_SEX':
-      '{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข',
+      '{howMany, select, two {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข} other {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): ไม่ใช่, a form's no, where ไม่ was.
     'csv.absentNo': 'ไม่ใช่',
@@ -530,7 +530,7 @@ const VERIFIED: Record<Locale, Record<string, string>> = {
     sectionImportExportHeading: 'นำเข้า / ส่งออก',
     sectionSoundHeading: 'เสียงและภาพเคลื่อนไหว',
     'site.calculators.forYeetalk': 'สำหรับ YeeTalk ↗',
-    'site.home.emailUs': 'ส่งอีเมลให้เรา',
+    'site.home.emailMe': 'ส่งอีเมล',
     'site.home.exploreShytalk': 'สำรวจ ShyTalk',
     'site.home.exploreYaweloIdle': 'สำรวจ Yawelo Idle',
     'site.home.pauseMotion': 'หยุดภาพเคลื่อนไหว',
@@ -675,10 +675,10 @@ describe('the copy the operator read and approved', () => {
 const AWAITING_READ: Record<Locale, readonly string[]> = {
   en: [],
   id: [],
-  // #97's report form gave `Contact` its first zh witness: the note hint's
-  // "contact details" is 联系方式, where the nav link says 联系我们 ("contact
-  // us"), the usual wording for that link. Flagged, not pinned, until read.
-  zh: ['site.nav.contact'],
+  // `site.nav.contact` waited here from #97 (联系我们, "contact us", against
+  // the note hint's 联系方式) until #665 made the site speak as one person
+  // and the link plain 联系, which agrees with its witness.
+  zh: [],
   vi: [],
   th: [],
 };
@@ -692,42 +692,39 @@ const WITNESSED_FLOOR: Readonly<Record<string, string>> = {
 };
 
 describe('short labels that disagree with their own locale', () => {
-  it("every one is pinned or awaiting the operator's read", () => {
-    const unread = Object.fromEntries(
-      LOCALES.map((locale) => {
-        const labels = checkLabels(backTranslationUnits(locale), locale);
-        const flagged = labels
-          .filter(
-            ({ status, variants }) =>
-              status === 'disagrees' || variants.length > 0,
-          )
-          .map(({ key }) => key)
-          .filter((key) => !Object.hasOwn(VERIFIED[locale], key));
-        // A check that stopped finding witnesses would flag nothing, and an
-        // emptied list would then agree with it. Only English has no labels.
-        const witnessed = labels
-          .filter(({ status }) => status !== 'unchecked')
-          .map(({ key }) => key);
-        if (locale === DEFAULT_LOCALE) return [locale, flagged];
-        const awaiting = [
+  // One test per locale (#714): the five in one test reached 71 ms of own CPU
+  // on the runner, over the 70 ms cut line under the 0.1 s limit.
+  for (const locale of LOCALES)
+    it(`${locale}: every one is pinned or awaiting the operator's read`, () => {
+      const labels = checkLabels(backTranslationUnits(locale), locale);
+      const flagged = labels
+        .filter(
+          ({ status, variants }) =>
+            status === 'disagrees' || variants.length > 0,
+        )
+        .map(({ key }) => key)
+        .filter((key) => !Object.hasOwn(VERIFIED[locale], key));
+      if (locale === DEFAULT_LOCALE) {
+        expect(flagged).toEqual([...AWAITING_READ[locale]].sort());
+        return;
+      }
+      // A check that stopped finding witnesses would flag nothing, and an
+      // emptied list would then agree with it. Only English has no labels.
+      const witnessed = labels
+        .filter(({ status }) => status !== 'unchecked')
+        .map(({ key }) => key);
+      expect(
+        [
           ...searched(flagged, {
             of: witnessed,
             what: `${locale} labels with a witness`,
           }),
-        ].sort();
-        expect(
-          floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
-        ).toBeUndefined();
-        return [locale, awaiting];
-      }),
-    );
-
-    expect(unread).toEqual(
-      Object.fromEntries(
-        LOCALES.map((locale) => [locale, [...AWAITING_READ[locale]].sort()]),
-      ),
-    );
-  });
+        ].sort(),
+      ).toEqual([...AWAITING_READ[locale]].sort());
+      expect(
+        floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
+      ).toBeUndefined();
+    });
 });
 
 /**

@@ -1,5 +1,5 @@
 import type { Strings } from '../lib/i18n';
-import { fitScale, fontThatFits } from '../lib/fit';
+import { fitScale, settleFont } from '../lib/fit';
 import { button } from './dom';
 
 /**
@@ -33,6 +33,9 @@ const FADE_AFTER_MS = 2500;
  * tested; these are the two numbers it is given.
  */
 const BASE_PX = 40;
+
+/** Readings `settleFont` may take before it ends at the floor (#743). */
+const SETTLE_READINGS = 4;
 
 /** How long between one group appearing and the next. */
 const REVEAL_STEP_MS = 220;
@@ -74,12 +77,27 @@ export interface ProjectorHandlers {
    * same instruction — the caller collapses them.
    */
   animates?: () => boolean;
+  /**
+   * Called as the board opens, before the results move onto it, and as it
+   * closes, after they are back (#743): a board opened before any shuffle
+   * shows the empty cards and the waiting list, and leaves the page as it
+   * found it. The results are still one element with one render path.
+   */
+  onEnter?: () => void;
+  onLeave?: () => void;
 }
 
 export interface Projector {
   setAvailable: (available: boolean) => void;
+  /**
+   * The board's Shuffle says what it will do: the page's own words before
+   * the first deal, "Shuffle again" after it (#743).
+   */
+  setShuffleLabel: (label: string) => void;
   /** Re-measure — after a shuffle changes how much there is to show. */
   refit: () => void;
+  /** Whether the board is up, so a deal knows it may travel (#744). */
+  isOpen: () => boolean;
 }
 
 export function renderProjector(
@@ -217,7 +235,7 @@ export function renderProjector(
     // 24px. One reading taken before the scale therefore describes a layout
     // that no longer exists once the scale lands.
     //
-    // The correction SOLVES rather than nudges. `fontThatFits` is handed the
+    // The correction SOLVES rather than nudges. `settleFont` (from `fontThatFits`, then a reading at each answer) is handed the
     // two readings already taken -- the sheet at the base font and the sheet
     // at the applied one -- and returns the font where the line through them
     // meets the box, clamped at the readable floor. A ratio correction only
@@ -228,11 +246,17 @@ export function renderProjector(
     // There is nothing left to shrink, so the second measurement is skipped
     // rather than taken and ignored.
     if (!onTheFloor && stage.scrollHeight > stage.clientHeight) {
-      stage.style.fontSize = `${fontThatFits(
+      const measure = (font: number): number => {
+        stage.style.fontSize = `${font}px`;
+        return stage.scrollHeight;
+      };
+      stage.style.fontSize = `${settleFont(
         stage.clientHeight,
         atBase,
         { font: applied, height: stage.scrollHeight },
         FLOOR_PX,
+        measure,
+        SETTLE_READINGS,
       )}px`;
     }
 
@@ -240,6 +264,14 @@ export function renderProjector(
     // describes is what left five group cards unreachable; this one is taken
     // from the box that is actually on the screen, so "it does not fit" and
     // "it can be scrolled to" cannot disagree.
+    //
+    // ...and taken under the overflow it will produce (#674). Read while the
+    // stage was `overflow: hidden`, Firefox reported an exact fit as
+    // overflowing (CI, fonts not yet landed: 705px sheet, 705px stage,
+    // `scrolls` left on at 37.6875px), and the board then offered a scrollbar
+    // it did not need. So the class goes on first, the stage is read as
+    // `overflow: auto`, and the class stays only if that reading overflows.
+    board.classList.add('scrolls');
     board.classList.toggle('scrolls', stage.scrollHeight > stage.clientHeight);
   };
 
@@ -300,6 +332,7 @@ export function renderProjector(
     if (open) return;
     if (handlers.refuseReason?.()) return;
     open = true;
+    handlers.onEnter?.();
     stage.appendChild(results);
     board.hidden = false;
     doc.documentElement.classList.add('cg-board-open-page');
@@ -382,6 +415,7 @@ export function renderProjector(
     // Back exactly where it came from, before the board is hidden, so the
     // page is never briefly missing its results.
     placeholder.parentElement?.insertBefore(results, placeholder);
+    handlers.onLeave?.();
     board.hidden = true;
     doc.documentElement.classList.remove('cg-board-open-page');
     stage.style.removeProperty('font-size');
@@ -398,9 +432,11 @@ export function renderProjector(
     // cards the second render has already detached.
     if (handlers.busy?.()) return;
     handlers.onShuffle();
-    // The cards were rebuilt by that shuffle, so they carry neither class
-    // -- reveal them again rather than leaving a board of invisible groups.
-    reveal();
+    // With animation on, the deal travels from the waiting list into cards
+    // that are already up (#744), so the groups are not faded in on top of
+    // it; with animation off, `reveal` shows them at once, as before.
+    if (handlers.animates?.() === false) reveal();
+    else stopReveal();
     // …and there may be more or less of them than before. Without this a
     // board shuffle never re-measured at all, so a taller arrangement was
     // sized to the previous one and lost its bottom group off the board.
@@ -454,11 +490,21 @@ export function renderProjector(
 
   window.addEventListener('resize', refit);
 
+  // A web font that lands after the board opened changes the sheet's height
+  // without any resize, so the verdict `refit` took against the fallback face
+  // went stale: `scrolls` stayed on for a sheet that then fitted exactly (#674).
+  // Like `resize` above, this stays wired and `refit` ignores it while closed.
+  doc.fonts?.addEventListener('loadingdone', refit);
+
   return {
+    setShuffleLabel: (label: string) => {
+      shuffle.textContent = label;
+    },
     setAvailable: (available: boolean) => {
       openButton.hidden = !available;
       if (!available) void leave();
     },
     refit,
+    isOpen: () => open,
   };
 }

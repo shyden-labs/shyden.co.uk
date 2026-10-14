@@ -1,5 +1,11 @@
 import ts from 'typescript';
-import { derivationOf, where, type Bound, type Closure } from './ast';
+import {
+  derivationOf,
+  where,
+  type Bound,
+  type CallGraph,
+  type Closure,
+} from './ast';
 
 /**
  * The detector behind `anchored-presence.test.ts`, taken out of the guard so it
@@ -36,6 +42,31 @@ export interface PresenceClosures {
    */
   readonly commentReaders: Closure;
 }
+
+/** The seeds each closure starts from, one home for the guard and the lint (#662). */
+const READS_CONTENT = new Set(['readFileSync']);
+const STRIPPERS = new Set([
+  'withoutTsComments',
+  'withoutMarkupComments',
+  'withoutCommentLines',
+  'withoutYamlComments',
+  'withoutIniComments',
+  'blankCommentLines',
+  'withoutAstroComments',
+  'withoutSqlComments',
+  'withoutYamlQuotes',
+]);
+const COMMENT_READERS = new Set(['isMarkerCommentLine', 'commentsIn']);
+
+/**
+ * The three closures over `graph`. Raw text is a read no JSON.parse stands
+ * on, here as in the detector (#570).
+ */
+export const presenceClosures = (graph: CallGraph): PresenceClosures => ({
+  readers: graph.close(READS_CONTENT, { parsedIsData: true }),
+  strippers: graph.close(STRIPPERS),
+  commentReaders: graph.close(COMMENT_READERS),
+});
 
 export interface PresenceScan {
   readonly scanned: number;

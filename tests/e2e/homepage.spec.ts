@@ -15,6 +15,7 @@ import { expectNoHorizontalScroll } from '../viewport';
 import { THEMES } from '../palette';
 import { emulateTheme, expectTheme, saveTheme } from '../themes';
 import { contrastRatio } from './helpers';
+import { contrast, parseColour } from '../wcag';
 
 test.use(recorded);
 
@@ -340,8 +341,13 @@ test.describe('homepage content', () => {
 
   test('contact section CTA links to the support mailbox', async ({ page }) => {
     await page.goto('/');
+    // The label from the catalogue, not a copy of it: #665 changed "Email us"
+    // to "Email me", and a literal here went red on copy it does not judge.
     await expect(
-      page.locator('#contact').getByRole('link', { name: /email us/i }),
+      page.locator('#contact').getByRole('link', {
+        name: getSiteStrings('en').home.emailMe,
+        exact: true,
+      }),
     ).toHaveAttribute('href', 'mailto:support@shyden.co.uk');
   });
 
@@ -861,75 +867,169 @@ test.describe('pause motion', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await expect(pauseControl(page, 'en')).not.toBeChecked();
-    const running = await page
+    // Reduced motion does not remove the band's animation: tokens.css makes
+    // it ONE 0.01 ms iteration, so it finishes at once (#390 F61). Until the
+    // next animation frame ticks it to its end it reads `running`, and the
+    // old count straight after goto could beat that frame on a loaded runner
+    // (#669, seen on #668's CI). Once finished (no `fill`) it leaves
+    // `getAnimations()` altogether, so the band's own declaration is the
+    // liveness probe, not the list. Wait for whatever is still there to
+    // finish -- a promise, never a timer; one that never finishes (motion
+    // not reduced) fails on the test's own budget -- and judge it then.
+    const band = await page
       .locator('.marquee-track')
-      .evaluate(
-        (element) =>
-          element.getAnimations().filter((a) => a.playState === 'running')
-            .length,
-      );
-    expect(running, 'animations running with motion reduced').toBe(0);
+      .evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((a) => a.finished));
+        return {
+          declared: getComputedStyle(element).animationName,
+          running: element
+            .getAnimations()
+            .filter((a) => a.playState === 'running').length,
+        };
+      });
+    expect(band.declared, 'the band declares its animation').toBe(
+      'marquee-slide',
+    );
+    expect(band.running, 'animations running with motion reduced').toBe(0);
   });
 
-  // At 320px, in every locale: measured, because Thai and Vietnamese run long.
+  // The control shows no words, so what a long label once risked (Thai and
+  // Vietnamese running past the band) is now the screen-reader text's to
+  // risk: it is absolutely positioned, and an absolute box with nothing to
+  // contain it can land anywhere, which at 320px means sideways scroll.
   for (const locale of LOCALES)
     test(
-      `${locale}: at 320px the label fits its band and the control is 44px tall`,
+      `${locale}: at 320px the control and its hidden name stay inside the band, with no sideways scroll`,
       { tag: '@emulated-viewport' },
       async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 800 });
         await page.goto(localisePath('/', locale));
-        const control = pauseControl(page, locale);
-        const label = page.locator('.band-pause');
-        await expect(label).toHaveCount(1);
-        const box = await label.boundingBox();
-        const band = await page.locator('.band').boundingBox();
-        expect(box).not.toBeNull();
-        expect(band).not.toBeNull();
-        expect(
-          box!.x,
-          'label starts inside the viewport',
-        ).toBeGreaterThanOrEqual(0);
-        expect(
-          box!.x + box!.width,
-          'label ends inside the viewport',
-        ).toBeLessThanOrEqual(320);
-        expect(
-          box!.x + box!.width,
-          'label ends inside its band',
-        ).toBeLessThanOrEqual(band!.x + band!.width + 0.5);
-        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-        // The text itself must not be clipped by the label's own box.
-        const clipped = await control.evaluate((input) => {
-          const text = input.parentElement!.querySelector('span')!;
-          return text.scrollWidth - text.clientWidth;
+        const target = page.locator('.band-pause');
+        await expect(target).toHaveCount(1);
+        const inside = await target.evaluate((label) => {
+          const band = label.closest('.band')!.getBoundingClientRect();
+          return [label, ...label.querySelectorAll('*')].map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+              what: el.tagName.toLowerCase() + '.' + el.getAttribute('class'),
+              ok:
+                r.left >= band.left - 0.5 &&
+                r.right <= band.right + 0.5 &&
+                r.left >= 0 &&
+                r.right <= 320,
+            };
+          });
         });
-        expect(clipped, 'label text overflows its own box').toBeLessThanOrEqual(
-          0,
+        expect(
+          searched(
+            inside.filter((box) => !box.ok).map((box) => box.what),
+            { of: inside, what: 'boxes in the pause control' },
+          ),
+          'boxes in the control that leave the band or the viewport',
+        ).toEqual([]);
+        expect(
+          inside.map((box) => box.what),
+          'the boxes the control is built from, each measured',
+        ).toEqual(
+          expect.arrayContaining([
+            'label.band-pause',
+            'input.null',
+            'span.band-pause-disc',
+            'svg.band-pause-icon',
+            'span.band-pause-name',
+          ]),
         );
+        expect(
+          floorBreach('homepage/pause-control-boxes', inside.length),
+        ).toBeUndefined();
         await expectNoHorizontalScroll(page);
       },
     );
-
-  for (const theme of THEMES)
-    test(`${theme}: the label clears AA against what is painted behind it`, async ({
-      page,
-    }) => {
-      await page.goto('/');
-      await emulateTheme(page, theme);
-      const ratio = await contrastRatio(page.locator('.band-pause span'));
-      expect(
-        ratio,
-        `${theme}: the label's painted contrast`,
-      ).toBeGreaterThanOrEqual(4.5);
-    });
 });
 
-test.describe('the pause pill sits on the strip (#606)', () => {
-  // The control was its own 44px row above the strip: a mostly empty band of
-  // page between the header and the strip. It is now a pill on the strip's
-  // inline-end, centred on it. Geometry is read in the page, from the
-  // rendered boxes.
+test.describe('the pause control is a small icon on the strip (#619)', () => {
+  // Operator 2026-10-07: "make the pause pill much smaller, it's huge". The
+  // pill (#606) becomes a 28px disc with an inline SVG icon and no visible
+  // words; its name stays the locale's `pauseMotion`, read by a screen reader
+  // only. The tap target stays 44px. Geometry is read in the page from layout
+  // boxes (`offsetWidth`), because the control sits on a rail tilted like the
+  // strip, and a rotated box's bounding rect is larger than the box.
+
+  // The words a visitor can SEE in the control: every non-blank text node
+  // whose own element's layout box is more than a pixel in either direction.
+  // The hidden name is clipped to a 1px box; `innerText` would still return
+  // it. The layout box, not the bounding rect: the rail is tilted -1.6deg,
+  // and a 1px square turned that far has a bounding rect 1.0275px on a side
+  // (cos + sin), which read the clipped name as visible in every engine.
+  const visibleWords = (page: Page) =>
+    page.locator('.band-pause').evaluate((label) => {
+      const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+      const seen: string[] = [];
+      const all: string[] = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node.textContent?.trim() ?? '';
+        if (!text) continue;
+        all.push(text);
+        const box = node.parentElement!;
+        if (box.offsetWidth > 1 || box.offsetHeight > 1) seen.push(text);
+      }
+      return { seen, all };
+    });
+
+  for (const locale of LOCALES)
+    test(`${locale}: the control shows an icon and no words, and its name is the band's`, async ({
+      page,
+    }) => {
+      await page.goto(localisePath('/', locale));
+      const name = getSiteStrings(locale).home.pauseMotion;
+      const words = await visibleWords(page);
+      expect(words.all, 'the text the control holds').toEqual([name]);
+      expect(
+        searched(words.seen, {
+          of: words.all,
+          what: 'text nodes in the pause control',
+        }),
+        'words a visitor can see in the control',
+      ).toEqual([]);
+      expect(
+        floorBreach('homepage/pause-control-text', words.all.length),
+      ).toBeUndefined();
+      const control = page.getByRole('checkbox', { name, exact: true });
+      await expect(control).toHaveCount(1);
+      await expect(control).toHaveAccessibleName(name);
+      // Two icons, and both hidden from the accessibility tree.
+      await expect(page.locator('.band-pause svg')).toHaveCount(2);
+      await expect(
+        page.locator('.band-pause svg[aria-hidden="true"]'),
+      ).toHaveCount(2);
+      await expect(
+        page.locator('.band-pause svg[data-icon="pause"]'),
+      ).toBeVisible();
+    });
+
+  test('the icon is a pause symbol while the strip moves and a play symbol while it is paused', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const control = page.getByRole('checkbox', {
+      name: getSiteStrings('en').home.pauseMotion,
+      exact: true,
+    });
+    const pause = page.locator('.band-pause svg[data-icon="pause"]');
+    const play = page.locator('.band-pause svg[data-icon="play"]');
+    await expect(pause).toHaveCount(1);
+    await expect(play).toHaveCount(1);
+    await expect(pause).toBeVisible();
+    await expect(play).toBeHidden();
+    await control.check();
+    await expect(play).toBeVisible();
+    await expect(pause).toBeHidden();
+    await shoot(page, 'paused: the control shows a play symbol');
+    await control.uncheck();
+    await expect(pause).toBeVisible();
+    await expect(play).toBeHidden();
+  });
+
   for (const width of BAND_WIDTHS)
     test(
       `at ${width}px no row sits between the header and the strip`,
@@ -941,18 +1041,17 @@ test.describe('the pause pill sits on the strip (#606)', () => {
           const header = document.querySelector('header');
           const strip = document.querySelector<HTMLElement>('.marquee');
           const band = document.querySelector('.band');
-          const pill = document.querySelector('.band-pause');
-          if (!header || !strip || !band || !pill)
-            throw new Error('header, strip, band or pill missing');
+          const target = document.querySelector('.band-pause');
+          if (!header || !strip || !band || !target)
+            throw new Error('header, strip, band or control missing');
           // The strip is rotated, so its bounding box is not its layout box:
           // its LAYOUT top is the band's top plus its own offset.
           const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
-          const hb = header.getBoundingClientRect().bottom;
-          const p = pill.getBoundingClientRect();
+          const t = target.getBoundingClientRect();
           return {
-            gap: layoutTop - hb,
+            gap: layoutTop - header.getBoundingClientRect().bottom,
             margin: parseFloat(getComputedStyle(strip).marginTop),
-            pillMid: p.top + p.height / 2,
+            targetMid: t.top + t.height / 2,
             layoutTop,
           };
         });
@@ -961,115 +1060,245 @@ test.describe('the pause pill sits on the strip (#606)', () => {
           facts.gap,
           `${width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
         ).toBeLessThanOrEqual(facts.margin + 1);
-        // No pill box lies in the space between the header and the strip.
         expect(
-          facts.pillMid,
-          'the pill sits in the gap above the strip',
+          facts.targetMid,
+          'the control sits in the gap above the strip',
         ).toBeGreaterThanOrEqual(facts.layoutTop);
       },
     );
 
   for (const width of BAND_WIDTHS)
     test(
-      `at ${width}px the pill is what a click at its centre hits, over the strip`,
+      `at ${width}px the disc is at most 28px, on the strip's tilted middle, and its 44px target takes a click at every edge`,
       { tag: '@emulated-viewport' },
       async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        const hit = await page.evaluate(() => {
-          const pill = document.querySelector('.band-pause');
-          const strip = document.querySelector('.marquee');
-          if (!pill || !strip) throw new Error('pill or strip missing');
-          const p = pill.getBoundingClientRect();
-          const s = strip.getBoundingClientRect();
-          const x = p.left + p.width / 2;
-          const y = p.top + p.height / 2;
-          const el = document.elementFromPoint(x, y);
+        const control = page.getByRole('checkbox', {
+          name: getSiteStrings('en').home.pauseMotion,
+          exact: true,
+        });
+        const at = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>('.band-pause');
+          const disc = document.querySelector<HTMLElement>('.band-pause-disc');
+          const strip = document.querySelector<HTMLElement>('.marquee');
+          if (!target || !disc || !strip)
+            throw new Error('control, disc or strip missing');
+          const centre = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          };
+          // The strip's tilt and scale, from the matrix the browser computed.
+          const m = new DOMMatrix(getComputedStyle(strip).transform);
+          const angle = Math.atan2(m.b, m.a);
+          const scale = Math.hypot(m.a, m.b);
+          const s = centre(strip);
+          const d = centre(disc);
+          // How far the disc's middle is from the strip's middle LINE, measured
+          // across the strip, and how much strip there is either side of it.
+          const across =
+            Math.abs(d.y - (s.y + (d.x - s.x) * Math.tan(angle))) *
+            Math.cos(angle);
+          const t = centre(target);
+          const reach = target.offsetWidth / 2 - 2;
           return {
-            inPill: !!el && pill.contains(el),
-            overStrip: y > s.top && y < s.bottom,
-            centred: Math.abs(y - (s.top + s.height / 2)) <= 6,
+            disc: { w: disc.offsetWidth, h: disc.offsetHeight },
+            target: { w: target.offsetWidth, h: target.offsetHeight },
+            stripHeight: strip.offsetHeight,
+            across,
+            room: (strip.offsetHeight * scale) / 2 - disc.offsetHeight / 2,
+            hitsAtCentre: target.contains(document.elementFromPoint(t.x, t.y)),
+            edges: [
+              { name: 'left', x: t.x - reach, y: t.y },
+              { name: 'right', x: t.x + reach, y: t.y },
+              { name: 'top', x: t.x, y: t.y - reach },
+              { name: 'bottom', x: t.x, y: t.y + reach },
+            ],
           };
         });
-        expect(hit.overStrip, 'the pill is not over the strip').toBe(true);
-        expect(hit.centred, 'the pill is not centred on the strip').toBe(true);
-        expect(hit.inPill, 'a click at the pill centre misses the pill').toBe(
-          true,
-        );
+        expect(
+          at.disc.w,
+          'the visible disc is no wider than 28px',
+        ).toBeLessThanOrEqual(28);
+        expect(
+          at.disc.h,
+          'the visible disc is no taller than 28px',
+        ).toBeLessThanOrEqual(28);
+        expect(
+          at.disc.h,
+          "the visible disc is no taller than the strip's layout box",
+        ).toBeLessThanOrEqual(at.stripHeight);
+        expect(
+          at.target.w,
+          'the tap target is at least 44px wide',
+        ).toBeGreaterThanOrEqual(44);
+        expect(
+          at.target.h,
+          'the tap target is at least 44px tall',
+        ).toBeGreaterThanOrEqual(44);
+        expect(
+          at.across,
+          `${width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
+        ).toBeLessThanOrEqual(1.5);
+        expect(
+          at.across,
+          `${width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
+        ).toBeLessThanOrEqual(at.room);
+        expect(
+          at.hitsAtCentre,
+          'a click at the centre misses the control',
+        ).toBe(true);
+        let ticked = false;
+        for (const edge of at.edges) {
+          await page.mouse.click(edge.x, edge.y);
+          ticked = !ticked;
+          await expect(
+            control,
+            `a click at the target's ${edge.name} edge toggles the control`,
+          ).toBeChecked({ checked: ticked });
+        }
       },
     );
 
   for (const theme of THEMES)
-    test(`${theme}: the pill paints a solid ground and its label clears AA on it`, async ({
+    test(`${theme}: the icon clears 3:1 on the disc, and the disc clears 3:1 against the strip`, async ({
       page,
     }) => {
       await page.goto('/');
       await emulateTheme(page, theme);
-      const ground = await page
-        .locator('.band-pause')
-        .evaluate((el) => getComputedStyle(el).backgroundColor);
-      expect(ground, `${theme}: the pill's own ground`).not.toMatch(
-        /^rgba\(.*, 0\)$|^transparent$/,
-      );
-      const ratio = await contrastRatio(page.locator('.band-pause span'));
+      const icon = page.locator('.band-pause svg[data-icon="pause"]');
+      await expect(icon).toBeVisible();
+      const iconRatio = await contrastRatio(icon);
       expect(
-        ratio,
-        `${theme}: the pill label's painted contrast`,
-      ).toBeGreaterThanOrEqual(4.5);
+        iconRatio,
+        `${theme}: the icon on its disc`,
+      ).toBeGreaterThanOrEqual(3);
+      const grounds = await page.evaluate(() => ({
+        disc: getComputedStyle(document.querySelector('.band-pause-disc')!)
+          .backgroundColor,
+        strip: getComputedStyle(document.querySelector('.marquee')!)
+          .backgroundColor,
+      }));
+      const disc = parseColour(grounds.disc);
+      const strip = parseColour(grounds.strip);
+      expect(disc?.alpha, `${theme}: the disc paints a solid ground`).toBe(1);
+      expect(strip?.alpha, `${theme}: the strip paints a solid ground`).toBe(1);
+      expect(
+        contrast(disc!.rgb, strip!.rgb),
+        `${theme}: the disc (${grounds.disc}) against the strip (${grounds.strip})`,
+      ).toBeGreaterThanOrEqual(3);
     });
 
-  for (const locale of LOCALES)
-    test(
-      `${locale}: at 320px the pill is at most half the viewport, 44px tall, inside the viewport and band, and shows every word`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 800 });
-        await page.goto(localisePath('/', locale));
-        const pill = page.locator('.band-pause');
-        await expect(pill).toHaveCount(1);
-        const box = await pill.boundingBox();
-        const band = await page.locator('.band').boundingBox();
-        expect(box).not.toBeNull();
-        expect(band).not.toBeNull();
-        expect(
-          box!.x,
-          'pill starts inside the viewport',
-        ).toBeGreaterThanOrEqual(0);
-        expect(
-          box!.x + box!.width,
-          'pill ends inside the viewport',
-        ).toBeLessThanOrEqual(320);
-        expect(
-          box!.x + box!.width,
-          'pill ends inside its band',
-        ).toBeLessThanOrEqual(band!.x + band!.width + 0.5);
-        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-        // Every word is shown: the label's own text neither overflows its
-        // box nor leaves the pill, and the pill is at most half the viewport.
-        const text = await pill.evaluate((el) => {
-          const span = el.querySelector('span')!;
-          const r = span.getBoundingClientRect();
-          const p = el.getBoundingClientRect();
-          return {
-            overflow: span.scrollWidth - span.clientWidth,
-            inside:
-              r.left >= p.left - 0.5 &&
-              r.right <= p.right + 0.5 &&
-              r.top >= p.top - 0.5 &&
-              r.bottom <= p.bottom + 0.5,
-          };
-        });
-        expect(
-          text.overflow,
-          'the label overflows its own box',
-        ).toBeLessThanOrEqual(0);
-        expect(text.inside, 'the label leaves the pill').toBe(true);
-        expect(
-          box!.width,
-          `${locale}: the pill is ${Math.round(box!.width)}px x ${Math.round(box!.height)} of 320`,
-        ).toBeLessThanOrEqual(160);
-      },
-    );
+  for (const theme of THEMES)
+    test(`${theme}: keyboard focus draws the site's ring on the disc, clear of the strip and unclipped`, async ({
+      page,
+      browserName,
+    }) => {
+      await page.goto('/');
+      await emulateTheme(page, theme);
+      const control = page.getByRole('checkbox', {
+        name: getSiteStrings('en').home.pauseMotion,
+        exact: true,
+      });
+      await page.locator('.hero a').first().focus();
+      await page.keyboard.press(
+        browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab',
+      );
+      await expect(control).toBeFocused();
+      const ring = await control.evaluate((element) => {
+        const input = element as HTMLInputElement;
+        const style = getComputedStyle(input);
+        const disc = input
+          .closest('.band-pause')!
+          .querySelector<HTMLElement>('.band-pause-disc')!;
+        // --accent as the browser resolves it, to hold the ring's colour to.
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--accent)';
+        document.body.append(probe);
+        const accent = getComputedStyle(probe).color;
+        probe.remove();
+        // The ring's own box, and every ancestor that clips its overflow and
+        // does not hold that box whole.
+        const reach =
+          parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+        const r = input.getBoundingClientRect();
+        const walked: string[] = [];
+        const clipping: string[] = [];
+        for (
+          let at = input.parentElement;
+          at && at !== document.body;
+          at = at.parentElement
+        ) {
+          const name = `${at.tagName.toLowerCase()}.${at.className}`;
+          walked.push(name);
+          const cs = getComputedStyle(at);
+          if (cs.overflowX === 'visible' && cs.overflowY === 'visible')
+            continue;
+          const a = at.getBoundingClientRect();
+          if (
+            r.left - reach < a.left ||
+            r.right + reach > a.right ||
+            r.top - reach < a.top ||
+            r.bottom + reach > a.bottom
+          )
+            clipping.push(name);
+        }
+        return {
+          focusVisible: input.matches(':focus-visible'),
+          style: style.outlineStyle,
+          width: parseFloat(style.outlineWidth),
+          offset: parseFloat(style.outlineOffset),
+          colour: style.outlineColor,
+          accent,
+          outer:
+            input.offsetWidth / 2 +
+            parseFloat(style.outlineOffset) +
+            parseFloat(style.outlineWidth),
+          discRadius: disc.offsetWidth / 2,
+          discGround: getComputedStyle(disc).backgroundColor,
+          walked,
+          clipping,
+        };
+      });
+      expect(ring.focusVisible, 'the control matches :focus-visible').toBe(
+        true,
+      );
+      expect(ring.style, 'the ring is drawn').toBe('solid');
+      expect(ring.width, "the site's 3px ring").toBe(3);
+      expect(ring.offset, "the site's 2px offset").toBe(2);
+      expect(ring.colour, "the site's --accent ring").toBe(ring.accent);
+      // Drawn ON the disc, with disc still showing outside it: an --accent
+      // ring outside the disc would sit on the --accent strip and vanish.
+      expect(
+        ring.outer,
+        `the ring reaches ${ring.outer}px from the middle; the disc is ${ring.discRadius}px`,
+      ).toBeLessThan(ring.discRadius);
+      const colour = parseColour(ring.colour);
+      const ground = parseColour(ring.discGround);
+      expect(
+        contrast(colour!.rgb, ground!.rgb),
+        `${theme}: the ring (${ring.colour}) on the disc (${ring.discGround})`,
+      ).toBeGreaterThanOrEqual(3);
+      expect(
+        searched(ring.clipping, {
+          of: ring.walked,
+          what: "the pause control's ancestors",
+        }),
+        'ancestors that clip the ring',
+      ).toEqual([]);
+      expect(
+        floorBreach('homepage/pause-ring-ancestors', ring.walked.length),
+      ).toBeUndefined();
+      await shoot(page, `${theme}: keyboard focus rings the pause disc`);
+    });
+
+  test('nothing of the control prints', async ({ page }) => {
+    await page.goto('/');
+    await page.emulateMedia({ media: 'print' });
+    const target = page.locator('.band-pause');
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeHidden();
+  });
 });
 
 test.describe('the ShyTalk phone frame', () => {

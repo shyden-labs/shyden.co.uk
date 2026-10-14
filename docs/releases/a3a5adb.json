@@ -72,8 +72,16 @@
     "3a651961b2721d5148a8d9f504a39b109b536171": {
       "kind": "visible",
       "journeys": [
-        "language switcher > lists every language: the current one first and ticked, every other a link",
-        "language switcher > names the current language in its own language, as its width calls for"
+        "language switcher > en: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > id: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > zh: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > vi: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > th: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > en: names the current language in its own language, as its width calls for",
+        "language switcher > id: names the current language in its own language, as its width calls for",
+        "language switcher > zh: names the current language in its own language, as its width calls for",
+        "language switcher > vi: names the current language in its own language, as its width calls for",
+        "language switcher > th: names the current language in its own language, as its width calls for"
       ]
     },
     "8aea25765f71c87dce423f351f7c4f34f2e32192": {
@@ -91,16 +99,28 @@
     "d5041ea01b51dbaccad455a8f83b44087ba23d2a": {
       "kind": "visible",
       "journeys": [
-        "the no-scroll rule, measured > the action row is sticky at every width, so the primary action is never below the fold",
-        "the no-scroll rule, measured > the pinned action row casts a soft shadow upward at every width"
+        "the no-scroll rule, measured > the action row is sticky at 320x568, so the primary action is never below the fold",
+        "the no-scroll rule, measured > the action row is sticky at 375x667, so the primary action is never below the fold",
+        "the no-scroll rule, measured > the action row is sticky at 768x1024, so the primary action is never below the fold",
+        "the no-scroll rule, measured > the action row is sticky at 1280x800, so the primary action is never below the fold",
+        "the no-scroll rule, measured > the pinned action row casts a soft shadow upward at 320x568",
+        "the no-scroll rule, measured > the pinned action row casts a soft shadow upward at 375x667",
+        "the no-scroll rule, measured > the pinned action row casts a soft shadow upward at 768x1024",
+        "the no-scroll rule, measured > the pinned action row casts a soft shadow upward at 1280x800"
       ]
     },
     "5ff997a2bfdf5a779a85ae79716bfa06b74ae620": {
       "kind": "visible",
       "journeys": [
-        "light theme > zh at 320px: every page renders the theme, with no sideways scroll",
-        "light theme > vi at 320px: every page renders the theme, with no sideways scroll",
-        "light theme > th at 320px: every page renders the theme, with no sideways scroll",
+        "light theme > /zh/ at 320px: renders the theme, with no sideways scroll",
+        "light theme > /zh/classroom-groups at 320px: renders the theme, with no sideways scroll",
+        "light theme > /zh/glory-points at 320px: renders the theme, with no sideways scroll",
+        "light theme > /vi/ at 320px: renders the theme, with no sideways scroll",
+        "light theme > /vi/classroom-groups at 320px: renders the theme, with no sideways scroll",
+        "light theme > /vi/glory-points at 320px: renders the theme, with no sideways scroll",
+        "light theme > /th/ at 320px: renders the theme, with no sideways scroll",
+        "light theme > /th/classroom-groups at 320px: renders the theme, with no sideways scroll",
+        "light theme > /th/glory-points at 320px: renders the theme, with no sideways scroll",
         "every language renders its own messages > zh: numbers, groups, a summary, a refusal and a list",
         "every language renders its own messages > th: numbers, groups, a summary, a refusal and a list"
       ]
@@ -110,7 +130,10 @@
       "journeys": [
         "every unverified language is marked BETA > zh: marks each beta language once in the list, and English never",
         "every unverified language is marked BETA > vi: the footer says why, in vi",
-        "every unverified language is marked BETA > the badge carries a translated name for screen readers"
+        "every unverified language is marked BETA > id: the badge carries a translated name for screen readers",
+        "every unverified language is marked BETA > th: the badge carries a translated name for screen readers",
+        "every unverified language is marked BETA > vi: the badge carries a translated name for screen readers",
+        "every unverified language is marked BETA > zh: the badge carries a translated name for screen readers"
       ]
     },
     "f7880334f6eb71e54d1016187d6980fe8dda970f": {
@@ -142,7 +165,8 @@
     "f19f073802ec9ae33bf88da62ba622d042013c3c": {
       "kind": "visible",
       "journeys": [
-        "the controls the browser draws use the brand accent, in both themes",
+        "light: the controls the browser draws use the brand accent",
+        "dark: the controls the browser draws use the brand accent",
         "the roster table > the table has seven columns, in order — the seventh (Remove) has a real header, visually hidden but present"
       ]
     },
@@ -150,8 +174,15 @@
       "kind": "visible",
       "journeys": [
         "homepage content > the hero leads with ShyTalk and every section is present",
-        "homepage content > the showcase frame shows a real room capture, one PER LOCALE",
-        "dark theme > en at 1280px: every page renders the theme, with no sideways scroll"
+        "homepage content > en: the showcase frame shows a real room capture",
+        "homepage content > id: the showcase frame shows a real room capture",
+        "homepage content > zh: the showcase frame shows a real room capture",
+        "homepage content > vi: the showcase frame shows a real room capture",
+        "homepage content > th: the showcase frame shows a real room capture",
+        "dark theme > / at 1280px: renders the theme, with no sideways scroll",
+        "dark theme > /classroom-groups at 1280px: renders the theme, with no sideways scroll",
+        "dark theme > /glory-points at 1280px: renders the theme, with no sideways scroll",
+        "dark theme > /definitely-not-a-page at 1280px: renders the theme, with no sideways scroll"
       ]
     },
     "25beba940926a2db49f9cf85b33765f175988b80": {
@@ -225,7 +256,8 @@
       "kind": "visible",
       "journeys": [
         "the Students box becomes a read-out > the three number fields lock with the box, and recover with it",
-        "a disabled control never depends on its fill reaching paper"
+        "light: a disabled control never depends on its fill reaching paper",
+        "dark: a disabled control never depends on its fill reaching paper"
       ]
     },
     "deb9fe77c949ba2e417303494fff82c4c2371193": {
@@ -268,16 +300,37 @@
     "fabbc1f82df84e8ddb836bcbd63dc545906d5d85": {
       "kind": "visible",
       "journeys": [
-        "out-of-date groups > the out-of-date sentence meets the WCAG AA contrast floor",
-        "validation as it is typed > the gap warning meets the WCAG AA contrast floor"
+        "out-of-date groups > light: the out-of-date sentence meets the WCAG AA contrast floor",
+        "out-of-date groups > dark: the out-of-date sentence meets the WCAG AA contrast floor",
+        "validation as it is typed > light: the gap warning meets the WCAG AA contrast floor",
+        "validation as it is typed > dark: the gap warning meets the WCAG AA contrast floor"
       ]
     },
     "5b669d1341cc9f0840e45ed5bd43cb5971df35fe": {
       "kind": "visible",
       "journeys": [
-        "language switcher > shows the short code below 720px and the full name from 720px, in every language",
-        "the header row has room for everything in it (#329) > th: no header item overlaps another, at any width",
-        "the header row has room for everything in it (#329) > vi: no header item overlaps another, at any width"
+        "language switcher > en at 320px: shows the short code below 720px and the full name from 720px",
+        "language switcher > en at 719px: shows the short code below 720px and the full name from 720px",
+        "language switcher > en at 720px: shows the short code below 720px and the full name from 720px",
+        "language switcher > en at 1280px: shows the short code below 720px and the full name from 720px",
+        "language switcher > id at 320px: shows the short code below 720px and the full name from 720px",
+        "language switcher > id at 719px: shows the short code below 720px and the full name from 720px",
+        "language switcher > id at 720px: shows the short code below 720px and the full name from 720px",
+        "language switcher > id at 1280px: shows the short code below 720px and the full name from 720px",
+        "language switcher > zh at 320px: shows the short code below 720px and the full name from 720px",
+        "language switcher > zh at 719px: shows the short code below 720px and the full name from 720px",
+        "language switcher > zh at 720px: shows the short code below 720px and the full name from 720px",
+        "language switcher > zh at 1280px: shows the short code below 720px and the full name from 720px",
+        "language switcher > vi at 320px: shows the short code below 720px and the full name from 720px",
+        "language switcher > vi at 719px: shows the short code below 720px and the full name from 720px",
+        "language switcher > vi at 720px: shows the short code below 720px and the full name from 720px",
+        "language switcher > vi at 1280px: shows the short code below 720px and the full name from 720px",
+        "language switcher > th at 320px: shows the short code below 720px and the full name from 720px",
+        "language switcher > th at 719px: shows the short code below 720px and the full name from 720px",
+        "language switcher > th at 720px: shows the short code below 720px and the full name from 720px",
+        "language switcher > th at 1280px: shows the short code below 720px and the full name from 720px",
+        "the header row has room for everything in it (#329) > /th/: no header item overlaps another, at any width",
+        "the header row has room for everything in it (#329) > /vi/: no header item overlaps another, at any width"
       ]
     },
     "606a143474f54f2a7d974948d0b74f2edc1e7dcc": {
@@ -290,8 +343,10 @@
     "3640af27e1cab40c1af69526d556767165a51732": {
       "kind": "visible",
       "journeys": [
-        "/classroom-groups: every control it paints uses a palette colour, in both themes",
-        "the screen palette is not dragged down with the print one"
+        "/classroom-groups, light: every control it paints uses a palette colour",
+        "/classroom-groups, dark: every control it paints uses a palette colour",
+        "light: the screen palette is not dragged down with the print one",
+        "dark: the screen palette is not dragged down with the print one"
       ]
     },
     "73aeafaccdf244bbffe32bbb95ea36fc47e950b7": {
@@ -300,7 +355,10 @@
         "no flash of the other theme (#142 §6.3, AC5) > a saved light choice on a device preferring dark > the first frame that paints a ground paints the saved theme",
         "the choice persists (#142 AC4) > across a reload and a second page",
         "light theme > interactive states > the header: the phone menu, the language list and the focused switch",
-        "dark theme > en at 320px: every page renders the theme, with no sideways scroll"
+        "dark theme > / at 320px: renders the theme, with no sideways scroll",
+        "dark theme > /classroom-groups at 320px: renders the theme, with no sideways scroll",
+        "dark theme > /glory-points at 320px: renders the theme, with no sideways scroll",
+        "dark theme > /definitely-not-a-page at 320px: renders the theme, with no sideways scroll"
       ]
     },
     "03ce0e852e52df0e9e62da8ae23376813c5db550": {
@@ -357,10 +415,195 @@
     "21dec514e1bffa5e7b13d2315aaab9a1f1355031": {
       "kind": "visible",
       "journeys": [
-        "light at 390px: every text run over the ribbon clears AA, on every page",
-        "light at 1280px: every text run over the ribbon clears AA, on every page",
-        "dark at 390px: every text run over the ribbon clears AA, on every page",
-        "dark at 1280px: every text run over the ribbon clears AA, on every page"
+        "light at 390px: every text run over the ribbon clears AA -- /",
+        "light at 1280px: every text run over the ribbon clears AA -- /",
+        "dark at 390px: every text run over the ribbon clears AA -- /",
+        "dark at 1280px: every text run over the ribbon clears AA -- /"
+      ]
+    },
+    "24a55f944fde25659c25470156cf41da6ddbb2fb": {
+      "kind": "gap",
+      "check": "On /glory-points and in each other language, read the line under the calculator: it says 0.9 coins per bean (not 0.9 beans per coin), and the sum it gives for 1,000 points still reads 1,000 coins, 1,112 beans, 2,780 gift value."
+    },
+    "8d0a723c28b1dd9aac6d64ad9b60b53424aa8398": {
+      "kind": "gap",
+      "check": "On /classroom-groups in all five languages: the paragraph under the heading says who the tool is for and why it was built, How to use (opened) starts with what it does, and on a 320 by 568 phone the Make groups button is on screen without scrolling."
+    },
+    "ac0f21191ff25dade01ee743c3a1c6d72d16270e": {
+      "kind": "visible",
+      "journeys": [
+        "language switcher > en: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > id: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > zh: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > vi: lists every language in one fixed order, the current one ticked in place, every other a link",
+        "language switcher > th: lists every language in one fixed order, the current one ticked in place, every other a link"
+      ]
+    },
+    "7251c4fad825e17bf9aa08436b18749cb1ea2c72": {
+      "kind": "gap",
+      "check": "Open the homepage in dark, press the theme switch to light and back: the ShyTalk wordmark and everything under it stay exactly where they were, only the colours change."
+    },
+    "1187cf721658cc432c3791edf5d8ce6ac49f9bcd": {
+      "kind": "gap",
+      "check": "On /classroom-groups, import a class list CSV exported from the /zh/, /vi/ and /th/ pages: each is recognised as that language and imports; importing it on a page in another language says which version of the page to open."
+    },
+    "fb986ce53d0dda8edee60711223f6a51005cd7b5": {
+      "kind": "gap",
+      "check": "Read /zh/, /vi/ and /th/ classroom-groups (Student details, grouping states, import and export, print headings) and their glory-points pages: the corrected wording reads naturally, and glory points, bean and coin are kept as terms in zh and vi."
+    },
+    "c48ed4414b417fa3951f4a41a0ef66ed083b1256": {
+      "kind": "none",
+      "reason": "Translation tooling and refactors: the DeepL and back-translation helpers (used only by scripts), localisePath rewritten to return the same paths, the language-name list derived from LOCALES (the same five languages), and comment edits in en.ts; no page renders anything differently."
+    },
+    "323ce246822eea705a25300b01704ea311206e0a": {
+      "kind": "visible",
+      "journeys": [
+        "the ShyTalk phone frame > the bezel is drawn and the capture keeps its ratio",
+        "reduced motion > the language band holds still when motion is reduced"
+      ]
+    },
+    "105bb12ebaedb7f2141bd3fbf853bc1e19106920": {
+      "kind": "gap",
+      "check": "Open a missing page (/definitely-not-a-page): each language's back-home sentence ends in its own full stop (none in Thai, an ideographic one in Chinese). On /classroom-groups, type a bad number in the number fields, then enter a class list in Student details: Make groups is no longer held by the locked fields."
+    },
+    "44dfbea9c3ba727ca9b14ba111e2d43224590e0f": {
+      "kind": "none",
+      "reason": "Print rules for the class list now pick the Sex, Together, Apart and Remove columns by a data-col name instead of by position (roster-ui.ts stamps it); with the current column order the same columns hide and print, and the other changes are comments, an engine-name helper for the translation review, and the markup comments on the Classroom Groups page (30) and the Glory Points page (1) rewritten as JSX comments, so they leave the served HTML without changing anything it renders."
+    },
+    "5054c35d15feb28526968faea2c13722b0c8ff4b": {
+      "kind": "visible",
+      "journeys": [
+        "screen-reader announcements > the refusal to open Student details is announced, not just revealed",
+        "screen-reader announcements > the warning before an import replaces a roster is announced",
+        "screen-reader announcements > a refused file is announced, not just revealed"
+      ]
+    },
+    "ef5ffc99c9b5dc0f7b3d4268504ec6530524aa14": {
+      "kind": "gap",
+      "check": "On /th/classroom-groups, open Import and export: every button in the section is at least 44 pixels wide as well as tall, including the ones with the shortest Thai words."
+    },
+    "dfef8931386e4e07c26765e70b377a8cd47c6e4b": {
+      "kind": "visible",
+      "journeys": [
+        "two products, both coming soon (#403) > en: ShyTalk wears the same Coming soon badge beside its heading",
+        "two products, both coming soon (#403) > en: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > en: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > id: ShyTalk wears the same Coming soon badge beside its heading",
+        "two products, both coming soon (#403) > id: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > id: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > th: ShyTalk wears the same Coming soon badge beside its heading",
+        "two products, both coming soon (#403) > th: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > th: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > vi: ShyTalk wears the same Coming soon badge beside its heading",
+        "two products, both coming soon (#403) > vi: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > vi: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > zh: ShyTalk wears the same Coming soon badge beside its heading",
+        "two products, both coming soon (#403) > zh: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > zh: the hero offers both products, ShyTalk then Yawelo Idle"
+      ]
+    },
+    "fc383d1fc5e7841ce3f07d55d4fdf7c85f9e2db8": {
+      "kind": "visible",
+      "journeys": [
+        "two products, both coming soon (#403) > en: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > en: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > id: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > id: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > zh: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > zh: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > vi: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > vi: the hero offers both products, ShyTalk then Yawelo Idle",
+        "two products, both coming soon (#403) > th: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link",
+        "two products, both coming soon (#403) > th: the hero offers both products, ShyTalk then Yawelo Idle"
+      ]
+    },
+    "271736f4bd4de3f4743bd695b6cdb27baf057b45": {
+      "kind": "gap",
+      "check": "On the homepage in each language, a checkbox labelled Pause motion sits by the language band; ticking it stops the band moving and unticking starts it again."
+    },
+    "e928db193d750b196f9406a1f1127d1b914b9c40": {
+      "kind": "visible",
+      "journeys": [
+        "the language band sits under the header (#599) > at 1024px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 1024px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > at 1280px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 1280px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > at 320px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 320px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > at 375px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 375px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > at 390px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 390px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > at 768px the band and the header do not intersect at load",
+        "the language band sits under the header (#599) > at 768px the header paints above the band as it scrolls beneath",
+        "the language band sits under the header (#599) > en: the band is the first element in main, before the hero, and not pinned",
+        "the language band sits under the header (#599) > id: the band is the first element in main, before the hero, and not pinned",
+        "the language band sits under the header (#599) > th: the band is the first element in main, before the hero, and not pinned",
+        "the language band sits under the header (#599) > the band scrolls away: past it, its box is above the viewport",
+        "the language band sits under the header (#599) > vi: the band is the first element in main, before the hero, and not pinned",
+        "the language band sits under the header (#599) > zh: the band is the first element in main, before the hero, and not pinned"
+      ]
+    },
+    "42f3f00eba6d975b29b71a3385c49f52d1705c91": {
+      "kind": "gap",
+      "check": "On the homepage, the Pause motion control is a small pill over the right end of the language band (not a row of its own), stays above the band text, and is covered by the header when the page scrolls, in light and dark, at 320px and at desktop width."
+    },
+    "8947153d67e608a6227282e63851f455b60d66fb": {
+      "kind": "gap",
+      "check": "Read /classroom-groups in en and id (the absent-numbers field is now Student numbers / Nomor siswa, with its help text) and zh, vi and th (print headings, count line, menu button, Pause motion), and the report note label in zh: each reads naturally."
+    },
+    "c32f85e1227d40779ca42712b8489fd09f8bb05e": {
+      "kind": "none",
+      "reason": "A comment in src/lib/shytalk-brand.ts now names tests/guards/shytalk-brand.test.ts; no code or value changed."
+    },
+    "9af7ecd02018317e3898b5e9a587a94a8a04020a": {
+      "kind": "gap",
+      "check": "Read the homepage and its footer in all five languages: the tools line and the contact button speak in one person's voice (\"I\", \"Email me\"), the beta footer notice says \"tell me\" in id, zh, vi and th, and the report form's not-found message reads as reworded."
+    },
+    "63a583116180680362c7d413eba5285162a07094": {
+      "kind": "none",
+      "reason": "Only comments in tokens.css changed: the test path they name moved from tests/unit to tests/guards."
+    },
+    "e9f997dabb4e1b054e162cb1f84b4a98d25178e2": {
+      "kind": "none",
+      "reason": "Only comments changed in five src files: the paths of guard tests they name moved from tests/unit to tests/guards."
+    },
+    "be523be40594ff4db82a8036d567238407ada93e": {
+      "kind": "none",
+      "reason": "label-check.ts (read only by the translation review scripts and tests, imported by no page) gained a code-point-aware whole-word matcher, and comments in five src files name the new tests/guards paths; nothing a visitor receives changes."
+    },
+    "cf55a91bc221415a11f007520e56b294b7f53552": {
+      "kind": "none",
+      "reason": "grouping.ts takes an optional searchNodeCap that defaults to the existing SEARCH_NODE_CAP; the page script never passes it, so the groups it deals are unchanged."
+    },
+    "06ebdc5a243155ff12c08bb22d28f20e7d20611b": {
+      "kind": "none",
+      "reason": "src/lib/deploy-failure.ts is the parser for the dev-deploy failure notice issue, imported only by scripts/deploy-failure.mjs in CI; no page imports it."
+    },
+    "76eaa05c211d44ccbd5599743a9465496ad75506": {
+      "kind": "gap",
+      "check": "On /classroom-groups in each language, with exactly two students marked keep-apart, then together but different sexes, then pinned together but different sexes: the message says both (two names) and all (three or more), in the words of that language."
+    },
+    "a43d30a28953a5403ad26b3eaff44dd53fc6ab4b": {
+      "kind": "visible",
+      "journeys": [
+        "the projector board never hides a name > the stage scrolls exactly when its sheet overflows, before and after the fonts land"
+      ]
+    },
+    "4ef080aad6490ce0bee70dc72d6c043597dc79d2": {
+      "kind": "gap",
+      "check": "On /classroom-groups in every language at 320, 375 and 768 pixels, open Student details with a few students: each dropdown (Sex, Together, Apart) shows its whole column name, wrapping to the next line rather than cutting off."
+    },
+    "cd18f53fc339be6d557a5e2e0910fc25b6e8fbd7": {
+      "kind": "visible",
+      "journeys": [
+        "the projector board never hides a name > nothing waiting is out of reach -- a last group far smaller than its siblings",
+        "the projector board never hides a name > nothing waiting is out of reach -- a small class in pairs, the only shape that is corrected",
+        "the projector board never hides a name > nothing waiting is out of reach -- five groups wrapping onto a second row",
+        "the projector board never hides a name > nothing waiting is out of reach -- twelve groups wrapping onto a third row",
+        "the projector board never hides a name > nothing waiting is out of reach on a 720p projector",
+        "the projector board never hides a name > nothing waiting is out of reach on a landscape phone",
+        "the projector board never hides a name > the waiting board does not scroll sideways at 320px"
       ]
     }
   }

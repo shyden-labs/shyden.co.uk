@@ -256,6 +256,15 @@ describe('walkDisagreements -- a walk against the list git keeps (#477)', () => 
   });
 
   it('names nothing when the two agree, in any order', () => {
-    expect(walkDisagreements(['b.ts', 'a.ts'], ['a.ts', 'b.ts'])).toEqual([]);
+    const walked = ['b.ts', 'a.ts'];
+    expect(
+      searched(walkDisagreements(walked, ['a.ts', 'b.ts']), {
+        of: walked,
+        what: 'files the walk read',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('source-files/agreeing-walk', walked.length),
+    ).toBeUndefined();
   });
 });

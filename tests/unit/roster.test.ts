@@ -14,6 +14,9 @@ import {
 } from '../../src/lib/roster';
 import * as roster from '../../src/lib/roster';
 import { student } from './factories';
+import type { Student } from '../../src/lib/grouping';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import { getStrings } from '../../src/lib/i18n';
 
 // The catalogues as a page receives them: every message compiled into a
@@ -494,16 +497,20 @@ describe('rosterProblems', () => {
   });
 
   it('is quiet when the same apart letter is on students not kept together', () => {
+    const students = [
+      student({ sex: 'M', number: 1, together: 'A', apart: 'X' }),
+      student({ sex: 'M', number: 2, together: 'A' }),
+      student({ sex: 'M', number: 3, apart: 'X' }),
+    ];
     expect(
-      rosterProblems(
-        [
-          student({ sex: 'M', number: 1, together: 'A', apart: 'X' }),
-          student({ sex: 'M', number: 2, together: 'A' }),
-          student({ sex: 'M', number: 3, apart: 'X' }),
-        ],
-        en,
-      ),
+      searched(rosterProblems(students, en), {
+        of: students,
+        what: 'students handed to rosterProblems',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('roster/apart-letter-not-kept-together', students.length),
+    ).toBeUndefined();
   });
 
   it('names an unnamed student as Student N in the message', () => {
@@ -574,20 +581,26 @@ describe('rosterProblems', () => {
   // fact, succeed -- mirroring the engine's own togetherApartClash, checked
   // against the present pool, never the raw roster.
   it('an absent student holding one side of a clash does not trigger it', () => {
-    const problems = rosterProblems(
-      [
-        student({
-          sex: 'M',
-          number: 1,
-          together: 'A',
-          apart: 'X',
-          absent: true,
-        }),
-        student({ sex: 'M', number: 2, together: 'A', apart: 'X' }),
-      ],
-      en,
-    );
-    expect(problems).toEqual([]);
+    const students = [
+      student({
+        sex: 'M',
+        number: 1,
+        together: 'A',
+        apart: 'X',
+        absent: true,
+      }),
+      student({ sex: 'M', number: 2, together: 'A', apart: 'X' }),
+    ];
+    const problems = rosterProblems(students, en);
+    expect(
+      searched(problems, {
+        of: students,
+        what: 'students handed to rosterProblems',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/absent-holder-of-a-clash', students.length),
+    ).toBeUndefined();
   });
 
   // ...but a duplicate number is still caught even when one holder is
@@ -608,7 +621,16 @@ describe('rosterProblems', () => {
   });
 
   it('is quiet on an empty roster', () => {
-    expect(rosterProblems([], en)).toEqual([]);
+    const cases = [{ case: 'an empty roster', students: [] as Student[] }];
+    expect(
+      searched(
+        cases.flatMap(({ students }) => rosterProblems(students, en)),
+        { of: cases, what: 'rosters handed to rosterProblems' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/empty-roster-problems', cases.length),
+    ).toBeUndefined();
   });
 
   it('renders the clash message in Indonesian too, not a copy of the English sentence', () => {
@@ -653,22 +675,30 @@ describe('rosterWarnings', () => {
   });
 
   it('is quiet when the numbers run without gaps', () => {
+    const students = [1, 2, 3].map((n) => student({ number: n }));
     expect(
-      rosterWarnings(
-        [1, 2, 3].map((n) => student({ number: n })),
-        en,
-      ),
+      searched(rosterWarnings(students, en), {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('roster/numbers-without-gaps', students.length),
+    ).toBeUndefined();
   });
 
   it('does not treat a roster starting above 1 as a gap', () => {
     // A class numbered from 101 is a register, not an incomplete list.
+    const students = [101, 102].map((n) => student({ number: n }));
     expect(
-      rosterWarnings(
-        [101, 102].map((n) => student({ number: n })),
-        en,
-      ),
+      searched(rosterWarnings(students, en), {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('roster/numbered-from-above-one', students.length),
+    ).toBeUndefined();
   });
 
   // Not in the brief -- English inflects (this file's established
@@ -688,7 +718,16 @@ describe('rosterWarnings', () => {
   });
 
   it('is quiet on an empty roster', () => {
-    expect(rosterWarnings([], en)).toEqual([]);
+    const cases = [{ case: 'an empty roster', students: [] as Student[] }];
+    expect(
+      searched(
+        cases.flatMap(({ students }) => rosterWarnings(students, en)),
+        { of: cases, what: 'rosters handed to rosterWarnings' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/empty-roster-warnings', cases.length),
+    ).toBeUndefined();
   });
 
   // A single-student roster has no internal range to be missing a number
@@ -697,15 +736,31 @@ describe('rosterWarnings', () => {
   // level too: filling the only row's number produces no gap, whatever it
   // is filled with.
   it('is quiet on a single-student roster, however it is numbered', () => {
-    expect(rosterWarnings([student({ number: 4 })], en)).toEqual([]);
+    const students = [student({ number: 4 })];
+    expect(
+      searched(rosterWarnings(students, en), {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/single-student', students.length),
+    ).toBeUndefined();
   });
 
   it('is quiet when a duplicate, not a gap, is what is wrong', () => {
     // rosterProblems' own job, not this function's -- a repeated number is
     // not a missing one.
+    const students = [student({ number: 1 }), student({ number: 1 })];
     expect(
-      rosterWarnings([student({ number: 1 }), student({ number: 1 })], en),
+      searched(rosterWarnings(students, en), {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('roster/duplicate-not-gap', students.length),
+    ).toBeUndefined();
   });
 
   // Absence does not touch the register -- design spec section 4's "their
@@ -713,12 +768,18 @@ describe('rosterWarnings', () => {
   // here too: an absent student's number still closes the gap it would
   // otherwise leave.
   it('an absent student still counts as holding their number, closing the gap', () => {
+    const students = [1, 2, 3].map((n) =>
+      student({ number: n, absent: n === 2 }),
+    );
     expect(
-      rosterWarnings(
-        [1, 2, 3].map((n) => student({ number: n, absent: n === 2 })),
-        en,
-      ),
+      searched(rosterWarnings(students, en), {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
     ).toEqual([]);
+    expect(
+      floorBreach('roster/absent-closes-the-gap', students.length),
+    ).toBeUndefined();
   });
 
   it('renders in Indonesian too, not a copy of the English sentence', () => {
@@ -747,11 +808,17 @@ describe('rosterWarnings does not enumerate an unbounded range', () => {
   // building an array it then threw away.
   it('returns nothing, promptly, for a range wider than MAX_ROSTER', () => {
     const started = Date.now();
-    const out = rosterWarnings(
-      [student({ number: 1 }), student({ number: 99999999 })],
-      en,
-    );
-    expect(out).toEqual([]);
+    const students = [student({ number: 1 }), student({ number: 99999999 })];
+    const out = rosterWarnings(students, en);
+    expect(
+      searched(out, {
+        of: students,
+        what: 'students handed to rosterWarnings',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/range-wider-than-max', students.length),
+    ).toBeUndefined();
     expect(Date.now() - started).toBeLessThan(200);
   });
 
@@ -775,6 +842,14 @@ describe('rosterWarnings does not enumerate an unbounded range', () => {
     const at = [student({ number: 1 }), student({ number: MAX_ROSTER })];
     const past = [student({ number: 1 }), student({ number: MAX_ROSTER + 1 })];
     expect(rosterWarnings(at, en)).toHaveLength(1);
-    expect(rosterWarnings(past, en)).toEqual([]);
+    expect(
+      searched(rosterWarnings(past, en), {
+        of: past,
+        what: 'students handed to rosterWarnings',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('roster/one-past-the-limit', past.length),
+    ).toBeUndefined();
   });
 });
