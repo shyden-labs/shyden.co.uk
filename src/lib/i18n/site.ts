@@ -576,7 +576,7 @@ export const siteTh: SiteStrings = {
     toolBadge: 'พร้อมใช้งาน',
     workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
     workCalculatorsBody:
-      'คำนวณเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือของขวัญให้อะไรบ้างเมื่อได้รับแล้ว',
+      'คำนวณจำนวนเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว',
     openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
