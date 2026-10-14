@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { LISTING_CAVEAT } from '../../scripts/build-release-content.mjs';
 import {
   EVIDENCE_MANIFEST,
   EVIDENCE_REPORT,
@@ -130,16 +131,16 @@ const run = (args: string[], devVerified = '') => {
   return { code: result.status, out: result.stdout, err: result.stderr };
 };
 
-const check = () =>
+const checkWith = (...against: string[]) =>
   run([
     '--release',
     at('release.json'),
     '--head',
     'HEAD',
     '--check',
-    '--listing',
-    at('listing.json'),
+    ...against,
   ]);
+const check = () => checkWith('--manifest', at('evidence', EVIDENCE_MANIFEST));
 const build = (devVerified: string) =>
   run(
     [
@@ -160,7 +161,7 @@ describe('build-release-content.mjs --check (#362)', () => {
     const { code, out, err } = check();
     expect(err).toBe('');
     expect(out).toBe(
-      `build-release-content: ${at('release.json')} holds for ${head}\n`,
+      `build-release-content: ${at('release.json')} holds for ${head}: every cited journey captured in ${at('evidence', EVIDENCE_MANIFEST)}\n`,
     );
     expect(code).toBe(0);
     expect(ghCalledWith(at('gh-args'))).toBeNull();
@@ -180,7 +181,7 @@ describe('build-release-content.mjs --check (#362)', () => {
     expect(code).toBe(1);
   });
 
-  it('asks for a listing, as usage', () => {
+  it('asks for a manifest or a listing, as usage', () => {
     const { code, err } = run([
       '--release',
       at('release.json'),
@@ -190,6 +191,55 @@ describe('build-release-content.mjs --check (#362)', () => {
     ]);
     expect(err).toContain('usage: build-release-content.mjs');
     expect(code).toBe(2);
+  });
+
+  it('names every cited title the capture never recorded, each with its entry', () => {
+    writeRelease({
+      entries: {
+        [head]: {
+          kind: 'visible',
+          journeys: [TITLE, 'a describe > no picture', 'a describe > none'],
+        },
+      },
+    });
+    const { code, out, err } = check();
+    expect(out).toBe('');
+    expect(err).toContain('2 cited titles are not journeys of this run');
+    expect(err).toContain(
+      `"a describe > no picture", cited by ${head}, is not a journey of this run`,
+    );
+    expect(err).toContain(
+      `"a describe > none", cited by ${head}, is not a journey of this run`,
+    );
+    expect(code).toBe(1);
+  });
+
+  it("refuses a manifest with no report beside it, which cannot tell this run's rows", () => {
+    rmSync(at('evidence', EVIDENCE_REPORT));
+    const { code, err } = check();
+    expect(err).toContain(EVIDENCE_REPORT);
+    expect(code).toBe(1);
+  });
+
+  it('refuses a listing alone, saying it proves a title runs, not that it captures', () => {
+    const { code, out, err } = checkWith('--listing', at('listing.json'));
+    expect(out).toBe('');
+    expect(err).toContain(LISTING_CAVEAT);
+    expect(err).toContain('--listing-only');
+    expect(code).toBe(2);
+  });
+
+  it('runs the listing-only check when asked for by name, and says what it proves', () => {
+    const { code, out, err } = checkWith(
+      '--listing',
+      at('listing.json'),
+      '--listing-only',
+    );
+    expect(err).toBe('');
+    expect(out).toBe(
+      `build-release-content: ${at('release.json')} holds for ${head}, as a listing: ${LISTING_CAVEAT}\n`,
+    );
+    expect(code).toBe(0);
   });
 
   it('names an option it does not know, and refuses', () => {
