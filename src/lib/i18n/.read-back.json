@@ -1,0 +1,1857 @@
+{
+  "engine": "Google Cloud Translation v2",
+  "readings": {
+    "zh": {
+      "课堂小组创建器": {
+        "english": "Classroom Group Creator",
+        "verdict": "agrees"
+      },
+      "立即将班级分成小组——直接在浏览器中完成，无需向任何地方发送数据。": {
+        "english": "Instantly divide the class into groups—all in the browser, without sending data anywhere.",
+        "verdict": "agrees"
+      },
+      "由Shyden专为教师打造。公平地给全班分组需要花费您本就不多的时间，而手动操作又容易引发关于“偏袒”的争议。只需一次点击，即可完成分组——完全免费，无需注册，且有关您班级的信息绝不会离开您的浏览器。": {
+        "english": "Designed specifically for teachers by Shyden. Fairly grouping the whole class takes up your limited time, and manual work can easily lead to accusations of favoritism. Grouping can be done with a single click—completely free, no registration required, and all information about your class never leaves your browser.",
+        "verdict": "agrees"
+      },
+      "所有操作都在您的浏览器中完成。班级名单绝不会离开此页面。": {
+        "english": "All operations are completed in your browser. The class roster will never leave this page.",
+        "verdict": "agrees"
+      },
+      "使用方法": { "english": "How to use", "verdict": "agrees" },
+      "只需输入班级人数以及每组希望安排多少名学生，系统就会自动将学生随机分组，确保每个小组的人数都不会少于您设定的最低人数。": {
+        "english": "Simply enter the number of students in the class and how many students you want in each group, and the system will automatically group the students randomly, ensuring that each group has no fewer than the minimum number you set.",
+        "verdict": "agrees"
+      },
+      "填写你班上的学生人数。": {
+        "english": "Enter the number of students in your class.",
+        "verdict": "agrees"
+      },
+      "选择如何给他们分组。": {
+        "english": "Choose how to group them.",
+        "verdict": "agrees"
+      },
+      "点击“开始分组”。": {
+        "english": "Click \"Start Grouping\".",
+        "verdict": "agrees"
+      },
+      "班级（可选）": { "english": "Class (optional)", "verdict": "agrees" },
+      "学生人数": { "english": "Number of students", "verdict": "agrees" },
+      "学生均为匿名，并按编号区分——学生1、学生2，依此类推。": {
+        "english": "All students are anonymous and are distinguished by their numbers—Student 1, Student 2, and so on.",
+        "verdict": "agrees"
+      },
+      "由您的列表设定。如需修改，请在“学生详情”中添加或移除学生。": {
+        "english": "This is set by your list. To make changes, add or remove students in \"Student Details\".",
+        "verdict": "agrees"
+      },
+      "学生编号": { "english": "Student ID", "verdict": "agrees" },
+      "同组": { "english": "same group", "verdict": "agrees" },
+      "分开": { "english": "separate", "verdict": "agrees" },
+      "缺席学生的学生编号，用逗号分隔。": {
+        "english": "The student IDs of absent students are separated by commas.",
+        "verdict": "agrees"
+      },
+      "逗号连接一对；分号开始新的一对——3,9; 14,15。": {
+        "english": "A comma connects a pair; a semicolon begins a new pair—3,9; 14,15.",
+        "verdict": "agrees"
+      },
+      "由您的列表设定。如需修改，请在“学生详情”中标记缺席和配对。": {
+        "english": "This is set by your list. To modify it, mark absences and pairings in \"Student Details\".",
+        "verdict": "agrees"
+      },
+      "请先填写学生人数。": {
+        "english": "Please fill in the number of students first.",
+        "verdict": "agrees"
+      },
+      "按……划分": { "english": "Classified by...", "verdict": "agrees" },
+      "每组学生人数": {
+        "english": "Number of students in each group",
+        "verdict": "agrees"
+      },
+      "组数": {
+        "english": "Group number",
+        "verdict": "ambiguous",
+        "note": "组数 is the number of groups; Google read it as a group's number"
+      },
+      "每个小组的学生": {
+        "english": "Students in each group",
+        "verdict": "agrees"
+      },
+      "有多少个小组": { "english": "How many groups", "verdict": "agrees" },
+      "将男生和女生平均分配": {
+        "english": "Distribute boys and girls equally.",
+        "verdict": "agrees"
+      },
+      "让男生和女生分开": {
+        "english": "Separate boys and girls",
+        "verdict": "agrees"
+      },
+      "在“学生详情”中添加您的学生，并为每位学生设置“M”或“F”，以便使用这些功能。": {
+        "english": "Add your students in \"Student Details\" and assign \"M\" or \"F\" to each student to use these features.",
+        "verdict": "agrees"
+      },
+      "如果还有剩余的学生": {
+        "english": "If there are still students remaining",
+        "verdict": "agrees"
+      },
+      "把他们平均分到各组": {
+        "english": "Divide them equally into groups",
+        "verdict": "agrees"
+      },
+      "把他们全都放进同一个组": {
+        "english": "Put them all in the same group",
+        "verdict": "agrees"
+      },
+      "无论哪种情况，任何一组的人数都不会少于你所选的数量。": {
+        "english": "In either case, the number of people in any group will not be less than the number you selected.",
+        "verdict": "agrees"
+      },
+      "声音：开": { "english": "Sound: On", "verdict": "agrees" },
+      "声音：关": { "english": "Sound: Off", "verdict": "agrees" },
+      "速度": { "english": "speed", "verdict": "agrees" },
+      "正常": { "english": "normal", "verdict": "agrees" },
+      "快": { "english": "quick", "verdict": "agrees" },
+      "跳过动画": { "english": "Skip animation", "verdict": "agrees" },
+      "学生详情": { "english": "Student Details", "verdict": "agrees" },
+      "分组选项": { "english": "Grouping options", "verdict": "agrees" },
+      "导入 / 导出": { "english": "Import / Export", "verdict": "agrees" },
+      "声音和动画": { "english": "Sound and animation", "verdict": "agrees" },
+      "姓名": { "english": "Name", "verdict": "agrees" },
+      "性别": { "english": "gender", "verdict": "agrees" },
+      "缺席": { "english": "absent", "verdict": "agrees" },
+      "在一起": { "english": "Together", "verdict": "agrees" },
+      "+ 添加学生": { "english": "Add students", "verdict": "agrees" },
+      "+ 添加几个……": { "english": "Add a few more...", "verdict": "agrees" },
+      "要加多少？": {
+        "english": "How much should I add?",
+        "verdict": "agrees"
+      },
+      "添加": { "english": "Add to", "verdict": "agrees" },
+      "在分组时，被标记为缺席的学生不会被纳入其中。": {
+        "english": "Students marked as absent will not be included when grouping.",
+        "verdict": "agrees"
+      },
+      "删除": { "english": "delete", "verdict": "agrees" },
+      "清除全部": { "english": "Clear all", "verdict": "agrees" },
+      "未添加": { "english": "No additions", "verdict": "agrees" },
+      "无": { "english": "none", "verdict": "agrees" },
+      "男女平均分配": {
+        "english": "Average distribution between men and women",
+        "verdict": "agrees"
+      },
+      "按性别划分": { "english": "Classified by gender", "verdict": "agrees" },
+      "剩余学生归入同一组": {
+        "english": "The remaining students were grouped together.",
+        "verdict": "agrees"
+      },
+      "目前尚无内容可保存": {
+        "english": "There is currently no content to save.",
+        "verdict": "agrees"
+      },
+      "未保存的更改 — 导出以保留这些更改": {
+        "english": "Unsaved changes — Export to preserve these changes",
+        "verdict": "agrees"
+      },
+      "开始分组": { "english": "Start grouping", "verdict": "agrees" },
+      "重新洗牌": { "english": "Reshuffle", "verdict": "agrees" },
+      "此工具需要启用 JavaScript。": {
+        "english": "This tool requires JavaScript to be enabled.",
+        "verdict": "agrees"
+      },
+      "您的分组": { "english": "Your group", "verdict": "agrees" },
+      "这些分组已经过时了——每组人数发生了变化。": {
+        "english": "These groupings are outdated—the number of people in each group has changed.",
+        "verdict": "agrees"
+      },
+      "这些分组已经过时了——“剩余学生”选项已经更改了。": {
+        "english": "These groupings are outdated—the “Remaining Students” option has been changed.",
+        "verdict": "agrees"
+      },
+      "这些分组已经过时了——男女生的分组方式已经发生了变化。": {
+        "english": "These groupings are outdated—the way boys and girls are grouped has changed.",
+        "verdict": "agrees"
+      },
+      "这些组已经过时了——班级名单已经变更。": {
+        "english": "These groups are outdated—the class rosters have changed.",
+        "verdict": "agrees"
+      },
+      "该文件为空。": { "english": "The file is empty.", "verdict": "agrees" },
+      "无法读取该文件。请重新选择该文件。": {
+        "english": "Unable to read the file. Please select the file again.",
+        "verdict": "agrees"
+      },
+      "该文件中没有编号列。每个学生都需要一个编号。": {
+        "english": "The file does not have a number column. Each student needs a number.",
+        "verdict": "agrees"
+      },
+      "英语": { "english": "English", "verdict": "agrees" },
+      "印尼语": { "english": "Indonesian", "verdict": "agrees" },
+      "中文": { "english": "Chinese", "verdict": "agrees" },
+      "越南语": { "english": "Vietnamese", "verdict": "agrees" },
+      "泰语": { "english": "Thai", "verdict": "agrees" },
+      "导出班级名单": { "english": "Export class list", "verdict": "agrees" },
+      "导出分组": { "english": "Export Groups", "verdict": "agrees" },
+      "下载模板": { "english": "Download template", "verdict": "agrees" },
+      "导入班级名单": { "english": "Import class list", "verdict": "agrees" },
+      "未导入此文件：": {
+        "english": "This file was not imported:",
+        "verdict": "agrees"
+      },
+      "替换它": { "english": "Replace it", "verdict": "agrees" },
+      "保留当前名单": {
+        "english": "Retain the current list",
+        "verdict": "agrees"
+      },
+      "还以另一种语言导出": {
+        "english": "Also exported in another language",
+        "verdict": "agrees"
+      },
+      "您的文件现已以该语言保存。系统会以您选择的语言打开第二个标签页，其中显示相同的班级名单，供您核对并保存。系统不会存储任何内容，也不会将任何信息发送至任何地方。": {
+        "english": "Your file is now saved in that language. The system will open a second tab in your selected language, displaying the same class list for you to check and save. The system does not store any content and will not send any information anywhere.",
+        "verdict": "agrees"
+      },
+      "无法打开第二个标签页。您的班级名单仍在此页面——请允许弹出窗口，然后重试。": {
+        "english": "Unable to open a second tab. Your class list is still on this page—please allow the pop-up and try again.",
+        "verdict": "agrees"
+      },
+      "第二个标签页没有请求班级名单。您的班级名单仍在此页面——请关闭那个标签页，然后重试。": {
+        "english": "The second tab did not request the class list. Your class list is still on this page—please close that tab and try again.",
+        "verdict": "agrees"
+      },
+      "没有收到班级名单。请返回另一个标签页，然后重试。": {
+        "english": "No class list received. Please return to another tab and try again.",
+        "verdict": "agrees"
+      },
+      "打印": { "english": "Print", "verdict": "agrees" },
+      "打印内容": { "english": "Print content", "verdict": "agrees" },
+      "班级名单": { "english": "Class list", "verdict": "agrees" },
+      "分组结果": { "english": "Grouping results", "verdict": "agrees" },
+      "两者": { "english": "Both", "verdict": "agrees" },
+      "在班级名单上": { "english": "On the class roster", "verdict": "agrees" },
+      "显示缺席的学生": {
+        "english": "Students showing absence",
+        "verdict": "ambiguous",
+        "note": "显示缺席的学生 says show the absent students; Google read it as a noun phrase"
+      },
+      "显示性别以及“在一起/分开”的字母": {
+        "english": "Displays gender and the letters \"Together/Separate\".",
+        "verdict": "agrees"
+      },
+      "包含头像": {
+        "english": "Includes profile picture",
+        "verdict": "agrees"
+      },
+      "取消": { "english": "Cancel", "verdict": "agrees" },
+      "组": { "english": "Group", "verdict": "agrees" },
+      "全屏": { "english": "full screen", "verdict": "agrees" },
+      "退出全屏模式": {
+        "english": "Exit fullscreen mode",
+        "verdict": "agrees"
+      },
+      "等待分组": { "english": "Waiting for grouping", "verdict": "agrees" },
+      "这些分组已经过时了。保存前请重新洗牌。": {
+        "english": "These groups are outdated. Please shuffle them before saving.",
+        "verdict": "agrees"
+      },
+      "这些分组已经过时了。打印前请重新洗牌。": {
+        "english": "These groups are outdated. Please shuffle them before printing.",
+        "verdict": "agrees"
+      },
+      "这些分组已经过时了。显示前请重新洗牌。": {
+        "english": "These groups are outdated. Please reshuffle before displaying.",
+        "verdict": "agrees"
+      },
+      "添加一些学生，或者确保其中至少有一人未被标记为缺席。": {
+        "english": "Add some students, or make sure that at least one of them is not marked as absent.",
+        "verdict": "agrees"
+      },
+      "每个小组至少需要1名学生。": {
+        "english": "Each group needs at least one student.",
+        "verdict": "agrees"
+      },
+      "您至少需要创建1个小组。": {
+        "english": "You need to create at least one group.",
+        "verdict": "agrees"
+      },
+      "这里的“在一起”字母太多，难以逐一处理。请尝试减少字母数量，或者扩大小组。": {
+        "english": "There are too many letters in \"together\" here, making it difficult to process them one by one. Please try reducing the number of letters or expanding the group.",
+        "verdict": "agrees"
+      },
+      "这里的“分开”规则太多，难以逐一处理。试着删除其中一些吧。": {
+        "english": "There are too many \"separate\" rules here to process them all individually. Try deleting some of them.",
+        "verdict": "agrees"
+      },
+      "这里的“在一起”和“分开”字母太多，无法一次全部处理。请尝试减少任一类字母的数量，或者扩大小组。": {
+        "english": "There are too many letters in \"together\" and \"separate\" here to process them all at once. Please try reducing the number of letters in either category, or expanding the group.",
+        "verdict": "agrees"
+      },
+      "这里的“在一起”和“分开”字母太多，无法在把男孩和女孩分到不同组的同时完成分组。请尝试减少字母数量，或者关闭此模式。": {
+        "english": "There are too many letters for \"together\" and \"separate\" to group boys and girls simultaneously. Please try reducing the number of letters or turning this mode off.",
+        "verdict": "agrees"
+      },
+      "工具": { "english": "tool", "verdict": "agrees" },
+      "联系": {
+        "english": "connect",
+        "verdict": "ambiguous",
+        "note": "联系 is both contact and connect; as a menu item it says contact"
+      },
+      "切换导航菜单": {
+        "english": "Switch navigation menu",
+        "verdict": "agrees"
+      },
+      "深色模式": { "english": "Dark mode", "verdict": "agrees" },
+      "跳转至正文": { "english": "Jump to the main text", "verdict": "agrees" },
+      "Shyden — 精心制作的小巧软件": {
+        "english": "Shyden — A meticulously crafted, compact software",
+        "verdict": "agrees"
+      },
+      "精心打造的小巧软件。即将推出：ShyTalk——通过口语练习学习语言的实时房间，以及 Yawelo Idle——一款用于学习语言的放置类游戏。": {
+        "english": "A meticulously crafted, compact software. Coming soon: ShyTalk—a live chat room for learning languages through spoken practice, and Yawelo Idle—an idle game for learning languages.",
+        "verdict": "agrees"
+      },
+      "Shyden 精心开发小型软件。": {
+        "english": "Shyden meticulously develops small software programs.",
+        "verdict": "agrees"
+      },
+      "即将推出：两种全新的语言学习方式。你可以在 ShyTalk 的实时房间里畅所欲言，或者通过 Yawelo Idle 这款放置类游戏边玩边学——在这款游戏中，你学会的每一个单词都能让你走得更远。": {
+        "english": "Coming Soon: Two brand-new ways to learn languages. You can speak freely in ShyTalk's live rooms, or learn while playing the Yawelo Idle, an idle game where every word you learn can take you further.",
+        "verdict": "agrees"
+      },
+      "了解 ShyTalk": { "english": "Learn about ShyTalk", "verdict": "agrees" },
+      "了解 Yawelo Idle": {
+        "english": "Learn about Yawelo Idle",
+        "verdict": "agrees"
+      },
+      "打开": { "english": "Open", "verdict": "agrees" },
+      "即将推出": { "english": "coming soon", "verdict": "agrees" },
+      "通过交谈学习": {
+        "english": "Learning through conversation",
+        "verdict": "agrees"
+      },
+      "在实时房间里坐下来开口说——和正在学你语言的人交流，或者在想要更有条理时，参加由真人老师带的免费课程。": {
+        "english": "Sit down in a live room and start speaking—talk to people who are learning your language, or take a free lesson led by a live teacher when you want to be more organized.",
+        "verdict": "agrees"
+      },
+      "实时语音房间，最多八个座位": {
+        "english": "Real-time voice chat room, up to eight seats",
+        "verdict": "agrees"
+      },
+      "申请一个座位，或者先听着，等你准备好": {
+        "english": "Request a seat, or listen in and wait until you're ready.",
+        "verdict": "agrees"
+      },
+      "由真人老师带的免费课程": {
+        "english": "Free courses taught by live teachers",
+        "verdict": "agrees"
+      },
+      "有人管理、按年龄分区，为友善而设计": {
+        "english": "Managed, age-grouped, and designed for user-friendliness.",
+        "verdict": "ambiguous",
+        "note": "友善 is friendliness between people; Google read it as user-friendliness"
+      },
+      "ShyTalk 应用在手机上显示一个实时语音房间，座位上有人，下面是房间聊天。": {
+        "english": "The ShyTalk app displays a live voice room on your phone, with people in seats and the room chat below.",
+        "verdict": "agrees"
+      },
+      "访问 ShyTalk 网站": {
+        "english": "Visit the ShyTalk website",
+        "verdict": "agrees"
+      },
+      "通过游戏学习": {
+        "english": "Learning through games",
+        "verdict": "agrees"
+      },
+      "一款学习真实语言的放置类游戏。穿越印度尼西亚群岛，或踏遍英语世界，你学到的单词会为游戏提供动力。": {
+        "english": "A casual game where you learn real-world languages. Travel through the Indonesian archipelago or explore the English-speaking world; the words you learn will power up the game.",
+        "verdict": "agrees"
+      },
+      "从英语学习印尼语，或从印尼语学习英语": {
+        "english": "Learn Indonesian from English, or learn English from Indonesian.",
+        "verdict": "agrees"
+      },
+      "复习一个单词，它就会变得更牢固": {
+        "english": "Reviewing a word makes it more ingrained.",
+        "verdict": "agrees"
+      },
+      "无广告、无能量计时器、无付费解锁": {
+        "english": "No ads, no energy timer, no paid unlocks",
+        "verdict": "agrees"
+      },
+      "哪怕错过一天，也不会有什么损失。没人会被强迫学习。": {
+        "english": "Even if you miss a day, there's nothing to lose. No one is forced to learn.",
+        "verdict": "agrees"
+      },
+      "访问 Yawelo Idle 网站": {
+        "english": "Visit the Yawelo Idle website",
+        "verdict": "agrees"
+      },
+      "等待期间，先试试这些。": {
+        "english": "While you wait, try these.",
+        "verdict": "agrees"
+      },
+      "我已经开发了两个工具。免费、无需注册，而且现在就可以使用。": {
+        "english": "I have developed two tools. They are free, require no registration, and are available for use right now.",
+        "verdict": "agrees"
+      },
+      "已上线": { "english": "It is now online.", "verdict": "agrees" },
+      "Glory Points 计算器": {
+        "english": "Glory Points Calculator",
+        "verdict": "agrees"
+      },
+      "把 YeeTalk 的 glory points 换算成达成目标所需的金币、bean 和礼物价值。": {
+        "english": "Convert YeeTalk glory points into the value of coins, beans, and gifts needed to achieve your goals.",
+        "verdict": "agrees"
+      },
+      "打开计算器": { "english": "Open the calculator", "verdict": "agrees" },
+      "粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。": {
+        "english": "Paste a class roster and get fair, random groupings in seconds. Made for teachers, and permanently free.",
+        "verdict": "agrees"
+      },
+      "打开小组创建器": {
+        "english": "Open Group Creator",
+        "verdict": "agrees"
+      },
+      "给我发邮件": { "english": "Send me an email", "verdict": "agrees" },
+      "暂停动画": { "english": "Pause animation", "verdict": "agrees" },
+      "页面未找到 — Shyden": {
+        "english": "Page Not Found — Shyden",
+        "verdict": "agrees"
+      },
+      "您要查找的页面不存在。": {
+        "english": "The page you are looking for does not exist.",
+        "verdict": "agrees"
+      },
+      "页面未找到": { "english": "Page Not Found", "verdict": "agrees" },
+      "该页面不存在。": {
+        "english": "This page does not exist.",
+        "verdict": "agrees"
+      },
+      "返回首页": { "english": "Return to homepage", "verdict": "agrees" },
+      "Glory Points 计算器 — Shyden": {
+        "english": "Glory Points Calculator — Shyden",
+        "verdict": "agrees"
+      },
+      "将 YeeTalk 的 glory points 换算成金币、bean 和礼物总价值——在浏览器中即可即时完成。": {
+        "english": "Convert YeeTalk glory points into the total value of coins, beans, and gifts—instantly within your browser.",
+        "verdict": "agrees"
+      },
+      "适用于 YeeTalk ↗": {
+        "english": "Applicable to YeeTalk ↗",
+        "verdict": "agrees"
+      },
+      "Glory points 是 YeeTalk 应用内送礼功能的一部分。输入您想达到的 glory points，这款由 Shyden 开发的辅助工具会算出达到该目标所需的确切金币、bean 和礼物总价值。": {
+        "english": "Glory points are part of the gifting feature in the YeeTalk app. Enter the glory points you want to achieve, and this helper tool, developed by Shyden, will calculate the exact amount of coins, beans, and total gift value needed to reach that goal.",
+        "verdict": "agrees"
+      },
+      "如何使用": { "english": "How to use", "verdict": "agrees" },
+      "请在下方框中输入您想达到的 glory points。": {
+        "english": "Please enter the glory points you wish to achieve in the box below.",
+        "verdict": "agrees"
+      },
+      "选择“计算”——或按 Enter 键。": {
+        "english": "Select “Calculate” – or press Enter.",
+        "verdict": "agrees"
+      },
+      "即可看到达到该目标所需的确切金币、bean 和礼物总价值。": {
+        "english": "You can then see the exact total value of gold coins, beans, and gifts required to achieve the goal.",
+        "verdict": "agrees"
+      },
+      "计算": { "english": "calculate", "verdict": "agrees" },
+      "此计算器需要启用 JavaScript。": {
+        "english": "This calculator requires JavaScript to be enabled.",
+        "verdict": "agrees"
+      },
+      "假设每 1 点需 1 枚金币，每个 bean 可兑换 0.9 枚金币，且礼物按 40% 的比例兑换成 bean。": {
+        "english": "Assuming each point requires 1 gold coin, each bean can be exchanged for 0.9 gold coins, and gifts are converted into beans at a rate of 40%.",
+        "verdict": "agrees"
+      },
+      "请输入一个数字。": {
+        "english": "Please enter a number.",
+        "verdict": "agrees"
+      },
+      "请输入一个整数。": {
+        "english": "Please enter an integer.",
+        "verdict": "agrees"
+      },
+      "请输入一个大于零的数字。": {
+        "english": "Please enter a number greater than zero.",
+        "verdict": "agrees"
+      },
+      "这个数字太大了。": {
+        "english": "This number is too large.",
+        "verdict": "agrees"
+      },
+      "语言": { "english": "language", "verdict": "agrees" },
+      "测试版翻译": { "english": "Beta translation", "verdict": "agrees" },
+      "翻译可能不够准确。如果您发现问题，请告诉我。": {
+        "english": "The translation may not be entirely accurate. Please let me know if you find any issues.",
+        "verdict": "agrees"
+      },
+      "报告翻译问题": {
+        "english": "Report translation issues",
+        "verdict": "agrees"
+      },
+      "报告将发送至Shyden，处理完毕后即会删除。": {
+        "english": "The report will be sent to Shyden and deleted after processing.",
+        "verdict": "agrees"
+      },
+      "哪些文字有误？": {
+        "english": "Which texts are incorrect?",
+        "verdict": "agrees"
+      },
+      "开始输入并从列表中选择这些文字，或从页面上复制。": {
+        "english": "Start typing and select the text from the list, or copy it from the page.",
+        "verdict": "agrees"
+      },
+      "应该怎么写？（可选）": {
+        "english": "How should it be written? (Optional)",
+        "verdict": "agrees"
+      },
+      "还有其他要补充的吗？（可选）": {
+        "english": "Is there anything else to add? (Optional)",
+        "verdict": "agrees"
+      },
+      "请勿填写姓名或联系方式。": {
+        "english": "Please do not fill in your name or contact information.",
+        "verdict": "agrees"
+      },
+      "请将此栏留空": {
+        "english": "Please leave this field blank.",
+        "verdict": "agrees"
+      },
+      "发送报告": { "english": "Send report", "verdict": "agrees" },
+      "谢谢。您的报告已发送。": {
+        "english": "Thank you. Your report has been sent.",
+        "verdict": "agrees"
+      },
+      "这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。": {
+        "english": "These words are not on this page. Please select from the list, or copy a shorter text that does not contain any names or numbers.",
+        "verdict": "agrees"
+      },
+      "该报告无法发送。请检查表单后重试。": {
+        "english": "The report could not be sent. Please check the form and try again.",
+        "verdict": "agrees"
+      },
+      "出现问题，您的报告未能发送。请稍后再试。": {
+        "english": "There was a problem; your report could not be sent. Please try again later.",
+        "verdict": "agrees"
+      },
+      "# 班级：": { "english": "# Class:", "verdict": "agrees" },
+      "编号": { "english": "serial number", "verdict": "agrees" },
+      "一起": { "english": "Together", "verdict": "agrees" },
+      "是": { "english": "yes", "verdict": "agrees" },
+      "否": { "english": "no", "verdict": "agrees" },
+      "# 已创建的组": {
+        "english": "# Groups already created",
+        "verdict": "agrees"
+      },
+      "删除这两行，然后输入你自己的内容": {
+        "english": "Delete these two lines, then enter your own content.",
+        "verdict": "agrees"
+      }
+    },
+    "th": {
+      "เครื่องมือสร้างกลุ่มในห้องเรียน": {
+        "english": "Classroom group creation tool",
+        "verdict": "agrees"
+      },
+      "แบ่งชั้นเรียนเป็นกลุ่มได้ทันที — ในเบราว์เซอร์ของคุณ โดยไม่ต้องส่งข้อมูลไปที่ใดทั้งสิ้น": {
+        "english": "You can instantly divide classes into groups — right in your browser — without sending any data anywhere.",
+        "verdict": "agrees"
+      },
+      "ออกแบบมาสำหรับครู โดยShyden การแบ่งชั้นเรียนให้ยุติธรรมนั้นใช้เวลามาก ซึ่งคุณอาจไม่มีเวลาพอ และการทำด้วยมืออาจก่อให้เกิดข้อโต้แย้งว่าครูมีนักเรียนคนโปรด การแบ่งชั้นเรียนนี้ทำได้เพียงคลิกเดียว — ฟรี ไม่ต้องสมัคร และข้อมูลเกี่ยวกับชั้นเรียนของคุณจะไม่ถูกส่งออกจากเบราว์เซอร์เลย": {
+        "english": "Designed for teachers by Shyden. Fairly dividing classes is time-consuming, and you may not have enough time. Doing it manually can also lead to arguments about teacher favoritism. This class division is done in one click — it's free, requires no registration, and no information about your classes is ever sent from your browser.",
+        "verdict": "agrees"
+      },
+      "ทุกอย่างเกิดขึ้นในเบราว์เซอร์ของคุณเท่านั้น รายชื่อชั้นเรียนจะไม่ถูกส่งออกจากหน้านี้เลย": {
+        "english": "Everything happens only in your browser. The list of classes will not be exported from this page at all.",
+        "verdict": "ambiguous",
+        "note": "รายชื่อชั้นเรียน is the class roster; Google read it as a list of classes"
+      },
+      "วิธีใช้": { "english": "How to use", "verdict": "agrees" },
+      "บอกระบบว่าชั้นเรียนของคุณมีนักเรียนกี่คน และต้องการให้นักเรียนในกลุ่มละกี่คน ระบบจะสับเปลี่ยนและจัดนักเรียนให้แต่ละกลุ่ม โดยไม่มีกลุ่มใดที่มีจำนวนนักเรียนน้อยกว่าที่คุณกำหนด": {
+        "english": "Tell the system how many students are in your class and how many students you want in each group. The system will shuffle and assign students to each group, ensuring that no group has fewer students than you specify.",
+        "verdict": "agrees"
+      },
+      "บอกจำนวนนักเรียนในชั้นของคุณว่ามีกี่คน": {
+        "english": "Tell me how many students are in your class.",
+        "verdict": "agrees"
+      },
+      "เลือกวิธีแบ่งกลุ่มนักเรียน": {
+        "english": "Choose a method for dividing students into groups.",
+        "verdict": "agrees"
+      },
+      "กด \"สร้างกลุ่ม\"": {
+        "english": "Click \"Create Group\".",
+        "verdict": "agrees"
+      },
+      "ชั้นเรียน (ไม่บังคับ)": {
+        "english": "Class (optional)",
+        "verdict": "agrees"
+      },
+      "จำนวนนักเรียน": { "english": "Number of students", "verdict": "agrees" },
+      "นักเรียนจะไม่เปิดเผยชื่อและถูกกำหนดด้วยหมายเลข — นักเรียน 1, นักเรียน 2, และต่อไปเรื่อยๆ": {
+        "english": "Students will not reveal their names and are assigned numbers — Student 1, Student 2, and so on.",
+        "verdict": "agrees"
+      },
+      "กำหนดตามรายชื่อของคุณ เพิ่มหรือลบนักเรียนในส่วน \"รายละเอียดนักเรียน\" เพื่อปรับเปลี่ยน": {
+        "english": "Customize your list by adding or removing students in the \"Student Details\" section.",
+        "verdict": "ambiguous",
+        "note": "กำหนดตามรายชื่อของคุณ says set by your list; Google read กำหนด as customize"
+      },
+      "เลขประจำตัวนักเรียน": {
+        "english": "Student ID number",
+        "verdict": "agrees"
+      },
+      "ให้อยู่กลุ่มเดียวกัน": {
+        "english": "Put them in the same group.",
+        "verdict": "agrees"
+      },
+      "ให้อยู่คนละกลุ่ม": {
+        "english": "Put them in separate groups.",
+        "verdict": "agrees"
+      },
+      "เลขประจำตัวนักเรียนของผู้ที่ขาดเรียน คั่นด้วยเครื่องหมายจุลภาค": {
+        "english": "The student ID numbers of those who are absent are separated by commas.",
+        "verdict": "agrees"
+      },
+      "จุลภาคเชื่อมหนึ่งคู่ อัฒภาคเริ่มคู่ใหม่ — 3,9; 14,15": {
+        "english": "A comma connects one pair of semicolons, a semicolon begins a new pair — 3,9; 14,15",
+        "verdict": "ambiguous",
+        "note": "the Thai runs two clauses together; it says a comma joins one pair, a semicolon starts a new pair"
+      },
+      "กำหนดตามรายชื่อของคุณ ทำเครื่องหมายการขาดเรียนและการจับคู่ในส่วน \"รายละเอียดนักเรียน\" เพื่อปรับเปลี่ยน": {
+        "english": "Based on your list, mark absences and matches in the \"Student Details\" section to make adjustments.",
+        "verdict": "agrees"
+      },
+      "กรุณากรอกจำนวนนักเรียนก่อน": {
+        "english": "Please enter the number of students first.",
+        "verdict": "agrees"
+      },
+      "แบ่งตาม": { "english": "Categorized by", "verdict": "agrees" },
+      "จำนวนนักเรียนต่อกลุ่ม": {
+        "english": "Number of students per group",
+        "verdict": "agrees"
+      },
+      "จำนวนกลุ่ม": { "english": "Number of groups", "verdict": "agrees" },
+      "นักเรียนในแต่ละกลุ่ม": {
+        "english": "Students in each group",
+        "verdict": "agrees"
+      },
+      "มีกี่กลุ่ม": {
+        "english": "How many groups are there?",
+        "verdict": "agrees"
+      },
+      "แบ่งเด็กชายและเด็กหญิงให้เท่ากัน": {
+        "english": "Divide the boys and girls equally.",
+        "verdict": "agrees"
+      },
+      "ให้เด็กชายและเด็กหญิงอยู่แยกกัน": {
+        "english": "Keep the boys and girls separate.",
+        "verdict": "agrees"
+      },
+      "เพิ่มชื่อนักเรียนของคุณในส่วน \"รายละเอียดนักเรียน\" และกำหนดเพศ (M หรือ F) สำหรับแต่ละคนเพื่อใช้ฟังก์ชันนี้": {
+        "english": "Add your students' names to the \"Student Details\" section and assign a gender (M or F) to each one to use this function.",
+        "verdict": "agrees"
+      },
+      "หากมีนักเรียนเหลือ": {
+        "english": "If there are any students left.",
+        "verdict": "agrees"
+      },
+      "แบ่งให้เท่ากัน": {
+        "english": "Divide it equally.",
+        "verdict": "agrees"
+      },
+      "รวมทั้งหมดไว้ในกลุ่มเดียว": {
+        "english": "Combine them all into one group.",
+        "verdict": "agrees"
+      },
+      "ไม่ว่าจะอย่างไร กลุ่มใดก็ตามจะไม่เล็กกว่าขนาดที่คุณเลือกไว้": {
+        "english": "Regardless, no group will be smaller than the size you have chosen.",
+        "verdict": "agrees"
+      },
+      "เปิดเสียง": { "english": "Turn on sound", "verdict": "agrees" },
+      "ปิดเสียง": { "english": "Mute", "verdict": "agrees" },
+      "ความเร็ว": { "english": "speed", "verdict": "agrees" },
+      "ปกติ": { "english": "normal", "verdict": "agrees" },
+      "เร็ว": { "english": "fast", "verdict": "agrees" },
+      "ข้ามส่วนแอนิเมชัน": {
+        "english": "Skip the animation section.",
+        "verdict": "agrees"
+      },
+      "รายละเอียดนักเรียน": {
+        "english": "Student details",
+        "verdict": "agrees"
+      },
+      "ตัวเลือกการจัดกลุ่ม": {
+        "english": "Grouping options",
+        "verdict": "agrees"
+      },
+      "นำเข้า / ส่งออก": { "english": "Import / Export", "verdict": "agrees" },
+      "เสียงและภาพเคลื่อนไหว": {
+        "english": "Sound and animation",
+        "verdict": "agrees"
+      },
+      "ชื่อ": { "english": "name", "verdict": "agrees" },
+      "เพศ": { "english": "sex", "verdict": "agrees" },
+      "ไม่มา": { "english": "Not coming.", "verdict": "agrees" },
+      "ด้วยกัน": { "english": "together", "verdict": "agrees" },
+      "แยก": { "english": "separate", "verdict": "agrees" },
+      "+ เพิ่มนักเรียน": { "english": "+ Add students", "verdict": "agrees" },
+      "+ เพิ่มหลายคน…": {
+        "english": "+ Add more people…",
+        "verdict": "agrees"
+      },
+      "เพิ่มกี่คน?": {
+        "english": "How many more people?",
+        "verdict": "agrees"
+      },
+      "เพิ่ม": {
+        "english": "increase",
+        "verdict": "ambiguous",
+        "note": "เพิ่ม is both add and increase; it is the usual word on an Add button"
+      },
+      "นักเรียนที่ถูกบันทึกว่าขาดเรียนจะไม่ถูกนับรวมในการจัดกลุ่ม": {
+        "english": "Students who are recorded as absent will not be included in the grouping.",
+        "verdict": "agrees"
+      },
+      "ลบ": { "english": "delete", "verdict": "agrees" },
+      "ลบทั้งหมด": { "english": "Delete all", "verdict": "agrees" },
+      "ยังไม่มีข้อมูล": {
+        "english": "There is no information yet.",
+        "verdict": "agrees"
+      },
+      "ไม่มี": { "english": "do not have", "verdict": "agrees" },
+      "คละชายหญิงเท่ากัน": {
+        "english": "Equal mix of men and women.",
+        "verdict": "agrees"
+      },
+      "แบ่งตามเพศ": {
+        "english": "Categorized by gender.",
+        "verdict": "agrees"
+      },
+      "นักเรียนที่เหลืออยู่ในกลุ่มเดียว": {
+        "english": "The remaining students are in the same group.",
+        "verdict": "agrees"
+      },
+      "ยังไม่มีอะไรที่จะบันทึก": {
+        "english": "There's nothing to record yet.",
+        "verdict": "agrees"
+      },
+      "การเปลี่ยนแปลงที่ยังไม่บันทึก — ส่งออกเพื่อเก็บรักษาการเปลี่ยนแปลงเหล่านั้น": {
+        "english": "Unsaved changes — Export to preserve those changes.",
+        "verdict": "agrees"
+      },
+      "สร้างกลุ่ม": { "english": "Create a group", "verdict": "agrees" },
+      "สับใหม่": {
+        "english": "Chop again",
+        "verdict": "ambiguous",
+        "note": "สับ is both shuffle (cards) and chop; สับใหม่ says shuffle again"
+      },
+      "เครื่องมือนี้ต้องเปิดใช้งาน JavaScript": {
+        "english": "This tool requires JavaScript to be enabled.",
+        "verdict": "agrees"
+      },
+      "กลุ่มของคุณ": { "english": "Your group", "verdict": "agrees" },
+      "ไฟล์นี้ไม่มีคอลัมน์หมายเลข นักเรียนทุกคนต้องมีหมายเลข": {
+        "english": "This file does not have a number column. Every student must have a number.",
+        "verdict": "agrees"
+      },
+      "ภาษาอินโดนีเซีย": {
+        "english": "Indonesian language",
+        "verdict": "agrees"
+      },
+      "ภาษาจีน": { "english": "Chinese", "verdict": "agrees" },
+      "ภาษาเวียดนาม": { "english": "Vietnamese language", "verdict": "agrees" },
+      "ไทย": { "english": "Thai", "verdict": "agrees" },
+      "ส่งออกรายชื่อชั้นเรียน": {
+        "english": "Export class list.",
+        "verdict": "agrees"
+      },
+      "ส่งออกกลุ่ม": { "english": "Export group", "verdict": "agrees" },
+      "ดาวน์โหลดแม่แบบ": {
+        "english": "Download template",
+        "verdict": "agrees"
+      },
+      "แทนที่": {
+        "english": "instead of",
+        "verdict": "ambiguous",
+        "note": "แทนที่ is both replace and instead of; as a button it says replace"
+      },
+      "พิมพ์อะไร": {
+        "english": "What to type?",
+        "verdict": "ambiguous",
+        "note": "พิมพ์ is both print and type; in the print options it says what to print"
+      },
+      "รายชื่อนักเรียน": { "english": "List of students", "verdict": "agrees" },
+      "ผลการจัดกลุ่ม": { "english": "Grouping results", "verdict": "agrees" },
+      "ทั้งสอง": { "english": "both", "verdict": "agrees" },
+      "แสดงเพศ และตัวอักษร \"ด้วยกัน\"/\"แยก\"": {
+        "english": "Displays gender and the letters \"together\"/\"separate\".",
+        "verdict": "agrees"
+      },
+      "เพิ่มรูปโปรไฟล์": {
+        "english": "Add a profile picture.",
+        "verdict": "agrees"
+      },
+      "ยกเลิก": { "english": "cancel", "verdict": "agrees" },
+      "กลุ่ม": { "english": "group", "verdict": "agrees" },
+      "เต็มหน้าจอ": { "english": "Full screen", "verdict": "agrees" },
+      "ปิดโหมดเต็มหน้าจอ": {
+        "english": "Turn off full screen mode.",
+        "verdict": "agrees"
+      },
+      "ที่นี่มีตัวอักษร \"ด้วยกัน\" มากเกินไปจนไม่สามารถจัดการได้ทั้งหมด ลองใช้ตัวอักษรให้น้อยลง หรือเพิ่มขนาดกลุ่มให้ใหญ่ขึ้น": {
+        "english": "There are too many characters \"together\" here to be managed all at once. Try using fewer characters or increasing the group size.",
+        "verdict": "agrees"
+      },
+      "มีกฎ “ให้อยู่คนละกลุ่ม” มากเกินไปจนยากที่จะปฏิบัติตาม ลองลบออกบางส่วนดู": {
+        "english": "There are too many \"stay in separate groups\" rules that are difficult to follow. Try removing some of them.",
+        "verdict": "agrees"
+      },
+      "ที่นี่มีตัวอักษร \"ด้วยกัน\" และ \"แยก\" มากเกินไปจนไม่สามารถจัดการได้ทั้งหมดในครั้งเดียว ลองใช้ตัวอักษรประเภทใดประเภทหนึ่งให้น้อยลง หรือเพิ่มขนาดกลุ่มให้ใหญ่ขึ้น": {
+        "english": "There are too many \"together\" and \"separate\" characters here to handle them all at once. Try using fewer of one type of character or increasing the group size.",
+        "verdict": "agrees"
+      },
+      "ที่นี่มีตัวอักษร \"ด้วยกัน\" และ \"แยก\" มากเกินไปจนไม่สามารถจัดการได้ พร้อมกับต้องแบ่งเด็กชายและเด็กหญิงเป็นกลุ่มต่างกัน ลองใช้ตัวอักษรน้อยลง หรือปิดโหมดนี้ไป": {
+        "english": "There are too many \"together\" and \"separate\" characters here to manage, along with the need to divide boys and girls into different groups. Try using fewer characters, or turn this mode off.",
+        "verdict": "agrees"
+      },
+      "เปิดหรือปิดเมนูนำทาง": {
+        "english": "Turn the navigation menu on or off.",
+        "verdict": "agrees"
+      },
+      "โหมดมืด": { "english": "Dark mode", "verdict": "agrees" },
+      "ไปตรงสู่เนื้อหา": {
+        "english": "Go directly to the content.",
+        "verdict": "agrees"
+      },
+      "สำรวจ ShyTalk": { "english": "Explore ShyTalk", "verdict": "agrees" },
+      "สำรวจ Yawelo Idle": {
+        "english": "Explore Yawelo Idle",
+        "verdict": "agrees"
+      },
+      "เรียนรู้ผ่านการพูดคุย": {
+        "english": "Learn through discussion.",
+        "verdict": "agrees"
+      },
+      "เรียนรู้ผ่านการเล่น": {
+        "english": "Learn through play.",
+        "verdict": "agrees"
+      },
+      "พร้อมใช้งาน": { "english": "Ready to use.", "verdict": "agrees" },
+      "เครื่องคำนวณ Glory Points": {
+        "english": "Glory Points Calculator",
+        "verdict": "agrees"
+      },
+      "เปิดเครื่องคำนวณ": {
+        "english": "Turn on the calculator.",
+        "verdict": "ambiguous",
+        "note": "เปิด is both open and turn on; the link opens the calculator"
+      },
+      "ส่งอีเมล": { "english": "Send email", "verdict": "agrees" },
+      "หยุดภาพเคลื่อนไหว": {
+        "english": "Stop animation.",
+        "verdict": "agrees"
+      },
+      "เครื่องคำนวณ Glory Points — Shyden": {
+        "english": "Glory Points Calculator — Shyden",
+        "verdict": "agrees"
+      },
+      "สำหรับ YeeTalk ↗": { "english": "For YeeTalk ↗", "verdict": "agrees" },
+      "คำแปลเวอร์ชันเบต้า": {
+        "english": "Beta version translation",
+        "verdict": "agrees"
+      },
+      "มีอะไรเพิ่มเติมไหม (ไม่บังคับ)": {
+        "english": "Anything else to add? (Optional)",
+        "verdict": "agrees"
+      },
+      "ส่งรายงาน": { "english": "Submit the report.", "verdict": "agrees" },
+      "หมายเลข": { "english": "number", "verdict": "agrees" },
+      "แยกกัน": { "english": "Separate", "verdict": "agrees" },
+      "ใช่": { "english": "yes", "verdict": "agrees" },
+      "ไม่ใช่": { "english": "no", "verdict": "agrees" },
+      "# กลุ่มที่สร้างแล้ว": {
+        "english": "# Groups that have been created",
+        "verdict": "agrees"
+      },
+      "รายชื่อชั้น": { "english": "Class list", "verdict": "agrees" }
+    },
+    "id": {
+      "Pembuat Kelompok Kelas": {
+        "english": "Class Group Creator",
+        "verdict": "agrees"
+      },
+      "Tekan Buat Kelompok.": {
+        "english": "Press Create Group.",
+        "verdict": "agrees"
+      },
+      "Kelas (opsional)": {
+        "english": "Class (optional)",
+        "verdict": "agrees"
+      },
+      "Nomor siswa": { "english": "Student number", "verdict": "agrees" },
+      "Selalu bersama": { "english": "Always together", "verdict": "agrees" },
+      "Jangan bersama": { "english": "Don't be together", "verdict": "agrees" },
+      "Nomor siswa untuk setiap siswa yang tidak hadir, dipisahkan dengan koma.": {
+        "english": "Student numbers for each absent student, separated by commas.",
+        "verdict": "agrees"
+      },
+      "Bagi berdasarkan": {
+        "english": "Share by",
+        "verdict": "ambiguous",
+        "note": "bagi is both divide and share; Bagi berdasarkan says split by"
+      },
+      "Siswa per kelompok": {
+        "english": "Students per group",
+        "verdict": "agrees"
+      },
+      "Berapa banyak kelompok": {
+        "english": "How many groups",
+        "verdict": "agrees"
+      },
+      "Suara aktif": {
+        "english": "Active voice",
+        "verdict": "ambiguous",
+        "note": "suara is both sound and voice; Suara aktif says the sound is on"
+      },
+      "Suara mati": { "english": "Sound off", "verdict": "agrees" },
+      "Kecepatan": { "english": "Speed", "verdict": "agrees" },
+      "Cepat": { "english": "Fast", "verdict": "agrees" },
+      "Lewati animasi": { "english": "Skip animation", "verdict": "agrees" },
+      "Opsi pengelompokan": {
+        "english": "Grouping options",
+        "verdict": "agrees"
+      },
+      "Impor / ekspor": { "english": "Import / export", "verdict": "agrees" },
+      "Suara dan animasi": {
+        "english": "Sound and animation",
+        "verdict": "agrees"
+      },
+      "Nama": { "english": "Name", "verdict": "agrees" },
+      "Jenis kelamin": { "english": "Gender", "verdict": "agrees" },
+      "Tidak hadir": { "english": "Not present", "verdict": "agrees" },
+      "Bersama": { "english": "Together", "verdict": "agrees" },
+      "Terpisah": { "english": "Separated", "verdict": "agrees" },
+      "+ Tambah siswa": { "english": "+ Add students", "verdict": "agrees" },
+      "+ Tambah beberapa…": { "english": "+ Add some…", "verdict": "agrees" },
+      "Hapus semua": { "english": "remove all", "verdict": "agrees" },
+      "tidak ada yang ditambahkan": {
+        "english": "nothing added",
+        "verdict": "agrees"
+      },
+      "dicampur berdasarkan jenis kelamin": {
+        "english": "mixed by gender",
+        "verdict": "agrees"
+      },
+      "dipisah berdasarkan jenis kelamin": {
+        "english": "separated by gender",
+        "verdict": "agrees"
+      },
+      "Kelompok Anda": { "english": "Your Group", "verdict": "agrees" },
+      "bahasa Indonesia": { "english": "Indonesian", "verdict": "agrees" },
+      "bahasa Mandarin": {
+        "english": "Mandarin language",
+        "verdict": "agrees"
+      },
+      "bahasa Vietnam": { "english": "Vietnamese", "verdict": "agrees" },
+      "bahasa Thai": { "english": "Thai", "verdict": "agrees" },
+      "Ekspor daftar kelas": {
+        "english": "Export class list",
+        "verdict": "agrees"
+      },
+      "Ekspor kelompok": { "english": "Export group", "verdict": "agrees" },
+      "Unduh templat": { "english": "Download template", "verdict": "agrees" },
+      "Ganti": { "english": "Change", "verdict": "agrees" },
+      "Apa yang dicetak": { "english": "What is printed", "verdict": "agrees" },
+      "Hasil kelompok": { "english": "Group results", "verdict": "agrees" },
+      "Keduanya": { "english": "Both of them", "verdict": "agrees" },
+      "Sertakan avatar": { "english": "Include avatar", "verdict": "agrees" },
+      "Batal": {
+        "english": "Cancelled",
+        "verdict": "ambiguous",
+        "note": "Batal is both cancel and cancelled; as a button it says cancel"
+      },
+      "Keluar dari layar penuh": {
+        "english": "Exit full screen",
+        "verdict": "agrees"
+      },
+      "Tambahkan siswa, atau pastikan tidak semuanya ditandai tidak hadir.": {
+        "english": "Add students, or make sure not all of them are marked absent.",
+        "verdict": "agrees"
+      },
+      "Buka atau tutup menu navigasi": {
+        "english": "Open or close the navigation menu",
+        "verdict": "agrees"
+      },
+      "Mode gelap": { "english": "Dark mode", "verdict": "agrees" },
+      "Lewati ke konten": { "english": "Skip to content", "verdict": "agrees" },
+      "Jelajahi ShyTalk": { "english": "Explore ShyTalk", "verdict": "agrees" },
+      "Jelajahi Yawelo Idle": {
+        "english": "Explore Yawelo Idle",
+        "verdict": "agrees"
+      },
+      "membuka": { "english": "open", "verdict": "agrees" },
+      "Belajar dengan berbicara": {
+        "english": "Learn by talking",
+        "verdict": "agrees"
+      },
+      "Belajar dengan bermain": {
+        "english": "Learn by playing",
+        "verdict": "agrees"
+      },
+      "Aktif sekarang": { "english": "Active now", "verdict": "agrees" },
+      "Buka kalkulator": {
+        "english": "Open the calculator",
+        "verdict": "agrees"
+      },
+      "Kirim email": { "english": "Send email", "verdict": "agrees" },
+      "Jeda gerakan": { "english": "Pause movement", "verdict": "agrees" },
+      "Untuk YeeTalk ↗": { "english": "For YeeTalk ↗", "verdict": "agrees" },
+      "terjemahan beta": { "english": "beta translation", "verdict": "agrees" },
+      "Ada hal lain? (opsional)": {
+        "english": "Anything else? (optional)",
+        "verdict": "agrees"
+      },
+      "Kirim laporan": { "english": "Submit a report", "verdict": "agrees" },
+      "bersama": { "english": "together", "verdict": "agrees" },
+      "terpisah": { "english": "separated", "verdict": "agrees" },
+      "ya": { "english": "yes", "verdict": "agrees" },
+      "# Kelompok dibuat": { "english": "# Group created", "verdict": "agrees" }
+    },
+    "vi": {
+      "Trình tạo nhóm trong lớp học": {
+        "english": "Classroom group builder",
+        "verdict": "agrees"
+      },
+      "Hãy chọn cách chia nhóm cho các em.": {
+        "english": "Choose a way to divide the students into groups.",
+        "verdict": "agrees"
+      },
+      "Nhấn vào “Tạo nhóm”.": {
+        "english": "Click on “Create group”.",
+        "verdict": "agrees"
+      },
+      "Lớp (tùy chọn)": { "english": "Class (optional)", "verdict": "agrees" },
+      "Mã học sinh": { "english": "Student ID", "verdict": "agrees" },
+      "Xếp cùng nhóm": { "english": "Grouped together", "verdict": "agrees" },
+      "Xếp khác nhóm": {
+        "english": "Placed in different groups",
+        "verdict": "agrees"
+      },
+      "Mã học sinh của những học sinh vắng mặt, phân tách bằng dấu phẩy.": {
+        "english": "The student IDs of absent students are separated by commas.",
+        "verdict": "agrees"
+      },
+      "Phân chia theo": { "english": "Classification by", "verdict": "agrees" },
+      "Số học sinh trong mỗi nhóm": {
+        "english": "Number of students in each group",
+        "verdict": "agrees"
+      },
+      "Có bao nhiêu nhóm": {
+        "english": "How many groups are there?",
+        "verdict": "agrees"
+      },
+      "Chia đều các em vào các nhóm": {
+        "english": "Divide the children equally into groups.",
+        "verdict": "agrees"
+      },
+      "Bật âm thanh": { "english": "Turn on the sound.", "verdict": "agrees" },
+      "Tắt âm thanh": { "english": "Mute", "verdict": "agrees" },
+      "Tốc độ": { "english": "Speed", "verdict": "agrees" },
+      "Bình thường": { "english": "Normal", "verdict": "agrees" },
+      "Nhanh": { "english": "Fast", "verdict": "agrees" },
+      "Bỏ qua hoạt ảnh": { "english": "Skip animation", "verdict": "agrees" },
+      "Thông tin học sinh": {
+        "english": "Student information",
+        "verdict": "agrees"
+      },
+      "Các tùy chọn phân nhóm": {
+        "english": "Grouping options",
+        "verdict": "agrees"
+      },
+      "Nhập / xuất": { "english": "Import/Export", "verdict": "agrees" },
+      "Âm thanh và hoạt ảnh": {
+        "english": "Sound and animation",
+        "verdict": "agrees"
+      },
+      "Tên": { "english": "Name", "verdict": "agrees" },
+      "Giới tính": { "english": "Sex", "verdict": "agrees" },
+      "Vắng mặt": { "english": "Absent", "verdict": "agrees" },
+      "Cùng nhau": { "english": "Together", "verdict": "agrees" },
+      "Tách biệt": { "english": "Separate", "verdict": "agrees" },
+      "+ Thêm học sinh": { "english": "Add students", "verdict": "agrees" },
+      "+ Thêm một vài…": {
+        "english": "+ Add a few more…",
+        "verdict": "agrees"
+      },
+      "Xóa tất cả": { "english": "Delete all", "verdict": "agrees" },
+      "chưa có mục nào được thêm vào": {
+        "english": "No items have been added yet.",
+        "verdict": "agrees"
+      },
+      "không có": { "english": "Not available", "verdict": "agrees" },
+      "nam và nữ cân bằng": {
+        "english": "Balance between men and women",
+        "verdict": "agrees"
+      },
+      "phân chia theo giới tính": {
+        "english": "gender division",
+        "verdict": "agrees"
+      },
+      "Các nhóm của bạn": { "english": "Your teams", "verdict": "agrees" },
+      "Tệp này không có cột số. Mỗi học sinh cần có số thứ tự.": {
+        "english": "This file does not have a number column. Each student needs a sequential number.",
+        "verdict": "agrees"
+      },
+      "Tiếng Indonesia": { "english": "Indonesian", "verdict": "agrees" },
+      "Tiếng Trung": { "english": "Chinese", "verdict": "agrees" },
+      "Tiếng Việt": { "english": "Vietnamese", "verdict": "agrees" },
+      "Tiếng Thái": { "english": "Thai language", "verdict": "agrees" },
+      "Xuất danh sách lớp": {
+        "english": "Export class list",
+        "verdict": "agrees"
+      },
+      "Xuất nhóm": { "english": "Group Export", "verdict": "agrees" },
+      "Tải xuống mẫu": { "english": "Download template", "verdict": "agrees" },
+      "Thay thế nó": { "english": "Replace it", "verdict": "agrees" },
+      "Nội dung cần in": {
+        "english": "Content to be printed",
+        "verdict": "agrees"
+      },
+      "Kết quả chia nhóm": {
+        "english": "Grouping results",
+        "verdict": "agrees"
+      },
+      "Cả hai": { "english": "Both", "verdict": "agrees" },
+      "Hiển thị giới tính và các chữ cái \"cùng nhau\"/\"tách biệt\"": {
+        "english": "Display gender and letters \"together\"/\"separate\".",
+        "verdict": "agrees"
+      },
+      "Thêm ảnh đại diện": {
+        "english": "Add a profile picture",
+        "verdict": "agrees"
+      },
+      "Hủy": { "english": "Cancel", "verdict": "agrees" },
+      "Thoát chế độ toàn màn hình": {
+        "english": "Exit full-screen mode",
+        "verdict": "agrees"
+      },
+      "Ở đây có quá nhiều chữ cái “cùng nhau” nên không thể xử lý hết. Hãy thử dùng ít chữ cái hơn, hoặc tăng quy mô các nhóm.": {
+        "english": "There are too many letters \"together\" here to handle them all. Try using fewer letters, or increase the size of the groups.",
+        "verdict": "agrees"
+      },
+      "Ở đây có quá nhiều quy tắc xếp khác nhóm, khó mà xử lý hết được. Hãy thử loại bỏ một số quy tắc trong số đó.": {
+        "english": "There are too many grouping rules here; it's difficult to handle them all. Let's try eliminating some of them.",
+        "verdict": "agrees"
+      },
+      "Ở đây có quá nhiều chữ cái “cùng nhau” và “tách biệt” để có thể xử lý hết cùng một lúc. Hãy thử dùng ít chữ cái hơn ở cả hai loại, hoặc tăng quy mô các nhóm.": {
+        "english": "There are too many \"together\" and \"separate\" letters here to handle them all at once. Try using fewer letters in both categories, or increase the size of the groups.",
+        "verdict": "agrees"
+      },
+      "Ở đây có quá nhiều chữ cái “cùng nhau” và “tách biệt” để xử lý hết trong khi vẫn phải xếp nam và nữ vào các nhóm riêng. Hãy thử dùng ít chữ cái hơn hoặc tắt chế độ này đi.": {
+        "english": "There are too many \"together\" and \"separate\" letters to process while still having to group men and women separately. Try using fewer letters or turn this feature off.",
+        "verdict": "agrees"
+      },
+      "Mở hoặc đóng menu điều hướng": {
+        "english": "Open or close the navigation menu.",
+        "verdict": "agrees"
+      },
+      "Chế độ tối": { "english": "Dark mode", "verdict": "agrees" },
+      "Chuyển thẳng đến nội dung": {
+        "english": "Go directly to the content",
+        "verdict": "agrees"
+      },
+      "Khám phá ShyTalk": {
+        "english": "Discover ShyTalk",
+        "verdict": "agrees"
+      },
+      "Khám phá Yawelo Idle": {
+        "english": "Explore Yawelo Idle",
+        "verdict": "agrees"
+      },
+      "Học qua giao tiếp": {
+        "english": "Learning through communication",
+        "verdict": "agrees"
+      },
+      "Học qua trò chơi": {
+        "english": "Learning through games",
+        "verdict": "agrees"
+      },
+      "Đang hoạt động": {
+        "english": "Currently operating",
+        "verdict": "agrees"
+      },
+      "Máy tính Glory Points": {
+        "english": "Glory Points Computer",
+        "verdict": "ambiguous",
+        "note": "máy tính is both calculator and computer; the page is the calculator"
+      },
+      "Mở máy tính": {
+        "english": "Turn on the computer.",
+        "verdict": "ambiguous",
+        "note": "máy tính is both calculator and computer; the link opens the calculator"
+      },
+      "Gửi email cho tôi": {
+        "english": "Send me an email",
+        "verdict": "agrees"
+      },
+      "Tạm dừng chuyển động": {
+        "english": "Pause motion",
+        "verdict": "agrees"
+      },
+      "Máy tính Glory Points — Shyden": {
+        "english": "Glory Points Computer — Shyden",
+        "verdict": "ambiguous",
+        "note": "máy tính is both calculator and computer; the page is the calculator"
+      },
+      "Dành cho YeeTalk ↗": { "english": "For YeeTalk ↗", "verdict": "agrees" },
+      "bản dịch beta": { "english": "beta translation", "verdict": "agrees" },
+      "Còn điều gì khác không? (không bắt buộc)": {
+        "english": "Is there anything else? (optional)",
+        "verdict": "agrees"
+      },
+      "Gửi báo cáo": { "english": "Submit report", "verdict": "agrees" },
+      "tách biệt": { "english": "separate", "verdict": "agrees" },
+      "có": {
+        "english": "Have",
+        "verdict": "ambiguous",
+        "note": "có is both yes and have; in the absent column it says yes"
+      },
+      "# Các nhóm đã được tạo": {
+        "english": "# Groups have been created",
+        "verdict": "agrees"
+      }
+    }
+  },
+  "pending": {
+    "zh": [
+      "numbersNotWholeMessage",
+      "numbersAboveCountMessage",
+      "numbersAboveMaximumMessage",
+      "numbersDuplicateMessage",
+      "numbersLonelySetMessage",
+      "numbersTooManySetsMessage",
+      "groupedNote",
+      "sexWhyUnset",
+      "sexWhyReturning",
+      "rosterCountLine",
+      "rosterDuplicateMessage",
+      "rosterNoSexMessage",
+      "rosterClashMessage",
+      "rosterGapWarning",
+      "rosterOpenRefusedMessage",
+      "rosterAtLimitMessage",
+      "rosterRoomMessage",
+      "stateNamed",
+      "stateAbsent",
+      "stateTogether",
+      "stateApart",
+      "stateAdded",
+      "resultsHeadingNamed",
+      "resultsSummary",
+      "groupLabel",
+      "studentNumber",
+      "csvProblemNumberBlank",
+      "csvProblemNumberNotWhole",
+      "csvProblemDuplicateNumber",
+      "csvProblemSex",
+      "csvProblemAbsent",
+      "csvProblemLetter",
+      "csvProblemTooMany",
+      "csvWrongLanguage",
+      "ioReplaceWarning",
+      "ioImported",
+      "ioHandoverSent",
+      "printedOn",
+      "printHereToday",
+      "errors.TOO_MANY_STUDENTS",
+      "errors.DUPLICATE_NUMBER",
+      "errors.TOO_MANY_GROUPS",
+      "errors.TOGETHER_APART_CLASH",
+      "errors.TOGETHER_UNIT_TOO_LARGE",
+      "errors.TOGETHER_NO_ARRANGEMENT",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=two]",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=other]",
+      "errors.KEEP_APART_NO_ARRANGEMENT",
+      "errors.BOTH_RULES_NO_ARRANGEMENT",
+      "errors.SEX_NEEDS_ALL_SET",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=two]",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=other]",
+      "errors.SEX_SEPARATE_IMPOSSIBLE",
+      "errors.PINNED_SPLITS_UNIT",
+      "errors.PINNED_APART_CLASH",
+      "errors.PINNED_IN_TWO_GROUPS",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=over]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=full]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=other]",
+      "warnings.SEX_SPILLOVER [sex=M]",
+      "warnings.SEX_SPILLOVER [sex=other]",
+      "warnings.PINNED_MIXED_SEX [howMany=two]",
+      "warnings.PINNED_MIXED_SEX [howMany=other]",
+      "warnings.SEX_BOTH_TOO_SMALL"
+    ],
+    "th": [
+      "numbersNotWholeMessage",
+      "numbersAboveCountMessage",
+      "numbersAboveMaximumMessage",
+      "numbersDuplicateMessage",
+      "numbersLonelySetMessage",
+      "numbersTooManySetsMessage",
+      "groupedNote",
+      "sexWhyUnset",
+      "sexWhyReturning",
+      "rosterCountLine",
+      "rosterDuplicateMessage",
+      "rosterNoSexMessage",
+      "rosterClashMessage",
+      "rosterGapWarning",
+      "rosterOpenRefusedMessage",
+      "rosterAtLimitMessage",
+      "rosterRoomMessage",
+      "stateNamed",
+      "stateAbsent",
+      "stateTogether",
+      "stateApart",
+      "stateAdded",
+      "resultsHeadingNamed",
+      "resultsSummary",
+      "groupLabel",
+      "studentNumber",
+      "staleMode",
+      "staleLeftovers",
+      "staleSexMode",
+      "staleRoster",
+      "csvProblemEmptyFile",
+      "csvProblemUnreadable",
+      "csvProblemNumberBlank",
+      "csvProblemNumberNotWhole",
+      "csvProblemDuplicateNumber",
+      "csvProblemSex",
+      "csvProblemAbsent",
+      "csvProblemLetter",
+      "csvProblemTooMany",
+      "csvWrongLanguage",
+      "csvLanguageName.en",
+      "csvLanguageVersion.en",
+      "ioImportLabel",
+      "ioProblemsHeading",
+      "ioReplaceWarning",
+      "ioReplaceCancel",
+      "ioImported",
+      "ioBothLanguages",
+      "ioBothLanguagesHint",
+      "ioHandoverBlocked",
+      "ioHandoverTimedOut",
+      "ioHandoverNotOffered",
+      "ioHandoverSent",
+      "printOpen",
+      "printHeading",
+      "printOnTheClassList",
+      "printShowAbsent",
+      "printConfirm",
+      "printedOn",
+      "printHereToday",
+      "boardWaiting",
+      "staleRefuseExport",
+      "staleRefusePrint",
+      "staleRefuseBoard",
+      "errors.NO_STUDENTS",
+      "errors.TOO_MANY_STUDENTS",
+      "errors.DUPLICATE_NUMBER",
+      "errors.INVALID_GROUP_SIZE",
+      "errors.INVALID_GROUP_COUNT",
+      "errors.TOO_MANY_GROUPS",
+      "errors.TOGETHER_APART_CLASH",
+      "errors.TOGETHER_UNIT_TOO_LARGE",
+      "errors.TOGETHER_NO_ARRANGEMENT",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=two]",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=other]",
+      "errors.KEEP_APART_NO_ARRANGEMENT",
+      "errors.BOTH_RULES_NO_ARRANGEMENT",
+      "errors.SEX_NEEDS_ALL_SET",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=two]",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=other]",
+      "errors.SEX_SEPARATE_IMPOSSIBLE",
+      "errors.PINNED_SPLITS_UNIT",
+      "errors.PINNED_APART_CLASH",
+      "errors.PINNED_IN_TWO_GROUPS",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=over]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=full]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=other]",
+      "warnings.SEX_SPILLOVER [sex=M]",
+      "warnings.SEX_SPILLOVER [sex=other]",
+      "warnings.PINNED_MIXED_SEX [howMany=two]",
+      "warnings.PINNED_MIXED_SEX [howMany=other]",
+      "warnings.SEX_BOTH_TOO_SMALL",
+      "site.nav.tools",
+      "site.nav.contact",
+      "site.home.title",
+      "site.home.description",
+      "site.home.heroHeading",
+      "site.home.heroLead",
+      "site.home.opensAt",
+      "site.home.comingSoon",
+      "site.home.shytalkBody",
+      "site.home.shytalkFeature1",
+      "site.home.shytalkFeature2",
+      "site.home.shytalkFeature3",
+      "site.home.shytalkFeature4",
+      "site.home.shytalkShotAlt",
+      "site.home.visitShytalk",
+      "site.home.yaweloIdleBody",
+      "site.home.yaweloIdleFeature1",
+      "site.home.yaweloIdleFeature2",
+      "site.home.yaweloIdleFeature3",
+      "site.home.yaweloIdleFeature4",
+      "site.home.visitYaweloIdle",
+      "site.home.toolsHeading",
+      "site.home.toolsLead",
+      "site.home.workGloryBody",
+      "site.home.workClassroomBody",
+      "site.home.openClassroom",
+      "site.notFound.title",
+      "site.notFound.description",
+      "site.notFound.heading",
+      "site.notFound.body",
+      "site.notFound.backHome",
+      "site.glory.description",
+      "site.glory.lead",
+      "site.glory.howToSteps[0]",
+      "site.glory.howToSteps[1]",
+      "site.glory.howToSteps[2]",
+      "site.glory.calculate",
+      "site.glory.needsJs",
+      "site.glory.assumptions",
+      "site.glory.errors.empty",
+      "site.glory.errors.notWhole",
+      "site.glory.errors.zero",
+      "site.glory.errors.tooLarge",
+      "site.language.label",
+      "site.language.betaNotice",
+      "site.report.open",
+      "site.report.intro",
+      "site.report.quoteLabel",
+      "site.report.quoteHint",
+      "site.report.suggestionLabel",
+      "site.report.noteHint",
+      "site.report.honeypotLabel",
+      "site.report.sent",
+      "site.report.notFound",
+      "site.report.rejected",
+      "site.report.failed",
+      "csv.classComment",
+      "csv.templateHint"
+    ],
+    "id": [
+      "description",
+      "lead",
+      "privacy",
+      "howToHeading",
+      "howToWhat",
+      "howToSteps[0]",
+      "howToSteps[1]",
+      "studentsLabel",
+      "studentsHelp",
+      "studentsLockedReason",
+      "pairNumbersHelp",
+      "numbersLockedReason",
+      "numbersNotWholeMessage",
+      "numbersAboveCountMessage",
+      "numbersAboveMaximumMessage",
+      "numbersDuplicateMessage",
+      "numbersLonelySetMessage",
+      "numbersTooManySetsMessage",
+      "numbersNoCountMessage",
+      "groupedNote",
+      "modeGroupCount",
+      "groupSizeLabel",
+      "sexMixLabel",
+      "sexSeparateLabel",
+      "sexWhyNoList",
+      "sexWhyUnset",
+      "sexWhyReturning",
+      "leftoversLabel",
+      "leftoversSpread",
+      "leftoversBunch",
+      "leftoversHelp",
+      "sectionStudentsHeading",
+      "rosterSexMale",
+      "rosterSexFemale",
+      "rosterHowMany",
+      "rosterAddConfirm",
+      "rosterAbsentPill",
+      "rosterAbsentConsequence",
+      "rosterCountLine",
+      "rosterDuplicateMessage",
+      "rosterNoSexMessage",
+      "rosterClashMessage",
+      "rosterGapWarning",
+      "rosterOpenRefusedMessage",
+      "rosterAtLimitMessage",
+      "rosterRoomMessage",
+      "rosterRemove",
+      "stateNamed",
+      "stateAbsent",
+      "stateTogether",
+      "stateApart",
+      "stateAdded",
+      "stateNone",
+      "stateBunched",
+      "stateNothingToSave",
+      "stateUnsaved",
+      "makeGroups",
+      "again",
+      "needsJs",
+      "resultsHeadingNamed",
+      "resultsSummary",
+      "groupLabel",
+      "studentNumber",
+      "staleMode",
+      "staleLeftovers",
+      "staleSexMode",
+      "staleRoster",
+      "csvProblemEmptyFile",
+      "csvProblemUnreadable",
+      "csvProblemNoNumberColumn",
+      "csvProblemNumberBlank",
+      "csvProblemNumberNotWhole",
+      "csvProblemDuplicateNumber",
+      "csvProblemSex",
+      "csvProblemAbsent",
+      "csvProblemLetter",
+      "csvProblemTooMany",
+      "csvWrongLanguage",
+      "csvLanguageName.en",
+      "csvLanguageVersion.en",
+      "ioImportLabel",
+      "ioProblemsHeading",
+      "ioReplaceWarning",
+      "ioReplaceCancel",
+      "ioImported",
+      "ioBothLanguages",
+      "ioBothLanguagesHint",
+      "ioHandoverBlocked",
+      "ioHandoverTimedOut",
+      "ioHandoverNotOffered",
+      "ioHandoverSent",
+      "printOpen",
+      "printHeading",
+      "printWhatClassList",
+      "printOnTheClassList",
+      "printShowAbsent",
+      "printShowLetters",
+      "printConfirm",
+      "printClassListHeading",
+      "printGroupsHeading",
+      "printedOn",
+      "printHereToday",
+      "boardOpen",
+      "boardShuffle",
+      "boardWaiting",
+      "staleRefuseExport",
+      "staleRefusePrint",
+      "staleRefuseBoard",
+      "errors.TOO_MANY_STUDENTS",
+      "errors.DUPLICATE_NUMBER",
+      "errors.INVALID_GROUP_SIZE",
+      "errors.INVALID_GROUP_COUNT",
+      "errors.TOO_MANY_GROUPS",
+      "errors.TOGETHER_APART_CLASH",
+      "errors.TOGETHER_UNIT_TOO_LARGE",
+      "errors.TOGETHER_NO_ARRANGEMENT",
+      "errors.TOGETHER_SEARCH_GAVE_UP",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=two]",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=other]",
+      "errors.KEEP_APART_NO_ARRANGEMENT",
+      "errors.KEEP_APART_SEARCH_GAVE_UP",
+      "errors.BOTH_RULES_NO_ARRANGEMENT",
+      "errors.BOTH_RULES_SEARCH_GAVE_UP",
+      "errors.SEX_NEEDS_ALL_SET",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=two]",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=other]",
+      "errors.SEX_SEPARATE_IMPOSSIBLE",
+      "errors.SEX_SEPARATE_SEARCH_GAVE_UP",
+      "errors.PINNED_SPLITS_UNIT",
+      "errors.PINNED_APART_CLASH",
+      "errors.PINNED_IN_TWO_GROUPS",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=over]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=full]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=other]",
+      "warnings.SEX_SPILLOVER [sex=M]",
+      "warnings.SEX_SPILLOVER [sex=other]",
+      "warnings.PINNED_MIXED_SEX [howMany=two]",
+      "warnings.PINNED_MIXED_SEX [howMany=other]",
+      "warnings.SEX_BOTH_TOO_SMALL",
+      "site.nav.tools",
+      "site.nav.contact",
+      "site.home.title",
+      "site.home.description",
+      "site.home.heroHeading",
+      "site.home.heroLead",
+      "site.home.comingSoon",
+      "site.home.shytalkBody",
+      "site.home.shytalkFeature1",
+      "site.home.shytalkFeature2",
+      "site.home.shytalkFeature3",
+      "site.home.shytalkFeature4",
+      "site.home.shytalkShotAlt",
+      "site.home.visitShytalk",
+      "site.home.yaweloIdleBody",
+      "site.home.yaweloIdleFeature1",
+      "site.home.yaweloIdleFeature2",
+      "site.home.yaweloIdleFeature3",
+      "site.home.yaweloIdleFeature4",
+      "site.home.visitYaweloIdle",
+      "site.home.toolsHeading",
+      "site.home.toolsLead",
+      "site.home.workGloryTitle",
+      "site.home.workGloryBody",
+      "site.home.workClassroomBody",
+      "site.home.openClassroom",
+      "site.notFound.title",
+      "site.notFound.description",
+      "site.notFound.heading",
+      "site.notFound.body",
+      "site.notFound.backHome",
+      "site.glory.title",
+      "site.glory.description",
+      "site.glory.heading",
+      "site.glory.lead",
+      "site.glory.howToHeading",
+      "site.glory.howToSteps[0]",
+      "site.glory.howToSteps[1]",
+      "site.glory.howToSteps[2]",
+      "site.glory.calculate",
+      "site.glory.needsJs",
+      "site.glory.assumptions",
+      "site.glory.errors.empty",
+      "site.glory.errors.notWhole",
+      "site.glory.errors.zero",
+      "site.glory.errors.tooLarge",
+      "site.language.label",
+      "site.language.betaNotice",
+      "site.report.open",
+      "site.report.intro",
+      "site.report.quoteLabel",
+      "site.report.quoteHint",
+      "site.report.suggestionLabel",
+      "site.report.noteHint",
+      "site.report.honeypotLabel",
+      "site.report.sent",
+      "site.report.notFound",
+      "site.report.rejected",
+      "site.report.failed",
+      "csv.classComment",
+      "csv.columns.number",
+      "csv.columns.name",
+      "csv.columns.sex",
+      "csv.columns.absent",
+      "csv.absentNo",
+      "csv.groupColumn",
+      "csv.templateHint",
+      "csv.fileName.class-list",
+      "csv.fileName.groups"
+    ],
+    "vi": [
+      "description",
+      "lead",
+      "privacy",
+      "howToHeading",
+      "howToWhat",
+      "howToSteps[0]",
+      "studentsLabel",
+      "studentsHelp",
+      "studentsLockedReason",
+      "pairNumbersHelp",
+      "numbersLockedReason",
+      "numbersNotWholeMessage",
+      "numbersAboveCountMessage",
+      "numbersAboveMaximumMessage",
+      "numbersDuplicateMessage",
+      "numbersLonelySetMessage",
+      "numbersTooManySetsMessage",
+      "numbersNoCountMessage",
+      "groupedNote",
+      "modeGroupCount",
+      "groupSizeLabel",
+      "sexMixLabel",
+      "sexSeparateLabel",
+      "sexWhyNoList",
+      "sexWhyUnset",
+      "sexWhyReturning",
+      "leftoversLabel",
+      "leftoversBunch",
+      "leftoversHelp",
+      "rosterHowMany",
+      "rosterAddConfirm",
+      "rosterAbsentPill",
+      "rosterAbsentConsequence",
+      "rosterCountLine",
+      "rosterDuplicateMessage",
+      "rosterNoSexMessage",
+      "rosterClashMessage",
+      "rosterGapWarning",
+      "rosterOpenRefusedMessage",
+      "rosterAtLimitMessage",
+      "rosterRoomMessage",
+      "rosterRemove",
+      "stateNamed",
+      "stateAbsent",
+      "stateTogether",
+      "stateApart",
+      "stateAdded",
+      "stateBunched",
+      "stateNothingToSave",
+      "stateUnsaved",
+      "makeGroups",
+      "again",
+      "needsJs",
+      "resultsHeadingNamed",
+      "resultsSummary",
+      "groupLabel",
+      "studentNumber",
+      "staleMode",
+      "staleLeftovers",
+      "staleSexMode",
+      "staleRoster",
+      "csvProblemEmptyFile",
+      "csvProblemUnreadable",
+      "csvProblemNumberBlank",
+      "csvProblemNumberNotWhole",
+      "csvProblemDuplicateNumber",
+      "csvProblemSex",
+      "csvProblemAbsent",
+      "csvProblemLetter",
+      "csvProblemTooMany",
+      "csvWrongLanguage",
+      "csvLanguageName.en",
+      "csvLanguageVersion.en",
+      "ioImportLabel",
+      "ioProblemsHeading",
+      "ioReplaceWarning",
+      "ioReplaceCancel",
+      "ioImported",
+      "ioBothLanguages",
+      "ioBothLanguagesHint",
+      "ioHandoverBlocked",
+      "ioHandoverTimedOut",
+      "ioHandoverNotOffered",
+      "ioHandoverSent",
+      "printOpen",
+      "printHeading",
+      "printWhatClassList",
+      "printOnTheClassList",
+      "printShowAbsent",
+      "printConfirm",
+      "printClassListHeading",
+      "printGroupsHeading",
+      "printedOn",
+      "printHereToday",
+      "boardOpen",
+      "boardShuffle",
+      "boardWaiting",
+      "staleRefuseExport",
+      "staleRefusePrint",
+      "staleRefuseBoard",
+      "errors.NO_STUDENTS",
+      "errors.TOO_MANY_STUDENTS",
+      "errors.DUPLICATE_NUMBER",
+      "errors.INVALID_GROUP_SIZE",
+      "errors.INVALID_GROUP_COUNT",
+      "errors.TOO_MANY_GROUPS",
+      "errors.TOGETHER_APART_CLASH",
+      "errors.TOGETHER_UNIT_TOO_LARGE",
+      "errors.TOGETHER_NO_ARRANGEMENT",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=two]",
+      "errors.KEEP_APART_IMPOSSIBLE [howMany=other]",
+      "errors.KEEP_APART_NO_ARRANGEMENT",
+      "errors.BOTH_RULES_NO_ARRANGEMENT",
+      "errors.SEX_NEEDS_ALL_SET",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=two]",
+      "errors.SEX_SEPARATE_SPLITS_UNIT [howMany=other]",
+      "errors.SEX_SEPARATE_IMPOSSIBLE",
+      "errors.PINNED_SPLITS_UNIT",
+      "errors.PINNED_APART_CLASH",
+      "errors.PINNED_IN_TWO_GROUPS",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=over]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=full]",
+      "errors.PINNED_TOO_MANY_GROUPS [situation=other]",
+      "warnings.SEX_SPILLOVER [sex=M]",
+      "warnings.SEX_SPILLOVER [sex=other]",
+      "warnings.PINNED_MIXED_SEX [howMany=two]",
+      "warnings.PINNED_MIXED_SEX [howMany=other]",
+      "warnings.SEX_BOTH_TOO_SMALL",
+      "site.nav.tools",
+      "site.nav.contact",
+      "site.home.title",
+      "site.home.description",
+      "site.home.heroHeading",
+      "site.home.heroLead",
+      "site.home.opensAt",
+      "site.home.comingSoon",
+      "site.home.shytalkBody",
+      "site.home.shytalkFeature1",
+      "site.home.shytalkFeature2",
+      "site.home.shytalkFeature3",
+      "site.home.shytalkFeature4",
+      "site.home.shytalkShotAlt",
+      "site.home.visitShytalk",
+      "site.home.yaweloIdleBody",
+      "site.home.yaweloIdleFeature1",
+      "site.home.yaweloIdleFeature2",
+      "site.home.yaweloIdleFeature3",
+      "site.home.yaweloIdleFeature4",
+      "site.home.visitYaweloIdle",
+      "site.home.toolsHeading",
+      "site.home.toolsLead",
+      "site.home.workGloryBody",
+      "site.home.workClassroomBody",
+      "site.home.openClassroom",
+      "site.notFound.title",
+      "site.notFound.description",
+      "site.notFound.heading",
+      "site.notFound.body",
+      "site.notFound.backHome",
+      "site.glory.description",
+      "site.glory.lead",
+      "site.glory.howToHeading",
+      "site.glory.howToSteps[0]",
+      "site.glory.howToSteps[1]",
+      "site.glory.howToSteps[2]",
+      "site.glory.calculate",
+      "site.glory.needsJs",
+      "site.glory.assumptions",
+      "site.glory.errors.empty",
+      "site.glory.errors.notWhole",
+      "site.glory.errors.zero",
+      "site.glory.errors.tooLarge",
+      "site.language.label",
+      "site.language.betaNotice",
+      "site.report.open",
+      "site.report.intro",
+      "site.report.quoteLabel",
+      "site.report.quoteHint",
+      "site.report.suggestionLabel",
+      "site.report.noteHint",
+      "site.report.honeypotLabel",
+      "site.report.sent",
+      "site.report.notFound",
+      "site.report.rejected",
+      "site.report.failed",
+      "csv.classComment",
+      "csv.columns.number",
+      "csv.columns.name",
+      "csv.columns.sex",
+      "csv.columns.absent",
+      "csv.columns.together",
+      "csv.absentNo",
+      "csv.groupColumn",
+      "csv.templateHint",
+      "csv.fileName.class-list",
+      "csv.fileName.groups"
+    ]
+  }
+}
