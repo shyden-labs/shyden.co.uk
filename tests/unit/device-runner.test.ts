@@ -12,6 +12,7 @@ import {
   leakedSessionOf,
   once,
   playwrightVerdict,
+  iosEvidenceReportOf,
   vitestVerdict,
   waitUntil,
 } from '../../scripts/test-devices.mjs';
@@ -100,6 +101,22 @@ describe('waitUntil: the timeout bounds the whole wait', () => {
 /** A Playwright JSON report's `stats`, clean unless a count is given. */
 const stats = (counts: Partial<Record<string, unknown>> = {}) => ({
   stats: { expected: 40, flaky: 0, unexpected: 0, skipped: 5, ...counts },
+});
+
+describe('iosEvidenceReportOf: where the iOS report goes for the evidence page (#354)', () => {
+  it('names vitest-report.json inside the evidence directory', () => {
+    expect(iosEvidenceReportOf({ EVIDENCE_DIR: '/runs/ios' })).toBe(
+      '/runs/ios/vitest-report.json',
+    );
+  });
+
+  it('names nothing when the run asked for no evidence', () => {
+    expect(iosEvidenceReportOf({})).toBeNull();
+  });
+
+  it('names nothing for an empty evidence directory', () => {
+    expect(iosEvidenceReportOf({ EVIDENCE_DIR: '' })).toBeNull();
+  });
 });
 
 describe('playwrightVerdict: what a Playwright group proved', () => {

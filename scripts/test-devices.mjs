@@ -57,6 +57,7 @@ import { adb, androidAbsence } from './adb.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
@@ -66,6 +67,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -88,6 +90,18 @@ export const REPORT_FILES = {
   android: path.join(TEST_RESULTS_DIR, 'android-report.json'),
   ios: path.join(TEST_RESULTS_DIR, 'ios-report.json'),
 };
+
+/**
+ * Where the iOS group's Vitest report is copied for the evidence page, or
+ * `null` when the run asked for no evidence (#354). The page builder reads
+ * `vitest-report.json` from the evidence directory, as it reads Playwright's
+ * `report.json` from an e2e evidence run.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+export const iosEvidenceReportOf = (env) =>
+  env.EVIDENCE_DIR ? path.join(env.EVIDENCE_DIR, VITEST_EVIDENCE_REPORT) : null;
 
 // ── the live dashboard (task 6) ─────────────────────────────────────────
 //
@@ -1057,6 +1071,11 @@ async function runIosGroup() {
     },
   );
   const durationMs = Date.now() - startedAt;
+  // An evidence run leaves the page builder this group's report beside its
+  // captures (#354). A report never written is already a failed group below.
+  const evidenceReport = iosEvidenceReportOf(process.env);
+  if (evidenceReport && existsSync(reportFile))
+    copyFileSync(reportFile, evidenceReport);
 
   const modeInfo = existsSync(IOS_MODE_FILE)
     ? readJson(IOS_MODE_FILE, "iOS's interaction-mode artifact")
