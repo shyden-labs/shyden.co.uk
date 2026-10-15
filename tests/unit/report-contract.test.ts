@@ -7,6 +7,8 @@ import {
   type ReportsDatabase,
 } from '../../src/lib/report';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import {
   loadSpec,
   checkResponse,
@@ -23,6 +25,13 @@ import {
  */
 
 const SPEC = loadSpec('openapi/report.yaml');
+
+/** A case's name as a floor id: `405 for GET` -> `405-for-get`. */
+const floorId = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 const PATH = '/api/report';
 const ORIGIN = 'https://dev.shyden.co.uk';
 const FORM = 'application/x-www-form-urlencoded';
@@ -101,10 +110,21 @@ const CASES: readonly (readonly [string, () => Request, string])[] = [
 ];
 
 describe('POST /api/report answers as openapi/report.yaml says', () => {
-  it.each(CASES)('%s', async (_, request, status) => {
+  it.each(CASES)('%s', async (name, request, status) => {
     const response = await handleReport(request(), {}, () => {});
     expect(String(response.status)).toBe(status);
-    expect(await checkResponse(SPEC, PATH, 'post', response)).toEqual([]);
+    const { findings, checked } = await checkResponse(
+      SPEC,
+      PATH,
+      'post',
+      response,
+    );
+    expect(
+      searched(findings, { of: checked, what: `${name}: points checked` }),
+    ).toEqual([]);
+    expect(
+      floorBreach(`report-contract/${floorId(name)}`, checked.length),
+    ).toBeUndefined();
   });
 });
 
@@ -177,12 +197,21 @@ const HEALTH_CASES: readonly (readonly [
 ];
 
 describe('GET /api/report/health answers as openapi/report-health.yaml says', () => {
-  it.each(HEALTH_CASES)('%s', async (_, answer, status) => {
+  it.each(HEALTH_CASES)('%s', async (name, answer, status) => {
     const response = await answer();
     expect(String(response.status)).toBe(status);
-    expect(await checkResponse(HEALTH_SPEC, HEALTH, 'get', response)).toEqual(
-      [],
+    const { findings, checked } = await checkResponse(
+      HEALTH_SPEC,
+      HEALTH,
+      'get',
+      response,
     );
+    expect(
+      searched(findings, { of: checked, what: `${name}: points checked` }),
+    ).toEqual([]);
+    expect(
+      floorBreach(`report-contract/health-${floorId(name)}`, checked.length),
+    ).toBeUndefined();
   });
 
   it('lists every status the cases produce, and no other', () => {

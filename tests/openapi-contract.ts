@@ -136,37 +136,63 @@ export const documentedStatuses = (
   method: string,
 ): string[] => Object.keys(operation(doc, path, method).responses ?? {});
 
-/** Every way `response` disagrees with the spec; empty means it agrees. */
+/** What a check against the spec found, and every point it checked. */
+export interface Verdict {
+  readonly findings: string[];
+  readonly checked: string[];
+}
+
+/**
+ * Every way `response` disagrees with the spec (`findings`, empty when it
+ * agrees), and every point it compared (`checked`), so a caller can show the
+ * absence of findings was read over something.
+ */
 export async function checkResponse(
   doc: OpenApiDoc,
   path: string,
   method: string,
   response: Response,
-): Promise<string[]> {
+): Promise<Verdict> {
+  const checked = [`status ${response.status}`];
   const documented = operation(doc, path, method).responses?.[
     String(response.status)
   ];
-  if (!documented) return [`status ${response.status} is not documented`];
-  const found: string[] = [];
+  if (!documented)
+    return {
+      findings: [`status ${response.status} is not documented`],
+      checked,
+    };
+  const findings: string[] = [];
   for (const [name, header] of Object.entries(documented.headers ?? {}))
-    if (header.required && response.headers.get(name) === null)
-      found.push(`header ${name}: documented as required, missing`);
+    if (header.required) {
+      checked.push(`header ${name}`);
+      if (response.headers.get(name) === null)
+        findings.push(`header ${name}: documented as required, missing`);
+    }
   const type = (response.headers.get('Content-Type') ?? '')
     .split(';')[0]
     .trim();
   const text = await response.text();
+  checked.push('body');
   const content = documented.content;
-  if (!content)
-    return text === ''
-      ? found
-      : [...found, `a body the spec does not document: ${text.slice(0, 80)}`];
+  if (!content) {
+    if (text !== '')
+      findings.push(`a body the spec does not document: ${text.slice(0, 80)}`);
+    return { findings, checked };
+  }
   // Form mode answers some statuses with no body; the spec says so, never the checker.
   if (text === '' && type === '' && documented['x-empty-in-form-mode'] === true)
-    return found;
+    return { findings, checked };
   const media = content[type];
-  if (!media)
-    return [...found, `content type ${type || '(none)'} is not documented`];
-  return [...found, ...validate(doc, media.schema, JSON.parse(text), 'body')];
+  if (!media) {
+    findings.push(`content type ${type || '(none)'} is not documented`);
+    return { findings, checked };
+  }
+  const body: unknown = JSON.parse(text);
+  if (body && typeof body === 'object')
+    checked.push(...Object.keys(body).map((key) => `body.${key}`));
+  findings.push(...validate(doc, media.schema, body, 'body'));
+  return { findings, checked };
 }
 
 /** The `enum` a form field's schema declares. */
