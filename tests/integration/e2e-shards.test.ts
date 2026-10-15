@@ -35,11 +35,33 @@ describe('the verdict, run as build-and-test runs it', () => {
     });
   };
 
-  const verdict = (files: string[], needs: unknown) =>
-    spawnSync(process.execPath, [SCRIPT, ...files], {
-      encoding: 'utf8',
-      env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) },
-    });
+  /**
+   * The capture shards' files (#774), as the workflow hands them over: the
+   * four accounts where scope said the capture runs, and otherwise the
+   * literal pattern of a glob that matched nothing, as a skipped download
+   * leaves it. A test that is about the capture passes its own.
+   */
+  const captureFilesFor = (needs: unknown) => {
+    const said = (needs as { scope?: { outputs?: { capture?: string } } })
+      ?.scope?.outputs?.capture;
+    return said === 'true'
+      ? accountFiles(whole())
+      : [join(scratch(), '*.json')];
+  };
+
+  const verdict = (
+    files: string[],
+    needs: unknown,
+    captureFiles: string[] = captureFilesFor(needs),
+  ) =>
+    spawnSync(
+      process.execPath,
+      [SCRIPT, ...files, '--capture', ...captureFiles],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) },
+      },
+    );
 
   /** `needs` with the capture job (#774) as scope's verdict leaves it. */
   const capturing = (
@@ -73,6 +95,57 @@ describe('the verdict, run as build-and-test runs it', () => {
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
     expect(run.stdout).toMatch(/4 shards ran 2210 of the 2210 tests/);
+    expect(run.stdout).toMatch(
+      /4 capture shards ran 2210 of the 2210 cases the release selection holds/,
+    );
+  });
+
+  it('fails when the capture shards fall short of the selection (#774)', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      succeeded,
+      accountFiles(whole().slice(0, 3)),
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /the capture: shard 4 of 4 never accounted for itself/,
+    );
+  });
+
+  it('fails, naming it, when the capture ran and its glob matched no account (#774)', () => {
+    const unmatched = join(scratch(), '*.json');
+    const run = verdict(accountFiles(whole()), succeeded, [unmatched]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(
+      `the capture: ${unmatched} does not exist, so it holds no shard's account`,
+    );
+  });
+
+  it('fails when a capture account exists where scope said the capture is skipped (#774)', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      capturing(succeeded, 'false', 'skipped'),
+      accountFiles(whole()),
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /the capture: 4 shard accounts were written, where scope said the capture does not run/,
+    );
+  });
+
+  it('fails when it is handed no --capture accounts at all (#774)', () => {
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, ...accountFiles(whole())],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, NEEDS_JSON: JSON.stringify(succeeded) },
+      },
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /handed no --capture accounts, so the capture shards cannot be added up/,
+    );
   });
 
   it('fails when a shard failed, even though the accounts add up', () => {

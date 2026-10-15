@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  accountArguments,
   accountFileName,
   accountFindings,
+  captureAccountFindings,
   captureFindings,
   docsOnlyFindings,
   isDocsOnlyRun,
@@ -538,5 +540,79 @@ describe('captureFindings: the capture shards ran exactly where scope said (#774
       findings: [],
       rest: 'not json',
     });
+  });
+});
+
+describe('accountArguments: the e2e accounts, then the capture accounts (#774)', () => {
+  it('splits the files at --capture', () => {
+    expect(
+      accountArguments(['e2e/1.json', 'e2e/2.json', '--capture', 'cap/1.json']),
+    ).toEqual({ e2e: ['e2e/1.json', 'e2e/2.json'], capture: ['cap/1.json'] });
+  });
+
+  it('keeps an unmatched capture glob as the file it names, for the verdict to refuse', () => {
+    expect(accountArguments(['e2e/1.json', '--capture', 'cap/*.json'])).toEqual(
+      { e2e: ['e2e/1.json'], capture: ['cap/*.json'] },
+    );
+  });
+
+  it('says when it was handed no --capture at all', () => {
+    expect(accountArguments(['e2e/1.json'])).toEqual({
+      e2e: ['e2e/1.json'],
+      capture: null,
+    });
+  });
+});
+
+describe('captureAccountFindings: the capture shards ran the whole selection (#774)', () => {
+  it('has nothing to say when four capture shards ran exactly the selection', () => {
+    const accounts = whole();
+    expect(
+      searched(captureAccountFindings(true, accounts), {
+        of: accounts,
+        what: 'capture accounts',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/capture-accounts', accounts.length),
+    ).toBeUndefined();
+  });
+
+  it('refuses capture shards that ran one case short, naming the capture', () => {
+    const accounts = whole();
+    accounts[1] = account(2, 552);
+    expect(captureAccountFindings(true, accounts)).toEqual([
+      'the capture: the shards ran 2209 of the 2210 tests the suite holds',
+    ]);
+  });
+
+  it('refuses a capture that ran where no shard accounted for itself', () => {
+    expect(captureAccountFindings(true, [])).toEqual([
+      'the capture: no shard accounted for itself, so there is no evidence that any of the suite ran',
+    ]);
+  });
+
+  it('refuses capture accounts written where scope said the capture does not run', () => {
+    expect(captureAccountFindings(false, whole())).toEqual([
+      'the capture: 4 shard accounts were written, where scope said the capture does not run',
+    ]);
+  });
+
+  it('takes no capture account where scope said the capture does not run', () => {
+    const cases = [
+      {
+        case: 'scope said the capture is skipped, and none was written',
+        input: [],
+      },
+    ];
+    expect(
+      searched(
+        cases.flatMap(({ input }) => captureAccountFindings(false, input)),
+        { of: cases, what: 'cases' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/capture-skipped-cases', cases.length),
+    ).toBeUndefined();
   });
 });

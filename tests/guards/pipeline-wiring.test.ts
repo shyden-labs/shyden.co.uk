@@ -1788,6 +1788,9 @@ const CAPTURE_SHARD_SCRIPT =
 /** Where each shard writes its account, and where build-and-test reads them. */
 const E2E_ACCOUNTS = 'e2e-accounts';
 
+/** The same, for the capture shards, added up to the selection (#774). */
+const CAPTURE_ACCOUNTS = 'capture-accounts';
+
 /**
  * `build-and-test` once the suite is split (#163).
  *
@@ -1869,7 +1872,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     // verdict to list: an unmatched glob stays the literal pattern, which the
     // verdict refuses by name (#84).
     expect(verdict?.run?.trim()).toBe(
-      `node scripts/e2e-shards.mjs ${E2E_ACCOUNTS}/*.json`,
+      `node scripts/e2e-shards.mjs ${E2E_ACCOUNTS}/*.json --capture ${CAPTURE_ACCOUNTS}/*.json`,
     );
     // An env var, not an interpolation into the script: `toJSON(needs)`
     // carries job outputs, and an expression spliced into a `run:` is code.
@@ -1990,6 +1993,30 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     );
     expect(upload?.if).toBe('always()');
     expect(upload?.with?.['if-no-files-found']).toBe('error');
+  });
+
+  it('each capture shard counts its selection and writes its account where build-and-test reads it (#774)', () => {
+    const steps = ciParsed().jobs.capture?.steps ?? [];
+    const run = steps.find((step) => step.run === CAPTURE_SHARD_SCRIPT);
+    expect(run?.env?.E2E_ENUMERATE).toBe('selection');
+    expect(run?.env?.E2E_ACCOUNT_DIR).toBe(CAPTURE_ACCOUNTS);
+    const upload = steps.find(
+      (step) =>
+        step.uses?.startsWith('actions/upload-artifact@') &&
+        step.with?.path === CAPTURE_ACCOUNTS,
+    );
+    expect(upload?.if).toBe('always()');
+    expect(upload?.with?.['if-no-files-found']).toBe('error');
+    expect(upload?.with?.name).toBe('capture-account-${{ matrix.shard }}');
+    // Collected only where the capture ran: elsewhere the verdict meets the
+    // glob's literal pattern, and refuses any account that does exist.
+    const download = (ciParsed().jobs['build-and-test']?.steps ?? []).find(
+      (step) =>
+        step.uses?.startsWith('actions/download-artifact@') &&
+        step.with?.path === CAPTURE_ACCOUNTS,
+    );
+    expect(download?.if).toBe("needs.scope.outputs.capture == 'true'");
+    expect(download?.with?.pattern).toBe('capture-account-*');
   });
 });
 

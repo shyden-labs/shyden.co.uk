@@ -311,12 +311,28 @@ jobs:
           tests=$(node scripts/release-inventory.mjs --tests)
           test -n "$tests"
           npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $tests
+        # Each shard counts the SELECTION it was handed, not the whole suite,
+        # and writes down what it ran, for build-and-test to add up exactly as
+        # it adds up the e2e shards (scripts/e2e-shards.mjs, #774).
         env:
           EVIDENCE_DIR: capture-evidence
+          E2E_ENUMERATE: selection
+          E2E_ACCOUNT_DIR: capture-accounts
       # Judged even when a case failed, so one run names every case with no
       # picture; a failed case itself is the e2e suite's to judge.
       - if: ${{ !cancelled() }}
         run: node scripts/capture-coverage.mjs capture-evidence
+      # Whatever the shard's outcome, and an empty upload is an ERROR, as for
+      # the e2e shards: a shard that wrote no account has nothing to add up.
+      - name: Keep this capture shard's account for build-and-test
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: capture-account-${{ matrix.shard }}
+          path: capture-accounts
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: error
       - name: Keep this shard's report and manifest
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -446,9 +462,19 @@ jobs:
           pattern: e2e-account-*
           merge-multiple: true
           path: e2e-accounts
+      # Only where the capture ran; elsewhere its glob stays the literal
+      # pattern, and any account that does exist is refused by name (#774).
+      - name: Collect every capture shard's account
+        if: needs.scope.outputs.capture == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: capture-account-*
+          merge-multiple: true
+          path: capture-accounts
       # Every job it needs SUCCEEDED -- skipped and cancelled refused like
       # failure -- and the shards' accounts add up to the suite each of them
-      # enumerated (scripts/e2e-shards.mjs). Run even when the download above
+      # enumerated, the capture shards' to the selection they were handed
+      # (scripts/e2e-shards.mjs, #774). Run even when a download above
       # failed, so the refusal names what is missing. The verdict is handed
       # the glob's FILES and lists no directory: a glob matching nothing stays
       # the literal pattern, which it refuses by name. `needs` arrives as an
@@ -458,7 +484,7 @@ jobs:
         if: always()
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
-        run: node scripts/e2e-shards.mjs e2e-accounts/*.json
+        run: node scripts/e2e-shards.mjs e2e-accounts/*.json --capture capture-accounts/*.json
 
   # The visual-regression suite, in the SAME pinned image the baselines are
   # captured in (#33). Not a tidiness choice: a bare `ubuntu-latest` runner
