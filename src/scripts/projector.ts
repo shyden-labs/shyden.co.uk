@@ -60,13 +60,13 @@ export interface ProjectorHandlers {
    */
   refuseReason?: () => string | null;
   /**
-   * Whether a shuffle is already running.
+   * Whether the roster cannot be dealt right now.
    *
    * The board's Shuffle button and the page's deal button are the same
-   * action, so they must share the same guard -- see the click handler
-   * below for what two overlapping deals actually do.
+   * action, so the board asks the page's own answer rather than keeping
+   * one: when the page's button cannot deal, neither can the board's.
    */
-  busy?: () => boolean;
+  cannotDeal?: () => boolean;
   /**
    * Whether the groups should be revealed one at a time, or simply be
    * there.
@@ -424,13 +424,12 @@ export function renderProjector(
   openButton.addEventListener('click', enter);
   exit.addEventListener('click', () => void leave());
   shuffle.addEventListener('click', () => {
-    // The page's own deal button disables itself for the whole animation
-    // (2.6s at 24 students). This one shares that fact rather than keeping
-    // its own: without it, two presses during a deal start two overlapping
-    // animate() loops -- doubled land sounds, the first loop re-enabling
-    // the button while the second still runs, and `.dealt` being set on
-    // cards the second render has already detached.
-    if (handlers.busy?.()) return;
+    // A press during a deal is not refused: it starts a new deal from the
+    // top (operator, 2026-08-13 and #744). The page's deal supersedes the
+    // running one itself -- `dealToken` and the travelling deal's abort --
+    // so the abandoned deal lands nobody and sounds nothing. What this
+    // refuses is only a roster the page cannot deal at all.
+    if (handlers.cannotDeal?.()) return;
     handlers.onShuffle();
     // With animation on, the deal travels from the waiting list into cards
     // that are already up (#744), so the groups are not faded in on top of

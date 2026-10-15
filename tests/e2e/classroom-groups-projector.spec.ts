@@ -284,11 +284,10 @@ test.describe('the projector view', () => {
     await withGroups(page);
     const before = await page.locator('#cg-results').innerText();
     await page.getByRole('button', { name: 'Full screen' }).click();
-    // The board's Shuffle shares the page's own one-at-a-time guard, so it
-    // does nothing while the previous deal is still running -- which is
-    // what a teacher pressing it twice should get, and what this test was
-    // unknowingly doing. Wait for the deal to finish first: condition-based
-    // on the deal button's own enabled state, never a sleep.
+    // The board's Shuffle refuses only a roster the page cannot deal: the
+    // deal button's enabled state, which a deal in progress never changes.
+    // A press mid-deal starts a new deal from the top, so this test does
+    // not need the first deal to have finished.
     await expect(page.locator('#cg-go')).toBeEnabled();
     await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
     // #744: a board Shuffle deals by travelling from the waiting list, which
