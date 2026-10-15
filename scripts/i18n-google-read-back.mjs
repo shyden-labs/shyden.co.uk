@@ -43,6 +43,7 @@ import {
   READ_ORDER,
   approvedFirst,
   batches,
+  blockingRead,
   charactersLeft,
   coverage,
   fromGoogleHtml,
@@ -202,6 +203,11 @@ async function main() {
 
   console.log(
     `read ${readNow.size} of ${plan.length} texts, ${spent} of ${total} characters`,
+  );
+  // The lines a change waits on, read before the backlog (#784).
+  const blocking = blockingRead(plan, readNow);
+  console.log(
+    `${blocking.read} of the ${blocking.inPlan} texts that block a change were read`,
   );
   if (!stop && readNow.size < plan.length)
     stop = `today's ${DAILY_CHARACTERS} characters are spent; ${plan.length - readNow.size} texts wait for Google's next day`;
