@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { expect } from 'vitest';
 import {
   EVIDENCE_MANIFEST,
   captureFile,
@@ -55,7 +56,14 @@ export interface Screenshotter {
 /** What one capture says about itself; `order` is this module's to assign. */
 export interface DeviceCapture {
   project: string;
-  title: string;
+  /**
+   * The journey, spelled as the run report spells it. Left out, it is the
+   * running test's name (`expect.getState().currentTestName`: its describes
+   * and its title joined with ` > `), which is what the evidence page joins a
+   * capture to its test by (#354). Given only where one test captures more
+   * than one journey on purpose.
+   */
+  title?: string;
   label: string;
 }
 
@@ -146,7 +154,13 @@ export const shootDevice = async (
   const dir = process.env.EVIDENCE_DIR;
   if (!dir) return null;
 
-  const { project, title, label } = capture;
+  const { project, label } = capture;
+  const title = capture.title ?? expect.getState().currentTestName;
+  if (!title)
+    throw new Error(
+      `shootDevice(${label}): no title was given and no test is running, so ` +
+        'the capture names no journey the evidence page could join it to',
+    );
   const key = `${project}|${title}`;
   const order = (counters.get(key) ?? 0) + 1;
   counters.set(key, order);
