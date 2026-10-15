@@ -24,6 +24,13 @@ import { createHash } from 'node:crypto';
 /** Playwright's json report, as the page builder expects to find it. */
 export const EVIDENCE_REPORT = 'report.json';
 
+/**
+ * The report a real-device iOS run leaves in the evidence directory: Vitest's
+ * JSON, copied there by `scripts/test-devices.mjs` (#354). A directory holds
+ * this or `EVIDENCE_REPORT`, never both.
+ */
+export const VITEST_EVIDENCE_REPORT = 'vitest-report.json';
+
 /** One line per captured assertion, appended as the run goes. */
 export const EVIDENCE_MANIFEST = 'manifest.jsonl';
 

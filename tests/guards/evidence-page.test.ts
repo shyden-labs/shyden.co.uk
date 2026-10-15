@@ -36,7 +36,10 @@ import {
   assetVideoPaths,
   assertAssetLimits,
   flattenReport,
+  journeysOfPage,
+  slugOf,
 } from '../../scripts/build-evidence-page.mjs';
+import { playwrightShapeOfVitest } from '../../scripts/vitest-evidence.mjs';
 import {
   CONTENT,
   REPORT,
@@ -1641,5 +1644,62 @@ describe('recordings travel in the asset store (#268)', () => {
         sizeOf: () => 1024,
       }),
     ).toBeUndefined();
+  });
+});
+
+describe('a real-device iOS run on the page (#354)', () => {
+  // The iOS leg runs under Vitest, read through the same adapter the builder
+  // uses, so these pages are built from the report a real run leaves.
+  const ios = (journey: string) =>
+    playwrightShapeOfVitest(
+      {
+        startTime: Date.parse(REPORT.stats.startTime),
+        testResults: [
+          {
+            name: '/repo/tests/device/ios/journeys.journey.ts',
+            assertionResults: [
+              {
+                ancestorTitles: ['en'],
+                title: journey,
+                status: 'passed',
+                duration: 900,
+              },
+            ],
+          },
+        ],
+      },
+      { project: 'ios-safari-real-device', root: '/repo' },
+    );
+
+  it('says a stills-only leg has no recording, not that a policy chose none', () => {
+    const html = build({
+      report: ios('Journey 1 -- groups render'),
+      manifest: [],
+      shots: new Map(),
+    });
+    expect(html).toContain(
+      '<div class="novid mono">no recording for this leg</div>',
+    );
+    expect(html, 'no recording policy applies to this leg').not.toContain(
+      'not recorded by policy',
+    );
+  });
+
+  it('gives a capture and its test one journey, as currentTestName spells it', () => {
+    const row = {
+      project: 'ios-safari-real-device',
+      title: 'en > Journey 14 -- the board open',
+      order: 1,
+      label: 'the board open on a refused grant',
+      file: 'ios-safari-real-device/j14__01.png',
+    };
+    const html = build({
+      report: ios('Journey 14 -- the board open'),
+      manifest: [row],
+      shots: new Map([[row.file, 'data:image/png;base64,AAAA']]),
+    });
+    expect(journeysOfPage(html)).toEqual([
+      slugOf('en > Journey 14 -- the board open'),
+    ]);
   });
 });

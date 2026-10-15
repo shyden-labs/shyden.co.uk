@@ -15,6 +15,7 @@ import {
   EVIDENCE_MANIFEST,
   EVIDENCE_REPORT,
   manifestRow,
+  VITEST_EVIDENCE_REPORT,
 } from '../../scripts/evidence-files.mjs';
 import { scriptCheckout, type ScriptCheckout } from '../unit/script-checkout';
 import { ASSET_MAX_FILES } from '../../scripts/build-evidence-page.mjs';
@@ -656,6 +657,8 @@ describe('recordings travel in the asset store (#268)', () => {
     );
   });
 
+  // #354: an empty directory now names both reports it looked for, since a
+  // real-device iOS run leaves Vitest's rather than Playwright's.
   it('names an evidence directory with no report in it', () => {
     const dir = mkdtempSync(join(scratch, 'empty-'));
     const refused = builder(
@@ -667,7 +670,7 @@ describe('recordings travel in the asset store (#268)', () => {
     );
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: could not read the evidence report at ${join(dir, EVIDENCE_REPORT)}: ENOENT`,
+      `✗ build-evidence-page: ${dir} holds neither ${EVIDENCE_REPORT} (Playwright) nor ${VITEST_EVIDENCE_REPORT} (Vitest)`,
     );
   });
 

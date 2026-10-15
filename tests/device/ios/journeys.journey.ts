@@ -831,7 +831,6 @@ describe.each(LOCALES)(
         logMode(`Journey 14 (${locale}, ${shape.count}/${shape.size})`);
         await session.navigateToPath(path);
 
-        const title = `Journey 14 -- ${shape.what}, ${shape.count} in ${shape.size}s, refused grant (${locale})`;
         const project = 'ios-safari-real-device';
 
         const count = await session.driver.findElement('#cg-count');
@@ -951,7 +950,6 @@ describe.each(LOCALES)(
         ).toBe(false);
         await shootDevice(session.driver, {
           project,
-          title,
           label: `the board open on a refused grant -- API offered: ${grant.apiOffered}`,
         });
 
@@ -988,7 +986,6 @@ describe.each(LOCALES)(
         ).toEqual([]);
         await shootDevice(session.driver, {
           project,
-          title,
           label: `nothing out of reach -- ${seen.rows} row(s) at ${seen.font}`,
         });
 
@@ -1023,7 +1020,6 @@ describe.each(LOCALES)(
 
         await shootDevice(session.driver, {
           project,
-          title,
           label: `${shape.what} confirmed -- ${seen.rows} row(s), ${seen.cards.length} cards at ${seen.font}`,
         });
       });

@@ -1,0 +1,237 @@
+import { describe, expect, it } from 'vitest';
+import { playwrightShapeOfVitest } from '../../scripts/vitest-evidence.mjs';
+import {
+  capturesOfThisRun,
+  evidenceReportOf,
+  flattenReport,
+} from '../../scripts/build-evidence-page.mjs';
+import { manifestRow } from '../../scripts/evidence-files.mjs';
+
+/**
+ * #354: the real-device iOS leg runs under Vitest and writes Vitest's JSON
+ * report; the evidence page reads Playwright's. Each case below builds a
+ * Vitest report and reads it back through `flattenReport`, the function the
+ * page itself uses, so "the same shape" is judged by the reader, not by a
+ * structure this file hand-copies.
+ */
+const ROOT = '/repo';
+const PROJECT = 'ios-safari-real-device';
+const START_MS = 1792040156736;
+
+/** One Vitest assertion result, passed unless told otherwise. */
+const assertion = (over: Record<string, unknown> = {}) => ({
+  ancestorTitles: ['en'],
+  title: 'Journey 1 -- groups render',
+  fullName: 'en Journey 1 -- groups render',
+  status: 'passed',
+  duration: 1234,
+  failureMessages: [],
+  meta: {},
+  ...over,
+});
+
+/** A Vitest JSON report holding one file of the given assertions. */
+const vitestReport = (
+  assertions: unknown[] = [assertion()],
+  over: Record<string, unknown> = {},
+) => ({
+  startTime: START_MS,
+  success: true,
+  testResults: [
+    {
+      name: `${ROOT}/tests/device/ios/journeys.journey.ts`,
+      status: 'passed',
+      startTime: START_MS,
+      endTime: START_MS + 5000,
+      assertionResults: assertions,
+    },
+  ],
+  ...over,
+});
+
+const read = (report: unknown) =>
+  flattenReport(
+    playwrightShapeOfVitest(report, { project: PROJECT, root: ROOT }),
+  );
+
+describe('playwrightShapeOfVitest: a Vitest run read as a Playwright report', () => {
+  it('stamps the run start as the ISO instant capturesOfThisRun reads', () => {
+    expect(
+      playwrightShapeOfVitest(vitestReport(), { project: PROJECT, root: ROOT })
+        .stats.startTime,
+    ).toBe(new Date(START_MS).toISOString());
+  });
+
+  it('gives a test inside a describe one journey, titled as currentTestName spells it', () => {
+    expect(read(vitestReport())).toEqual([
+      {
+        title: 'en > Journey 1 -- groups render',
+        block: 'en',
+        project: PROJECT,
+        status: 'passed',
+        duration: 1234,
+        file: 'tests/device/ios/journeys.journey.ts',
+        video: undefined,
+      },
+    ]);
+  });
+
+  it('keeps a title that contains the separator as one title', () => {
+    expect(
+      read(vitestReport([assertion({ title: 'Journey 14 -- a > b' })]))[0],
+    ).toMatchObject({ title: 'en > Journey 14 -- a > b', block: 'en' });
+  });
+
+  it('nests two describes as two blocks of one journey', () => {
+    expect(
+      read(
+        vitestReport([assertion({ ancestorTitles: ['en', 'the board'] })]),
+      )[0],
+    ).toMatchObject({
+      title: 'en > the board > Journey 1 -- groups render',
+      block: 'en > the board',
+    });
+  });
+
+  it('keeps a test with no describe at the top of its file', () => {
+    expect(
+      read(vitestReport([assertion({ ancestorTitles: [] })]))[0],
+    ).toMatchObject({
+      title: 'Journey 1 -- groups render',
+      block: '',
+    });
+  });
+
+  it('carries every assertion, in order', () => {
+    expect(
+      read(
+        vitestReport([
+          assertion({ title: 'one' }),
+          assertion({ ancestorTitles: ['id'], title: 'two' }),
+        ]),
+      ).map((s) => s.title),
+    ).toEqual(['en > one', 'id > two']);
+  });
+
+  it('reads a failed test as failed', () => {
+    expect(
+      read(vitestReport([assertion({ status: 'failed' })]))[0].status,
+    ).toBe('failed');
+  });
+
+  it.each(['skipped', 'pending', 'todo', 'disabled'])(
+    'reads a %s test as skipped, with no duration of its own',
+    (status) => {
+      expect(
+        read(vitestReport([assertion({ status, duration: null })]))[0],
+      ).toMatchObject({ status: 'skipped', duration: 0 });
+    },
+  );
+
+  it('refuses a status it does not know, naming it', () => {
+    expect(() => read(vitestReport([assertion({ status: 'flaky' })]))).toThrow(
+      'en > Journey 1 -- groups render: Vitest status "flaky" is not one this reader knows',
+    );
+  });
+
+  it('refuses a run test with no duration, naming it', () => {
+    expect(() => read(vitestReport([assertion({ duration: null })]))).toThrow(
+      'en > Journey 1 -- groups render: a passed test carries no duration',
+    );
+  });
+
+  it('refuses a report with no start time', () => {
+    expect(() =>
+      read(vitestReport(undefined, { startTime: undefined })),
+    ).toThrow('the Vitest report has no startTime');
+  });
+
+  it('refuses a report with no testResults list', () => {
+    expect(() => read({ startTime: START_MS })).toThrow(
+      'the Vitest report has no testResults list',
+    );
+  });
+
+  it('refuses a file outside the root it was told', () => {
+    expect(() =>
+      read(
+        vitestReport(undefined, {
+          testResults: [
+            {
+              name: '/elsewhere/x.journey.ts',
+              assertionResults: [assertion()],
+            },
+          ],
+        }),
+      ),
+    ).toThrow('/elsewhere/x.journey.ts is not under /repo');
+  });
+});
+
+describe('evidenceReportOf: the one report an evidence directory holds', () => {
+  const DIR = '/runs/ios';
+  const PLAYWRIGHT = {
+    stats: { startTime: '2026-10-15T00:00:00.000Z' },
+    suites: [],
+  };
+  const holding = (files: Record<string, unknown>) => ({
+    dir: DIR,
+    root: ROOT,
+    exists: (file: string) => file in files,
+    read: (file: string) => files[file],
+  });
+
+  it('returns a Playwright report as it is', () => {
+    expect(
+      evidenceReportOf(holding({ [`${DIR}/report.json`]: PLAYWRIGHT })),
+    ).toBe(PLAYWRIGHT);
+  });
+
+  it('reads a Vitest report as the real-device iOS leg', () => {
+    const report = evidenceReportOf(
+      holding({ [`${DIR}/vitest-report.json`]: vitestReport() }),
+    );
+    expect(flattenReport(report).map((s) => s.project)).toEqual([PROJECT]);
+  });
+
+  it('refuses a directory holding neither, naming both files it looked for', () => {
+    expect(() => evidenceReportOf(holding({}))).toThrow(
+      `${DIR} holds neither report.json (Playwright) nor vitest-report.json (Vitest)`,
+    );
+  });
+
+  it('refuses a directory holding both, rather than choosing one', () => {
+    expect(() =>
+      evidenceReportOf(
+        holding({
+          [`${DIR}/report.json`]: PLAYWRIGHT,
+          [`${DIR}/vitest-report.json`]: vitestReport(),
+        }),
+      ),
+    ).toThrow(`${DIR} holds both report.json and vitest-report.json`);
+  });
+});
+
+describe("an earlier run's iOS captures are set aside (#354 AC3)", () => {
+  it('keeps the rows stamped at or after the Vitest run started, and sets the rest aside', () => {
+    const capture = (label: string, at: number) =>
+      manifestRow(
+        {
+          project: PROJECT,
+          title: 'en > Journey 1 -- groups render',
+          order: 1,
+          label,
+          file: `ios/${label}.png`,
+        },
+        new Date(at),
+      );
+    const before = capture('an earlier run', START_MS - 60_000);
+    const during = capture('this run', START_MS + 1_000);
+    const { current, earlier } = capturesOfThisRun(
+      [before, during],
+      playwrightShapeOfVitest(vitestReport(), { project: PROJECT, root: ROOT }),
+    );
+    expect(current).toEqual([during]);
+    expect(earlier).toEqual([before]);
+  });
+});
