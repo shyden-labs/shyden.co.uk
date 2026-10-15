@@ -596,18 +596,21 @@ describe('the measuring twin cannot become a gate (#224)', () => {
 const CONFIG = /^playwright.*\.config\.[cm]?[jt]s$/;
 
 /**
- * A config's module, freshly evaluated under `env` added to the environment,
- * with every variable put back afterwards, including any its import sets. The
- * module cache is reset first, because a config reads the environment once,
- * as it loads.
+ * A config's module, freshly evaluated under `env` applied to the environment
+ * (a variable given as `undefined` is removed, so a run under CI can still
+ * load a config as the laptop does), with every variable put back afterwards,
+ * including any its import sets. The module cache is reset first, because a
+ * config reads the environment once, as it loads.
  */
 const importConfig = async (
   file: string,
-  env: Record<string, string> = {},
+  env: Record<string, string | undefined> = {},
 ): Promise<PlaywrightTestConfig> => {
   const before = { ...process.env };
   try {
-    Object.assign(process.env, env);
+    for (const [key, value] of Object.entries(env))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
     vi.resetModules();
     return (await import(resolve(file))).default as PlaywrightTestConfig;
   } finally {
@@ -715,26 +718,33 @@ describe('no test run retries (#445)', () => {
   // are required that means it's flaky, adding a retry is NOT a fix". A retry
   // turns a failure into a pass: playwright.prod.config.ts's one let a check
   // that failed once verify a release.
-  it('resolves retries to 0 in every Playwright config and project, under CI', async () => {
-    const configs = rootConfigs();
-    const retrying: string[] = [];
-    for (const file of configs) {
-      const loaded = await importConfig(file, { CI: 'true' });
-      if ((loaded.retries ?? 0) !== 0)
-        retrying.push(`${file}: retries ${String(loaded.retries)}`);
-      for (const project of loaded.projects ?? [])
-        if ((project.retries ?? 0) !== 0)
-          retrying.push(
-            `${file} › ${project.name}: retries ${String(project.retries)}`,
-          );
-    }
-    expect(
-      searched(retrying, { of: configs, what: 'Playwright configs' }),
-    ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/retry-configs', configs.length),
-    ).toBeUndefined();
-  });
+  // Both environments, because a config can retry on one only: `retries:
+  // process.env.CI ? 0 : 1` resolves to 0 under CI, and the device config
+  // only ever runs on the laptop (#502, F168).
+  it.each([
+    ['under CI', { CI: 'true' }, 'browser-matrix/retry-configs'],
+    ['without CI', { CI: undefined }, 'browser-matrix/retry-configs-local'],
+  ] as const)(
+    'resolves retries to 0 in every Playwright config and project, %s',
+    async (_, env, floorId) => {
+      const configs = rootConfigs();
+      const retrying: string[] = [];
+      for (const file of configs) {
+        const loaded = await importConfig(file, env);
+        if ((loaded.retries ?? 0) !== 0)
+          retrying.push(`${file}: retries ${String(loaded.retries)}`);
+        for (const project of loaded.projects ?? [])
+          if ((project.retries ?? 0) !== 0)
+            retrying.push(
+              `${file} › ${project.name}: retries ${String(project.retries)}`,
+            );
+      }
+      expect(
+        searched(retrying, { of: configs, what: 'Playwright configs' }),
+      ).toEqual([]);
+      expect(floorBreach(floorId, configs.length)).toBeUndefined();
+    },
+  );
 
   it('passes no --retries but 0 in any workflow step or package script', () => {
     // `trackedFiles`, the walk's home for dot-directories, which proves its
