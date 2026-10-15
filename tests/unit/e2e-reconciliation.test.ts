@@ -7,6 +7,7 @@ import {
   mergeReporters,
   NAV_TIMING_REPORTER,
   enumerationArgs,
+  enumerationMode,
 } from '../../scripts/test-e2e.mjs';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
@@ -374,6 +375,79 @@ describe('what the enumeration is allowed to inherit', () => {
         argv.filter((arg) => arg.startsWith('-')).length,
       ),
     ).toBeUndefined();
+  });
+});
+
+/**
+ * A capture shard runs the release page's selection, not the suite (#774), so
+ * the count build-and-test adds its shards up to is the SELECTION's. That
+ * count only means something across shards: on one unsharded run it would
+ * restate exactly what ran. So it is an opt-in, and refused unsharded.
+ */
+describe('a sharded selection may enumerate itself, by opt-in only (#774)', () => {
+  it('forwards the test ids, and still no flag, when asked to', () => {
+    const argv = [
+      '--shard=2/4',
+      'tests/e2e/a.spec.ts:12',
+      'tests/e2e/b.spec.ts:30',
+    ];
+    expect(enumerationArgs(argv, { selection: true })).toEqual([
+      'tests/e2e/a.spec.ts:12',
+      'tests/e2e/b.spec.ts:30',
+    ]);
+  });
+
+  it("keeps a flag's own value out of the selection", () => {
+    const argv = ['--shard', '2/4', '--workers', '2', 'tests/e2e/a.spec.ts:12'];
+    expect(enumerationArgs(argv, { selection: true })).toEqual([
+      'tests/e2e/a.spec.ts:12',
+    ]);
+  });
+
+  it('still forwards the config, which says which suite this is', () => {
+    const argv = ['-c', 'playwright.dev.config.ts', 'tests/dev/a.spec.ts'];
+    expect(enumerationArgs(argv, { selection: true })).toEqual([
+      '-c',
+      'playwright.dev.config.ts',
+      'tests/dev/a.spec.ts',
+    ]);
+  });
+
+  it('forwards no test id unless asked to', () => {
+    const argv = ['--shard=1/4', 'tests/e2e/a.spec.ts:12'];
+    const ids = argv.filter((arg) => !arg.startsWith('-'));
+    expect(
+      searched(enumerationArgs(argv), { of: ids, what: 'test ids offered' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-reconciliation/unasked-test-ids', ids.length),
+    ).toBeUndefined();
+  });
+
+  it('enumerates the whole suite when nothing asks otherwise', () => {
+    expect(enumerationMode(['--shard=1/4'], {})).toBe('suite');
+  });
+
+  it('enumerates the selection when a sharded run asks to', () => {
+    expect(
+      enumerationMode(['--shard=1/4', 'tests/e2e/a.spec.ts:12'], {
+        E2E_ENUMERATE: 'selection',
+      }),
+    ).toBe('selection');
+  });
+
+  it('refuses the selection on an unsharded run, where it would assert nothing', () => {
+    expect(() =>
+      enumerationMode(['tests/e2e/a.spec.ts:12'], {
+        E2E_ENUMERATE: 'selection',
+      }),
+    ).toThrow(/E2E_ENUMERATE=selection is refused on an unsharded run/);
+  });
+
+  it('refuses any other value, rather than guessing', () => {
+    expect(() =>
+      enumerationMode(['--shard=1/4'], { E2E_ENUMERATE: 'Selection' }),
+    ).toThrow(/E2E_ENUMERATE must be unset or "selection", not "Selection"/);
   });
 });
 

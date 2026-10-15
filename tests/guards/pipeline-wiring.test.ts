@@ -25,6 +25,7 @@ import {
 } from '../workflow-jobs';
 import { REQUIRED_CHECKS } from '../../scripts/deploy-gate.mjs';
 import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';
+import { CAPTURE_ENTRIES } from '../../scripts/capture-scope.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { floorBreach } from '../floors';
@@ -1775,8 +1776,20 @@ const CI_WORKFLOW = './.github/workflows/ci.yml';
 const E2E_SHARD_COMMAND =
   'npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}';
 
+/** Where each capture shard writes its report and manifest (#774). */
+const CAPTURE_EVIDENCE = 'capture-evidence';
+
+/** What each capture shard runs: the release page's selection, under capture. */
+const CAPTURE_SHARD_SCRIPT =
+  'tests=$(node scripts/release-inventory.mjs --tests)\n' +
+  'test -n "$tests"\n' +
+  'npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $tests\n';
+
 /** Where each shard writes its account, and where build-and-test reads them. */
 const E2E_ACCOUNTS = 'e2e-accounts';
+
+/** The same, for the capture shards, added up to the selection (#774). */
+const CAPTURE_ACCOUNTS = 'capture-accounts';
 
 /**
  * `build-and-test` once the suite is split (#163).
@@ -1859,7 +1872,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     // verdict to list: an unmatched glob stays the literal pattern, which the
     // verdict refuses by name (#84).
     expect(verdict?.run?.trim()).toBe(
-      `node scripts/e2e-shards.mjs ${E2E_ACCOUNTS}/*.json`,
+      `node scripts/e2e-shards.mjs ${E2E_ACCOUNTS}/*.json --capture ${CAPTURE_ACCOUNTS}/*.json`,
     );
     // An env var, not an interpolation into the script: `toJSON(needs)`
     // carries job outputs, and an expression spliced into a `run:` is code.
@@ -1870,8 +1883,56 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     const e2e = workflowJobs(workflow('ci.yml'), 'ci.yml').filter(({ runs }) =>
       runs.some(runsTheE2eSuite),
     );
-    expect(e2e.map(({ id }) => id)).toEqual(['e2e']);
+    expect(e2e.map(({ id }) => id)).toEqual(['e2e', 'capture']);
     expect(e2e[0].runs.filter(runsTheE2eSuite)).toEqual([E2E_SHARD_COMMAND]);
+    // The capture shards run only the release page's selection (#774), read
+    // into a variable that stops the step when the inventory fails or is
+    // empty, so a broken selection never runs the whole suite under capture.
+    expect(e2e[1].runs.filter(runsTheE2eSuite)).toEqual([CAPTURE_SHARD_SCRIPT]);
+  });
+
+  it('runs the capture shards only where scope says a picture can move (#774)', () => {
+    const capture = jobNamed('ci.yml', 'capture');
+    expect(capture.condition).toBe("needs.scope.outputs.capture == 'true'");
+    expect(capture.needs).toEqual(['image', 'scope']);
+  });
+
+  it('traces every script the capture job runs from its entries (#774)', () => {
+    const scripts = [
+      ...jobNamed('ci.yml', 'capture')
+        .runs.join('\n')
+        .matchAll(/\bnode (scripts\/[\w.-]+\.mjs)/g),
+    ].map(([, script]) => script);
+    // npm run test:e2e is the package's script, so its file is an entry too.
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const e2e = /node (scripts\/[\w.-]+\.mjs)/.exec(pkg.scripts['test:e2e']);
+    expect(e2e).not.toBeNull();
+    const ran = [...new Set([...scripts, e2e![1]])].sort();
+    const untraced = ran.filter((script) => !CAPTURE_ENTRIES.includes(script));
+    expect(
+      searched(untraced, { of: ran, what: 'scripts the capture runs' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/capture-scripts', ran.length),
+    ).toBeUndefined();
+  });
+
+  it('judges every capture shard for a case with no picture (#774)', () => {
+    const job = ciParsed().jobs.capture;
+    const steps = job?.steps ?? [];
+    const run = steps.find((step) => step.run === CAPTURE_SHARD_SCRIPT);
+    expect(run?.env?.EVIDENCE_DIR).toBe(CAPTURE_EVIDENCE);
+    const judge = steps.find(
+      (step) =>
+        step.run?.trim() ===
+        `node scripts/capture-coverage.mjs ${CAPTURE_EVIDENCE}`,
+    );
+    // Judged after a failed case too, so one run names every case.
+    expect(judge?.if).toBe('${{ !cancelled() }}');
+    expect(steps.indexOf(judge!)).toBeGreaterThan(steps.indexOf(run!));
+    expect(job?.strategy?.['fail-fast']).toBe(false);
   });
 
   it('schedules shards 1 to N, and lets each one finish when another fails', () => {
@@ -1932,6 +1993,30 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     );
     expect(upload?.if).toBe('always()');
     expect(upload?.with?.['if-no-files-found']).toBe('error');
+  });
+
+  it('each capture shard counts its selection and writes its account where build-and-test reads it (#774)', () => {
+    const steps = ciParsed().jobs.capture?.steps ?? [];
+    const run = steps.find((step) => step.run === CAPTURE_SHARD_SCRIPT);
+    expect(run?.env?.E2E_ENUMERATE).toBe('selection');
+    expect(run?.env?.E2E_ACCOUNT_DIR).toBe(CAPTURE_ACCOUNTS);
+    const upload = steps.find(
+      (step) =>
+        step.uses?.startsWith('actions/upload-artifact@') &&
+        step.with?.path === CAPTURE_ACCOUNTS,
+    );
+    expect(upload?.if).toBe('always()');
+    expect(upload?.with?.['if-no-files-found']).toBe('error');
+    expect(upload?.with?.name).toBe('capture-account-${{ matrix.shard }}');
+    // Collected only where the capture ran: elsewhere the verdict meets the
+    // glob's literal pattern, and refuses any account that does exist.
+    const download = (ciParsed().jobs['build-and-test']?.steps ?? []).find(
+      (step) =>
+        step.uses?.startsWith('actions/download-artifact@') &&
+        step.with?.path === CAPTURE_ACCOUNTS,
+    );
+    expect(download?.if).toBe("needs.scope.outputs.capture == 'true'");
+    expect(download?.with?.pattern).toBe('capture-account-*');
   });
 });
 
@@ -3515,6 +3600,7 @@ describe('a docs-only pull request skips the browser jobs and nothing else (#582
     expect(checkout?.with?.['fetch-depth']).toBe(2);
     expect(ci().jobs.scope?.outputs).toEqual({
       docs_only: '${{ steps.verdict.outputs.docs_only }}',
+      capture: '${{ steps.verdict.outputs.capture }}',
     });
   });
 

@@ -3,7 +3,6 @@ import type { Page } from '@playwright/test';
 import {
   getSiteStrings,
   localeFromPath,
-  localisePath,
   type Locale,
 } from '../../src/lib/i18n';
 import { layoutWidthsFrom } from '../layout-widths';
@@ -247,17 +246,16 @@ test.describe('the header row has room for everything in it (#329)', () => {
           await header.measure(page, `${path} at ${width}px`);
         }
         header.expectRoom();
-        // The picture comes after the verdict, so it shows a row that passed,
-        // and of the page a visitor lands on: each locale's homepage.
-        if (path === localisePath('/', locale)) {
-          await header.open(page, path);
-          await page.setViewportSize({ width: 320, height: 800 });
-          await shoot(
-            page,
-            `${path} at 320px: the header row`,
-            page.locator('header'),
-          );
-        }
+        // The picture comes after the verdict, so it shows a row that passed.
+        // The release evidence cites every page here, so every page takes it
+        // (#774: a cited case that captured nothing is fixed, never dropped).
+        await header.open(page, path);
+        await page.setViewportSize({ width: 320, height: 800 });
+        await shoot(
+          page,
+          `${path} at 320px: the header row`,
+          page.locator('header'),
+        );
       },
     );
   }
