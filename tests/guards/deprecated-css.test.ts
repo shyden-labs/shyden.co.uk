@@ -182,3 +182,107 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
     ]);
   });
 });
+
+/**
+ * The visually-hidden recipe's clip: `clip-path` set to an `inset()`, in any
+ * case or spacing, with any lengths. Nothing else under `src/` clips with an
+ * inset, so every such declaration is a copy of the recipe (#767).
+ */
+const HIDDEN_CLIP = /^clip-path\s*:\s*inset\(/i;
+
+/** Every visually-hidden clip declaration in `css`. */
+const hiddenClips = (css: string): string[] =>
+  declarationsIn(css).filter((declaration) => HIDDEN_CLIP.test(declaration));
+
+describe('the visually-hidden recipe is written once, in tokens.css (#767)', () => {
+  it.each([
+    ['a stylesheet', 'case.css', '.a { clip-path: inset(50%); }'],
+    ['another spelling', 'case.css', '.a{CLIP-PATH :Inset( 50% 50% )}'],
+    [
+      'a media query',
+      'case.css',
+      '@media (max-width: 599px) { .a { clip-path: inset(50%) } }',
+    ],
+    [
+      'a component style',
+      'case.astro',
+      '<p>x</p>\n<style>\n  .a { clip-path: inset(50%); }\n</style>',
+    ],
+    [
+      'a global style',
+      'case.astro',
+      '<p>x</p>\n<style is:global>\n  .a { clip-path: inset(50%); }\n</style>',
+    ],
+    [
+      'the last declaration of a block',
+      'case.css',
+      '.a { color: red; clip-path: inset(50%) }',
+    ],
+  ])('finds the recipe in %s', (_where, file, text) => {
+    expect(stylesheetCss(file, text).flatMap(hiddenClips)).toHaveLength(1);
+  });
+
+  it('is not tripped by another clip-path, the clip keyword or a comment', () => {
+    const css = [
+      '.a { clip-path: none; }',
+      '.b { clip-path: circle(50%); overflow: clip; }',
+      '.c { /* was: clip-path: inset(50%); */ }',
+    ].join('\n');
+    const sheet = stylesheetCss(CSS_FIXTURE, css).join('\n');
+    const judged = declarationsIn(sheet);
+    expect(
+      searched(hiddenClips(sheet), {
+        of: judged,
+        what: 'declarations in the fixture',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('visually-hidden/lookalike-declarations', judged.length),
+    ).toBeUndefined();
+  });
+
+  it('finds it in exactly one stylesheet under src/: the global .visually-hidden', () => {
+    const declarations = stylesheetsUnder('src').flatMap(({ file, css }) =>
+      declarationsIn(css).map((declaration) => ({ file, declaration })),
+    );
+    const copies = declarations
+      .filter(({ declaration }) => HIDDEN_CLIP.test(declaration))
+      .map(({ file, declaration }) => `${file}: ${declaration}`);
+    expect(
+      searched(copies, {
+        of: declarations,
+        what: 'declarations under src/',
+      }),
+      'every copy of the visually-hidden recipe; a second one belongs on the global class',
+    ).toEqual(['src/styles/tokens.css: clip-path: inset(50%)']);
+    expect(
+      floorBreach('visually-hidden/judged-declarations', declarations.length),
+    ).toBeUndefined();
+  });
+
+  it('reads the recipe in every file whose text holds it', () => {
+    // Read as text, independently of the declaration reader: a file whose
+    // source holds the recipe but yields no copy is a form the reader has
+    // gone blind to, and would let a second copy through.
+    const files = filesUnder('src', (path) => /\.(astro|css)$/.test(path));
+    const read = new Set(
+      stylesheetsUnder('src')
+        .filter(({ css }) => hiddenClips(css).length > 0)
+        .map(({ file }) => file),
+    );
+    const unread = files.filter(
+      (file) =>
+        /clip-path\s*:\s*inset\(/i.test(readFileSync(file, 'utf8')) &&
+        !read.has(file),
+    );
+    expect(
+      searched(unread, {
+        of: files,
+        what: 'stylesheets and components under src/',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('visually-hidden/css-sources', files.length),
+    ).toBeUndefined();
+  });
+});
