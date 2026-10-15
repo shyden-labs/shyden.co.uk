@@ -12,6 +12,7 @@ import {
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { expectNoHorizontalScroll } from '../viewport';
+import { readsAsLineWidth } from '../device-pixels';
 import { THEMES } from '../palette';
 import { emulateTheme, expectTheme, saveTheme } from '../themes';
 import { contrastRatio } from './helpers';
@@ -1248,6 +1249,7 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
           focusVisible: input.matches(':focus-visible'),
           style: style.outlineStyle,
           width: parseFloat(style.outlineWidth),
+          ratio: window.devicePixelRatio,
           offset: parseFloat(style.outlineOffset),
           colour: style.outlineColor,
           accent,
@@ -1265,7 +1267,12 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
         true,
       );
       expect(ring.style, 'the ring is drawn').toBe('solid');
-      expect(ring.width, "the site's 3px ring").toBe(3);
+      // Declared, or snapped at this screen's ratio (#805): 2.857px on the
+      // 3.5x phone, 3 on emulated Chrome at 2.75.
+      expect(
+        readsAsLineWidth(ring.width, 3, ring.ratio),
+        `the site's 3px ring: read ${ring.width} at a ratio of ${ring.ratio}`,
+      ).toBe(true);
       expect(ring.offset, "the site's 2px offset").toBe(2);
       expect(ring.colour, "the site's --accent ring").toBe(ring.accent);
       // Drawn ON the disc, with disc still showing outside it: an --accent
