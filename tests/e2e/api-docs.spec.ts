@@ -90,6 +90,11 @@ const openEverything = async (page: Page, path: string) => {
   await expect(
     page.locator('#swagger .live-responses-table .response'),
   ).toHaveCount(count);
+  // Swagger UI's `.btn` eases every property over 0.3 s, so a button the
+  // clicks above restyled is still between its old and new colours: WebKit
+  // read Execute at 3.83:1 mid-fade (run 38756544561). Every reading below
+  // is of the settled page a visitor sees.
+  await page.waitForFunction(() => document.getAnimations().length === 0);
 };
 
 /** Every visible element in the mount that holds text of its own, with the ratio WCAG asks of it. */
