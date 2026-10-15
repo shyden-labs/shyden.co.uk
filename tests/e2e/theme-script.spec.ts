@@ -31,9 +31,10 @@ const OWN_SCRIPTS: Record<string, readonly string[]> = {
   '/yeetalk-calculators': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
   [NOT_FOUND]: [],
-  // #781: the page's own module, and the Swagger UI library it loads.
-  '/api/docs/': ['inline module in body', 'external classic in head'],
-  '/api/docs/private/': ['inline module in body', 'external classic in head'],
+  // #781: the Swagger UI library the page loads into <head>, then the page's
+  // own module, in document order.
+  '/api/docs/': ['external classic in head', 'inline module in body'],
+  '/api/docs/private/': ['external classic in head', 'inline module in body'],
 };
 
 type Script = {

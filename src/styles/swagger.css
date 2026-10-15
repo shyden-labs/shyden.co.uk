@@ -196,3 +196,18 @@
   flex-wrap: nowrap;
   gap: 0.5rem;
 }
+
+/*
+ * On paper a fill prints only when the reader turns background graphics on,
+ * so a label painted --on-accent over --accent would print white on white.
+ * The filled labels print as ink inside an outline instead, as the site's
+ * own filled controls do.
+ */
+@media print {
+  #swagger .opblock-summary-method,
+  #swagger .btn.execute {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+}
