@@ -6,7 +6,8 @@ interface Props {
   lang: Locale;
 }
 const { lang } = Astro.props;
-const t = getSiteStrings(lang).glory;
+const t = getSiteStrings(lang).calculators;
+const g = t.glory;
 ---
 
 <BaseLayout title={t.title} description={t.description} lang={lang}>
@@ -24,38 +25,51 @@ const t = getSiteStrings(lang).glory;
     </p>
     <h1>{t.heading}</h1>
     <p class="lead">{t.lead}</p>
-    <div class="how-to">
-      <h2 id="how-to-heading">{t.howToHeading}</h2>
-      <ol aria-labelledby="how-to-heading">
-        {t.howToSteps.map((step) => (
-          <li>{step}</li>
-        ))}
-      </ol>
-    </div>
-    <div class="card">
-      <label for="glory-input">{t.inputLabel}</label>
-      <input
-        id="glory-input"
-        name="glory"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        aria-describedby="glory-error"
-      />
-      <button id="glory-submit" type="button">
-        {t.calculate}
-      </button>
-      <p id="glory-error" class="error" role="alert" aria-live="assertive"></p>
-      <p id="glory-result" class="result" aria-live="polite"></p>
-      <noscript>
-        <p class="error">{t.needsJs}</p>
-      </noscript>
-    </div>
-    <p class="assumptions">{t.assumptions}</p>
+    <p class="jump">
+      <a href="#glory-points">{g.heading}</a>
+    </p>
+    <section id="glory-points" aria-labelledby="glory-heading">
+      <h2 id="glory-heading" class="section-heading">
+        {g.heading}
+      </h2>
+      <div class="how-to">
+        <h3 id="how-to-heading">{g.howToHeading}</h3>
+        <ol aria-labelledby="how-to-heading">
+          {g.howToSteps.map((step) => (
+            <li>{step}</li>
+          ))}
+        </ol>
+      </div>
+      <div class="card">
+        <label for="glory-input">{g.inputLabel}</label>
+        <input
+          id="glory-input"
+          name="glory"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          aria-describedby="glory-error"
+        />
+        <button id="glory-submit" type="button">
+          {g.calculate}
+        </button>
+        <p
+          id="glory-error"
+          class="error"
+          role="alert"
+          aria-live="assertive"
+        ></p>
+        <p id="glory-result" class="result" aria-live="polite"></p>
+        <noscript>
+          <p class="error">{t.needsJs}</p>
+        </noscript>
+      </div>
+      <p class="assumptions">{g.assumptions}</p>
+    </section>
   </section>
 </BaseLayout>
 <script>
-  import '../../scripts/glory-points.ts';
+  import '../../scripts/yeetalk-calculators.ts';
 </script>
 <style>
   .wrap {
@@ -84,10 +98,23 @@ const t = getSiteStrings(lang).glory;
     border-color: var(--accent);
     color: var(--accent-ink);
   }
+  .jump {
+    margin: 0 0 1.5rem;
+  }
+  .jump a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+  }
+  .section-heading {
+    margin: 0 0 0.75rem;
+    font-size: 1.35rem;
+  }
   .how-to {
     margin: 0 0 1.5rem;
   }
-  .how-to h2 {
+  .how-to h3 {
     font-size: 1rem;
     margin: 0 0 0.5rem;
   }

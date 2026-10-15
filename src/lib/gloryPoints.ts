@@ -54,7 +54,7 @@ export function calculateGlory(rawInput: string): GloryOutcome {
  * A number in the reader's own convention.
  *
  * Indonesian groups thousands with "." and marks decimals with ",", the exact
- * reverse of English — so `1,112` rendered on /id/glory-points reads as "one
+ * reverse of English — so `1,112` rendered on /id/yeetalk-calculators reads as "one
  * point one one two". The page's own static copy already says "0,9 koin per
  * bean", so hard-coding en-US here made it contradict itself.
  */

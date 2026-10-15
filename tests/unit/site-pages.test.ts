@@ -24,7 +24,7 @@ describe('the site page list is derived from src/pages', () => {
 
   it('serves index at the site root, every other page at its own name', () => {
     expect(sitePaths()).toContain('/');
-    expect(sitePaths()).toContain('/glory-points');
+    expect(sitePaths()).toContain('/yeetalk-calculators');
     expect(sitePaths()).toHaveLength(pageNames().length);
   });
 });

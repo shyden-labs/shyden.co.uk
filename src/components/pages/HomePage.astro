@@ -37,7 +37,7 @@ const heroLinks = [
 ].map((link) => ({ ...link, host: new URL(link.href).host }));
 
 // Internal links stay inside the visitor's language.
-const glory = localisePath('/glory-points', lang);
+const glory = localisePath('/yeetalk-calculators', lang);
 const classroom = localisePath('/classroom-groups', lang);
 
 const features = [
@@ -129,12 +129,12 @@ const yaweloIdleFeatures = [
     <p class="lead">{t.toolsLead}</p>
     <div class="grid-2">
       <WorkCard
-        title={t.workGloryTitle}
+        title={t.workCalculatorsTitle}
         href={glory}
         badge={t.toolBadge}
-        cta={t.openGlory}
+        cta={t.openCalculators}
       >
-        {t.workGloryBody}
+        {t.workCalculatorsBody}
       </WorkCard>
       <WorkCard
         title={t.workClassroomTitle}

@@ -23,6 +23,7 @@
 import {
   isProdHostname,
   wwwRedirectLocation,
+  legacyPathRedirectLocation,
   blockingRobotsBody,
   noIndexHeaderValue,
   basicAuthOk,
@@ -44,6 +45,16 @@ export const onRequest = async ({ request, env, next }) => {
     return new Response(null, {
       status: 301,
       headers: { Location: wwwTarget },
+    });
+  }
+
+  // Moved page (#635): /glory-points answers 301 to /yeetalk-calculators on
+  // every host, before the auth gate, so an old bookmark never meets a 401.
+  const legacyTarget = legacyPathRedirectLocation(url);
+  if (legacyTarget) {
+    return new Response(null, {
+      status: 301,
+      headers: { Location: legacyTarget },
     });
   }
 

@@ -1681,7 +1681,11 @@ test.describe('site-wide language switching', () => {
       getSiteStrings('id').home.heroHeading,
       getSiteStrings('en').home.heroHeading,
     ],
-    ['/id/glory-points', 'Kalkulator Glory Points', 'Glory Points Calculator'],
+    [
+      '/id/yeetalk-calculators',
+      getSiteStrings('id').calculators.heading,
+      getSiteStrings('en').calculators.heading,
+    ],
   ] as const) {
     test(`${path} is translated`, async ({ page }) => {
       expect(heading).not.toBe(english);
@@ -1733,8 +1737,18 @@ test.describe('site-wide language switching', () => {
         '/classroom-groups/',
         'id_ID',
       ],
-      ['/glory-points', '/glory-points/', '/id/glory-points/', 'en_GB'],
-      ['/id/glory-points', '/id/glory-points/', '/glory-points/', 'id_ID'],
+      [
+        '/yeetalk-calculators',
+        '/yeetalk-calculators/',
+        '/id/yeetalk-calculators/',
+        'en_GB',
+      ],
+      [
+        '/id/yeetalk-calculators',
+        '/id/yeetalk-calculators/',
+        '/yeetalk-calculators/',
+        'id_ID',
+      ],
     ] as const) {
       test(`${path}`, async ({ page }) => {
         await page.goto(path);

@@ -28,7 +28,7 @@ const NOT_FOUND = '/definitely-not-a-page';
  */
 const OWN_SCRIPTS: Record<string, readonly string[]> = {
   '/': [],
-  '/glory-points': ['external module in body'],
+  '/yeetalk-calculators': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
   [NOT_FOUND]: [],
 };

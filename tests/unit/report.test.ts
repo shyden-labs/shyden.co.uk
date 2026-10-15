@@ -42,12 +42,12 @@ describe('the page table', () => {
   it('knows the three pages with a footer, and the 404 besides', () => {
     expect(FOOTER_PAGE_IDS).toEqual([
       'home',
-      'glory-points',
+      'yeetalk-calculators',
       'classroom-groups',
     ]);
     expect(PAGE_IDS).toEqual([
       'home',
-      'glory-points',
+      'yeetalk-calculators',
       'classroom-groups',
       'not-found',
     ]);
@@ -61,7 +61,7 @@ describe('the page table', () => {
     ['/', 'home'],
     ['/vi/', 'home'],
     ['/vi', 'home'],
-    ['/th/glory-points', 'glory-points'],
+    ['/th/yeetalk-calculators', 'yeetalk-calculators'],
     ['/zh/classroom-groups/', 'classroom-groups'],
     ['/classroom-groups', 'classroom-groups'],
   ])('reads %s as %s', (path, page) => {
@@ -76,7 +76,9 @@ describe('the page table', () => {
   it('builds the path the site links use', () => {
     expect(pagePath('home', 'vi')).toBe('/vi/');
     expect(pagePath('classroom-groups', 'vi')).toBe('/vi/classroom-groups');
-    expect(pagePath('glory-points', 'th')).toBe('/th/glory-points');
+    expect(pagePath('yeetalk-calculators', 'th')).toBe(
+      '/th/yeetalk-calculators',
+    );
     // The 404 is one file for every locale (spec 14.3).
     expect(pagePath('not-found', 'vi')).toBe('/404');
     expect(pagePath('not-found', 'th')).toBe('/404');
@@ -104,23 +106,23 @@ describe('a page offers its own sections plus the chrome', () => {
   );
 
   it.each(PREFIXED_LOCALES)(
-    '%s: glory-points carries every leaf of site.glory and none of site.home',
+    '%s: yeetalk-calculators carries every leaf of site.calculators and none of site.home',
     (locale) => {
-      const keys = keysOn('glory-points', locale);
+      const keys = keysOn('yeetalk-calculators', locale);
       for (const key of nonEmpty(
-        siteLeafKeys(locale, 'glory'),
-        'site.glory leaves',
+        siteLeafKeys(locale, 'calculators'),
+        'site.calculators leaves',
       ))
         expect(keys, key).toContain(key);
       const offered = [...keys];
       expect(
         searched(
           offered.filter((key) => key.startsWith('site.home.')),
-          { of: offered, what: 'keys offered on glory-points' },
+          { of: offered, what: 'keys offered on yeetalk-calculators' },
         ),
       ).toEqual([]);
       expect(
-        floorBreach('report/glory-points-keys', offered.length),
+        floorBreach('report/yeetalk-calculators-keys', offered.length),
       ).toBeUndefined();
     },
   );
@@ -171,7 +173,7 @@ describe('a page offers its own sections plus the chrome', () => {
 
   it('every page carries every chrome entry, bare strings and the report section included', () => {
     const chrome = Object.keys(getSiteStrings('vi')).filter(
-      (section) => !['home', 'glory', 'notFound'].includes(section),
+      (section) => !['home', 'calculators', 'notFound'].includes(section),
     );
     expect(chrome).toEqual(
       expect.arrayContaining([
@@ -276,10 +278,10 @@ describe('display forms', () => {
   });
 
   it('offers each display once, and every one of them', () => {
-    const options = reportOptions('glory-points', 'id');
+    const options = reportOptions('yeetalk-calculators', 'id');
     expect(new Set(options).size).toBe(options.length);
-    const displays = reportableStrings('glory-points', 'id').flatMap((s) =>
-      s.forms.map((f) => f.display),
+    const displays = reportableStrings('yeetalk-calculators', 'id').flatMap(
+      (s) => s.forms.map((f) => f.display),
     );
     expect(new Set(options)).toEqual(new Set(displays));
   });
@@ -540,24 +542,25 @@ describe('matching a quote (spec 5)', () => {
     },
   );
 
-  it('offers only its own page: a home string is not found on glory-points', () => {
+  it('offers only its own page: a home string is not found on yeetalk-calculators', () => {
     const homeOnly = nonEmpty(
       reportOptions('home', 'vi').filter(
         (o) =>
-          !reportOptions('glory-points', 'vi').includes(o) && o.length > 12,
+          !reportOptions('yeetalk-calculators', 'vi').includes(o) &&
+          o.length > 12,
       ),
       'long home-only displays',
     )[0];
-    const strings = reportableStrings('glory-points', 'vi');
+    const strings = reportableStrings('yeetalk-calculators', 'vi');
     expect(
-      searched(matchingKeys(homeOnly, 'glory-points', 'vi'), {
+      searched(matchingKeys(homeOnly, 'yeetalk-calculators', 'vi'), {
         of: strings,
-        what: 'strings reportable on glory-points',
+        what: 'strings reportable on yeetalk-calculators',
       }),
     ).toEqual([]);
     expect(
       floorBreach(
-        'report/glory-points-strings-home-only-quote',
+        'report/yeetalk-calculators-strings-home-only-quote',
         strings.length,
       ),
     ).toBeUndefined();
