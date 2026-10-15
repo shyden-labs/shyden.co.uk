@@ -762,7 +762,7 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
     const main = runner.slice(runner.indexOf('function main()'));
     const asked = main.indexOf('oneAttemptEach(argv, process.env)');
     // `listSuite` holds the `--list` itself (#438); main() calls it.
-    const listed = main.indexOf('listSuite(argv)');
+    const listed = main.indexOf('listSuite(argv, spawnSync, { selection })');
     expect(listed, 'main() no longer lists the suite').toBeGreaterThan(0);
     expect(asked, 'main() never asks oneAttemptEach').toBeGreaterThan(0);
     expect(asked, 'main() lists the suite before it asks').toBeLessThan(listed);
