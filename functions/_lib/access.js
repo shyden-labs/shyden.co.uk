@@ -11,13 +11,14 @@
  * Pure logic, like `lockdown.js`, so Vitest can test it without workerd.
  */
 
-const PRIVATE_PREFIX = '/api/docs/private';
+/** The private API docs (#781) and the report health check (#782). */
+const PRIVATE_PREFIXES = ['/api/docs/private', '/api/report/health'];
 const KEYS_KEPT_SECONDS = 600;
 const BASE64URL = /^[A-Za-z0-9_-]*$/;
 
 /**
- * Whether production keeps `pathname` for signed-in people: the private docs
- * page and anything under or beside it. Matched on the decoded, lower-cased
+ * Whether production keeps `pathname` for signed-in people: each of
+ * `PRIVATE_PREFIXES` and anything under or beside it. Matched on the decoded, lower-cased
  * path with repeated slashes collapsed, so no spelling of the path slips
  * past; a path that cannot be decoded counts as private.
  *
@@ -32,10 +33,11 @@ export function privatePath(pathname) {
     return true;
   }
   const path = decoded.replace(/\/{2,}/g, '/').toLowerCase();
-  return (
-    path === PRIVATE_PREFIX ||
-    path.startsWith(`${PRIVATE_PREFIX}/`) ||
-    path.startsWith(`${PRIVATE_PREFIX}.`)
+  return PRIVATE_PREFIXES.some(
+    (prefix) =>
+      path === prefix ||
+      path.startsWith(`${prefix}/`) ||
+      path.startsWith(`${prefix}.`),
   );
 }
 

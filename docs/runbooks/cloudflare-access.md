@@ -21,12 +21,15 @@ every path (operator decision 2026-10-15).
 
 1. **Zero Trust → Settings → Custom pages / Team name.** If the account has no
    Zero Trust team yet, create one on the Free plan (up to 50 users). Note the
-   team domain, `<team>.cloudflareaccess.com`.
+   team domain, `<team>.cloudflareaccess.com` (this account's is
+   `shyden.cloudflareaccess.com`).
 2. **Zero Trust → Access → Applications → Add an application → Self-hosted.**
    - Name: `shyden.co.uk private`.
    - Public hostname: domain `shyden.co.uk`, path `api/docs/private`.
-   - Add a second public hostname with path `api/report/health` when #782
-     lands.
+   - Add a second public hostname with path `api/report/health` once #782
+     is on `develop` and before the release that carries it: from that
+     release on, the after-release check sends the service token, which only
+     a path Access covers turns into the signed token the site checks.
    - Session duration: 24 hours.
 3. **Policies → Add a policy** named `prod`: action **Allow**, include
    **Emails** with the operator's address. This is the "prod" list; a
@@ -44,18 +47,26 @@ every path (operator decision 2026-10-15).
 
 ## Automation (#782)
 
-A scheduled check that calls a private path uses an Access **service token**,
-never a person's sign-in:
+A check that calls a private path uses an Access **service token**, never a
+person's sign-in. Set up 2026-10-15: token `prod-sanity-2` (expires
+2027-10-15, warned by #796), policy `prod-automation`, read by
+`deploy-prod.yml`'s `smoke-and-verify` job from the `prod` environment, which
+is why that job asks for the release approval too.
 
-1. **Zero Trust → Access → Service Auth → Create Service Token**, named for the
-   job. Copy the Client ID and Client Secret once; Cloudflare will not show the
-   secret again.
-2. Add to the `prod` policy an **Include → Service Token** rule naming it, with
-   action **Service Auth**.
-3. Store both values in the GitHub environment the job runs in (branch-restricted
-   to `main`, as `prod-cron` is), never as repository secrets. The job sends
-   them as `CF-Access-Client-Id` and `CF-Access-Client-Secret`; Access then
-   adds the same signed token, and the site's check admits it.
+1. **Zero Trust → Access controls → Service credentials → Create Service
+   Token**, named for the job. Cloudflare shows the Client Secret once.
+2. A Service Auth action cannot share a policy with Allow, so the token has
+   its own reusable policy: **Policies → Add a policy**, action **Service
+   Auth**, **Include → Service Token** naming it; then add that policy to the
+   application.
+3. Store both values in the GitHub environment the job runs in, never as
+   repository secrets: `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`.
+   The job sends them as `CF-Access-Client-Id` and `CF-Access-Client-Secret`
+   (`tests/access-service-token.ts`); Access then adds the same signed token,
+   and the site's check admits it.
+
+To replace the token: create the new one, store its pair in `prod`, swap it
+into `prod-automation`, then delete the old token.
 
 ## Adding or removing a person
 

@@ -4,7 +4,8 @@
  *
  * Plumbing only, like `index.js`: the handler answers any other method with
  * 405 itself, where a unit test can see it. Behind the dev Basic Auth gate
- * like every other path; a no-op gate on prod.
+ * like every other path; on prod, private (#782): the middleware answers 403
+ * unless Cloudflare Access signed the request (`functions/_lib/access.js`).
  */
 import { reportHealth } from '../../../src/lib/report';
 

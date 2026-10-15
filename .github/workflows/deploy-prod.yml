@@ -94,6 +94,13 @@ jobs:
     needs: deploy-prod
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    # The report health check is private on production (#782), and the Access
+    # service token that signs in for it lives in `prod`, behind Shyden's
+    # approval like every production credential: so this job asks for that
+    # approval too, a second click per release (his decision, 2026-10-15).
+    environment:
+      name: prod
+      url: https://shyden.co.uk
     permissions:
       contents: read
       statuses: write
@@ -112,8 +119,9 @@ jobs:
       # The smoke was a step of its own here until #390, where a fact in it
       # went stale with nothing before a release able to see it. As a spec,
       # each pull request's `sanity-on-build` runs it against that PR's own
-      # prod build. The public apex is not behind Basic auth, so nothing here
-      # sends a credential (#241).
+      # prod build. The public apex is not behind Basic auth, so the one
+      # credential here is the Access service token, sent only on the request
+      # to the private health check (#241, #782).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -126,6 +134,8 @@ jobs:
       - name: Smoke and verify the live prod site
         env:
           WEB_BASE_URL: https://shyden.co.uk
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: npx playwright test --config=playwright.prod.config.ts
 
       # Reached only if BOTH the smoke and the browser run passed: a failing

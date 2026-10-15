@@ -6,6 +6,7 @@ import {
   REPORT_COLUMNS,
 } from '../../src/lib/report';
 import { tableWith } from '../report-fakes';
+import { onRequest } from '../../functions/_middleware.js';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
@@ -80,6 +81,8 @@ const FLOOR_OF: Readonly<Record<string, string>> = {
   '503 ok:false with no database':
     'report-contract/health-503-ok-false-with-no-database',
   '405 for POST': 'report-contract/health-405-for-post',
+  '403 on production without an Access sign-in':
+    'report-contract/health-403-on-production-without-an-access-sign-in',
 };
 
 /** The floor id of a case, or a failure naming the case that has none. */
@@ -206,6 +209,18 @@ const HEALTH_CASES: readonly (readonly [
         () => {},
       ),
     '405',
+  ],
+  [
+    // #782: production's middleware answers before the handler. With no
+    // Access settings it refuses at once, so nothing reaches the network.
+    '403 on production without an Access sign-in',
+    () =>
+      onRequest({
+        request: new Request(`https://shyden.co.uk${HEALTH}`),
+        env: {},
+        next: async () => new Response('reached the handler', { status: 200 }),
+      }),
+    '403',
   ],
 ];
 
