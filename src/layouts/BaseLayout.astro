@@ -24,6 +24,12 @@ interface Props {
    * therefore has no address of its own to be canonical about.
    */
   noIndex?: boolean;
+  /**
+   * False for a page served in English only (the API docs, #781): the header
+   * then offers no language switcher, whose links would lead to pages that do
+   * not exist.
+   */
+  localised?: boolean;
 }
 const {
   title,
@@ -31,6 +37,7 @@ const {
   ogImage = '/og-default.png',
   lang = localeFromPath(Astro.url.pathname),
   noIndex = false,
+  localised = true,
 } = Astro.props;
 const site = getSiteStrings(lang);
 const siteOrigin = Astro.site ?? Astro.url;
@@ -114,7 +121,7 @@ const xDefault = new URL(localisePath(Astro.url.pathname, 'en'), siteOrigin)
     <a class="skip-link" href="#main">
       {site.skipToContent}
     </a>
-    <Header lang={lang} />
+    <Header lang={lang} localised={localised} />
     <main id="main" tabindex="-1">
       <slot />
     </main>

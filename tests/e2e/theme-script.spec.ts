@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { searched } from '../source-files';
-import { sitePaths } from '../site-pages';
+import { docsPaths, sitePaths } from '../site-pages';
 import { THEME_SCRIPT_SOURCE } from '../themes';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
 
@@ -31,6 +31,9 @@ const OWN_SCRIPTS: Record<string, readonly string[]> = {
   '/glory-points': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
   [NOT_FOUND]: [],
+  // #781: the page's own module, and the Swagger UI library it loads.
+  '/api/docs/': ['inline module in body', 'external classic in head'],
+  '/api/docs/private/': ['inline module in body', 'external classic in head'],
 };
 
 type Script = {
@@ -83,6 +86,7 @@ const BUILT = [
   ...LOCALES.flatMap((locale) =>
     sitePaths().map((route) => ({ route, path: localisePath(route, locale) })),
   ),
+  ...docsPaths().map((route) => ({ route, path: route })),
   { route: NOT_FOUND, path: NOT_FOUND },
 ];
 

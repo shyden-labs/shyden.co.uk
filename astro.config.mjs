@@ -27,6 +27,9 @@ export default defineConfig({
   // the seam is checked even though the import cannot be. See #108.
   integrations: [
     sitemap({
+      // The API docs (#781) are developer pages in English only, kept out of
+      // search engines with noindex, so they stay out of the sitemap too.
+      filter: (page) => !new URL(page).pathname.startsWith('/api/docs/'),
       i18n: {
         defaultLocale: 'en',
         locales: {

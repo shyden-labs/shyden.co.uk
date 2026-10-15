@@ -1,0 +1,146 @@
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
+import { docsPaths } from '../site-pages';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
+import { contrastRatio } from './helpers';
+import { recorded, shoot } from './evidence';
+
+test.use(recorded);
+
+/**
+ * #781. The API docs pages meet the site's bar (operator decision
+ * 2026-10-15): no sideways scroll at 320px, WCAG AA text, 44px targets, in
+ * both themes. Swagger UI draws them at run time, so they are measured with
+ * every operation open and Try it out showing, the most the page can show.
+ */
+
+const WIDTHS = [320, 1280] as const;
+const THEMES = ['light', 'dark'] as const;
+const floorName = (path: string): string =>
+  path === '/api/docs/' ? 'public' : path.replace(/^\/api\/docs\/|\/$/g, '');
+
+/** Opens every operation and its Try it out, as a visitor exploring would. */
+const openEverything = async (page: Page) => {
+  const operations = page.locator('#swagger .opblock');
+  await expect(operations.first()).toBeVisible();
+  // runtime population: the operations Swagger UI drew from the spec.
+  for (const summary of await page
+    .locator('#swagger .opblock:not(.is-open) .opblock-summary-control')
+    .all())
+    await summary.click();
+  // runtime population: the Try it out buttons the open operations show.
+  for (const tryIt of await page
+    .locator('#swagger .try-out__btn:not(.cancel)')
+    .all())
+    await tryIt.click();
+};
+
+/** Every visible element in the mount that holds text of its own, with the ratio WCAG asks of it. */
+const textsToRead = (page: Page) =>
+  page.evaluate(() => {
+    const probes: { index: number; said: string; need: number }[] = [];
+    let index = 0;
+    for (const el of document.querySelectorAll('#swagger *')) {
+      if (!el.getClientRects().length) continue;
+      const own = [...el.childNodes].some(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+      );
+      if (!own) continue;
+      const style = getComputedStyle(el);
+      const size = parseFloat(style.fontSize);
+      const bold = Number(style.fontWeight) >= 700;
+      el.setAttribute('data-docs-probe', String(index));
+      probes.push({
+        index,
+        said: (el.textContent ?? '').trim().slice(0, 40),
+        need: size >= 24 || (bold && size >= 18.66) ? 3 : 4.5,
+      });
+      index += 1;
+    }
+    return probes;
+  });
+
+/** Every visible control in the mount, with its size. */
+const controlSizes = (page: Page) =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        '#swagger button, #swagger a, #swagger select, #swagger input, #swagger textarea, #swagger summary',
+      ),
+    ]
+      .filter((el) => el.getClientRects().length)
+      .map((el) => {
+        const box = el.getBoundingClientRect();
+        return {
+          name: `${el.tagName.toLowerCase()} ${(el.textContent ?? '').trim().slice(0, 30)}`,
+          width: box.width,
+          height: box.height,
+        };
+      }),
+  );
+
+test.describe('the API docs meet the site bar (#781)', () => {
+  for (const path of docsPaths())
+    for (const theme of THEMES)
+      for (const width of WIDTHS)
+        test(
+          `${path} in the ${theme} theme at ${width}px`,
+          { tag: '@emulated-viewport' },
+          async ({ page }) => {
+            await page.emulateMedia({ colorScheme: theme });
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto(path);
+            await openEverything(page);
+            const name = floorName(path);
+
+            const box = await page.evaluate(() => {
+              const mount = document.querySelector('#swagger');
+              const root = document.documentElement;
+              return {
+                page: root.scrollWidth - root.clientWidth,
+                mount: mount ? mount.scrollWidth - mount.clientWidth : -1,
+              };
+            });
+            expect(
+              box,
+              'nothing pushes the page or the mount sideways',
+            ).toEqual({ page: 0, mount: 0 });
+
+            const probes = await textsToRead(page);
+            const dim: string[] = [];
+            // runtime population: the text Swagger UI drew in this state.
+            for (const probe of probes) {
+              const ratio = await contrastRatio(
+                page.locator(`[data-docs-probe="${probe.index}"]`),
+              );
+              if (ratio < probe.need)
+                dim.push(
+                  `'${probe.said}' ${ratio.toFixed(2)}:1 < ${probe.need}`,
+                );
+            }
+            expect(
+              searched(dim, { of: probes, what: `${path} text elements` }),
+            ).toEqual([]);
+            expect(
+              floorBreach(`api-docs/${name}-texts`, probes.length),
+            ).toBeUndefined();
+
+            const controls = await controlSizes(page);
+            const small = controls
+              .filter((c) => c.width < 44 || c.height < 44)
+              .map(
+                (c) =>
+                  `${c.name} ${Math.round(c.width)}x${Math.round(c.height)}`,
+              );
+            expect(
+              searched(small, { of: controls, what: `${path} controls` }),
+            ).toEqual([]);
+            expect(
+              floorBreach(`api-docs/${name}-controls`, controls.length),
+            ).toBeUndefined();
+
+            await shoot(page, `${path}, ${theme}, ${width}px, everything open`);
+          },
+        );
+});

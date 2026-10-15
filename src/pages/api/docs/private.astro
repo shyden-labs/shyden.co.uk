@@ -1,0 +1,14 @@
+---
+// Route only: the private docs for the report health check (#781). On
+// production the middleware refuses this path without a Cloudflare Access
+// sign-in, and this page is the only place its spec appears.
+import ApiDocsPage from '../../../components/pages/ApiDocsPage.astro';
+import specText from '../../../../openapi/report-health.yaml?raw';
+---
+
+<ApiDocsPage
+  title="Report health API (private) — Shyden"
+  heading="Report health API (private)"
+  description="The report health check, documented for the operator."
+  specText={specText}
+/>
