@@ -936,7 +936,8 @@ test.describe('pause motion', () => {
             'input.null',
             'span.band-pause-disc',
             'svg.band-pause-icon',
-            'span.band-pause-name',
+            // its whole class attribute: the name wears the global recipe (#767)
+            'span.band-pause-name visually-hidden',
           ]),
         );
         expect(

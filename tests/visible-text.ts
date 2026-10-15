@@ -32,7 +32,7 @@ export const visibleLinesReader = (): ((node: Text) => DOMRect[]) => {
         : NaN;
 
   // What an element's `clip-path: inset()` and `clip: rect()` leave showing.
-  // Both cut the element and everything inside it, which is how an `.sr`
+  // Both cut the element and everything inside it, which is how a `.visually-hidden`
   // label keeps its layout and shows nothing. Other clip-path shapes are not
   // read, so they cut nothing here: a clip this misreads can only show more
   // text to a check, never hide some from it.

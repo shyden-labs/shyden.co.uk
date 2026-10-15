@@ -52,7 +52,7 @@ test.describe('the roster table', () => {
   // the bug's own shape, not the contract. The seventh header's own text
   // ('Remove'/'Hapus') is present in the DOM -- `toHaveText` reads it here
   // exactly as it reads the other six -- but visually hidden via `clip-path`
-  // (ClassroomGroupsPage.astro's own `.cg-roster-remove-heading`): a
+  // (`.visually-hidden`, tokens.css): a
   // screen reader building this table's column headers finds a real name
   // for every one of the seven, while a sighted teacher never sees a
   // printed "Remove" heading sitting above a column of seven identical

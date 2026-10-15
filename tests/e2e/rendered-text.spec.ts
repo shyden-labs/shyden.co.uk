@@ -132,7 +132,7 @@ const INTENTIONAL_JOINS: Array<{ left: RegExp; right: RegExp; why: string }> = [
  *
  * Both sides of a join are read as the lines of text a visitor can see, and
  * nothing else (#198). At phone width every page failed on a join nobody could
- * see: the header's last text box was an `.sr` label inside the closed
+ * see: the header's last text box was a `.visually-hidden` label inside the closed
  * language menu, and the "line" it touched was the hero section's 550px
  * border box, which `Range.getClientRects()` returns alongside the text
  * inside it. Hidden text is left out of the neighbours too, so the visible
@@ -379,7 +379,7 @@ test.describe('rendered text — no sentence may lose a space to the formatter',
     // Every case lays its left text out flush against its right text, on one
     // line. Only `visible` can be seen, so only `visible` is a join. The rest
     // are the ways this site keeps text in the layout while hiding it: the
-    // closed language menu and its `.sr` label are what failed every page at
+    // closed language menu and its `.visually-hidden` label are what failed every page at
     // phone width (#198).
     const reported = await joinsReportedFor(page, {
       visible: { left: el('span', LEFT, 'visible-left') },

@@ -1275,67 +1275,24 @@ const sexWhyText = sexWhy(roster, t);
        below) already showed this page cannot simply assume away. */
     display: block;
   }
-  #cg-roster thead {
-    /* Visually hidden, not `display: none`: each `<th>`'s text stays in
-       the accessibility tree for anything that still exposes table
-       semantics, while the per-control `aria-label` every input/select
-       already carries (rosterColName/Sex/Absent/Together/Apart, set in
-       buildRow -- roster-ui.ts) is what a screen reader actually announces
-       per field, in EITHER layout. A sighted card reader gets no header
-       row at all -- design spec section 3 describes the card as two lines
-       of controls, not a header plus a card -- so hiding it here rather
-       than leaving it to render as six stacked, unlabelled-looking lines
-       above the first card. `#cg-roster thead th` keeps its own text
-       regardless: `toHaveText` reads `textContent`, which this technique
-       never touches (unlike `display: none`, which would still pass that
-       same assertion but for the wrong reason -- verified by reading
-       Playwright's own `elementText`, not assumed). So the roster spec also
-       asserts each heading's accessible name, which `display: none` would
-       empty (#200). The box is clipped away with `clip-path: inset(50%)`:
-       `clip` is deprecated, and `tests/guards/deprecated-css.test.ts` keeps it
-       out. */
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-    padding: 0;
-    margin: -1px;
-  }
-  /* Remove's own column header text (fix round 1; roster-ui.ts's own
-     renderRoster, the `removeHeading` span). Same clip-based recipe as
-     `#cg-roster thead` immediately above -- text stays in the
-     accessibility tree, nothing here is `display: none` -- but applied to
-     ONE cell's own content, not a whole row, and UNCONDITIONALLY (no
-     media query) rather than only below the table breakpoint: the other
-     six headers show normally the moment the table returns at 600px, but
-     a visible "Remove" heading sitting above a column of seven identical
-     "Remove" buttons would only repeat what every row already says --
-     that judgement call was already made once, for the whole header row
-     on the card layout; this is the same call for one column, in both
-     layouts.
-
-     The SPAN carries the hiding, not the `<th>` itself, on purpose: an
-     absolutely-positioned `<th>` risks being pulled out of the header
-     ROW's own table layout once the table breakpoint restores real
-     `display: table-header-group`/`table-row`/`table-cell` values, where
-     the other six headers really are visible cells contributing to that
-     row -- hiding the CONTENT instead of the CELL sidesteps that risk
-     entirely, so the `<th>` stays an ordinary (empty-looking, still
-     participating) table cell in both layouts. */
-  .cg-roster-remove-heading {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-    padding: 0;
-    margin: -1px;
-  }
+  /* `<thead>` wears `.visually-hidden` (tokens.css, set by roster-ui.ts) in
+     this card layout, not `display: none`: each `<th>`'s text stays in
+     the accessibility tree for anything that still exposes table
+     semantics, while the per-control `aria-label` every input/select
+     already carries (rosterColName/Sex/Absent/Together/Apart, set in
+     buildRow -- roster-ui.ts) is what a screen reader actually announces
+     per field, in EITHER layout. A sighted card reader gets no header
+     row at all -- design spec section 3 describes the card as two lines
+     of controls, not a header plus a card -- so hiding it here rather
+     than leaving it to render as six stacked, unlabelled-looking lines
+     above the first card. `#cg-roster thead th` keeps its own text
+     regardless: `toHaveText` reads `textContent`, which this technique
+     never touches (unlike `display: none`, which would still pass that
+     same assertion but for the wrong reason -- verified by reading
+     Playwright's own `elementText`, not assumed). So the roster spec also
+     asserts each heading's accessible name, which `display: none` would
+     empty (#200). The table breakpoint's `#cg-roster thead` rule below
+     undoes the class, at an ID's specificity. */
   /* One card per student (design spec section 3). `.cg-student` is the
      SAME `<tr class="cg-student">` roster-ui.ts already builds for the
      table -- this is the whole of "one renderer, two CSS layouts": no
@@ -1618,7 +1575,7 @@ const sexWhyText = sexWhy(roster, t);
     }
     /* Remove's own column -- see the CARD layout's own nth-child(7) rule,
        above, for the row-placement side of this control, and
-       .cg-roster-remove-heading (further down) for its own header cell:
+       roster-ui.ts's `removeHeading` span for its own header cell:
        fix round 1 shipped this column with no matching <th> at all
        (reasoning that adding one would redden a test asserting six
        columns -- the test was pinning the OLD count, not a requirement,

@@ -13,7 +13,7 @@ import { withoutTsComments } from '../unit/source-text';
  * page as text (#619).
  *
  * `rendered-text.spec.ts` cut each line of text by every `clip-path: inset()`
- * and `clip: rect()` above it, so an `.sr` name read as nothing, while
+ * and `clip: rect()` above it, so a `.visually-hidden` name read as nothing, while
  * `text-over-ribbon.spec.ts` read the raw line boxes. When #619 put the pause
  * control's name on the ribbon as screen-reader-only text, the second scan
  * scored that invisible name at 1.00:1 on every engine (run 38485095201).
