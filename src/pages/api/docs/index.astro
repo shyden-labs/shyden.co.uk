@@ -1,0 +1,12 @@
+---
+// Route only: the public docs for the report form's API (#781).
+import ApiDocsPage from '../../../components/pages/ApiDocsPage.astro';
+import specText from '../../../../openapi/report.yaml?raw';
+---
+
+<ApiDocsPage
+  title="Report API — Shyden"
+  heading="Report API"
+  description="The report-a-translation API, documented."
+  specText={specText}
+/>

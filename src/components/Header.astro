@@ -5,8 +5,10 @@ import { localisePath, type Locale, getSiteStrings } from '../lib/i18n';
 
 interface Props {
   lang: Locale;
+  /** False on an English-only page: no language switcher (#781). */
+  localised?: boolean;
 }
-const { lang } = Astro.props;
+const { lang, localised = true } = Astro.props;
 const t = getSiteStrings(lang);
 
 // Root-relative (/#…) not bare (#…): the Header renders on every page via
@@ -48,7 +50,9 @@ const links = [
         from exactly the visitors most likely to want them. */}
     <div class="controls">
       <ThemeSwitch lang={lang} />
-      <LanguageSwitcher lang={lang} pathname={Astro.url.pathname} />
+      {localised && (
+        <LanguageSwitcher lang={lang} pathname={Astro.url.pathname} />
+      )}
     </div>
     <nav id="primary-nav">
       {links.map((l) => (

@@ -4,6 +4,9 @@ import { LOCALES, localisePath } from '../../src/lib/i18n/index';
 import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { docsPaths } from '../site-pages';
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 
 /**
  * The hreflang set every page in the sitemap must declare.
@@ -31,10 +34,12 @@ test.describe('the sitemap', () => {
     // check that the sitemap is complete; a hand-written
     // list of three pages could only agree with itself, and a fourth page
     // the sitemap left out would have been invisible to all of them (#390
-    // F126). The 404 is the one page deliberately left out. Read here, not
-    // at module scope: the web server rebuilds dist/ after this file loads.
+    // F126). The 404 and the API docs (#781) are the pages deliberately left
+    // out. Read here, not at module scope: the web server rebuilds dist/
+    // after this file loads.
     const built = filesUnder('dist', (path) => /\.html$/.test(path))
       .filter((path) => path !== 'dist/404.html')
+      .filter((path) => !path.startsWith('dist/api/docs/'))
       .map((path) => path.replace(/^dist/, '').replace(/\/?index\.html$/, ''));
     expect(locs.sort()).toEqual(built.sort());
 
@@ -95,6 +100,43 @@ test.describe('the sitemap', () => {
     expect(tool).toBeDefined();
     expect(tool).toContain('href="https://shyden.co.uk/id/classroom-groups/"');
   });
+});
+
+test.describe('the API docs head (#781)', () => {
+  for (const path of docsPaths())
+    test(`${path} asks not to be indexed, and claims no other language`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+        'content',
+        'noindex',
+      );
+      await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    });
+});
+
+test.describe('each API spec is served only inside its own page (#781)', () => {
+  // The private spec has no URL of its own: it reaches visitors only inside
+  // the page the middleware gates. A spec imported by a script would land in
+  // a public /_astro/ chunk instead, so every built file is read.
+  for (const [spec, page] of [
+    ['openapi/report.yaml', 'dist/api/docs/index.html'],
+    ['openapi/report-health.yaml', 'dist/api/docs/private/index.html'],
+  ] as const)
+    test(`${spec} appears in ${page} and nowhere else`, () => {
+      const said = (
+        parse(readFileSync(spec, 'utf8')) as { info: { description: string } }
+      ).info.description.slice(0, 40);
+      const built = filesUnder('dist', () => true);
+      const holding = built.filter((path) =>
+        readFileSync(path, 'latin1').includes(said),
+      );
+      // Equality with one page: a read that saw nothing fails as surely as a
+      // spec that leaked.
+      expect(holding).toEqual([page]);
+    });
 });
 
 test.describe('the 404 head', () => {

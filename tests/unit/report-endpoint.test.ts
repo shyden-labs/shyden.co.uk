@@ -7,10 +7,10 @@ import {
   handleReport,
   reportHealth,
   schemaMatches,
-  type ReportsDatabase,
 } from '../../src/lib/report';
 import { getSiteStrings } from '../../src/lib/i18n';
 import { codeWithoutComments, withoutSqlComments } from './source-text';
+import { tableWith } from '../report-fakes';
 
 /**
  * Real `Request` objects, no stand-in database (spec 10). Checks 1–8 return
@@ -471,22 +471,6 @@ describe('the health check', () => {
     expect(schemaMatches([])).toBe(false);
     // Same count, one name changed: a length check alone would pass it.
     expect(schemaMatches([...REPORT_COLUMNS.slice(1), 'status'])).toBe(false);
-  });
-
-  // The real D1 in tests/functions always holds the migrated table, so only
-  // a table answering other columns can show what health says about drift.
-  const tableWith = (columns: readonly string[]): ReportsDatabase => ({
-    prepare: () => ({
-      bind() {
-        throw new Error('health binds nothing');
-      },
-      run() {
-        throw new Error('health writes nothing');
-      },
-      all: async <T>() => ({
-        results: columns.map((name) => ({ name })) as T[],
-      }),
-    }),
   });
 
   it('answers 200 ok:true for the migrated table, and logs nothing', async () => {

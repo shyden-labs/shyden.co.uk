@@ -35,6 +35,23 @@ export const pageNames = (dir: string = PAGES_DIR): string[] =>
 export const sitePaths = (): string[] =>
   pageNames().map((name) => (name === 'index' ? '/' : `/${name}`));
 
+const DOCS_DIR = 'src/pages/api/docs';
+
+/**
+ * The API docs pages (#781), English only and out of the sitemap, as request
+ * paths: `index` is `/api/docs/`. Derived from their folder, like
+ * `sitePaths`, so a docs page added later is measured the day it appears.
+ */
+export const docsPaths = (): string[] =>
+  nonEmpty(
+    readdirSync(DOCS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.astro'))
+      .map((entry) => entry.name.replace(/\.astro$/, ''))
+      .map((name) => (name === 'index' ? '/api/docs/' : `/api/docs/${name}/`))
+      .sort(),
+    `docs pages in ${DOCS_DIR}`,
+  );
+
 /**
  * The `<h1>` a page renders, per locale, keyed by its UNLOCALISED path.
  *

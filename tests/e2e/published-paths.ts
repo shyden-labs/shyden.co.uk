@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
-import { sitePaths } from '../site-pages';
+import { docsPaths, sitePaths } from '../site-pages';
 
 /** The not-found path every published-page sweep visits. */
 export const NOT_FOUND_PATH = '/definitely-not-a-page';
@@ -18,6 +18,7 @@ export const PUBLISHED_ROUTES: readonly string[] = [
   ...LOCALES.flatMap((locale) =>
     sitePaths().map((path) => localisePath(path, locale)),
   ),
+  ...docsPaths(),
   NOT_FOUND_PATH,
 ];
 
@@ -36,7 +37,8 @@ export async function publishedPaths(page: Page): Promise<string[]> {
     (m) => new URL(m[1]).pathname,
   );
   expect(paths.length).toBeGreaterThan(0); // an empty sitemap must not pass
-  return [...paths, NOT_FOUND_PATH];
+  // The API docs (#781) are left out of the sitemap on purpose, like the 404.
+  return [...paths, ...docsPaths(), NOT_FOUND_PATH];
 }
 
 /** A path without its trailing slash, so `/id/` and `/id` compare equal. */
