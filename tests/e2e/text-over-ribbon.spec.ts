@@ -235,18 +235,14 @@ for (const theme of THEMES)
               what: `text runs read on ${path}`,
             }),
           ).toEqual([]);
-          if (path === '/') {
-            // The release evidence (#362) pictures the ribbon here: the
-            // homepage's first screen, where the band sits behind the hero.
-            // The scan left every glyph transparent to photograph the ground,
-            // so the picture is of a fresh load, as a visitor sees it.
-            await page.goto(path);
-            await emulateTheme(page, theme);
-            await expect(page.locator('.hero h1')).toBeVisible();
-            await shoot(
-              page,
-              `${theme} at ${width}px: the homepage under the ribbon`,
-            );
-          }
+          // The release evidence (#362) cites every page here, so every page
+          // takes its picture (#774: a cited case that captured nothing is
+          // fixed, never dropped). The scan left every glyph transparent to
+          // photograph the ground, so the picture is of a fresh load, as a
+          // visitor sees it, once its heading has painted.
+          await page.goto(path);
+          await emulateTheme(page, theme);
+          await expect(page.locator('h1').first()).toBeVisible();
+          await shoot(page, `${theme} at ${width}px: ${path} under the ribbon`);
         },
       );
