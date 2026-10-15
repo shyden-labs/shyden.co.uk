@@ -132,6 +132,21 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'BACK_TRANSLATE_URL must be the engine',
   },
+  // Refuses an argument before it reads the key, the store or the network,
+  // so the probe proves the entry point ran without spending a character of
+  // Google's quota (#754).
+  'i18n-google-read-back.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: 'i18n-google-read-back.mjs takes no arguments',
+  },
+  // Refuses an argument before it reads the store, so the probe writes
+  // nothing (#754).
+  'i18n-read-back-verdicts.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: 'i18n-read-back-verdicts.mjs takes no arguments',
+  },
   // Takes no arguments either, and refuses one before it reads the config or
   // reaches for `gh` -- so the probe proves the entry point ran without a
   // token, a network call or a repository (#299).
