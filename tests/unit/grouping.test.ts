@@ -1834,7 +1834,12 @@ describe('apart and together letters both in play — the failure names both rul
       }),
     );
     const out = buildGroups(
-      base({ students: pairs, mode: { kind: 'groupCount', count: 10 } }),
+      base({
+        students: pairs,
+        mode: { kind: 'groupCount', count: 10 },
+        // The real budget's run of this roster: tests/simulation/ (#794).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -2989,6 +2994,8 @@ describe('sex mode: separate', () => {
           students: eightBoysFifteenGirlsFiveApart,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -3006,6 +3013,8 @@ describe('sex mode: separate', () => {
           students: eightBoysFifteenGirlsFiveApart,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4652,6 +4661,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4716,6 +4727,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4757,6 +4770,8 @@ describe('pinned groups', () => {
           mode: { kind: 'groupCount', count: 7 },
           sexMode: 'separate',
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
