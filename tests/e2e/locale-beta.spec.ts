@@ -162,7 +162,7 @@ test.describe('every unverified language is marked BETA', () => {
       await page.goto(localisePath('/', locale));
       await page.locator(`${SWITCHER} > summary`).click();
       const voices = await page
-        .locator(`${SWITCHER} ${BADGE} .sr`)
+        .locator(`${SWITCHER} ${BADGE} .visually-hidden`)
         .evaluateAll((labels) =>
           labels.map((label) => label.closest('[lang]')?.getAttribute('lang')),
         );
