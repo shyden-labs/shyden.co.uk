@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildGroups, ERROR_CODES } from '../../src/lib/grouping';
-import { student, seeded } from '../unit/factories';
+import {
+  student,
+  seeded,
+  fifteenBuddyPairs,
+  eightBoysFifteenGirlsFiveApart,
+} from '../unit/factories';
 
 const M = (number: number) => student({ number, sex: 'M' });
-const F = (number: number) => student({ number, sex: 'F' });
 
 /**
  * The real-budget runs of the unit suite's gave-up tests (#714, #794).
@@ -57,14 +61,8 @@ describe('the search gives up under the real budget, and says so (#714)', () => 
   it('fifteen buddy pairs into 10 groups exhaust the together-block search', () => {
     // The unit stand-in reached 68 ms of own CPU at the real budget, 2 ms
     // from the cut line, over 8 CI runs (#714).
-    const pairs = Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)),
-      }),
-    );
     const out = buildGroups({
-      students: pairs,
+      students: fifteenBuddyPairs(),
       mode: { kind: 'groupCount', count: 10 },
       leftovers: 'spread',
       sexMode: 'off',
@@ -85,26 +83,9 @@ describe('the search gives up under the real budget, and says so (#714)', () => 
  * sentence is rendered from the code alone.
  */
 describe('the search gives up under the real budget beside pins, both rules and separate sexes (#794)', () => {
-  const buddyPairs = (apartPair: boolean) =>
-    Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)),
-        apart: apartPair && (i === 0 || i === 16) ? 'X' : null,
-      }),
-    );
-
-  const eightBoysFifteenGirlsFiveApart = () => [
-    ...Array.from({ length: 8 }, (_, i) => M(i + 1)),
-    ...Array.from({ length: 5 }, (_, i) =>
-      student({ number: i + 9, sex: 'F' as const, apart: 'X' }),
-    ),
-    ...Array.from({ length: 10 }, (_, i) => F(i + 14)),
-  ];
-
   it('fifteen buddy pairs and one apart-letter into 10 groups exhaust it with both rules live', () => {
     const out = buildGroups({
-      students: buddyPairs(true),
+      students: fifteenBuddyPairs({ apartAcross: true }),
       mode: { kind: 'groupCount', count: 10 },
       leftovers: 'spread',
       sexMode: 'off',
@@ -133,7 +114,7 @@ describe('the search gives up under the real budget beside pins, both rules and 
   it('fifteen buddy pairs beside a pinned pair, into 11 groups, exhaust the together-block search', () => {
     const pinnedPair = [student({ number: 31 }), student({ number: 32 })];
     const out = buildGroups({
-      students: [...buddyPairs(false), ...pinnedPair],
+      students: [...fifteenBuddyPairs(), ...pinnedPair],
       mode: { kind: 'groupCount', count: 11 },
       leftovers: 'spread',
       sexMode: 'off',
@@ -148,7 +129,7 @@ describe('the search gives up under the real budget beside pins, both rules and 
   it('fifteen buddy pairs and one apart-letter beside a pinned pair, into 11 groups, exhaust it with both rules live', () => {
     const pinnedPair = [student({ number: 31 }), student({ number: 32 })];
     const out = buildGroups({
-      students: [...buddyPairs(true), ...pinnedPair],
+      students: [...fifteenBuddyPairs({ apartAcross: true }), ...pinnedPair],
       mode: { kind: 'groupCount', count: 11 },
       leftovers: 'spread',
       sexMode: 'off',
