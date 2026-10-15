@@ -312,13 +312,20 @@ test.describe('storage refused (#142 AC7)', () => {
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
     await errors.expectNone('the theme script threw where storage is refused');
-    // A second page carries no refusal, so it can read what was saved.
+    // A second page carries no refusal, so it can read what was saved. An
+    // ABSOLUTE url, built from the page under test: a page the context opens
+    // has no baseURL of its own, and on the real phone's adopted context `/`
+    // was "an invalid URL" (#808). Closed in `finally`, so a failure here
+    // cannot leave a tab in front of the next test's page (#807).
     const probe = await page.context().newPage();
-    await probe.goto('/');
-    expect(
-      await probe.evaluate(() => localStorage.getItem('theme')),
-    ).toBeNull();
-    await probe.close();
+    try {
+      await probe.goto(new URL('/', page.url()).href);
+      expect(
+        await probe.evaluate(() => localStorage.getItem('theme')),
+      ).toBeNull();
+    } finally {
+      await probe.close();
+    }
   });
 });
 
