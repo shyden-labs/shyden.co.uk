@@ -149,6 +149,8 @@ export interface PlanItem {
   readonly locale: ReadLocale;
   readonly text: string;
   readonly chars: number;
+  /** Not pending: until it is read, read-back-coverage fails the change (#784). */
+  readonly blocks: boolean;
 }
 
 /** One line a run read, as its review shows it. */
@@ -421,32 +423,54 @@ export function approvedFirst(
  * Every line still to read, each once per locale, in the order a run sends
  * them, counted as Google bills what is sent, markup included: the lines the operator approved (`first`, as `locale:key`) before
  * everything else, so Google is proved on known-good copy before it is
- * trusted (#754 AC5), then each locale in `READ_ORDER`. A line that is
- * nothing but slots is never sent.
+ * trusted (#754 AC5); then the lines that block a change, those not on the
+ * store's pending list, which read-back-coverage fails until they are read
+ * (#784); then the pending backlog. Each group goes in `READ_ORDER`. A text
+ * a blocking and a pending line both say is sent once, as blocking. A line
+ * that is nothing but slots is never sent.
  */
 export function readingPlan(
   units: Readonly<Record<ReadLocale, readonly BackTranslationUnit[]>>,
   store: ReadBackStore,
   first: ReadonlySet<string>,
 ): PlanItem[] {
-  const all = READ_ORDER.flatMap((locale) =>
-    units[locale].map((unit) => ({
+  const all = READ_ORDER.flatMap((locale) => {
+    const pending = new Set(store.pending[locale]);
+    return units[locale].map((unit) => ({
       locale,
       text: unit.translation,
       approved: first.has(`${locale}:${unit.key}`),
-    })),
-  );
+      blocks: !pending.has(unit.key),
+    }));
+  });
   const seen = new Set<string>();
   return [
     ...all.filter(({ approved }) => approved),
-    ...all.filter(({ approved }) => !approved),
-  ].flatMap(({ locale, text }) => {
+    ...all.filter(({ approved, blocks }) => !approved && blocks),
+    ...all.filter(({ approved, blocks }) => !approved && !blocks),
+  ].flatMap(({ locale, text, blocks }) => {
     const id = `${locale}\n${text}`;
     if (sendable(text) === '' || text in store.readings[locale] || seen.has(id))
       return [];
     seen.add(id);
-    return [{ locale, text, chars: [...googleHtml(text)].length }];
+    return [{ locale, text, chars: [...googleHtml(text)].length, blocks }];
   });
+}
+
+/**
+ * How many of the plan's lines block a change, and how many of those a run
+ * read (`read` holds `locale\ntext`, as the run records each reading). #784.
+ */
+export function blockingRead(
+  plan: readonly PlanItem[],
+  read: ReadonlySet<string>,
+): { inPlan: number; read: number } {
+  const blocking = plan.filter(({ blocks }) => blocks);
+  return {
+    inPlan: blocking.length,
+    read: blocking.filter(({ locale, text }) => read.has(`${locale}\n${text}`))
+      .length,
+  };
 }
 
 /**
