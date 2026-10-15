@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: Report health (private)
+  version: 1.0.0
+  description: >-
+    Whether the report form can store a report: the database binding answers
+    and its table has the columns the migration made. It writes nothing and
+    returns no counts or content. Private: on production only people Cloudflare
+    Access lets through, and the site checks their sign-in again itself.
+  x-private: true
+paths:
+  /api/report/health:
+    get:
+      summary: Can the report form store a report?
+      operationId: reportHealth
+      responses:
+        '200':
+          description: The binding answers and the table matches the migration.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+        '405':
+          description: Any method but GET.
+          headers:
+            Allow:
+              required: true
+              schema:
+                type: string
+                const: GET
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '503':
+          description: >-
+            The binding is missing or fails, or the table does not match the
+            migration. The reason goes to the log, never the answer.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+                    const: false

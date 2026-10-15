@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { handleReport, PAGE_IDS } from '../../src/lib/report';
+import {
+  handleReport,
+  reportHealth,
+  PAGE_IDS,
+  REPORT_COLUMNS,
+  type ReportsDatabase,
+} from '../../src/lib/report';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
 import {
   loadSpec,
@@ -116,6 +122,72 @@ describe('the spec covers what the code can answer', () => {
   it('enumerates the beta locales the code accepts', () => {
     expect(formEnum(SPEC, PATH, 'locale')).toEqual(
       LOCALES.filter(isBetaLocale),
+    );
+  });
+});
+
+const HEALTH_SPEC = loadSpec('openapi/report-health.yaml');
+const HEALTH = '/api/report/health';
+
+/** A reports table answering `columns`, as `report-endpoint.test.ts` fakes it. */
+const tableWith = (columns: readonly string[]): ReportsDatabase => ({
+  prepare: () => ({
+    bind() {
+      throw new Error('health binds nothing');
+    },
+    run() {
+      throw new Error('health writes nothing');
+    },
+    all: async <T>() => ({
+      results: columns.map((name) => ({ name })) as T[],
+    }),
+  }),
+});
+
+const HEALTH_CASES: readonly (readonly [
+  string,
+  () => Promise<Response>,
+  string,
+])[] = [
+  [
+    '200 ok:true for the migrated table',
+    () =>
+      reportHealth(
+        new Request(`${ORIGIN}${HEALTH}`),
+        { REPORTS: tableWith(REPORT_COLUMNS) },
+        () => {},
+      ),
+    '200',
+  ],
+  [
+    '503 ok:false with no database',
+    () => reportHealth(new Request(`${ORIGIN}${HEALTH}`), {}, () => {}),
+    '503',
+  ],
+  [
+    '405 for POST',
+    () =>
+      reportHealth(
+        new Request(`${ORIGIN}${HEALTH}`, { method: 'POST' }),
+        {},
+        () => {},
+      ),
+    '405',
+  ],
+];
+
+describe('GET /api/report/health answers as openapi/report-health.yaml says', () => {
+  it.each(HEALTH_CASES)('%s', async (_, answer, status) => {
+    const response = await answer();
+    expect(String(response.status)).toBe(status);
+    expect(await checkResponse(HEALTH_SPEC, HEALTH, 'get', response)).toEqual(
+      [],
+    );
+  });
+
+  it('lists every status the cases produce, and no other', () => {
+    expect(documentedStatuses(HEALTH_SPEC, HEALTH, 'get').sort()).toEqual(
+      [...new Set(HEALTH_CASES.map(([, , status]) => status))].sort(),
     );
   });
 });
