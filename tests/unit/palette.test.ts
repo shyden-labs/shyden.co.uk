@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { floorBreach } from '../floors';
+import { searched } from '../source-files';
 import {
   ATMOSPHERE,
   atmosphereLayers,
@@ -127,9 +129,13 @@ describe('subsets', () => {
     expect(all).toContainEqual([]);
     expect(all).toContainEqual(['a', 'c']);
     expect(all).toContainEqual(['a', 'b', 'c']);
-    expect(all.filter((s) => s.join('') !== [...s].sort().join(''))).toEqual(
-      [],
-    );
+    expect(
+      searched(
+        all.filter((s) => s.join('') !== [...s].sort().join('')),
+        { of: all, what: 'subsets' },
+      ),
+    ).toEqual([]);
+    expect(floorBreach('palette/subsets-of-three', all.length)).toBeUndefined();
   });
 });
 

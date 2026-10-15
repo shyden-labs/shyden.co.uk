@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-# Runs the three fastest checks of ci.yml's `checks` job, so a two-second
-# problem cannot cost a CI round trip. Typecheck joined in #390 (about ten
+# Runs the two fastest checks of ci.yml's `checks` job, format and typecheck,
+# and since #662 the test-code lint below, so a two-second problem cannot cost
+# a CI round trip. Typecheck joined in #390 (about ten
 # seconds): vitest strips types without checking them, so a type error passed
 # this hook and reached a pushed commit. PR #34 failed on a single over-long line in a
 # test file; `npm run format` ran first, so the build, the unit suite and the
@@ -10,8 +11,21 @@
 # slip no longer skips them -- it still turns `build-and-test` red, and the
 # push still costs a whole run to find out.
 #
-# e2e is deliberately NOT here — ~7.3 minutes would make pushing unusable, and
-# a hook people bypass every time is worse than no hook. CI remains its gate.
+# Nothing else is here, deliberately: only unit tests, formatters and type
+# checks run on the laptop, and every other suite (guards, integration, e2e,
+# visual, sanity) runs in CI alone (operator, 2026-10-09, a global rule; #653).
+# The guards ran here from #638 until then. `lint:tests` (#662) is not a
+# suite: it applies three of the guards' finders (floorless-searches,
+# absence-liveness, anchored-presence) to the test files this branch changed,
+# a static read the operator ruled a lint (2026-10-12), so a new test meets
+# them here rather than one CI round trip later.
+#
+# And no test suite runs here, not even unit (operator, 2026-10-12, a global
+# rule; #713). Floors are recorded by `record-floors.yml` on the pushed branch,
+# so a branch that adds or moves a floor fails the unit suite until that job
+# has run, and a unit run here refused the very push the record needs (#658).
+# Run `npm run test:unit` by hand before each push; CI runs every suite on the
+# pull request.
 #
 # Installed by `scripts/install-hooks.mjs` via `prepare`, which points
 # `core.hooksPath` at this directory. Bypass a single push with --no-verify.
@@ -24,13 +38,23 @@ set -u
 unset $(git rev-parse --local-env-vars)
 
 fail() {
+  code=$?
+  # A check whose tool is missing exits 127, which is not the failure the check
+  # looks for, so it is never reported as one (#717: a missing prettier read as
+  # "files that are not formatted", with a fix that reformats the whole tree).
+  if [ "$code" -eq 127 ]; then
+    set -- 'a check could not start its tool (exit 127, command not found), so it checked nothing' 'npm ci'
+  fi
   printf '\npre-push blocked: %s\n' "$1"
   printf '  fix:  %s\n' "$2"
-  printf '  skip: git push --no-verify   (CI still runs all three)\n\n'
+  printf '  skip: git push --no-verify   (CI still runs every check)\n\n'
   exit 1
 }
 
+# A checkout with no installed dependencies can run no check at all, and every
+# new worktree starts that way (#717).
+[ -d node_modules/.bin ] || fail 'this checkout has no installed dependencies, so no check can run' 'npm ci'
+
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'
-npm run test:unit || fail 'a unit test failed' 'npm run test:unit'
-npm run test:guards || fail 'a guard failed' 'npm run test:guards'
+npm run lint:tests || fail 'a changed test file breaks a test-code meta-guard' 'npm run lint:tests'

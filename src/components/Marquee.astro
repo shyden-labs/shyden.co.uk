@@ -22,6 +22,11 @@ import { localeNativeNames } from '../lib/i18n/metadata';
  * `:has(:checked)` rule sets `animation-play-state`, so the page still ships
  * only the theme script. The control is a SIBLING of the aria-hidden clip,
  * never inside it, or a screen reader would not find it.
+ *
+ * It shows an icon and no words (#619): a pause symbol while the strip moves,
+ * a play symbol while it is paused, both inline SVG and hidden from the
+ * accessibility tree. Its name is `pauseLabel`, kept as screen-reader-only
+ * text inside the label, so the checkbox is still named "Pause motion".
  */
 interface Props {
   /** The locale's label for the control: "Pause motion". */
@@ -37,10 +42,33 @@ const half = run.repeat(2);
 ---
 
 <div class="band">
-  <label class="band-pause">
-    <input type="checkbox" />
-    <span>{pauseLabel}</span>
-  </label>
+  <div class="band-pause-rail">
+    <label class="band-pause">
+      <input type="checkbox" />
+      <span class="band-pause-disc" aria-hidden="true">
+        <svg
+          class="band-pause-icon"
+          data-icon="pause"
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 16 16"
+        >
+          <rect x="3" y="2" width="3.5" height="12" rx="1"></rect>
+          <rect x="9.5" y="2" width="3.5" height="12" rx="1"></rect>
+        </svg>
+        <svg
+          class="band-pause-icon"
+          data-icon="play"
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 16 16"
+        >
+          <path d="M4 2.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 4 2.2z"></path>
+        </svg>
+      </span>
+      <span class="band-pause-name visually-hidden">{pauseLabel}</span>
+    </label>
+  </div>
   <div class="marquee-clip" aria-hidden="true">
     <div class="marquee">
       <div class="marquee-track">
@@ -82,14 +110,15 @@ const half = run.repeat(2);
     background: var(--accent);
     /* Not --ink: --ink is the page's text colour, and on the accent ground
        it fails AA in both themes (the dark theme's mint is a LIGHT ground).
-       --on-accent exists for exactly this (#17); tests/unit/contrast.test.ts
+       --on-accent exists for exactly this (#17); tests/guards/contrast.test.ts
        scores it against --accent, so no ratio is written here. */
     color: var(--on-accent);
     box-shadow: 0 0 50px var(--accent-glow);
     /* The tilt is the point of the band. `scale` covers the corners the
        rotation would otherwise leave bare; the parent clips the overflow,
-       which is what keeps a 320px viewport from scrolling sideways. */
-    transform: rotate(-1.6deg) scale(1.05);
+       which is what keeps a 320px viewport from scrolling sideways. The
+       angle is the band's, shared with the pause control's rail. */
+    transform: rotate(var(--band-tilt)) scale(1.05);
   }
 
   .marquee-track {
@@ -104,49 +133,85 @@ const half = run.repeat(2);
     animation-play-state: paused;
   }
 
-  /* The control is a pill ON the strip (#606), at its inline-end and centred
-     on it, where it used to be a 44px row of its own above the strip with
-     nothing in it but the checkbox. The band is the positioning context and
-     is exactly the strip's height (the strip's margins collapse out of it),
-     so `top: 50%` is the strip's middle. It paints above the strip's text
-     (z-index 3 over the strip's 2) and BELOW the sticky header (10, #599), so
-     the header still covers it after scrolling. A solid --surface ground with
-     its own --ink: tests/unit/contrast.test.ts scores that pair. The label is
-     the touch target: 44px tall. The ring is the site's global
-     :focus-visible one, on the input. */
+  /* The control sits ON the strip (#606) at its inline-end, as a 28px disc
+     with an icon and no words (#619). The band is the positioning context and
+     is exactly the strip's height (the strip's margins collapse out of it).
+     It paints above the strip's text (z-index 3 over the strip's 2) and
+     BELOW the sticky header (10, #599), so the header still covers it after
+     scrolling. */
   .band {
+    --band-tilt: -1.6deg;
     position: relative;
   }
-  .band-pause {
+  /* A rail tilted like the strip and turning about the same middle, so the
+     disc sits on the strip's middle LINE at every width. Centred on the
+     band's middle instead, it would sit where that line has risen by
+     about 17px at 1280px (computed: 600px from the middle x tan 1.6deg), and
+     hang about 8px off the strip's lower edge. It is inset
+     by --space each side, keeping the middle, so its tilted corners stay
+     inside the band and cannot add sideways scroll at 320px. Only the label
+     takes pointer events: the rail spans the strip. */
+  .band-pause-rail {
     position: absolute;
     z-index: 3;
-    inset-inline-end: var(--space);
-    top: 50%;
-    translate: 0 -50%;
+    inset-block: 0;
+    inset-inline: var(--space);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    min-block-size: 44px;
-    padding-block: 0.25rem;
-    padding-inline: 0.9rem;
-    /* Never wider than half the band: a long label (Vietnamese, Thai) wraps
-       onto two even lines inside the pill instead of widening it (#606). */
-    max-inline-size: 50%;
-    border: 1px solid var(--border-strong);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--ink);
-    font-size: 0.95rem;
+    justify-content: flex-end;
+    transform: rotate(var(--band-tilt));
+    pointer-events: none;
+  }
+  /* The label is the 44px touch target; the disc inside it is what shows.
+     The icon is --accent on an --on-accent disc, and the disc --on-accent on
+     the --accent strip: tests/guards/contrast.test.ts scores both. */
+  .band-pause {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    color: var(--accent);
     cursor: pointer;
+    pointer-events: auto;
   }
-  .band-pause span {
-    text-wrap: balance;
+  .band-pause > * {
+    grid-area: 1 / 1;
   }
+  .band-pause-disc {
+    display: grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 50%;
+    background: var(--on-accent);
+  }
+  .band-pause-icon {
+    inline-size: 12px;
+    block-size: 12px;
+    fill: currentColor;
+  }
+  .band-pause [data-icon='play'],
+  .band-pause input:checked ~ .band-pause-disc [data-icon='pause'] {
+    display: none;
+  }
+  .band-pause input:checked ~ .band-pause-disc [data-icon='play'] {
+    display: block;
+  }
+  /* The checkbox is a 14px transparent circle over the disc's middle, above
+     it. Small on purpose: the site's global :focus-visible ring (3px of
+     --accent, 2px out) then lands ON the disc, 9px to 12px from its middle,
+     with 2px of disc still outside it. A ring drawn outside the disc would
+     sit on the --accent strip in its own colour, and vanish. */
   .band-pause input {
-    inline-size: 1.25rem;
-    block-size: 1.25rem;
-    flex: none;
+    z-index: 1;
+    inline-size: 14px;
+    block-size: 14px;
     margin: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    appearance: none;
     cursor: pointer;
   }
 
@@ -167,7 +232,7 @@ const half = run.repeat(2);
      do not print by default. Hiding it settles both at once. */
   @media print {
     .marquee,
-    .band-pause {
+    .band-pause-rail {
       display: none;
     }
   }

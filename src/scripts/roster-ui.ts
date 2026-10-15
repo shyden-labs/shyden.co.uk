@@ -647,6 +647,9 @@ export function renderRoster(
   table.appendChild(colgroup);
 
   const thead = document.createElement('thead');
+  // Hidden in the card layout; the table breakpoint's `#cg-roster thead`
+  // rule (ClassroomGroupsPage.astro) undoes it, at an ID's specificity.
+  thead.className = 'visually-hidden';
   const headRow = document.createElement('tr');
   // Absent FIRST (operator, 2026-08-13). It is the column a teacher touches
   // at the start of a lesson, before anything else on the row matters, and it
@@ -687,9 +690,9 @@ export function renderRoster(
   // defect class every other control on this page already refuses to
   // ship.
   //
-  // Visually hidden (`.cg-roster-remove-heading`, ClassroomGroupsPage.astro
-  // -- the SAME clip-based technique #cg-roster thead's own rule already
-  // uses, just applied to one cell's own content rather than a whole row,
+  // Visually hidden (`.visually-hidden`, tokens.css -- the SAME recipe
+  // the <thead> wears below the table breakpoint, just applied to one
+  // cell's own content rather than a whole row,
   // and UNCONDITIONALLY rather than only below the table breakpoint):
   // showing "Remove" as a visible heading above a column of seven
   // identical "Remove" buttons would only repeat what every row already
@@ -711,7 +714,7 @@ export function renderRoster(
   removeTh.scope = 'col';
   removeTh.dataset.col = 'remove' satisfies RosterColumn;
   const removeHeading = document.createElement('span');
-  removeHeading.className = 'cg-roster-remove-heading';
+  removeHeading.className = 'cg-roster-remove-heading visually-hidden';
   removeHeading.textContent = t.rosterRemove;
   removeTh.appendChild(removeHeading);
   headRow.appendChild(removeTh);

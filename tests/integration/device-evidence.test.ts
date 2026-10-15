@@ -117,6 +117,34 @@ describe('the device leg writes the same evidence every other leg does', () => {
     ]);
   });
 
+  // #354: the page joins a capture to its test by journey, and the report
+  // spells a journey as the describes and the test joined with ` > `. A
+  // capture that names its own journey by hand can never match that, so a
+  // capture with no title takes the running test's, as Vitest spells it.
+  it('takes the journey from the running test when no title is given', async () => {
+    const dir = evidenceDir();
+    vi.stubEnv('EVIDENCE_DIR', dir);
+    const at = new Date('2026-10-15T12:00:00.000Z');
+    const file = await shootDevice(
+      fakeDriver(),
+      { project: 'ios-safari-real-device', label: 'the board open' },
+      () => at,
+    );
+    expect(rowsIn(dir)).toEqual([
+      manifestRow(
+        {
+          project: 'ios-safari-real-device',
+          title:
+            'the device leg writes the same evidence every other leg does > takes the journey from the running test when no title is given',
+          order: 1,
+          label: 'the board open',
+          file: file!,
+        },
+        at,
+      ),
+    ]);
+  });
+
   it('writes bytes the page builder can still recognise -- the seam, not the sides', async () => {
     const dir = evidenceDir();
     vi.stubEnv('EVIDENCE_DIR', dir);

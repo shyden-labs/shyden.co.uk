@@ -158,7 +158,12 @@ describe('the script, as the workflow runs it', () => {
     );
     const result = run(dir, { GITHUB_EVENT_NAME: 'pull_request' });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.written).toBe('docs_only=true\n');
+    // The fixture holds none of the capture's entry files, so the trace
+    // refuses and the capture runs: the fail-safe answer (#774).
+    expect(result.written).toBe('docs_only=true\ncapture=true\n');
+    expect(result.stdout).toMatch(
+      /^ {2}- the capture's files could not be traced: astro\.config\.mjs is a root of the trace and does not exist$/m,
+    );
   });
 
   it('writes docs_only=false, with the reason, for anything else', () => {
@@ -167,7 +172,7 @@ describe('the script, as the workflow runs it', () => {
     );
     const result = run(dir, { GITHUB_EVENT_NAME: 'pull_request' });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.written).toBe('docs_only=false\n');
+    expect(result.written).toBe('docs_only=false\ncapture=true\n');
     expect(result.stdout).toMatch(
       /^ {2}- M src\/a\.ts: src\/a\.ts is not documentation alone$/m,
     );
@@ -177,7 +182,7 @@ describe('the script, as the workflow runs it', () => {
     const dir = scratchDir('docs-only-bare-');
     const result = run(dir, { GITHUB_EVENT_NAME: 'pull_request' });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.written).toBe('docs_only=false\n');
+    expect(result.written).toBe('docs_only=false\ncapture=true\n');
   });
 
   it('fails, rather than deciding nothing, when it has nowhere to write', () => {

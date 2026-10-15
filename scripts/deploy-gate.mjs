@@ -236,5 +236,5 @@ const main = async () => {
 // Only when run, never when imported: `tests/unit/deploy-gate.test.ts` imports
 // `decideDeploy`. Matching the entry file's name would run `main()` for any
 // entry file whose name ended the same way (#221,
-// `tests/unit/script-entry.test.ts`).
+// `tests/guards/script-entry.test.ts`).
 if (import.meta.main) await main();

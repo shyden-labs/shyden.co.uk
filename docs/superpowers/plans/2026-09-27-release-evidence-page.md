@@ -2011,10 +2011,10 @@ describe('no script carries a release’s prose (#362)', () => {
 ```bash
 node scripts/release-inventory.mjs --tests > /tmp/release-tests.txt
 npx playwright test --list --reporter=json --project=chromium $(cat /tmp/release-tests.txt) > /tmp/release-listing.json
-node scripts/build-release-content.mjs --release docs/releases/a3a5adb.json --head HEAD --check --listing /tmp/release-listing.json
+node scripts/build-release-content.mjs --release docs/releases/a3a5adb.json --head HEAD --check --listing /tmp/release-listing.json --listing-only
 ```
 
-Expected: `build-release-content: docs/releases/a3a5adb.json holds for <HEAD sha>`, exit 0. Because the selection is capturing tests only, the listing holds exactly the capturing tests, so `--check` refuses a non-capturing title too.
+Expected: `build-release-content: docs/releases/a3a5adb.json holds for <HEAD sha>, as a listing: …`, exit 0. This is an early typo check only, and the command says so: a listing proves a cited title RUNS, not that it CAPTURES. A looped test's case that returns before its `shoot` is selected, listed and passes, which let 64 such citations through in v4 (#765). Without `--listing-only` the command refuses. The real check is Task 8's `--check --manifest`, against the release's one capture, before the content merges.
 
 - [ ] **Step 4: Commit.**
 
@@ -2075,6 +2075,9 @@ git commit -m "The release file for a3a5adb, checked before the merge, with no s
 
 - [ ] **Step 1:** `git switch develop && git pull --ff-only`. Write `git rev-parse HEAD > <scratch>/head`, then `node scripts/release-inventory.mjs --tests > <scratch>/tests.txt`.
 - [ ] **Step 2:** With nothing else running, `EVIDENCE_DIR=<scratch>/evidence npm run test:e2e -- --workers=2 $(cat <scratch>/tests.txt)`. Read the whole verdict, and the duration of any failure before diagnosing it.
+- [ ] **Step 2a: Check the content against the capture, before it merges** (operator 2026-10-14, #765: the code merges, the laptop captures once, the content is checked against that capture, then the content merges and the page is built from the same capture). From the content branch: `node scripts/build-release-content.mjs --release docs/releases/a3a5adb.json --head "$(cat <scratch>/head)" --check --manifest <scratch>/evidence/manifest.jsonl`. It names every cited title no row of this run carries, all in one refusal, each with its entry's sha.
+  - A named case is **fixed so it captures, never dropped or cited around** (operator 2026-10-14: every case on the review page has a picture, every moving journey a video). Ticket and PR the test fix, merge it, and run Step 2 again: a second laptop capture for this release is allowed for exactly this. #774 catches such a case on every pull request, so this should not happen once it lands.
+  - Merge the content PR once the check holds.
 - [ ] **Step 3:** `node scripts/build-release-content.mjs --release docs/releases/a3a5adb.json --head "$(cat <scratch>/head)" --evidence <scratch>/evidence --out <scratch>/content.json`.
 - [ ] **Step 4:** Plan, upload and build with the recipe `build-evidence-page.mjs` prints: `--plan`, then `upload-evidence-assets.mjs`, then `--assets`. Publish with `{"db": {}, "assets": {}}`.
 - [ ] **Step 5:** Verify:

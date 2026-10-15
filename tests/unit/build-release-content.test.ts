@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LISTING_CAVEAT,
   listedTitles,
+  modeOf,
   releaseContentOf,
 } from '../../scripts/build-release-content.mjs';
 
@@ -178,6 +180,7 @@ describe('--check against a listing (#362)', () => {
         report: listing,
         manifest: null,
         devVerified: null,
+        check: true,
       }),
     ).toBeNull();
   });
@@ -197,7 +200,125 @@ describe('--check against a listing (#362)', () => {
         report: listing,
         manifest: null,
         devVerified: null,
+        check: true,
       }),
     ).toThrow(/is not a journey of this run/);
+  });
+});
+
+describe('--check against a capture manifest (#765)', () => {
+  /** The check, run over `rows` of the capture `report` describes. */
+  const checkOf = (rows: object[], over = release) =>
+    releaseContentOf({
+      release: over,
+      inventory,
+      report,
+      manifest: rows,
+      devVerified: null,
+      check: true,
+    });
+  const captured = (title: string) => ({ ...manifest[0], title });
+
+  it('passes a cited title a manifest row carries, with no dev-verified', () => {
+    expect(checkOf([captured(TITLE)])).toBeNull();
+  });
+
+  it('refuses a cited title that ran but no manifest row carries, naming its entry', () => {
+    expect(() => checkOf([captured('a describe > another journey')])).toThrow(
+      `"${TITLE}", cited by ${V.sha}, is not a journey of this run`,
+    );
+  });
+
+  it('names every uncaptured title in one refusal, each with its entry', () => {
+    const many = {
+      ...release,
+      entries: {
+        [V.sha]: { kind: 'visible', journeys: [TITLE, 'a describe > two'] },
+        [G.sha]: { kind: 'visible', journeys: ['a describe > three'] },
+      },
+    };
+    let said = '';
+    try {
+      checkOf([captured('a describe > captured')], many);
+    } catch (error) {
+      said = String(error);
+    }
+    expect(said.split('\n').slice(1)).toEqual([
+      `  "${TITLE}", cited by ${V.sha}, is not a journey of this run`,
+      `  "a describe > two", cited by ${V.sha}, is not a journey of this run`,
+      `  "a describe > three", cited by ${G.sha}, is not a journey of this run`,
+    ]);
+    expect(said.split('\n')[0]).toContain('3 cited titles');
+  });
+
+  it('refuses an empty manifest, which proves no capture ran', () => {
+    expect(() => checkOf([])).toThrow(
+      /nothing in manifest\.jsonl was captured/,
+    );
+  });
+
+  it('refuses rows an earlier run captured, as building does', () => {
+    expect(() =>
+      checkOf([{ ...captured(TITLE), at: '2026-09-27T07:59:59.000Z' }]),
+    ).toThrow(/an earlier run's/);
+  });
+
+  it('refuses to build with no manifest', () => {
+    expect(() =>
+      releaseContentOf({
+        release,
+        inventory,
+        report,
+        manifest: null,
+        devVerified: 'success',
+      }),
+    ).toThrow(/building reads a capture's manifest/);
+  });
+});
+
+describe('what the command line asks for (#765)', () => {
+  const MODES = [
+    ['a capture to build from', { evidence: 'e', out: 'o' }, 'build'],
+    ['a check against a manifest', { check: true, manifest: 'm' }, 'manifest'],
+    [
+      'a listing-only check, asked for by name',
+      { check: true, listing: 'l', listingOnly: true },
+      'listing',
+    ],
+    [
+      'a listing-only check, not asked for',
+      { check: true, listing: 'l' },
+      'listing-refused',
+    ],
+    ['a check with nothing to check against', { check: true }, 'usage'],
+    [
+      'a check against both a listing and a manifest',
+      { check: true, listing: 'l', manifest: 'm' },
+      'usage',
+    ],
+    [
+      '--listing-only outside a check',
+      { listingOnly: true, evidence: 'e', out: 'o' },
+      'usage',
+    ],
+    [
+      '--manifest outside a check',
+      { manifest: 'm', evidence: 'e', out: 'o' },
+      'usage',
+    ],
+    ['a build with no output file', { evidence: 'e' }, 'usage'],
+  ] as const;
+  it.each(MODES)('reads %s', (_, given, mode) => {
+    expect(modeOf({ release: 'r.json', head: 'HEAD', ...given })).toBe(mode);
+  });
+
+  it('reads no release file as usage, whatever else is given', () => {
+    expect(modeOf({ head: 'HEAD', check: true, manifest: 'm' })).toBe('usage');
+  });
+
+  it('says a listing proves a title runs, not that it captures', () => {
+    expect(LISTING_CAVEAT).toMatch(/RUNS/);
+    expect(LISTING_CAVEAT).toMatch(/not that it CAPTURES/);
+    expect(LISTING_CAVEAT).toContain('--manifest');
   });
 });

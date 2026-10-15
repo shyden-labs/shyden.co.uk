@@ -52,7 +52,7 @@ test.describe('the roster table', () => {
   // the bug's own shape, not the contract. The seventh header's own text
   // ('Remove'/'Hapus') is present in the DOM -- `toHaveText` reads it here
   // exactly as it reads the other six -- but visually hidden via `clip-path`
-  // (ClassroomGroupsPage.astro's own `.cg-roster-remove-heading`): a
+  // (`.visually-hidden`, tokens.css): a
   // screen reader building this table's column headers finds a real name
   // for every one of the seven, while a sighted teacher never sees a
   // printed "Remove" heading sitting above a column of seven identical
@@ -1841,31 +1841,12 @@ test.describe('an unset roster dropdown says which column it is for', () => {
   // table, so both layouts are measured, and 600px and 430px sit inside the
   // card band that used to be the table's.
   const TRUNCATION_WIDTHS = [320, 375, 390, 430, 600, 768, 1024, 1280];
-  /**
-   * Where a column name does not fit today (#409), measured on CI's platform
-   * (the pinned Linux image, all five engines) when this split was made.
-   * Expected to FAIL there, not skipped: the day the layout is fixed the case
-   * goes red and its entry has to go, so the park cannot outlive its fix.
-   * CI run 36965820730 failed exactly these five cases on every engine,
-   * so an entry names the case and holds for all five.
-   */
-  const DOES_NOT_FIT_YET: ReadonlySet<string> = new Set([
-    '/id/classroom-groups 320',
-    '/id/classroom-groups 768',
-    '/id/classroom-groups 1024',
-    '/id/classroom-groups 1280',
-    '/vi/classroom-groups 768',
-  ]);
   for (const path of localePaths('/classroom-groups'))
     for (const width of TRUNCATION_WIDTHS)
       test(
         `no dropdown ever truncates its own column name -- ${path} at ${width}px`,
         { tag: '@emulated-viewport' },
         async ({ page }) => {
-          test.fail(
-            DOES_NOT_FIT_YET.has(`${path} ${width}`),
-            'a column name does not fit here yet (#409)',
-          );
           await page.setViewportSize({ width, height: 900 });
           await openRoster(page, path);
           const row = page.locator('.cg-student').first();

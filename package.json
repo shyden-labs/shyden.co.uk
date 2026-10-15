@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.2.0"
+    "node": "^24.16.0 || >=26.3.0"
   },
   "scripts": {
     "dev": "ASTRO_DEV_BACKGROUND=1 astro dev",
     "build": "astro build",
     "preview": "ASTRO_PREVIEW_BACKGROUND=1 astro preview",
     "typecheck": "astro check",
+    "lint:tests": "node scripts/lint-changed-tests.mjs",
     "test:unit": "vitest run",
-    "test:guards": "vitest run --config vitest.guards.config.ts --reporter=verbose --testTimeout=25000",
-    "test:integration": "vitest run --config vitest.integration.config.ts --reporter=verbose --testTimeout=30000",
+    "test:guards": "vitest run --config vitest.guards.config.ts --testTimeout=25000",
+    "test:simulation": "vitest run --config vitest.simulation.config.ts --testTimeout=700",
+    "test:integration": "vitest run --config vitest.integration.config.ts --testTimeout=30000",
     "floors:record": "node scripts/record-floors.mjs",
     "test:e2e": "node scripts/test-e2e.mjs",
     "test:functions": "playwright test --config=playwright.functions.config.ts",
@@ -24,9 +26,11 @@
     "test:devices": "node scripts/test-devices.mjs",
     "i18n:translate": "node scripts/i18n-translate.mjs",
     "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
+    "i18n:google-read-back": "node scripts/i18n-google-read-back.mjs",
+    "i18n:read-back-verdicts": "node scripts/i18n-read-back-verdicts.mjs",
     "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
-    "test": "npm run test:unit && npm run test:guards && npm run test:integration && npm run test:e2e",
+    "test": "npm run format && npm run typecheck && npm run test:unit",
     "format": "prettier --check .",
     "i18n:scaffold": "node scripts/i18n-scaffold.mjs",
     "prepare": "node scripts/install-hooks.mjs"
@@ -36,16 +40,17 @@
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
-    "astro": "^7.3.5"
+    "astro": "^7.3.6"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.5",
     "prettier": "^3.9.9",
     "prettier-plugin-astro": "1.1.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.2",
-    "wrangler": "4.144.0",
+    "vitest": "^5.0.3",
+    "wrangler": "4.148.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
@@ -55,6 +60,6 @@
   "allowScripts": {
     "esbuild@0.28.1": true,
     "fsevents@2.3.3": true,
-    "workerd@1.20260926.1": true
+    "workerd@1.20261006.1": true
   }
 }

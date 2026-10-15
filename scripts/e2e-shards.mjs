@@ -23,8 +23,9 @@
  * ran, and the sum is held here against a count that came from outside every
  * run.
  *
- * Usage, as the workflow runs it:
- *   NEEDS_JSON='${{ toJSON(needs) }}' node scripts/e2e-shards.mjs <accounts-dir>
+ * Usage, as the workflow runs it (each list a shell glob's expansion):
+ *   NEEDS_JSON='${{ toJSON(needs) }}' node scripts/e2e-shards.mjs \
+ *     <e2e account files> --capture <capture account files>
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { messageOf } from './errors.mjs';
@@ -175,6 +176,51 @@ export function needsFindings(needs) {
         : `${job} reported no result at all`,
     ];
   });
+}
+
+/**
+ * The capture shards (#774) run only where the scope job said a pull request
+ * can move a release picture, so a skip is a pass there and a refusal
+ * everywhere else. Judged here against that verdict, then left out of what
+ * the docs-only and full-run verdicts read, which know nothing of it. A
+ * verdict other than exactly `true` or `false` judges nothing, so it refuses:
+ * an output that went missing must not read as "skip".
+ *
+ * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @returns {{ findings: string[], rest: unknown }}
+ */
+export function captureFindings(needs) {
+  if (!isRecord(needs)) return { findings: [], rest: needs };
+  const { capture, ...rest } = needs;
+  if (capture === undefined)
+    return {
+      findings: [
+        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+      ],
+      rest,
+    };
+  const result = isRecord(capture) ? capture.result : undefined;
+  const outputs = isRecord(needs.scope) ? needs.scope.outputs : undefined;
+  const said = isRecord(outputs) ? outputs.capture : undefined;
+  if (said !== 'true' && said !== 'false')
+    return {
+      findings: [
+        `scope handed on no capture verdict (${JSON.stringify(said)}), ` +
+          `so capture finishing \`${String(result)}\` cannot be judged`,
+      ],
+      rest,
+    };
+  const [wanted, where] =
+    said === 'true' ? ['success', 'runs'] : ['skipped', 'does not run'];
+  return {
+    findings:
+      result === wanted
+        ? []
+        : [
+            `capture finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
+          ],
+    rest,
+  };
 }
 
 /**
@@ -365,6 +411,43 @@ export function accountFindings(accounts) {
 }
 
 /**
+ * The account files build-and-test was handed: the e2e shards' first, then,
+ * after `--capture`, the capture shards' (#774). Each list is a shell glob's
+ * expansion, so an unmatched one arrives as its pattern and is refused by
+ * name. `capture` is null when no `--capture` was handed over at all.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ e2e: string[], capture: string[] | null }}
+ */
+export function accountArguments(args) {
+  const at = args.indexOf('--capture');
+  return at === -1
+    ? { e2e: [...args], capture: null }
+    : { e2e: args.slice(0, at), capture: args.slice(at + 1) };
+}
+
+/**
+ * Why the capture shards do not add up to the selection (#774). Where scope
+ * said the capture runs, they are held to it exactly as the e2e shards are
+ * held to the suite: each shard counted the selection it was handed
+ * (`E2E_ENUMERATE=selection`), and between them they ran all of it. Where
+ * scope said it does not run, no capture account may exist.
+ *
+ * @param {boolean} runs
+ * @param {readonly unknown[]} accounts
+ * @returns {string[]}
+ */
+export function captureAccountFindings(runs, accounts) {
+  if (!runs)
+    return accounts.length === 0
+      ? []
+      : [
+          `the capture: ${accounts.length} shard accounts were written, where scope said the capture does not run`,
+        ];
+  return accountFindings(accounts).map((finding) => `the capture: ${finding}`);
+}
+
+/**
  * One account, read from the file it was given. A file that is not JSON
  * arrives as something that is not an account, which the verdict names.
  *
@@ -387,7 +470,9 @@ function main() {
   // itself, a path that does not exist, and is refused by name; no files at
   // all is no accounts, which the verdict refuses too. So an empty download
   // cannot pass as an empty directory that proved nothing (#84).
-  const files = process.argv.slice(2);
+  const { e2e: files, capture: captureFiles } = accountArguments(
+    process.argv.slice(2),
+  );
 
   /** @type {unknown} */
   let needs;
@@ -398,20 +483,58 @@ function main() {
   }
 
   const present = files.filter((file) => existsSync(file));
-  const docsOnly = isDocsOnlyRun(needs);
-  const findings = docsOnly
-    ? // No shard runs, and the download is skipped, so the glob arrives
-      // unmatched; any account that does exist is refused by name.
-      docsOnlyFindings(needs, present)
-    : [
-        ...needsFindings(needs),
-        ...files
-          .filter((file) => !existsSync(file))
-          .map(
-            (file) => `${file} does not exist, so it holds no shard's account`,
-          ),
-        ...accountFindings(present.map((file) => loadAccount(file))),
-      ];
+  // The capture job first: it is judged against scope's verdict, not by
+  // whether the pull request is docs-only, and the rest never see it.
+  const capture = captureFindings(needs);
+  const docsOnly = isDocsOnlyRun(capture.rest);
+  // Its accounts, wherever scope gave a verdict captureFindings could read;
+  // any other verdict is already refused there.
+  const said =
+    isRecord(needs) && isRecord(needs.scope) && isRecord(needs.scope.outputs)
+      ? needs.scope.outputs.capture
+      : undefined;
+  const captureRuns = said === 'true';
+  const captureAccounts =
+    captureFiles === null
+      ? [
+          'build-and-test was handed no --capture accounts, so the capture shards cannot be added up',
+        ]
+      : said === 'true' || said === 'false'
+        ? [
+            ...(captureRuns
+              ? captureFiles
+                  .filter((file) => !existsSync(file))
+                  .map(
+                    (file) =>
+                      `the capture: ${file} does not exist, so it holds no shard's account`,
+                  )
+              : []),
+            ...captureAccountFindings(
+              captureRuns,
+              captureFiles
+                .filter((file) => existsSync(file))
+                .map((file) => loadAccount(file)),
+            ),
+          ]
+        : [];
+  const findings = [
+    ...capture.findings,
+    ...captureAccounts,
+    ...(docsOnly
+      ? // No shard runs, and the download is skipped, so the glob arrives
+        // unmatched; any account that does exist is refused by name.
+        docsOnlyFindings(capture.rest, present)
+      : [
+          ...needsFindings(capture.rest),
+          ...files
+            .filter((file) => !existsSync(file))
+            .map(
+              (file) =>
+                `${file} does not exist, so it holds no shard's account`,
+            ),
+          ...accountFindings(present.map((file) => loadAccount(file))),
+        ]),
+  ];
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +
@@ -420,6 +543,15 @@ function main() {
     process.exit(1);
   }
 
+  if (captureRuns) {
+    const accounts = /** @type {ShardAccount[]} */ (
+      /** @type {string[]} */ (captureFiles).map((file) => loadAccount(file))
+    );
+    console.log(
+      `${accounts.length} capture shards ran ${accounts[0].enumerated} of the ` +
+        `${accounts[0].enumerated} cases the release selection holds.`,
+    );
+  }
   if (docsOnly) {
     console.log(
       'A docs-only pull request: checks and every job it keeps succeeded, and ' +

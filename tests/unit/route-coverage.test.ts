@@ -206,9 +206,17 @@ describe('the post-deploy gates derive their routes', () => {
   });
 
   it('does not read a route that only starts with the same letters', () => {
-    expect(localePrefixed("await page.goto('/identity'); '/thanks';")).toEqual(
-      [],
-    );
+    const source = "await page.goto('/identity'); '/thanks';";
+    const routes = stringTextsIn(parseSource(source));
+    expect(
+      searched(localePrefixed(source), {
+        of: routes,
+        what: 'routes quoted in the planted source',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('route-coverage/lookalike-routes', routes.length),
+    ).toBeUndefined();
   });
 });
 

@@ -269,7 +269,7 @@ export function declarationsIn(sf: ts.SourceFile): Declaration[] {
 }
 
 /** What a `test.use()` argument sets, or why it cannot be read. */
-function optionsOf(argument: ts.Expression | undefined): {
+export function optionsOf(argument: ts.Expression | undefined): {
   options: Map<string, ts.Expression>;
   unreadable?: string;
   shared?: string;

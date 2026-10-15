@@ -1,3 +1,4 @@
+import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { floorBreach } from '../floors';
@@ -49,38 +50,55 @@ const LANGUAGES: readonly Locale[] = ['zh', 'vi', 'th'];
 const NAMES = ['Ana', 'Budi', 'Citra', 'Dedi'];
 const byNumber = (n: number) => NAMES[n - 1] ?? String(n);
 
+/**
+ * The roster every test below starts from, handed over to `locale`'s tool:
+ * four students, the first two a together pair of mixed sex. Each test starts
+ * here rather than where the one before left off, so each reads one group of
+ * sentences inside its own budget: walked as one journey, the whole set ran
+ * past 30 s on Firefox and WebKit whenever captures ran under load (#380).
+ */
+const openTool = async (
+  page: Page,
+  context: BrowserContext,
+  locale: Locale,
+) => {
+  await buildRoster(page, [
+    ['F', NAMES[0]],
+    ['M', NAMES[1]],
+    ['F', NAMES[2]],
+    ['M', NAMES[3]],
+  ]);
+  for (const row of [0, 1])
+    await page
+      .locator('.cg-student')
+      .nth(row)
+      .getByLabel('Together')
+      .selectOption('A');
+  await page.locator('#cg-io-toggle').click();
+  const [, tool] = await Promise.all([
+    page.waitForEvent('download'),
+    context.waitForEvent('page'),
+    handoverTo(page, LOCALE_METADATA[locale].nativeName),
+  ]);
+  await tool.waitForLoadState();
+  const rows = tool.locator('.cg-student');
+  await expect(rows).toHaveCount(NAMES.length);
+  return {
+    tool,
+    rows,
+    go: tool.locator('#cg-go'),
+    error: tool.locator('#cg-error'),
+  };
+};
+
 test.describe('the sentences corrected on #319', () => {
   for (const locale of LANGUAGES) {
-    test(`${locale}: every reachable correction reads as approved`, async ({
+    test(`${locale}: the how-to and the grouping options read as approved`, async ({
       page,
       context,
     }) => {
       const t = getStrings(locale);
-      const columns = CSV_LOCALES[locale].columns;
-
-      await buildRoster(page, [
-        ['F', NAMES[0]],
-        ['M', NAMES[1]],
-        ['F', NAMES[2]],
-        ['M', NAMES[3]],
-      ]);
-      for (const row of [0, 1])
-        await page
-          .locator('.cg-student')
-          .nth(row)
-          .getByLabel('Together')
-          .selectOption('A');
-      await page.locator('#cg-io-toggle').click();
-      const [, tool] = await Promise.all([
-        page.waitForEvent('download'),
-        context.waitForEvent('page'),
-        handoverTo(page, LOCALE_METADATA[locale].nativeName),
-      ]);
-      await tool.waitForLoadState();
-      const rows = tool.locator('.cg-student');
-      await expect(rows).toHaveCount(NAMES.length);
-      const go = tool.locator('#cg-go');
-      const error = tool.locator('#cg-error');
+      const { tool } = await openTool(page, context, locale);
 
       // The how-to's second step names who is being split.
       await tool.locator('#cg-howto-toggle').click();
@@ -129,7 +147,17 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: leftover students in one group reads “${t.stateBunched}”`,
         summary,
       );
-      await tool.locator('input[name="leftovers"][value="spread"]').check();
+    });
+
+    test(`${locale}: the roster's refusals read as approved`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const { tool, rows, go, error } = await openTool(page, context, locale);
+
+      // The grouping options arrive folded, and separate mode is one of them.
+      await tool.locator('#cg-grouping-toggle').click();
 
       // A mixed-sex together pair cannot make a single-sex group.
       await tool.locator('#cg-sex-separate').check();
@@ -201,16 +229,14 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: a roster with everyone absent is refused`,
         error,
       );
-      for (let row = 0; row < NAMES.length; row++) {
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColAbsent, { exact: true })
-          .uncheck();
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColTogether, { exact: true })
-          .selectOption({ value: '' });
-      }
+    });
+
+    test(`${locale}: the print panel and the stale notice read as approved`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const { tool, go, error } = await openTool(page, context, locale);
 
       // Groups made, the print panel offers the group results and the letters.
       await go.click();
@@ -241,6 +267,7 @@ test.describe('the sentences corrected on #319', () => {
       // Changing the leftovers choice makes those groups out of date, and the
       // notice names the choice in the words of its own label (#390).
       const stale = tool.locator('#cg-stale');
+      await tool.locator('#cg-grouping-toggle').click();
       await tool.locator('input[name="leftovers"][value="bunch"]').check();
       await expectVisibleText(
         stale.locator('#cg-stale-text'),
@@ -254,6 +281,18 @@ test.describe('the sentences corrected on #319', () => {
       await tool.locator('input[name="leftovers"][value="spread"]').check();
       await expect(stale).toHaveCount(1);
       await expect(stale).toBeHidden();
+    });
+
+    test(`${locale}: a together pair kept apart is refused as it is typed`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const { tool, rows } = await openTool(page, context, locale);
+
+      // The roster arrives folded; its rows are edited from here on.
+      await tool.locator('#cg-students-toggle').click();
+      await expect(rows.first()).toBeVisible();
 
       // A together pair that is also an apart pair is refused as it is typed.
       // A select offers the letters in use and the next free one, so 'A' it is.
@@ -282,6 +321,15 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: a together pair kept apart is refused as it is typed`,
         clash,
       );
+    });
+
+    test(`${locale}: a faulty class list is refused in the words approved`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const columns = CSV_LOCALES[locale].columns;
+      const { tool } = await openTool(page, context, locale);
 
       // Every problem the page lists after an import, in order.
       const listed = tool.locator('#cg-io-problems li');

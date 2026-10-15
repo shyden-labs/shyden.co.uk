@@ -1,3 +1,4 @@
+import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import {
@@ -42,30 +43,44 @@ test.use(recorded);
  */
 const LANGUAGES: readonly Locale[] = ['zh', 'vi', 'th'];
 
+/**
+ * The roster every tool test below starts from, handed over to `locale`'s
+ * tool: six students, five named, one absent, two together, one apart. Each
+ * test starts here rather than where the one before left off, so each reads
+ * one group of sentences inside its own budget: walked as one journey, the
+ * tool ran past 30 s on WebKit whenever captures ran under load (#380).
+ */
+const openTool = async (
+  page: Page,
+  context: BrowserContext,
+  locale: Locale,
+) => {
+  // The board's words are this spec's subject, not fullscreen, which
+  // classroom-groups-projector.spec.ts owns. On the CONTEXT, so the
+  // handover popup gets it (#344).
+  await refuseFullscreen(context);
+  await rosterWithAnAbsence(page);
+  await giveEveryoneASex(page);
+  await page.locator('#cg-io-toggle').click();
+  const [, tool] = await Promise.all([
+    page.waitForEvent('download'),
+    context.waitForEvent('page'),
+    handoverTo(page, LOCALE_METADATA[locale].nativeName),
+  ]);
+  await tool.waitForLoadState();
+  // The refusal reached the popup. Without it this spec does not fail, it
+  // flakes, which is how #344 went unexplained.
+  expect(
+    await tool.evaluate(() => String(Element.prototype.requestFullscreen)),
+  ).toContain('refused');
+  return tool;
+};
+
 test.describe('the copy the operator approved on #161', () => {
   for (const locale of LANGUAGES) {
-    test(`${locale}: the tool reads as approved`, async ({ page, context }) => {
+    test(`${locale}: the form reads as approved`, async ({ page, context }) => {
       const t = getStrings(locale);
-      // The board's words are this spec's subject, not fullscreen, which
-      // classroom-groups-projector.spec.ts owns. On the CONTEXT, so the
-      // handover popup gets it (#344).
-      await refuseFullscreen(context);
-
-      // Six students: five named, one absent, two together, one apart.
-      await rosterWithAnAbsence(page);
-      await giveEveryoneASex(page);
-      await page.locator('#cg-io-toggle').click();
-      const [, tool] = await Promise.all([
-        page.waitForEvent('download'),
-        context.waitForEvent('page'),
-        handoverTo(page, LOCALE_METADATA[locale].nativeName),
-      ]);
-      await tool.waitForLoadState();
-      // The refusal reached the popup. Without it this spec does not fail, it
-      // flakes, which is how #344 went unexplained.
-      expect(
-        await tool.evaluate(() => String(Element.prototype.requestFullscreen)),
-      ).toContain('refused');
+      const tool = await openTool(page, context, locale);
 
       const go = tool.locator('#cg-go');
       await expectVisibleText(go, t.makeGroups);
@@ -110,7 +125,16 @@ test.describe('the copy the operator approved on #161', () => {
         `${locale}: the roster's column is headed “${t.rosterColTogether}”`,
         tool.locator('#cg-roster thead'),
       );
+    });
 
+    test(`${locale}: the groups and the board read as approved`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const tool = await openTool(page, context, locale);
+
+      const go = tool.locator('#cg-go');
       await go.click();
       const heading = tool.locator('#cg-results-h');
       await expectVisibleText(heading, t.resultsHeading);
@@ -155,7 +179,18 @@ test.describe('the copy the operator approved on #161', () => {
         shuffle,
       );
       await bar.getByRole('button', { name: t.boardExit, exact: true }).click();
+    });
 
+    test(`${locale}: the class list file reads as approved`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const tool = await openTool(page, context, locale);
+
+      // Named for a class, as a teacher's list is: the file then opens with
+      // the class comment, and the header is its second line.
+      await tool.getByLabel(t.classLabel, { exact: true }).fill('6A');
       await tool.locator('#cg-io-toggle').click();
       const file = await downloadText(tool, t.ioExportClassList);
       // The header CELLS, compared exactly: a header word is a parsing token,

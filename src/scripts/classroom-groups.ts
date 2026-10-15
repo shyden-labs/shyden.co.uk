@@ -12,6 +12,8 @@
 import {
   anonymousStudent,
   buildGroups,
+  plannedGroups,
+  type GroupingInput,
   type Student,
   type Mode,
   type Leftovers,
@@ -78,6 +80,8 @@ import { sexWhy, sexWhyReturning } from '../lib/sexOptions';
 import { renderIo } from './io-ui';
 import { renderPrintPanel } from './print-ui';
 import { renderProjector } from './projector';
+import { travel } from './board-travel';
+import { travelOrder, travelSchedule } from '../lib/travel';
 import { todayISO } from '../lib/csv';
 import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
@@ -787,6 +791,9 @@ if (form) {
    * `updateRosterValidation` therefore hands the decision here rather than
    * setting the property itself.
    */
+  // Filled once the board exists (#743): its button follows this same fact,
+  // and `updateGoButton` first runs during set-up, before the board does.
+  let onShuffleReadinessChanged: (() => void) | null = null;
   const updateGoButton = () => {
     // Copied, not passed straight through: `getRoster()` hands back a
     // `readonly Student[]` and `rosterProblems` takes a mutable one, which
@@ -810,6 +817,7 @@ if (form) {
     } else {
       goButton.removeAttribute('aria-describedby');
     }
+    onShuffleReadinessChanged?.();
   };
 
   /**
@@ -1508,8 +1516,10 @@ if (form) {
     // never behave differently from one triggered on the page.
     onShuffle: () => form.requestSubmit(goButton),
     // The SAME fact the page's own deal button uses, read rather than
-    // duplicated: one shuffle at a time, whichever button asked for it.
-    busy: () => goButton.disabled,
+    // duplicated: `updateGoButton` disables it only when the roster cannot
+    // be dealt, never for a deal in progress. A second press mid-deal is
+    // superseded by `dealToken`, whichever button made it.
+    cannotDeal: () => goButton.disabled,
     refuseReason: () => refuse(t.staleRefuseBoard),
     // Design spec section 8: the reveal is animation, and the two ways a
     // teacher can already turn animation off both apply here. `#cg-speed`
@@ -1517,9 +1527,26 @@ if (form) {
     // it to `skip` -- one fact, read once, rather than two checks that
     // could disagree.
     animates: () => speedSelect.value !== 'skip',
+    // #743: opened before the first deal, the board waits with empty cards;
+    // closed without one, the page is left as it was (AC4).
+    onEnter: () => {
+      if (lastGroups === null) showWaiting();
+    },
+    onLeave: () => {
+      finishDealNow(); // #744: a deal still travelling lands at once
+      if (lastGroups !== null) return;
+      hideWaiting();
+      tables.textContent = '';
+      results.hidden = true;
+    },
   });
+  // #743 AC1: the board opens whenever the page's own Shuffle can run, to
+  // deal with the class watching, as well as once groups exist. It reads
+  // `goButton.disabled` itself, the fact `updateGoButton` alone writes.
   const refreshBoardAvailability = () =>
-    projector?.setAvailable(lastGroups !== null);
+    projector?.setAvailable(lastGroups !== null || !goButton.disabled);
+  onShuffleReadinessChanged = refreshBoardAvailability;
+  refreshBoardAvailability();
 
   const ioBody = $<HTMLElement>('cg-io-body');
   const io = ioBody
@@ -2162,10 +2189,85 @@ if (form) {
   //
   // Neither disables the button. Pressing "Shuffle again" during a deal
   // starts a new one from the top, which is what the button says it does.
+  // ── the waiting board (#743) ────────────────────────────────────────────
+  const waiting = $<HTMLElement>('cg-waiting')!;
+  const waitingList = $<HTMLUListElement>('cg-waiting-list')!;
+  const waitingError = $<HTMLParagraphElement>('cg-waiting-error')!;
+
+  /** Everyone the deal will place who is not already seated (#743). */
+  const waitingPool = (input: ReturnType<typeof dealInput>): Student[] => {
+    const pinned = new Set(input.pinned.flat().map((s) => s.number));
+    return (
+      typeof input.students === 'number'
+        ? Array.from({ length: input.students }, (_, i) =>
+            anonymousStudent(i + 1),
+          )
+        : input.students.filter((s) => !s.absent)
+    ).filter((s) => !pinned.has(s.number));
+  };
+
+  /** The waiting list, shown: every student in `pool`, numbered (#743). */
+  const showList = (pool: readonly Student[]) => {
+    waitingList.textContent = '';
+    for (const student of pool) {
+      const li = document.createElement('li');
+      li.className = 'waiting-student';
+      li.dataset.number = String(student.number);
+      const number = document.createElement('span');
+      number.className = 'number';
+      number.textContent = String(student.number);
+      li.appendChild(number);
+      const name = rosterNames.get(student.number);
+      if (name) {
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = name; // the untrusted value, set as TEXT
+        li.appendChild(who);
+      }
+      waitingList.appendChild(li);
+    }
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+    waiting.hidden = false;
+  };
+
+  /**
+   * A board opened before the first deal: the heading, one card per group
+   * the deal will make (`plannedGroups`, the deal's own code, so the count
+   * cannot disagree), and every student the deal will place, numbered, with
+   * the name beside the number where the roster has one. Rendered into
+   * `#cg-results` through the same `render` a deal uses: one element, one
+   * render path (AC2).
+   */
+  const showWaiting = () => {
+    const input = dealInput();
+    resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
+    render(plannedGroups(input) ?? []);
+    // A pinned member is already in place: nothing deals it in.
+    tables
+      .querySelectorAll('.student')
+      .forEach((c) => c.classList.add('dealt'));
+    showList(waitingPool(input));
+    results.hidden = false;
+    projector?.setShuffleLabel(t.makeGroups);
+  };
+
+  /** The waiting board is gone: by a deal, or by leaving without one. */
+  const hideWaiting = () => {
+    waiting.hidden = true;
+    waitingList.textContent = '';
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+  };
+
   let dealToken = 0;
   let dealSkip = false;
+  // #744: the travelling deal's way out. `finish` lands everyone now (a
+  // detail changed, or the board closed); `superseded` is a newer deal.
+  let travelling: AbortController | null = null;
   const finishDealNow = () => {
     dealSkip = true;
+    travelling?.abort('finish');
   };
 
   const animate = async (speed: string) => {
@@ -2202,13 +2304,12 @@ if (form) {
     sfx.done();
   };
 
-  // ── submit ──────────────────────────────────────────────────────────────
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    errorBox.hidden = true;
-
-    const mode = readMode();
-
+  /**
+   * What the deal is asked to group, read from the form: the ONE reading,
+   * shared by the deal and by the waiting board's plan (#743), so the cards
+   * shown before a shuffle are the cards the shuffle fills.
+   */
+  const dealInput = (): Omit<GroupingInput, 'random' | 'searchNodeCap'> => {
     const count = readCount();
     // The roster takes over the moment it is non-empty; `count` is the
     // fallback for the case where a teacher never opens Student details at
@@ -2228,17 +2329,76 @@ if (form) {
       roster.length > 0
         ? roster
         : studentsForInput(count, readNumberFields().fields);
-    const outcome = buildGroups({
+    return {
       students,
-      mode,
+      mode: readMode(),
       leftovers: readLeftovers(),
       sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
       pinned: [], // a later stage wires the pins
-      random: Math.random,
+    };
+  };
+
+  /** The board's travelling deal (#744): order, schedule, then the flights. */
+  const travelDeal = async (
+    groups: Student[][],
+    input: ReturnType<typeof dealInput>,
+  ) => {
+    ++dealToken; // a page deal still running stops, as a newer deal says
+    const pinned = new Set(input.pinned.flat().map((s) => s.number));
+    for (const row of tables.querySelectorAll<HTMLElement>('.student'))
+      if (pinned.has(Number(row.dataset.number))) row.classList.add('dealt');
+    const order = travelOrder(groups, pinned);
+    const schedule = travelSchedule(
+      order.length,
+      speedSelect.value === 'fast' ? 'fast' : 'normal',
+    );
+    if (!schedule) {
+      tables
+        .querySelectorAll('.student')
+        .forEach((c) => c.classList.add('dealt'));
+      hideWaiting();
+      projector?.refit();
+      return;
+    }
+    const controller = new AbortController();
+    travelling = controller;
+    sfx.shuffle();
+    const outcome = await travel({
+      list: waitingList,
+      tables,
+      order,
+      schedule,
+      signal: controller.signal,
+      hideList: hideWaiting,
+      refit: () => projector?.refit(),
+      onLand: (i) => sfx.land(i),
     });
+    if (travelling === controller) travelling = null;
+    if (outcome === 'dealt') sfx.done();
+  };
+
+  // ── submit ──────────────────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+
+    const input = dealInput();
+    const { students } = input;
+    const outcome = buildGroups({ ...input, random: Math.random });
 
     if (!outcome.ok) {
-      results.hidden = true;
+      // From the waiting board the cards and the list stay up, and the
+      // reason is said there as well as on the page (#743 AC5).
+      if (waiting.hidden) {
+        results.hidden = true;
+      } else {
+        waitingError.hidden = false;
+        waitingError.textContent = renderError(
+          outcome.error,
+          t,
+          resolveStudent,
+        );
+      }
       // The sheet is gone, so "Export groups" must go with it -- otherwise
       // it stays offering the arrangement from before the refusal, which is
       // not on screen any more.
@@ -2264,6 +2424,16 @@ if (form) {
     }
 
     const { groups, warnings } = outcome.result;
+    // #744: on the board with animation on, the deal travels from the list,
+    // so the list is (re)shown for it; ruling 2 brings everyone back to it
+    // on a second Shuffle too. Anywhere else the list goes, as before.
+    const travels =
+      (projector?.isOpen() ?? false) && speedSelect.value !== 'skip';
+    travelling?.abort('superseded');
+    travelling = null;
+    if (travels) showList(waitingPool(input));
+    else hideWaiting();
+    projector?.setShuffleLabel(t.boardShuffle);
     // What the sheet is showing, for "Export groups" -- see `lastGroups`'s
     // own comment where it is declared.
     lastGroups = groups;
@@ -2370,7 +2540,8 @@ if (form) {
     updateStaleness();
 
     try {
-      await animate(speedSelect.value);
+      if (travels) await travelDeal(groups, input);
+      else await animate(speedSelect.value);
     } finally {
       // The deal no longer disables this button at all (see `animate`), so
       // this is not an "undo the disable" step — it re-derives the button's

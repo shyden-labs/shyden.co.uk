@@ -57,6 +57,7 @@ import { adb, androidAbsence } from './adb.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
@@ -66,6 +67,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -88,6 +90,18 @@ export const REPORT_FILES = {
   android: path.join(TEST_RESULTS_DIR, 'android-report.json'),
   ios: path.join(TEST_RESULTS_DIR, 'ios-report.json'),
 };
+
+/**
+ * Where the iOS group's Vitest report is copied for the evidence page, or
+ * `null` when the run asked for no evidence (#354). The page builder reads
+ * `vitest-report.json` from the evidence directory, as it reads Playwright's
+ * `report.json` from an e2e evidence run.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+export const iosEvidenceReportOf = (env) =>
+  env.EVIDENCE_DIR ? path.join(env.EVIDENCE_DIR, VITEST_EVIDENCE_REPORT) : null;
 
 // ── the live dashboard (task 6) ─────────────────────────────────────────
 //
@@ -725,12 +739,14 @@ function countAt(report, at, description) {
 
 /**
  * The one rule both kinds of group are judged by: the process and the report
- * must both say it passed, and something must have passed. A group in which
- * nothing passed measured nothing, whatever its exit code says (#390).
+ * must both say it passed, nothing may have passed only on a retry, and
+ * something must have passed. A group in which nothing passed measured
+ * nothing, whatever its exit code says (#390). A retry is not a fix: a test
+ * that failed and then passed is a failure the run hid, not a pass (#502).
  *
  * @param {{ name: string, code: number | null, passed: number, failed: number,
  *   skippedByDesign: number, reportSaysOk: boolean, reportSays: string,
- *   failures: string }} counts
+ *   failures: string, retried?: number }} counts
  */
 function judged({
   name,
@@ -741,6 +757,7 @@ function judged({
   reportSaysOk,
   reportSays,
   failures,
+  retried = 0,
 }) {
   const processSaysOk = code === 0;
   const reason =
@@ -749,9 +766,11 @@ function judged({
         'as failed either way, since these should never disagree'
       : !processSaysOk
         ? `${failures} (process exit code ${code})`
-        : passed === 0
-          ? 'no test passed, so this group proved nothing -- a run that measured nothing is not a pass'
-          : undefined;
+        : retried > 0
+          ? `${retried} test(s) passed only on a retry -- a retry is not a fix, so this group is failed`
+          : passed === 0
+            ? 'no test passed, so this group proved nothing -- a run that measured nothing is not a pass'
+            : undefined;
   return {
     name,
     status: reason === undefined ? 'passed' : 'failed',
@@ -798,17 +817,21 @@ export function playwrightVerdict({
   const description = `${name}'s Playwright report`;
   /** @param {string} key */
   const count = (key) => countAt(report, ['stats', key], description);
-  const passed = count('expected') + count('flaky');
-  const failed = count('unexpected');
+  // `flaky` is Playwright's word for a test that failed and then passed on a
+  // retry, with the run still exiting 0: counted with the failures (#502).
+  const passed = count('expected');
+  const retried = count('flaky');
+  const unexpected = count('unexpected');
   return judged({
     name,
     code,
     passed,
-    failed,
+    failed: unexpected + retried,
     skippedByDesign: count('skipped') + extraSkipped,
-    reportSaysOk: failed === 0,
-    reportSays: `${failed} failed`,
-    failures: `${failed} test(s) failed`,
+    reportSaysOk: unexpected === 0,
+    reportSays: `${unexpected} failed`,
+    failures: `${unexpected} test(s) failed`,
+    retried,
   });
 }
 
@@ -1048,6 +1071,11 @@ async function runIosGroup() {
     },
   );
   const durationMs = Date.now() - startedAt;
+  // An evidence run leaves the page builder this group's report beside its
+  // captures (#354). A report never written is already a failed group below.
+  const evidenceReport = iosEvidenceReportOf(process.env);
+  if (evidenceReport && existsSync(reportFile))
+    copyFileSync(reportFile, evidenceReport);
 
   const modeInfo = existsSync(IOS_MODE_FILE)
     ? readJson(IOS_MODE_FILE, "iOS's interaction-mode artifact")

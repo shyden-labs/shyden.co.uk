@@ -19,16 +19,24 @@ name: CI
 # Widening costs nothing on the merge path: a PR into develop or main already
 # ran exactly one run, and a stacked PR had none to add to. Which checks BLOCK
 # a merge still lives where it belongs, in `required_status_checks.contexts`,
-# and `tests/unit/pipeline-wiring.test.ts` pins the job name that list matches.
+# and `tests/guards/pipeline-wiring.test.ts` pins the job name that list matches.
 #
 # `pull_request`, never `pull_request_target`: a fork PR must not see secrets.
 #
 # `workflow_call` is the one other trigger, and it is not a push: it is how
 # deploy-dev.yml's dispatch path runs THIS suite on a branch that has no pull
 # request, rather than a copy of it that could drift (#163).
+#
+# `workflow_dispatch` is the other, and it exists for one reason: a commit
+# pushed with a workflow's own `GITHUB_TOKEN` starts no run, so the commit the
+# floor recorder makes (`record-floors.yml`, #651) would sit on a branch with
+# no checks. The recorder dispatches this workflow on the branch afterwards,
+# and the dispatched run's checks attach to the new head, which is what branch
+# protection reads by name.
 on:
   pull_request:
   workflow_call:
+  workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
 # that could no longer merge. The key names this workflow, because every
@@ -61,7 +69,7 @@ concurrency:
 # AC2) -- and so is build-and-test's download of this run's own artifacts.
 #
 # Changing the repository default is administration, and so the operator's.
-# `tests/unit/pipeline-wiring.test.ts` derives this rule from the filesystem,
+# `tests/guards/pipeline-wiring.test.ts` derives this rule from the filesystem,
 # so a workflow added later is covered the day it appears rather than the day
 # someone remembers (#24, #49, #80).
 permissions:
@@ -105,6 +113,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.verdict.outputs.docs_only }}
+      capture: ${{ steps.verdict.outputs.capture }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,7 +142,7 @@ jobs:
     # read` is restated beside it; labels live under the issues scope, which
     # is what `issues: read` buys. deploy-dev.yml's dispatch path calls this
     # workflow and must grant the same, since a called workflow's token can
-    # only be narrowed (tests/unit/pipeline-wiring.test.ts).
+    # only be narrowed (tests/guards/pipeline-wiring.test.ts).
     permissions:
       contents: read
       issues: read
@@ -162,10 +171,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       # Every guard that reads the whole tree (#638). One limit, measured, on the command
-      # itself (tests/unit/guards-budget.test.ts).
+      # itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:guards
+      # Every real run of the engine over many seeded inputs (#650); the unit
+      # suite keeps a stand-in of each. One limit, measured, on the command
+      # itself (tests/unit/suite-budgets.test.ts).
+      - run: npm run test:simulation
       # Every test that starts a process (#630). The unit suite starts none.
-      # One limit, measured, on the command itself (tests/unit/integration-budget.test.ts).
+      # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
@@ -184,7 +197,7 @@ jobs:
     # that every shard was skipped rather than adding up accounts.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The e2e policy, restated per shard: tests/unit/pipeline-wiring.test.ts
+    # The e2e policy, restated per shard: tests/guards/pipeline-wiring.test.ts
     # pins it and fails if any job running the suite carries another.
     timeout-minutes: 20
     # The pinned Playwright image (#431): browsers and their system packages
@@ -254,6 +267,81 @@ jobs:
           # `warn`, never `ignore`: `ignore` is the one value that lets this
           # step go GREEN having preserved nothing, and this step IS the
           # evidence path for a red run (#131).
+          if-no-files-found: warn
+
+  # Every case the release page cites takes its picture (#774; operator ruling
+  # 2026-10-14). The release capture runs once, on the laptop, as the release's
+  # last gate, and a cited case whose shoot() is conditional runs, passes and
+  # captures nothing: v4 found 64 of them only when the page was built (#765).
+  # So a pull request that can move a picture runs the same selection here,
+  # with EVIDENCE_DIR set, and capture-coverage.mjs names every passed case, on
+  # every engine, that took no picture in this run. The scope job decides
+  # which pull requests can (scripts/capture-scope.mjs): the capture runs
+  # unless every changed path is outside what it reads, so the four heavy
+  # shards are paid for only by a change they could catch. build-and-test
+  # takes a skip only where scope said so. Sharded and contained like e2e,
+  # under the same budget, but it writes no account: build-and-test adds up
+  # the e2e shards alone, and this selection is a part of what they ran.
+  capture:
+    name: capture shard ${{ matrix.shard }} of ${{ strategy.job-total }}
+    needs: [image, scope]
+    if: needs.scope.outputs.capture == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The selection is read into a variable first: an assignment stops the
+      # step when the inventory fails, where `$(...)` inside the command would
+      # hand Playwright no test ids and run the WHOLE suite under capture.
+      - run: |
+          tests=$(node scripts/release-inventory.mjs --tests)
+          test -n "$tests"
+          npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $tests
+        # Each shard counts the SELECTION it was handed, not the whole suite,
+        # and writes down what it ran, for build-and-test to add up exactly as
+        # it adds up the e2e shards (scripts/e2e-shards.mjs, #774).
+        env:
+          EVIDENCE_DIR: capture-evidence
+          E2E_ENUMERATE: selection
+          E2E_ACCOUNT_DIR: capture-accounts
+      # Judged even when a case failed, so one run names every case with no
+      # picture; a failed case itself is the e2e suite's to judge.
+      - if: ${{ !cancelled() }}
+        run: node scripts/capture-coverage.mjs capture-evidence
+      # Whatever the shard's outcome, and an empty upload is an ERROR, as for
+      # the e2e shards: a shard that wrote no account has nothing to add up.
+      - name: Keep this capture shard's account for build-and-test
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: capture-account-${{ matrix.shard }}
+          path: capture-accounts
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: error
+      - name: Keep this shard's report and manifest
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: capture-coverage-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
+          path: |
+            capture-evidence/report.json
+            capture-evidence/manifest.jsonl
+          retention-days: 14
           if-no-files-found: warn
 
   # The deployed-site suites, against this pull request's own build (#335).
@@ -350,7 +438,7 @@ jobs:
   # what it meant when it ran the suite itself: every step ran, and the whole
   # suite ran. It runs none of that now. It stands for the jobs that do.
   build-and-test:
-    needs: [image, scope, checks, e2e, sanity-on-build, functions]
+    needs: [image, scope, checks, e2e, capture, sanity-on-build, functions]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read
     # green exactly when a shard failed or was skipped (#157). It runs always,
@@ -374,9 +462,19 @@ jobs:
           pattern: e2e-account-*
           merge-multiple: true
           path: e2e-accounts
+      # Only where the capture ran; elsewhere its glob stays the literal
+      # pattern, and any account that does exist is refused by name (#774).
+      - name: Collect every capture shard's account
+        if: needs.scope.outputs.capture == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: capture-account-*
+          merge-multiple: true
+          path: capture-accounts
       # Every job it needs SUCCEEDED -- skipped and cancelled refused like
       # failure -- and the shards' accounts add up to the suite each of them
-      # enumerated (scripts/e2e-shards.mjs). Run even when the download above
+      # enumerated, the capture shards' to the selection they were handed
+      # (scripts/e2e-shards.mjs, #774). Run even when a download above
       # failed, so the refusal names what is missing. The verdict is handed
       # the glob's FILES and lists no directory: a glob matching nothing stays
       # the literal pattern, which it refuses by name. `needs` arrives as an
@@ -386,7 +484,7 @@ jobs:
         if: always()
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
-        run: node scripts/e2e-shards.mjs e2e-accounts/*.json
+        run: node scripts/e2e-shards.mjs e2e-accounts/*.json --capture capture-accounts/*.json
 
   # The visual-regression suite, in the SAME pinned image the baselines are
   # captured in (#33). Not a tidiness choice: a bare `ubuntu-latest` runner
@@ -396,7 +494,7 @@ jobs:
   # anything.
   #
   # `image` tracks the `@playwright/test` version in package.json, and
-  # `tests/unit/browser-matrix.test.ts` fails if the two drift apart -- a
+  # `tests/guards/browser-matrix.test.ts` fails if the two drift apart -- a
   # library and a browser bundle from different releases is the one mismatch
   # this job cannot report clearly.
   #

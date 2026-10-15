@@ -28,10 +28,16 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { isAbsolute, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { die, messageOf } from './errors.mjs';
-import { EVIDENCE_MANIFEST, EVIDENCE_REPORT } from './evidence-files.mjs';
+import {
+  EVIDENCE_MANIFEST,
+  EVIDENCE_REPORT,
+  VITEST_EVIDENCE_REPORT,
+} from './evidence-files.mjs';
+import { playwrightShapeOfVitest } from './vitest-evidence.mjs';
 import { signOffOf, standingOf } from './evidence-signoff.mjs';
 
 /**
@@ -107,6 +113,47 @@ export const flattenReport = (report) => {
   // Each top-level entry is a FILE; its children are the describes.
   for (const suite of report.suites || []) walk(suite, [], suite.file);
   return out;
+};
+
+/**
+ * The projects that capture stills and can record no video: the real-device
+ * iOS leg drives Safari over WebDriver, which offers screenshots only (#354).
+ * Their journeys read "no recording for this leg", because "not recorded by
+ * policy" would claim a choice nobody made.
+ */
+export const STILLS_ONLY_PROJECTS = new Set(['ios-safari-real-device']);
+
+/**
+ * The run report an evidence directory holds, read as Playwright's (#354). A
+ * Playwright run leaves `report.json`; a real-device iOS run leaves Vitest's
+ * `vitest-report.json`, read through `playwrightShapeOfVitest`. Exactly one
+ * must be there: neither is a directory no run wrote, and both is one whose
+ * page would describe whichever run was picked.
+ *
+ * @param {{ dir: string, root: string, exists: (file: string) => boolean,
+ *   read: (file: string, what: string) => unknown }} io
+ * @returns {any}
+ */
+export const evidenceReportOf = ({ dir, root, exists, read }) => {
+  const playwright = join(dir, EVIDENCE_REPORT);
+  const vitest = join(dir, VITEST_EVIDENCE_REPORT);
+  const hasPlaywright = exists(playwright);
+  const hasVitest = exists(vitest);
+  if (hasPlaywright && hasVitest)
+    throw new Error(
+      `build-evidence-page: ${dir} holds both ${EVIDENCE_REPORT} and ` +
+        `${VITEST_EVIDENCE_REPORT}; refusing to choose which run the page describes`,
+    );
+  if (hasPlaywright) return read(playwright, 'the evidence report');
+  if (hasVitest)
+    return playwrightShapeOfVitest(
+      read(vitest, 'the real-device iOS evidence report'),
+      { project: 'ios-safari-real-device', root },
+    );
+  throw new Error(
+    `build-evidence-page: ${dir} holds neither ${EVIDENCE_REPORT} (Playwright) ` +
+      `nor ${VITEST_EVIDENCE_REPORT} (Vitest), so there is no run to describe`,
+  );
 };
 
 /** An instant exactly as `Date.prototype.toISOString` writes one. */
@@ -701,6 +748,8 @@ export const renderEvidencePage = ({
     // the two cases are only distinguishable through the key.
     if (!specEntryOf.has(title)) return 'no test result';
     const entry = specEntryOf.get(title);
+    if (entry !== undefined && STILLS_ONLY_PROJECTS.has(entry.project))
+      return 'no recording for this leg';
     return entry !== undefined &&
       entry.file !== undefined &&
       recordingBlocks.has(blockKey(entry))
@@ -1552,8 +1601,14 @@ const build = ({
   planning,
   assetsPath,
 }) => {
-  const reportFile = join(dir, EVIDENCE_REPORT);
-  const report = jsonAt(reportFile, 'the evidence report');
+  const report = evidenceReportOf({
+    dir,
+    // The repository, as this script sits in it: a Vitest report names its
+    // files absolutely, and the page names them relative to the repository.
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    exists: existsSync,
+    read: jsonAt,
+  });
   // Before any capture is read: an earlier run's rows are set aside here, so a
   // capture of theirs that has gone since is never reached for. Blank lines are
   // skipped, never removed first, so a refusal names the line an editor shows.
@@ -1693,5 +1748,5 @@ const build = ({
 // Only when run, never when imported: the tests import the functions above.
 // Node answers "was I run directly?" itself. Comparing `import.meta.url` with
 // the raw path skipped the build, in silence, from any checkout whose path held
-// a space (#221, `tests/unit/script-entry.test.ts`).
+// a space (#221, `tests/guards/script-entry.test.ts`).
 if (import.meta.main) main();

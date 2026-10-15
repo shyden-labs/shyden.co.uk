@@ -12,6 +12,7 @@ import {
   leakedSessionOf,
   once,
   playwrightVerdict,
+  iosEvidenceReportOf,
   vitestVerdict,
   waitUntil,
 } from '../../scripts/test-devices.mjs';
@@ -99,7 +100,23 @@ describe('waitUntil: the timeout bounds the whole wait', () => {
 
 /** A Playwright JSON report's `stats`, clean unless a count is given. */
 const stats = (counts: Partial<Record<string, unknown>> = {}) => ({
-  stats: { expected: 40, flaky: 2, unexpected: 0, skipped: 5, ...counts },
+  stats: { expected: 40, flaky: 0, unexpected: 0, skipped: 5, ...counts },
+});
+
+describe('iosEvidenceReportOf: where the iOS report goes for the evidence page (#354)', () => {
+  it('names vitest-report.json inside the evidence directory', () => {
+    expect(iosEvidenceReportOf({ EVIDENCE_DIR: '/runs/ios' })).toBe(
+      '/runs/ios/vitest-report.json',
+    );
+  });
+
+  it('names nothing when the run asked for no evidence', () => {
+    expect(iosEvidenceReportOf({})).toBeNull();
+  });
+
+  it('names nothing for an empty evidence directory', () => {
+    expect(iosEvidenceReportOf({ EVIDENCE_DIR: '' })).toBeNull();
+  });
 });
 
 describe('playwrightVerdict: what a Playwright group proved', () => {
@@ -113,11 +130,11 @@ describe('playwrightVerdict: what a Playwright group proved', () => {
       extraSkipped,
     });
 
-  it('passes a clean report from a clean exit, flaky passes counted as passes', () => {
+  it('passes a clean report from a clean exit', () => {
     expect(judge(0, stats(), 7)).toEqual({
       name: 'desktop',
       status: 'passed',
-      passed: 42,
+      passed: 40,
       failed: 0,
       skippedByDesign: 12,
       reason: undefined,
@@ -149,6 +166,29 @@ describe('playwrightVerdict: what a Playwright group proved', () => {
       status: 'failed',
       reason:
         'disagreement: process exit code 0 but the report says 1 failed -- treated as failed either way, since these should never disagree',
+    });
+  });
+
+  // #502: Playwright calls a test `flaky` when it failed and then passed on a
+  // retry, and exits 0. A retry is not a fix, so the group is failed, and the
+  // test is counted with the failures rather than the passes.
+  it('fails a test that passed only on a retry, from a clean exit', () => {
+    expect(judge(0, stats({ flaky: 1 }))).toEqual({
+      name: 'desktop',
+      status: 'failed',
+      passed: 40,
+      failed: 1,
+      skippedByDesign: 5,
+      reason:
+        '1 test(s) passed only on a retry -- a retry is not a fix, so this group is failed',
+    });
+  });
+
+  it('names the failures before the retries when a group has both', () => {
+    expect(judge(1, stats({ unexpected: 2, flaky: 3 }))).toMatchObject({
+      status: 'failed',
+      failed: 5,
+      reason: '2 test(s) failed (process exit code 1)',
     });
   });
 
@@ -187,6 +227,7 @@ describe('playwrightVerdict: what a Playwright group proved', () => {
     ],
     ['a count written as text', { expected: '40' }, 'stats.expected', '"40"'],
     ['a fractional count', { flaky: 1.5 }, 'stats.flaky', '1.5'],
+    ['a missing retry count', { flaky: undefined }, 'stats.flaky', 'undefined'],
     ['a negative count', { skipped: -1 }, 'stats.skipped', '-1'],
   ])('refuses %s, naming the field', (_, counts, field, got) => {
     expect(() => judge(0, stats(counts))).toThrow(

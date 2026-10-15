@@ -12,7 +12,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
  *
  * The boundary is mechanical, not editorial -- a spec is content-only exactly
  * when it neither drives the viewport nor reads layout -- so it is enforced
- * rather than trusted: tests/unit/browser-matrix.test.ts fails if anything
+ * rather than trusted: tests/guards/browser-matrix.test.ts fails if anything
  * listed here does either (`tests/unit/engine-dependence.ts` names what counts
  * and reads it from the parse tree, never from comments), if a name here stops
  * matching a real file, or if any engine project stops ignoring these.
@@ -66,7 +66,7 @@ const visualOnly = /(?:^|\/)visual\.spec\.ts$/;
 /**
  * One engine, one set of baselines -- and OPT-IN, behind `VISUAL=1`.
  *
- * Exported so `tests/unit/browser-matrix.test.ts` can pin its shape without
+ * Exported so `tests/guards/browser-matrix.test.ts` can pin its shape without
  * the env var set, and conditional so the ordinary `npm run test:e2e` run is
  * unchanged: a bare GitHub runner and the pinned container render text
  * differently, and comparing container-made baselines on a bare runner fails

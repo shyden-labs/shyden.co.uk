@@ -118,14 +118,22 @@ const SUITE_FLAGS = new Set(['--config', '-c']);
  * run executes, so the two would always agree and this guard could never fire
  * again — while still being present, still passing, and asserting nothing.
  *
+ * `selection` forwards the run's test ids as well, and no flag: a capture
+ * shard (#774) is held, with its sibling shards, to the selection it was
+ * handed, which only `enumerationMode` grants, and only to a sharded run.
+ *
  *  @param {readonly string[]} argv
+ *  @param {{ selection?: boolean }} [options]
  */
-export function enumerationArgs(argv = []) {
+export function enumerationArgs(argv = [], { selection = false } = {}) {
   const forwarded = [];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (!arg.startsWith('-')) continue;
+    if (!arg.startsWith('-')) {
+      if (selection) forwarded.push(arg);
+      continue;
+    }
     const name = arg.split('=')[0];
 
     if (SUITE_FLAGS.has(name)) {
@@ -161,17 +169,44 @@ export const LIST_MAX_BUFFER = 256 * 1024 * 1024;
  */
 
 /**
- * The unfiltered `playwright test --list` this run is reconciled against.
+ * The unfiltered `playwright test --list` this run is reconciled against, or,
+ * for a capture shard, the list of the selection it was handed (#774).
  *
  * @param {readonly string[]} argv
  * @param {Spawn} spawn
+ * @param {{ selection?: boolean }} [options]
  */
-export function listSuite(argv = [], spawn = spawnSync) {
+export function listSuite(argv = [], spawn = spawnSync, options = {}) {
   return spawn(
     'npx',
-    ['playwright', 'test', '--list', ...enumerationArgs(argv)],
+    ['playwright', 'test', '--list', ...enumerationArgs(argv, options)],
     { encoding: 'utf8', maxBuffer: LIST_MAX_BUFFER },
   );
+}
+
+/**
+ * What a run is counted against: the whole suite, or, where `E2E_ENUMERATE`
+ * says `selection`, the selection it was handed (#774). The selection is
+ * granted only to a shard, where build-and-test adds the shards up to it; on
+ * one unsharded run it would restate exactly what ran, and assert nothing.
+ *
+ * @param {readonly string[]} argv
+ * @param {Readonly<Record<string, string | undefined>>} env
+ * @returns {'suite' | 'selection'}
+ */
+export function enumerationMode(argv, env) {
+  const asked = env.E2E_ENUMERATE;
+  if (asked === undefined) return 'suite';
+  if (asked !== 'selection')
+    throw new Error(
+      `E2E_ENUMERATE must be unset or "selection", not ${JSON.stringify(asked)}`,
+    );
+  if (shardOf(argv) === null)
+    throw new Error(
+      'E2E_ENUMERATE=selection is refused on an unsharded run: counted ' +
+        'against its own selection, a run can only agree with itself',
+    );
+  return 'selection';
 }
 
 /**
@@ -468,8 +503,10 @@ function main() {
   const filtered = isFilteredRun(argv);
   const { passthrough, reporter } = mergeReporters(argv);
 
-  // Same suite, no filters: this is the number the run has to answer to.
-  const listing = listSuite(argv);
+  // Same suite, no filters: this is the number the run has to answer to. A
+  // capture shard answers to its selection instead, summed in build-and-test.
+  const selection = enumerationMode(argv, process.env) === 'selection';
+  const listing = listSuite(argv, spawnSync, { selection });
   const enumerated = parseListTotal(listing.stdout);
 
   const {
@@ -924,5 +961,5 @@ export function resultsByProject(report) {
 // Only when run, never when imported: the unit tests import the functions
 // above. Comparing `process.argv[1]` with this file's path skipped the whole
 // run, exit 0, from a checkout reached through a symlink (#221,
-// `tests/unit/script-entry.test.ts`).
+// `tests/guards/script-entry.test.ts`).
 if (import.meta.main) main();

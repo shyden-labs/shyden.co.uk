@@ -125,7 +125,16 @@ describe('a message is sent as the sentences it can say', () => {
     expect(
       translationUnits('{n, plural, one {# group} other {# groups}}'),
     ).toEqual(['{n} groups']);
-    expect(translationUnits('#')).toEqual([]);
+    const symbols = [{ case: 'a bare symbol', text: '#' }];
+    expect(
+      searched(
+        symbols.flatMap(({ text }) => translationUnits(text)),
+        { of: symbols, what: 'symbols handed to translationUnits' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('translate-messages/symbol-inputs', symbols.length),
+    ).toBeUndefined();
   });
 
   it('sends no syntax for any real English message', () => {
