@@ -1,18 +1,18 @@
 ---
-import GloryPointsPage from '../../components/pages/GloryPointsPage.astro';
+import YeetalkCalculatorsPage from '../../components/pages/YeetalkCalculatorsPage.astro';
 import { PREFIXED_LOCALES } from '../../lib/i18n';
 
 /**
  * The Glory Points calculator for every locale that carries a prefix.
  *
  * One route, not a file per language. This used to be
- * `src/pages/id/glory-points.astro`, a two-line wrapper that had to be copied for
+ * `src/pages/id/yeetalk-calculators.astro`, a two-line wrapper that had to be copied for
  * every new locale — and forgetting one 404s that page in that language with
  * nothing in the suite to say so. #21 Stage 4 replaced the directory with
  * this, so adding `zh` to LOCALES adds the route.
  *
  * The default locale is served WITHOUT a prefix and keeps its own route at
- * `src/pages/glory-points.astro`; `PREFIXED_LOCALES` is LOCALES minus that one, so
+ * `src/pages/yeetalk-calculators.astro`; `PREFIXED_LOCALES` is LOCALES minus that one, so
  * the two can never both claim the same URL.
  *
  * The locale rides on `props` as well as `params`: `Astro.params` is
@@ -30,4 +30,4 @@ export function getStaticPaths() {
 const { locale } = Astro.props;
 ---
 
-<GloryPointsPage lang={locale} />
+<YeetalkCalculatorsPage lang={locale} />

@@ -320,7 +320,7 @@ const SITE_PAGES: Record<keyof SiteStrings, string> = {
   language: CHROME,
   report: CHROME,
   home: '/',
-  glory: '/glory-points',
+  calculators: '/yeetalk-calculators',
   notFound: 'the 404 page',
 };
 

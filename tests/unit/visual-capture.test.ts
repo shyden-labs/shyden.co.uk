@@ -191,7 +191,7 @@ describe('captureSummary names every page committed and every page kept', () => 
         commit: [
           { file: png('home-en'), differing: 5148 },
           { file: png('home-th'), differing: 'new' },
-          { file: png('glory-points'), differing: 'size' },
+          { file: png('yeetalk-calculators'), differing: 'size' },
         ],
         kept: [{ file: png('not-found'), differing: 17 }],
       }),
@@ -200,7 +200,7 @@ describe('captureSummary names every page committed and every page kept', () => 
         '3 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
         `- \`${png('home-en')}\`: 5148 pixels differ`,
         `- \`${png('home-th')}\`: new`,
-        `- \`${png('glory-points')}\`: size changed`,
+        `- \`${png('yeetalk-calculators')}\`: size changed`,
         '1 rewrite kept out (60 pixels or fewer differ):',
         `- \`${png('not-found')}\`: 17 pixels differ`,
       ].join('\n'),

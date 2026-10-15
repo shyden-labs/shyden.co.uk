@@ -20,7 +20,7 @@ test('robots.txt references the sitemap', async ({ request }) => {
 
 // The 404 page is a real, user-reachable page (broken links, typos, shared bad
 // URLs — disproportionately on mobile), so it carries the same no-horizontal-
-// scroll guarantee as every other page (cf. homepage.spec.ts / glory-points.spec.ts).
+// scroll guarantee as every other page (cf. homepage.spec.ts / yeetalk-calculators.spec.ts).
 test.describe('404 page — mobile-first layout', () => {
   for (const width of [320, 375, 768, 1280]) {
     test(

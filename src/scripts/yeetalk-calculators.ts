@@ -18,7 +18,7 @@ import { enhanceReportForm } from './report-form';
 // meant; this was a sixth, in a runtime script rather than a component. #110.
 const declared = document.documentElement.lang;
 const lang = isLocale(declared) ? declared : DEFAULT_LOCALE;
-const t = getSiteStrings(lang).glory;
+const t = getSiteStrings(lang).calculators;
 const LOCALISED_ERROR = new Map<string, string>([
   [ERRORS.empty, t.errors.empty],
   [ERRORS.notWhole, t.errors.notWhole],
@@ -41,7 +41,7 @@ function run(): void {
   }
   error.textContent = '';
   const { coinsNeeded, beansNeeded, totalGiftValue } = outcome.result;
-  result.textContent = t.resultLine(
+  result.textContent = t.glory.resultLine(
     formatNumber(coinsNeeded, lang),
     formatNumber(beansNeeded, lang),
     formatNumber(totalGiftValue, lang),

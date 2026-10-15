@@ -38,7 +38,7 @@ paths:
                   description: Which page the quote is from.
                   enum:
                     - home
-                    - glory-points
+                    - yeetalk-calculators
                     - classroom-groups
                     - not-found
                 quote:
