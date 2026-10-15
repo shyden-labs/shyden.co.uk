@@ -7,23 +7,13 @@ info:
     line they think is wrong, and may suggest a better one. The request is a
     plain HTML form post. A browser without JavaScript gets a 303 back to the
     page it came from, with the outcome in the fragment; a client that sends
-    `Accept: application/json` gets the outcome as JSON instead.
+    `Accept: application/json` gets the outcome as JSON instead (here, the
+    responses' media type, which sets that header).
 paths:
   /api/report:
     post:
       summary: Report a translation
       operationId: report
-      parameters:
-        - name: Accept
-          in: header
-          required: false
-          description: >-
-            `application/json` for a JSON outcome; anything else, or nothing,
-            for the form mode's 303.
-          schema:
-            type: string
-            examples:
-              - application/json
       requestBody:
         required: true
         content:

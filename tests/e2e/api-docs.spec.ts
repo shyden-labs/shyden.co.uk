@@ -20,20 +20,50 @@ const THEMES = ['light', 'dark'] as const;
 const floorName = (path: string): string =>
   path === '/api/docs/' ? 'public' : path.replace(/^\/api\/docs\/|\/$/g, '');
 
-/** Opens every operation and its Try it out, as a visitor exploring would. */
+/**
+ * Opens every operation and its Try it out, then sends each, as a visitor
+ * exploring would. A preview of dist/ runs no Pages Function, so the API's
+ * answer is a stand-in: the response view is what is measured, not the API.
+ */
 const openEverything = async (page: Page) => {
+  await page.route(
+    (url) => url.pathname.startsWith('/api/report'),
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json; charset=utf-8',
+        body: '{"outcome":"sent"}',
+      }),
+  );
   const operations = page.locator('#swagger .opblock');
   await expect(operations.first()).toBeVisible();
+  // Each step waits for an exact count before it acts: Swagger UI draws an
+  // operation's body a moment after the click, and a list read too early is
+  // empty, which would measure a collapsed page and pass.
+  const count = await operations.count();
   // runtime population: the operations Swagger UI drew from the spec.
   for (const summary of await page
-    .locator('#swagger .opblock:not(.is-open) .opblock-summary-control')
+    .locator('#swagger .opblock-summary-control')
     .all())
     await summary.click();
-  // runtime population: the Try it out buttons the open operations show.
-  for (const tryIt of await page
-    .locator('#swagger .try-out__btn:not(.cancel)')
+  await expect(page.locator('#swagger .opblock.is-open')).toHaveCount(count);
+  const tryOuts = page.locator('#swagger .try-out__btn');
+  await expect(tryOuts).toHaveCount(count);
+  // runtime population: one Try it out per open operation.
+  for (const tryIt of await tryOuts.all()) await tryIt.click();
+  const executes = page.locator('#swagger .btn.execute');
+  await expect(executes).toHaveCount(count);
+  // runtime population: the text fields Try it out showed; a required one
+  // left empty stops Swagger UI sending at all.
+  for (const field of await page
+    .locator('#swagger .opblock-body input[type="text"]')
     .all())
-    await tryIt.click();
+    if ((await field.inputValue()) === '') await field.fill('x');
+  // runtime population: one Execute per operation.
+  for (const execute of await executes.all()) await execute.click();
+  await expect(
+    page.locator('#swagger .live-responses-table .response'),
+  ).toHaveCount(count);
 };
 
 /** Every visible element in the mount that holds text of its own, with the ratio WCAG asks of it. */

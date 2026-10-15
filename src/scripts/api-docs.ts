@@ -1,5 +1,5 @@
 import bundleUrl from 'swagger-ui-dist/swagger-ui-bundle.js?url';
-import { submitMethods } from '../lib/api-docs';
+import { askForJson, submitMethods, type DocsRequest } from '../lib/api-docs';
 
 /**
  * #781. Mounts Swagger UI on a docs page from the spec the page carries in
@@ -18,6 +18,7 @@ interface SwaggerUIOptions {
   readonly deepLinking: boolean;
   readonly supportedSubmitMethods: readonly string[];
   readonly syntaxHighlight: { readonly activated: boolean };
+  readonly requestInterceptor: (request: DocsRequest) => DocsRequest;
 }
 
 declare global {
@@ -51,5 +52,6 @@ if (mount) {
     supportedSubmitMethods: submitMethods(location.hostname),
     // The highlighter colours code with inline styles no stylesheet can reach.
     syntaxHighlight: { activated: false },
+    requestInterceptor: askForJson,
   });
 }

@@ -176,3 +176,10 @@
   background: var(--glass);
   color: var(--ink);
 }
+
+/* After an execute, Try it out shows Cancel and Reset side by side: they wrap. */
+#swagger .opblock-section-header,
+#swagger .try-out {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

@@ -9,7 +9,7 @@ import {
 } from '../../src/lib/i18n/index';
 import { expectReportsBound } from '../report-health';
 import { expectedBadges } from '../beta-badges';
-import { deployedRoutes } from '../site-pages';
+import { deployedRoutes, docsPaths } from '../site-pages';
 import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectTheSwitchPersists } from '../themes';
 import { robotsDirectives } from '../robots-directives';
@@ -282,5 +282,40 @@ test(
       (url) => url.pathname === home && url.hash === '#report-sent',
     );
     await expect(page.locator('#report-sent')).toBeVisible();
+  },
+);
+
+// #781: the API docs, public and private; dev's own gate covers both.
+for (const path of docsPaths())
+  test(`the API docs at ${path} render on dev`, async ({ page }) => {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('#swagger .opblock').first()).toBeVisible();
+  });
+
+test(
+  "Try it out sends the report form from dev's docs, and dev answers sent",
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'POST /api/report is a Pages Function, and a preview of dist/ runs no Pages Function',
+    },
+  },
+  async ({ page }) => {
+    await page.goto('/api/docs/');
+    await page.locator('#swagger .opblock-summary-control').first().click();
+    await page.locator('#swagger .try-out__btn').click();
+    await page.getByPlaceholder('quote', { exact: true }).fill('x');
+    // The honeypot: dev answers sent and stores nothing.
+    await page.getByPlaceholder('website', { exact: true }).fill('a bot');
+    await page.locator('#swagger .btn.execute').click();
+    const live = page.locator('#swagger .live-responses-table .response');
+    await expect(live).toHaveCount(1);
+    await expect(live.locator('.response-col_status')).toHaveText('200');
+    await expect(live.locator('.response-col_description')).toContainText(
+      '"outcome": "sent"',
+    );
   },
 );
