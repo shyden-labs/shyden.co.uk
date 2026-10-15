@@ -77,8 +77,24 @@ function packagesWithInstallScripts(): string[] {
     .sort();
 }
 
-const allowScripts = (): Record<string, boolean> =>
-  (json('package.json').allowScripts as Record<string, boolean>) ?? {};
+const allowScripts = (): Record<string, unknown> =>
+  (json('package.json').allowScripts as Record<string, unknown>) ?? {};
+
+/** `@scope/pkg@1.2.3` -> `@scope/pkg`. */
+const packageName = (key: string): string => key.replace(/(.)@[^@]*$/, '$1');
+
+/**
+ * The packages whose install script is DENIED, by name, each with its reason.
+ * A denial is reviewed like an approval, so it sits in `allowScripts` pinned
+ * to a version like any entry; this list is what lets it be `false`.
+ */
+const DENIED: Readonly<Record<string, string>> = {
+  // Issue 781, the Swagger docs pages.
+  '@scarf/scarf':
+    'install telemetry: its postinstall reports each install to Scarf. ' +
+    'swagger-ui-dist depends on it; denied by the operator 2026-10-15, ' +
+    'with scarfSettings.enabled false in package.json as well.',
+};
 
 describe('the install-script allowlist', () => {
   it('has something to protect', () => {
@@ -130,19 +146,36 @@ describe('the install-script allowlist', () => {
     ).toBeUndefined();
   });
 
-  it('approves rather than denies — a false value blocks the install', () => {
-    // `npm install-scripts deny` writes the same field with `false`, which
-    // would leave esbuild without its platform binary and the build broken in
-    // a way that looks like a download failure.
+  it('denies exactly the packages DENIED names, and approves every other', () => {
+    // `npm install-scripts deny` writes the same field with `false`. On the
+    // wrong package that leaves esbuild without its platform binary and the
+    // build broken in a way that looks like a download failure, so a denial
+    // is allowed only where DENIED names the package and says why.
     const approvals = Object.entries(allowScripts());
     const denied = approvals
-      .filter(([, allowed]) => allowed !== true)
+      .filter(([, allowed]) => allowed === false)
+      .map(([key]) => packageName(key))
+      .sort();
+    const neither = approvals
+      .filter(([, allowed]) => typeof allowed !== 'boolean')
       .map(([key]) => key);
     expect(
-      searched(denied, { of: approvals, what: 'approval entries' }),
+      searched(neither, { of: approvals, what: 'approval entries' }),
+      'an entry is either true (approved) or false (denied); npm reads anything else its own way',
     ).toEqual([]);
+    expect(
+      denied,
+      'a denied install script that DENIED does not name, or a DENIED package still approved',
+    ).toEqual(Object.keys(DENIED).sort());
     expect(
       floorBreach('install-scripts/approval-entries', approvals.length),
     ).toBeUndefined();
   });
+
+  it.each(Object.entries(DENIED))(
+    '%s is denied for a reason it states',
+    (_, reason) => {
+      expect(reason.trim().length).toBeGreaterThan(0);
+    },
+  );
 });
