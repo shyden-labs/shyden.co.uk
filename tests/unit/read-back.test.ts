@@ -21,6 +21,7 @@ import {
   parseStore,
   readBackReview,
   readingPlan,
+  blockingRead,
   applyVerdicts,
   verdictProblems,
   verdictReview,
@@ -519,7 +520,7 @@ describe('readingPlan: what is read, in what order', () => {
         store(),
         new Set(),
       ),
-    ).toEqual([{ locale: 'zh', text: '置顶 {n} 个', chars: 36 }]);
+    ).toEqual([{ locale: 'zh', text: '置顶 {n} 个', chars: 36, blocks: true }]);
   });
 
   it('never sends a line that is nothing but slots', () => {
@@ -540,6 +541,48 @@ describe('readingPlan: what is read, in what order', () => {
     ).toEqual(['完成']);
   });
 
+  // A pending line blocks nothing; an unread line that is not pending fails
+  // read-back-coverage, so it blocks the change that made it (#784).
+  const pendingAll = (except: Partial<Record<string, string[]>> = {}) =>
+    store({
+      pending: {
+        id: ['a'],
+        zh: ['a', 'b', 'c'],
+        vi: ['a'],
+        th: ['a'],
+        ...except,
+      },
+    });
+
+  it('reads a blocking line before a pending line of an earlier locale (#784)', () => {
+    expect(
+      readingPlan(units, pendingAll({ id: [], vi: [] }), new Set()).map(
+        ({ locale, text }) => `${locale}:${text}`,
+      ),
+    ).toEqual(['id:Sesuatu', 'vi:Một thứ', 'zh:东西', 'zh:完成', 'th:สิ่งของ']);
+  });
+
+  it('still reads an approved line first, pending or not (#784)', () => {
+    expect(
+      readingPlan(units, pendingAll({ id: [] }), new Set(['zh:c'])).map(
+        ({ locale, text }) => `${locale}:${text}`,
+      ),
+    ).toEqual(['zh:完成', 'id:Sesuatu', 'zh:东西', 'th:สิ่งของ', 'vi:Một thứ']);
+  });
+
+  it('sends a text both a blocking and a pending line say once, as blocking (#784)', () => {
+    const plan = readingPlan(units, pendingAll({ zh: ['a', 'c'] }), new Set());
+    expect(
+      plan.map(({ locale, text, blocks }) => `${locale}:${text}:${blocks}`),
+    ).toEqual([
+      'zh:东西:true',
+      'zh:完成:false',
+      'th:สิ่งของ:false',
+      'id:Sesuatu:false',
+      'vi:Một thứ:false',
+    ]);
+  });
+
   it('counts characters by code point, as Google bills them', () => {
     expect(
       readingPlan(
@@ -556,11 +599,36 @@ describe('readingPlan: what is read, in what order', () => {
   });
 });
 
+describe('blockingRead: how many lines that block a change a run read (#784)', () => {
+  const item = (text: string, blocks: boolean) => ({
+    locale: 'zh' as const,
+    text,
+    chars: 1,
+    blocks,
+  });
+
+  it('counts the blocking lines in the plan, and those read', () => {
+    const plan = [item('甲', true), item('乙', true), item('丙', false)];
+    expect(blockingRead(plan, new Set(['zh\n甲', 'zh\n丙']))).toEqual({
+      inPlan: 2,
+      read: 1,
+    });
+  });
+
+  it('counts a line read in another locale as unread', () => {
+    expect(blockingRead([item('甲', true)], new Set(['th\n甲']))).toEqual({
+      inPlan: 1,
+      read: 0,
+    });
+  });
+});
+
 describe('batches: requests of a bounded size, one locale each', () => {
   const item = (locale: 'zh' | 'th', text: string) => ({
     locale,
     text,
     chars: [...text].length,
+    blocks: true,
   });
 
   it('starts a new batch when the locale changes', () => {
@@ -732,6 +800,7 @@ describe('batches under an allowance', () => {
     locale: 'zh' as const,
     text,
     chars: [...text].length,
+    blocks: true,
   });
 
   it('sends nothing past the allowance, and never a text that would cross it', () => {
