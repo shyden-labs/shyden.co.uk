@@ -38,6 +38,18 @@ paths:
                   ok:
                     type: boolean
                     const: true
+        '403':
+          description: >-
+            Production only: the request carries no Cloudflare Access sign-in
+            the site accepts (a person's, or the release check's service
+            token). The site's own gate answers, with nothing in the body, and
+            also whenever its Access settings are missing (#782).
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
         '405':
           description: Any method but GET.
           headers:

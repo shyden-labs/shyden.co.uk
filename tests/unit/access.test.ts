@@ -96,16 +96,25 @@ describe('privatePath: which paths production keeps for signed-in people', () =>
     '//api/docs//private/',
     '/API/Docs/Private/',
     '/api/docs/%E0%A4%A/',
+    '/api/report/health',
+    '/api/report/health/',
+    '/api/report/health.json',
+    '/api/report/%68ealth',
+    '//api/report//health',
+    '/API/Report/Health',
   ])('%s is private', (path) => {
     expect(privatePath(path)).toBe(true);
   });
 
-  it.each(['/api/docs/', '/api/docs/privateer', '/api/report', '/'])(
-    '%s is public',
-    (path) => {
-      expect(privatePath(path)).toBe(false);
-    },
-  );
+  it.each([
+    '/api/docs/',
+    '/api/docs/privateer',
+    '/api/report',
+    '/api/report/healthy',
+    '/',
+  ])('%s is public', (path) => {
+    expect(privatePath(path)).toBe(false);
+  });
 });
 
 describe('verifyAccessJwt: only a token Access signed for this site, still valid', () => {
@@ -286,6 +295,32 @@ describe('the middleware on production', () => {
       'Cf-Access-Jwt-Assertion': await token(),
     });
     expect(response.status).toBe(403);
+  });
+
+  it('refuses the report health check without a token, with no body (#782)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(KEYS)),
+    );
+    const calls = next.mock.calls.length;
+    const response = await visit('/api/report/health');
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('');
+    expect(next.mock.calls.length).toBe(calls);
+  });
+
+  it('admits the report health check with a valid token (#782)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(KEYS)),
+    );
+    vi.spyOn(Date, 'now').mockReturnValue(NOW * 1000);
+    const response = await visit('/api/report/health', {
+      'Cf-Access-Jwt-Assertion': await token(),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('page');
+    vi.restoreAllMocks();
   });
 
   it('leaves the public docs alone', async () => {

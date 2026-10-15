@@ -27,9 +27,10 @@ import { onBuild } from './tests/sanity-on-build';
 // password-locked staging URL rendered, and said nothing about whether
 // shyden.co.uk resolved, presented a valid certificate, or routed here at all.
 //
-// It sends no credential: the apex is not behind Basic auth. The release used to
-// hand this config the DEV password for a prod run, which prod must never hold
-// (#241).
+// It sends no credential by default: the apex is not behind Basic auth. The
+// release used to hand this config the DEV password for a prod run, which prod
+// must never hold (#241). The one exception is the Access service token, sent
+// by a single test on its request to the private health check (#782).
 //
 // With SANITY_ON_BUILD=1 it measures this tree's own production build instead
 // (#335). A build inherits the whole environment, and a config cannot unset a

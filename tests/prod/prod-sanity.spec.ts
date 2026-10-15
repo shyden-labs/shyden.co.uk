@@ -6,6 +6,7 @@ import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectNoHorizontalScroll } from '../viewport';
 import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
+import { accessServiceHeaders } from '../access-service-token';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 
 /**
@@ -181,8 +182,9 @@ test(
     },
   },
   async ({ request }) => {
-    // Health only: automation never writes to the production database.
-    await expectReportsBound(request);
+    // Health only: automation never writes to the production database. The
+    // route is private on production (#782): the service token signs in.
+    await expectReportsBound(request, accessServiceHeaders(process.env));
   },
 );
 
@@ -229,29 +231,32 @@ test(
   },
 );
 
-test(
-  'the private API docs refuse a request with no sign-in',
-  {
-    tag: '@deployed-only',
-    annotation: {
-      type: 'deployed-only',
-      description:
-        'functions/_middleware.js and Cloudflare Access refuse it, and a preview of dist/ runs neither',
+// Production's private paths (#781, #782), each asked with no sign-in.
+for (const [what, path] of [
+  ['the private API docs page', '/api/docs/private/'],
+  ['the report health check', '/api/report/health'],
+] as const)
+  test(
+    `${what} refuses a request with no sign-in`,
+    {
+      tag: '@deployed-only',
+      annotation: {
+        type: 'deployed-only',
+        description:
+          'functions/_middleware.js and Cloudflare Access refuse it, and a preview of dist/ runs neither',
+      },
     },
-  },
-  async ({ request }) => {
-    const response = await request.get('/api/docs/private/', {
-      maxRedirects: 0,
-    });
-    // Access, once set up, sends the visitor to its sign-in; until then, and
-    // behind it, the site's own gate answers 403 with nothing in the body.
-    if (response.status() === 302)
-      expect(new URL(response.headers()['location'] ?? '').hostname).toMatch(
-        /\.cloudflareaccess\.com$/,
-      );
-    else {
-      expect(response.status()).toBe(403);
-      expect(await response.text()).toBe('');
-    }
-  },
-);
+    async ({ request }) => {
+      const response = await request.get(path, { maxRedirects: 0 });
+      // Access, once set up, sends the visitor to its sign-in; until then, and
+      // behind it, the site's own gate answers 403 with nothing in the body.
+      if (response.status() === 302)
+        expect(new URL(response.headers()['location'] ?? '').hostname).toMatch(
+          /\.cloudflareaccess\.com$/,
+        );
+      else {
+        expect(response.status()).toBe(403);
+        expect(await response.text()).toBe('');
+      }
+    },
+  );
