@@ -80,6 +80,42 @@ export function dockerArgs({ image, cwd, update, forwarded }) {
 }
 
 /** Playwright's update flag in each spelling: `-u`, bare, and `=<preset>`. */
+const BASELINES = 'tests/e2e/__screenshots__/';
+
+/**
+ * The baseline files `git status --porcelain` reports changed or new (#789).
+ * @param {string} porcelain
+ * @returns {string[]}
+ */
+export function changedBaselines(porcelain) {
+  return porcelain
+    .split('\n')
+    .map((line) => line.slice(3))
+    .filter((path) => path.startsWith(BASELINES))
+    .sort();
+}
+
+/**
+ * What a failed capture says (#789). Playwright writes the snapshot of every
+ * capture that passed even when another in the run failed, so the message
+ * names the files the run changed rather than promising none did.
+ * @param {readonly string[]} changed
+ * @returns {string}
+ */
+export function captureFailedMessage(changed) {
+  if (changed.length === 0)
+    return 'Capture failed, and no baseline changed. Read the output above before retrying.';
+  const one = changed.length === 1;
+  return (
+    `Capture failed, but ${changed.length} baseline${one ? '' : 's'} changed:\n` +
+    [...changed]
+      .sort()
+      .map((path) => `  ${path}\n`)
+      .join('') +
+    `Read the output above before keeping or discarding ${one ? 'it' : 'them'}.`
+  );
+}
+
 const PLAYWRIGHT_UPDATE = /^(-u|--update-snapshots(=.*)?)$/;
 
 /**
@@ -137,11 +173,19 @@ function main() {
     { stdio: 'inherit' },
   );
 
-  if (run.status !== 0 && update)
-    console.error(
-      '\nCapture failed, so the committed baselines are unchanged. Read the\n' +
-        'output above before retrying.',
+  if (run.status !== 0 && update) {
+    const status = spawnSync(
+      'git',
+      ['status', '--porcelain', '--untracked-files=all', '--', BASELINES],
+      { encoding: 'utf8' },
     );
+    console.error(
+      '\n' +
+        (status.status === 0
+          ? captureFailedMessage(changedBaselines(status.stdout))
+          : `Capture failed, and git could not say which baselines changed (${messageOf(status.error ?? status.stderr)}): run git status before keeping or discarding any.`),
+    );
+  }
   process.exit(run.status ?? 1);
 }
 
