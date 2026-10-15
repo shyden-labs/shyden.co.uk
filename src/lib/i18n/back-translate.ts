@@ -500,7 +500,7 @@ const LABEL_CAVEAT =
   'Read back word for word, a correct label can score near 0 and a wrong one 100: `Giới tính` (gender) reads back as *Gender* for *Sex* and scores 9, where the `Tình dục` (sexual intercourse) it replaced read back as *Sex* and scored 100. Judge these by eye; the order is only a place to start (#95, #161).';
 
 /** A value inside one Markdown table cell, whatever characters it carries. */
-const cell = (text: string): string =>
+export const cell = (text: string): string =>
   text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

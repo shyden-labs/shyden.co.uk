@@ -26,6 +26,8 @@
     "test:devices": "node scripts/test-devices.mjs",
     "i18n:translate": "node scripts/i18n-translate.mjs",
     "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
+    "i18n:google-read-back": "node scripts/i18n-google-read-back.mjs",
+    "i18n:read-back-verdicts": "node scripts/i18n-read-back-verdicts.mjs",
     "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
     "test": "npm run format && npm run typecheck && npm run test:unit",

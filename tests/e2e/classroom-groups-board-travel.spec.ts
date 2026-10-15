@@ -367,6 +367,81 @@ test.describe('the board deals by moving students into their cards', () => {
     expect(new Set(numbers).size).toBe(COUNT);
   });
 
+  // #768: the board's Shuffle is not refused mid-deal (operator, 2026-10-14).
+  // The press and the reads around it run in ONE task, because the submit
+  // handler supersedes the running deal before its first await: the rows
+  // read before the click are the abandoned deal's, the rows read after it
+  // are the new deal's, and no landing can fall between the two reads.
+  test('a board Shuffle mid-deal starts from the top, and the abandoned deal lands nobody', async ({
+    page,
+  }) => {
+    await openWaitingBoard(page, String(COUNT), '4');
+    await press(page, 'Make Groups');
+    await expectThirdLanding(page);
+    const pressed = await bar(page)
+      .getByRole('button', { name: 'Shuffle again' })
+      .evaluate((button) => {
+        const rows = () =>
+          Array.from(
+            document.querySelectorAll<HTMLElement>('#cg-board .student'),
+          );
+        const old = rows();
+        const landed = old.map((row) => row.classList.contains('dealt'));
+        (
+          window as unknown as {
+            abandoned: { old: HTMLElement[]; landed: boolean[] };
+          }
+        ).abandoned = { old, landed };
+        (button as HTMLButtonElement).click();
+        return {
+          unlandedAtPress: landed.filter((l) => !l).length,
+          freshDealt: rows().filter((row) => row.classList.contains('dealt'))
+            .length,
+          chipsWaiting: document.querySelectorAll(
+            '#cg-board .waiting-student:not(.left)',
+          ).length,
+        };
+      });
+    // The press fell mid-deal: some of the old deal had yet to land.
+    expect(pressed.unlandedAtPress).toBeGreaterThan(0);
+    // From the top: nobody of the new deal is seated, everyone waits.
+    expect(pressed.freshDealt).toBe(0);
+    expect(pressed.chipsWaiting).toBe(COUNT);
+    await expectDealt(page);
+    // A row of the abandoned deal that gains `.dealt` after the press was
+    // landed by it, and its land sound plays in the same callback
+    // (`board-travel.ts`, the flight's `finished` handler).
+    const abandoned = await page.evaluate(() => {
+      const { old, landed } = (
+        window as unknown as {
+          abandoned: { old: HTMLElement[]; landed: boolean[] };
+        }
+      ).abandoned;
+      return old.map((row, i) => ({
+        number: row.dataset.number,
+        attached: row.isConnected,
+        landedAfterPress: !landed[i] && row.classList.contains('dealt'),
+      }));
+    });
+    expect(
+      searched(
+        abandoned.filter((row) => row.landedAfterPress),
+        { of: abandoned, what: 'rows of the abandoned deal' },
+      ),
+      'rows the abandoned deal landed after the press',
+    ).toEqual([]);
+    expect(
+      searched(
+        abandoned.filter((row) => row.attached),
+        { of: abandoned, what: 'rows of the abandoned deal' },
+      ),
+      'rows of the abandoned deal still on the board',
+    ).toEqual([]);
+    expect(
+      floorBreach('board-travel/abandoned-rows', abandoned.length),
+    ).toBeUndefined();
+  });
+
   test('leaving the board while students travel puts the groups on the page at once', async ({
     page,
   }) => {

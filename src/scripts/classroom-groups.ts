@@ -1516,8 +1516,10 @@ if (form) {
     // never behave differently from one triggered on the page.
     onShuffle: () => form.requestSubmit(goButton),
     // The SAME fact the page's own deal button uses, read rather than
-    // duplicated: one shuffle at a time, whichever button asked for it.
-    busy: () => goButton.disabled,
+    // duplicated: `updateGoButton` disables it only when the roster cannot
+    // be dealt, never for a deal in progress. A second press mid-deal is
+    // superseded by `dealToken`, whichever button made it.
+    cannotDeal: () => goButton.disabled,
     refuseReason: () => refuse(t.staleRefuseBoard),
     // Design spec section 8: the reveal is animation, and the two ways a
     // teacher can already turn animation off both apply here. `#cg-speed`
