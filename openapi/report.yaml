@@ -1,0 +1,253 @@
+openapi: 3.1.0
+info:
+  title: Report a translation
+  version: 1.0.0
+  description: >-
+    The form under every translated page of shyden.co.uk: a reader quotes a
+    line they think is wrong, and may suggest a better one. The request is a
+    plain HTML form post. A browser without JavaScript gets a 303 back to the
+    page it came from, with the outcome in the fragment; a client that sends
+    `Accept: application/json` gets the outcome as JSON instead.
+paths:
+  /api/report:
+    post:
+      summary: Report a translation
+      operationId: report
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          description: >-
+            `application/json` for a JSON outcome; anything else, or nothing,
+            for the form mode's 303.
+          schema:
+            type: string
+            examples:
+              - application/json
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - locale
+                - page
+                - quote
+              properties:
+                locale:
+                  type: string
+                  description: The page's language. English pages carry no form.
+                  enum:
+                    - id
+                    - zh
+                    - vi
+                    - th
+                page:
+                  type: string
+                  description: Which page the quote is from.
+                  enum:
+                    - home
+                    - glory-points
+                    - classroom-groups
+                    - not-found
+                quote:
+                  type: string
+                  description: >-
+                    The line as the page shows it, 1 to 1000 characters. It must
+                    match copy the page renders, or the outcome is not-found.
+                  minLength: 1
+                  maxLength: 1000
+                suggestion:
+                  type: string
+                  description: A better wording, if the reader has one.
+                  maxLength: 1000
+                note:
+                  type: string
+                  description: Anything else the reader wants to say.
+                  maxLength: 1000
+                website:
+                  type: string
+                  description: >-
+                    Left empty by people. A form that fills it is answered
+                    `sent` and nothing is stored.
+                  maxLength: 1000
+      responses:
+        '200':
+          description: JSON mode, the report was stored (or the honeypot was filled).
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - outcome
+                properties:
+                  outcome:
+                    type: string
+                    const: sent
+        '303':
+          description: >-
+            Form mode, every outcome after the request is understood: back to
+            the page, with `-sent`, `-not-found`, `-rejected` or `-failed` at
+            the end of the fragment.
+          headers:
+            Location:
+              required: true
+              description: For example `/vi/#report-home-vi-sent`.
+              schema:
+                type: string
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '400':
+          description: >-
+            The locale or page is not one the site serves (both modes), or,
+            in JSON mode, a field is empty, too long or holds a control
+            character. Form mode answers the first with no body.
+          x-empty-in-form-mode: true
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - outcome
+                properties:
+                  outcome:
+                    type: string
+                    const: rejected
+        '403':
+          description: The request's Origin is missing or is not this site.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '405':
+          description: Any method but POST.
+          headers:
+            Allow:
+              required: true
+              schema:
+                type: string
+                const: POST
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '413':
+          description: The body is over 65,536 bytes, declared or read.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '415':
+          description: The body is not `application/x-www-form-urlencoded`.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+        '422':
+          description: JSON mode, the quote matches nothing the page says.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - outcome
+                properties:
+                  outcome:
+                    type: string
+                    const: not-found
+        '503':
+          description: JSON mode, the report could not be stored.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - outcome
+                properties:
+                  outcome:
+                    type: string
+                    const: failed
