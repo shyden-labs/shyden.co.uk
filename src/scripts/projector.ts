@@ -429,7 +429,11 @@ export function renderProjector(
     // running one itself -- `dealToken` and the travelling deal's abort --
     // so the abandoned deal lands nobody and sounds nothing. What this
     // refuses is only a roster the page cannot deal at all.
-    if (handlers.cannotDeal?.()) return;
+    if (
+      handlers.cannotDeal?.() ||
+      doc.querySelector('#cg-board .student.travelling')
+    )
+      return;
     handlers.onShuffle();
     // With animation on, the deal travels from the waiting list into cards
     // that are already up (#744), so the groups are not faded in on top of
