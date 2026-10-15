@@ -52,6 +52,30 @@ export const docsPaths = (): string[] =>
     `docs pages in ${DOCS_DIR}`,
   );
 
+/** The not-found path every published-page sweep visits. */
+export const NOT_FOUND_PATH = '/definitely-not-a-page';
+
+/**
+ * Every page the site publishes, in every locale, and the 404: derived from
+ * the source, so a spec can generate one test per page (#422). A test is
+ * created when its file is COLLECTED, before the web server has built
+ * `dist/`, so a list read from the built sitemap would be empty there on a
+ * cold tree and generate nothing. `the published routes are the sitemap's`
+ * (rendered-text.spec.ts) holds this list to the built sitemap, so a page
+ * the sitemap publishes and nothing here visits still goes red.
+ *
+ * Here rather than in `tests/e2e/published-paths.ts`, which re-exports it,
+ * because that module imports Playwright and the iPhone's journeys run under
+ * Vitest (#800).
+ */
+export const PUBLISHED_ROUTES: readonly string[] = [
+  ...LOCALES.flatMap((locale) =>
+    sitePaths().map((path) => localisePath(path, locale)),
+  ),
+  ...docsPaths(),
+  NOT_FOUND_PATH,
+];
+
 /**
  * The `<h1>` a page renders, per locale, keyed by its UNLOCALISED path.
  *

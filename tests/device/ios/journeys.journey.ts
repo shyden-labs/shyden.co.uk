@@ -70,7 +70,7 @@ import {
   measureTypedFieldsScript,
 } from '../../typed-fields';
 import { shootDevice } from './evidence';
-import { startIosSession, type DeviceSession } from './session';
+import { announceMode, startIosSession, type DeviceSession } from './session';
 import { waitFor } from './webdriver';
 
 let session: DeviceSession;
@@ -129,15 +129,9 @@ afterAll(async () => {
   await session?.teardown();
 }, 120_000);
 
-/**
- * Design doc s5a's own requirement, restated at the point every reader
- * actually looks: the top of each test's own output, not only once at
- * session start. `session.mode` is read fresh (not captured at module
- * load) because it is only known once `beforeAll` has resolved.
- */
+/** This file's session, announced: see `announceMode` (session.ts). */
 function logMode(journeyName: string): void {
-  // eslint-disable-next-line no-console -- the required per-test mode announcement, not incidental debug output
-  console.log(`  [mode: ${session.mode}] ${journeyName}`);
+  announceMode(session, journeyName);
 }
 
 // The describe name carries a static pointer to the console output rather

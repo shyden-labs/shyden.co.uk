@@ -4,7 +4,7 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test';
-import { contrast, over, paintedGround, parseColour } from '../wcag';
+import { paintedContrast } from '../wcag';
 import {
   deviceDownloadText,
   emptyDeviceDownloads,
@@ -478,24 +478,7 @@ export const contrastRatio = async (target: Locator): Promise<number> => {
     }
     return { colour: style.color, grounds, opacity: Number(style.opacity) };
   });
-
-  const ink = parseColour(painted.colour);
-  const layers = painted.grounds.map(parseColour);
-  if (ink === null || layers.some((layer) => layer === null))
-    throw new Error(
-      `unreadable computed colour: ${painted.colour} on ${painted.grounds.join(' over ')}`,
-    );
-  const ground = paintedGround(
-    layers.filter((layer): layer is NonNullable<typeof layer> => !!layer),
-  );
-  // The element's own opacity dims its text against what is behind it. A
-  // colour token that passes AA on paper can still fail once the browser has
-  // mixed it -- the bug this was first written for, in classroom-groups.
-  const mixed = over(
-    { rgb: ink.rgb, alpha: ink.alpha * painted.opacity },
-    ground,
-  );
-  return contrast(mixed, ground);
+  return paintedContrast(painted);
 };
 
 /**

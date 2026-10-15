@@ -99,3 +99,41 @@ export const paintedGround = (grounds: readonly RGBA[]): RGB =>
     (behind, layer) => over(layer, behind),
     [255, 255, 255],
   );
+
+/** What a browser reports for one element's text, read in the page. */
+export interface PaintedText {
+  /** The element's computed `color`. */
+  readonly colour: string;
+  /** Every background from the element itself outward, nearest first. */
+  readonly grounds: readonly string[];
+  /** The element's computed `opacity`. */
+  readonly opacity: number;
+}
+
+/**
+ * The contrast ratio a browser PAINTS for text it reported as `painted`: the
+ * ink, dimmed by the element's own opacity, over the composite of every
+ * background behind it. One home for the arithmetic, whichever driver read
+ * the page: Playwright's `contrastRatio` (tests/e2e/helpers.ts) and the
+ * iPhone's journeys (#800) both end here, so the two platforms cannot
+ * disagree about the same pixels.
+ */
+export const paintedContrast = (painted: PaintedText): number => {
+  const ink = parseColour(painted.colour);
+  const layers = painted.grounds.map(parseColour);
+  if (ink === null || layers.some((layer) => layer === null))
+    throw new Error(
+      `unreadable computed colour: ${painted.colour} on ${painted.grounds.join(' over ')}`,
+    );
+  const ground = paintedGround(
+    layers.filter((layer): layer is NonNullable<typeof layer> => !!layer),
+  );
+  // The element's own opacity dims its text against what is behind it. A
+  // colour token that passes AA on paper can still fail once the browser has
+  // mixed it -- the bug this was first written for, in classroom-groups.
+  const mixed = over(
+    { rgb: ink.rgb, alpha: ink.alpha * painted.opacity },
+    ground,
+  );
+  return contrast(mixed, ground);
+};

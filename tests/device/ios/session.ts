@@ -41,7 +41,7 @@ import {
   WebDriverError,
   type WebElement,
 } from './webdriver';
-import { themeColour } from '../../palette';
+import { themeColour, type Theme } from '../../palette';
 import { listDevices, pickIphone } from '../../../scripts/devicectl.mjs';
 
 const DEV_SERVER_PORT = 4321;
@@ -519,8 +519,13 @@ export interface DeviceSession {
   readonly mode: InteractionMode;
   /** click/type/clear, mode-agnostic -- see interaction.ts. Journeys call only this, never `driver` directly for input. */
   readonly interaction: Interaction;
-  /** Navigates to `path` on the real server and waits for the page to be interactive. */
-  navigateToPath(path: string): Promise<void>;
+  /**
+   * Navigates to `path` on the real server and waits for `ready` to exist:
+   * `#cg-go` by default, the tool page every grouping journey drives; a
+   * journey on another page names an element that page renders (#800).
+   * `theme` is the saved choice stamped before the load: dark by default.
+   */
+  navigateToPath(path: string, ready?: string, theme?: Theme): Promise<void>;
   /** ALWAYS call this, in a `finally` -- see this file's module doc. */
   teardown(): Promise<void>;
 }
@@ -605,23 +610,47 @@ export async function startIosSession(): Promise<DeviceSession> {
     mode,
     interaction,
 
-    async navigateToPath(path: string): Promise<void> {
+    async navigateToPath(
+      path: string,
+      ready = '#cg-go',
+      theme: Theme = 'dark',
+    ): Promise<void> {
       // The palette is pinned per load (#142 §6.2), so no journey's result
       // depends on the phone's own appearance setting. WebDriver cannot
       // emulate a media feature on Safari, so the lever is the one the page
       // itself honours: a saved choice, stamped on the origin BEFORE the
-      // measured load, which the load then proves it rendered. Dark, the
-      // palette every journey was written against.
+      // measured load, which the load then proves it rendered. Dark unless
+      // a journey asks for light (#800's mirrors of Android's per-theme tests).
       await driver.navigate(`${baseUrl}/`);
-      await driver.executeScript("localStorage.setItem('theme', 'dark');");
+      await driver.executeScript(
+        'localStorage.setItem("theme", arguments[0]);',
+        [theme],
+      );
       await driver.navigate(`${baseUrl}${path}`);
+      // The page must BE the requested one before anything is read from it:
+      // after a journey followed an in-page link (the skip link's `#main`),
+      // a navigation returned with Classroom Groups still loaded, and the
+      // 404's heading test read that page's h1 (#800, measured on the phone).
+      const wanted = new URL(path, `${baseUrl}/`).pathname;
+      await waitFor(
+        async () => {
+          const at = await driver.executeScript<string>(
+            'return location.pathname;',
+          );
+          return at === wanted ? true : undefined;
+        },
+        {
+          timeout: 15_000,
+          describe: `the page at ${wanted} to be the one loaded`,
+        },
+      );
       const ground = await driver.executeScript<string>(
         'return getComputedStyle(document.documentElement).backgroundColor;',
       );
-      if (ground !== themeColour('dark', '--bg'))
+      if (ground !== themeColour(theme, '--bg'))
         throw new Error(
-          `${path} rendered the ground ${ground}, not the dark theme's ` +
-            `${themeColour('dark', '--bg')}: the stamped choice did not take`,
+          `${path} rendered the ground ${ground}, not the ${theme} theme's ` +
+            `${themeColour(theme, '--bg')}: the stamped choice did not take`,
         );
       // The page's own module script (src/scripts/classroom-groups.ts) is a
       // deferred `type="module"`. `navigate` is specified to block until the
@@ -633,12 +662,12 @@ export async function startIosSession(): Promise<DeviceSession> {
       // assumption implicitly at every call site.
       await waitFor(
         async () => {
-          const found = await driver.findElements('#cg-go');
+          const found = await driver.findElements(ready);
           return found.length > 0 ? true : undefined;
         },
         {
           timeout: 15_000,
-          describe: `#cg-go to exist after navigating to ${path}`,
+          describe: `${ready} to exist after navigating to ${path}`,
         },
       );
     },
@@ -647,6 +676,20 @@ export async function startIosSession(): Promise<DeviceSession> {
       await endSession(driver, child);
     },
   };
+}
+
+/**
+ * Design doc s5a's own requirement, restated at the point every reader
+ * actually looks: the top of each test's own output, not only once at
+ * session start. `session.mode` is read at the call, because it is only
+ * known once `beforeAll` has resolved. One home for every journey file.
+ */
+export function announceMode(
+  session: DeviceSession,
+  journeyName: string,
+): void {
+  // eslint-disable-next-line no-console -- the required per-test mode announcement, not incidental debug output
+  console.log(`  [mode: ${session.mode}] ${journeyName}`);
 }
 
 export type { WebElement };
