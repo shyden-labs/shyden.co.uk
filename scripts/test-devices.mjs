@@ -1358,15 +1358,26 @@ function cleanUpOnSignal() {
   }
 }
 
+/**
+ * The groups a run launches: all three, or the iOS group alone for `--ios`,
+ * which is how `npm run floors:record -- --device` records the iPhone
+ * journeys' floors (#623) without an emulated browser writing figures beside
+ * them. Anything else is the usage line naming what was given -- and refusing
+ * it is the cheapest proof that `main()` ran when the file is executed
+ * directly (#227). A skipped entry point exits 0 in silence.
+ *
+ * @param {readonly string[]} args
+ * @returns {string[] | string}
+ */
+export function deviceRunGroups(args) {
+  if (args.length === 0) return ['desktop', 'android', 'ios'];
+  if (args.length === 1 && args[0] === '--ios') return ['ios'];
+  return `usage: test-devices.mjs [--ios] (got ${args.join(' ')})`;
+}
+
 async function main() {
-  // This script takes no arguments, so one is a mistake -- and refusing it is
-  // the cheapest proof that `main()` ran when the file is executed directly
-  // (#227). A skipped entry point exits 0 in silence.
-  const unexpected = process.argv.slice(2);
-  if (unexpected.length > 0)
-    die(
-      `test-devices.mjs takes no arguments, received: ${unexpected.join(' ')}`,
-    );
+  const groupNames = deviceRunGroups(process.argv.slice(2));
+  if (typeof groupNames === 'string') die(groupNames);
 
   cleanUpOnSignal();
 
@@ -1473,23 +1484,31 @@ async function main() {
       '==> Confirmed: the shared server serves the page this run just built, byte for byte.\n',
     );
 
-    process.stdout.write(
-      '==> Counting excluded-by-design exclusions (static, source-only fact)...\n',
-    );
-    const excludedByDesign = await countExcludedByDesign();
-    process.stdout.write(
-      `==> ${excludedByDesign} test(s) excluded by design ` +
-        `(${EXCLUDED_BY_DESIGN_GREP.split('|').join(' or ')}) for the Android group.\n`,
-    );
+    // The Android group's own count, asked only when that group runs.
+    let excludedByDesign = 0;
+    if (groupNames.includes('android')) {
+      process.stdout.write(
+        '==> Counting excluded-by-design exclusions (static, source-only fact)...\n',
+      );
+      excludedByDesign = await countExcludedByDesign();
+      process.stdout.write(
+        `==> ${excludedByDesign} test(s) excluded by design ` +
+          `(${EXCLUDED_BY_DESIGN_GREP.split('|').join(' or ')}) for the Android group.\n`,
+      );
+    }
 
+    /** @type {Record<string, () => Promise<Record<string, unknown>>>} */
+    const runners = {
+      desktop: runDesktopGroup,
+      android: () => runAndroidGroup(excludedByDesign),
+      ios: runIosGroup,
+    };
     process.stdout.write(
-      '==> Launching desktop, android and ios concurrently...\n\n',
+      `==> Launching ${groupNames.join(', ')} concurrently...\n\n`,
     );
-    const groups = await Promise.all([
-      contained('desktop', runDesktopGroup),
-      contained('android', () => runAndroidGroup(excludedByDesign)),
-      contained('ios', runIosGroup),
-    ]);
+    const groups = await Promise.all(
+      groupNames.map((name) => contained(name, runners[name])),
+    );
 
     await cleanup();
 

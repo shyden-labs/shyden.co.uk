@@ -365,8 +365,8 @@ describe('every search checks a floor, or is listed (#515, #534)', () => {
     // search's population (17 token-floored sites in 12 scopes). A
     // conversion lowers these with the list; nothing else raises them.
     const counts = Object.values(FLOORLESS);
-    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(48);
-    expect(counts.length).toBeLessThanOrEqual(45);
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(47);
+    expect(counts.length).toBeLessThanOrEqual(44);
     // The entries judged are the list's own: the floor falls with it, by hand,
     // in the conversion that removes an entry.
     expect(

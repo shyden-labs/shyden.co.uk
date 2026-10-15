@@ -15,6 +15,7 @@ import {
   iosEvidenceReportOf,
   vitestVerdict,
   waitUntil,
+  deviceRunGroups,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -505,5 +506,27 @@ describe('exitCodeFor: an interrupted run exits as the shell would report it', (
     ['SIGTERM', 143],
   ] as const)('%s exits %i', (signal, code) => {
     expect(exitCodeFor(signal)).toBe(code);
+  });
+});
+
+describe('deviceRunGroups: every group, or the iPhone alone (#623)', () => {
+  it('runs all three groups when given nothing', () => {
+    expect(deviceRunGroups([])).toEqual(['desktop', 'android', 'ios']);
+  });
+
+  it('runs the iOS group alone for --ios, the floor record of the iPhone journeys', () => {
+    expect(deviceRunGroups(['--ios'])).toEqual(['ios']);
+  });
+
+  it('refuses an argument it does not know, naming it', () => {
+    expect(deviceRunGroups(['--android'])).toBe(
+      'usage: test-devices.mjs [--ios] (got --android)',
+    );
+  });
+
+  it('refuses --ios given twice, or with anything beside it', () => {
+    expect(deviceRunGroups(['--ios', '--ios'])).toBe(
+      'usage: test-devices.mjs [--ios] (got --ios --ios)',
+    );
   });
 });

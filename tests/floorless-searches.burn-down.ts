@@ -10,7 +10,6 @@
  * entry removed; a new floorless site is red because it is not listed.
  */
 export const FLOORLESS: Readonly<Record<string, number>> = {
-  'tests/device/ios/journeys.journey.ts › `Journey 14 -- iOS-only, ${shape.what}: ${shape.count} pupils in ${shape.size}s on the projector board, with the fullscreen grant refused by the phone itself`': 1,
   'tests/e2e/baseurl-guard.spec.ts › every baseURL-aware API call on a relative URL is one the device fixtures actually resolve': 1,
   'tests/e2e/chrome.spec.ts › `${locale}: the footer names no company, and still reaches a person`': 1,
   'tests/e2e/classroom-groups-controls.spec.ts › `no horizontal scroll at ${width}px with any single section open — ${path}, every section derived`': 1,

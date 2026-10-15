@@ -4,13 +4,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { floorBreach, readFloors, FLOORS_FILE, RECORD_ENV } from '../floors';
-import { searched, specFilesUnder } from '../source-files';
-import { parseFile } from '../unit/ast';
+import { filesUnder, searched, specFilesUnder } from '../source-files';
+import { parseFile, parseSource } from '../unit/ast';
 import {
   decideRecord,
   describeMoves,
   carriedIds,
   carriedOutside,
+  DEVICE_DIR,
+  DEVICE_SUFFIX,
   floorSpecs,
   floorsText,
   playwrightRecordArgs,
@@ -639,5 +641,111 @@ describe('floorSpecs', () => {
     // A known positive, so two readers blind alike cannot agree on nothing.
     const known = 'tests/e2e/copy-reaches-a-page.spec.ts';
     expect(parsed.filter((file) => file === known)).toEqual([known]);
+  });
+});
+
+/**
+ * Every floor id an iPhone journey checks, read from the parse tree (#623):
+ * the first argument of each `floorBreach` call, as a string, or as
+ * `<table>.<name>` when one test runs per table row, which reads every string
+ * the file gives a property of that name. Anything else is refused, never
+ * skipped: an id this cannot read is an id it cannot hold to the record.
+ */
+const deviceFloorIds = (sf: ts.SourceFile): string[] => {
+  const ids: string[] = [];
+  const named = (name: string): string[] => {
+    const found: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isPropertyAssignment(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === name &&
+        ts.isStringLiteral(node.initializer)
+      )
+        found.push(node.initializer.text);
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    if (found.length === 0)
+      throw new Error(
+        `${sf.fileName}: floorBreach reads .${name}, and no ${name}: '<id>' is written`,
+      );
+    return found;
+  };
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'floorBreach'
+    ) {
+      const [id] = node.arguments;
+      if (id !== undefined && ts.isStringLiteral(id)) ids.push(id.text);
+      else if (id !== undefined && ts.isPropertyAccessExpression(id))
+        ids.push(...named(id.name.text));
+      else
+        throw new Error(
+          `${sf.fileName}: a floorBreach id this cannot read: ${id?.getText(sf)}`,
+        );
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return ids;
+};
+
+describe('the iPhone floors, which only the phone measures (#623)', () => {
+  const journeys = (): string[] =>
+    filesUnder(DEVICE_DIR, (path) => path.endsWith(DEVICE_SUFFIX)).sort();
+
+  it('names every iPhone journey that calls floorBreach, as the parse tree reads them', () => {
+    const calls = (node: ts.Node): boolean =>
+      (ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'floorBreach') ||
+      (ts.forEachChild(node, (child) => calls(child) || undefined) ?? false);
+    const parsed = journeys().filter((file) => calls(parseFile(file)));
+    expect(floorSpecs(DEVICE_DIR, DEVICE_SUFFIX)).toEqual(parsed);
+    // A known positive, so two readers blind alike cannot agree on nothing.
+    const known = 'tests/device/ios/journeys.journey.ts';
+    expect(parsed.filter((file) => file === known)).toEqual([known]);
+  });
+
+  it('reads an id written in the call, and one per row of a table the test runs over', () => {
+    const sf = parseSource(
+      [
+        "const ROWS = [{ floor: 'ios/a' }, { floor: 'ios/b' }] as const;",
+        'for (const row of ROWS) floorBreach(row.floor, 1);',
+        "floorBreach('ios/c', 2);",
+      ].join('\n'),
+      'rows.journey.ts',
+    );
+    expect(deviceFloorIds(sf)).toEqual(['ios/a', 'ios/b', 'ios/c']);
+  });
+
+  it('refuses an id it cannot read rather than skip it', () => {
+    const sf = parseSource(
+      'const id = pick();\nfloorBreach(id, 1);',
+      'computed.journey.ts',
+    );
+    expect(() => deviceFloorIds(sf)).toThrow(
+      'computed.journey.ts: a floorBreach id this cannot read: id',
+    );
+  });
+
+  it('holds every id an iPhone journey checks in the record, though no other run measures it', () => {
+    // No other suite asserts these ids, so a deleted one would never go red
+    // anywhere else: the phone is never in CI, and every other record carries
+    // them unmeasured.
+    const recorded = readFloors();
+    const ids = floorSpecs(DEVICE_DIR, DEVICE_SUFFIX).flatMap((file) =>
+      deviceFloorIds(parseFile(file)),
+    );
+    expect(
+      searched(
+        ids.filter((id) => !Object.hasOwn(recorded, id)),
+        { of: ids, what: 'iPhone floor ids' },
+      ),
+    ).toEqual([]);
+    expect(floorBreach('floors/device-ids', ids.length)).toBeUndefined();
   });
 });
