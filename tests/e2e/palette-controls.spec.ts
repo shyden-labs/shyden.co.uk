@@ -6,6 +6,8 @@ import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
 import { resolvedColour } from './helpers';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { PAINTED, offPalette, readPalette } from './palette-readings';
+import { docsPaths } from '../site-pages';
 
 /**
  * Every control's colour comes from the palette, not from the browser.
@@ -38,17 +40,10 @@ import { PUBLISHED_ROUTES } from './published-paths';
 // Every published page in every locale, and the 404. A hand-written four
 // missed the 404's four report forms, /id/classroom-groups and every zh, vi
 // and th page, so a textarea painted off-palette on the 404 passed (PC1).
-const PAGES = PUBLISHED_ROUTES;
-
-/** Controls the page paints itself, as opposed to the ones the UA draws. */
-const PAINTED =
-  'input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea';
-
-type Reading = {
-  what: string;
-  background: string;
-  color: string;
-};
+// The API docs paint their controls only once Try it out is open, which
+// this read-only sweep does not do: api-docs.spec.ts opens everything and
+// holds the same palette check there, through the same reader (#781).
+const PAGES = PUBLISHED_ROUTES.filter((path) => !docsPaths().includes(path));
 
 for (const path of PAGES) {
   // One test per page per theme (#421).
@@ -66,56 +61,7 @@ for (const path of PAGES) {
           details.open = true;
       });
 
-      const { allowed, examined, readings } = await page.evaluate(
-        (selector) => {
-          // Resolve a declared value the way the renderer does, so the comparison
-          // cannot disagree with what is actually on screen.
-          const probe = document.createElement('span');
-          probe.style.display = 'none';
-          document.body.append(probe);
-          const computed = (value: string): string => {
-            probe.style.color = '';
-            probe.style.color = value;
-            return getComputedStyle(probe).color;
-          };
-
-          const root = getComputedStyle(document.documentElement);
-          const names = Array.from(document.styleSheets)
-            .flatMap((sheet) => {
-              try {
-                return Array.from(sheet.cssRules);
-              } catch {
-                return []; // a cross-origin sheet; none of ours are
-              }
-            })
-            .flatMap((rule) =>
-              rule instanceof CSSStyleRule ? Array.from(rule.style) : [],
-            )
-            .filter((property) => property.startsWith('--'));
-
-          const palette = new Set<string>(['rgba(0, 0, 0, 0)']);
-          for (const name of new Set(names)) {
-            const value = root.getPropertyValue(name).trim();
-            if (value) palette.add(computed(value));
-          }
-          probe.remove();
-
-          return {
-            allowed: [...palette],
-            // Every element the selector ran over (#610).
-            examined: document.body.querySelectorAll('*').length,
-            readings: [...document.querySelectorAll(selector)].map((el) => {
-              const style = getComputedStyle(el);
-              return {
-                what: `${el.tagName.toLowerCase()}#${el.id || '(no id)'}`,
-                background: style.backgroundColor,
-                color: style.color,
-              };
-            }),
-          };
-        },
-        PAINTED,
-      );
+      const { allowed, examined, readings } = await readPalette(page);
 
       // Liveness. A page with no controls would pass the loop below having
       // measured nothing, and every page but the English homepage carries
@@ -159,16 +105,10 @@ for (const path of PAGES) {
         `${path} rendered no controls — the selector or the page changed`,
       ).toBeGreaterThan(0);
 
-      const offPalette = (readings as Reading[])
-        .flatMap((r) => [
-          { ...r, role: 'background', value: r.background },
-          { ...r, role: 'color', value: r.color },
-        ])
-        .filter((r) => !allowed.includes(r.value))
-        .map((r) => `${r.what} ${r.role}=${r.value}`);
+      const off = offPalette(readings, allowed);
 
       expect(
-        searched(offPalette, {
+        searched(off, {
           of: readings,
           what: `controls measured on ${path}`,
         }),

@@ -5,6 +5,7 @@ import { searched } from '../source-files';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../typed-fields';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { docsPaths } from '../site-pages';
 
 /**
  * iOS Safari zooms the whole page when a visitor focuses a text field whose
@@ -40,7 +41,12 @@ test.describe('no field makes iOS zoom the page (#352)', () => {
   // One test per page (#390 F152): each locale's pages were visited in one
   // test through typedControls, whose goto the one-test-per-case guard could
   // not see while it matched names alone.
-  for (const path of PUBLISHED_ROUTES)
+  // The API docs draw their fields only once Try it out is open, which this
+  // read-only sweep does not do: api-docs.spec.ts opens everything and holds
+  // the same floor there, through the same measureTypedFields (#781).
+  for (const path of PUBLISHED_ROUTES.filter(
+    (route) => !docsPaths().includes(route),
+  ))
     test(`${path}: every typed field computes to at least ${IOS_ZOOM_FLOOR_PX}px`, async ({
       page,
     }) => {

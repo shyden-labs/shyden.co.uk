@@ -6,6 +6,8 @@ import { searched } from '../source-files';
 import { contrastRatio } from './helpers';
 import { docsSpecFile, requiredTextFields } from '../api-docs-pages';
 import { recorded, shoot } from './evidence';
+import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../typed-fields';
+import { offPalette, readPalette } from './palette-readings';
 
 test.use(recorded);
 
@@ -166,6 +168,30 @@ test.describe('the API docs meet the site bar (#781)', () => {
             ).toEqual([]);
             expect(
               floorBreach(`api-docs/${name}-controls`, controls.length),
+            ).toBeUndefined();
+
+            // The two page-wide sweeps that read pages as they load hand the
+            // docs over to this, the state with every field drawn.
+            const typed = await page.evaluate(measureTypedFields);
+            const zooming = typed
+              .filter(({ fontSize }) => fontSize < IOS_ZOOM_FLOOR_PX)
+              .map(({ field, fontSize }) => `${field} ${fontSize}px`);
+            expect(
+              searched(zooming, { of: typed, what: `${path} typed fields` }),
+            ).toEqual([]);
+            expect(
+              floorBreach(`api-docs/${name}-typed-fields`, typed.length),
+            ).toBeUndefined();
+
+            const { allowed, readings } = await readPalette(page);
+            expect(
+              searched(offPalette(readings, allowed), {
+                of: readings,
+                what: `${path} painted controls`,
+              }),
+            ).toEqual([]);
+            expect(
+              floorBreach(`api-docs/${name}-painted-controls`, readings.length),
             ).toBeUndefined();
 
             await shoot(page, `${path}, ${theme}, ${width}px, everything open`);

@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { floorBreach } from '../floors';
-import { deployedRoutes } from '../site-pages';
+import { deployedRoutes, docsPaths } from '../site-pages';
 import {
   LOCALES,
   PREFIXED_LOCALES,
@@ -361,6 +361,7 @@ test.describe('no built page names the dissolved company (#370)', () => {
     expect(pages.map(({ path }) => path).sort()).toEqual(
       [
         ...deployedRoutes().map(({ path }) => join('dist', path, 'index.html')),
+        ...docsPaths().map((path) => join('dist', path, 'index.html')),
         join('dist', '404.html'),
       ].sort(),
     );
