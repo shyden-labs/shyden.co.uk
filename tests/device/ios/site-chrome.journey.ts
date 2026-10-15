@@ -360,6 +360,12 @@ describe('iOS mirror: header + footer', () => {
         `${locale} footer still names the company`,
       ).toEqual([]);
       expect(
+        floorBreach(
+          'ios-chrome/footer-company-forms',
+          DISSOLVED_COMPANY.length,
+        ),
+      ).toBeUndefined();
+      expect(
         await visibilityOf(
           phone().driver,
           'footer a[href="mailto:support@shyden.co.uk"]',
@@ -454,6 +460,15 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
       expect(spoken).toContain(BETA_BADGE);
     });
 
+  /** One recorded floor per locale: each lists its own number of badges. */
+  const BADGE_VOICE_FLOORS: Record<Locale, string> = {
+    en: 'ios-chrome/badge-voices-en',
+    id: 'ios-chrome/badge-voices-id',
+    zh: 'ios-chrome/badge-voices-zh',
+    vi: 'ios-chrome/badge-voices-vi',
+    th: 'ios-chrome/badge-voices-th',
+  };
+
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: the badge's spoken label keeps the page's language, even inside another language's entry`, async () => {
       announceMode(phone(), `beta badge voice (${locale})`);
@@ -474,6 +489,9 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
         ),
         'badge labels voiced in another language',
       ).toEqual([]);
+      expect(
+        floorBreach(BADGE_VOICE_FLOORS[locale], voices.length),
+      ).toBeUndefined();
     });
 
   for (const theme of THEMES)
