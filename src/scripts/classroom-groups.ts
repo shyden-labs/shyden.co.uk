@@ -2429,7 +2429,6 @@ if (form) {
     // on a second Shuffle too. Anywhere else the list goes, as before.
     const travels =
       (projector?.isOpen() ?? false) && speedSelect.value !== 'skip';
-    travelling?.abort('superseded');
     travelling = null;
     if (travels) showList(waitingPool(input));
     else hideWaiting();
