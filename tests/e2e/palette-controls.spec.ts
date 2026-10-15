@@ -152,6 +152,13 @@ for (const path of PAGES) {
         expect(
           floorBreach('palette-controls/homepage-elements', examined),
         ).toBeUndefined();
+        // The release evidence cites this case too, so it takes a picture
+        // (#774): with no control to clip to, the first screen that holds
+        // none.
+        await shoot(
+          page,
+          `${path}, ${theme}: no form controls among ${examined} elements`,
+        );
         return;
       }
       expect(

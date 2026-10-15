@@ -44,6 +44,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: signoff-status.mjs',
   },
+  // With no evidence directory there is no run to judge, so it refuses; a
+  // skipped main() would exit 0 and read as every case pictured (#774).
+  'capture-coverage.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/capture-coverage.mjs',
+  },
   // With nowhere to hand its verdict on, it refuses rather than decide
   // nothing, which would leave the browser jobs to a missing output (#582).
   'docs-only.mjs': {
