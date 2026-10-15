@@ -20,8 +20,34 @@ test.use(recorded);
 
 const WIDTHS = [320, 1280] as const;
 const THEMES = ['light', 'dark'] as const;
-const floorName = (path: string): string =>
-  path === '/api/docs/' ? 'public' : path.replace(/^\/api\/docs\/|\/$/g, '');
+/**
+ * Each docs page's recorded floors, spelled once here so the floor reader can
+ * find them (literal-floors.test.ts); a page with no entry fails its tests.
+ */
+const FLOORS: Readonly<
+  Record<
+    string,
+    {
+      readonly texts: string;
+      readonly controls: string;
+      readonly typed: string;
+      readonly painted: string;
+    }
+  >
+> = {
+  '/api/docs/': {
+    texts: 'api-docs/public-texts',
+    controls: 'api-docs/public-controls',
+    typed: 'api-docs/public-typed-fields',
+    painted: 'api-docs/public-painted-controls',
+  },
+  '/api/docs/private/': {
+    texts: 'api-docs/private-texts',
+    controls: 'api-docs/private-controls',
+    typed: 'api-docs/private-typed-fields',
+    painted: 'api-docs/private-painted-controls',
+  },
+};
 
 /**
  * Opens every operation and its Try it out, then sends each, as a visitor
@@ -122,7 +148,8 @@ test.describe('the API docs meet the site bar (#781)', () => {
             await page.setViewportSize({ width, height: 900 });
             await page.goto(path);
             await openEverything(page, path);
-            const name = floorName(path);
+            const floors = FLOORS[path];
+            if (!floors) throw new Error(`${path} has no floors in FLOORS`);
 
             const box = await page.evaluate(() => {
               const mount = document.querySelector('#swagger');
@@ -152,9 +179,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               searched(dim, { of: probes, what: `${path} text elements` }),
             ).toEqual([]);
-            expect(
-              floorBreach(`api-docs/${name}-texts`, probes.length),
-            ).toBeUndefined();
+            expect(floorBreach(floors.texts, probes.length)).toBeUndefined();
 
             const controls = await controlSizes(page);
             const small = controls
@@ -167,7 +192,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
               searched(small, { of: controls, what: `${path} controls` }),
             ).toEqual([]);
             expect(
-              floorBreach(`api-docs/${name}-controls`, controls.length),
+              floorBreach(floors.controls, controls.length),
             ).toBeUndefined();
 
             // The two page-wide sweeps that read pages as they load hand the
@@ -179,9 +204,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               searched(zooming, { of: typed, what: `${path} typed fields` }),
             ).toEqual([]);
-            expect(
-              floorBreach(`api-docs/${name}-typed-fields`, typed.length),
-            ).toBeUndefined();
+            expect(floorBreach(floors.typed, typed.length)).toBeUndefined();
 
             const { allowed, readings } = await readPalette(page);
             expect(
@@ -191,7 +214,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
               }),
             ).toEqual([]);
             expect(
-              floorBreach(`api-docs/${name}-painted-controls`, readings.length),
+              floorBreach(floors.painted, readings.length),
             ).toBeUndefined();
 
             await shoot(page, `${path}, ${theme}, ${width}px, everything open`);

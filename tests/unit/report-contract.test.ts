@@ -26,12 +26,19 @@ import {
 
 const SPEC = loadSpec('openapi/report.yaml');
 
-/** A case's name as a floor id: `405 for GET` -> `405-for-get`. */
-const floorId = (name: string): string =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+const post = (
+  body: string,
+  headers: Record<string, string> = {},
+  method = 'POST',
+) =>
+  new Request(`${ORIGIN}${PATH}`, {
+    method,
+    headers: { Origin: ORIGIN, 'Content-Type': FORM, ...headers },
+    body: method === 'POST' ? body : undefined,
+  });
+const form = (extra: Record<string, string> = {}) =>
+  new URLSearchParams({ ...valid, ...extra }).toString();
+
 const PATH = '/api/report';
 const ORIGIN = 'https://dev.shyden.co.uk';
 const FORM = 'application/x-www-form-urlencoded';
@@ -46,18 +53,41 @@ const valid = {
   website: '',
 };
 
-const post = (
-  body: string,
-  headers: Record<string, string> = {},
-  method = 'POST',
-) =>
-  new Request(`${ORIGIN}${PATH}`, {
-    method,
-    headers: { Origin: ORIGIN, 'Content-Type': FORM, ...headers },
-    body: method === 'POST' ? body : undefined,
-  });
-const form = (extra: Record<string, string> = {}) =>
-  new URLSearchParams({ ...valid, ...extra }).toString();
+/**
+ * Each case's recorded floor, spelled once here so the floor reader can find
+ * it (literal-floors.test.ts); a case with no entry fails its own test.
+ */
+const FLOOR_OF: Readonly<Record<string, string>> = {
+  '405 for GET': 'report-contract/405-for-get',
+  '403 for a foreign Origin': 'report-contract/403-for-a-foreign-origin',
+  '415 for a JSON body': 'report-contract/415-for-a-json-body',
+  '413 for a body over 65536 bytes':
+    'report-contract/413-for-a-body-over-65536-bytes',
+  '400 with no body for an unknown page (form mode)':
+    'report-contract/400-with-no-body-for-an-unknown-page-form-mode',
+  '400 rejected for an unknown page (JSON mode)':
+    'report-contract/400-rejected-for-an-unknown-page-json-mode',
+  '303 sent for the honeypot (form mode)':
+    'report-contract/303-sent-for-the-honeypot-form-mode',
+  '200 sent for the honeypot (JSON mode)':
+    'report-contract/200-sent-for-the-honeypot-json-mode',
+  '422 not-found for a quote the page does not say (JSON mode)':
+    'report-contract/422-not-found-for-a-quote-the-page-does-not-say-json-mode',
+  '503 failed with no database (JSON mode)':
+    'report-contract/503-failed-with-no-database-json-mode',
+  '200 ok:true for the migrated table':
+    'report-contract/health-200-ok-true-for-the-migrated-table',
+  '503 ok:false with no database':
+    'report-contract/health-503-ok-false-with-no-database',
+  '405 for POST': 'report-contract/health-405-for-post',
+};
+
+/** The floor id of a case, or a failure naming the case that has none. */
+const floorOf = (name: string): string => {
+  const id = FLOOR_OF[name];
+  if (!id) throw new Error(`${name} has no floor in FLOOR_OF`);
+  return id;
+};
 
 /** One row per documented case; each row is its own test. */
 const CASES: readonly (readonly [string, () => Request, string])[] = [
@@ -122,9 +152,7 @@ describe('POST /api/report answers as openapi/report.yaml says', () => {
     expect(
       searched(findings, { of: checked, what: `${name}: points checked` }),
     ).toEqual([]);
-    expect(
-      floorBreach(`report-contract/${floorId(name)}`, checked.length),
-    ).toBeUndefined();
+    expect(floorBreach(floorOf(name), checked.length)).toBeUndefined();
   });
 });
 
@@ -194,9 +222,7 @@ describe('GET /api/report/health answers as openapi/report-health.yaml says', ()
     expect(
       searched(findings, { of: checked, what: `${name}: points checked` }),
     ).toEqual([]);
-    expect(
-      floorBreach(`report-contract/health-${floorId(name)}`, checked.length),
-    ).toBeUndefined();
+    expect(floorBreach(floorOf(name), checked.length)).toBeUndefined();
   });
 
   it('lists every status the cases produce, and no other', () => {
