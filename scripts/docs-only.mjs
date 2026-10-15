@@ -15,11 +15,15 @@
  * diff, or any error at all is "not docs-only", which runs everything.
  *
  *   node scripts/docs-only.mjs   # writes docs_only=true|false to $GITHUB_OUTPUT
+ *
+ * It writes `capture=true|false` beside it, from the same diff: whether the
+ * release capture runs (`scripts/capture-scope.mjs`, #774).
  */
 
 import { execFileSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { env, exit } from 'node:process';
+import { captureFromDiff } from './capture-scope.mjs';
 
 /** The files outside `docs/` that are documentation and nothing reads. */
 export const DOCS_ONLY_FILES = Object.freeze(['HANDOVER.md']);
@@ -152,18 +156,19 @@ export function docsOnlyVerdict(changes) {
 }
 
 /**
- * The verdict on the checkout a `pull_request` run holds: GitHub's merge
+ * What the checkout a `pull_request` run holds would land: GitHub's merge
  * commit, whose first parent is the base, so its diff from that parent is
- * exactly what the pull request would land. Any other event, a checkout that
- * is not a merge, or a git that fails is not docs-only.
+ * exactly the pull request. Any other event, a checkout that is not a merge,
+ * or a git that fails gives reasons instead of changes. One home for both
+ * verdicts the scope job hands on: docs-only here, and whether the capture
+ * runs (`scripts/capture-scope.mjs`, #774).
  *
  * @param {{ event: string | undefined, git: (args: readonly string[]) => string }} input
- * @returns {Verdict}
+ * @returns {{ changes: Change[] } | { reasons: string[] }}
  */
-export function verdictFromGit({ event, git }) {
+export function pullRequestChanges({ event, git }) {
   if (event !== 'pull_request')
     return {
-      docsOnly: false,
       reasons: [
         event
           ? `a ${event} run is not a pull request, so it has no diff to judge`
@@ -177,14 +182,13 @@ export function verdictFromGit({ event, git }) {
       .slice(1);
     if (parents.length !== 2)
       return {
-        docsOnly: false,
         reasons: [
           `HEAD has ${parents.length} parent${parents.length === 1 ? '' : 's'}, ` +
             "so it is not GitHub's merge commit for a pull request",
         ],
       };
-    return docsOnlyVerdict(
-      parseNameStatus(
+    return {
+      changes: parseNameStatus(
         git([
           '-c',
           'core.quotePath=false',
@@ -197,15 +201,28 @@ export function verdictFromGit({ event, git }) {
           'HEAD',
         ]),
       ),
-    );
+    };
   } catch (error) {
     return {
-      docsOnly: false,
       reasons: [
         `the diff could not be judged: ${/** @type {Error} */ (error).message}`,
       ],
     };
   }
+}
+
+/**
+ * The docs-only verdict on the checkout a run holds. Anything
+ * `pullRequestChanges` cannot read as a pull request's diff is not docs-only.
+ *
+ * @param {{ event: string | undefined, git: (args: readonly string[]) => string }} input
+ * @returns {Verdict}
+ */
+export function verdictFromGit(input) {
+  const diff = pullRequestChanges(input);
+  return 'changes' in diff
+    ? docsOnlyVerdict(diff.changes)
+    : { docsOnly: false, reasons: diff.reasons };
 }
 
 export function main() {
@@ -216,19 +233,35 @@ export function main() {
     );
     exit(1);
   }
-  const verdict = verdictFromGit({
-    event: env.GITHUB_EVENT_NAME,
-    git: (args) =>
-      execFileSync('git', args, {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
+  /** @param {readonly string[]} args */
+  const git = (args) =>
+    execFileSync('git', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  const event = env.GITHUB_EVENT_NAME;
+  const verdict = verdictFromGit({ event, git });
+  // The second verdict on the same diff: whether it can move a release
+  // picture, so the capture job runs (#774).
+  const capture = captureFromDiff({
+    diff: pullRequestChanges({ event, git }),
+    git,
+    read: (path) => readFileSync(path, 'utf8'),
+    exists: existsSync,
   });
-  appendFileSync(output, `docs_only=${verdict.docsOnly}\n`);
+  appendFileSync(
+    output,
+    `docs_only=${verdict.docsOnly}\ncapture=${capture.capture}\n`,
+  );
   console.log(
     verdict.docsOnly
       ? 'docs-only: every change is documentation that nothing reads, so the browser jobs are skipped.'
       : `not docs-only, so every job runs:\n${verdict.reasons.map((reason) => `  - ${reason}`).join('\n')}`,
+  );
+  console.log(
+    capture.capture
+      ? `the capture runs:\n${capture.reasons.map((reason) => `  - ${reason}`).join('\n')}`
+      : 'the capture is skipped: no change reaches a file it reads.',
   );
 }
 

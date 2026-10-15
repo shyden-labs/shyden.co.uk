@@ -41,10 +41,32 @@ describe('the verdict, run as build-and-test runs it', () => {
       env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) },
     });
 
-  const succeeded = {
-    checks: { result: 'success', outputs: {} },
-    e2e: { result: 'success', outputs: {} },
+  /** `needs` with the capture job (#774) as scope's verdict leaves it. */
+  const capturing = (
+    needs: Record<string, unknown>,
+    said: 'true' | 'false',
+    result: string,
+  ) => {
+    const scope = needs.scope as
+      { outputs?: Record<string, string> } | undefined;
+    return {
+      ...needs,
+      scope: {
+        result: 'success',
+        outputs: { docs_only: 'false', ...scope?.outputs, capture: said },
+      },
+      capture: { result, outputs: {} },
+    };
   };
+
+  const succeeded = capturing(
+    {
+      checks: { result: 'success', outputs: {} },
+      e2e: { result: 'success', outputs: {} },
+    },
+    'true',
+    'success',
+  );
 
   it('passes when every job succeeded and the shards add up, and says so', () => {
     const run = verdict(accountFiles(whole()), succeeded);
@@ -94,7 +116,10 @@ describe('the verdict, run as build-and-test runs it', () => {
 
   it('passes a docs-only pull request whose download was skipped, and says so', () => {
     const unmatched = join(scratch(), '*.json');
-    const run = verdict([unmatched], docsOnlyNeeds());
+    const run = verdict(
+      [unmatched],
+      capturing(docsOnlyNeeds(), 'false', 'skipped'),
+    );
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
     expect(run.stdout).toMatch(/docs-only/);
@@ -104,7 +129,11 @@ describe('the verdict, run as build-and-test runs it', () => {
   it('fails a docs-only verdict when a shard ran anyway', () => {
     const run = verdict(
       accountFiles(whole()),
-      docsOnlyNeeds({ e2e: { result: 'success', outputs: {} } }),
+      capturing(
+        docsOnlyNeeds({ e2e: { result: 'success', outputs: {} } }),
+        'false',
+        'skipped',
+      ),
     );
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(
@@ -116,11 +145,36 @@ describe('the verdict, run as build-and-test runs it', () => {
   it('judges a full run by its accounts when the scope job said false', () => {
     const run = verdict([join(scratch(), '*.json')], {
       ...docsOnlyNeeds(),
-      scope: { result: 'success', outputs: { docs_only: 'false' } },
+      scope: {
+        result: 'success',
+        outputs: { docs_only: 'false', capture: 'false' },
+      },
+      capture: { result: 'skipped', outputs: {} },
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(/e2e finished `skipped`, not `success`/);
     expect(run.stderr).toMatch(/no shard accounted for itself/);
+  });
+
+  it('passes a full run whose capture scope skipped, and says so', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      capturing(succeeded, 'false', 'skipped'),
+    );
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(run.stdout).toMatch(/4 shards ran 2210 of the 2210 tests/);
+  });
+
+  it('fails a full run whose capture was skipped where scope said it runs', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      capturing(succeeded, 'true', 'skipped'),
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /capture finished `skipped` where scope said it runs, not `success`/,
+    );
   });
 
   it('fails when it is handed no needs to read', () => {

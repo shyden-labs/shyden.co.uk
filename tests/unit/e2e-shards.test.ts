@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   accountFileName,
   accountFindings,
+  captureFindings,
   docsOnlyFindings,
   isDocsOnlyRun,
   needsFindings,
@@ -445,5 +446,97 @@ describe('accountFindings: the shards add up to the suite', () => {
     const accounts: unknown[] = whole().slice(1);
     accounts.unshift(broken);
     expect(accountFindings(accounts).join('\n')).toMatch(/not an account/);
+  });
+});
+
+describe('captureFindings: the capture shards ran exactly where scope said (#774)', () => {
+  const checks = { result: 'success', outputs: {} };
+  const scopeSaid = (capture: unknown) => ({
+    result: 'success',
+    outputs: { docs_only: 'false', capture },
+  });
+  const job = (result: string) => ({ result, outputs: {} });
+
+  it('takes a capture that ran where scope said it runs, and hands on the rest', () => {
+    expect(
+      captureFindings({
+        scope: scopeSaid('true'),
+        checks,
+        capture: job('success'),
+      }),
+    ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
+  });
+
+  it('takes a capture skipped where scope said it does not run', () => {
+    expect(
+      captureFindings({
+        scope: scopeSaid('false'),
+        checks,
+        capture: job('skipped'),
+      }),
+    ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
+  });
+
+  it('refuses a capture skipped where scope said it runs', () => {
+    expect(
+      captureFindings({ scope: scopeSaid('true'), capture: job('skipped') })
+        .findings,
+    ).toEqual([
+      'capture finished `skipped` where scope said it runs, not `success`',
+    ]);
+  });
+
+  it('refuses a capture that failed where scope said it runs', () => {
+    expect(
+      captureFindings({ scope: scopeSaid('true'), capture: job('failure') })
+        .findings,
+    ).toEqual([
+      'capture finished `failure` where scope said it runs, not `success`',
+    ]);
+  });
+
+  it('refuses a capture that ran where scope said it does not', () => {
+    expect(
+      captureFindings({ scope: scopeSaid('false'), capture: job('success') })
+        .findings,
+    ).toEqual([
+      'capture finished `success` where scope said it does not run, not `skipped`',
+    ]);
+  });
+
+  it('refuses a scope that handed on no capture verdict', () => {
+    expect(
+      captureFindings({
+        scope: { result: 'success', outputs: { docs_only: 'false' } },
+        capture: job('skipped'),
+      }).findings,
+    ).toEqual([
+      'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
+    ]);
+  });
+
+  it('refuses a capture verdict that is not exactly true or false', () => {
+    expect(
+      captureFindings({ scope: scopeSaid('TRUE'), capture: job('success') })
+        .findings,
+    ).toEqual([
+      'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
+    ]);
+  });
+
+  it('refuses needs that do not include the capture job', () => {
+    expect(captureFindings({ scope: scopeSaid('false'), checks })).toEqual({
+      findings: [
+        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+      ],
+      rest: { scope: scopeSaid('false'), checks },
+    });
+  });
+
+  it('hands needs it cannot read to the verdict that refuses them', () => {
+    expect(captureFindings('not json')).toEqual({
+      findings: [],
+      rest: 'not json',
+    });
   });
 });

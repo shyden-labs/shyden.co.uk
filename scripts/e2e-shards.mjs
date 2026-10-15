@@ -178,6 +178,51 @@ export function needsFindings(needs) {
 }
 
 /**
+ * The capture shards (#774) run only where the scope job said a pull request
+ * can move a release picture, so a skip is a pass there and a refusal
+ * everywhere else. Judged here against that verdict, then left out of what
+ * the docs-only and full-run verdicts read, which know nothing of it. A
+ * verdict other than exactly `true` or `false` judges nothing, so it refuses:
+ * an output that went missing must not read as "skip".
+ *
+ * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @returns {{ findings: string[], rest: unknown }}
+ */
+export function captureFindings(needs) {
+  if (!isRecord(needs)) return { findings: [], rest: needs };
+  const { capture, ...rest } = needs;
+  if (capture === undefined)
+    return {
+      findings: [
+        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+      ],
+      rest,
+    };
+  const result = isRecord(capture) ? capture.result : undefined;
+  const outputs = isRecord(needs.scope) ? needs.scope.outputs : undefined;
+  const said = isRecord(outputs) ? outputs.capture : undefined;
+  if (said !== 'true' && said !== 'false')
+    return {
+      findings: [
+        `scope handed on no capture verdict (${JSON.stringify(said)}), ` +
+          `so capture finishing \`${String(result)}\` cannot be judged`,
+      ],
+      rest,
+    };
+  const [wanted, where] =
+    said === 'true' ? ['success', 'runs'] : ['skipped', 'does not run'];
+  return {
+    findings:
+      result === wanted
+        ? []
+        : [
+            `capture finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
+          ],
+    rest,
+  };
+}
+
+/**
  * Whether the scope job said this pull request is docs-only (#582). Only the
  * exact string the runner hands over for `docs_only=true` counts; anything
  * else is a full run, judged by its accounts.
@@ -398,20 +443,27 @@ function main() {
   }
 
   const present = files.filter((file) => existsSync(file));
-  const docsOnly = isDocsOnlyRun(needs);
-  const findings = docsOnly
-    ? // No shard runs, and the download is skipped, so the glob arrives
-      // unmatched; any account that does exist is refused by name.
-      docsOnlyFindings(needs, present)
-    : [
-        ...needsFindings(needs),
-        ...files
-          .filter((file) => !existsSync(file))
-          .map(
-            (file) => `${file} does not exist, so it holds no shard's account`,
-          ),
-        ...accountFindings(present.map((file) => loadAccount(file))),
-      ];
+  // The capture job first: it is judged against scope's verdict, not by
+  // whether the pull request is docs-only, and the rest never see it.
+  const capture = captureFindings(needs);
+  const docsOnly = isDocsOnlyRun(capture.rest);
+  const findings = [
+    ...capture.findings,
+    ...(docsOnly
+      ? // No shard runs, and the download is skipped, so the glob arrives
+        // unmatched; any account that does exist is refused by name.
+        docsOnlyFindings(capture.rest, present)
+      : [
+          ...needsFindings(capture.rest),
+          ...files
+            .filter((file) => !existsSync(file))
+            .map(
+              (file) =>
+                `${file} does not exist, so it holds no shard's account`,
+            ),
+          ...accountFindings(present.map((file) => loadAccount(file))),
+        ]),
+  ];
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +
