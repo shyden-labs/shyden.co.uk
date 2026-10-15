@@ -10,6 +10,7 @@ import {
 import { expectReportsBound } from '../report-health';
 import { expectedBadges } from '../beta-badges';
 import { deployedRoutes, docsPaths } from '../site-pages';
+import { expectDocsRendered } from '../api-docs-pages';
 import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectTheSwitchPersists } from '../themes';
 import { robotsDirectives } from '../robots-directives';
@@ -288,9 +289,7 @@ test(
 // #781: the API docs, public and private; dev's own gate covers both.
 for (const path of docsPaths())
   test(`the API docs at ${path} render on dev`, async ({ page }) => {
-    const response = await page.goto(path);
-    expect(response?.status()).toBe(200);
-    await expect(page.locator('#swagger .opblock').first()).toBeVisible();
+    await expectDocsRendered(page, path);
   });
 
 test(

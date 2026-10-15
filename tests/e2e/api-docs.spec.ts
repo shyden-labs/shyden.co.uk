@@ -4,6 +4,7 @@ import { docsPaths } from '../site-pages';
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { contrastRatio } from './helpers';
+import { docsSpecFile, requiredTextFields } from '../api-docs-pages';
 import { recorded, shoot } from './evidence';
 
 test.use(recorded);
@@ -25,7 +26,7 @@ const floorName = (path: string): string =>
  * exploring would. A preview of dist/ runs no Pages Function, so the API's
  * answer is a stand-in: the response view is what is measured, not the API.
  */
-const openEverything = async (page: Page) => {
+const openEverything = async (page: Page, path: string) => {
   await page.route(
     (url) => url.pathname.startsWith('/api/report'),
     (route) =>
@@ -42,10 +43,9 @@ const openEverything = async (page: Page) => {
   // empty, which would measure a collapsed page and pass.
   const count = await operations.count();
   // runtime population: the operations Swagger UI drew from the spec.
-  for (const summary of await page
-    .locator('#swagger .opblock-summary-control')
-    .all())
-    await summary.click();
+  const summaries = page.locator('#swagger .opblock-summary-control');
+  await expect(summaries).toHaveCount(count);
+  for (const summary of await summaries.all()) await summary.click();
   await expect(page.locator('#swagger .opblock.is-open')).toHaveCount(count);
   const tryOuts = page.locator('#swagger .try-out__btn');
   await expect(tryOuts).toHaveCount(count);
@@ -53,12 +53,10 @@ const openEverything = async (page: Page) => {
   for (const tryIt of await tryOuts.all()) await tryIt.click();
   const executes = page.locator('#swagger .btn.execute');
   await expect(executes).toHaveCount(count);
-  // runtime population: the text fields Try it out showed; a required one
-  // left empty stops Swagger UI sending at all.
-  for (const field of await page
-    .locator('#swagger .opblock-body input[type="text"]')
-    .all())
-    if ((await field.inputValue()) === '') await field.fill('x');
+  // The fields the page's own spec requires a visitor to type: Swagger UI
+  // sends nothing while one is empty, and labels each with its name.
+  for (const name of requiredTextFields(docsSpecFile(path)))
+    await page.getByPlaceholder(name, { exact: true }).fill('x');
   // runtime population: one Execute per operation.
   for (const execute of await executes.all()) await execute.click();
   await expect(
@@ -121,7 +119,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
             await page.emulateMedia({ colorScheme: theme });
             await page.setViewportSize({ width, height: 900 });
             await page.goto(path);
-            await openEverything(page);
+            await openEverything(page, path);
             const name = floorName(path);
 
             const box = await page.evaluate(() => {

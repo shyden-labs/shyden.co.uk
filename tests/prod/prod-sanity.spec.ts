@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import { deployedRoutes } from '../site-pages';
+import { expectDocsRendered } from '../api-docs-pages';
 import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectNoHorizontalScroll } from '../viewport';
 import { expectTheSwitchPersists } from '../themes';
@@ -186,9 +187,7 @@ test(
 
 // #781: the public API docs render; production lets nothing be written from them.
 test('the public API docs render on production', async ({ page }) => {
-  const response = await page.goto('/api/docs/');
-  expect(response?.status()).toBe(200);
-  await expect(page.locator('#swagger .opblock-post')).toBeVisible();
+  await expectDocsRendered(page, '/api/docs/');
 });
 
 test(

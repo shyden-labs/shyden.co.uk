@@ -78,8 +78,8 @@ const kindOf = (value: unknown): string =>
         ? 'integer'
         : typeof value;
 
-/** Every way `value` disagrees with `raw`, each naming where; empty means it agrees. */
-export function validate(
+/** How one value disagrees with a schema that holds no other schema. */
+function leafFindings(
   doc: OpenApiDoc,
   raw: Schema,
   value: unknown,
@@ -105,17 +105,46 @@ export function validate(
     found.push(
       `${at}: ${JSON.stringify(value)} is not ${JSON.stringify(schema.const)}`,
     );
-  if (actual === 'object') {
-    const object = value as Record<string, unknown>;
-    const properties = (schema.properties ?? {}) as Record<string, Schema>;
-    for (const name of (schema.required ?? []) as string[])
-      if (!(name in object)) found.push(`${at}.${name}: required, missing`);
-    for (const [name, item] of Object.entries(object)) {
-      if (properties[name])
-        found.push(...validate(doc, properties[name], item, `${at}.${name}`));
-      else if (schema.additionalProperties === false)
+  return found;
+}
+
+/**
+ * Every way `value` disagrees with `raw`, each naming where; empty means it
+ * agrees. One level deep, which is all the report API's bodies are: a body
+ * schema's properties are read as leaves, and a property that holds a schema
+ * of its own (`properties` or `items`) is refused, never passed unread.
+ */
+export function validate(
+  doc: OpenApiDoc,
+  raw: Schema,
+  value: unknown,
+  at: string,
+): string[] {
+  const schema = resolve(doc, raw);
+  const found = leafFindings(
+    doc,
+    Object.fromEntries(
+      Object.entries(schema).filter(
+        ([key]) =>
+          !['properties', 'required', 'additionalProperties'].includes(key),
+      ),
+    ),
+    value,
+    at,
+  );
+  if (found.length || kindOf(value) !== 'object') return found;
+  const object = value as Record<string, unknown>;
+  const properties = (schema.properties ?? {}) as Record<string, Schema>;
+  for (const name of (schema.required ?? []) as string[])
+    if (!(name in object)) found.push(`${at}.${name}: required, missing`);
+  for (const [name, item] of Object.entries(object)) {
+    const property = properties[name];
+    if (!property) {
+      if (schema.additionalProperties === false)
         found.push(`${at}.${name}: not in the spec`);
-    }
+    } else if ('properties' in property || 'items' in property)
+      found.push(`${at}.${name}: a nested schema this checker does not read`);
+    else found.push(...leafFindings(doc, property, item, `${at}.${name}`));
   }
   return found;
 }

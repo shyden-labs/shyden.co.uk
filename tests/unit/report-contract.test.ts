@@ -4,8 +4,8 @@ import {
   reportHealth,
   PAGE_IDS,
   REPORT_COLUMNS,
-  type ReportsDatabase,
 } from '../../src/lib/report';
+import { tableWith } from '../report-fakes';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
@@ -148,21 +148,6 @@ describe('the spec covers what the code can answer', () => {
 
 const HEALTH_SPEC = loadSpec('openapi/report-health.yaml');
 const HEALTH = '/api/report/health';
-
-/** A reports table answering `columns`, as `report-endpoint.test.ts` fakes it. */
-const tableWith = (columns: readonly string[]): ReportsDatabase => ({
-  prepare: () => ({
-    bind() {
-      throw new Error('health binds nothing');
-    },
-    run() {
-      throw new Error('health writes nothing');
-    },
-    all: async <T>() => ({
-      results: columns.map((name) => ({ name })) as T[],
-    }),
-  }),
-});
 
 const HEALTH_CASES: readonly (readonly [
   string,
