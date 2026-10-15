@@ -12,7 +12,14 @@ import {
   type Student,
 } from '../../src/lib/grouping';
 import * as grouping from '../../src/lib/grouping';
-import { student, shape, groupOf, seeded } from './factories';
+import {
+  student,
+  shape,
+  groupOf,
+  seeded,
+  fifteenBuddyPairs,
+  eightBoysFifteenGirlsFiveApart,
+} from './factories';
 import { apartSweep } from '../apart-sweep';
 // Fix round 1, F-2: closing the reviewer's named gap -- nothing in this
 // file, before this fix, ever piped a `separate`-mode failure through
@@ -1106,12 +1113,7 @@ describe('together letters', () => {
     // an already-exhausted search a second time -- measured at 17-23ms
     // across repeated runs, roughly double the single-pass number above,
     // as two equal exhaustions predict.
-    const pairs = Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)), // A,A,B,B,...,O,O
-      }),
-    );
+    const pairs = fifteenBuddyPairs(); // A,A,B,B,...,O,O
     const out = buildGroups(
       base({
         students: pairs,
@@ -1826,15 +1828,15 @@ describe('apart and together letters both in play — the failure names both rul
     // assumed from that argument alone: this exact roster reproducibly
     // returns BOTH_RULES_SEARCH_GAVE_UP, deterministically, on repeated
     // runs.
-    const pairs = Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)), // A,A,B,B,...,O,O
-        apart: i === 0 || i === 16 ? 'X' : null, // student 1 (pair A) vs student 17 (pair I)
-      }),
-    );
+    // Student 1 (pair A) vs student 17 (pair I).
+    const pairs = fifteenBuddyPairs({ apartAcross: true });
     const out = buildGroups(
-      base({ students: pairs, mode: { kind: 'groupCount', count: 10 } }),
+      base({
+        students: pairs,
+        mode: { kind: 'groupCount', count: 10 },
+        // The real budget's run of this roster: tests/simulation/ (#794).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -2966,29 +2968,16 @@ describe('sex mode: separate', () => {
   // like this file's other SEARCH_GAVE_UP tests do (see "says it gave up,
   // not that no arrangement exists" above).
   describe('when at least one allocation candidate gives up rather than proving impossibility: reports sexSeparateSearchGaveUp, not the proof code (Fix round 2)', () => {
-    const eightBoysFifteenGirlsFiveApart = [
-      ...Array.from({ length: 8 }, (_, i) => M(i + 1)),
-      ...Array.from({ length: 5 }, (_, i) =>
-        student({ number: i + 9, sex: 'F' as const, apart: 'X' }),
-      ),
-      F(14),
-      F(15),
-      F(16),
-      F(17),
-      F(18),
-      F(19),
-      F(20),
-      F(21),
-      F(22),
-      F(23),
-    ];
+    const eightBoysFifteenGirls = eightBoysFifteenGirlsFiveApart();
 
     it('reports the gave-up code, not sexSeparateImpossible, when the search never fully explored every candidate', () => {
       const out = buildGroups(
         base({
-          students: eightBoysFifteenGirlsFiveApart,
+          students: eightBoysFifteenGirls,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -3003,9 +2992,11 @@ describe('sex mode: separate', () => {
     it('renders the exact sentence claiming nothing about possibility, offering fewer letters or the mode switch, in both languages', () => {
       const out = buildGroups(
         base({
-          students: eightBoysFifteenGirlsFiveApart,
+          students: eightBoysFifteenGirls,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4632,12 +4623,7 @@ describe('pinned groups', () => {
     // the pool, per that doc comment). --------------------------------
 
     const testTogetherSearchGaveUpPinned = () => {
-      const pairs = Array.from({ length: 30 }, (_, i) =>
-        student({
-          number: i + 1,
-          together: String.fromCharCode(65 + Math.floor(i / 2)),
-        }),
-      );
+      const pairs = fifteenBuddyPairs();
       // The pinned pair must be REAL roster members, not just numbers handed
       // to `pinned` -- a pin resolves by matching `presentByNumber` (see
       // buildGroups's own comment on `pinnedGroups`), so a number with no
@@ -4652,6 +4638,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4702,13 +4690,7 @@ describe('pinned groups', () => {
     };
 
     const testBothRulesSearchGaveUpPinned = () => {
-      const pairs = Array.from({ length: 30 }, (_, i) =>
-        student({
-          number: i + 1,
-          together: String.fromCharCode(65 + Math.floor(i / 2)),
-          apart: i === 0 || i === 16 ? 'X' : null,
-        }),
-      );
+      const pairs = fifteenBuddyPairs({ apartAcross: true });
       // See testTogetherSearchGaveUpPinned's comment.
       const pinnedPair = [student({ number: 31 }), student({ number: 32 })];
       const out = buildGroups(
@@ -4716,6 +4698,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4730,22 +4714,7 @@ describe('pinned groups', () => {
     };
 
     const testSexSeparateSearchGaveUpPinned = () => {
-      const students = [
-        ...Array.from({ length: 8 }, (_, i) => M(i + 1)),
-        ...Array.from({ length: 5 }, (_, i) =>
-          student({ number: i + 9, sex: 'F' as const, apart: 'X' }),
-        ),
-        F(14),
-        F(15),
-        F(16),
-        F(17),
-        F(18),
-        F(19),
-        F(20),
-        F(21),
-        F(22),
-        F(23),
-      ];
+      const students = eightBoysFifteenGirlsFiveApart();
       // See testTogetherSearchGaveUpPinned's comment. `sexMode: 'separate'`
       // additionally requires every PRESENT student to have a sex set (the
       // unset-sex guard runs on `present`, before pins are even resolved),
@@ -4757,6 +4726,8 @@ describe('pinned groups', () => {
           mode: { kind: 'groupCount', count: 7 },
           sexMode: 'separate',
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);

@@ -46,3 +46,34 @@ export function seeded(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/**
+ * Fifteen buddy pairs, students 1-30 kept together as A,A,B,B,...,O,O: the
+ * reviewer's gave-up repro, whose same-size blocks exhaust the search budget.
+ * With `apartAcross`, students 1 (pair A) and 17 (pair I) also share the
+ * apart-letter X, a cross-block conflict that changes no block's size.
+ * One home for the unit tests and their real-budget simulations (#794).
+ */
+export const fifteenBuddyPairs = ({
+  apartAcross = false,
+}: { apartAcross?: boolean } = {}): Student[] =>
+  Array.from({ length: 30 }, (_, i) =>
+    student({
+      number: i + 1,
+      together: String.fromCharCode(65 + Math.floor(i / 2)),
+      apart: apartAcross && (i === 0 || i === 16) ? 'X' : null,
+    }),
+  );
+
+/**
+ * Eight boys (1-8) and fifteen girls (9-23), girls 9-13 mutually apart: the
+ * smallest measured roster on which `separate` mode gives up rather than
+ * proving impossibility (Fix round 2). One home for the unit tests and their
+ * real-budget simulations (#794).
+ */
+export const eightBoysFifteenGirlsFiveApart = (): Student[] => [
+  ...Array.from({ length: 8 }, (_, i) => student({ number: i + 1, sex: 'M' })),
+  ...Array.from({ length: 15 }, (_, i) =>
+    student({ number: i + 9, sex: 'F', apart: i < 5 ? 'X' : null }),
+  ),
+];
