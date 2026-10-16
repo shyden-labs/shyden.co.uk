@@ -49,7 +49,7 @@ const TREE = {
   },
 };
 
-const UNLISTED: BurnDownLists = { floorless: {}, absence: {} };
+const UNLISTED: BurnDownLists = { floorless: {} };
 
 describe('lintChangedTests names what each finder plants, by file:line', () => {
   it('names a search with no floor in a changed file', () => {
@@ -101,7 +101,6 @@ describe('lintChangedTests judges only the changed files, as the guards would', 
     expect(
       lintChangedTests(['floorless.test.ts', 'absence.test.ts'], TREE, {
         floorless: { 'floorless.test.ts › no floor': 1 },
-        absence: {},
       }).findings.map((finding) => finding.split(':')[0]),
     ).toEqual(['absence.test.ts']);
   });
@@ -110,7 +109,6 @@ describe('lintChangedTests judges only the changed files, as the guards would', 
     expect(
       lintChangedTests(['absence.test.ts'], TREE, {
         floorless: { 'floorless.test.ts › no floor': 1 },
-        absence: { 'clean.test.ts › clean': 1 },
       }).findings.map((finding) => finding.split(':')[0]),
     ).toEqual(['absence.test.ts']);
   });
@@ -119,24 +117,9 @@ describe('lintChangedTests judges only the changed files, as the guards would', 
     expect(
       lintChangedTests(['clean.test.ts'], TREE, {
         floorless: { 'clean.test.ts › clean': 1 },
-        absence: {},
       }).findings,
     ).toEqual([
       'clean.test.ts › clean: floorless-searches: 0 read, 1 listed. Lower the entry in tests/floorless-searches.burn-down.ts: the list only shrinks.',
-    ]);
-  });
-
-  it('names a listed scope that now reads fewer, so its entry is lowered', () => {
-    expect(
-      lintChangedTests(['clean.test.ts', 'absence.test.ts'], TREE, {
-        floorless: {},
-        absence: {
-          'clean.test.ts › clean': 1,
-          'absence.test.ts › self-contained': 1,
-        },
-      }).findings,
-    ).toEqual([
-      'clean.test.ts › clean: absence-liveness: 0 read, 1 listed. Lower the entry in tests/absence-liveness.burn-down.ts: the list only shrinks.',
     ]);
   });
 });

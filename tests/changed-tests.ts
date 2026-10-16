@@ -1,4 +1,3 @@
-import { ABSENCE_BURN_DOWN } from './absence-liveness.burn-down';
 import { DISCOVERY, scanAbsences } from './absence-liveness';
 import { burnDownBreaches } from './burn-down';
 import { FLOORLESS } from './floorless-searches.burn-down';
@@ -32,16 +31,18 @@ export interface TestTree {
   readonly presence: PresenceClosures;
 }
 
-/** The two burn-down lists, by `file › scope`, as the guards hold them. */
+/**
+ * The burn-down lists, by `file › scope`, as the guards hold them: the
+ * floorless one alone since absence-liveness's emptied with #623 and was
+ * retired (#647).
+ */
 export interface BurnDownLists {
   readonly floorless: Readonly<Record<string, number>>;
-  readonly absence: Readonly<Record<string, number>>;
 }
 
 /** The lists the guards hold today. */
 export const BURN_DOWN_LISTS: BurnDownLists = {
   floorless: FLOORLESS,
-  absence: ABSENCE_BURN_DOWN,
 };
 
 /**
@@ -134,31 +135,20 @@ export function lintChangedTests(
         : [lowerTheEntry(breach, 'floorless-searches')]),
     );
 
-  // absence-liveness: each absence carries its population, or is listed.
+  // absence-liveness: each absence carries its population; none is listed.
   const absences = scanAbsences(tree.bound, tree.discoverers);
   for (const file of files) judged.absences += absences.perFile.get(file) ?? 0;
   findings.push(
     ...absences.findings
       .filter((finding) => atInFiles(files, finding))
       .map((finding) => labelled(finding, 'absence-liveness')),
+    ...absences.unjudgedSites
+      .filter(({ key }) => keyInFiles(files, key))
+      .map(
+        ({ key, at, why }) =>
+          `${at}: absence-liveness: ${why} (${key.slice(key.indexOf(' › ') + 3)}). Route it through searched() and check a floor.`,
+      ),
   );
-  const unjudged = new Map(
-    [...absences.unjudged].filter(([key]) => keyInFiles(files, key)),
-  );
-  for (const breach of burnDownBreaches(
-    unjudged,
-    listedFor(lists.absence, files),
-  ))
-    findings.push(
-      ...(breach.read > breach.listed
-        ? absences.unjudgedSites
-            .filter(({ key }) => key === breach.key)
-            .map(
-              ({ key, at, why }) =>
-                `${at}: absence-liveness: ${why} (${key.slice(key.indexOf(' › ') + 3)}). Route it through searched() and check a floor.`,
-            )
-        : [lowerTheEntry(breach, 'absence-liveness')]),
-    );
 
   // anchored-presence: a presence over raw source is stripped or anchored.
   const presence = scanPresence(tree.bound, tree.presence);

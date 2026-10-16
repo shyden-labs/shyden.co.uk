@@ -39,6 +39,16 @@
  * functions id is new, the unit suite runs once more, as in every mode, for the
  * floor that counts the record's ids; the Playwright figures are carried.
  *
+ * `npm run floors:record -- --device` records the real-iPhone journeys'
+ * floors (#623), the one suite no other record can reach: they run under
+ * Vitest against the phone over WebDriver, never in CI. It asks
+ * `xcrun devicectl` for exactly one iPhone before anything runs and refuses
+ * by name without one, then runs the device runner's iOS group alone
+ * (`npm run test:devices -- --ios`, one build and one phone) and refuses a
+ * run that passed without recording a floor. Every other mode carries the
+ * iPhone floors unchanged and names them; `tests/guards/floors.test.ts` holds
+ * every id a journey checks to the record, since nothing else measures them.
+ *
  * `npm run floors:record -- --retire <id>` (#640, any mode, repeatable) drops
  * an id the branch itself created and no test spells any more, in the same run
  * that records its replacement: the floors that count the record's ids are
@@ -71,6 +81,7 @@ import {
 import { isAbsolute, join, posix, relative, sep } from 'node:path';
 import { argv, env } from 'node:process';
 
+import { listDevices, pickIphone } from './devicectl.mjs';
 import { die, messageOf, nonEmpty } from './errors.mjs';
 import { containerArgs, localImage } from './playwright-image.mjs';
 
@@ -79,10 +90,12 @@ const GUARDS = 'guards suite';
 const INTEGRATION = 'integration suite';
 const PLAYWRIGHT = 'Playwright run';
 const FUNCTIONS = 'functions suite';
+const DEVICE = 'iPhone journeys';
 const UNIT_ONLY = '--unit';
 const FUNCTIONS_ONLY = '--functions';
 const UNIT_SUITE_ONLY = '--unit-suite';
-const MODES = [UNIT_ONLY, FUNCTIONS_ONLY, UNIT_SUITE_ONLY];
+const DEVICE_ONLY = '--device';
+const MODES = [UNIT_ONLY, FUNCTIONS_ONLY, UNIT_SUITE_ONLY, DEVICE_ONLY];
 
 /**
  * A suite's command, read from the `test:<name>` script that carries its one
@@ -163,21 +176,28 @@ export const RECORD_DIR_PREFIX = '.floors-record-';
 
 const E2E_DIR = 'tests/e2e';
 const FUNCTIONS_DIR = 'tests/functions';
+const SPEC_SUFFIX = '.spec.ts';
+
+/** The real-iPhone journeys (#623), which `vitest.ios.config.ts` runs. */
+export const DEVICE_DIR = 'tests/device/ios';
+export const DEVICE_SUFFIX = '.journey.ts';
 
 /**
  * The Playwright specs that call `floorBreach`, which the record run is
  * limited to: every other spec would cost minutes and record nothing. Read
  * from each spec's text, so one that names the function only in a comment
  * runs for nothing; `tests/guards/floors.test.ts` holds this list equal to the
- * specs whose parse tree calls it. `FUNCTIONS_DIR` is read the same way (#610).
+ * specs whose parse tree calls it. `FUNCTIONS_DIR` is read the same way (#610),
+ * and so are the iPhone journeys, by their own suffix (#623).
  *
  * @param {string} [dir]
+ * @param {string} [suffix]
  * @returns {string[]}
  */
-export const floorSpecs = (dir = E2E_DIR) =>
+export const floorSpecs = (dir = E2E_DIR, suffix = SPEC_SUFFIX) =>
   nonEmpty(
-    readdirSync(dir).filter((name) => name.endsWith('.spec.ts')),
-    `Playwright specs in ${dir}`,
+    readdirSync(dir).filter((name) => name.endsWith(suffix)),
+    `${suffix} files in ${dir}`,
   )
     .map((name) => join(dir, name))
     .filter((file) => /\bfloorBreach\(/.test(readFileSync(file, 'utf8')))
@@ -380,50 +400,138 @@ export const carriedOutside = (ids, functionsTexts, asserted) =>
 /**
  * The suites a record runs on `pass`, by mode (#658). A later pass runs only
  * to settle the ids the pass before it added, so it reruns the Vitest suites
- * and never Playwright or the functions suite; `--unit-suite` reruns the unit
- * suite alone, since the laptop runs nothing else.
+ * and never Playwright, the functions suite or the iPhone; `--unit-suite` and
+ * `--device` rerun the unit suite alone, since the laptop runs nothing else.
+ * The iPhone journeys run in `--device` alone (#623): a full record runs in
+ * CI, which has no phone.
  *
  * @param {string | undefined} mode the one argument, or none for a full record
  * @param {number} pass
- * @returns {{ unit: boolean, guards: boolean, integration: boolean, playwright: boolean, functions: boolean }}
+ * @returns {{ unit: boolean, guards: boolean, integration: boolean, playwright: boolean, functions: boolean, device: boolean }}
  */
 export const recordSuites = (mode, pass) => {
-  const vitest = pass > 1 || mode !== FUNCTIONS_ONLY;
-  const unitAlone = mode === UNIT_SUITE_ONLY;
+  const vitest = pass > 1 || (mode !== FUNCTIONS_ONLY && mode !== DEVICE_ONLY);
+  const unitAlone = mode === UNIT_SUITE_ONLY || mode === DEVICE_ONLY;
   return {
     unit: vitest,
     guards: vitest && !unitAlone,
     integration: vitest && !unitAlone,
     playwright: pass === 1 && mode === undefined,
     functions: pass === 1 && (mode === undefined || mode === FUNCTIONS_ONLY),
+    device: pass === 1 && mode === DEVICE_ONLY,
   };
 };
 
 /**
  * The recorded ids a mode carries unmeasured, given the ids the run asserted
- * (#658): `--unit` those a Playwright or functions spec spells (#548);
- * `--functions` every one no functions spec spells (#610); a full record
- * none. In those modes an id its own suite spells and the run did not assert
- * is a floor that lost its test, and is refused. `--unit-suite` carries every
- * id the unit run did not assert: telling a unit floor that lost its test from
- * a guards one would take a second walk of `tests/` beside the one home in
- * `tests/source-files.ts`, and `record-floors.yml` refuses a lost test anyway,
- * since its full record carries nothing.
+ * (#658): `--unit` those a Playwright, functions or iPhone test spells (#548);
+ * `--functions` every one no functions spec spells (#610); `--device` every
+ * one no iPhone journey spells (#623); a full record those an iPhone journey
+ * spells, since CI has no phone. In those modes an id its own suite spells and
+ * the run did not assert is a floor that lost its test, and is refused.
+ * `--unit-suite` carries every id the unit run did not assert: telling a unit
+ * floor that lost its test from a guards one would take a second walk of
+ * `tests/` beside the one home in `tests/source-files.ts`, and
+ * `record-floors.yml` refuses a lost test anyway, since its full record
+ * carries only the iPhone's.
  *
  * @param {string | undefined} mode
  * @param {readonly string[]} ids the recorded ids
  * @param {ReadonlySet<string>} asserted
- * @param {{ specTexts: readonly string[], functionsTexts: readonly string[] }} texts
+ * @param {{ specTexts: readonly string[], functionsTexts: readonly string[], deviceTexts: readonly string[] }} texts
  * @returns {string[]}
  */
 export const carriedFor = (mode, ids, asserted, texts) =>
   mode === UNIT_ONLY
-    ? carriedIds(ids, [...texts.specTexts, ...texts.functionsTexts], asserted)
+    ? carriedIds(
+        ids,
+        [...texts.specTexts, ...texts.functionsTexts, ...texts.deviceTexts],
+        asserted,
+      )
     : mode === FUNCTIONS_ONLY
       ? carriedOutside(ids, texts.functionsTexts, asserted)
       : mode === UNIT_SUITE_ONLY
         ? ids.filter((id) => !asserted.has(id))
-        : [];
+        : mode === DEVICE_ONLY
+          ? carriedOutside(ids, texts.deviceTexts, asserted)
+          : carriedIds(ids, texts.deviceTexts, asserted);
+
+/**
+ * What a record says of the ids it carried unmeasured, one line per kind
+ * (#548, #623): the iPhone's apart, by name, since CI judges the rest and only
+ * a device record on the phone ever measures them.
+ *
+ * @param {string | undefined} mode
+ * @param {readonly string[]} carried
+ * @param {readonly string[]} deviceTexts the iPhone journeys, read
+ * @returns {string[]}
+ */
+export const carriedLines = (mode, carried, deviceTexts) => {
+  const label = mode ?? 'a full record';
+  const onPhone = carriedIds(carried, deviceTexts, new Set());
+  const rest = carried.filter((id) => !onPhone.includes(id));
+  return [
+    ...(rest.length > 0
+      ? [
+          `${label}: not measured, carried unchanged for CI to judge: ` +
+            rest.join(', '),
+        ]
+      : []),
+    ...(onPhone.length > 0
+      ? [
+          `${label}: the iPhone floors, carried unchanged: only npm run ` +
+            `floors:record -- ${DEVICE_ONLY}, on the phone, measures them: ` +
+            onPhone.join(', '),
+        ]
+      : []),
+  ];
+};
+
+/**
+ * The process a device record starts (#623): the device runner's iOS group
+ * alone, which builds the site, serves it and drives the phone, as
+ * `npm run test:devices` does for all three groups.
+ */
+export const DEVICE_RECORD_COMMAND = {
+  file: 'npm',
+  args: ['run', 'test:devices', '--', '--ios'],
+};
+
+/**
+ * The iPhone journeys' observations, or why there are none (#623). Asks for
+ * exactly one iPhone (`IOS_UDID` chooses among several, as the session does)
+ * before `run` starts anything, so a record without a phone is refused by
+ * name and never reads as "nothing moved"; then refuses a run that failed, and
+ * one that passed without recording a floor, which is a run `RECORD_ENV` never
+ * reached. Every process is a parameter, so the unit tests stand each in.
+ *
+ * @param {{
+ *   list: () => string,
+ *   udid: string | undefined,
+ *   run: () => { status: number | null, error?: Error },
+ *   read: () => readonly Observation[],
+ * }} device `list` is `xcrun devicectl`'s listing, throwing on failure;
+ *   `read` is what the run wrote
+ * @returns {readonly Observation[] | string}
+ */
+export const measureDevice = ({ list, udid, run, read }) => {
+  const absent = 'no iPhone to record the device floors on';
+  let listing;
+  try {
+    listing = list();
+  } catch (error) {
+    return `${absent}: ${messageOf(error)}`;
+  }
+  const picked = pickIphone(listing, udid);
+  if ('absence' in picked) return `${absent}: ${picked.absence}`;
+  const refusal = runRefusal(DEVICE, run());
+  if (refusal !== undefined) return refusal;
+  const seen = read();
+  return seen.length > 0
+    ? seen
+    : `the ${DEVICE} passed and recorded no floor: ${RECORD_ENV} never ` +
+        'reached them, so nothing was measured';
+};
 
 /**
  * What a record run wrote, one observation per line; nothing when it wrote
@@ -804,6 +912,9 @@ const main = () => {
   const functionsSpecs = floorSpecs(FUNCTIONS_DIR);
   if (functionsSpecs.length === 0)
     die('no functions spec calls floorBreach: nothing to record there');
+  const deviceJourneys = floorSpecs(DEVICE_DIR, DEVICE_SUFFIX);
+  if (deviceJourneys.length === 0)
+    die('no iPhone journey calls floorBreach: nothing to record there');
 
   // Collected inside the try and judged after it: `die` exits at once, which
   // skips any `finally` still pending, and the scratch directory would leak.
@@ -819,6 +930,8 @@ const main = () => {
   let e2eSeen = [];
   /** @type {readonly Observation[]} */
   let functionsSeen = [];
+  /** @type {readonly Observation[]} */
+  let deviceSeen = [];
   let settled;
   try {
     // The first pass reads the record the run would write: without the
@@ -843,13 +956,14 @@ const main = () => {
         carried = carriedFor(mode, Object.keys(recorded), asserted, {
           specTexts: textsOf(specs),
           functionsTexts: textsOf(functionsSpecs),
+          deviceTexts: textsOf(deviceJourneys),
         });
         return carried;
       },
       measure: (floors, pass) => {
         // A later pass reads the record the one before it decided. Only the
-        // Vitest suites run again: no Playwright or functions test reads the
-        // record's ids.
+        // Vitest suites run again: no Playwright, functions or iPhone test
+        // reads the record's ids.
         const suites = recordSuites(mode, pass);
         if (pass > 1) {
           writeFileSync(FLOORS_FILE, floorsText(floors));
@@ -936,10 +1050,33 @@ const main = () => {
           if (functionsRefusal !== undefined) return functionsRefusal;
           functionsSeen = observationsIn(functions);
         }
+        if (suites.device) {
+          const device = join(dir, 'device.jsonl');
+          console.log(
+            `Recording the iPhone floors: ${deviceJourneys.join(' ')}`,
+          );
+          const seen = measureDevice({
+            list: listDevices,
+            udid: env.IOS_UDID,
+            run: () =>
+              spawnSync(
+                DEVICE_RECORD_COMMAND.file,
+                DEVICE_RECORD_COMMAND.args,
+                {
+                  stdio: 'inherit',
+                  env: childEnv(env, device),
+                },
+              ),
+            read: () => observationsIn(device),
+          });
+          if (typeof seen === 'string') return seen;
+          deviceSeen = seen;
+        }
         return [
           ...(existsSync(unit) ? observationsIn(unit) : []),
           ...e2eSeen,
           ...functionsSeen,
+          ...deviceSeen,
         ];
       },
     });
@@ -955,12 +1092,12 @@ const main = () => {
       else writeFileSync(FLOORS_FILE, original);
     die(failure ?? `nothing recorded:\n  ${refusals.join('\n  ')}`);
   }
-  if (carried.length > 0)
-    console.log(
-      `${mode}: not measured, carried ` +
-        'unchanged for CI to judge: ' +
-        carried.join(', '),
-    );
+  for (const line of carriedLines(
+    mode,
+    carried,
+    deviceJourneys.map((file) => readFileSync(file, 'utf8')),
+  ))
+    console.log(line);
 
   const moves = describeMoves(recorded, next);
   writeFileSync(FLOORS_FILE, floorsText(next));

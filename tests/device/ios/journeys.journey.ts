@@ -62,6 +62,7 @@ import {
 import { MAX_STUDENTS } from '../../../src/lib/grouping';
 import { FLOOR_PX } from '../../../src/scripts/projector';
 import { measureBoardScript, type BoardGeometry } from '../../board-geometry';
+import { floorBreach } from '../../floors';
 import { searched } from '../../source-files';
 import {
   IOS_ZOOM_FLOOR_PX,
@@ -73,6 +74,49 @@ import { startIosSession, type DeviceSession } from './session';
 import { waitFor } from './webdriver';
 
 let session: DeviceSession;
+
+/**
+ * The group cards on the page, by their text (#623). Each refused-count
+ * journey reads them twice through this one reader: after the refusal, where
+ * there must be none, and after a class the page can deal, where there must be
+ * some. The second reading is the population the first is judged against, so
+ * a reader gone blind (a selector that stopped matching, a card whose text
+ * stopped reading) is a short count against its recorded floor rather than a
+ * clean "nothing rendered". `npm run floors:record -- --device` records the
+ * floors, on the phone, since nothing else can run this file.
+ */
+async function groupCardTexts(): Promise<string[]> {
+  const cards = await session.driver.findElements('#cg-tables .group');
+  return Promise.all(cards.map((card) => card.text()));
+}
+
+/**
+ * Deals `students` with the rest of the form as the journey left it, and
+ * reads the cards that deal rendered through `groupCardTexts`: the positive
+ * control after a refusal. The page renders a deal at once (Journey 1 counts
+ * every student on the first read), so the first read with any card is all of
+ * them.
+ */
+async function dealtCardTexts(
+  students: number,
+  locale: Locale,
+): Promise<string[]> {
+  const count = await session.driver.findElement('#cg-count');
+  await session.interaction.click(count);
+  await session.interaction.clear(count);
+  await session.interaction.type(count, String(students));
+  await session.interaction.click(await session.driver.findElement('#cg-go'));
+  return waitFor(
+    async () => {
+      const texts = await groupCardTexts();
+      return texts.length > 0 ? texts : undefined;
+    },
+    {
+      timeout: 20_000,
+      describe: `${students} students to deal into group cards after the refusal (${locale}, mode: ${session.mode})`,
+    },
+  );
+}
 
 beforeAll(async () => {
   session = await startIosSession();
@@ -380,8 +424,18 @@ describe.each(LOCALES)(
       const results = await session.driver.findElement('#cg-results');
       expect(await results.property('hidden')).toBe(true);
 
-      const groupCards = await session.driver.findElements('#cg-tables .group');
-      expect(groupCards.length).toBe(0);
+      const refused = await groupCardTexts();
+      const dealt = await dealtCardTexts(12, locale);
+      expect(
+        searched(refused, {
+          of: dealt,
+          what: `group cards 12 students deal into (${locale})`,
+        }),
+        `group cards after refusing 0 students (${locale})`,
+      ).toEqual([]);
+      expect(
+        floorBreach('ios-journeys/no-students-dealt', dealt.length),
+      ).toBeUndefined();
     });
 
     // Brief item 6 reads "a group size larger than the class". The only
@@ -433,8 +487,19 @@ describe.each(LOCALES)(
       const results = await session.driver.findElement('#cg-results');
       expect(await results.property('hidden')).toBe(true);
 
-      const groupCards = await session.driver.findElements('#cg-tables .group');
-      expect(groupCards.length).toBe(0);
+      // 12 students fill the 10 groups still asked for.
+      const refused = await groupCardTexts();
+      const dealt = await dealtCardTexts(12, locale);
+      expect(
+        searched(refused, {
+          of: dealt,
+          what: `group cards 12 students in 10 groups deal into (${locale})`,
+        }),
+        `group cards after refusing more groups than students (${locale})`,
+      ).toEqual([]);
+      expect(
+        floorBreach('ios-journeys/too-many-groups-dealt', dealt.length),
+      ).toBeUndefined();
     });
 
     test('Journey 7 -- changing the student count after a shuffle shows the real localised stale notice', async () => {
@@ -578,11 +643,18 @@ describe.each(LOCALES)(
         strings.errors.TOO_MANY_STUDENTS({ max: MAX_STUDENTS }),
       );
 
-      const groupCards = await session.driver.findElements('#cg-tables .group');
+      const refused = await groupCardTexts();
+      const dealt = await dealtCardTexts(12, locale);
       expect(
-        groupCards.length,
+        searched(refused, {
+          of: dealt,
+          what: `group cards 12 students deal into (${locale})`,
+        }),
         `nothing rendered for a refused count (${locale})`,
-      ).toBe(0);
+      ).toEqual([]);
+      expect(
+        floorBreach('ios-journeys/too-many-students-dealt', dealt.length),
+      ).toBeUndefined();
     });
 
     test('Journey 9 -- no horizontal scroll at the real device width', async () => {
@@ -822,8 +894,20 @@ describe.each(LOCALES)(
      * journey can still catch the defect that caused it.
      */
     const BOARD_SHAPES = [
-      { count: '25', size: '5', groups: 5, what: 'the reported case' },
-      { count: '8', size: '2', groups: 4, what: 'the false-fit shape' },
+      {
+        count: '25',
+        size: '5',
+        groups: 5,
+        what: 'the reported case',
+        floor: 'ios-journeys/board-reported-case-cards',
+      },
+      {
+        count: '8',
+        size: '2',
+        groups: 4,
+        what: 'the false-fit shape',
+        floor: 'ios-journeys/board-false-fit-cards',
+      },
     ] as const;
 
     for (const shape of BOARD_SHAPES) {
@@ -984,6 +1068,7 @@ describe.each(LOCALES)(
           }),
           where,
         ).toEqual([]);
+        expect(floorBreach(shape.floor, seen.cards.length)).toBeUndefined();
         await shootDevice(session.driver, {
           project,
           label: `nothing out of reach -- ${seen.rows} row(s) at ${seen.font}`,

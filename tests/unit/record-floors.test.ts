@@ -114,31 +114,38 @@ describe('recordArguments reads the mode and the ids to retire', () => {
     });
   });
 
+  it('reads --device as a mode beside ids to retire (#623)', () => {
+    expect(recordArguments(['--device', '--retire', 'x/one'])).toEqual({
+      mode: '--device',
+      retired: ['x/one'],
+    });
+  });
+
   it('refuses --retire with no id after it', () => {
     expect(recordArguments(['--unit', '--retire'])).toBe(
-      'usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --unit --retire)',
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --unit --retire)',
     );
   });
 
   it('refuses --retire followed by a flag instead of an id', () => {
     expect(recordArguments(['--retire', '--unit'])).toBe(
-      'usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --retire --unit)',
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --retire --unit)',
     );
   });
 
   it('refuses two modes at once', () => {
     expect(recordArguments(['--unit', '--functions'])).toBe(
-      'usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --unit --functions)',
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --unit --functions)',
     );
   });
 
   it('refuses an argument it does not know', () => {
     expect(recordArguments(['--units'])).toBe(
-      'usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --units)',
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --units)',
     );
   });
 });
