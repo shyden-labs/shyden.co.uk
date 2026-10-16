@@ -1812,6 +1812,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
   };
   type Job = {
     steps?: Step[];
+    outputs?: Record<string, string>;
     strategy?: { 'fail-fast'?: unknown; matrix?: Record<string, unknown> };
   };
   const ciParsed = () =>
@@ -1895,6 +1896,54 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     const capture = jobNamed('ci.yml', 'capture');
     expect(capture.condition).toBe("needs.scope.outputs.capture == 'true'");
     expect(capture.needs).toEqual(['image', 'scope']);
+  });
+
+  // The logs suite (#822): Shyden, 2026-10-16, "a release cannot be cut
+  // until all checks are complete, including this one. and this is the only
+  // time that suite is run automatically". So it runs on the release pull
+  // request, scope's `release` verdict, which build-and-test stands for.
+  it('runs the logs suite only where scope says the run is a release (#822)', () => {
+    const logs = jobNamed('ci.yml', 'logs');
+    expect({
+      condition: logs.condition,
+      needs: logs.needs,
+      uses: logs.uses,
+      stood: jobNamed('ci.yml', 'build-and-test').needs.includes('logs'),
+      handed: ciParsed().jobs.scope?.outputs?.release,
+    }).toEqual({
+      condition: "needs.scope.outputs.release == 'true'",
+      needs: ['scope'],
+      uses: './.github/workflows/logs.yml',
+      stood: true,
+      handed: '${{ steps.verdict.outputs.release }}',
+    });
+  });
+
+  it('starts the logs suite nowhere else: one job runs it, one job calls that (#822)', () => {
+    const graphs = workflowGraphs();
+    const where = (has: (job: WorkflowJob) => boolean) =>
+      graphs.flatMap(({ name, jobs }) =>
+        jobs.filter(has).map(({ id }) => `${name} ${id}`),
+      );
+    expect({
+      runs: where(({ runs }) =>
+        runs.some((script) =>
+          /\btest:logs\b|vitest\.logs\.config/.test(script),
+        ),
+      ),
+      calls: where(({ uses }) => uses === './.github/workflows/logs.yml'),
+      triggers: Object.keys(
+        (parseCleanYaml(workflow('logs.yml'), 'logs.yml') as { on: object }).on,
+      ),
+    }).toEqual({
+      runs: ['logs.yml logs'],
+      calls: ['ci.yml logs'],
+      triggers: ['workflow_call', 'workflow_dispatch'],
+    });
+    expect(jobNamed('logs.yml', 'logs').runs).toEqual([
+      'npm ci',
+      'npm run test:logs',
+    ]);
   });
 
   it('traces every script the capture job runs from its entries (#774)', () => {
@@ -3601,6 +3650,7 @@ describe('a docs-only pull request skips the browser jobs and nothing else (#582
     expect(ci().jobs.scope?.outputs).toEqual({
       docs_only: '${{ steps.verdict.outputs.docs_only }}',
       capture: '${{ steps.verdict.outputs.capture }}',
+      release: '${{ steps.verdict.outputs.release }}',
     });
   });
 

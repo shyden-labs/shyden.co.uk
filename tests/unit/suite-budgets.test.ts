@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
+import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import { workflowJobs } from '../workflow-jobs';
@@ -56,6 +57,14 @@ import { unitProject } from '../vitest-suite-dirs';
  * these same tests, so moving them raises nothing: a figure at 3x the laptop
  * (51s) would have been a raise, and the operator rule is that none is ever
  * made.
+ *
+ * logs (#822). Every check of a log line or an audit trail, run on the release
+ * pull request alone (Shyden, 2026-10-16: "separate test suite for logging
+ * and auditing. run in ci as a pre-requisite to a release"). Its tests came
+ * from the unit suite, where each met the 1 s limit and the 0.1 s CPU check,
+ * and the ones added here are the same calls on more inputs. 1 s is that same
+ * limit, so moving them raises nothing; the suite is measured on its first
+ * runs like every other.
  */
 const SUITES = [
   {
@@ -74,6 +83,11 @@ const SUITES = [
     config: integration,
     command:
       'vitest run --config vitest.integration.config.ts --testTimeout=30000',
+  },
+  {
+    suite: 'logs',
+    config: logs,
+    command: 'vitest run --config vitest.logs.config.ts --testTimeout=1000',
   },
 ] as const;
 

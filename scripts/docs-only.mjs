@@ -17,7 +17,9 @@
  *   node scripts/docs-only.mjs   # writes docs_only=true|false to $GITHUB_OUTPUT
  *
  * It writes `capture=true|false` beside it, from the same diff: whether the
- * release capture runs (`scripts/capture-scope.mjs`, #774).
+ * release capture runs (`scripts/capture-scope.mjs`, #774). And
+ * `release=true|false`: whether this run is the release pull request, the one
+ * run the logs suite starts on by itself (#822).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -225,6 +227,21 @@ export function verdictFromGit(input) {
     : { docsOnly: false, reasons: diff.reasons };
 }
 
+/**
+ * Whether a run is the release (#822): a pull request into `main`, whose head
+ * is the release head. The logs suite runs there and nowhere else by itself
+ * (Shyden, 2026-10-16: "a release cannot be cut until all checks are
+ * complete, including this one. and this is the only time that suite is run
+ * automatically"). Anything else, a workflow_call from deploy-dev included,
+ * is not a release.
+ *
+ * @param {{ event: string | undefined, base: string | undefined }} input
+ * @returns {boolean}
+ */
+export function releaseVerdict({ event, base }) {
+  return event === 'pull_request' && base === 'main';
+}
+
 export function main() {
   const output = env.GITHUB_OUTPUT;
   if (!output) {
@@ -249,9 +266,10 @@ export function main() {
     read: (path) => readFileSync(path, 'utf8'),
     exists: existsSync,
   });
+  const release = releaseVerdict({ event, base: env.GITHUB_BASE_REF });
   appendFileSync(
     output,
-    `docs_only=${verdict.docsOnly}\ncapture=${capture.capture}\n`,
+    `docs_only=${verdict.docsOnly}\ncapture=${capture.capture}\nrelease=${release}\n`,
   );
   console.log(
     verdict.docsOnly
@@ -262,6 +280,11 @@ export function main() {
     capture.capture
       ? `the capture runs:\n${capture.reasons.map((reason) => `  - ${reason}`).join('\n')}`
       : 'the capture is skipped: no change reaches a file it reads.',
+  );
+  console.log(
+    release
+      ? 'a release pull request into main, so the logs suite runs.'
+      : 'not a release pull request, so the logs suite is skipped.',
   );
 }
 
