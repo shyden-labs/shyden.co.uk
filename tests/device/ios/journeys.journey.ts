@@ -5,17 +5,15 @@
  * real driver for the real W3C WebDriver protocol Safari speaks -- not a
  * mock of Playwright's API.
  *
- * DUAL-MODE INTERACTION (design doc s5a). Real synthetic click/keyboard
- * input does not currently work on this device -- see
- * tests/device/ios/interaction.ts's own module doc for the measurements.
- * A canary decides, once per run, whether real WebDriver input primitives
- * or DOM-dispatch (`execute/sync`) drives interaction; every journey below
- * calls only `session.interaction.click/type/clear`, never
- * `driver`-level click/sendKeys/clear directly, so it is written once and
- * does not know or care which mode is active. The mode is logged
- * prominently by session.ts the moment it is decided, and again at the
- * start of every test here (see `logMode` below) -- a DOM-dispatch run
- * must never read as though taps were taps.
+ * INTERACTION (design doc s5a, as changed by #838). Taps are real touches:
+ * press and release as separate W3C actions, which a canary proves once per
+ * run, failing the run when they do not land (tests/device/ios/interaction.ts
+ * has the measurements). Text entry is a marked stand-in: no real typing path
+ * works on this iOS build, so the value is set in the page. Every journey
+ * below calls only `session.interaction.click/type/clear`, never
+ * `driver`-level click/sendKeys/clear directly. The mode is logged by
+ * session.ts the moment it is decided, and again at the start of every test
+ * here (see `logMode` below) -- stand-in typing must never read as typing.
  *
  * TASK 3a + 3b SCOPE. The task brief lists 13 journeys, in three groups
  * (happy 1-4, unhappy 5-7, edge 8-10) plus three iOS-only proofs (11-13)
@@ -26,15 +24,14 @@
  * that way in the first place: a later journey drops in with no new
  * plumbing.
  *
- * Journeys 11 and 13 are bounded by the SAME dual-mode limitation this
- * whole file already carries (see DUAL-MODE INTERACTION, above):
- * dom-dispatch mode does not exercise the touch input path itself, so
- * neither can verify that a real tap actually lands on a control (Journey
- * 13) or that focusing a field via a real tap changes
- * `visualViewport.scale` (Journey 11) -- only the real, computed geometry
- * each one measures (an input's own computed font-size; a control's own
- * real `rect()`) is asserted, and each says so plainly in its own test
- * name. Journey 12 is a measurement, not a threshold -- see
+ * Since #838 every tap here is a real touch (press and release as
+ * separate W3C actions); text entry is still a marked stand-in, so typing
+ * itself is unverified. Journeys 11 and 13 were written when taps were
+ * dispatched inside the page, and their names still say what they assert:
+ * only the real, computed geometry each one measures (an input's own
+ * computed font-size; a control's own real `rect()`). This file is itself
+ * a stand-in: the shared suite (#839) runs the Android's own files on the
+ * iPhone and retires these twins. Journey 12 is a measurement, not a threshold -- see
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 5, for why real hardware, not an emulated profile, is the whole
  * point of this file.
@@ -739,9 +736,9 @@ describe.each(LOCALES)(
       ).toBe(true);
     });
 
-    // iOS-only proofs (11-13): the reason this whole runner exists. Bounded
-    // by the SAME dual-mode limitation as the rest of this file -- see this
-    // file's own module doc, and design doc s5a.
+    // iOS-only proofs (11-13), written when taps were dispatched in the page;
+    // their names still state only what they measure. See this file's own
+    // module doc (taps real since #838, typing a stand-in), and design doc s5a.
     // The fields are the ones `zoom-on-focus.spec.ts` checks in CI, from the
     // one definition in tests/typed-fields.ts. This journey used to check only
     // `input[type=text|number]`, so the one leg on real WebKit skipped every

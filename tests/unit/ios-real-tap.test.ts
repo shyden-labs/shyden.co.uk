@@ -60,22 +60,37 @@ const session = () =>
   WebDriver.createSession(SERVER, { browserName: 'safari' });
 
 describe('a real tap is press and release as separate W3C action calls (#838)', () => {
-  it('presses at the element in one call, releases in a second, then releases all', async () => {
+  it('scrolls the element in, presses in one call, releases in a second, then releases all', async () => {
     const sent = wire();
     const driver = await session();
     await realTap(driver, 'e1');
     expect(sent.slice(1).map(({ method, path }) => `${method} ${path}`)).toEqual([
+      'POST /session/s1/execute/async',
       'POST /session/s1/actions',
       'POST /session/s1/actions',
       'DELETE /session/s1/actions',
     ]);
   });
 
-  it('the first call moves to the element and presses, and nothing else', async () => {
+  // A W3C action cannot press outside the viewport ("move target out of
+  // bounds", measured on the iPhone: 6 journeys). Playwright's own click on
+  // the Android scrolls into view and waits for the box to settle first, so
+  // the iPhone tap does the same, on the same element, before pressing.
+  it('scrolls that element into view and waits for it to settle, before pressing', async () => {
     const sent = wire();
     const driver = await session();
     await realTap(driver, 'e1');
-    expect(sent[1].body).toEqual({
+    const { script, args } = sent[1].body as { script: string; args: unknown[] };
+    expect(args).toEqual([{ [ELEMENT_KEY]: 'e1' }]);
+    expect(script).toContain('scrollIntoView');
+    expect(script).toContain('requestAnimationFrame');
+  });
+
+  it('the press call moves to the element and presses, and nothing else', async () => {
+    const sent = wire();
+    const driver = await session();
+    await realTap(driver, 'e1');
+    expect(sent[2].body).toEqual({
       actions: [
         {
           type: 'pointer',
@@ -96,11 +111,11 @@ describe('a real tap is press and release as separate W3C action calls (#838)', 
     });
   });
 
-  it('the second call only releases', async () => {
+  it('the release call only releases', async () => {
     const sent = wire();
     const driver = await session();
     await realTap(driver, 'e1');
-    expect(sent[2].body).toEqual({
+    expect(sent[3].body).toEqual({
       actions: [
         {
           type: 'pointer',
@@ -120,6 +135,7 @@ describe('the interaction a session hands its tests', () => {
     const interaction = new RealTapInteraction(driver);
     await interaction.click({ elementId: 'e7' } as never);
     expect(sent.slice(1).map(({ method, path }) => `${method} ${path}`)).toEqual([
+      'POST /session/s1/execute/async',
       'POST /session/s1/actions',
       'POST /session/s1/actions',
       'DELETE /session/s1/actions',

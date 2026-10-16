@@ -52,6 +52,23 @@ export async function realTap(
   driver: WebDriver,
   elementId: string,
 ): Promise<void> {
+  // A W3C action cannot press outside the viewport ("move target out of
+  // bounds", measured on the iPhone). Playwright's click on the Android
+  // scrolls into view and waits for the box to stop moving before it
+  // presses, so this does the same: scroll, then resolve once the element's
+  // box reads the same on two animation frames in a row.
+  await driver.executeAsyncScript(
+    `var el = arguments[0], done = arguments[arguments.length - 1];
+     el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+     var last = '';
+     (function settle() {
+       var r = el.getBoundingClientRect(), now = [r.x, r.y, r.width, r.height].join();
+       if (now === last) return done(true);
+       last = now;
+       requestAnimationFrame(settle);
+     })();`,
+    [driver.elementRef(elementId)],
+  );
   await driver.performActions([
     finger([
       {
