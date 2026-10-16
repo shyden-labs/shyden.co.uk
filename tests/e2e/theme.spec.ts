@@ -6,6 +6,7 @@ import { resolvedColour } from './helpers';
 import { THEMES, themeColour } from '../palette';
 import { emulateTheme, expectTheme } from '../themes';
 import { atLeast44 } from '../viewport';
+import { readsAsLineWidth } from '../device-pixels';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
@@ -123,7 +124,17 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await page.keyboard.press('Shift');
     await toggle(page).focus();
     await expect(toggle(page)).toHaveCSS('outline-style', 'solid');
-    await expect(toggle(page)).toHaveCSS('outline-width', '3px');
+    // Declared, or snapped at this screen's ratio (#805): 2.857px on the 3.5x
+    // phone, 3 on emulated Chrome at 2.75. Read once the ring is drawn, which
+    // the style assertion above waits for.
+    const ring = await toggle(page).evaluate((el) => ({
+      width: parseFloat(getComputedStyle(el).outlineWidth),
+      ratio: window.devicePixelRatio,
+    }));
+    expect(
+      readsAsLineWidth(ring.width, 3, ring.ratio),
+      `the 3px ring: read ${ring.width} at a ratio of ${ring.ratio}`,
+    ).toBe(true);
     await shoot(
       page,
       'the switch focused: its ring is the accent',
