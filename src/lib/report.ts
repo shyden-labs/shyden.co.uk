@@ -545,8 +545,10 @@ export async function handleReport(
         note,
       )
       .run();
-  } catch {
-    log(`report failed: ${'database' satisfies FailureKind}`);
+  } catch (error) {
+    log(
+      `report failed: ${error instanceof Error ? error.message : 'database'}`,
+    );
     return outcome('failed', request, locale, page);
   }
   return outcome('sent', request, locale, page);
