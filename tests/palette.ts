@@ -28,6 +28,14 @@ const topLevel = (css: string, selector: string): CssRule[] =>
     ({ chain }) => chain.length === 1 && chain[0] === selector,
   );
 
+/**
+ * The one script every page carries (#142 §5), and its text as shipped. Here
+ * rather than in themes.ts, which re-exports it, because themes.ts imports
+ * Playwright and the iPhone's journeys run under Vitest (#801).
+ */
+export const THEME_SCRIPT_FILE = 'src/scripts/theme.inline.js';
+export const THEME_SCRIPT_SOURCE = readFileSync(THEME_SCRIPT_FILE, 'utf8');
+
 /** The site's two themes (#142): light on bare `:root`, dark in the blocks that declare `color-scheme: dark`. */
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];

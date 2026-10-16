@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 import { themeColour, type Theme } from './palette';
 
@@ -9,9 +8,7 @@ import { themeColour, type Theme } from './palette';
  * with itself.
  */
 
-/** The one script every page carries (#142 §5), and its text as shipped. */
-export const THEME_SCRIPT_FILE = 'src/scripts/theme.inline.js';
-export const THEME_SCRIPT_SOURCE = readFileSync(THEME_SCRIPT_FILE, 'utf8');
+export { THEME_SCRIPT_FILE, THEME_SCRIPT_SOURCE } from './palette';
 
 /**
  * Prove `page` rendered `theme`, by its ground. Every per-theme run asserts
