@@ -21,7 +21,13 @@ import {
   rowScope,
   upload,
 } from './classroom-groups';
-import { countOf, expectEventually, textCount, textMatchesOf } from './dom';
+import {
+  countOf,
+  expectEventually,
+  textCount,
+  textMatchesOf,
+  visibilityOf,
+} from './dom';
 import { shootDevice } from './evidence';
 import { holdIosSession } from './held-session';
 import { byLabel, byRole } from './roles';
@@ -47,8 +53,9 @@ const makeGroups = async (): Promise<void> => {
   await phone().interaction.click(
     await byRole(phone().driver, 'button', 'Make Groups', { exact: false }),
   );
+  // `expect(page.locator('#cg-results .group').first()).toBeVisible()`.
   await expectEventually(
-    async () => (await countOf(phone().driver, '#cg-results .group')) > 0,
+    async () => (await visibilityOf(phone().driver, '#cg-results .group'))[0],
     true,
     'the first group shows',
   );
@@ -57,11 +64,16 @@ const makeGroups = async (): Promise<void> => {
 const openImport = async (): Promise<void> =>
   phone().interaction.click(await phone().driver.findElement('#cg-io-toggle'));
 
-const rosterRowsAfterOpening = async (): Promise<number> => {
+/** Android's `#cg-students-toggle` click, then `.cg-student` toHaveCount(0), retried. */
+const noRosterRowsAfterOpening = async (): Promise<void> => {
   await phone().interaction.click(
     await phone().driver.findElement('#cg-students-toggle'),
   );
-  return countOf(phone().driver, '.cg-student');
+  await expectEventually(
+    () => countOf(phone().driver, '.cg-student'),
+    0,
+    'no roster rows',
+  );
 };
 
 describe('iOS mirror: privacy — the number fields are forgotten on reload', () => {
@@ -243,11 +255,7 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
     announceMode(phone(), 'reload loses roster');
     await buildRoster(phone(), [['F', 'Ana']]);
     await phone().reload();
-    await expectEventually(
-      async () => rosterRowsAfterOpening(),
-      0,
-      'rosterRowsAfterOpening()',
-    );
+    await noRosterRowsAfterOpening();
   });
 
   test('iOS mirror: two children called Ana are separated independently', async () => {
@@ -319,9 +327,10 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
 describe('iOS mirror: privacy — the roster still never persists, after the new paths', () => {
   test('iOS mirror: an import writes nothing', async () => {
     // NOT YET THE SAME as Android (#811): getByText is read by
-    // textMatchesOf, a restatement of Playwright's text engine. Kept,
-    // never deleted (Shyden 2026-10-16), until #811 runs Playwright's own
-    // code in Safari.
+    // textMatchesOf, a restatement of Playwright's text engine, and the file
+    // is handed over by upload, a restatement of setInputFiles. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code in
+    // Safari.
     announceMode(phone(), 'import writes nothing');
     await phone().navigateToPath('/classroom-groups');
     await openImport();
@@ -339,9 +348,10 @@ describe('iOS mirror: privacy — the roster still never persists, after the new
 
   test('iOS mirror: a reload after an import still loses the roster', async () => {
     // NOT YET THE SAME as Android (#811): getByText is read by
-    // textMatchesOf, a restatement of Playwright's text engine. Kept,
-    // never deleted (Shyden 2026-10-16), until #811 runs Playwright's own
-    // code in Safari.
+    // textMatchesOf, a restatement of Playwright's text engine, and the file
+    // is handed over by upload, a restatement of setInputFiles. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code in
+    // Safari.
     announceMode(phone(), 'reload after import');
     await phone().navigateToPath('/classroom-groups');
     await openImport();
@@ -355,10 +365,6 @@ describe('iOS mirror: privacy — the roster still never persists, after the new
       'the import is reported',
     );
     await phone().reload();
-    await expectEventually(
-      async () => rosterRowsAfterOpening(),
-      0,
-      'rosterRowsAfterOpening()',
-    );
+    await noRosterRowsAfterOpening();
   });
 });

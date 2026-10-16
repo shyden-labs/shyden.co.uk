@@ -961,9 +961,10 @@ const makeGroups = async (): Promise<void> =>
     await byRole(phone().driver, 'button', 'Make Groups', { exact: false }),
   );
 
+/** `toHaveClass(/stale/)`: the pattern tested against the whole class attribute, as Playwright tests it. */
 const resultsStale = (): Promise<boolean> =>
   phone().driver.executeScript<boolean>(
-    "return document.querySelector('#cg-results').classList.contains('stale');",
+    "return /stale/.test(document.querySelector('#cg-results').getAttribute('class') ?? '');",
   );
 
 const firstGroupShown = (): Promise<void> =>
@@ -1366,8 +1367,8 @@ describe('iOS mirror: out-of-date groups', () => {
       await phone().driver.findElement('#cg-stale button'),
     );
     await expectEventually(
-      () => visibilityOf(phone().driver, '#cg-stale'),
-      [false],
+      () => hiddenOf(phone().driver, '#cg-stale'),
+      true,
       'the notice hides',
     );
     await expectEventually(
@@ -1512,9 +1513,6 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 });
 
-const pathname = (): Promise<string> =>
-  phone().driver.executeScript<string>('return location.pathname;');
-
 describe('iOS mirror: site-wide language switching', () => {
   test('iOS mirror: the switcher moves between the two versions of the SAME page', async () => {
     announceMode(phone(), 'language switcher');
@@ -1531,15 +1529,18 @@ describe('iOS mirror: site-wide language switching', () => {
     await phone().navigateToPath('/classroom-groups');
     await open();
     await choose();
+    // `toHaveURL(pattern)`: the same pattern as Android's, on the whole URL.
+    const href = (): Promise<string> =>
+      phone().driver.executeScript<string>('return location.href;');
     await expectEventually(
-      async () => /\/id\/classroom-groups\/?$/.test(await pathname()),
+      async () => /\/\/[^/]+\/id\/classroom-groups\/?$/.test(await href()),
       true,
       'on the Indonesian page',
     );
     await open();
     await choose();
     await expectEventually(
-      async () => /^\/classroom-groups\/?$/.test(await pathname()),
+      async () => /\/\/[^/]+\/classroom-groups\/?$/.test(await href()),
       true,
       'back on the English page',
     );
@@ -1761,15 +1762,17 @@ describe('iOS mirror: every language renders its own messages', () => {
       await phone().navigateToPath(path);
       await fill({ count: '4', size: '2' });
       await go();
-      await expectEventually(
-        async () =>
-          (await textsOf(phone().driver, '#cg-results .student')).sort(),
+      // `allTextContents()`: read once, raw, as Android reads it.
+      const labels = await rawTextsOf(phone().driver, '#cg-results .student');
+      expect(labels.sort()).toEqual(
         [1, 2, 3, 4].map((n) => t.studentNumber({ n })).sort(),
-        'four numbered students',
       );
       notEnglish(t.studentNumber({ n: 1 }), english.studentNumber({ n: 1 }));
-      expect((await textsOf(phone().driver, '#cg-results .group h3'))[0]).toBe(
+      // `.first()` toHaveText, retried.
+      await expectEventually(
+        async () => (await textsOf(phone().driver, '#cg-results .group h3'))[0],
         t.groupLabel({ n: 1 }),
+        'the first group heading',
       );
       notEnglish(t.groupLabel({ n: 1 }), english.groupLabel({ n: 1 }));
       await shoot('students and groups are numbered in the page language');

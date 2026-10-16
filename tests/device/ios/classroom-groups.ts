@@ -209,8 +209,10 @@ export const openWaitingBoard = async (
 /**
  * Android's `upload`, on Safari: Playwright's `setInputFiles` bypasses the
  * native picker, and so does this. The file is made in the page and handed
- * to `#cg-import` through a `DataTransfer`, then `change` fires as a pick
- * would fire it.
+ * to `#cg-import` through a `DataTransfer`, then `input` and `change` fire,
+ * as `setInputFiles` fires them. A restatement of Playwright's own call, so
+ * it is a stand-in (tests/device/ios/stand-ins.ts) and each test reaching it
+ * is marked NOT YET THE SAME as Android (#811).
  */
 export const upload = async (
   phone: DeviceSession,
@@ -222,6 +224,7 @@ export const upload = async (
      const files = new DataTransfer();
      files.items.add(new File([arguments[1]], arguments[0], { type: 'text/csv' }));
      input.files = files.files;
+     input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
      input.dispatchEvent(new Event('change', { bubbles: true }));
      return input.files.length;`,
     [name, body],

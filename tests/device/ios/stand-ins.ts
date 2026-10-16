@@ -26,4 +26,9 @@ export const STAND_INS: readonly StandInSeed[] = [
     file: 'tests/device/ios/dom.ts',
     names: ['textMatchesOf', 'textCount', 'accessibleTextsOf'],
   },
+  {
+    // setInputFiles, restated as a DataTransfer handed to the file input.
+    file: 'tests/device/ios/classroom-groups.ts',
+    names: ['upload'],
+  },
 ];

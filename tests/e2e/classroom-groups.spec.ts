@@ -1666,10 +1666,12 @@ test.describe('site-wide language switching', () => {
     await page.goto('/classroom-groups');
     await open();
     await choose();
-    await expect(page).toHaveURL(/\/id\/classroom-groups\/?$/);
+    await expect(page).toHaveURL(/\/\/[^/]+\/id\/classroom-groups\/?$/);
     await open();
     await choose();
-    await expect(page).toHaveURL(/\/classroom-groups\/?$/);
+    // The path straight after the host: `/\/classroom-groups\/?$/` alone also
+    // matched the Indonesian page, so a switcher that never came back passed.
+    await expect(page).toHaveURL(/\/\/[^/]+\/classroom-groups\/?$/);
   });
 
   // The homepage heading comes from the catalogue, so a headline change
