@@ -209,6 +209,29 @@ describe("expectLocator is Playwright's web-first expect on a selector", () => {
     expect(calls[0].args).toEqual(['.mark', 'color']);
   });
 
+  test('toBeHidden passes when nothing matches', async () => {
+    const { driver } = readingDriver([[]]);
+    await expect(
+      expectLocator(driver, '.gone').toBeHidden(),
+    ).resolves.toBeUndefined();
+  });
+
+  test('toBeHidden waits for the one match to hide', async () => {
+    const { driver } = readingDriver([[true], [false]]);
+    const settled = expectLocator(driver, 'svg.play').toBeHidden();
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(settled).resolves.toBeUndefined();
+  });
+
+  test('toBeHidden fails on two matches, as strict mode does', async () => {
+    const { driver } = readingDriver([[false, false]]);
+    const verdict = expect(
+      expectLocator(driver, 'svg').toBeHidden(),
+    ).rejects.toThrow(/svg hidden/);
+    await vi.advanceTimersByTimeAsync(5_100);
+    await verdict;
+  });
+
   test('nth picks one of the matches, as locator.nth does', async () => {
     const { driver } = readingDriver([['https://a', 'https://b']]);
     await expect(

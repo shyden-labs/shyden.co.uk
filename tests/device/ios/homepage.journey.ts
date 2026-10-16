@@ -31,15 +31,26 @@ import { contrast, paintedContrast, parseColour } from '../../wcag';
 import {
   attributesOf,
   countOf,
+  expectEventually,
+  expectLocator,
   paintedTextOf,
   textsOf,
-  visibilityOf,
 } from './dom';
+import { shootDevice } from './evidence';
 import { holdIosSession } from './held-session';
+import { byRole, expectRole, expectRoleAttribute } from './roles';
 import { announceMode } from './session';
 import { waitFor } from './webdriver';
 
 const phone = holdIosSession();
+
+/** `expect(page.locator(selector))`, retried as Playwright retries it (#821); `nth` is `.nth(n)`. */
+const on = (selector: string, nth?: number) =>
+  expectLocator(phone().driver, selector, { nth });
+
+/** Android's `shoot`: evidence only, written when the run asks for it. */
+const shoot = (label: string): Promise<string | null> =>
+  shootDevice(phone().driver, { project: 'ios-safari-real-device', label });
 
 const SHYTALK_URL = 'https://shytalk.shyden.co.uk';
 const SHYTALK_HOST = 'shytalk.shyden.co.uk';
@@ -54,62 +65,47 @@ const openHome = (locale: Locale, theme?: 'light' | 'dark'): Promise<void> =>
 const read = <T>(script: string, args: unknown[] = []): Promise<T> =>
   phone().driver.executeScript<T>(script, args);
 
-/** Each link's text and attributes, for the links `selector` matches. */
-const linksOf = (
-  selector: string,
-): Promise<
-  {
-    text: string;
-    href: string | null;
-    rel: string | null;
-    target: string | null;
-  }[]
-> =>
-  read(
-    `return Array.from(document.querySelectorAll(arguments[0]), (a) => ({
-       text: a.innerText.trim(), href: a.getAttribute('href'),
-       rel: a.getAttribute('rel'), target: a.getAttribute('target') }));`,
-    [selector],
-  );
-
 describe('iOS mirror: homepage content', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: the hero has no label above its heading`, async () => {
       announceMode(phone(), `hero heading (${locale})`);
       await openHome(locale);
-      expect(await visibilityOf(phone().driver, '.hero h1')).toEqual([true]);
-      expect(await countOf(phone().driver, '.hero .eyebrow')).toBe(0);
+      await on('.hero h1').toBeVisible();
+      await on('.hero .eyebrow').toHaveCount(0);
     });
 
   test('iOS mirror: the heading and the title say what Shyden makes', async () => {
     announceMode(phone(), 'hero heading and title');
     await openHome('en');
-    expect(await textsOf(phone().driver, '.hero h1')).toEqual([
-      'Shyden makes small software, with care.',
-    ]);
-    expect(await read<string>('return document.title;')).toBe(
+    await on('.hero h1').toHaveText('Shyden makes small software, with care.');
+    await expectEventually(
+      () => read<string>('return document.title;'),
       'Shyden — small software, made with care',
+      'the title',
     );
   });
 
   test('iOS mirror: the hero leads with ShyTalk and every section is present', async () => {
     announceMode(phone(), 'hero CTA and sections');
     await openHome('en');
-    expect((await textsOf(phone().driver, 'h1')).join(' ')).toMatch(/Shyden/i);
-    const ctas = (await linksOf('.hero a')).filter((l) =>
-      /explore shytalk/i.test(l.text),
-    );
-    expect(ctas).toEqual([
-      expect.objectContaining({
-        href: SHYTALK_URL,
-        rel: 'noopener noreferrer',
-        target: '_blank',
-      }),
-    ]);
+    await on('h1').toContainText(/Shyden/i);
+    // `getByRole('link', { name: /explore shytalk/i })`: a case-blind part of
+    // the name, which is the rule `exact: false` keeps.
+    const cta = (attribute: string, value: string): Promise<void> =>
+      expectRoleAttribute(
+        phone().driver,
+        'link',
+        'explore shytalk',
+        { exact: false, scope: '.hero' },
+        attribute,
+        value,
+      );
+    await cta('href', SHYTALK_URL);
+    await cta('rel', 'noopener noreferrer');
+    await cta('target', '_blank');
     for (const id of ['shytalk', 'yawelo-idle', 'tools', 'contact'])
-      expect(await visibilityOf(phone().driver, `#${id}`), `#${id}`).toEqual([
-        true,
-      ]);
+      await on(`#${id}`).toBeVisible();
+    await shoot('the Aurora hero leads with ShyTalk');
   });
 
   for (const locale of LOCALES) {
@@ -131,11 +127,15 @@ describe('iOS mirror: homepage content', () => {
           path.endsWith('/') ? path : `${path}/`,
           `${home}: nav link ${href} leaves this locale`,
         ).toBe(home);
-        expect(
-          await countOf(phone().driver, `#${fragment}`),
+        await expectEventually(
+          () => countOf(phone().driver, `#${fragment}`),
+          1,
           `${home}: nav points at #${fragment}, which the page does not render`,
-        ).toBe(1);
+        );
       }
+      await shoot(
+        `${home}: all ${fragmented.length} nav fragments resolve in-locale`,
+      );
     });
   }
 
@@ -143,24 +143,19 @@ describe('iOS mirror: homepage content', () => {
     announceMode(phone(), 'ShyTalk wordmark');
     await openHome('en');
     const wordmark = '#shytalk .shytalk-wordmark';
-    expect(await textsOf(phone().driver, wordmark)).toEqual(['ShyTalk']);
-    expect(await textsOf(phone().driver, `${wordmark} span`)).toEqual(['Talk']);
-    const colours = await read<{ shy: string; talk: string }>(
-      `const w = document.querySelector(arguments[0]);
-       return { shy: getComputedStyle(w).color, talk: getComputedStyle(w.querySelector('span')).color };`,
-      [wordmark],
+    await on(wordmark).toHaveText('ShyTalk');
+    await on(`${wordmark} span`).toHaveText('Talk');
+    await on(wordmark).toHaveCSS('color', asComputedRgb(SHYTALK_MARK.shy));
+    await on(`${wordmark} span`).toHaveCSS(
+      'color',
+      asComputedRgb(SHYTALK_MARK.talk),
     );
-    expect(colours).toEqual({
-      shy: asComputedRgb(SHYTALK_MARK.shy),
-      talk: asComputedRgb(SHYTALK_MARK.talk),
-    });
-    expect(await countOf(phone().driver, '#shytalk .features li')).toBe(4);
-    const out = await attributesOf(
-      phone().driver,
-      `#shytalk a[href="${SHYTALK_URL}"]`,
+    await on('#shytalk .features li').toHaveCount(4);
+    await on(`#shytalk a[href="${SHYTALK_URL}"]`, -1).toHaveAttribute(
       'rel',
+      'noopener noreferrer',
     );
-    expect(out.at(-1)).toBe('noopener noreferrer');
+    await shoot('the ShyTalk showcase and its two-tone wordmark');
   });
 
   const TILE = {
@@ -174,22 +169,16 @@ describe('iOS mirror: homepage content', () => {
       // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
       // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
-      const painted = await read<{ colour: string; tile: string }>(
-        `const w = document.querySelector('#shytalk .shytalk-wordmark');
-         const s = getComputedStyle(w);
-         return { colour: s.color, tile: s.backgroundColor };`,
-      );
-      expect(painted).toEqual({
-        colour: asComputedRgb(SHYTALK_MARK.shy),
-        tile: TILE[theme],
-      });
+      const wordmark = on('#shytalk .shytalk-wordmark');
+      await wordmark.toHaveCSS('color', asComputedRgb(SHYTALK_MARK.shy));
+      await wordmark.toHaveCSS('background-color', TILE[theme]);
     });
 
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: the showcase frame shows a real room capture`, async () => {
       announceMode(phone(), `showcase capture (${locale})`);
       await openHome(locale);
-      expect(await countOf(phone().driver, '#shytalk .frame img')).toBe(1);
+      await on('#shytalk .frame img').toHaveCount(1);
       const [alt] = await attributesOf(
         phone().driver,
         '#shytalk .frame img',
@@ -206,22 +195,29 @@ describe('iOS mirror: homepage content', () => {
           );
           return w > 0 ? w : undefined;
         },
-        { timeout: 15_000, describe: `the ${locale} capture to decode` },
+        // `expect.poll`'s own ceiling: the 5 s every Playwright assertion has.
+        { timeout: 5_000, describe: `the ${locale} capture to decode` },
       );
       expect(width, 'capture never decoded').toBeGreaterThan(0);
+      await shoot(
+        `${locale}: the showcase shows a real room capture in that locale`,
+      );
     });
 
   test('iOS mirror: the showcase frame is a different capture in every locale', async () => {
     announceMode(phone(), 'distinct captures');
+    // `request.get`: from the test process, as Android's request context asks.
+    const pages = await Promise.all(
+      LOCALES.map(async (locale) =>
+        (await fetch(new URL(localisePath('/', locale), phone().baseUrl))).text(),
+      ),
+    );
     await openHome('en');
-    const srcs = await phone().driver.executeAsyncScript<string[]>(
-      `const [paths, done] = [arguments[0], arguments[arguments.length - 1]];
-       Promise.all(paths.map((p) => fetch(p).then((r) => r.text())))
-         .then((htmls) => done(htmls.map((html) =>
-           new DOMParser().parseFromString(html, 'text/html')
-             .querySelector('#shytalk .frame img')?.getAttribute('src') ?? '')))
-         .catch(() => done([]));`,
-      [LOCALES.map((locale) => localisePath('/', locale))],
+    const srcs = await read<string[]>(
+      `return arguments[0].map((html) =>
+         new DOMParser().parseFromString(html, 'text/html')
+           .querySelector('#shytalk .frame img')?.getAttribute('src') ?? '');`,
+      [pages],
     );
     expect(srcs.filter(Boolean), 'a frame with no src').toHaveLength(
       LOCALES.length,
@@ -239,8 +235,8 @@ describe('iOS mirror: homepage content', () => {
       // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
       // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
+      await on('.status-badge').toHaveCount(4);
       const badges = await paintedTextOf(phone().driver, '.status-badge');
-      expect(badges).toHaveLength(4);
       const texts = await textsOf(phone().driver, '.status-badge');
       badges.forEach((badge, i) =>
         expect(paintedContrast(badge), `"${texts[i]}"`).toBeGreaterThanOrEqual(
@@ -253,15 +249,11 @@ describe('iOS mirror: homepage content', () => {
     test(`iOS mirror: ${locale}: exactly two tool cards, each badged and linked in-locale`, async () => {
       announceMode(phone(), `tool cards (${locale})`);
       await openHome(locale);
-      expect(await countOf(phone().driver, '#tools .work-card')).toBe(2);
+      await on('#tools .work-card').toHaveCount(2);
       const live = getSiteStrings(locale).home.toolBadge;
-      expect(await textsOf(phone().driver, '#tools .status-badge')).toEqual([
-        live,
-        live,
-      ]);
-      expect(
-        await visibilityOf(phone().driver, '#tools .status-badge'),
-      ).toEqual([true, true]);
+      await on('#tools .status-badge').toHaveText([live, live]);
+      await on('#tools .status-badge', 0).toBeVisible();
+      await on('#tools .status-badge', 1).toBeVisible();
       const hrefs = await attributesOf(
         phone().driver,
         '#tools a[href]',
@@ -272,17 +264,20 @@ describe('iOS mirror: homepage content', () => {
           localisePath(tool, locale),
         ),
       );
+      await shoot(`${locale}: both tool cards, badged and in-locale`);
     });
 
   test('iOS mirror: contact section CTA links to the support mailbox', async () => {
     announceMode(phone(), 'contact CTA');
     await openHome('en');
-    const name = getSiteStrings('en').home.emailMe;
-    expect(
-      (await linksOf('#contact a'))
-        .filter((l) => l.text === name)
-        .map((l) => l.href),
-    ).toEqual(['mailto:support@shyden.co.uk']);
+    await expectRoleAttribute(
+      phone().driver,
+      'link',
+      getSiteStrings('en').home.emailMe,
+      { exact: true, scope: '#contact' },
+      'href',
+      'mailto:support@shyden.co.uk',
+    );
   });
 
   const OPENS: Record<Locale, string> = {
@@ -296,7 +291,7 @@ describe('iOS mirror: homepage content', () => {
     test(`iOS mirror: ${locale}: each hero link annotation reads as one line`, async () => {
       announceMode(phone(), `hero annotations (${locale})`);
       await openHome(locale);
-      expect(await textsOf(phone().driver, '.hero .opens')).toEqual([
+      await on('.hero .opens').toHaveText([
         `${OPENS[locale]} ${SHYTALK_HOST}`,
         `${OPENS[locale]} ${YAWELO_IDLE_HOST}`,
       ]);
@@ -310,7 +305,7 @@ describe('iOS mirror: two products, both coming soon (#403)', () => {
       const t = getSiteStrings(locale).home;
       await openHome(locale);
       const section = '#yawelo-idle';
-      expect(await visibilityOf(phone().driver, section)).toEqual([true]);
+      await on(section).toBeVisible();
       const ids = await read<string[]>(
         `return Array.from(document.querySelectorAll('section[id]'), (s) => s.id);`,
       );
@@ -318,44 +313,36 @@ describe('iOS mirror: two products, both coming soon (#403)', () => {
       expect(ids.indexOf('yawelo-idle'), 'Yawelo Idle follows ShyTalk').toBe(
         ids.indexOf('shytalk') + 1,
       );
-      expect(await visibilityOf(phone().driver, `${section} .kicker`)).toEqual([
-        true,
-      ]);
-      expect(await textsOf(phone().driver, `${section} .kicker`)).toEqual([
-        t.yaweloIdleKicker,
-      ]);
-      expect(await visibilityOf(phone().driver, `${section} h2`)).toEqual([
-        true,
-      ]);
-      expect(await textsOf(phone().driver, `${section} h2`)).toEqual([
-        'Yawelo Idle',
-      ]);
-      const badge = `${section} .showcase-head .status-badge`;
-      expect(await visibilityOf(phone().driver, badge)).toEqual([true]);
-      expect(await textsOf(phone().driver, badge)).toEqual([t.comingSoon]);
-      expect(await textsOf(phone().driver, `${section} .features li`)).toEqual([
+      await on(`${section} .kicker`).toBeVisible();
+      await on(`${section} .kicker`).toHaveText(t.yaweloIdleKicker);
+      await on(`${section} h2`).toBeVisible();
+      await on(`${section} h2`).toHaveText('Yawelo Idle');
+      const badge = on(`${section} .showcase-head .status-badge`);
+      await badge.toBeVisible();
+      await badge.toHaveText(t.comingSoon);
+      await on(`${section} .features li`).toHaveText([
         t.yaweloIdleFeature1,
         t.yaweloIdleFeature2,
         t.yaweloIdleFeature3,
         t.yaweloIdleFeature4,
       ]);
-      expect(
-        (await linksOf(`${section} a`)).filter(
-          (l) => l.text === t.visitYaweloIdle,
-        ),
-      ).toEqual([
-        expect.objectContaining({
-          href: YAWELO_IDLE_URL,
-          rel: 'noopener noreferrer',
-          target: '_blank',
-        }),
-      ]);
-      expect(
-        await countOf(
+      // `section.getByRole('link', { name: t.visitYaweloIdle })`: no `exact`.
+      const link = (attribute: string, value: string): Promise<void> =>
+        expectRoleAttribute(
           phone().driver,
-          `${section} img, ${section} svg, ${section} picture`,
-        ),
-      ).toBe(0);
+          'link',
+          t.visitYaweloIdle,
+          { exact: false, scope: section },
+          attribute,
+          value,
+        );
+      await link('href', YAWELO_IDLE_URL);
+      await link('rel', 'noopener noreferrer');
+      await link('target', '_blank');
+      await on(
+        `${section} img, ${section} svg, ${section} picture`,
+      ).toHaveCount(0);
+      await shoot(`${locale}: the Yawelo Idle showcase, coming soon`);
     });
 
   for (const locale of LOCALES)
@@ -364,18 +351,12 @@ describe('iOS mirror: two products, both coming soon (#403)', () => {
       const t = getSiteStrings(locale).home;
       await openHome(locale);
       const head = '#shytalk .showcase-head';
-      expect(
-        await visibilityOf(phone().driver, `${head} h2 .shytalk-wordmark`),
-      ).toEqual([true]);
-      expect(
-        await visibilityOf(phone().driver, `${head} .status-badge`),
-      ).toEqual([true]);
-      expect(await textsOf(phone().driver, `${head} .status-badge`)).toEqual([
-        t.comingSoon,
-      ]);
-      expect(await textsOf(phone().driver, '#shytalk .kicker')).toEqual([
-        t.shytalkKicker,
-      ]);
+      await on(`${head} h2 .shytalk-wordmark`).toBeVisible();
+      const badge = on(`${head} .status-badge`);
+      await badge.toBeVisible();
+      await badge.toHaveText(t.comingSoon);
+      await on('#shytalk .kicker').toHaveText(t.shytalkKicker);
+      await shoot(`${locale}: ShyTalk, coming soon`);
     });
 
   for (const locale of LOCALES)
@@ -383,20 +364,15 @@ describe('iOS mirror: two products, both coming soon (#403)', () => {
       announceMode(phone(), `hero products (${locale})`);
       const t = getSiteStrings(locale).home;
       await openHome(locale);
-      expect(await linksOf('.hero .cta-item a')).toEqual([
-        {
-          text: t.exploreShytalk,
-          href: SHYTALK_URL,
-          rel: 'noopener noreferrer',
-          target: '_blank',
-        },
-        {
-          text: t.exploreYaweloIdle,
-          href: YAWELO_IDLE_URL,
-          rel: 'noopener noreferrer',
-          target: '_blank',
-        },
-      ]);
+      const links = '.hero .cta-item a';
+      await on(links).toHaveText([t.exploreShytalk, t.exploreYaweloIdle]);
+      await on(links, 0).toHaveAttribute('href', SHYTALK_URL);
+      await on(links, 1).toHaveAttribute('href', YAWELO_IDLE_URL);
+      await on(links, 0).toHaveAttribute('rel', 'noopener noreferrer');
+      await on(links, 0).toHaveAttribute('target', '_blank');
+      await on(links, 1).toHaveAttribute('rel', 'noopener noreferrer');
+      await on(links, 1).toHaveAttribute('target', '_blank');
+      await shoot(`${locale}: the hero's two products`);
     });
 
   for (const locale of LOCALES)
@@ -405,12 +381,9 @@ describe('iOS mirror: two products, both coming soon (#403)', () => {
       const home = localisePath('/', locale);
       const base = home === '/' ? '' : home.replace(/\/$/, '');
       await openHome(locale);
-      expect(
-        await textsOf(
-          phone().driver,
-          `header nav a[href="${base}/#yawelo-idle"]`,
-        ),
-      ).toEqual([getSiteStrings(locale).nav.yaweloIdle]);
+      const link = on(`header nav a[href="${base}/#yawelo-idle"]`);
+      await link.toHaveCount(1);
+      await link.toHaveText(getSiteStrings(locale).nav.yaweloIdle);
     });
 });
 
@@ -419,7 +392,7 @@ describe('iOS mirror: the language band sits under the header (#599)', () => {
     test(`iOS mirror: ${locale}: the band is the first element in main, before the hero, and not pinned`, async () => {
       announceMode(phone(), `band placement (${locale})`);
       await openHome(locale);
-      expect(await countOf(phone().driver, 'main > .band')).toBe(1);
+      await on('main > .band').toHaveCount(1);
       const facts = await read<{
         first: boolean;
         before: boolean;
@@ -452,6 +425,10 @@ describe('iOS mirror: the language band sits under the header (#599)', () => {
       expect(
         floorBreach('ios-homepage/band-positions', facts.positions.length),
       ).toBeUndefined();
+      expect(facts.positions).toHaveLength(3);
+      await shoot(
+        `${locale}: the band is first in main, before the hero, unpinned`,
+      );
     });
 
   test('iOS mirror: the band scrolls away: past it, its box is above the viewport', async () => {
@@ -467,6 +444,7 @@ describe('iOS mirror: the language band sits under the header (#599)', () => {
       bottom,
       'the band is still on screen after scrolling past it',
     ).toBeLessThanOrEqual(0);
+    await shoot(`scrolled past, the band's bottom is at ${Math.round(bottom)}px`);
   });
 });
 
@@ -490,56 +468,47 @@ const runningAnimations = (): Promise<number> =>
        .filter((a) => a.playState === 'running').length;`,
   );
 
-/** The band's pause checkbox, found by its own label text. */
-const PAUSE = '.band-pause input[type="checkbox"]';
+/** Android's `pauseControl`: `getByRole('checkbox', { name: pauseMotion, exact: true })`. */
+const pauseControl = (locale: Locale) =>
+  [
+    phone().driver,
+    'checkbox',
+    getSiteStrings(locale).home.pauseMotion,
+    { exact: true },
+  ] as const;
 
 describe('iOS mirror: pause motion', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: a visible, unticked checkbox named for the band, outside its hidden subtree`, async () => {
       announceMode(phone(), `pause control (${locale})`);
       await openHome(locale);
-      const control = await read<
-        {
-          name: string;
-          checked: boolean;
-          visible: boolean;
-          hiddenAncestor: boolean;
-        }[]
-      >(
-        `return Array.from(document.querySelectorAll(arguments[0]), (input) => ({
-           name: (input.closest('label')?.textContent ?? '').trim(),
-           checked: input.checked,
-           visible: input.getClientRects().length > 0 && getComputedStyle(input).visibility === 'visible',
-           hiddenAncestor: !!input.closest('[aria-hidden="true"]'),
-         }));`,
-        [PAUSE],
-      );
-      expect(control).toEqual([
-        {
-          name: getSiteStrings(locale).home.pauseMotion,
-          checked: false,
-          visible: true,
-          hiddenAncestor: false,
-        },
-      ]);
+      const control = expectRole(...pauseControl(locale));
+      await control.toHaveCount(1);
+      await control.toBeVisible();
+      await control.toBeChecked(false);
+      const found = await byRole(...pauseControl(locale));
       expect(
-        await attributesOf(phone().driver, '.marquee-clip', 'aria-hidden'),
-      ).toEqual(['true']);
+        await read<boolean>(
+          `return arguments[0].closest('[aria-hidden="true"]') === null;`,
+          [phone().driver.elementRef(found.elementId)],
+        ),
+        'the control sits inside an aria-hidden ancestor',
+      ).toBe(true);
+      await on('.marquee-clip').toHaveAttribute('aria-hidden', 'true');
     });
 
   test('iOS mirror: ticked pauses the band and unticked resumes it', async () => {
-    // Android sets reduced motion to no-preference first; WebDriver cannot,
-    // so this reads the phone's own setting: with Reduce Motion on, the first
-    // expectation below fails and says why.
+    // NOT YET THE SAME as Android (#811): Android emulates reduced motion as
+    // no-preference first; WebDriver cannot, so this reads the phone's own
+    // setting, and with Reduce Motion on the first expectation fails and says
+    // why. Kept, never deleted (Shyden 2026-10-16), until #811 emulates it.
     announceMode(phone(), 'pause and resume');
     await openHome('en');
-    const control = await phone().driver.findElement(PAUSE);
+    const track = on('.marquee-track');
+    await track.toHaveCount(1);
+    const control = await byRole(...pauseControl('en'));
     const moves = async (): Promise<boolean> =>
       new Set(await offsets()).size !== 1;
-    const playState = (): Promise<string> =>
-      read(
-        `return getComputedStyle(document.querySelector('.marquee-track')).animationPlayState;`,
-      );
 
     expect(
       await moves(),
@@ -550,8 +519,8 @@ describe('iOS mirror: pause motion', () => {
       'animations running before the pause',
     ).toBe(1);
 
-    await phone().interaction.click(control);
-    expect(await playState()).toBe('paused');
+    await phone().interaction.setChecked(control, true);
+    await track.toHaveCSS('animation-play-state', 'paused');
     expect(await runningAnimations(), 'animations running while paused').toBe(
       0,
     );
@@ -561,8 +530,8 @@ describe('iOS mirror: pause motion', () => {
       `the band's offset on six frames while paused: ${held.join(', ')}`,
     ).toBe(1);
 
-    await phone().interaction.click(control);
-    expect(await playState()).toBe('running');
+    await phone().interaction.setChecked(control, false);
+    await track.toHaveCSS('animation-play-state', 'running');
     expect(await runningAnimations(), 'animations running after resuming').toBe(
       1,
     );
@@ -600,38 +569,31 @@ describe('iOS mirror: the pause control is a small icon on the strip (#619)', ()
       expect(
         floorBreach('ios-homepage/pause-control-text', words.all.length),
       ).toBeUndefined();
-      expect(await countOf(phone().driver, PAUSE)).toBe(1);
-      expect(await countOf(phone().driver, '.band-pause svg')).toBe(2);
-      expect(
-        await countOf(phone().driver, '.band-pause svg[aria-hidden="true"]'),
-      ).toBe(2);
-      expect(
-        await visibilityOf(
-          phone().driver,
-          '.band-pause svg[data-icon="pause"]',
-        ),
-      ).toEqual([true]);
+      // One control found by its exact name is Android's count of one and
+      // its `toHaveAccessibleName(name)` together: the name IS the match.
+      await expectRole(...pauseControl(locale)).toHaveCount(1);
+      await on('.band-pause svg').toHaveCount(2);
+      await on('.band-pause svg[aria-hidden="true"]').toHaveCount(2);
+      await on('.band-pause svg[data-icon="pause"]').toBeVisible();
     });
 
   test('iOS mirror: the icon is a pause symbol while the strip moves and a play symbol while it is paused', async () => {
     announceMode(phone(), 'pause and play icons');
     await openHome('en');
-    const shown = async (): Promise<{ pause: boolean[]; play: boolean[] }> => ({
-      pause: await visibilityOf(
-        phone().driver,
-        '.band-pause svg[data-icon="pause"]',
-      ),
-      play: await visibilityOf(
-        phone().driver,
-        '.band-pause svg[data-icon="play"]',
-      ),
-    });
-    expect(await shown()).toEqual({ pause: [true], play: [false] });
-    const control = await phone().driver.findElement(PAUSE);
-    await phone().interaction.click(control);
-    expect(await shown()).toEqual({ pause: [false], play: [true] });
-    await phone().interaction.click(control);
-    expect(await shown()).toEqual({ pause: [true], play: [false] });
+    const control = await byRole(...pauseControl('en'));
+    const pause = on('.band-pause svg[data-icon="pause"]');
+    const play = on('.band-pause svg[data-icon="play"]');
+    await pause.toHaveCount(1);
+    await play.toHaveCount(1);
+    await pause.toBeVisible();
+    await play.toBeHidden();
+    await phone().interaction.setChecked(control, true);
+    await play.toBeVisible();
+    await pause.toBeHidden();
+    await shoot('paused: the control shows a play symbol');
+    await phone().interaction.setChecked(control, false);
+    await pause.toBeVisible();
+    await play.toBeHidden();
   });
 
   for (const theme of THEMES)
@@ -641,6 +603,7 @@ describe('iOS mirror: the pause control is a small icon on the strip (#619)', ()
       // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
       // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
+      await on('.band-pause svg[data-icon="pause"]').toBeVisible();
       const [icon] = await paintedTextOf(
         phone().driver,
         '.band-pause svg[data-icon="pause"]',
@@ -671,7 +634,7 @@ describe('iOS mirror: the ShyTalk phone frame', () => {
   test('iOS mirror: the bezel is drawn and the capture keeps its ratio', async () => {
     announceMode(phone(), 'phone frame bezel');
     await openHome('en');
-    expect(await countOf(phone().driver, '.frame')).toBe(1);
+    await on('.frame').toHaveCount(1);
     const drawn = await read<{
       width: string;
       style: string;
@@ -697,5 +660,6 @@ describe('iOS mirror: the ShyTalk phone frame', () => {
     expect(drawn.width, 'bezel border width').toBe('2px');
     expect(drawn.color, 'bezel border colour is --border').toBe(drawn.border);
     expect(drawn.ratio, "the capture's aspect-ratio").toBe('280 / 616');
+    await shoot('the ShyTalk phone frame draws its bezel');
   });
 });

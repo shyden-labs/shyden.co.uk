@@ -180,6 +180,17 @@ export const expectLocator = (
         [true],
         `${named} visible`,
       ),
+    /** No match, or the one match not shown; two matches are strict mode's refusal. */
+    toBeHidden: (): Promise<void> =>
+      expectEventually(
+        async () => {
+          const shown = await pick(visibilityOf(driver, selector));
+          if (shown.length > 1) return `${shown.length} elements match`;
+          return shown.length === 0 || !shown[0];
+        },
+        true,
+        `${named} hidden`,
+      ),
     toHaveAttribute: (name: string, value: string): Promise<void> =>
       expectEventually(
         () => pick(attributesOf(driver, selector, name)),
