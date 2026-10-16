@@ -28,11 +28,14 @@ import {
 } from '../../../src/lib/report';
 import { floorBreach } from '../../floors';
 import { filesUnder, searched } from '../../source-files';
-import { attributesOf, countOf, textsOf, visibilityOf } from './dom';
+import { attributesOf, expectEventually, expectLocator } from './dom';
 import { holdIosSession } from './held-session';
 import { announceMode } from './session';
 
 const phone = holdIosSession();
+
+/** `expect(page.locator(selector))`, retried as Playwright retries it (#821). */
+const on = (selector: string) => expectLocator(phone().driver, selector);
 
 const built = () =>
   filesUnder('dist', (path) => /\.html$/.test(path)).map((file) => ({
@@ -104,25 +107,23 @@ describe('iOS mirror: the report form is where it should be', () => {
           `${pagePath('home', locale)}#report-${outcome}`,
           'footer',
         );
-        const shown = `#report-${outcome}`;
-        expect(await visibilityOf(phone().driver, shown)).toEqual([true]);
-        expect(await textsOf(phone().driver, shown)).toEqual([
-          getSiteStrings(locale).report[COPY[outcome]],
-        ]);
-        expect(await attributesOf(phone().driver, shown, 'role')).toEqual([
-          'status',
-        ]);
-        expect(
-          await phone().driver.executeScript<string>(
-            'return document.activeElement?.id ?? "";',
-          ),
-          `${shown} takes focus`,
-        ).toBe(`report-${outcome}`);
+        const shown = on(`#report-${outcome}`);
+        await shown.toBeVisible();
+        await shown.toHaveText(getSiteStrings(locale).report[COPY[outcome]]);
+        await shown.toHaveAttribute('role', 'status');
+        // `toBeFocused()`: the one match is the focused element, retried.
+        await expectEventually(
+          () =>
+            phone().driver.executeScript<boolean[]>(
+              `return Array.from(document.querySelectorAll(arguments[0]), (el) => el === document.activeElement);`,
+              [`#report-${outcome}`],
+            ),
+          [true],
+          `#report-${outcome} takes focus`,
+        );
         for (const other of OUTCOMES.filter((o) => o !== outcome)) {
-          expect(await countOf(phone().driver, `#report-${other}`)).toBe(1);
-          expect(
-            await visibilityOf(phone().driver, `#report-${other}`),
-          ).toEqual([false]);
+          await on(`#report-${other}`).toHaveCount(1);
+          await on(`#report-${other}`).toBeHidden();
         }
       });
 
@@ -130,12 +131,7 @@ describe('iOS mirror: the report form is where it should be', () => {
     test(`iOS mirror: ${locale}: the disclosure sits right after the BETA notice, and asks for nothing personal`, async () => {
       announceMode(phone(), `report disclosure (${locale})`);
       await phone().navigateToPath(pagePath('home', locale), 'footer');
-      expect(
-        await countOf(
-          phone().driver,
-          '[data-beta-notice] + details[data-report]',
-        ),
-      ).toBe(1);
+      await on('[data-beta-notice] + details[data-report]').toHaveCount(1);
       expect(
         await attributesOf(phone().driver, '[data-report-form] [name]', 'name'),
         locale,
