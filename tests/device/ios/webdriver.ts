@@ -304,6 +304,11 @@ export class WebDriver {
     await wireRequest('POST', this.sessionUrl('/url'), { url });
   }
 
+  /** W3C Refresh: the browser's own reload of the current page, as `page.reload()` is. */
+  async refresh(): Promise<void> {
+    await wireRequest('POST', this.sessionUrl('/refresh'), {});
+  }
+
   async findElement(cssSelector: string): Promise<WebElement> {
     const value = await wireRequest('POST', this.sessionUrl('/element'), {
       using: 'css selector',
@@ -354,6 +359,22 @@ export class WebDriver {
       script,
       args,
     })) as T;
+  }
+
+  /**
+   * `execute/sync` for a script that returns ONE element: the reply's wire
+   * envelope, wrapped as the `WebElement` `findElement` would give, so a
+   * journey that finds a control by its accessible name (roles.ts, #813)
+   * still acts on it through `session.interaction`. A script that returns
+   * no element is refused, naming `what`.
+   */
+  async findByScript(
+    script: string,
+    args: unknown[],
+    what: string,
+  ): Promise<WebElement> {
+    const value = await this.executeScript(script, args);
+    return new WebElement(this, requireWireElement(value, what));
   }
 
   /**

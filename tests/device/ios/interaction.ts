@@ -43,13 +43,97 @@ export interface Interaction {
   /** Appends `text` to whatever the element currently holds -- real keyboard semantics, not an overwrite. */
   type(element: WebElement, text: string): Promise<void>;
   clear(element: WebElement): Promise<void>;
+  /** Chooses the `<select>`'s option whose value is `value`, as `selectOption` does (#813). */
+  select(element: WebElement, value: string): Promise<void>;
+  /**
+   * Replaces the field's value as Playwright's `fill` does (#821): focus,
+   * the whole value in one edit, ONE `input` event, no `change` (that waits
+   * for blur), and a refusal on a disabled or read-only field. Not
+   * `clear` + `type`, which fires two rounds of `input` and `change` with
+   * an empty value between them, which Android's `page.fill` never does.
+   */
+  fill(element: WebElement, value: string): Promise<void>;
+  /**
+   * Playwright's `check()` (`on`) and `uncheck()` (`!on`): nothing if the
+   * box already reads `on`, else one click, then a refusal if the click did
+   * not leave it reading `on`, as Playwright refuses (#821).
+   */
+  setChecked(element: WebElement, on: boolean): Promise<void>;
 }
+
+/**
+ * Playwright's actionability wait before a click (#821): the element is
+ * attached, visible and enabled (not `:disabled`, no `aria-disabled`
+ * ancestor), or the action fails naming what it waited for. Without it a
+ * DOM-dispatched click on a disabled button does nothing and passes.
+ */
+const ACTIONABLE = `
+  const el = arguments[0];
+  if (!el.isConnected) return 'detached';
+  if (!(el.checkVisibility({ visibilityProperty: true }) && el.getClientRects().length > 0)) return 'not visible';
+  if (el.matches(':disabled') || el.closest('[aria-disabled="true"]') !== null) return 'not enabled';
+  return 'ok';
+`;
+
+const waitActionable = async (
+  driver: WebDriver,
+  element: WebElement,
+): Promise<void> => {
+  const deadline = Date.now() + 5_000;
+  let state = await driver.executeScript<string>(ACTIONABLE, [
+    driver.elementRef(element.elementId),
+  ]);
+  while (state !== 'ok' && Date.now() < deadline) {
+    await new Promise((settle) => setTimeout(settle, 100));
+    state = await driver.executeScript<string>(ACTIONABLE, [
+      driver.elementRef(element.elementId),
+    ]);
+  }
+  if (state !== 'ok')
+    throw new Error(`click: the element stayed ${state} for 5 s`);
+};
+
+/** In-page: Playwright's `fill`, as described on `Interaction.fill`. */
+const FILL = `
+  const el = arguments[0], value = arguments[1];
+  if (el.disabled) throw new Error('fill: the field is disabled');
+  if (el.readOnly) throw new Error('fill: the field is read-only');
+  el.focus();
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
+  el.dispatchEvent(new InputEvent('input', {
+    bubbles: true,
+    inputType: value ? 'insertText' : 'deleteContentBackward',
+    data: value || null,
+  }));
+`;
+
+/**
+ * Playwright's `check()` (`on`) and `uncheck()` (`!on`), for both modes:
+ * nothing if the box already reads `on`, else one `click`, then a refusal if
+ * the click did not leave it reading `on`, as Playwright refuses (#821).
+ */
+const setCheckedBy = async (
+  click: (element: WebElement) => Promise<void>,
+  element: WebElement,
+  on: boolean,
+): Promise<void> => {
+  if ((await element.property('checked')) === on) return;
+  await click(element);
+  if ((await element.property('checked')) !== on)
+    throw new Error(
+      `Clicking the checkbox did not change its state to ${on ? 'checked' : 'unchecked'}`,
+    );
+};
 
 /** The real WebDriver primitives -- used when the canary confirms they actually work. */
 export class SyntheticTouchInteraction implements Interaction {
   readonly mode: InteractionMode = 'synthetic-touch';
 
+  constructor(private readonly driver: WebDriver) {}
+
   async click(element: WebElement): Promise<void> {
+    await waitActionable(this.driver, element);
     await element.click();
   }
 
@@ -59,6 +143,27 @@ export class SyntheticTouchInteraction implements Interaction {
 
   async clear(element: WebElement): Promise<void> {
     await element.clear();
+  }
+
+  async select(element: WebElement, value: string): Promise<void> {
+    // W3C WebDriver selects an option by clicking the <option> itself.
+    const option = await this.driver.findByScript(
+      `return Array.from(arguments[0].options).find((o) => o.value === arguments[1]) ?? null;`,
+      [this.driver.elementRef(element.elementId), value],
+      `the option ${JSON.stringify(value)}`,
+    );
+    await option.click();
+  }
+
+  async fill(element: WebElement, value: string): Promise<void> {
+    await this.driver.executeScript(FILL, [
+      this.driver.elementRef(element.elementId),
+      value,
+    ]);
+  }
+
+  async setChecked(element: WebElement, on: boolean): Promise<void> {
+    await setCheckedBy((e) => this.click(e), element, on);
   }
 }
 
@@ -75,6 +180,7 @@ export class DomDispatchInteraction implements Interaction {
   constructor(private readonly driver: WebDriver) {}
 
   async click(element: WebElement): Promise<void> {
+    await waitActionable(this.driver, element);
     await this.driver.executeScript(`arguments[0].click();`, [
       this.driver.elementRef(element.elementId),
     ]);
@@ -98,6 +204,31 @@ export class DomDispatchInteraction implements Interaction {
        el.dispatchEvent(new Event('change', { bubbles: true }));`,
       [this.driver.elementRef(element.elementId)],
     );
+  }
+
+  async select(element: WebElement, value: string): Promise<void> {
+    const chosen = await this.driver.executeScript<boolean>(
+      `var el = arguments[0], want = arguments[1];
+       if (!Array.from(el.options).some(function (o) { return o.value === want; })) return false;
+       el.value = want;
+       el.dispatchEvent(new Event('input', { bubbles: true }));
+       el.dispatchEvent(new Event('change', { bubbles: true }));
+       return true;`,
+      [this.driver.elementRef(element.elementId), value],
+    );
+    if (!chosen)
+      throw new Error(`no option ${JSON.stringify(value)} to select`);
+  }
+
+  async fill(element: WebElement, value: string): Promise<void> {
+    await this.driver.executeScript(FILL, [
+      this.driver.elementRef(element.elementId),
+      value,
+    ]);
+  }
+
+  async setChecked(element: WebElement, on: boolean): Promise<void> {
+    await setCheckedBy((e) => this.click(e), element, on);
   }
 }
 
@@ -183,7 +314,7 @@ export function createInteraction(
   mode: InteractionMode,
 ): Interaction {
   return mode === 'synthetic-touch'
-    ? new SyntheticTouchInteraction()
+    ? new SyntheticTouchInteraction(driver)
     : new DomDispatchInteraction(driver);
 }
 

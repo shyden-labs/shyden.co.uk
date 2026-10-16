@@ -526,6 +526,13 @@ export interface DeviceSession {
    * `theme` is the saved choice stamped before the load: dark by default.
    */
   navigateToPath(path: string, ready?: string, theme?: Theme): Promise<void>;
+  /**
+   * Reloads the current page as Android's `page.reload()` does (WebDriver's
+   * Refresh, never a fresh navigation), then waits for `ready` (`#cg-go` by
+   * default) on the NEW document: the old one is marked first, and the wait
+   * refuses to read it.
+   */
+  reload(ready?: string): Promise<void>;
   /** ALWAYS call this, in a `finally` -- see this file's module doc. */
   teardown(): Promise<void>;
 }
@@ -609,6 +616,21 @@ export async function startIosSession(): Promise<DeviceSession> {
     device,
     mode,
     interaction,
+
+    async reload(ready = '#cg-go'): Promise<void> {
+      await driver.executeScript('window.__iosBeforeReload = true;');
+      await driver.refresh();
+      await waitFor(
+        async () =>
+          (await driver.executeScript<boolean>(
+            'return window.__iosBeforeReload !== true && document.querySelector(arguments[0]) !== null;',
+            [ready],
+          ))
+            ? true
+            : undefined,
+        { timeout: 15_000, describe: `${ready} to exist on the reloaded page` },
+      );
+    },
 
     async navigateToPath(
       path: string,
