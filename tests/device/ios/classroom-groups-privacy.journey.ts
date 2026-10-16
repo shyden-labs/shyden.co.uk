@@ -72,15 +72,39 @@ describe('iOS mirror: privacy — the number fields are forgotten on reload', ()
     await fill(phone(), '#cg-numbers-absent', '7, 12');
     await fill(phone(), '#cg-numbers-together', '3,9');
     await fill(phone(), '#cg-numbers-apart', '2,5');
-    expect(await value('#cg-numbers-absent')).toBe('7, 12');
-    expect(await value('#cg-numbers-together')).toBe('3,9');
-    expect(await value('#cg-numbers-apart')).toBe('2,5');
+    await expectEventually(
+      async () => value('#cg-numbers-absent'),
+      '7, 12',
+      "value('#cg-numbers-absent')",
+    );
+    await expectEventually(
+      async () => value('#cg-numbers-together'),
+      '3,9',
+      "value('#cg-numbers-together')",
+    );
+    await expectEventually(
+      async () => value('#cg-numbers-apart'),
+      '2,5',
+      "value('#cg-numbers-apart')",
+    );
     await shoot('all three fields hold what was typed');
 
     await phone().reload();
-    expect(await value('#cg-numbers-absent')).toBe('');
-    expect(await value('#cg-numbers-together')).toBe('');
-    expect(await value('#cg-numbers-apart')).toBe('');
+    await expectEventually(
+      async () => value('#cg-numbers-absent'),
+      '',
+      "value('#cg-numbers-absent')",
+    );
+    await expectEventually(
+      async () => value('#cg-numbers-together'),
+      '',
+      "value('#cg-numbers-together')",
+    );
+    await expectEventually(
+      async () => value('#cg-numbers-apart'),
+      '',
+      "value('#cg-numbers-apart')",
+    );
     await shoot('all three fields empty after a reload');
   });
 
@@ -89,7 +113,11 @@ describe('iOS mirror: privacy — the number fields are forgotten on reload', ()
     await phone().navigateToPath('/classroom-groups');
     await fill(phone(), '#cg-count', '25');
     await fill(phone(), '#cg-numbers-absent', '7, 12');
-    expect(await value('#cg-numbers-absent')).toBe('7, 12');
+    await expectEventually(
+      async () => value('#cg-numbers-absent'),
+      '7, 12',
+      "value('#cg-numbers-absent')",
+    );
     await phone().interaction.click(
       await phone().driver.findElement('#cg-sound-toggle'),
     );
@@ -215,7 +243,11 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
     announceMode(phone(), 'reload loses roster');
     await buildRoster(phone(), [['F', 'Ana']]);
     await phone().reload();
-    expect(await rosterRowsAfterOpening()).toBe(0);
+    await expectEventually(
+      async () => rosterRowsAfterOpening(),
+      0,
+      'rosterRowsAfterOpening()',
+    );
   });
 
   test('iOS mirror: two children called Ana are separated independently', async () => {
@@ -251,12 +283,19 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
     await giveEveryoneASex(phone());
     await makeGroups();
 
-    expect(
-      await textCount(phone().driver, '#cg-results .student', 'Ana', {
-        exact: false,
-      }),
-    ).toBe(2);
-    expect(await countOf(phone().driver, '#cg-results .student')).toBe(4);
+    await expectEventually(
+      async () =>
+        textCount(phone().driver, '#cg-results .student', 'Ana', {
+          exact: false,
+        }),
+      2,
+      "textCount(phone().driver, '#cg-results .student', 'Ana', { exact: fals",
+    );
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results .student'),
+      4,
+      "countOf(phone().driver, '#cg-results .student')",
+    );
 
     const groupsOf = (n: number): Promise<string[]> =>
       phone().driver.executeScript<string[]>(
@@ -269,7 +308,11 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
     const [budiGroup] = await groupsOf(3);
     expect(anaGroup).toMatch(/^Group \d+$/);
     expect(anaGroup).not.toBe(budiGroup);
-    expect(await groupsOf(2)).toHaveLength(1);
+    await expectEventually(
+      async () => (await groupsOf(2)).length,
+      1,
+      'the group of student 2, once',
+    );
   });
 });
 
@@ -312,6 +355,10 @@ describe('iOS mirror: privacy — the roster still never persists, after the new
       'the import is reported',
     );
     await phone().reload();
-    expect(await rosterRowsAfterOpening()).toBe(0);
+    await expectEventually(
+      async () => rosterRowsAfterOpening(),
+      0,
+      'rosterRowsAfterOpening()',
+    );
   });
 });

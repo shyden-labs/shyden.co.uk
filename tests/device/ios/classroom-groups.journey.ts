@@ -126,8 +126,16 @@ describe('iOS mirror: classroom group creator', () => {
   test('iOS mirror: the paste-names box and the keep-apart box are gone', async () => {
     announceMode(phone(), 'removed boxes');
     await phone().navigateToPath('/classroom-groups');
-    expect(await countOf(phone().driver, '#cg-names')).toBe(0);
-    expect(await countOf(phone().driver, '#cg-apart')).toBe(0);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-names'),
+      0,
+      "countOf(phone().driver, '#cg-names')",
+    );
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-apart'),
+      0,
+      "countOf(phone().driver, '#cg-apart')",
+    );
   });
 
   test('iOS mirror: leaves a pupil typed absent out of the groups entirely', async () => {
@@ -288,7 +296,11 @@ describe('iOS mirror: classroom group creator', () => {
     );
     await shoot('five groups holding all 22 students');
 
-    expect(await countOf(phone().driver, '#cg-grouped-note')).toBe(1);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-grouped-note'),
+      1,
+      "countOf(phone().driver, '#cg-grouped-note')",
+    );
     await expectEventually(
       () => hiddenOf(phone().driver, '#cg-grouped-note'),
       true,
@@ -504,9 +516,12 @@ describe('iOS mirror: class name and results heading', () => {
     await fill({ count: '9', size: '4' });
     await go();
     await expectEventually(heading, ['7B — your groups'], 'the heading');
-    expect(
-      await textCount(phone().driver, '#cg-tables', '7B', { exact: false }),
-    ).toBe(0);
+    await expectEventually(
+      async () =>
+        textCount(phone().driver, '#cg-tables', '7B', { exact: false }),
+      0,
+      "textCount(phone().driver, '#cg-tables', '7B', { exact: false })",
+    );
   });
 
   test('iOS mirror: a blank class name blocks nothing', async () => {
@@ -515,8 +530,16 @@ describe('iOS mirror: class name and results heading', () => {
     await fill({ count: '9', size: '4' });
     await go();
     await expectEventually(heading, ['Your groups'], 'the heading');
-    expect(await countOf(phone().driver, '#cg-results .group')).toBe(2);
-    expect(await countOf(phone().driver, '#cg-results .student')).toBe(9);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results .group'),
+      2,
+      "countOf(phone().driver, '#cg-results .group')",
+    );
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results .student'),
+      9,
+      "countOf(phone().driver, '#cg-results .student')",
+    );
   });
 
   test('iOS mirror: a class name of only spaces is treated as no class name', async () => {
@@ -559,8 +582,10 @@ describe('iOS mirror: class name and results heading', () => {
     // in Safari.
     announceMode(phone(), 'class name rendered literally');
     await phone().navigateToPath('/classroom-groups');
-    // Android listens for a dialog; here the alert the payload would call is
-    // recorded instead of shown, which observes the same thing.
+    // NOT YET THE SAME as Android (#811): Android listens for any dialog the
+    // page opens; this stubs `window.alert`, the one the payload calls, so a
+    // confirm or prompt would go unseen. Kept, never deleted (Shyden
+    // 2026-10-16), until the harness reads WebDriver's user prompts.
     await phone().driver.executeScript(
       'window.__iosAlerted = false; window.alert = () => { window.__iosAlerted = true; };',
     );
@@ -569,7 +594,11 @@ describe('iOS mirror: class name and results heading', () => {
     await chooseSpeed(phone(), 'skip');
     await go();
     await expectEventually(heading, [`${raw} — your groups`], 'the heading');
-    expect(await countOf(phone().driver, '#cg-results-h img')).toBe(0);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results-h img'),
+      0,
+      "countOf(phone().driver, '#cg-results-h img')",
+    );
     expect(
       await phone().driver.executeScript<boolean>(
         'return window.__iosAlerted;',
@@ -742,13 +771,18 @@ describe('iOS mirror: the Split by row names its own fields', () => {
       // in Safari.
       announceMode(phone(), `Split by labels on ${path}`);
       await phone().navigateToPath(path);
-      expect(await textsOf(phone().driver, '#cg-mode-label')).toEqual([
-        splitBy,
-      ]);
+      await expectEventually(
+        async () => textsOf(phone().driver, '#cg-mode-label'),
+        [splitBy],
+        "textsOf(phone().driver, '#cg-mode-label')",
+      );
       const driver = phone().driver;
-      expect(
-        await isShown(driver, await byLabel(driver, perGroup, { exact: true })),
-      ).toBe(true);
+      await expectEventually(
+        async () =>
+          isShown(driver, await byLabel(driver, perGroup, { exact: true })),
+        true,
+        'isShown(driver, await byLabel(driver, perGroup, { exact: true }))',
+      );
       const radio = await byLabel(driver, groupCountRadio, { exact: true });
       await phone().interaction.setChecked(radio, true);
       await expectEventually(
@@ -765,11 +799,21 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
   test('iOS mirror: the Indonesian page is genuinely in Indonesian', async () => {
     announceMode(phone(), 'Indonesian page');
     await phone().navigateToPath('/id/classroom-groups');
-    expect(await attributesOf(phone().driver, 'html', 'lang')).toEqual(['id']);
-    expect(await textsOf(phone().driver, 'h1')).toEqual([
-      'Pembuat Kelompok Kelas',
-    ]);
-    expect(await textsOf(phone().driver, '#cg-go')).toEqual(['Buat Kelompok']);
+    await expectEventually(
+      async () => attributesOf(phone().driver, 'html', 'lang'),
+      ['id'],
+      "attributesOf(phone().driver, 'html', 'lang')",
+    );
+    await expectEventually(
+      async () => textsOf(phone().driver, 'h1'),
+      ['Pembuat Kelompok Kelas'],
+      "textsOf(phone().driver, 'h1')",
+    );
+    await expectEventually(
+      async () => textsOf(phone().driver, '#cg-go'),
+      ['Buat Kelompok'],
+      "textsOf(phone().driver, '#cg-go')",
+    );
   });
 
   test('iOS mirror: anonymous students are labelled in Indonesian', async () => {
@@ -806,9 +850,13 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
   test('iOS mirror: the help text under Jumlah siswa reads in Indonesian, as a whole sentence', async () => {
     announceMode(phone(), 'Indonesian count help');
     await phone().navigateToPath('/id/classroom-groups');
-    expect(await textsOf(phone().driver, '#cg-count-help')).toEqual([
-      'Siswa bersifat anonim dan diberi nomor — Siswa 1, Siswa 2, dan seterusnya.',
-    ]);
+    await expectEventually(
+      async () => textsOf(phone().driver, '#cg-count-help'),
+      [
+        'Siswa bersifat anonim dan diberi nomor — Siswa 1, Siswa 2, dan seterusnya.',
+      ],
+      "textsOf(phone().driver, '#cg-count-help')",
+    );
   });
 
   test('iOS mirror: the button relabels to Acak lagi after a shuffle, and back to Buat Kelompok on a refusal', async () => {
@@ -828,7 +876,11 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
       [true],
       'the error shows',
     );
-    expect(await textsOf(phone().driver, '#cg-go')).toEqual(['Buat Kelompok']);
+    await expectEventually(
+      async () => textsOf(phone().driver, '#cg-go'),
+      ['Buat Kelompok'],
+      "textsOf(phone().driver, '#cg-go')",
+    );
   });
 
   test('iOS mirror: the class name heads the results, once', async () => {
@@ -847,9 +899,12 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
     await fill({ count: '9', size: '4' });
     await go();
     await expectEventually(heading, ['7B — kelompok Anda'], 'the heading');
-    expect(
-      await textCount(phone().driver, '#cg-tables', '7B', { exact: false }),
-    ).toBe(0);
+    await expectEventually(
+      async () =>
+        textCount(phone().driver, '#cg-tables', '7B', { exact: false }),
+      0,
+      "textCount(phone().driver, '#cg-tables', '7B', { exact: false })",
+    );
   });
 
   test('iOS mirror: a blank class name blocks nothing', async () => {
@@ -858,7 +913,11 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
     await fill({ count: '9', size: '4' });
     await go();
     await expectEventually(heading, ['Kelompok Anda'], 'the heading');
-    expect(await countOf(phone().driver, '#cg-results .group')).toBe(2);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results .group'),
+      2,
+      "countOf(phone().driver, '#cg-results .group')",
+    );
   });
 });
 
@@ -1023,7 +1082,11 @@ describe('iOS mirror: out-of-date groups', () => {
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
     await typeLabelled('Students in each group', '3', { exact: false });
-    expect(await countOf(phone().driver, '#cg-results .group')).toBe(3);
+    await expectEventually(
+      async () => countOf(phone().driver, '#cg-results .group'),
+      3,
+      "countOf(phone().driver, '#cg-results .group')",
+    );
   });
 
   test('iOS mirror: shuffling clears it', async () => {
@@ -1235,7 +1298,7 @@ describe('iOS mirror: out-of-date groups', () => {
     await setChecked('Put them all in one group', true, { exact: false });
     await typeLabelled('Students in each group', '4', { exact: false });
     await outOfDateShown(LEFTOVERS_CHANGED);
-    expect(await resultsStale()).toBe(true);
+    await expectEventually(async () => resultsStale(), true, 'resultsStale()');
   });
 
   test('iOS mirror: when two things change, undoing both clears it', async () => {
@@ -1254,7 +1317,7 @@ describe('iOS mirror: out-of-date groups', () => {
     await typeLabelled('Students in each group', '4', { exact: false });
     await setChecked('Share them out evenly', true, { exact: false });
     await noOutOfDate();
-    expect(await resultsStale()).toBe(false);
+    await expectEventually(async () => resultsStale(), false, 'resultsStale()');
   });
 
   test('iOS mirror: the notice element itself carries the exact sentence', async () => {
@@ -1351,9 +1414,11 @@ describe('iOS mirror: out-of-date groups', () => {
         [true],
         'the sentence shows',
       );
-      expect(await textsOf(phone().driver, '#cg-stale-text')).toEqual([
-        SIZE_CHANGED,
-      ]);
+      await expectEventually(
+        async () => textsOf(phone().driver, '#cg-stale-text'),
+        [SIZE_CHANGED],
+        "textsOf(phone().driver, '#cg-stale-text')",
+      );
       const [sentence] = await paintedTextOf(phone().driver, '#cg-stale-text');
       expect(paintedContrast(sentence)).toBeGreaterThanOrEqual(4.5);
       await shootDevice(phone().driver, {
@@ -1486,23 +1551,32 @@ describe('iOS mirror: site-wide language switching', () => {
       announceMode(phone(), `${path} translated`);
       expect(heading).not.toBe(english);
       await phone().navigateToPath(path, 'h1');
-      expect(await attributesOf(phone().driver, 'html', 'lang')).toEqual([
-        'id',
-      ]);
-      expect(await textsOf(phone().driver, 'h1')).toEqual([heading]);
+      await expectEventually(
+        async () => attributesOf(phone().driver, 'html', 'lang'),
+        ['id'],
+        "attributesOf(phone().driver, 'html', 'lang')",
+      );
+      await expectEventually(
+        async () => textsOf(phone().driver, 'h1'),
+        [heading],
+        "textsOf(phone().driver, 'h1')",
+      );
     });
   }
 
   test('iOS mirror: Indonesian nav links stay inside Indonesian — and read as Indonesian', async () => {
     announceMode(phone(), 'Indonesian nav');
     await phone().navigateToPath('/id/', 'nav');
-    expect(await countOf(phone().driver, 'nav a[href="/id/#shytalk"]')).toBe(1);
-    expect(await textsOf(phone().driver, 'nav a')).toEqual([
-      'ShyTalk',
-      'Yawelo Idle',
-      'Alat',
-      'Kontak',
-    ]);
+    await expectEventually(
+      async () => countOf(phone().driver, 'nav a[href="/id/#shytalk"]'),
+      1,
+      'countOf(phone().driver, \'nav a[href="/id/#shytalk"]\')',
+    );
+    await expectEventually(
+      async () => textsOf(phone().driver, 'nav a'),
+      ['ShyTalk', 'Yawelo Idle', 'Alat', 'Kontak'],
+      "textsOf(phone().driver, 'nav a')",
+    );
   });
 
   describe('iOS mirror: what each page tells a search engine', () => {
@@ -1541,24 +1615,37 @@ describe('iOS mirror: site-wide language switching', () => {
         const isId = locale === 'id_ID';
         const read = (selector: string, name: string) =>
           attributesOf(phone().driver, selector, name);
-        expect(await read('link[rel="canonical"]', 'href')).toEqual([
-          SITE + self,
-        ]);
-        expect(
-          await read('link[rel="alternate"][hreflang="id"]', 'href'),
-        ).toEqual([SITE + (isId ? self : other)]);
-        expect(
-          await read('link[rel="alternate"][hreflang="en"]', 'href'),
-        ).toEqual([SITE + (isId ? other : self)]);
-        expect(
-          await read('link[rel="alternate"][hreflang="x-default"]', 'href'),
-        ).toEqual([SITE + (isId ? other : self)]);
-        expect(await read('meta[property="og:locale"]', 'content')).toEqual([
-          locale,
-        ]);
-        expect(await read('meta[property="og:url"]', 'content')).toEqual([
-          SITE + self,
-        ]);
+        await expectEventually(
+          async () => read('link[rel="canonical"]', 'href'),
+          [SITE + self],
+          "read('link[rel=\"canonical\"]', 'href')",
+        );
+        await expectEventually(
+          async () => read('link[rel="alternate"][hreflang="id"]', 'href'),
+          [SITE + (isId ? self : other)],
+          'read(\'link[rel="alternate"][hreflang="id"]\', \'href\')',
+        );
+        await expectEventually(
+          async () => read('link[rel="alternate"][hreflang="en"]', 'href'),
+          [SITE + (isId ? other : self)],
+          'read(\'link[rel="alternate"][hreflang="en"]\', \'href\')',
+        );
+        await expectEventually(
+          async () =>
+            read('link[rel="alternate"][hreflang="x-default"]', 'href'),
+          [SITE + (isId ? other : self)],
+          'read(\'link[rel="alternate"][hreflang="x-default"]\', \'href\')',
+        );
+        await expectEventually(
+          async () => read('meta[property="og:locale"]', 'content'),
+          [locale],
+          "read('meta[property=\"og:locale\"]', 'content')",
+        );
+        await expectEventually(
+          async () => read('meta[property="og:url"]', 'content'),
+          [SITE + self],
+          "read('meta[property=\"og:url\"]', 'content')",
+        );
       });
     }
   });
@@ -1678,7 +1765,11 @@ describe('iOS mirror: every language renders its own messages', () => {
       await shoot('students and groups are numbered in the page language');
 
       const summary = t.resultsSummary({ groups: 2, students: 4 });
-      expect(await textsOf(phone().driver, '#cg-summary')).toEqual([summary]);
+      await expectEventually(
+        async () => textsOf(phone().driver, '#cg-summary'),
+        [summary],
+        "textsOf(phone().driver, '#cg-summary')",
+      );
       notEnglish(summary, english.resultsSummary({ groups: 2, students: 4 }));
       await shoot('the summary counts in the page language');
 
@@ -1716,9 +1807,11 @@ describe('iOS mirror: every language renders its own messages', () => {
         names,
         t.rosterNoSexMessage({ names }),
       );
-      expect(await textsOf(phone().driver, '#cg-roster-problem')).toEqual([
-        problem,
-      ]);
+      await expectEventually(
+        async () => textsOf(phone().driver, '#cg-roster-problem'),
+        [problem],
+        "textsOf(phone().driver, '#cg-roster-problem')",
+      );
       notEnglish(
         problem,
         english.rosterNoSexMessage({
