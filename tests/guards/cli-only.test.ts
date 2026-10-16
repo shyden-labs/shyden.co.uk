@@ -15,7 +15,8 @@ import { floorBreach } from '../floors';
  * carries the same five, and `feature-terms.ts` builds on `label-check.ts`
  * (#319). `read-back.ts` builds on `back-translate.ts` too, and `verified.ts`
  * is the approved copy it reads first (#754). `arm-drift.ts` measures the
- * units `back-translate.ts` reads (#754 AC1).
+ * units `back-translate.ts` reads (#754 AC1). `google-ledger.ts` keeps the
+ * read-back's shared character ledger and builds on `read-back.ts` (#841).
  *
  * The guard this replaces looked for the SUBSTRING `i18n/translate` in each
  * shipped file. A sibling in `src/lib/i18n/` importing `./translate` never
@@ -30,6 +31,7 @@ const CLI_ONLY = [
   'src/lib/i18n/read-back.ts',
   'src/lib/i18n/verified.ts',
   'src/lib/i18n/arm-drift.ts',
+  'src/lib/i18n/google-ledger.ts',
   'src/lib/report-review.ts',
 ];
 
