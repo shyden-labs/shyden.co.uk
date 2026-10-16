@@ -56,9 +56,15 @@ export const quotaDay = (at: Date): string =>
     day: '2-digit',
   }).format(at);
 
-/** What is left of a day's characters: never less than nothing. */
-export const charactersLeft = (ledger: Readonly<Ledger>, day: string): number =>
-  Math.max(0, DAILY_CHARACTERS - (ledger[day] ?? 0));
+/**
+ * What is left of a day's characters: never less than nothing. `limit` is
+ * the day's limit when the operator has raised it (#841).
+ */
+export const charactersLeft = (
+  ledger: Readonly<Ledger>,
+  day: string,
+  limit = DAILY_CHARACTERS,
+): number => Math.max(0, limit - (ledger[day] ?? 0));
 
 /** The ledger after a request spent `chars` on `day`. */
 export const spend = (
