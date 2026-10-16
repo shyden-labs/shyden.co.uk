@@ -304,6 +304,16 @@ export class WebDriver {
     await wireRequest('POST', this.sessionUrl('/url'), { url });
   }
 
+  /** W3C Perform Actions: one input source's action sequence, in one call. */
+  async performActions(actions: readonly unknown[]): Promise<void> {
+    await wireRequest('POST', this.sessionUrl('/actions'), { actions });
+  }
+
+  /** W3C Release Actions: lets go of every pressed input. */
+  async releaseActions(): Promise<void> {
+    await wireRequest('DELETE', this.sessionUrl('/actions'));
+  }
+
   async findElement(cssSelector: string): Promise<WebElement> {
     const value = await wireRequest('POST', this.sessionUrl('/element'), {
       using: 'css selector',

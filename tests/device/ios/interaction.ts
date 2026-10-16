@@ -1,41 +1,76 @@
 /**
- * The dual-mode interaction layer -- design doc
+ * How the iPhone journeys tap and type -- design doc
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
- * section 5a.
+ * section 5a, as changed by #838.
  *
- * Measured on this device (iPhone Air, iOS 27.0, build 24A5390f):
- * `element/click`, `element/value` and W3C `actions` all return SUCCESS
- * while having NO effect -- no on-screen change, no keyboard, no form
- * submission, confirmed across multiple elements and an unrelated site.
- * Ruled out by direct measurement (not assumed): the device is unlocked
- * (no passcode), awake (launching Safari via `devicectl` changes nothing),
- * and the page is visible/focused throughout. A WebDriver screenshot is
- * NOT evidence of an awake device -- it captures the page viewport, which
- * renders regardless.
+ * Measured 2026-10-16 on the iPhone Air, iOS 27.0.1 (build 24A446), with a
+ * fixture logging every event and its `isTrusted` (#838's comment): Safari's
+ * own WebDriver delivers the PRESS of `element/click`, or of one W3C action
+ * sequence holding press and release, and drops the RELEASE, so no click ever
+ * fires. Press and release sent as two separate `POST /actions` calls, then
+ * `DELETE /actions`, deliver the whole trusted tap a finger makes --
+ * pointerdown, touchstart, pointerup, touchend, mousedown, mouseup, click --
+ * 20 of 20 with taps 500 ms apart. (Back to back, one in 20 fell inside iOS's
+ * double-tap window, which a person's finger meets too.) That split tap is
+ * `realTap`, and every journey click goes through it.
  *
- * The fallback, verified working: driving interaction through
- * `execute/sync` by DOM dispatch -- calling `el.click()` in-page, and
- * setting `.value` then firing `input`/`change`. This still runs the
- * page's real handlers inside real WebKit, so it still catches real
- * rendering/logic defects on real Safari -- it does NOT exercise the
- * touch input path itself: taps actually reaching targets, focus-zoom,
- * momentum scroll are unverified in this mode. See `InteractionMode`.
+ * Before #838 the canary fell back to `el.click()` inside the page when a
+ * real click had no effect, and every iPhone run since August ran that way:
+ * the page's handlers were exercised, a finger's tap was not. That fallback
+ * is gone for taps. The canary now measures the real tap, and a tap that does
+ * not land fails the run by name (#838 AC2), never a quieter mode.
  *
- * Nothing here is assumed for a given run: `detectInteractionMode` is a
- * canary that measures which mode this session actually needs, every
- * time, so if a future OS build restores real input injection the suite
- * notices and upgrades itself -- and says so (see session.ts, which logs
- * the outcome prominently).
+ * Typing has no real path yet: `element/value` and W3C key actions, in one
+ * call or one per key, leave a field focused by a real tap empty (measured
+ * the same day). Text entry is therefore a MARKED STAND-IN -- the value is set
+ * in the page and `input`/`change` fired -- and `describeInteractionMode`
+ * says so in every run's output until a real path is found (#838).
  */
 import type { WebDriver, WebElement } from './webdriver';
 import { waitFor } from './webdriver';
 
-export type InteractionMode = 'synthetic-touch' | 'dom-dispatch';
+/** The one mode a run may be in: real taps, with text entry a stand-in. */
+export type InteractionMode = 'real-tap';
+
+/** The W3C element-reference key safaridriver reads in an action's origin. */
+const ELEMENT_KEY = 'element-6066-11e4-a52e-4f735466cecf';
+
+/** A pointer input source; `mouse` is the type iOS turns into a touch. */
+const finger = (actions: readonly unknown[]) => ({
+  type: 'pointer',
+  id: 'finger',
+  parameters: { pointerType: 'mouse' },
+  actions,
+});
 
 /**
- * One small interface, two implementations. Journeys are written once
- * against this and never branch on which mode is active -- see
- * journeys.journey.ts, which only ever calls `session.interaction.*`.
+ * A real tap at the centre of an element: press in one W3C action call,
+ * release in a second, then release everything. One call holding both drops
+ * the release on iOS 27.0.1 (#838), so the split is the mechanism, not style.
+ */
+export async function realTap(
+  driver: WebDriver,
+  elementId: string,
+): Promise<void> {
+  await driver.performActions([
+    finger([
+      {
+        type: 'pointerMove',
+        duration: 0,
+        origin: { [ELEMENT_KEY]: elementId },
+        x: 0,
+        y: 0,
+      },
+      { type: 'pointerDown', button: 0 },
+    ]),
+  ]);
+  await driver.performActions([finger([{ type: 'pointerUp', button: 0 }])]);
+  await driver.releaseActions();
+}
+
+/**
+ * One small interface the journeys are written against; they never branch on
+ * the mode -- see journeys.journey.ts, which only calls `session.interaction.*`.
  */
 export interface Interaction {
   readonly mode: InteractionMode;
@@ -45,39 +80,18 @@ export interface Interaction {
   clear(element: WebElement): Promise<void>;
 }
 
-/** The real WebDriver primitives -- used when the canary confirms they actually work. */
-export class SyntheticTouchInteraction implements Interaction {
-  readonly mode: InteractionMode = 'synthetic-touch';
-
-  async click(element: WebElement): Promise<void> {
-    await element.click();
-  }
-
-  async type(element: WebElement, text: string): Promise<void> {
-    await element.sendKeys(text);
-  }
-
-  async clear(element: WebElement): Promise<void> {
-    await element.clear();
-  }
-}
-
 /**
- * The fallback -- real DOM events, dispatched via `execute/sync` rather
- * than synthesized touch/keyboard hardware events. Still exercises the
- * page's actual `click`/`input`/`change` listeners in real WebKit; does
- * not exercise the touch/keyboard input PATH itself (see this file's own
- * module doc).
+ * Taps are real touches; text entry is the marked stand-in (no real typing
+ * path on iOS 27.0.1 yet, #838): the value is set in the page and the
+ * `input`/`change` listeners run in real WebKit.
  */
-export class DomDispatchInteraction implements Interaction {
-  readonly mode: InteractionMode = 'dom-dispatch';
+export class RealTapInteraction implements Interaction {
+  readonly mode: InteractionMode = 'real-tap';
 
   constructor(private readonly driver: WebDriver) {}
 
   async click(element: WebElement): Promise<void> {
-    await this.driver.executeScript(`arguments[0].click();`, [
-      this.driver.elementRef(element.elementId),
-    ]);
+    await realTap(this.driver, element.elementId);
   }
 
   async type(element: WebElement, text: string): Promise<void> {
@@ -121,25 +135,14 @@ document.getElementById('btn').addEventListener('click', function () {
 const CANARY_URL = `data:text/html,${encodeURIComponent(CANARY_FIXTURE_HTML)}`;
 
 /**
- * Navigates to the canary fixture, performs a click via `performClick`,
- * and reports whether the click's real effect (the listener actually
- * running) was observed within a bounded wait.
- *
- * Deliberately takes `performClick` as a parameter rather than hardcoding
- * a real `element/click` call: `detectInteractionMode` below calls this
- * with the real WebDriver click (what the canary actually decides the
- * session's mode from), but the SAME observe-and-wait logic can be, and
- * was, exercised with a DOM-dispatch click too -- proving this function
- * correctly reports `true` when a click genuinely lands and `false` when
- * it does not, in both directions, on this real device. See
- * task-3a-report.md, "Proving the canary both ways" for that proof's
- * real output; nothing about the device itself is faked here in either
- * case -- both are real clicks via real (if different) mechanisms against
- * a real fixture in real WebKit.
+ * Navigates to the canary fixture, performs a click via `performClick`, and
+ * reports whether the click's real effect (the listener actually running)
+ * was observed within `timeoutMs`.
  */
 export async function observeClickEffect(
   driver: WebDriver,
   performClick: (button: WebElement) => Promise<void>,
+  timeoutMs = 3_000,
 ): Promise<boolean> {
   await driver.navigate(CANARY_URL);
   const button = await driver.findElement('#btn');
@@ -153,9 +156,9 @@ export async function observeClickEffect(
         return text === 'CLICKED' ? true : undefined;
       },
       {
-        timeout: 3_000,
-        interval: 150,
-        describe: 'canary #out to read CLICKED after a click',
+        timeout: timeoutMs,
+        interval: Math.min(150, timeoutMs / 4),
+        describe: 'canary #out to read CLICKED after a real tap',
       },
     );
     return true;
@@ -165,40 +168,46 @@ export async function observeClickEffect(
 }
 
 /**
- * The canary itself (design doc s5a): attempts a REAL `element/click` and
- * decides the session's interaction mode from whether it had any effect.
- * Nothing about the mode is assumed anywhere else in this harness -- see
- * session.ts, which calls this exactly once per run, before any journey,
- * and refuses to guess.
+ * The canary (design doc s5a, as changed by #838): one real tap on the
+ * fixture. It lands, and the run is in `real-tap`; it does not, and the run
+ * fails here, naming the cause -- there is no quieter mode to fall back to.
+ * session.ts calls this exactly once per run, before any journey.
  */
 export async function detectInteractionMode(
   driver: WebDriver,
+  { timeoutMs = 3_000 }: { timeoutMs?: number } = {},
 ): Promise<InteractionMode> {
-  const clicked = await observeClickEffect(driver, (button) => button.click());
-  return clicked ? 'synthetic-touch' : 'dom-dispatch';
+  const landed = await observeClickEffect(
+    driver,
+    (button) => realTap(driver, button.elementId),
+    timeoutMs,
+  );
+  if (!landed)
+    throw new Error(
+      `a real tap did not land on the iPhone (#838): the canary's button saw no click within ${timeoutMs} ms of a ` +
+        'press and a release sent as separate W3C actions. Check the phone is unlocked and Safari is in front; ' +
+        'the run stops here rather than fake taps inside the page.',
+    );
+  return 'real-tap';
 }
 
 export function createInteraction(
   driver: WebDriver,
   mode: InteractionMode,
 ): Interaction {
-  return mode === 'synthetic-touch'
-    ? new SyntheticTouchInteraction()
-    : new DomDispatchInteraction(driver);
+  void mode;
+  return new RealTapInteraction(driver);
 }
 
 /**
- * The exact, unmissable line this project's standard requires: "the mode
- * is named in the suite's output... a DOM-dispatch run is never reported
- * as though taps were taps." Called once, by session.ts, the moment the
- * mode is known.
+ * The line every run prints, and the dashboard shows: what this run's taps
+ * and typing were. Text entry is named as a stand-in until #838 finds a real
+ * path, so a run is never reported as though typing were typing.
  */
 export function describeInteractionMode(mode: InteractionMode): string {
-  const banner = `[iOS interaction mode] ${mode}`;
-  return mode === 'synthetic-touch'
-    ? `${banner} -- real synthetic touch/keyboard input confirmed working this run; the full interaction path, including touch delivery, is exercised.`
-    : `${banner} -- real synthetic touch/keyboard input is NOT landing on this device right now (canary observed no effect from a real click). ` +
-        'Interaction is driven by DOM dispatch instead (execute/sync: el.click(), and .value + input/change events) -- this still exercises real ' +
-        'page logic and rendering in real WebKit, but the touch input PATH ITSELF is NOT covered by this run: taps actually reaching their ' +
-        'targets, focus-triggered zoom, and momentum scroll are unverified.';
+  return (
+    `[iOS interaction mode] ${mode} -- taps are real touches (press and release as separate W3C actions, #838); ` +
+    'text entry is a marked stand-in (the value is set in the page and input/change fired), because no real typing ' +
+    'path works on this iOS build yet (#838).'
+  );
 }
