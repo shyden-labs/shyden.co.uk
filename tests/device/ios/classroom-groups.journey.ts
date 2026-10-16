@@ -709,7 +709,11 @@ describe('iOS mirror: the sound assets', () => {
       await phone().driver.findElement('#cg-sound-toggle'),
     );
     const box = await phone().driver.findElement('#cg-sound-check');
-    expect(await box.property('checked'), 'sound stays off').toBe(false);
+    await expectEventually(
+      async () => box.property('checked'),
+      false,
+      'sound stays off',
+    );
     await fill({ count: '6', size: '3', speed: 'fast' });
     await go();
     await expectEventually(
