@@ -555,7 +555,8 @@ export const siteTh: SiteStrings = {
     shytalkFeature1: 'ห้องเสียงสดรองรับได้สูงสุดแปดที่นั่ง',
     shytalkFeature2: 'ขอที่นั่ง หรือจะฟังไปก่อนจนกว่าคุณจะพร้อม',
     shytalkFeature3: 'บทเรียนฟรีกับครูตัวจริง',
-    shytalkFeature4: 'มีการดูแล แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
+    shytalkFeature4:
+      'มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
     shytalkShotAlt:
       'แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง',
     visitShytalk: 'เยี่ยมชมเว็บไซต์ ShyTalk',
@@ -587,7 +588,7 @@ export const siteTh: SiteStrings = {
   },
   notFound: {
     title: 'ไม่พบหน้า — Shyden',
-    description: 'หน้าที่คุณกำลังค้นหาไม่มีอยู่',
+    description: 'หน้าเว็บที่คุณกำลังค้นหาไม่มีอยู่',
     heading: 'ไม่พบหน้า',
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
