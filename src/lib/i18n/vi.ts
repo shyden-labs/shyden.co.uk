@@ -278,7 +278,7 @@ export const vi: Catalogue = {
   },
   warnings: {
     SEX_SPILLOVER:
-      '{sex, select, M {{names} đã gia nhập một nhóm các bạn nữ vì không có đủ bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là do tỷ lệ giới tính như vậy, chứ không phải là một sai lầm cần khắc phục.} other {{names} đã gia nhập một nhóm các cậu bé vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.}}',
+      '{sex, select, M {{names} đã gia nhập một nhóm các bạn nữ vì không có đủ số lượng các bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.} other {{names} đã gia nhập một nhóm các bạn nam vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.}}',
     PINNED_MIXED_SEX:
       '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     SEX_BOTH_TOO_SMALL:
