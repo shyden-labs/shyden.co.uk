@@ -101,6 +101,11 @@ const goEnabled = async (): Promise<boolean> =>
 
 describe('iOS mirror: classroom group creator', () => {
   test('iOS mirror: shuffles anonymous students against the rewritten engine', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'anonymous shuffle');
     await phone().navigateToPath('/classroom-groups');
     await phone().interaction.fill(
@@ -126,6 +131,10 @@ describe('iOS mirror: classroom group creator', () => {
   });
 
   test('iOS mirror: leaves a pupil typed absent out of the groups entirely', async () => {
+    // NOT YET THE SAME as Android (#811): getByText is read by
+    // textMatchesOf, a restatement of Playwright's text engine. Kept,
+    // never deleted (Shyden 2026-10-16), until #811 runs Playwright's own
+    // code in Safari.
     announceMode(phone(), 'absent by number');
     await phone().navigateToPath('/classroom-groups');
     await fill({ count: '25', groups: '5' });
@@ -169,6 +178,11 @@ describe('iOS mirror: classroom group creator', () => {
   });
 
   test('iOS mirror: a refused number blocks the shuffle until it is corrected', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'refused absent number');
     await phone().navigateToPath('/classroom-groups');
 
@@ -198,6 +212,11 @@ describe('iOS mirror: classroom group creator', () => {
   });
 
   test('iOS mirror: lowering the count refuses a number that was valid when it was typed', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'count lowered under an absent number');
     const problem = '#cg-numbers-problem';
     await phone().navigateToPath('/classroom-groups');
@@ -473,6 +492,12 @@ const heading = (): Promise<string[]> =>
 
 describe('iOS mirror: class name and results heading', () => {
   test('iOS mirror: the class name heads the results, once', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'class name heads results');
     await phone().navigateToPath('/classroom-groups');
     await className('7B');
@@ -495,6 +520,11 @@ describe('iOS mirror: class name and results heading', () => {
   });
 
   test('iOS mirror: a class name of only spaces is treated as no class name', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'spaces-only class name');
     await phone().navigateToPath('/classroom-groups');
     await className('   ');
@@ -504,6 +534,11 @@ describe('iOS mirror: class name and results heading', () => {
   });
 
   test('iOS mirror: groups stay numbered when a class name is set', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'groups numbered under a class name');
     await phone().navigateToPath('/classroom-groups');
     await className('7B');
@@ -517,6 +552,11 @@ describe('iOS mirror: class name and results heading', () => {
   });
 
   test('iOS mirror: a class name is rendered literally, HTML metacharacters included', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'class name rendered literally');
     await phone().navigateToPath('/classroom-groups');
     // Android listens for a dialog; here the alert the payload would call is
@@ -539,6 +579,11 @@ describe('iOS mirror: class name and results heading', () => {
   });
 
   test('iOS mirror: filename-unsafe characters reach the heading unaltered', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'filename-unsafe class name');
     await phone().navigateToPath('/classroom-groups');
     await className('Year 7 / Set B');
@@ -552,6 +597,11 @@ describe('iOS mirror: class name and results heading', () => {
   });
 
   test('iOS mirror: a changed class name is picked up on the next shuffle', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'class name changed between shuffles');
     await phone().navigateToPath('/classroom-groups');
     await className('7B');
@@ -685,6 +735,11 @@ describe('iOS mirror: the Split by row names its own fields', () => {
     ],
   ] as const) {
     test(`iOS mirror: the fields are correctly labelled (${path})`, async () => {
+      // NOT YET THE SAME as Android (#811): its controls are found by the
+      // name roles.ts computes, a part of the ARIA naming rules, where
+      // Android's getByRole and getByLabel run Playwright's own. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+      // in Safari.
       announceMode(phone(), `Split by labels on ${path}`);
       await phone().navigateToPath(path);
       expect(await textsOf(phone().driver, '#cg-mode-label')).toEqual([
@@ -777,6 +832,12 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
   });
 
   test('iOS mirror: the class name heads the results, once', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'Indonesian class name heading');
     await phone().navigateToPath('/id/classroom-groups');
     const field = await byLabel(phone().driver, 'Kelas (opsional)', {
@@ -881,6 +942,12 @@ const LEFTOVERS_CHANGED =
 
 describe('iOS mirror: out-of-date groups', () => {
   test('iOS mirror: changing the group size marks them out of date, naming the change', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: group size');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -889,6 +956,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: changing the leftovers choice marks them out of date', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: leftovers choice');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -898,6 +971,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: changing the number of students marks them out of date, naming the change', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: student count');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -906,6 +985,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: undoing the count change clears it', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: count undone');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -915,6 +1000,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the class name does NOT mark them out of date', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: class name ignored');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -923,6 +1014,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the old groups stay visible while stale', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: old groups kept');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -931,6 +1027,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: shuffling clears it', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: cleared by shuffle');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -940,6 +1042,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: undoing the change clears it', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: size undone');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -989,6 +1097,12 @@ describe('iOS mirror: out-of-date groups', () => {
     ],
   ] as const) {
     test(`iOS mirror: ${what} marks the groups out of date`, async () => {
+      // NOT YET THE SAME as Android (#811): its controls are found by the
+      // name roles.ts computes, a part of the ARIA naming rules, where
+      // Android's getByRole and getByLabel run Playwright's own; getByText
+      // is read by textMatchesOf, a restatement of Playwright's text engine.
+      // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+      // Playwright's own code in Safari.
       announceMode(phone(), `stale: ${what}`);
       await openRoster(phone());
       await addSeveral(phone(), 11);
@@ -1001,6 +1115,12 @@ describe('iOS mirror: out-of-date groups', () => {
   }
 
   test('iOS mirror: marking a student present again marks the groups out of date', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: present again');
     await openRoster(phone());
     await addSeveral(phone(), 11);
@@ -1019,6 +1139,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: changing a sex under a sex option marks the groups out of date', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: sex changed');
     await buildRoster(phone(), [
       ['M'],
@@ -1040,6 +1166,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: turning a sex option on marks the groups out of date, naming the change', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: sex option on');
     await buildRoster(phone(), [
       ['M'],
@@ -1062,6 +1194,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: a rename does not mark the groups out of date', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: rename ignored');
     await openRoster(phone());
     await addSeveral(phone(), 11);
@@ -1083,6 +1221,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: when two things change, undoing one still names the other', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: one of two undone');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -1095,6 +1239,12 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: when two things change, undoing both clears it', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'stale: both undone');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -1108,6 +1258,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the notice element itself carries the exact sentence', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: exact sentence');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -1120,6 +1275,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the notice offers its own way to reshuffle, without hunting for the main button', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: notice reshuffle');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -1145,6 +1305,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the old groups are visually dimmed while stale, not merely still present', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: dimmed');
     await phone().navigateToPath('/classroom-groups');
     await shuffleTwelve();
@@ -1198,6 +1363,11 @@ describe('iOS mirror: out-of-date groups', () => {
     });
 
   test('iOS mirror: the reason reads in Indonesian, as a whole sentence', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: Indonesian size reason');
     await phone().navigateToPath('/id/classroom-groups');
     await typeLabelled('Jumlah siswa', '12', { exact: false });
@@ -1216,6 +1386,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the leftovers-choice reason reads in Indonesian, as a whole sentence', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: Indonesian leftovers reason');
     await phone().navigateToPath('/id/classroom-groups');
     await typeLabelled('Jumlah siswa', '12', { exact: false });
@@ -1239,6 +1414,11 @@ describe('iOS mirror: out-of-date groups', () => {
   });
 
   test('iOS mirror: the class-list reason reads in Indonesian, as a whole sentence', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'stale: Indonesian class-list reason');
     await phone().navigateToPath('/id/classroom-groups');
     await typeLabelled('Jumlah siswa', '12', { exact: false });
@@ -1463,6 +1643,11 @@ const listedBySafari = async (
 describe('iOS mirror: every language renders its own messages', () => {
   for (const locale of LOCALES) {
     test(`iOS mirror: ${locale}: numbers, groups, a summary, a refusal and a list`, async () => {
+      // NOT YET THE SAME as Android (#811): its controls are found by the
+      // name roles.ts computes, a part of the ARIA naming rules, where
+      // Android's getByRole and getByLabel run Playwright's own. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+      // in Safari.
       announceMode(phone(), `own messages (${locale})`);
       const t = getStrings(locale);
       const english = getStrings(DEFAULT_LOCALE);

@@ -155,6 +155,11 @@ describe('iOS mirror: privacy — the class list cannot leave the page', () => {
 
 describe('iOS mirror: privacy — the roster never leaves memory', () => {
   test('iOS mirror: nothing about the class is stored, after every operation', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'roster never stored');
     await buildRoster(phone(), [
       ['F', 'Ana'],
@@ -202,6 +207,11 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
   });
 
   test('iOS mirror: a reload loses the roster', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own. Kept, never
+    // deleted (Shyden 2026-10-16), until #811 runs Playwright's own code
+    // in Safari.
     announceMode(phone(), 'reload loses roster');
     await buildRoster(phone(), [['F', 'Ana']]);
     await phone().reload();
@@ -209,6 +219,12 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
   });
 
   test('iOS mirror: two children called Ana are separated independently', async () => {
+    // NOT YET THE SAME as Android (#811): its controls are found by the
+    // name roles.ts computes, a part of the ARIA naming rules, where
+    // Android's getByRole and getByLabel run Playwright's own; getByText
+    // is read by textMatchesOf, a restatement of Playwright's text engine.
+    // Kept, never deleted (Shyden 2026-10-16), until #811 runs
+    // Playwright's own code in Safari.
     announceMode(phone(), 'two Anas');
     await buildRoster(phone(), [
       ['F', 'Ana'],
@@ -259,6 +275,10 @@ describe('iOS mirror: privacy — the roster never leaves memory', () => {
 
 describe('iOS mirror: privacy — the roster still never persists, after the new paths', () => {
   test('iOS mirror: an import writes nothing', async () => {
+    // NOT YET THE SAME as Android (#811): getByText is read by
+    // textMatchesOf, a restatement of Playwright's text engine. Kept,
+    // never deleted (Shyden 2026-10-16), until #811 runs Playwright's own
+    // code in Safari.
     announceMode(phone(), 'import writes nothing');
     await phone().navigateToPath('/classroom-groups');
     await openImport();
@@ -275,6 +295,10 @@ describe('iOS mirror: privacy — the roster still never persists, after the new
   });
 
   test('iOS mirror: a reload after an import still loses the roster', async () => {
+    // NOT YET THE SAME as Android (#811): getByText is read by
+    // textMatchesOf, a restatement of Playwright's text engine. Kept,
+    // never deleted (Shyden 2026-10-16), until #811 runs Playwright's own
+    // code in Safari.
     announceMode(phone(), 'reload after import');
     await phone().navigateToPath('/classroom-groups');
     await openImport();
