@@ -5,9 +5,12 @@
  * journeys need to be mirrored". Playwright cannot drive iOS Safari, so each
  * Android test is restated here over the session's WebDriver, under the SAME
  * title with an `iOS mirror:` prefix, generated per locale and per page as the
- * Android one is. What Android runs and this file cannot is listed in
- * `.superpowers/sdd/800/plan.md` with its reason (keyboard walks: no trusted
- * key events in dom-dispatch; console errors: safaridriver has no log endpoint).
+ * Android one is. What Android runs and this file does not is listed in
+ * `.superpowers/sdd/800/plan.md` with its reason. The skip link's first-Tab
+ * test needs no twin: Shyden ruled 2026-10-16 (#811) that a hardware key press
+ * is exempt, "because it's a phone and phone users are not expected to have a
+ * separate usb keyboard for their phones". The console-error tests are a gap,
+ * not an exemption: safaridriver has no log endpoint, and #811 gives them one.
  *
  * Interaction goes through `phone().interaction` only, so the canary's mode
  * decides whether a click is a tap or a DOM-dispatched click (ruling
@@ -496,9 +499,10 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
 
   for (const theme of THEMES)
     test(`iOS mirror: ${theme}, saved: the badge clears the WCAG AA floor for normal text`, async () => {
-      // Android emulates the device's colour scheme; WebDriver cannot set
-      // Safari's, so the theme arrives as the saved choice the page honours.
       announceMode(phone(), `beta badge contrast (${theme})`);
+      // NOT YET THE SAME as Android (#811): Android emulates the device colour
+      // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await phone().navigateToPath(
         localisePath('/', PREFIXED_LOCALES[0]),
         SWITCHER,

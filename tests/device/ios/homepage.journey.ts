@@ -5,13 +5,16 @@
  * `iOS mirror:` prefix. Playwright cannot drive iOS Safari, so each is
  * restated over the session's WebDriver.
  *
- * Seven Android tests have no twin here, each for a reason WebDriver on
- * Safari imposes (`.superpowers/sdd/800/plan.md` lists them): print and
+ * Seven Android tests have no twin here (`.superpowers/sdd/800/plan.md`
+ * lists them). The two keyboard walks are exempt: Shyden ruled 2026-10-16
+ * (#811) that a hardware key press needs no iPhone twin, "because it's a
+ * phone and phone users are not expected to have a separate usb keyboard for
+ * their phones". The rest are gaps #811 closes, not exemptions: print and
  * reduced-motion emulation (`emulateMedia` has no WebDriver twin), the
- * console (safaridriver exposes no log), the two keyboard walks (no trusted
- * key events in dom-dispatch), and the device's own colour scheme. Where
- * Android emulates a scheme to pick a palette, this file stamps the saved
- * choice the page honours instead, and its title says "saved".
+ * console (safaridriver exposes no log), and the device's own colour scheme.
+ * Where Android emulates a scheme to pick a palette, this file stamps the
+ * saved choice the page honours instead, its title says "saved", and the
+ * test is marked NOT YET THE SAME as Android (#811).
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -167,6 +170,9 @@ describe('iOS mirror: homepage content', () => {
   for (const theme of THEMES)
     test(`iOS mirror: ${theme}, saved: the ShyTalk wordmark keeps its tones, on its own tile in light only`, async () => {
       announceMode(phone(), `wordmark tile (${theme})`);
+      // NOT YET THE SAME as Android (#811): Android emulates the device colour
+      // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
       const painted = await read<{ colour: string; tile: string }>(
         `const w = document.querySelector('#shytalk .shytalk-wordmark');
@@ -229,6 +235,9 @@ describe('iOS mirror: homepage content', () => {
   for (const theme of THEMES)
     test(`iOS mirror: ${theme}, saved: every status badge clears AA as painted`, async () => {
       announceMode(phone(), `status badges (${theme})`);
+      // NOT YET THE SAME as Android (#811): Android emulates the device colour
+      // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
       const badges = await paintedTextOf(phone().driver, '.status-badge');
       expect(badges).toHaveLength(4);
@@ -628,6 +637,9 @@ describe('iOS mirror: the pause control is a small icon on the strip (#619)', ()
   for (const theme of THEMES)
     test(`iOS mirror: ${theme}, saved: the icon clears 3:1 on the disc, and the disc clears 3:1 against the strip`, async () => {
       announceMode(phone(), `pause icon contrast (${theme})`);
+      // NOT YET THE SAME as Android (#811): Android emulates the device colour
+      // scheme; WebDriver cannot, so the theme is the SAVED choice. Kept, never
+      // deleted (Shyden 2026-10-16), until #811 sets the phone's appearance.
       await openHome('en', theme);
       const [icon] = await paintedTextOf(
         phone().driver,
