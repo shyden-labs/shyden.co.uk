@@ -448,10 +448,13 @@ const within = (text: string, min: number): boolean =>
 const field = (fields: URLSearchParams, name: string): string =>
   (fields.get(name) ?? '').replace(/\r\n/g, '\n');
 
-const describeError = (error: unknown): string =>
-  error instanceof Error
-    ? `${error.name}: ${error.message}`
-    : 'NonError: a value that is not an Error was thrown';
+/**
+ * Why a call to the database failed, as a kind from a closed list (#829). A
+ * D1 error's own text can repeat what was bound, the visitor's words
+ * included, so it is never read into a log line: personal data is left out
+ * of logs by default (global rule, Shyden 2026-10-16).
+ */
+type FailureKind = 'binding-missing' | 'database';
 
 /**
  * The body, or null once it passes `cap` bytes. A chunked body declares no
@@ -525,8 +528,11 @@ export async function handleReport(
   const keys = matchingKeys(quote, page, locale);
   if (keys.length === 0) return outcome('not-found', request, locale, page);
 
+  if (!env.REPORTS) {
+    log(`report failed: ${'binding-missing' satisfies FailureKind}`);
+    return outcome('failed', request, locale, page);
+  }
   try {
-    if (!env.REPORTS) throw new Error('the REPORTS binding is missing');
     await env.REPORTS.prepare(INSERT)
       .bind(
         crypto.randomUUID(),
@@ -539,8 +545,8 @@ export async function handleReport(
         note,
       )
       .run();
-  } catch (error) {
-    log(`report failed: ${describeError(error)}`);
+  } catch {
+    log(`report failed: ${'database' satisfies FailureKind}`);
     return outcome('failed', request, locale, page);
   }
   return outcome('sent', request, locale, page);
@@ -558,16 +564,19 @@ export async function reportHealth(
 ): Promise<Response> {
   if (request.method !== 'GET') return plain(405, { Allow: 'GET' });
   let ok = false;
+  if (!env.REPORTS) {
+    log(`report health: ${'binding-missing' satisfies FailureKind}`);
+    return json({ ok }, 503);
+  }
   try {
-    if (!env.REPORTS) throw new Error('the REPORTS binding is missing');
     const { results } = await env.REPORTS.prepare(HEALTH_QUERY).all<{
       name: string;
     }>();
     ok = schemaMatches(results.map(({ name }) => name));
     if (!ok)
       log('report health: the reports table does not match the migration');
-  } catch (error) {
-    log(`report health: ${describeError(error)}`);
+  } catch {
+    log(`report health: ${'database' satisfies FailureKind}`);
   }
   return json({ ok }, ok ? 200 : 503);
 }
