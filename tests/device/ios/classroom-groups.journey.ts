@@ -825,14 +825,14 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
     await phone().navigateToPath('/id/classroom-groups');
     await fill({ count: '4', size: '2' });
     await go();
+    // `allTextContents()`: read once, raw, as Android reads it.
+    const labels = await rawTextsOf(phone().driver, '#cg-results .student');
+    expect(labels.sort()).toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
+    // `.first()` toHaveText, retried.
     await expectEventually(
-      async () =>
-        (await textsOf(phone().driver, '#cg-results .student')).sort(),
-      ['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4'],
-      'four Indonesian labels',
-    );
-    expect((await textsOf(phone().driver, '#cg-results .group h3'))[0]).toBe(
+      async () => (await textsOf(phone().driver, '#cg-results .group h3'))[0],
       'Kelompok 1',
+      'the first group heading',
     );
   });
 
@@ -846,8 +846,14 @@ describe('iOS mirror: classroom group creator — Bahasa Indonesia', () => {
       [true],
       'the error shows',
     );
-    expect((await textsOf(phone().driver, '#cg-error'))[0]).toContain(
-      'Tambahkan siswa',
+    // `toContainText`, retried, on the one error.
+    await expectEventually(
+      async () =>
+        (await textsOf(phone().driver, '#cg-error')).map((t) =>
+          t.includes('Tambahkan siswa'),
+        ),
+      [true],
+      'the error names Tambahkan siswa',
     );
   });
 
