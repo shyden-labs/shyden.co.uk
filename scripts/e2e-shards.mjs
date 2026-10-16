@@ -179,34 +179,55 @@ export function needsFindings(needs) {
 }
 
 /**
- * The capture shards (#774) run only where the scope job said a pull request
- * can move a release picture, so a skip is a pass there and a refusal
- * everywhere else. Judged here against that verdict, then left out of what
- * the docs-only and full-run verdicts read, which know nothing of it. A
+ * The jobs that run only where the scope job's own verdict says (#774, #822),
+ * with the verdict each one reads and what a verdict that never asked for it
+ * would let through. The capture shards run where a pull request can move a
+ * release picture; the logs suite runs on a pull request into `main`, the
+ * release, and nowhere else (Shyden, 2026-10-16: "a release cannot be cut
+ * until all checks are complete, including this one").
+ */
+const SCOPED_JOBS = {
+  capture: {
+    verdict: 'capture',
+    unguarded: 'a case with no picture would pass',
+  },
+  logs: {
+    verdict: 'release',
+    unguarded:
+      'a release whose logs and audit trails were never checked would pass',
+  },
+};
+
+/**
+ * A scoped job runs only where scope said, so a skip is a pass there and a
+ * refusal everywhere else. Judged here against that verdict, then left out of
+ * what the docs-only and full-run verdicts read, which know nothing of it. A
  * verdict other than exactly `true` or `false` judges nothing, so it refuses:
  * an output that went missing must not read as "skip".
  *
  * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @param {keyof typeof SCOPED_JOBS} name The scoped job.
  * @returns {{ findings: string[], rest: unknown }}
  */
-export function captureFindings(needs) {
+export function scopedJobFindings(needs, name) {
   if (!isRecord(needs)) return { findings: [], rest: needs };
-  const { capture, ...rest } = needs;
-  if (capture === undefined)
+  const { verdict, unguarded } = SCOPED_JOBS[name];
+  const { [name]: state, ...rest } = needs;
+  if (state === undefined)
     return {
       findings: [
-        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+        `${name} is not among the jobs build-and-test stands for, so ${unguarded}`,
       ],
       rest,
     };
-  const result = isRecord(capture) ? capture.result : undefined;
+  const result = isRecord(state) ? state.result : undefined;
   const outputs = isRecord(needs.scope) ? needs.scope.outputs : undefined;
-  const said = isRecord(outputs) ? outputs.capture : undefined;
+  const said = isRecord(outputs) ? outputs[verdict] : undefined;
   if (said !== 'true' && said !== 'false')
     return {
       findings: [
-        `scope handed on no capture verdict (${JSON.stringify(said)}), ` +
-          `so capture finishing \`${String(result)}\` cannot be judged`,
+        `scope handed on no ${verdict} verdict (${JSON.stringify(said)}), ` +
+          `so ${name} finishing \`${String(result)}\` cannot be judged`,
       ],
       rest,
     };
@@ -217,7 +238,7 @@ export function captureFindings(needs) {
       result === wanted
         ? []
         : [
-            `capture finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
+            `${name} finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
           ],
     rest,
   };
@@ -483,11 +504,12 @@ function main() {
   }
 
   const present = files.filter((file) => existsSync(file));
-  // The capture job first: it is judged against scope's verdict, not by
-  // whether the pull request is docs-only, and the rest never see it.
-  const capture = captureFindings(needs);
-  const docsOnly = isDocsOnlyRun(capture.rest);
-  // Its accounts, wherever scope gave a verdict captureFindings could read;
+  // The scoped jobs first: each is judged against scope's verdict, not by
+  // whether the pull request is docs-only, and the rest never see them.
+  const capture = scopedJobFindings(needs, 'capture');
+  const logs = scopedJobFindings(capture.rest, 'logs');
+  const docsOnly = isDocsOnlyRun(logs.rest);
+  // The capture's accounts, wherever scope gave a verdict it could read;
   // any other verdict is already refused there.
   const said =
     isRecord(needs) && isRecord(needs.scope) && isRecord(needs.scope.outputs)
@@ -519,13 +541,14 @@ function main() {
         : [];
   const findings = [
     ...capture.findings,
+    ...logs.findings,
     ...captureAccounts,
     ...(docsOnly
       ? // No shard runs, and the download is skipped, so the glob arrives
         // unmatched; any account that does exist is refused by name.
-        docsOnlyFindings(capture.rest, present)
+        docsOnlyFindings(logs.rest, present)
       : [
-          ...needsFindings(capture.rest),
+          ...needsFindings(logs.rest),
           ...files
             .filter((file) => !existsSync(file))
             .map(

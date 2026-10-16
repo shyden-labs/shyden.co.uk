@@ -2,7 +2,7 @@
  * Record the guards' liveness floors (#468): `npm run floors:record`.
  *
  * Runs the unit suite, then the guards suite (#638), then the integration
- * suite (#630) with
+ * suite (#630), then the logs suite (#822) with
  * `FLOORS_RECORD` set, so every `floorBreach` call
  * writes the count it saw instead of judging it (`tests/floors.ts`), then the
  * Playwright specs that call it, on every project, in the pinned image CI
@@ -19,8 +19,8 @@
  *   sharing a figure would let either go blind behind the other;
  * - either run failed or did not start, Docker included.
  *
- * `npm run floors:record -- --unit` runs the unit, guards and integration
- * suites (#548) and carries every Playwright and functions floor unchanged,
+ * `npm run floors:record -- --unit` runs the unit, guards, integration and
+ * logs suites (#548) and carries every Playwright and functions floor unchanged,
  * naming them: for a change that moves no browser floor, which CI then judges
  * as it judges every floor. It is CI's mode, not the laptop's.
  *
@@ -88,6 +88,7 @@ import { containerArgs, localImage } from './playwright-image.mjs';
 const UNIT = 'unit suite';
 const GUARDS = 'guards suite';
 const INTEGRATION = 'integration suite';
+const LOGS = 'logs suite';
 const PLAYWRIGHT = 'Playwright run';
 const FUNCTIONS = 'functions suite';
 const DEVICE = 'iPhone journeys';
@@ -102,7 +103,7 @@ const MODES = [UNIT_ONLY, FUNCTIONS_ONLY, UNIT_SUITE_ONLY, DEVICE_ONLY];
  * limit (#630, #638), so the record run and CI cannot differ on it. Refuses a
  * script of another shape rather than guessing.
  *
- * @param {string} name `integration` or `guards`
+ * @param {string} name `integration`, `guards` or `logs`
  */
 const suiteArguments = (name) => {
   const { scripts } = JSON.parse(
@@ -121,6 +122,8 @@ const suiteArguments = (name) => {
 export const integrationArguments = () => suiteArguments('integration');
 
 export const guardsArguments = () => suiteArguments('guards');
+
+export const logsArguments = () => suiteArguments('logs');
 
 /** The recorded figures: one home, which `tests/floors.ts` imports. */
 export const FLOORS_FILE = 'tests/floors.json';
@@ -407,7 +410,7 @@ export const carriedOutside = (ids, functionsTexts, asserted) =>
  *
  * @param {string | undefined} mode the one argument, or none for a full record
  * @param {number} pass
- * @returns {{ unit: boolean, guards: boolean, integration: boolean, playwright: boolean, functions: boolean, device: boolean }}
+ * @returns {{ unit: boolean, guards: boolean, integration: boolean, logs: boolean, playwright: boolean, functions: boolean, device: boolean }}
  */
 export const recordSuites = (mode, pass) => {
   const vitest = pass > 1 || (mode !== FUNCTIONS_ONLY && mode !== DEVICE_ONLY);
@@ -416,6 +419,7 @@ export const recordSuites = (mode, pass) => {
     unit: vitest,
     guards: vitest && !unitAlone,
     integration: vitest && !unitAlone,
+    logs: vitest && !unitAlone,
     playwright: pass === 1 && mode === undefined,
     functions: pass === 1 && (mode === undefined || mode === FUNCTIONS_ONLY),
     device: pass === 1 && mode === DEVICE_ONLY,
@@ -1008,6 +1012,18 @@ const main = () => {
             }),
           );
           if (integrationRefusal !== undefined) return integrationRefusal;
+        }
+        if (suites.logs) {
+          // The logs suite (#822) asserts floors too, so it runs into the same
+          // record, with the limit its own script carries.
+          const logsRefusal = runRefusal(
+            LOGS,
+            spawnSync('npx', logsArguments(), {
+              stdio: 'inherit',
+              env: childEnv(env, unit),
+            }),
+          );
+          if (logsRefusal !== undefined) return logsRefusal;
         }
         if (suites.playwright) {
           const image = inImage ? 'the running container' : localImage();

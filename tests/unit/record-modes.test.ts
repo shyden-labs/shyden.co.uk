@@ -12,8 +12,8 @@ import {
  * carries unmeasured (#658). The laptop runs only the unit suite (operator
  * rule 2026-10-09), so `--unit-suite` runs `vitest run` alone, on every pass,
  * and leaves every other suite's floors for `record-floors.yml` to record.
- * `--unit` (#548) is not that mode: it runs the guards and integration suites
- * too, and skips only Playwright and the functions suite. `--device` (#623)
+ * `--unit` (#548) is not that mode: it runs the guards, integration and logs
+ * suites too, and skips only Playwright and the functions suite. `--device` (#623)
  * runs the iPhone journeys alone, the one suite no other mode can reach, and
  * every other mode carries their floors unmeasured.
  */
@@ -22,15 +22,38 @@ describe('the suites each record mode runs (#658)', () => {
     {
       mode: undefined,
       pass: 1,
-      runs: ['unit', 'guards', 'integration', 'playwright', 'functions'],
+      runs: [
+        'unit',
+        'guards',
+        'integration',
+        'logs',
+        'playwright',
+        'functions',
+      ],
     },
-    { mode: '--unit', pass: 1, runs: ['unit', 'guards', 'integration'] },
+    {
+      mode: '--unit',
+      pass: 1,
+      runs: ['unit', 'guards', 'integration', 'logs'],
+    },
     { mode: '--functions', pass: 1, runs: ['functions'] },
     { mode: '--unit-suite', pass: 1, runs: ['unit'] },
     { mode: '--device', pass: 1, runs: ['device'] },
-    { mode: undefined, pass: 2, runs: ['unit', 'guards', 'integration'] },
-    { mode: '--unit', pass: 2, runs: ['unit', 'guards', 'integration'] },
-    { mode: '--functions', pass: 2, runs: ['unit', 'guards', 'integration'] },
+    {
+      mode: undefined,
+      pass: 2,
+      runs: ['unit', 'guards', 'integration', 'logs'],
+    },
+    {
+      mode: '--unit',
+      pass: 2,
+      runs: ['unit', 'guards', 'integration', 'logs'],
+    },
+    {
+      mode: '--functions',
+      pass: 2,
+      runs: ['unit', 'guards', 'integration', 'logs'],
+    },
     { mode: '--unit-suite', pass: 2, runs: ['unit'] },
     { mode: '--device', pass: 2, runs: ['unit'] },
   ])('mode $mode, pass $pass, runs exactly $runs', ({ mode, pass, runs }) => {
@@ -44,6 +67,7 @@ describe('the suites each record mode runs (#658)', () => {
       'unit',
       'guards',
       'integration',
+      'logs',
       'playwright',
       'functions',
       'device',

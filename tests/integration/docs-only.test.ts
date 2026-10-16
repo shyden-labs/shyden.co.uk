@@ -147,7 +147,15 @@ describe('the script, as the workflow runs it', () => {
     const result = spawnSync(process.execPath, [SCRIPT], {
       cwd: dir,
       encoding: 'utf8',
-      env: { ...withoutLocalGit(process.env), GITHUB_OUTPUT: output, ...env },
+      // A base of develop unless the test names one: CI runs this suite on
+      // a pull request into main too, where the runner's own base would leak
+      // in and turn every case into a release (#822).
+      env: {
+        ...withoutLocalGit(process.env),
+        GITHUB_BASE_REF: 'develop',
+        GITHUB_OUTPUT: output,
+        ...env,
+      },
     });
     return { ...result, written: readFileSync(output, 'utf8') };
   };
@@ -160,7 +168,9 @@ describe('the script, as the workflow runs it', () => {
     expect(result.status, result.stderr).toBe(0);
     // The fixture holds none of the capture's entry files, so the trace
     // refuses and the capture runs: the fail-safe answer (#774).
-    expect(result.written).toBe('docs_only=true\ncapture=true\n');
+    expect(result.written).toBe(
+      'docs_only=true\ncapture=true\nrelease=false\n',
+    );
     expect(result.stdout).toMatch(
       /^ {2}- the capture's files could not be traced: astro\.config\.mjs is a root of the trace and does not exist$/m,
     );
@@ -172,9 +182,28 @@ describe('the script, as the workflow runs it', () => {
     );
     const result = run(dir, { GITHUB_EVENT_NAME: 'pull_request' });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.written).toBe('docs_only=false\ncapture=true\n');
+    expect(result.written).toBe(
+      'docs_only=false\ncapture=true\nrelease=false\n',
+    );
     expect(result.stdout).toMatch(
       /^ {2}- M src\/a\.ts: src\/a\.ts is not documentation alone$/m,
+    );
+  });
+
+  it('writes release=true for a pull request into main, and says so (#822)', () => {
+    const { dir } = pullRequest((at) =>
+      writeFileSync(join(at, 'src/a.ts'), 'export const a = 2;\n'),
+    );
+    const result = run(dir, {
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_BASE_REF: 'main',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.written).toBe(
+      'docs_only=false\ncapture=true\nrelease=true\n',
+    );
+    expect(result.stdout).toMatch(
+      /^a release pull request into main, so the logs suite runs\.$/m,
     );
   });
 
@@ -182,7 +211,9 @@ describe('the script, as the workflow runs it', () => {
     const dir = scratchDir('docs-only-bare-');
     const result = run(dir, { GITHUB_EVENT_NAME: 'pull_request' });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.written).toBe('docs_only=false\ncapture=true\n');
+    expect(result.written).toBe(
+      'docs_only=false\ncapture=true\nrelease=false\n',
+    );
   });
 
   it('fails, rather than deciding nothing, when it has nowhere to write', () => {

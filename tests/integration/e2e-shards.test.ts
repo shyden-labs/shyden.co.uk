@@ -63,7 +63,10 @@ describe('the verdict, run as build-and-test runs it', () => {
       },
     );
 
-  /** `needs` with the capture job (#774) as scope's verdict leaves it. */
+  /**
+   * `needs` with the capture job (#774) as scope's verdict leaves it, beside a
+   * logs suite (#822) skipped as on every pull request that is not a release.
+   */
   const capturing = (
     needs: Record<string, unknown>,
     said: 'true' | 'false',
@@ -72,12 +75,28 @@ describe('the verdict, run as build-and-test runs it', () => {
     const scope = needs.scope as
       { outputs?: Record<string, string> } | undefined;
     return {
+      logs: { result: 'skipped', outputs: {} },
       ...needs,
       scope: {
         result: 'success',
-        outputs: { docs_only: 'false', ...scope?.outputs, capture: said },
+        outputs: {
+          docs_only: 'false',
+          release: 'false',
+          ...scope?.outputs,
+          capture: said,
+        },
       },
       capture: { result, outputs: {} },
+    };
+  };
+
+  /** `needs` on a release pull request (#822): scope says the logs suite runs. */
+  const releasing = (needs: Record<string, unknown>, result: string) => {
+    const scope = needs.scope as { outputs: Record<string, string> };
+    return {
+      ...needs,
+      scope: { ...scope, outputs: { ...scope.outputs, release: 'true' } },
+      logs: { result, outputs: {} },
     };
   };
 
@@ -220,9 +239,10 @@ describe('the verdict, run as build-and-test runs it', () => {
       ...docsOnlyNeeds(),
       scope: {
         result: 'success',
-        outputs: { docs_only: 'false', capture: 'false' },
+        outputs: { docs_only: 'false', capture: 'false', release: 'false' },
       },
       capture: { result: 'skipped', outputs: {} },
+      logs: { result: 'skipped', outputs: {} },
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(/e2e finished `skipped`, not `success`/);
@@ -247,6 +267,21 @@ describe('the verdict, run as build-and-test runs it', () => {
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(
       /capture finished `skipped` where scope said it runs, not `success`/,
+    );
+  });
+
+  it('passes a release whose logs suite succeeded (#822)', () => {
+    const run = verdict(accountFiles(whole()), releasing(succeeded, 'success'));
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(run.stdout).toMatch(/4 shards ran 2210 of the 2210 tests/);
+  });
+
+  it('fails a release whose logs suite was skipped (#822)', () => {
+    const run = verdict(accountFiles(whole()), releasing(succeeded, 'skipped'));
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /logs finished `skipped` where scope said it runs, not `success`/,
     );
   });
 
