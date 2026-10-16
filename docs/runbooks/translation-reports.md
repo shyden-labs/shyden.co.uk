@@ -37,6 +37,17 @@ carries the note.
 table's columns match `migrations/0001_reports.sql`, and `503` otherwise. The
 dev and prod sanity suites call it after every deploy.
 
+A failure writes one line to the Functions log (Cloudflare dashboard → Workers
+& Pages → the project → Logs), and nothing a visitor sent (#829):
+
+| Line | Means |
+| --- | --- |
+| `report failed: binding-missing` | A report arrived and the `REPORTS` binding is not set on this environment. |
+| `report failed: database` | The insert into D1 failed; D1's own metrics say why. The error's text is never logged, because it can repeat what was bound. |
+| `report health: binding-missing` | The health check found no `REPORTS` binding. |
+| `report health: database` | The health check's query failed. |
+| `report health: the reports table does not match the migration` | The table's columns differ from `migrations/0001_reports.sql`. |
+
 ## The rate limit (operator, before the production release)
 
 The endpoint validates every report, but only Cloudflare can count requests

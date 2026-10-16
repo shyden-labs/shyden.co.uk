@@ -9,6 +9,7 @@ import {
   schemaMatches,
 } from '../../src/lib/report';
 import { getSiteStrings } from '../../src/lib/i18n';
+import { failingWith } from '../report-fakes';
 import { codeWithoutComments } from './source-text';
 import {
   FORM,
@@ -326,7 +327,7 @@ describe('check 9 with no database: failed, and a clean log line', () => {
 
   // Stand-in (#822): one fixed request. Every field and header a visitor
   // sends is the logs suite's (tests/logs/report-log.test.ts).
-  it('logs the error name and message, and no visitor text or header', async () => {
+  it('logs the failure kind, and no visitor text or header', async () => {
     const lines: string[] = [];
     const secret = 'the-suggestion-7f3a';
     await answer(
@@ -335,11 +336,21 @@ describe('check 9 with no database: failed, and a clean log line', () => {
       }),
       lines,
     );
-    expect(lines).toEqual([
-      'report failed: Error: the REPORTS binding is missing',
-    ]);
+    expect(lines).toEqual(['report failed: binding-missing']);
     for (const leak of [secret, 'note-9c1d', 'agent-2b8e', quote, ORIGIN])
       expect(lines[0]).not.toContain(leak);
+  });
+
+  // Stand-in (#829): one planted value in a database error's text. Every
+  // kind of private or identifying data is the logs suite's.
+  it('logs a database failure as its kind, never the error text', async () => {
+    const lines: string[] = [];
+    await handleReport(
+      post(valid()),
+      { REPORTS: failingWith('D1_ERROR: cannot bind ana.putri@example.com') },
+      (line) => lines.push(line),
+    );
+    expect(lines).toEqual(['report failed: database']);
   });
 });
 
