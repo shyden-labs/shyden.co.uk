@@ -209,7 +209,9 @@ describe('iOS mirror: homepage content', () => {
     // `request.get`: from the test process, as Android's request context asks.
     const pages = await Promise.all(
       LOCALES.map(async (locale) =>
-        (await fetch(new URL(localisePath('/', locale), phone().baseUrl))).text(),
+        (
+          await fetch(new URL(localisePath('/', locale), phone().baseUrl))
+        ).text(),
       ),
     );
     await openHome('en');
@@ -444,7 +446,9 @@ describe('iOS mirror: the language band sits under the header (#599)', () => {
       bottom,
       'the band is still on screen after scrolling past it',
     ).toBeLessThanOrEqual(0);
-    await shoot(`scrolled past, the band's bottom is at ${Math.round(bottom)}px`);
+    await shoot(
+      `scrolled past, the band's bottom is at ${Math.round(bottom)}px`,
+    );
   });
 });
 

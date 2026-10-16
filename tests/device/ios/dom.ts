@@ -40,6 +40,35 @@ export function textsOf(
   );
 }
 
+/**
+ * The text a screen reader is given for each match, as Playwright's
+ * `ariaSnapshot()` reads it for a containment check (#821): every text node,
+ * whitespace-normalised, except those inside an `aria-hidden="true"` subtree or
+ * under a box that is not rendered (`checkVisibility()`, which sees a
+ * `display: none` ancestor). A visually-hidden label still counts, as it does
+ * in the accessibility tree.
+ */
+export function accessibleTextsOf(
+  driver: WebDriver,
+  selector: string,
+): Promise<string[]> {
+  return driver.executeScript<string[]>(
+    `const norm = ${NORMALISE_SOURCE};
+     return Array.from(document.querySelectorAll(arguments[0]), (root) => {
+       const parts = [];
+       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+         const box = node.parentElement;
+         if (box.closest('[aria-hidden="true"]')) continue;
+         if (!box.checkVisibility()) continue;
+         parts.push(node.textContent);
+       }
+       return norm(parts.join(' '));
+     });`,
+    [selector],
+  );
+}
+
 /** One attribute of every match (`null` where a match does not carry it). */
 export function attributesOf(
   driver: WebDriver,

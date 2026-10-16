@@ -76,7 +76,21 @@ const FIND = `${NAME_OF}
 export interface NameMatch {
   exact: boolean;
   scope?: string;
+  /** `getByRole('heading', { level })`: only headings of this level. */
+  level?: number;
 }
+
+/** The selector for `role`, narrowed to a heading `level` when one is asked for. */
+const roleSelector = (role: keyof typeof ROLE, level?: number): string => {
+  if (level !== undefined) {
+    if (role !== 'heading')
+      throw new Error(`level is a heading option, not ${role}'s`);
+    return `h${level}, [role="heading"][aria-level="${level}"]`;
+  }
+  const selector = ROLE[role];
+  if (selector === undefined) throw new Error(`no role selector for ${role}`);
+  return selector;
+};
 
 /**
  * One round trip: the script returns the element, or a sentence counting what
@@ -102,11 +116,8 @@ export const byRole = (
   role: keyof typeof ROLE,
   name: string,
   match: NameMatch,
-): Promise<WebElement> => {
-  const selector = ROLE[role];
-  if (selector === undefined) throw new Error(`no role selector for ${role}`);
-  return find(driver, selector, name, match, role, true);
-};
+): Promise<WebElement> =>
+  find(driver, roleSelector(role, match.level), name, match, role, true);
 
 /** The one form control labelled `label` inside `scope`: `getByLabel(label, { exact })`. */
 export const byLabel = (
@@ -180,10 +191,9 @@ export const expectRole = (
   driver: WebDriver,
   role: keyof typeof ROLE,
   name: string,
-  { exact, scope = 'body' }: NameMatch,
+  { exact, scope = 'body', level }: NameMatch,
 ) => {
-  const selector = ROLE[role];
-  if (selector === undefined) throw new Error(`no role selector for ${role}`);
+  const selector = roleSelector(role, level);
   const states = (): Promise<{ visible: boolean; checked: boolean }[]> =>
     driver.executeScript(STATES, [selector, name, scope, role, exact]);
   const named = `${role} named ${JSON.stringify(name)}`;
@@ -208,3 +218,24 @@ export const expectRole = (
       ),
   };
 };
+
+/**
+ * `expect(page.locator(selector)).toHaveAccessibleName(name)` (#821): the
+ * name computed in the page as `nameOf` computes it, for the one match, and a
+ * string name matched whole, as Playwright matches it; retried for 5 s.
+ */
+export const expectAccessibleName = (
+  driver: WebDriver,
+  selector: string,
+  name: string,
+): Promise<void> =>
+  expectEventually(
+    () =>
+      driver.executeScript<string[]>(
+        `${NAME_OF}
+         return Array.from(document.querySelectorAll(arguments[0]), nameOf);`,
+        [selector],
+      ),
+    [name],
+    `${selector} accessible name`,
+  );

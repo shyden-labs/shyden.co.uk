@@ -39,18 +39,40 @@ import { NOT_FOUND_PATH, PUBLISHED_ROUTES, sitePaths } from '../../site-pages';
 import { searched } from '../../source-files';
 import { paintedContrast } from '../../wcag';
 import {
+  accessibleTextsOf,
   attributesOf,
   boxesOf,
   countOf,
+  expectEventually,
+  expectLocator,
   paintedTextOf,
-  statusOf,
   textsOf,
   visibilityOf,
 } from './dom';
+import { shootDevice } from './evidence';
 import { holdIosSession } from './held-session';
+import { NORMALISE_SOURCE } from './playwright-rules';
+import {
+  byRole,
+  expectAccessibleName,
+  expectRole,
+  expectRoleAttribute,
+} from './roles';
 import { announceMode } from './session';
 
 const phone = holdIosSession();
+
+/** `expect(page.locator(selector))`, retried as Playwright retries it (#821); `nth` is `.nth(n)`. */
+const on = (selector: string, nth?: number) =>
+  expectLocator(phone().driver, selector, { nth });
+
+/** Android's `shoot`: evidence only, written when the run asks for it. */
+const shoot = (label: string): Promise<string | null> =>
+  shootDevice(phone().driver, { project: 'ios-safari-real-device', label });
+
+/** Runs `script` in the page and returns what it returns. */
+const read = <T>(script: string, args: unknown[] = []): Promise<T> =>
+  phone().driver.executeScript<T>(script, args);
 
 const SWITCHER = 'details.lang-switch';
 const SUMMARY = `${SWITCHER} > summary`;
@@ -81,24 +103,50 @@ async function switcherTargets(): Promise<Record<string, string>> {
   );
 }
 
-/** Opens the switcher the way a visitor does: its summary, clicked. */
-async function openSwitcher(): Promise<void> {
+/** `page.locator(`${SWITCHER} > summary`).click()`: the summary, clicked, nothing more. */
+async function clickSummary(): Promise<void> {
   await phone().interaction.click(await phone().driver.findElement(SUMMARY));
-  expect(
-    await attributesOf(phone().driver, SWITCHER, 'open'),
-    'the switcher opened',
-  ).toEqual(['']);
 }
 
-/** Round to the nearest device pixel, as `rectAtLeast44` does on Android. */
+/** `locator.boundingBox()` on a strict locator: one match, or the test fails. */
+async function oneBox(
+  selector: string,
+): Promise<{ width: number; height: number }> {
+  const boxes = await boxesOf(phone().driver, selector);
+  expect(boxes, `${selector} has one box`).toHaveLength(1);
+  return boxes[0]!;
+}
+
+/** Android's `rectAtLeast44`: rounded to the nearest device pixel, at least 44 each way. */
 function expectTouchable(
-  box: { width: number; height: number } | undefined,
+  box: { width: number; height: number },
   what: string,
 ): void {
-  expect(box, `${what} has a box`).toBeDefined();
-  expect(Math.round(box!.width), `${what} width`).toBeGreaterThanOrEqual(44);
-  expect(Math.round(box!.height), `${what} height`).toBeGreaterThanOrEqual(44);
+  expect(Math.round(box.width), `${what} width`).toBeGreaterThanOrEqual(44);
+  expect(Math.round(box.height), `${what} height`).toBeGreaterThanOrEqual(44);
 }
+
+/** Each entry's text, shown state and language attributes, in page order. */
+const entriesOf = (
+  selector: string,
+): Promise<
+  {
+    text: string;
+    visible: boolean;
+    hreflang: string | null;
+    lang: string | null;
+  }[]
+> =>
+  phone().driver.executeScript(
+    `const norm = ${NORMALISE_SOURCE};
+     return Array.from(document.querySelectorAll(arguments[0]), (a) => ({
+       text: norm(a.textContent),
+       visible: a.checkVisibility() && getComputedStyle(a).visibility === 'visible',
+       hreflang: a.getAttribute('hreflang'),
+       lang: a.getAttribute('lang'),
+     }));`,
+    [selector],
+  );
 
 describe('iOS mirror: language switcher', () => {
   for (const locale of LOCALES)
@@ -108,79 +156,106 @@ describe('iOS mirror: language switcher', () => {
       const width = await phone().driver.executeScript<number>(
         'return window.innerWidth;',
       );
+      // Android's expectLabel, step for step.
       const { nativeName, shortName } = LOCALE_METADATA[locale];
       const [shown, hidden, text] =
         width < COMPACT_BELOW
           ? ['.short', '.full', shortName]
           : ['.full', '.short', nativeName];
       const where = `${locale} at ${width}px`;
-      expect(
-        await visibilityOf(phone().driver, `${SUMMARY} ${shown}`),
+      await expectEventually(
+        () => visibilityOf(phone().driver, `${SUMMARY} ${shown}`),
+        [true],
         `${where}: ${shown}`,
-      ).toEqual([true]);
-      expect(await textsOf(phone().driver, `${SUMMARY} ${shown}`)).toEqual([
-        text,
-      ]);
-      expect(
-        await visibilityOf(phone().driver, `${SUMMARY} ${hidden}`),
-        `${where}: ${hidden}`,
-      ).toEqual([false]);
-      expect(await attributesOf(phone().driver, SUMMARY, 'aria-label')).toEqual(
-        [getSiteStrings(locale).language.label],
       );
+      await on(`${SUMMARY} ${shown}`).toHaveText(text);
+      await expectEventually(
+        () => countOf(phone().driver, `${SUMMARY} ${hidden}`),
+        1,
+        `${where}: ${hidden}`,
+      );
+      await on(`${SUMMARY} ${hidden}`).toBeHidden();
+      await expectAccessibleName(
+        phone().driver,
+        SUMMARY,
+        getSiteStrings(locale).language.label,
+      );
+      await shoot(`${where}: the switcher shows ${text}`);
     });
 
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: lists every language in one fixed order, the current one ticked in place, every other a link`, async () => {
       announceMode(phone(), `switcher list (${locale})`);
       await phone().navigateToPath(localisePath('/', locale), SWITCHER);
-      await openSwitcher();
-      expect(await textsOf(phone().driver, `${SWITCHER} li .name`)).toEqual(
+      await clickSummary();
+      const items = `${SWITCHER} li`;
+      await on(items).toHaveCount(LOCALES.length);
+
+      await on(`${items} .name`).toHaveText(
         LOCALES.map((l) => LOCALE_METADATA[l].nativeName),
       );
-      expect(
-        await attributesOf(phone().driver, `${SWITCHER} li`, 'aria-current'),
-        'only the current entry is marked',
-      ).toEqual(LOCALES.map((l) => (l === locale ? 'true' : null)));
-      expect(
-        await visibilityOf(
-          phone().driver,
-          `${SWITCHER} li[aria-current] .tick`,
-        ),
-        'the current entry is ticked, visibly',
-      ).toEqual([true]);
-      expect(
-        await countOf(phone().driver, `${SWITCHER} li[aria-current] a`),
-        'the current entry is a link',
-      ).toBe(0);
-      expect(await countOf(phone().driver, `${SWITCHER} .tick`)).toBe(1);
 
-      const others = otherLocales(locale);
-      expect(await textsOf(phone().driver, `${SWITCHER} li a .name`)).toEqual(
-        others.map((other) => LOCALE_METADATA[other].nativeName),
+      // `items.nth(i)`; its `.name` and `.tick` are read through
+      // `li[aria-current]`, which the next lines pin as that same entry.
+      const at = LOCALES.indexOf(locale);
+      await on(items, at).toHaveAttribute('aria-current', 'true');
+      await on(`${items}[aria-current] .name`).toBeVisible();
+      await on(`${items}[aria-current] .name`).toHaveText(
+        LOCALE_METADATA[locale].nativeName,
       );
-      expect(
-        await visibilityOf(phone().driver, `${SWITCHER} li a`),
-        'every other entry is visible',
-      ).toEqual(others.map(() => true));
-      expect(
-        await attributesOf(phone().driver, `${SWITCHER} li a`, 'hreflang'),
-      ).toEqual(others);
-      expect(
-        await attributesOf(phone().driver, `${SWITCHER} li a`, 'lang'),
-      ).toEqual(others);
+      await on(`${items}[aria-current] .tick`).toBeVisible();
+      await expectEventually(
+        () => countOf(phone().driver, `${items}[aria-current] a`),
+        0,
+        'the current entry is a link',
+      );
+      await on(`${items}[aria-current]`).toHaveCount(1);
+      await on(`${SWITCHER} .tick`).toHaveCount(1);
+
+      const entries = `${SWITCHER} li a`;
+      await on(entries).toHaveCount(otherLocales(locale).length);
+      for (const other of otherLocales(locale)) {
+        // `entries.filter({ hasText })`: the entries whose text holds the name.
+        const entry = async () =>
+          (await entriesOf(entries)).filter((e) =>
+            e.text
+              .toLowerCase()
+              .includes(LOCALE_METADATA[other].nativeName.toLowerCase()),
+          );
+        await expectEventually(
+          async () => (await entry()).length,
+          1,
+          `${locale}: an entry for ${other}`,
+        );
+        await expectEventually(
+          async () => (await entry()).map((e) => e.visible),
+          [true],
+          `${other} entry visible`,
+        );
+        await expectEventually(
+          async () => (await entry()).map((e) => e.hreflang),
+          [other],
+          `${other} entry hreflang`,
+        );
+        await expectEventually(
+          async () => (await entry()).map((e) => e.lang),
+          [other],
+          `${other} entry lang`,
+        );
+      }
+      await shoot(
+        `${locale}: every language listed in one order, ${LOCALE_METADATA[locale].nativeName} ticked in place`,
+      );
     });
 
   test('iOS mirror: opens and closes without JavaScript', async () => {
     announceMode(phone(), 'switcher opens');
     await phone().navigateToPath('/', SWITCHER);
-    const [entryShown] = await visibilityOf(phone().driver, `${SWITCHER} li a`);
-    expect(entryShown, 'an entry is hidden while the switcher is shut').toBe(
-      false,
-    );
-    await openSwitcher();
-    const [entryOpen] = await visibilityOf(phone().driver, `${SWITCHER} li a`);
-    expect(entryOpen, 'an entry shows once it is open').toBe(true);
+    const entry = on(`${SWITCHER} li a`, 0);
+    await entry.toBeHidden();
+    await clickSummary();
+    await on(SWITCHER).toHaveAttribute('open', '');
+    await entry.toBeVisible();
   });
 
   for (const path of sitePaths())
@@ -205,24 +280,27 @@ describe('iOS mirror: language switcher', () => {
         await phone().navigateToPath(here, SWITCHER);
         const targets = Object.values(await switcherTargets());
         expect(targets).toHaveLength(otherLocales(locale).length);
+        // `page.request.get`: from the test process, as Android asks.
         for (const href of targets)
-          expect(await statusOf(phone().driver, href), href).toBe(200);
+          expect(
+            (await fetch(new URL(href, phone().baseUrl))).status,
+            href,
+          ).toBe(200);
       });
     }
 
   test('iOS mirror: the control and its entries are touchable', async () => {
     announceMode(phone(), 'switcher touch targets');
     await phone().navigateToPath('/', SWITCHER);
-    const [summary] = await boxesOf(phone().driver, SUMMARY);
-    expectTouchable(summary, 'the switcher summary');
-    await openSwitcher();
+    expectTouchable(await oneBox(SUMMARY), 'the switcher summary');
+    await clickSummary();
     const [entry] = await boxesOf(phone().driver, `${SWITCHER} li a`);
-    expectTouchable(entry, 'the first switcher entry');
-    const [current] = await boxesOf(
-      phone().driver,
-      `${SWITCHER} li[aria-current]`,
+    expect(entry, 'the first switcher entry has a box').toBeDefined();
+    expectTouchable(entry!, 'the first switcher entry');
+    expectTouchable(
+      await oneBox(`${SWITCHER} li[aria-current]`),
+      'the current language entry',
     );
-    expectTouchable(current, 'the current language entry');
   });
 });
 
@@ -231,9 +309,9 @@ describe('iOS mirror: skip link — WCAG 2.4.1', () => {
     test(`iOS mirror: ${path} offers it, in the page's language`, async () => {
       announceMode(phone(), `skip link offered (${path})`);
       await phone().navigateToPath(path, '.skip-link');
-      expect(await textsOf(phone().driver, '.skip-link')).toEqual([
+      await on('.skip-link').toHaveText(
         getSiteStrings(localeOf(path)).skipToContent,
-      ]);
+      );
     });
 
   test('iOS mirror: it becomes visible when focused, and lands on the content', async () => {
@@ -244,69 +322,88 @@ describe('iOS mirror: skip link — WCAG 2.4.1', () => {
         `const r = document.querySelector('.skip-link').getBoundingClientRect();
          return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;`,
       );
-    expect(await inViewport(), 'hidden until focused').toBe(false);
+    await expectEventually(inViewport, false, 'hidden until focused');
     await phone().driver.executeScript(
       `document.querySelector('.skip-link').focus();`,
     );
-    expect(await inViewport(), 'shown once focused').toBe(true);
+    await expectEventually(inViewport, true, 'shown once focused');
 
+    // Android presses Enter on the focused link. A key press needs no iPhone
+    // twin (Shyden 2026-10-16, #811): a phone follows the link by a tap.
     await phone().interaction.click(
       await phone().driver.findElement('.skip-link'),
     );
-    expect(
-      await phone().driver.executeScript<string>('return location.hash;'),
-    ).toBe('#main');
-    expect(
-      await phone().driver.executeScript<string>(
-        'return document.activeElement?.id ?? "";',
-      ),
+    await expectEventually(
+      async () =>
+        /#main$/.test(
+          await phone().driver.executeScript<string>('return location.href;'),
+        ),
+      true,
+      'the URL ends #main',
+    );
+    await expectEventually(
+      () =>
+        phone().driver.executeScript<(string | null)[]>(
+          `return Array.from(document.querySelectorAll(':focus'), (el) => el.getAttribute('id'));`,
+        ),
+      ['main'],
       'focus lands on the content',
-    ).toBe('main');
+    );
   });
 });
 
+/**
+ * The 404's tests, one per language. Android checks every language inside
+ * ONE test of each kind (not-found.spec.ts), which the one-test-per-case rule
+ * forbids; #462 splits those, and these titles say the language until then.
+ * Each step is Android's, in Android's order, for that language.
+ */
 describe('iOS mirror: the 404 answers everyone', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: shows ${locale}, among every language the site serves`, async () => {
       announceMode(phone(), `404 heading (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
-      const level = locale === DEFAULT_LOCALE ? 1 : 2;
-      const heading = getSiteStrings(locale).notFound.heading;
-      const texts = await textsOf(phone().driver, `h${level}`);
-      const shown = await visibilityOf(phone().driver, `h${level}`);
-      expect(
-        texts.flatMap((text, i) => (text === heading ? [shown[i]] : [])),
-        `${locale}: no heading on the 404 among h${level}s ${JSON.stringify(texts)}`,
-      ).toEqual([true]);
+      const t = getSiteStrings(locale).notFound;
+      await expectRole(phone().driver, 'heading', t.heading, {
+        exact: false,
+        level: locale === DEFAULT_LOCALE ? 1 : 2,
+      }).toBeVisible();
+      await shoot(`${locale} is answered on the 404`);
     });
 
   for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE))
     test(`iOS mirror: marks ${locale} so a screen reader changes voice`, async () => {
       announceMode(phone(), `404 lang (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
-      const marked = await phone().driver.executeScript<(string | null)[]>(
-        `return Array.from(document.querySelectorAll('h2'))
-           .filter((h) => h.innerText.trim() === arguments[0])
-           .map((h) => h.getAttribute('lang'));`,
-        [getSiteStrings(locale).notFound.heading],
+      const t = getSiteStrings(locale).notFound;
+      await expectRoleAttribute(
+        phone().driver,
+        'heading',
+        t.heading,
+        { exact: false, level: 2 },
+        'lang',
+        locale,
       );
-      expect(marked).toEqual([locale]);
+      await shoot(`${locale} heading carries lang="${locale}"`);
     });
 
   for (const locale of LOCALES)
     test(`iOS mirror: sends a ${locale} visitor home in their own language`, async () => {
       announceMode(phone(), `404 home link (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
-      const hrefs = await phone().driver.executeScript<(string | null)[]>(
-        `return Array.from(document.querySelectorAll('a'))
-           .filter((a) => a.innerText.trim() === arguments[0])
-           .map((a) => a.getAttribute('href'));`,
-        [getSiteStrings(locale).notFound.backHome],
+      const t = getSiteStrings(locale).notFound;
+      await expectRoleAttribute(
+        phone().driver,
+        'link',
+        t.backHome,
+        { exact: true },
+        'href',
+        localisePath('/', locale),
       );
-      expect(hrefs).toEqual([localisePath('/', locale)]);
+      await shoot(`${locale} link goes to its own homepage`);
     });
 
-  const sentences: Record<Locale, string> = {
+  const sentences: Record<string, string> = {
     en: "That page doesn't exist. Back to the homepage.",
     id: 'Halaman itu tidak ada. Kembali ke beranda.',
     zh: '该页面不存在。返回首页。',
@@ -317,20 +414,36 @@ describe('iOS mirror: the 404 answers everyone', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ends the ${locale} back-home sentence in its own language`, async () => {
       announceMode(phone(), `404 sentence (${locale})`);
+      expect(Object.keys(sentences).sort()).toEqual([...LOCALES].sort());
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
-      const paragraphs = await phone().driver.executeScript<
-        { text: string; visible: boolean }[]
-      >(
-        `return Array.from(document.querySelectorAll('a'))
-           .filter((a) => a.innerText.trim() === arguments[0])
-           .map((a) => a.closest('p'))
-           .filter(Boolean)
-           .map((p) => ({ text: p.innerText, visible: p.getClientRects().length > 0 }));`,
-        [getSiteStrings(locale).notFound.backHome],
+      const t = getSiteStrings(locale).notFound;
+      // `link.locator('xpath=ancestor::p[1]')`: the link found afresh by its
+      // exact name on each read, then its nearest paragraph.
+      const sentence = async (): Promise<
+        { visible: boolean; text: string }[]
+      > => {
+        const link = await byRole(phone().driver, 'link', t.backHome, {
+          exact: true,
+        }).catch(() => null);
+        if (link === null) return [];
+        return read(
+          `const p = arguments[0].parentElement?.closest('p');
+           return p ? [{ visible: p.checkVisibility() && getComputedStyle(p).visibility === 'visible', text: p.innerText }] : [];`,
+          [phone().driver.elementRef(link.elementId)],
+        );
+      };
+      await expectEventually(
+        async () => (await sentence()).length,
+        1,
+        `${locale} count`,
       );
-      expect(paragraphs, locale).toEqual([
-        { text: sentences[locale], visible: true },
-      ]);
+      await expectEventually(
+        async () => (await sentence()).map((s) => s.visible),
+        [true],
+        `${locale} visible`,
+      );
+      expect((await sentence())[0]?.text, locale).toBe(sentences[locale]);
+      await shoot(`${locale} back-home sentence`);
     });
 });
 
@@ -350,8 +463,8 @@ describe('iOS mirror: header + footer', () => {
     test(`iOS mirror: ${locale}: the footer names no company, and still reaches a person`, async () => {
       announceMode(phone(), `footer (${locale})`);
       await phone().navigateToPath(localisePath('/', locale), 'footer');
-      expect(await visibilityOf(phone().driver, 'footer')).toEqual([true]);
-      expect(await countOf(phone().driver, 'footer .disclosure')).toBe(0);
+      await on('footer').toBeVisible();
+      await on('footer .disclosure').toHaveCount(0);
       const [text] = await phone().driver.executeScript<string[]>(
         `return Array.from(document.querySelectorAll('footer'), (f) => f.textContent ?? '');`,
       );
@@ -368,12 +481,8 @@ describe('iOS mirror: header + footer', () => {
           DISSOLVED_COMPANY.length,
         ),
       ).toBeUndefined();
-      expect(
-        await visibilityOf(
-          phone().driver,
-          'footer a[href="mailto:support@shyden.co.uk"]',
-        ),
-      ).toEqual([true]);
+      await on('footer a[href="mailto:support@shyden.co.uk"]').toBeVisible();
+      await shoot(`${locale} footer: the support email, and no company`);
     });
 
   test('iOS mirror: no header link overrides the visitor’s own Tab preference', async () => {
@@ -410,57 +519,83 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
         await countOf(phone().driver, BADGE),
         `${path}: expected one badge per beta locale, and one for the summary`,
       ).toBe(expectedBadges(locale));
-      expect(await countOf(phone().driver, `${SUMMARY} ${BADGE}`)).toBe(
-        isBetaLocale(locale) ? 1 : 0,
+      await shoot(
+        `${locale} page carries exactly ${expectedBadges(locale)} badges`,
       );
-      await openSwitcher();
-      expect(
-        await countOf(phone().driver, `${SWITCHER} li[aria-current] ${BADGE}`),
+      await on(`${SUMMARY} ${BADGE}`).toHaveCount(isBetaLocale(locale) ? 1 : 0);
+      await shoot(
+        isBetaLocale(locale)
+          ? `${locale} is unverified, so the control it is read in is badged`
+          : `${locale} is verified, so the control shows no badge`,
+      );
+      await clickSummary();
+      await expectEventually(
+        () => countOf(phone().driver, `${SWITCHER} li[aria-current] ${BADGE}`),
+        isBetaLocale(locale) ? 1 : 0,
         `${path}: the current entry, ${locale}, is badged only if it is unverified`,
-      ).toBe(isBetaLocale(locale) ? 1 : 0);
-      for (const other of otherLocales(locale))
-        expect(
-          await countOf(
-            phone().driver,
-            `${SWITCHER} li a[hreflang="${other}"] ${BADGE}`,
-          ),
+      );
+      for (const other of otherLocales(locale)) {
+        await expectEventually(
+          () =>
+            countOf(
+              phone().driver,
+              `${SWITCHER} li a[hreflang="${other}"] ${BADGE}`,
+            ),
+          isBetaLocale(other) ? 1 : 0,
           `${path}: ${other} is ${isBetaLocale(other) ? 'unverified and unbadged' : 'verified but badged'}`,
-        ).toBe(isBetaLocale(other) ? 1 : 0);
+        );
+        await shoot(
+          `${other} entry ${isBetaLocale(other) ? 'is badged' : 'is NOT badged'}`,
+        );
+      }
     });
 
     test(`iOS mirror: ${locale}: the footer says why, in ${locale}`, async () => {
       announceMode(phone(), `beta notice (${locale})`);
       await phone().navigateToPath(path, 'footer');
+      const notice = on(NOTICE);
       if (!isBetaLocale(locale)) {
-        expect(await countOf(phone().driver, NOTICE)).toBe(0);
+        await notice.toHaveCount(0);
+        await shoot('the English footer carries no beta notice');
         return;
       }
-      expect(await visibilityOf(phone().driver, NOTICE)).toEqual([true]);
-      const [notice] = await textsOf(phone().driver, NOTICE);
-      expect(notice).toContain(t.language.betaNotice);
-      expect(notice).toContain(BETA_BADGE);
-      if (locale !== DEFAULT_LOCALE)
-        expect(notice).not.toContain(
-          getSiteStrings(DEFAULT_LOCALE).language.betaNotice,
+      await notice.toBeVisible();
+      await notice.toContainText(t.language.betaNotice);
+      await notice.toContainText(BETA_BADGE);
+      await shoot(`the notice is present and in ${locale}`);
+      if (locale !== DEFAULT_LOCALE) {
+        // `not.toContainText`, retried as Playwright retries a negation.
+        await expectEventually(
+          async () =>
+            (await textsOf(phone().driver, NOTICE)).map((text) =>
+              text.includes(getSiteStrings(DEFAULT_LOCALE).language.betaNotice),
+            ),
+          [false],
+          `${NOTICE} does not contain the English sentence`,
         );
+        await shoot(`${locale} does not fall back to the English sentence`);
+      }
     });
   }
 
   for (const locale of PREFIXED_LOCALES)
     test(`iOS mirror: ${locale}: the badge carries a translated name for screen readers`, async () => {
-      // Playwright reads this with `ariaSnapshot`, which WebDriver has no
-      // twin of; the badge's whole text, its visually-hidden name included,
-      // is what a screen reader is given.
+      // `badge.ariaSnapshot()`: what the accessibility tree is given, read by
+      // accessibleTextsOf (aria-hidden and unrendered text left out, the
+      // visually-hidden name kept). A strict locator: one badge, or a failure.
       announceMode(phone(), `beta badge name (${locale})`);
       await phone().navigateToPath(localisePath('/', locale), SWITCHER);
-      const [spoken] = await phone().driver.executeScript<string[]>(
-        `return Array.from(document.querySelectorAll(arguments[0]), (b) => b.textContent ?? '');`,
-        [`${SUMMARY} ${BADGE}`],
+      const texts = await accessibleTextsOf(
+        phone().driver,
+        `${SUMMARY} ${BADGE}`,
       );
+      expect(texts, 'one summary badge').toHaveLength(1);
+      const spoken = texts[0]!;
       expect(spoken, 'badge is a bare token').toContain(
         getSiteStrings(locale).language.betaLabel,
       );
       expect(spoken).toContain(BETA_BADGE);
+      await shoot(`${locale} badge is announced as "${spoken.trim()}"`);
     });
 
   /** One recorded floor per locale: each lists its own number of badges. */
@@ -476,7 +611,7 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
     test(`iOS mirror: ${locale}: the badge's spoken label keeps the page's language, even inside another language's entry`, async () => {
       announceMode(phone(), `beta badge voice (${locale})`);
       await phone().navigateToPath(localisePath('/', locale), SWITCHER);
-      await openSwitcher();
+      await clickSummary();
       const voices = await phone().driver.executeScript<(string | null)[]>(
         `return Array.from(document.querySelectorAll(arguments[0]),
            (label) => label.closest('[lang]')?.getAttribute('lang') ?? null);`,
@@ -508,7 +643,8 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
         SWITCHER,
         theme,
       );
-      await openSwitcher();
+      await clickSummary();
+      await on(`${SWITCHER} li ${BADGE}`, 0).toBeVisible();
       const [summary] = await paintedTextOf(
         phone().driver,
         `${SUMMARY} ${BADGE}`,
@@ -519,12 +655,12 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
       );
       expect(summary, 'a summary badge was read').toBeDefined();
       expect(entry, 'an entry badge was read').toBeDefined();
-      expect(
-        paintedContrast(summary!),
-        'the summary badge',
-      ).toBeGreaterThanOrEqual(4.5);
-      expect(paintedContrast(entry!), 'the entry badge').toBeGreaterThanOrEqual(
-        4.5,
+      const summaryRatio = paintedContrast(summary!);
+      expect(summaryRatio, 'the summary badge').toBeGreaterThanOrEqual(4.5);
+      const entryRatio = paintedContrast(entry!);
+      expect(entryRatio, 'the entry badge').toBeGreaterThanOrEqual(4.5);
+      await shoot(
+        `${theme}: the badge paints ${summaryRatio.toFixed(2)}:1 in the summary and ${entryRatio.toFixed(2)}:1 in the list, floor 4.5:1`,
       );
     });
 });

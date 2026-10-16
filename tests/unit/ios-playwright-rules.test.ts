@@ -4,9 +4,17 @@ import {
   NAME_MATCHES_SOURCE,
   NORMALISE_SOURCE,
 } from '../device/ios/playwright-rules';
-import { expectEventually, expectLocator } from '../device/ios/dom';
+import {
+  accessibleTextsOf,
+  expectEventually,
+  expectLocator,
+} from '../device/ios/dom';
 import { DomDispatchInteraction } from '../device/ios/interaction';
-import { expectRole, expectRoleAttribute } from '../device/ios/roles';
+import {
+  expectAccessibleName,
+  expectRole,
+  expectRoleAttribute,
+} from '../device/ios/roles';
 import type { WebDriver, WebElement } from '../device/ios/webdriver';
 
 /**
@@ -269,7 +277,7 @@ describe("expectLocator is Playwright's web-first expect on a selector", () => {
   });
 });
 
-describe("expectRoleAttribute is expect(getByRole(...)).toHaveAttribute", () => {
+describe('expectRoleAttribute is expect(getByRole(...)).toHaveAttribute', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -374,6 +382,15 @@ describe('expectRole is expect(getByRole(role, { name, exact }))', () => {
     ]);
   });
 
+  test('a heading level narrows the role to that level, as getByRole level does', async () => {
+    const { driver, calls } = readingDriver([[unticked]]);
+    await expectRole(driver, 'heading', 'Page not found', {
+      exact: false,
+      level: 2,
+    }).toHaveCount(1);
+    expect(calls[0].args[0]).toBe('h2, [role="heading"][aria-level="2"]');
+  });
+
   test('toBeChecked(false) fails on a ticked box', async () => {
     const { driver } = readingDriver([[{ visible: true, checked: true }]]);
     const verdict = expect(
@@ -392,6 +409,42 @@ describe('expectRole is expect(getByRole(role, { name, exact }))', () => {
     ).rejects.toThrow(/checkbox named "Pause" visible/);
     await vi.advanceTimersByTimeAsync(5_100);
     await verdict;
+  });
+});
+
+describe("expectAccessibleName is Playwright's toHaveAccessibleName", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('passes on the one match whose computed name is the name', async () => {
+    const { driver, calls } = readingDriver([['Language']]);
+    await expectAccessibleName(driver, 'details > summary', 'Language');
+    expect(calls[0].script).toContain('nameOf');
+    expect(calls[0].args).toEqual(['details > summary']);
+  });
+
+  test('a name that only contains the text fails, as a string name must match whole', async () => {
+    const { driver } = readingDriver([['Language: English']]);
+    const verdict = expect(
+      expectAccessibleName(driver, 'summary', 'Language'),
+    ).rejects.toThrow(/summary accessible name/);
+    await vi.advanceTimersByTimeAsync(5_100);
+    await verdict;
+  });
+});
+
+describe('accessibleTextsOf reads what an aria snapshot reads', () => {
+  test('sends the selector and returns one spoken text per match', async () => {
+    const { driver, calls } = readingDriver([['Beta (unverified)']]);
+    expect(await accessibleTextsOf(driver, '.badge')).toEqual([
+      'Beta (unverified)',
+    ]);
+    expect(calls[0].script).toContain('aria-hidden');
+    expect(calls[0].args).toEqual(['.badge']);
   });
 });
 
@@ -429,9 +482,7 @@ describe("a click waits as Playwright's actionability check does", () => {
 
   test('a click waits until the element is enabled, then clicks', async () => {
     const { driver, scripts } = fakeDriver(['not enabled', 'ok']);
-    const clicked = new DomDispatchInteraction(driver).click(
-      fakeElement([]),
-    );
+    const clicked = new DomDispatchInteraction(driver).click(fakeElement([]));
     await vi.advanceTimersByTimeAsync(100);
     await clicked;
     expect(
@@ -443,26 +494,26 @@ describe("a click waits as Playwright's actionability check does", () => {
     const { driver, scripts } = fakeDriver(
       Array.from({ length: 60 }, () => 'not enabled'),
     );
-    const clicked = new DomDispatchInteraction(driver).click(
-      fakeElement([]),
-    );
+    const clicked = new DomDispatchInteraction(driver).click(fakeElement([]));
     const verdict = expect(clicked).rejects.toThrow(
       'click: the element stayed not enabled for 5 s',
     );
     await vi.advanceTimersByTimeAsync(5_100);
     await verdict;
-    expect(scripts.filter((s) => s.includes('.click()'))).toHaveLength(0);
+    // A check at 0 ms and every 100 ms to the 5 s ceiling, and no click.
+    expect(
+      scripts.map((s) => (s.includes('isConnected') ? 'check' : 'click')),
+    ).toEqual(Array.from({ length: 51 }, () => 'check'));
   });
 });
 
 describe("setChecked is Playwright's check and uncheck", () => {
   test('a box that already reads checked is not clicked', async () => {
-    const { driver, scripts } = fakeDriver([]);
-    await new DomDispatchInteraction(driver).setChecked(
-      fakeElement([true]),
-      true,
-    );
-    expect(scripts).toHaveLength(0);
+    const { driver } = fakeDriver([]);
+    const box = fakeElement([true]);
+    await new DomDispatchInteraction(driver).setChecked(box, true);
+    // One read of its state, and it returns: a click would read it again.
+    expect(box.property).toHaveBeenCalledTimes(1);
   });
 
   test('a box the click leaves unchanged is refused', async () => {
