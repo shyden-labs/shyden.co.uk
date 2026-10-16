@@ -1479,10 +1479,6 @@
         "verdict": "ambiguous",
         "note": "Google dropped the plural after {groupsRequested}"
       },
-      "{names} ได้เข้าร่วมกลุ่มเด็กหญิง เพราะไม่มีเด็กชายพอที่จะตั้งกลุ่มของตัวเองได้ นั่นเป็นเพียงการแบ่งกลุ่มตามจำนวนเท่านั้น ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
-        "english": "{names} joined the girls' group because there weren't enough boys to form their own group. That was simply a division based on number of boys, not a mistake that needed fixing.",
-        "verdict": "agrees"
-      },
       "{names} ได้เข้าร่วมกลุ่มเด็กชาย เนื่องจากไม่มีเด็กหญิงเพียงพอที่จะจัดกลุ่มของตัวเองได้ นั่นเป็นเพียงการแบ่งกลุ่มตามจำนวนเท่านั้น ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
         "english": "{names} was joined by the boys' group because there weren't enough girls to form their own group. This was simply a division based on number of girls, not an error that needs correcting.",
         "verdict": "ambiguous",
@@ -1722,6 +1718,11 @@
       "ลบสองบรรทัดนี้แล้วพิมพ์ข้อความของคุณเอง": {
         "english": "Delete these two lines and type your own text.",
         "verdict": "agrees"
+      },
+      "{names} ได้เข้าร่วมกลุ่มเด็กหญิง เนื่องจากไม่มีเด็กชายเพียงพอที่จะจัดกลุ่มของตัวเองได้ นั่นเป็นเพียงการแบ่งกลุ่มตามจำนวนเท่านั้น ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
+        "english": "{names} was joined by the girls' group because there weren't enough boys to form their own group. This was simply a division based on number of boys, not an error that needs fixing.",
+        "verdict": "ambiguous",
+        "note": "\"Google reversed the clause, as on the other arm; the th says {names} joined the girls' group, and DeepL reads it so (\"\"joined the girls' group ... based on numbers\"\")\""
       }
     },
     "id": {
@@ -3299,15 +3300,6 @@
         "english": "{name} is currently pinned to two different groups at the same time. A student can only be pinned to one group at a time. Please remove that student from one of the two groups.",
         "verdict": "agrees"
       },
-      "{names} đã gia nhập một nhóm các bạn nữ vì không có đủ bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là do tỷ lệ giới tính như vậy, chứ không phải là một sai lầm cần khắc phục.": {
-        "english": "{names} joined a group of girls because there weren't enough boys to form a separate group. This is simply due to the gender ratio, not a mistake that needs fixing.",
-        "verdict": "ambiguous",
-        "note": "theo số lượng (by the numbers) read as 'gender ratio'"
-      },
-      "{names} đã gia nhập một nhóm các cậu bé vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.": {
-        "english": "{names} joined a group of boys because there weren't enough girls to form a separate group. It was simply a matter of dividing the group, not a mistake that needed correcting.",
-        "verdict": "agrees"
-      },
       "{names} đã được xếp vào một nhóm chung vì số lượng của cả hai giới đều không đủ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia theo số lượng, chứ không phải là một sai sót cần sửa chữa.": {
         "english": "{names} were grouped together because the number of names of both genders was insufficient to form a separate group. This is simply a classification based on numbers, not an error that needs correction.",
         "verdict": "ambiguous",
@@ -3563,7 +3555,15 @@
         "english": "Delete these two lines and enter your own content.",
         "verdict": "agrees"
       },
-      "danh sách lớp": { "english": "class list", "verdict": "agrees" }
+      "danh sách lớp": { "english": "class list", "verdict": "agrees" },
+      "{names} đã gia nhập một nhóm các bạn nữ vì không có đủ số lượng các bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.": {
+        "english": "{names} joined a group of girls because there weren't enough boys to form a separate group. It's simply a matter of dividing the group, not a mistake that needs fixing.",
+        "verdict": "agrees"
+      },
+      "{names} đã gia nhập một nhóm các bạn nam vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.": {
+        "english": "{names} joined a group of boys because there weren't enough girls to form a separate group. This is simply a matter of dividing the group, not a mistake that needs correcting.",
+        "verdict": "agrees"
+      }
     }
   },
   "pending": { "zh": [], "th": [], "id": [], "vi": [] }
