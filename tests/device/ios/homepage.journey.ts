@@ -86,6 +86,10 @@ describe('iOS mirror: homepage content', () => {
   });
 
   test('iOS mirror: the hero leads with ShyTalk and every section is present', async () => {
+    // NOT YET THE SAME as Android (#811): the control is found by the name
+    // roles.ts computes, a part of the ARIA naming rules, where Android's
+    // getByRole runs Playwright's own. Kept, never deleted (Shyden
+    // 2026-10-16), until #811 runs Playwright's name code in Safari.
     announceMode(phone(), 'hero CTA and sections');
     await openHome('en');
     await on('h1').toContainText(/Shyden/i);
@@ -270,6 +274,10 @@ describe('iOS mirror: homepage content', () => {
     });
 
   test('iOS mirror: contact section CTA links to the support mailbox', async () => {
+    // NOT YET THE SAME as Android (#811): the control is found by the name
+    // roles.ts computes, a part of the ARIA naming rules, where Android's
+    // getByRole runs Playwright's own. Kept, never deleted (Shyden
+    // 2026-10-16), until #811 runs Playwright's name code in Safari.
     announceMode(phone(), 'contact CTA');
     await openHome('en');
     await expectRoleAttribute(
@@ -303,6 +311,10 @@ describe('iOS mirror: homepage content', () => {
 describe('iOS mirror: two products, both coming soon (#403)', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: the Yawelo Idle showcase follows ShyTalk's, with its badge, four features and link`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `Yawelo Idle showcase (${locale})`);
       const t = getSiteStrings(locale).home;
       await openHome(locale);
@@ -484,6 +496,10 @@ const pauseControl = (locale: Locale) =>
 describe('iOS mirror: pause motion', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: a visible, unticked checkbox named for the band, outside its hidden subtree`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `pause control (${locale})`);
       await openHome(locale);
       const control = expectRole(...pauseControl(locale));
@@ -546,6 +562,10 @@ describe('iOS mirror: pause motion', () => {
 describe('iOS mirror: the pause control is a small icon on the strip (#619)', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: the control shows an icon and no words, and its name is the band's`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `pause icon (${locale})`);
       await openHome(locale);
       const name = getSiteStrings(locale).home.pauseMotion;
@@ -582,6 +602,10 @@ describe('iOS mirror: the pause control is a small icon on the strip (#619)', ()
     });
 
   test('iOS mirror: the icon is a pause symbol while the strip moves and a play symbol while it is paused', async () => {
+    // NOT YET THE SAME as Android (#811): the control is found by the name
+    // roles.ts computes, a part of the ARIA naming rules, where Android's
+    // getByRole runs Playwright's own. Kept, never deleted (Shyden
+    // 2026-10-16), until #811 runs Playwright's name code in Safari.
     announceMode(phone(), 'pause and play icons');
     await openHome('en');
     const control = await byRole(...pauseControl('en'));

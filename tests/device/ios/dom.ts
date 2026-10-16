@@ -41,12 +41,13 @@ export function textsOf(
 }
 
 /**
- * The text a screen reader is given for each match, as Playwright's
- * `ariaSnapshot()` reads it for a containment check (#821): every text node,
+ * An APPROXIMATION of the text Playwright's `ariaSnapshot()` gives for each
+ * match, for a containment check (#821), not its algorithm: every text node,
  * whitespace-normalised, except those inside an `aria-hidden="true"` subtree or
  * under a box that is not rendered (`checkVisibility()`, which sees a
  * `display: none` ancestor). A visually-hidden label still counts, as it does
- * in the accessibility tree.
+ * in the accessibility tree. A test that reads through it is marked NOT YET
+ * THE SAME as Android (#811) until Playwright's own snapshot code runs here.
  */
 export function accessibleTextsOf(
   driver: WebDriver,

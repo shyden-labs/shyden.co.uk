@@ -151,6 +151,10 @@ const entriesOf = (
 describe('iOS mirror: language switcher', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: ${locale}: names the current language in its own language, as its width calls for`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `switcher label (${locale})`);
       await phone().navigateToPath(localisePath('/', locale), SWITCHER);
       const width = await phone().driver.executeScript<number>(
@@ -361,6 +365,10 @@ describe('iOS mirror: skip link — WCAG 2.4.1', () => {
 describe('iOS mirror: the 404 answers everyone', () => {
   for (const locale of LOCALES)
     test(`iOS mirror: shows ${locale}, among every language the site serves`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `404 heading (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
       const t = getSiteStrings(locale).notFound;
@@ -373,6 +381,10 @@ describe('iOS mirror: the 404 answers everyone', () => {
 
   for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE))
     test(`iOS mirror: marks ${locale} so a screen reader changes voice`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `404 lang (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
       const t = getSiteStrings(locale).notFound;
@@ -389,6 +401,10 @@ describe('iOS mirror: the 404 answers everyone', () => {
 
   for (const locale of LOCALES)
     test(`iOS mirror: sends a ${locale} visitor home in their own language`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `404 home link (${locale})`);
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
       const t = getSiteStrings(locale).notFound;
@@ -413,6 +429,10 @@ describe('iOS mirror: the 404 answers everyone', () => {
 
   for (const locale of LOCALES)
     test(`iOS mirror: ends the ${locale} back-home sentence in its own language`, async () => {
+      // NOT YET THE SAME as Android (#811): the control is found by the name
+      // roles.ts computes, a part of the ARIA naming rules, where Android's
+      // getByRole runs Playwright's own. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 runs Playwright's name code in Safari.
       announceMode(phone(), `404 sentence (${locale})`);
       expect(Object.keys(sentences).sort()).toEqual([...LOCALES].sort());
       await phone().navigateToPath(NOT_FOUND_PATH, 'h1');
@@ -580,6 +600,10 @@ describe('iOS mirror: every unverified language is marked BETA', () => {
 
   for (const locale of PREFIXED_LOCALES)
     test(`iOS mirror: ${locale}: the badge carries a translated name for screen readers`, async () => {
+      // NOT YET THE SAME as Android (#811): accessibleTextsOf reads the
+      // badge's accessible text, an approximation of Playwright's
+      // ariaSnapshot. Kept, never deleted (Shyden 2026-10-16), until #811
+      // runs Playwright's snapshot code in Safari.
       // `badge.ariaSnapshot()`: what the accessibility tree is given, read by
       // accessibleTextsOf (aria-hidden and unrendered text left out, the
       // visually-hidden name kept). A strict locator: one badge, or a failure.
