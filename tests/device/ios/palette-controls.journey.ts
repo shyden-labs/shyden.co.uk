@@ -25,10 +25,16 @@ import {
   readPaletteScript,
   type PaletteReading,
 } from '../../e2e/palette-readings';
+import { countOf, expectLocator } from './dom';
+import { shootDevice } from './evidence';
 import { holdIosSession } from './held-session';
 import { announceMode } from './session';
 
 const phone = holdIosSession();
+
+/** Android's `shoot`: evidence only, written when the run asks for it. */
+const shoot = (label: string): Promise<string | null> =>
+  shootDevice(phone().driver, { project: 'ios-safari-real-device', label });
 
 const PAGES = PUBLISHED_ROUTES.filter((path) => !docsPaths().includes(path));
 
@@ -47,6 +53,10 @@ describe('iOS mirror: palette controls', () => {
     for (const theme of THEMES)
       test(`iOS mirror: ${path}, ${theme}: every control it paints uses a palette colour`, async () => {
         announceMode(phone(), `palette controls (${path}, ${theme})`);
+        // NOT YET THE SAME as Android (#811): Android emulates the device
+        // colour scheme after the load; WebDriver cannot, so the theme is the
+        // SAVED choice, stamped before it. Kept, never deleted (Shyden
+        // 2026-10-16), until #811 sets the phone's appearance.
         await phone().navigateToPath(path, 'body', theme);
         await phone().driver.executeScript(
           `for (const details of document.querySelectorAll('details')) details.open = true;`,
@@ -72,6 +82,9 @@ describe('iOS mirror: palette controls', () => {
           expect(
             floorBreach('ios-palette-controls/homepage-elements', examined),
           ).toBeUndefined();
+          await shoot(
+            `${path}, ${theme}: no form controls among ${examined} elements`,
+          );
           return;
         }
         expect(
@@ -120,32 +133,40 @@ describe('iOS mirror: palette controls', () => {
         ];
         expect(floor, `${path} has a controls floor`).toBeDefined();
         expect(floor!()).toBeUndefined();
+        await shoot(
+          `${path}, ${theme}: all ${readings.length} controls drawn from the palette's ${allowed.length} values`,
+        );
       });
 
   for (const theme of THEMES)
     test(`iOS mirror: ${theme}: the controls the browser draws use the brand accent`, async () => {
       announceMode(phone(), `UA controls accent (${theme})`);
+      // NOT YET THE SAME as Android (#811): Android emulates the device
+      // colour scheme after the load; WebDriver cannot, so the theme is the
+      // SAVED choice, stamped before it. Kept, never deleted (Shyden
+      // 2026-10-16), until #811 sets the phone's appearance.
       await phone().navigateToPath('/classroom-groups', '#cg-go', theme);
-      const { resolved, accents } = await phone().driver.executeScript<{
-        resolved: string;
-        accents: string[];
-      }>(
+      const boxes = 'input[type="checkbox"], input[type="radio"]';
+      await expectLocator(phone().driver, boxes, { nth: 0 }).toBeVisible();
+      const resolved = await phone().driver.executeScript<string>(
         `const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
          const probe = document.createElement('span');
          probe.style.color = accent;
          document.body.append(probe);
          const resolved = getComputedStyle(probe).color;
          probe.remove();
-         return {
-           resolved,
-           accents: Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'),
-             (box) => getComputedStyle(box).accentColor),
-         };`,
+         return resolved;`,
       );
-      expect(
-        accents.length,
-        'the page draws no checkbox or radio',
-      ).toBeGreaterThan(0);
-      expect(accents).toEqual(accents.map(() => resolved));
+      // `for (const box of await boxes.all())`: the boxes there are now, a
+      // population known only at run time, each retried as toHaveCSS is.
+      const count = await countOf(phone().driver, boxes);
+      for (let nth = 0; nth < count; nth++)
+        await expectLocator(phone().driver, boxes, { nth }).toHaveCSS(
+          'accent-color',
+          resolved,
+        );
+      await shoot(
+        `${theme}: all ${count} browser-drawn controls use --accent ${resolved}`,
+      );
     });
 });
