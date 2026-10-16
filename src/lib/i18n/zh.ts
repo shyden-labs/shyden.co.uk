@@ -128,7 +128,7 @@ export const zh: Catalogue = {
   resultsHeading: '您的分组',
   resultsHeadingNamed: '{className} — 您的分组',
   resultsSummary: '{groups} 个小组，由 {students} 名学生组成。',
-  groupLabel: '{n} 组',
+  groupLabel: '第 {n} 组',
   studentNumber: '学生 {n}',
   staleMode: '这些分组已经过时了——每组人数发生了变化。',
   staleLeftovers: '这些分组已经过时了——“剩余学生”选项已经更改了。',

@@ -699,11 +699,6 @@
         "note": "a count label read as a noun: {n} absent"
       },
       "{n} 一起": { "english": "{n} together", "verdict": "agrees" },
-      "{n} 组": {
-        "english": "{n} groups",
-        "verdict": "ambiguous",
-        "note": "{n} 组 is a group label (Group {n}); read as a count"
-      },
       "学生 {n}": { "english": "Student {n}", "verdict": "agrees" },
       "行 {row} — 编号处为空。每位学生都需要一个。": {
         "english": "The row {row} is empty. Each student needs one.",
@@ -808,6 +803,11 @@
       "两款辅助 YeeTalk 应用内送礼功能的工具，由 Shyden 开发。可算出达到 glory points 目标需要什么，或一份礼物在收到后价值多少。": {
         "english": "Two tools developed by Shyden to enhance the gifting feature within the YeeTalk app. These tools can calculate what's needed to reach a glory points goal, or the value of a gift once received.",
         "verdict": "agrees"
+      },
+      "第 {n} 组": {
+        "english": "Group {n}",
+        "verdict": "agrees",
+        "note": "Corrected #754 from {n} 组 (read as a count); DeepL reads Set {n}"
       }
     },
     "th": {
@@ -1003,11 +1003,6 @@
         "verdict": "agrees"
       },
       "สร้างกลุ่ม": { "english": "Create a group", "verdict": "agrees" },
-      "สับใหม่": {
-        "english": "Chop again",
-        "verdict": "ambiguous",
-        "note": "สับ is both shuffle (cards) and chop; สับใหม่ says shuffle again"
-      },
       "เครื่องมือนี้ต้องเปิดใช้งาน JavaScript": {
         "english": "This tool requires JavaScript to be enabled.",
         "verdict": "agrees"
@@ -1413,20 +1408,6 @@
         "english": "Waiting for grouping.",
         "verdict": "agrees"
       },
-      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนที่จะบันทึก": {
-        "english": "These groups are outdated. Please shuffle before saving.",
-        "verdict": "agrees"
-      },
-      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนพิมพ์": {
-        "english": "These groups are outdated. Please rearrange them before printing.",
-        "verdict": "ambiguous",
-        "note": "สับ/จัดใหม่ read as 'rearrange'; the th says shuffle again"
-      },
-      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสับใหม่ก่อนที่จะแสดงออกมา": {
-        "english": "These groups are outdated. Please rearrange them before displaying them.",
-        "verdict": "ambiguous",
-        "note": "สับ/จัดใหม่ read as 'rearrange'; the th says shuffle again"
-      },
       "เพิ่มนักเรียนบ้าง หรือตรวจสอบให้แน่ใจว่าอย่างน้อยมีนักเรียนหนึ่งคนที่ไม่ถูกบันทึกว่าขาดเรียน": {
         "english": "Add some students, or make sure that at least one student is not recorded as absent.",
         "verdict": "agrees"
@@ -1533,11 +1514,6 @@
         "english": "Free lessons with a real teacher.",
         "verdict": "agrees"
       },
-      "มีการดูแล แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ": {
-        "english": "They are cared for according to age groups and are always designed to be friendly.",
-        "verdict": "ambiguous",
-        "note": "มีการดูแล (supervised, moderated) read as 'cared for'"
-      },
       "แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง": {
         "english": "The ShyTalk app on your phone displays a live audio room with people seated and the room's chat below.",
         "verdict": "agrees"
@@ -1599,11 +1575,6 @@
       "ไม่พบหน้า — Shyden": {
         "english": "Page not found — Shyden",
         "verdict": "agrees"
-      },
-      "หน้าที่คุณกำลังค้นหาไม่มีอยู่": {
-        "english": "The function you are looking for does not exist.",
-        "verdict": "ambiguous",
-        "note": "หน้าที่ read as one word ('function'); here it is หน้า ที่, 'the page that'"
       },
       "ไม่พบหน้า": { "english": "Page not found.", "verdict": "agrees" },
       "หน้านั้นไม่มีอยู่": {
@@ -1723,6 +1694,36 @@
         "english": "{names} was joined by the girls' group because there weren't enough boys to form their own group. This was simply a division based on number of boys, not an error that needs fixing.",
         "verdict": "ambiguous",
         "note": "\"Google reversed the clause, as on the other arm; the th says {names} joined the girls' group, and DeepL reads it so (\"\"joined the girls' group ... based on numbers\"\")\""
+      },
+      "สุ่มใหม่": {
+        "english": "Randomize again.",
+        "verdict": "agrees",
+        "note": "Corrected #754 from สับใหม่ (read as chop again by Google and DeepL; operator ruled 2026-10-16); DeepL reads Refresh"
+      },
+      "หน้าเว็บที่คุณกำลังค้นหาไม่มีอยู่": {
+        "english": "The webpage you are looking for does not exist.",
+        "verdict": "agrees",
+        "note": "Corrected #754: หน้าที่ read as function/role by Google and DeepL; หน้าเว็บที่ is the web page that; DeepL reads The page you are looking for"
+      },
+      "มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ": {
+        "english": "The content is controlled, categorized by age group, and always designed to be age-friendly.",
+        "verdict": "agrees",
+        "note": "Corrected #754: มีการดูแล lost moderated in Google and DeepL; มีการควบคุมเนื้อหา is DeepL's own draft word, read back by Google as content is controlled"
+      },
+      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนที่จะบันทึก": {
+        "english": "These groups are outdated. Please randomize again before saving.",
+        "verdict": "agrees",
+        "note": "Corrected #754 with the button (สับใหม่ to สุ่มใหม่, operator ruling 2026-10-16); DeepL reads: generate new ones before saving"
+      },
+      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนพิมพ์": {
+        "english": "These groups are outdated. Please randomize before printing.",
+        "verdict": "agrees",
+        "note": "Corrected #754 with the button (สับใหม่ to สุ่มใหม่, operator ruling 2026-10-16); DeepL reads: refresh the list before printing"
+      },
+      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนที่จะแสดงออกมา": {
+        "english": "These groups are outdated. Please randomize again before displaying them.",
+        "verdict": "agrees",
+        "note": "Corrected #754 with the button (สับใหม่ to สุ่มใหม่, operator ruling 2026-10-16); DeepL reads: refresh the list before displaying it"
       }
     },
     "id": {

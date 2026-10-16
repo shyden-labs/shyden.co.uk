@@ -143,7 +143,10 @@ const AWAITING_READ: Record<Locale, readonly string[]> = {
   // `site.nav.contact` waited here from #97 (联系我们, "contact us", against
   // the note hint's 联系方式) until #665 made the site speak as one person
   // and the link plain 联系, which agrees with its witness.
-  zh: [],
+  // `groupLabel` 第 {n} 组 (#754): the old {n} 组 read back as "{n} groups"
+  // in Google and DeepL; the ordinal 第 reads "Group {n}" in Google, but no
+  // witness carries 第, so the check cannot agree with it on its own.
+  zh: ['groupLabel'],
   vi: [],
   th: [],
 };
