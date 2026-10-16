@@ -57,9 +57,10 @@ describe('iOS mirror: the report form is where it should be', () => {
       const has = footerOf(html).includes('data-report-form');
       return has === want ? [] : [`${file}: lang=${lang} form=${has}`];
     });
+    const footedFiles = footed.map(({ file }) => file);
     expect(
       searched(findings, {
-        of: footed.map(({ file }) => file),
+        of: footedFiles,
         what: 'built pages with a footer',
       }),
     ).toEqual([]);
@@ -68,7 +69,7 @@ describe('iOS mirror: the report form is where it should be', () => {
         .length,
     ).toBeGreaterThan(0);
     expect(
-      floorBreach('ios-report/footed-pages', footed.length),
+      floorBreach('ios-report/footed-pages', footedFiles.length),
     ).toBeUndefined();
   });
 
