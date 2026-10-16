@@ -279,7 +279,10 @@ describe.each(LOCALES)(
       // is open-survives-reload -- the identical reasoning
       // classroom-groups-controls.spec.ts's own "the opened state survives
       // a reload" test already states for the emulated suite.
-      await session.navigateToPath(path); // the "reload" -- a fresh navigation, so both handles above are now stale; both are re-found below.
+      // A real reload, as Android's `page.reload()` is (W3C Refresh, #821),
+      // never a fresh navigation; both handles above are stale after it, so
+      // both are re-found below.
+      await session.reload();
       toggle = await session.driver.findElement('#cg-howto-toggle');
       body = await session.driver.findElement('#cg-howto-body');
       expect(
