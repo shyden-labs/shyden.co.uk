@@ -575,8 +575,8 @@ export async function reportHealth(
     ok = schemaMatches(results.map(({ name }) => name));
     if (!ok)
       log('report health: the reports table does not match the migration');
-  } catch {
-    log(`report health: ${'database' satisfies FailureKind}`);
+  } catch (error) {
+    log(`report health: ${(error as Error).message}`);
   }
   return json({ ok }, ok ? 200 : 503);
 }
