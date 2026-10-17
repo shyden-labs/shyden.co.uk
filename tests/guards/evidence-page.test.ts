@@ -1657,6 +1657,7 @@ describe('a real-device iOS run on the page (#354)', () => {
         testResults: [
           {
             name: '/repo/tests/device/ios/journeys.journey.ts',
+            endTime: Date.parse(REPORT.stats.startTime) + 900,
             assertionResults: [
               {
                 ancestorTitles: ['en'],
@@ -1682,6 +1683,20 @@ describe('a real-device iOS run on the page (#354)', () => {
     );
     expect(html, 'no recording policy applies to this leg').not.toContain(
       'not recorded by policy',
+    );
+  });
+
+  it("sums the run in its tiles: the passed count and the wall clock are the Vitest run's", () => {
+    const html = build({
+      report: ios('Journey 1 -- groups render'),
+      manifest: [],
+      shots: new Map(),
+    });
+    expect(html).toContain(
+      '<div class="vc good"><span class="n">1</span><span class="k">passed</span></div>',
+    );
+    expect(html).toContain(
+      '<div class="vc"><span class="n">0.9s</span><span class="k">wall clock</span></div>',
     );
   });
 
