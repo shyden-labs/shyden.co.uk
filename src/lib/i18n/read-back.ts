@@ -96,7 +96,21 @@ export const unitsByLocale = (): Record<ReadLocale, BackTranslationUnit[]> =>
   each(backTranslationUnits);
 
 /** Who wrote a line, as far as the DeepL cache can say. */
-export type Writer = 'DeepL' | 'edited after DeepL' | 'no DeepL draft';
+export const WRITERS = [
+  'DeepL',
+  'edited after DeepL',
+  'no DeepL draft',
+] as const;
+export type Writer = (typeof WRITERS)[number];
+
+/** Writers as a store must hold them: some, each known, once, in order. */
+export function usableWriters(value: unknown): value is Writer[] {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const order = value.map((writer) => WRITERS.indexOf(writer as Writer));
+  return order.every(
+    (at, i) => at >= 0 && (i === 0 || at > (order[i - 1] as number)),
+  );
+}
 
 /**
  * A judgement of Google's reading beside the English (operator 2026-10-15:
@@ -113,6 +127,8 @@ export type Verdict = (typeof VERDICTS)[number];
 /** Google's English for one line, and its verdict once judged. */
 export interface Reading {
   readonly english: string;
+  /** Who wrote every line saying this text, in `WRITERS` order (#754 AC10). */
+  readonly writers: readonly Writer[];
   readonly verdict?: Verdict;
   /** Why: required for `ambiguous` and `wrong`. */
   readonly note?: string;
@@ -131,10 +147,11 @@ export interface ReadBackStore {
 
 /** A reading as the store may hold it, or undefined. */
 function usableReading(value: unknown): Reading | undefined {
-  const { english, verdict, note } = record(value);
+  const { english, verdict, note, writers } = record(value);
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return undefined;
   if (typeof english !== 'string') return undefined;
+  if (!usableWriters(writers)) return undefined;
   if (verdict !== undefined && !VERDICTS.includes(verdict as Verdict))
     return undefined;
   if (note !== undefined && typeof note !== 'string') return undefined;
@@ -145,6 +162,7 @@ function usableReading(value: unknown): Reading | undefined {
     return undefined;
   return {
     english,
+    writers: [...writers],
     ...(verdict === undefined ? {} : { verdict: verdict as Verdict }),
     ...(note === undefined ? {} : { note }),
   };
@@ -263,7 +281,8 @@ export const fromGoogleHtml = (reading: string): string =>
       return NAMED_ENTITIES[name.toLowerCase()] ?? entity;
     });
 
-const record = (value: unknown): Record<string, unknown> =>
+/** A value as a plain object, or an empty one: read fields, never trust them. */
+export const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? { ...value }
     : {};
@@ -601,6 +620,7 @@ export function applyVerdicts(
       );
     readings[unit.translation] = {
       english: reading.english,
+      writers: reading.writers,
       verdict: verdict as Verdict,
       ...(note?.trim() ? { note: note.trim() } : {}),
     };
