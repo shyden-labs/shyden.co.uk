@@ -246,7 +246,7 @@ jobs:
       # again, into a run that still holds the one it replaces.
       - name: Keep this shard's account for build-and-test
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-account-${{ matrix.shard }}
           path: e2e-accounts
@@ -260,7 +260,7 @@ jobs:
       # because one run cannot hold two artifacts of one name (AC7).
       - name: Keep the failing shard's Playwright traces
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
           path: test-results/
@@ -327,7 +327,7 @@ jobs:
       # the e2e shards: a shard that wrote no account has nothing to add up.
       - name: Keep this capture shard's account for build-and-test
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: capture-account-${{ matrix.shard }}
           path: capture-accounts
@@ -336,7 +336,7 @@ jobs:
           if-no-files-found: error
       - name: Keep this shard's report and manifest
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: capture-coverage-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
           path: |
@@ -384,7 +384,7 @@ jobs:
       - run: npm run test:sanity
       - name: Keep the failing run's Playwright traces
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces-${{ github.run_id }}-${{ github.run_attempt }}-sanity-on-build
           path: test-results/
@@ -427,7 +427,7 @@ jobs:
       - run: npm run test:functions
       - name: Keep the failing run's Playwright traces
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces-${{ github.run_id }}-${{ github.run_attempt }}-functions
           path: test-results/
@@ -470,7 +470,7 @@ jobs:
       # collect (#582); the verdict below holds that none was written.
       - name: Collect every shard's account
         if: needs.scope.outputs.docs_only != 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: e2e-account-*
           merge-multiple: true
@@ -479,7 +479,7 @@ jobs:
       # pattern, and any account that does exist is refused by name (#774).
       - name: Collect every capture shard's account
         if: needs.scope.outputs.capture == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: capture-account-*
           merge-multiple: true
@@ -614,7 +614,7 @@ jobs:
       # keep (#311).
       - name: Keep the visual diff
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-diff-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/
