@@ -151,16 +151,6 @@ export function renderProjector(
   let revealTimers: number[] = [];
   let open = false;
   /**
-   * Which showing we are on.
-   *
-   * Every asynchronous answer the browser owes us -- a fullscreen grant, a
-   * `fullscreenchange` from an exit -- can arrive after the showing that
-   * asked for it has ended, and must not be allowed to act on the NEXT one.
-   * Each async handler captures the session it belongs to and does nothing
-   * if it has been superseded.
-   */
-  let session = 0;
-  /**
    * Whether THIS showing actually got fullscreen.
    *
    * `fullscreenchange` fires for exits too, including the exit that tidies
@@ -348,22 +338,25 @@ export function renderProjector(
     // into fullscreen on a board that is already `display: none`, leaving
     // the whole page unreachable behind a blank fullscreen surface with no
     // way back but the browser's own.
-    const mine = ++session;
     void board
       .requestFullscreen?.()
       .then(() => {
-        // A grant that belongs to a showing which has already ended must be
-        // UNDONE, not merely ignored -- ignoring it leaves the document in
-        // fullscreen over a hidden board, with the whole page unclickable
-        // behind a blank surface. It must also not be mistaken for the
-        // CURRENT showing's fullscreen, which is what `session` separates:
-        // ignoring it outright broke exactly that, and leaving it unguarded
-        // let a stale exit close a board that had just opened.
-        if (session !== mine || !open) {
+        // A grant that lands while the board is closed must be UNDONE, not
+        // merely ignored -- ignoring it leaves the document in fullscreen
+        // over a hidden board, with the whole page unclickable behind a
+        // blank surface.
+        if (!open) {
           if (doc.fullscreenElement)
             void doc.exitFullscreen?.().catch(() => {});
           return;
         }
+        // While a board is open, the grant is that board's, whichever
+        // showing asked for it: the request is always for this one element.
+        // A real Android phone delivers the first showing's grant only once
+        // the board is up again (#231), just ahead of the second showing's
+        // own. Undoing it as a leftover took the document out of fullscreen
+        // under the open board, and the `fullscreenchange` handler below
+        // then closed that board with nobody asking.
         inFullscreen = true;
       })
       .catch(() => {});
@@ -480,9 +473,10 @@ export function renderProjector(
   // tell that exit from a teacher's Escape.
   //
   // `inFullscreen` is what makes this safe. The event also fires for the
-  // EXIT that tidies up a grant landing late from a previous showing, and
-  // acting on that closed the board the current showing had just opened.
-  // Only a showing that actually got fullscreen can be the one leaving it.
+  // EXIT that tidies up a grant landing late, while the board was closed,
+  // from a previous showing, and acting on that closed the board the
+  // current showing had just opened. Only a showing that actually got
+  // fullscreen can be the one leaving it.
   doc.addEventListener('fullscreenchange', () => {
     if (open && inFullscreen && !doc.fullscreenElement) void leave();
   });
