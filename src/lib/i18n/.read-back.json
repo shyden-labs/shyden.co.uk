@@ -1257,6 +1257,31 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Corrected #754 from {n} 组 (read as a count); DeepL reads Set {n}"
+      },
+      "礼物价值计算器": {
+        "english": "Gift Value Calculator",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "请在下方框中输入礼物的价值。": {
+        "english": "Please enter the value of the gift in the box below.",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "读取礼物所给的 bean 数量，以及这些 bean 可兑换的金币数量。": {
+        "english": "Read the number of beans given as a gift, and the amount of gold coins that can be exchanged for those beans.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "礼物价值": {
+        "english": "Gift value",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "假设礼物按 40% 的比率转换为 bean，每个 bean 可兑换 0.9 枚金币，bean 和金币的数量均向下取整至整数。": {
+        "english": "Assuming gifts are converted into beans at a rate of 40%, each bean can be exchanged for 0.9 gold coins, and the quantities of beans and gold coins are rounded down to the nearest integer.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
       }
     },
     "th": {
@@ -2569,6 +2594,31 @@
       },
       "คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
         "english": "Calculate the number of coins, beans, and gift value behind a YeeTalk glory points goal, or what you get from a gift once received.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "เครื่องคำนวณมูลค่าของขวัญ": {
+        "english": "Gift value calculator",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "กรอกมูลค่าของของขวัญลงในช่องด้านล่าง": {
+        "english": "Enter the value of the gift in the box below.",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "อ่านจำนวน bean ที่ของขวัญให้ และจำนวนเหรียญที่ bean เหล่านั้นแลกได้": {
+        "english": "Read the number of beans that the gift gave and the number of coins those beans can be redeemed for.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "มูลค่าของขวัญ": {
+        "english": "Value of the gift",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "สมมติว่าของขวัญจะแปลงเป็น bean ในอัตรา 40% และแต่ละ bean แลกได้ 0.9 เหรียญ โดยจะปัดลงเป็นจำนวนเต็มของ bean และเหรียญ": {
+        "english": "Assume that gifts are converted into beans at a rate of 40%, and each bean is worth $0.9, rounded down to the nearest whole number of beans and coins.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       }
@@ -3941,6 +3991,35 @@
         "english": "class list",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
+      },
+      "Kalkulator Nilai Hadiah": {
+        "english": "Prize Value Calculator",
+        "writers": ["DeepL"],
+        "verdict": "ambiguous",
+        "note": "hadiah (gift) read as 'prize/reward'"
+      },
+      "Masukkan nilai hadiah pada kotak di bawah ini.": {
+        "english": "Enter the prize value in the box below.",
+        "writers": ["DeepL"],
+        "verdict": "ambiguous",
+        "note": "hadiah (gift) read as 'prize/reward'"
+      },
+      "Baca bean yang diberikan hadiah dan koin yang bisa ditukarkan dengan bean tersebut.": {
+        "english": "Read the beans that are given as gifts and the coins that can be exchanged for those beans.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "Nilai hadiah": {
+        "english": "Prize value",
+        "writers": ["DeepL"],
+        "verdict": "ambiguous",
+        "note": "hadiah (gift) read as 'prize/reward'"
+      },
+      "Asumsinya, hadiah dikonversi menjadi bean dengan rasio 40%, dan setiap bean dapat ditukarkan dengan 0,9 koin, dengan jumlah bean dan koin dibulatkan ke bawah ke angka bulat.": {
+        "english": "Assuming that rewards are converted into beans at a ratio of 40%, and each bean can be exchanged for 0.9 coins, with the number of beans and coins rounded down to the nearest whole number.",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "hadiah (gift) read as 'prize/reward'"
       }
     },
     "vi": {
@@ -5278,6 +5357,32 @@
       },
       "Mở các công cụ tính": {
         "english": "Open the calculator tools",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "Máy tính giá trị quà tặng": {
+        "english": "Computers as gifts",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "máy tính is both calculator and computer; the page is the calculator"
+      },
+      "Hãy nhập giá trị của món quà vào ô bên dưới.": {
+        "english": "Please enter the value of the gift in the box below.",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "Hãy đọc số bean mà món quà mang lại và số xu mà những bean đó có thể đổi lấy.": {
+        "english": "Read the number of beans the gift provides and the number of coins those beans can be exchanged for.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "Giá trị quà tặng": {
+        "english": "Gift value",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "Giả định rằng quà tặng được quy đổi thành bean với tỷ lệ 40% và mỗi bean có thể đổi lấy 0,9 xu, số lượng bean và xu được làm tròn xuống thành số nguyên.": {
+        "english": "Assuming that the gift is converted into beans at a rate of 40% and each bean can be exchanged for 0.9 cents, the number of beans and cents is rounded down to an integer.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       }
