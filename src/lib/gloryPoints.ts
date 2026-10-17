@@ -19,11 +19,10 @@ export type GloryOutcome =
 
 /**
  * The rates (yeetalkRates.ts) were ported from the YeeTalk Flask calculator.
- * One bean converts to 0.9 coins, so C coins cost C / 0.9 beans; a gift converts to
- * beans at 40%, so B beans cost B / 0.4 in gift value (#382).
- * Input is capped at MAX_AMOUNT, 1,000,000,000.
- * Across the entire
- * accepted range [1, 1e9] the naive Math.ceil arithmetic is EXACT — verified
+ * One bean converts to 0.9 coins, so C coins cost C / 0.9 beans; a gift
+ * converts to beans at 40%, so B beans cost B / 0.4 in gift value (#382).
+ * Input is capped at MAX_AMOUNT, 1,000,000,000. Across the entire accepted
+ * range [1, 1e9] the naive Math.ceil arithmetic is EXACT — verified
  * exhaustively to 50,000,000 and by a dense BigInt cross-check up to 1e9, with
  * the first divergence only at ~2^51 (2.25e15), a >1,000,000x margin. Do NOT
  * raise the cap without re-verifying exactness (float division by 0.9 / 0.4
