@@ -10,6 +10,13 @@ import {
   verdictProblems,
   type ReadLocale,
 } from '../../src/lib/i18n/read-back';
+import {
+  googleEntries,
+  parseSecondStore,
+  readerProblems,
+  secondEntries,
+  type ReaderEntry,
+} from '../../src/lib/i18n/readers';
 
 /**
  * #754. Every translated line has Google's reading of its exact current text,
@@ -31,6 +38,20 @@ const STORE = parseStore(
     ),
   ),
 );
+const SECOND = parseSecondStore(
+  JSON.parse(
+    readFileSync(
+      new URL('../../src/lib/i18n/.second-readings.json', import.meta.url),
+      'utf8',
+    ),
+  ),
+);
+const DRAFTS = JSON.parse(
+  readFileSync(
+    new URL('../../src/lib/i18n/.translations.json', import.meta.url),
+    'utf8',
+  ),
+) as Record<string, Record<string, string>>;
 const UNITS = unitsByLocale();
 const LINES_FLOOR: Readonly<Record<ReadLocale, string>> = {
   zh: 'read-back/lines-zh',
@@ -80,5 +101,71 @@ describe('every translated line is read back by Google, or pending', () => {
       `${locale}: lines whose reading shows them wrong; correct the line, then read it again`,
     ).toEqual([]);
     expect(floorBreach(LINES_FLOOR[locale], lines.length)).toBeUndefined();
+  });
+});
+
+/**
+ * #754 AC10. Nobody marks their own homework (operator 2026-10-16): every
+ * reading the repo keeps, Google's and every other engine's, names the
+ * writers of its line, and none was read by one of them. DeepL wrote every
+ * line it drafted, word for word or edited after (operator 2026-10-17). The
+ * writers are judged as the DeepL cache says now, so a re-drafted line
+ * cannot keep a reading its new writer took.
+ */
+const GOOGLE_READINGS_FLOOR: Readonly<Record<ReadLocale, string>> = {
+  zh: 'read-back/google-readings-zh',
+  th: 'read-back/google-readings-th',
+  id: 'read-back/google-readings-id',
+  vi: 'read-back/google-readings-vi',
+};
+const SECOND_READINGS_FLOOR: Readonly<Record<ReadLocale, string>> = {
+  zh: 'read-back/second-readings-zh',
+  th: 'read-back/second-readings-th',
+  id: 'read-back/second-readings-id',
+  vi: 'read-back/second-readings-vi',
+};
+const REFRESH = 'run npm run i18n:second-read -- --refresh-writers';
+
+const noSelfReading = (
+  locale: ReadLocale,
+  entries: readonly ReaderEntry[],
+  what: string,
+  floor: string,
+) => {
+  const found = readerProblems(locale, UNITS[locale], DRAFTS, entries);
+  expect(
+    searched(found.selfRead, { of: entries, what }),
+    `${locale}: readings by an engine that wrote the line; ${REFRESH}`,
+  ).toEqual([]);
+  expect(
+    searched(found.writersChanged, { of: entries, what }),
+    `${locale}: readings whose recorded writers are not the writers now; ${REFRESH}`,
+  ).toEqual([]);
+  expect(
+    searched(found.stale, { of: entries, what }),
+    `${locale}: readings of text no line says; ${REFRESH}`,
+  ).toEqual([]);
+  expect(floorBreach(floor, entries.length)).toBeUndefined();
+};
+
+describe('no Google reading is filed under the wrong writer', () => {
+  it.each(READ_ORDER)('%s', (locale) => {
+    noSelfReading(
+      locale,
+      googleEntries(STORE, locale),
+      `${locale} Google readings`,
+      GOOGLE_READINGS_FLOOR[locale],
+    );
+  });
+});
+
+describe('no second reading was taken by the engine that wrote the line', () => {
+  it.each(READ_ORDER)('%s', (locale) => {
+    noSelfReading(
+      locale,
+      secondEntries(SECOND, locale),
+      `${locale} second readings`,
+      SECOND_READINGS_FLOOR[locale],
+    );
   });
 });

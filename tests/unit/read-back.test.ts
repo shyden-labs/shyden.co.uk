@@ -298,7 +298,11 @@ const store = (over: Partial<ReadBackStore> = {}): ReadBackStore => ({
 });
 
 /** A saved reading, judged `agrees`. */
-const r = (english: string) => ({ english, verdict: 'agrees' as const });
+const r = (english: string) => ({
+  english,
+  writers: ['DeepL' as const],
+  verdict: 'agrees' as const,
+});
 
 describe('parseStore: the saved readings, fail-closed', () => {
   it('reads a well-formed store', () => {
@@ -306,7 +310,9 @@ describe('parseStore: the saved readings, fail-closed', () => {
       engine: GOOGLE_ENGINE,
       readings: {
         id: {},
-        zh: { 你好: { english: 'Hello', verdict: 'agrees' } },
+        zh: {
+          你好: { english: 'Hello', writers: ['DeepL'], verdict: 'agrees' },
+        },
         vi: {},
         th: {},
       },
@@ -330,15 +336,23 @@ describe('parseStore: the saved readings, fail-closed', () => {
 
   it.each([
     ['a reading that is not an object', 'Hello'],
-    ['a reading with no English', { verdict: 'agrees' }],
-    ['a verdict nobody defined', { english: 'Hello', verdict: 'fine' }],
+    ['a reading with no English', { verdict: 'agrees', writers: ['DeepL'] }],
+    ['a reading with no writers (#754 AC10)', { english: 'Hello' }],
+    [
+      'a writer nobody defined',
+      { english: 'Hello', writers: ['Google Cloud Translation v2'] },
+    ],
+    [
+      'a verdict nobody defined',
+      { english: 'Hello', writers: ['DeepL'], verdict: 'fine' },
+    ],
     [
       'an ambiguous verdict with no note',
-      { english: 'Hello', verdict: 'ambiguous' },
+      { english: 'Hello', writers: ['DeepL'], verdict: 'ambiguous' },
     ],
     [
       'a wrong verdict with no note',
-      { english: 'Hello', verdict: 'wrong', note: ' ' },
+      { english: 'Hello', writers: ['DeepL'], verdict: 'wrong', note: ' ' },
     ],
   ])('refuses %s', (_name, reading) => {
     expect(() =>
@@ -353,7 +367,10 @@ describe('parseStore: the saved readings, fail-closed', () => {
     expect(() =>
       parseStore({
         ...store(),
-        readings: { ...store().readings, zh: { a: { english: 1 } } },
+        readings: {
+          ...store().readings,
+          zh: { a: { english: 1, writers: ['DeepL'] } },
+        },
       }),
     ).toThrow('the read-back store has a zh reading it cannot use: "a"');
   });
@@ -842,15 +859,17 @@ describe('verdicts: a wrong reading blocks the change', () => {
         标题: r('Title'),
         重新洗牌: {
           english: 'Chop again',
+          writers: ['DeepL' as const],
           verdict: 'ambiguous',
           note: 'cut / shuffle',
         },
         置顶: {
           english: 'Stake it',
+          writers: ['edited after DeepL' as const],
           verdict: 'wrong',
           note: 'reads as a stake, not a pin',
         },
-        新: { english: 'New' },
+        新: { english: 'New', writers: ['DeepL' as const] },
       },
     },
   });
@@ -879,14 +898,19 @@ describe('verdicts: a wrong reading blocks the change', () => {
     ]);
     expect(next.readings.zh['新']).toEqual({
       english: 'New',
+      writers: ['DeepL'],
       verdict: 'agrees',
     });
     expect(next.readings.zh['置顶']).toEqual({
       english: 'Stake it',
+      writers: ['edited after DeepL'],
       verdict: 'agrees',
       note: 'pinned to the top',
     });
-    expect(judged.readings.zh['新']).toEqual({ english: 'New' });
+    expect(judged.readings.zh['新']).toEqual({
+      english: 'New',
+      writers: ['DeepL'],
+    });
   });
 
   it.each([

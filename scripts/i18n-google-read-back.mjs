@@ -76,6 +76,7 @@ import {
   unitsByLocale,
   writerOf,
 } from '../src/lib/i18n/read-back.ts';
+import { withGoogleWriters, writersOf } from '../src/lib/i18n/readers.ts';
 import { VERIFIED } from '../src/lib/i18n/verified.ts';
 import { messageOf } from './errors.mjs';
 
@@ -155,11 +156,16 @@ async function save(store) {
 
 /** @param {string} key */
 async function readBack(key) {
-  const store = parseStore(JSON.parse(readFileSync(STORE, 'utf8')));
   /** @type {Record<string, Record<string, string>>} */
   const drafts = JSON.parse(readFileSync(DRAFTS, 'utf8'));
-
   const units = unitsByLocale();
+  // Every reading names the writers of its lines as the cache says now
+  // (#754 AC10), so a re-drafted line is never filed under its old writer.
+  const store = withGoogleWriters(
+    parseStore(JSON.parse(readFileSync(STORE, 'utf8'))),
+    units,
+    drafts,
+  );
   // A reading of a text no line says any more is dropped first.
   for (const locale of READ_ORDER)
     for (const text of coverage(locale, units[locale], store).stale)
@@ -215,6 +221,7 @@ async function readBack(key) {
         // Saved unjudged: the coverage test fails until it has a verdict.
         store.readings[locale][batch[at].text] = {
           english: fromGoogleHtml(reading),
+          writers: writersOf(locale, batch[at].text, units[locale], drafts),
         };
         readNow.add(`${locale}\n${batch[at].text}`);
       });

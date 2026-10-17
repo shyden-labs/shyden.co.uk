@@ -29,6 +29,7 @@
     "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
     "i18n:google-read-back": "node scripts/i18n-google-read-back.mjs",
     "i18n:read-back-verdicts": "node scripts/i18n-read-back-verdicts.mjs",
+    "i18n:second-read": "node scripts/i18n-second-read.mjs",
     "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
     "test": "npm run format && npm run typecheck && npm run test:unit",
