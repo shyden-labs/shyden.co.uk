@@ -307,7 +307,7 @@ const PRODUCT_VALUES: Readonly<Record<string, string>> = {
     'how many distinct partitions the grouping produces: a statistic of the algorithm',
   'tests/unit/grouping.test.ts: successes':
     'how many searches succeeded: a statistic of the algorithm',
-  'tests/unit/report-review.test.ts: body.length':
+  'tests/logs/report-review.test.ts: body.length':
     "the lines a fixture's report block renders, fixed by the fixture",
   'tests/unit/report.test.ts: entry!.forms.length':
     'a select message offers more than one form: the language, not a population',

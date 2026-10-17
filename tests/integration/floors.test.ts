@@ -15,6 +15,9 @@ import { basename, dirname, join } from 'node:path';
 import { readFloors, FLOORS_FILE } from '../floors';
 import {
   carriedIds,
+  carriedLines,
+  DEVICE_DIR,
+  DEVICE_SUFFIX,
   floorSpecs,
   floorsText,
   RECORD_DIR_PREFIX,
@@ -86,12 +89,19 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
 
   /**
    * The recorded ids the unit suite owns once `recorded` is added to the
-   * record: every id no Playwright or functions spec spells whole.
+   * record: every id no Playwright spec, functions spec or iPhone journey
+   * (#623) spells whole.
    */
   const recordedKeys = (recorded: Readonly<Record<string, number>>) =>
     Object.keys(JSON.parse(floorsText({ ...readFloors(), ...recorded })));
+  /** The iPhone journeys' texts, as the recorder reads them. */
+  const deviceTexts = () =>
+    floorSpecs(DEVICE_DIR, DEVICE_SUFFIX).map((file) =>
+      readFileSync(file, 'utf8'),
+    );
   const spellingSpecs = (functionsIds: readonly string[]) => [
     ...floorSpecs().map((file) => readFileSync(file, 'utf8')),
+    ...deviceTexts(),
     plantedSpec(functionsIds),
   ];
   const carriedBeside = (
@@ -137,7 +147,8 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
   ) => {
     const dir = mkdtempSync(join(tmpdir(), 'floors-path-'));
     // The recorder runs in a checkout of its own, holding copies of what it
-    // reads: the record, the Playwright floor specs, and the lockfile and
+    // reads: the record, the Playwright floor specs, the iPhone journeys whose
+    // ids every mode carries (#623), and the lockfile and
     // Dockerfile that pick its image. Every floor in the
     // suite reads the real record from other workers, and a write truncates
     // it first, so a recorder test that wrote it, even to put it back, failed
@@ -146,6 +157,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     for (const file of [
       FLOORS_FILE,
       ...floorSpecs(),
+      ...floorSpecs(DEVICE_DIR, DEVICE_SUFFIX),
       'package-lock.json',
       DOCKERFILE,
     ]) {
@@ -235,6 +247,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       'ran: vitest run',
       `ran: ${script}`,
       expect.stringContaining('vitest.integration.config.ts'),
+      expect.stringContaining('vitest.logs.config.ts'),
     ]);
   });
 
@@ -266,7 +279,40 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       'ran: vitest run',
       expect.stringContaining('vitest.guards.config.ts'),
       `ran: ${script}`,
+      expect.stringContaining('vitest.logs.config.ts'),
     ]);
+  });
+
+  it('runs the logs suite after the integration suite, with the limit its own script carries (#822)', () => {
+    const run = recordWith({ npx: '#!/bin/sh\necho "ran: $*"\nexit 0\n' }, [
+      '--unit',
+    ]);
+    const script = (
+      JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts['test:logs'];
+    expect(
+      run.stdout.split('\n').filter((line) => line.startsWith('ran: ')),
+    ).toEqual([
+      'ran: vitest run',
+      expect.stringContaining('vitest.guards.config.ts'),
+      expect.stringContaining('vitest.integration.config.ts'),
+      `ran: ${script}`,
+    ]);
+  });
+
+  it('refuses a logs suite that failed, naming it (#822)', () => {
+    const run = recordWith(
+      {
+        npx: '#!/bin/sh\nfor a; do [ "$a" = vitest.logs.config.ts ] && exit 6; done\nexit 0\n',
+      },
+      ['--unit'],
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ the logs suite failed in record mode (exit 6): nothing recorded\n',
+    );
   });
 
   it('refuses an integration suite that failed, naming it (#630)', () => {
@@ -352,8 +398,8 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     const run = recordWith({}, ['--units']);
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --units)\n',
+      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --units)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -362,8 +408,8 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     const run = recordWith({}, ['--unit', '--functions']);
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite] ' +
-        '[--retire <id>]... (got --unit --functions)\n',
+      '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device] [--retire <id>]... (got --unit --functions)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -569,14 +615,16 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       stderr: '',
     });
     expect(run.floors['probe/fn']).toBe(2);
-    expect(run.stdout.split('\n').slice(0, 5)).toEqual([
+    // The carried ids in the recorder's own lines (#623): the iPhone's apart.
+    const expected = [
       'Recording the functions floors: tests/functions/planted.spec.ts',
       `${FLOORS_FILE}: ids were added, so the unit suite runs again (pass 2): ` +
         'a floor may count the ids the record holds',
-      `--functions: not measured, carried unchanged for CI to judge: ${carried.join(', ')}`,
+      ...carriedLines('--functions', carried, deviceTexts()),
       `${FLOORS_FILE}: 1 floor(s) moved:`,
       '  probe/fn: new, 2',
-    ]);
+    ];
+    expect(run.stdout.split('\n').slice(0, expected.length)).toEqual(expected);
   });
 
   it('with --unit, carries a functions id its spec spells as it carries a Playwright one (#610)', () => {
@@ -594,8 +642,10 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     });
     expect(run.floors['probe/fn']).toBe(5);
     expect(run.stdout).toBe(
-      `--unit: not measured, carried unchanged for CI to judge: ${carried.join(', ')}\n` +
-        `${FLOORS_FILE}: every floor already matches (${owned.length} read)\n`,
+      [
+        ...carriedLines('--unit', carried, deviceTexts()),
+        `${FLOORS_FILE}: every floor already matches (${owned.length} read)`,
+      ].join('\n') + '\n',
     );
   });
 

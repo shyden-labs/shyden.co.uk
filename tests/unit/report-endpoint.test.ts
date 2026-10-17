@@ -7,10 +7,20 @@ import {
   handleReport,
   reportHealth,
   schemaMatches,
-  type ReportsDatabase,
 } from '../../src/lib/report';
 import { getSiteStrings } from '../../src/lib/i18n';
-import { codeWithoutComments, withoutSqlComments } from './source-text';
+import { failingWith } from '../report-fakes';
+import { codeWithoutComments } from './source-text';
+import {
+  FORM,
+  HEALTH,
+  NO_DB,
+  ORIGIN,
+  ENDPOINT,
+  post,
+  quote,
+  valid,
+} from '../report-endpoint-shared';
 
 /**
  * Real `Request` objects, no stand-in database (spec 10). Checks 1–8 return
@@ -18,48 +28,6 @@ import { codeWithoutComments, withoutSqlComments } from './source-text';
  * REPORTS binding absent, which is a real failure the health check also
  * reports. Check 9 succeeding is proved on a real local D1 (Task 10).
  */
-const ORIGIN = 'https://dev.shyden.co.uk';
-const ENDPOINT = `${ORIGIN}/api/report`;
-const HEALTH = `${ORIGIN}/api/report/health`;
-const FORM = 'application/x-www-form-urlencoded';
-const quote = getSiteStrings('vi').report.open;
-const NO_DB = {};
-
-type Fields = Record<string, string>;
-const valid = (extra: Fields = {}): Fields => ({
-  locale: 'vi',
-  page: 'home',
-  quote,
-  suggestion: '',
-  note: '',
-  website: '',
-  ...extra,
-});
-
-function post(
-  fields: Fields | string,
-  init: {
-    headers?: Record<string, string>;
-    json?: boolean;
-    method?: string;
-  } = {},
-) {
-  const body =
-    typeof fields === 'string'
-      ? fields
-      : new URLSearchParams(fields).toString();
-  return new Request(ENDPOINT, {
-    method: init.method ?? 'POST',
-    headers: {
-      Origin: ORIGIN,
-      'Content-Type': FORM,
-      ...(init.json ? { Accept: 'application/json' } : {}),
-      ...init.headers,
-    },
-    body: init.method && init.method !== 'POST' ? undefined : body,
-  });
-}
-
 const answer = async (request: Request, lines: string[] = []) =>
   handleReport(request, NO_DB, (line) => lines.push(line));
 const outcomeOf = async (response: Response) =>
@@ -357,7 +325,9 @@ describe('check 9 with no database: failed, and a clean log line', () => {
     expect(response.headers.get('Location')).toBe('/vi/#report-failed');
   });
 
-  it('logs the error name and message, and no visitor text or header', async () => {
+  // Stand-in (#822): one fixed request. Every field and header a visitor
+  // sends is the logs suite's (tests/logs/report-log.test.ts).
+  it('logs the failure kind, and no visitor text or header', async () => {
     const lines: string[] = [];
     const secret = 'the-suggestion-7f3a';
     await answer(
@@ -366,11 +336,21 @@ describe('check 9 with no database: failed, and a clean log line', () => {
       }),
       lines,
     );
-    expect(lines).toEqual([
-      'report failed: Error: the REPORTS binding is missing',
-    ]);
+    expect(lines).toEqual(['report failed: binding-missing']);
     for (const leak of [secret, 'note-9c1d', 'agent-2b8e', quote, ORIGIN])
       expect(lines[0]).not.toContain(leak);
+  });
+
+  // Stand-in (#829): one planted value in a database error's text. Every
+  // kind of private or identifying data is the logs suite's.
+  it('logs a database failure as its kind, never the error text', async () => {
+    const lines: string[] = [];
+    await handleReport(
+      post(valid()),
+      { REPORTS: failingWith('D1_ERROR: cannot bind ana.putri@example.com') },
+      (line) => lines.push(line),
+    );
+    expect(lines).toEqual(['report failed: database']);
   });
 });
 
@@ -425,6 +405,8 @@ describe('every response', () => {
 });
 
 describe('the health check', () => {
+  // Stand-in (#822): one line. Each line's words, and the silence of a
+  // healthy table, are the logs suite's.
   it('answers 503 ok:false with no binding, and logs why', async () => {
     const lines: string[] = [];
     const response = await reportHealth(new Request(HEALTH), NO_DB, (line) =>
@@ -454,6 +436,9 @@ describe('the health check', () => {
     expect(lines).toHaveLength(1);
   });
 
+  // Stand-in (#822) of the reports table's shape: the migration, the bounds
+  // and the runbook agreeing with it are the logs suite's
+  // (tests/logs/reports-table.test.ts).
   it('matches the migration column set exactly, in any order', () => {
     expect(REPORT_COLUMNS).toEqual([
       'id',
@@ -471,91 +456,6 @@ describe('the health check', () => {
     expect(schemaMatches([])).toBe(false);
     // Same count, one name changed: a length check alone would pass it.
     expect(schemaMatches([...REPORT_COLUMNS.slice(1), 'status'])).toBe(false);
-  });
-
-  // The real D1 in tests/functions always holds the migrated table, so only
-  // a table answering other columns can show what health says about drift.
-  const tableWith = (columns: readonly string[]): ReportsDatabase => ({
-    prepare: () => ({
-      bind() {
-        throw new Error('health binds nothing');
-      },
-      run() {
-        throw new Error('health writes nothing');
-      },
-      all: async <T>() => ({
-        results: columns.map((name) => ({ name })) as T[],
-      }),
-    }),
-  });
-
-  it('answers 200 ok:true for the migrated table, and logs nothing', async () => {
-    const lines: string[] = [];
-    const log = (line: string) => lines.push(line);
-    const response = await reportHealth(
-      new Request(HEALTH),
-      { REPORTS: tableWith(REPORT_COLUMNS) },
-      log,
-    );
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
-    // A call with no binding through the same log proves it live, so one
-    // line in all is the healthy call's silence, not a dead listener.
-    await reportHealth(new Request(HEALTH), NO_DB, log);
-    expect(lines).toEqual([
-      'report health: Error: the REPORTS binding is missing',
-    ]);
-  });
-
-  it('answers 503 ok:false for a drifted table, and logs the drift', async () => {
-    const lines: string[] = [];
-    const response = await reportHealth(
-      new Request(HEALTH),
-      { REPORTS: tableWith([...REPORT_COLUMNS.slice(1), 'status']) },
-      (line) => lines.push(line),
-    );
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ ok: false });
-    expect(lines).toEqual([
-      'report health: the reports table does not match the migration',
-    ]);
-  });
-});
-
-describe('the migration', () => {
-  // Comments stripped, both forms: the migration's own column notes must not
-  // satisfy this. A private `--` replace stood here, and a block comment below
-  // the table holding the old `quote` line passed the anchored check while the
-  // column itself allowed 100000 characters (#390 F160).
-  const sql = () =>
-    withoutSqlComments(readFileSync('migrations/0001_reports.sql', 'utf8'));
-
-  it('creates exactly the columns the endpoint writes and the health check expects', () => {
-    const body = /CREATE TABLE reports \(([\s\S]*)\);/.exec(sql())?.[1];
-    expect(body, 'a CREATE TABLE reports statement').toBeDefined();
-    const columns = body!
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => line.split(/\s+/)[0]);
-    expect(columns).toEqual([...REPORT_COLUMNS]);
-  });
-
-  it('bounds every text column the way check 7 does', () => {
-    // Anchored to each column's own line, so no other text can satisfy them
-    // (`anchored-presence.test.ts`). The literal 1000 is tied to check 7 by
-    // the pin on MAX_FIELD_UNITS.
-    expect(MAX_FIELD_UNITS).toBe(1000);
-    const text = sql();
-    expect(text).toMatch(
-      /^\s*quote\s+TEXT NOT NULL CHECK \(length\(quote\) BETWEEN 1 AND 1000\),\s*$/m,
-    );
-    expect(text).toMatch(
-      /^\s*suggestion\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(suggestion\) <= 1000\),\s*$/m,
-    );
-    expect(text).toMatch(
-      /^\s*note\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(note\) <= 1000\)\s*$/m,
-    );
   });
 });
 
@@ -600,17 +500,6 @@ describe('the runbook', () => {
     expect(script, 'an npm run reports:review line').toBeGreaterThanOrEqual(0);
     expect(firstDelete, 'a DELETE line').toBeGreaterThanOrEqual(0);
     expect(script).toBeLessThan(firstDelete);
-  });
-
-  it('lists every stored column, and holds both deletes (AC7)', () => {
-    const text = runbook();
-    const select = /^SELECT (.+)$/m.exec(text)?.[1];
-    expect(select, 'a SELECT line in the runbook').toBeDefined();
-    expect(select!.split(', ')).toEqual([...REPORT_COLUMNS]);
-    expect(text).toMatch(/^DELETE FROM reports WHERE id = '<id>';$/m);
-    expect(text).toMatch(
-      /^DELETE FROM reports WHERE note LIKE 'automated dev check %';$/m,
-    );
   });
 
   it('documents the WAF rate limit for the operator (AC5)', () => {

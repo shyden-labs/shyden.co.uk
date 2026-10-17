@@ -103,6 +103,13 @@ const INTENTIONAL_JOINS: Array<{ left: RegExp; right: RegExp; why: string }> = [
     why: 'punctuation closing a sentence that ended in a link',
   },
   {
+    left: /\/[a-z][\w-]*$/,
+    right: /^\/[a-z][\w-]*/,
+    why:
+      'a URL path the API docs draw one segment per element, /api then ' +
+      '/report: one path, read as one word (#781)',
+  },
+  {
     left: /[。！？]$/,
     right: /^\S/,
     why:

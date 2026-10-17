@@ -8,6 +8,7 @@ import {
 import { layoutWidthsFrom } from '../layout-widths';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { docsPaths } from '../site-pages';
 import { recorded, shoot } from './evidence';
 
 test.use(recorded);
@@ -180,11 +181,13 @@ const collisions = (row: Row): string[] => {
  * little to mean anything. The test owns the loop and every resize, so each
  * resize sits in the body of a test tagged `@emulated-viewport`.
  */
-const survey = (locale: Locale) => {
+const survey = (locale: Locale, localised: boolean) => {
   const findings: string[] = [];
   const rows: string[] = [];
   const thin: string[] = [];
-  const least = 4; // wordmark, menu or nav, theme switch, language switcher
+  // Wordmark, menu or nav, theme switch, language switcher; an English-only
+  // page (the API docs, #781) has no switcher by decision, so three.
+  const least = localised ? 4 : 3;
   // The theme switch by its own name (#142): a row without it has not
   // measured the room AC5 asks for.
   const themeSwitch = getSiteStrings(locale).themeDarkMode;
@@ -237,7 +240,7 @@ test.describe('the header row has room for everything in it (#329)', () => {
       `${path}: no header item overlaps another, at any width`,
       { tag: '@emulated-viewport' },
       async ({ page }) => {
-        const header = survey(locale);
+        const header = survey(locale, !docsPaths().includes(path));
         // runtime population: the widths this page's own CSS can lay out,
         // read from the media queries it serves, so only the loaded page
         // knows them (#422).

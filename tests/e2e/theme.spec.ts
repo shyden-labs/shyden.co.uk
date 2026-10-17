@@ -6,6 +6,7 @@ import { resolvedColour } from './helpers';
 import { THEMES, themeColour } from '../palette';
 import { emulateTheme, expectTheme } from '../themes';
 import { atLeast44 } from '../viewport';
+import { readsAsLineWidth } from '../device-pixels';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
@@ -123,7 +124,17 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await page.keyboard.press('Shift');
     await toggle(page).focus();
     await expect(toggle(page)).toHaveCSS('outline-style', 'solid');
-    await expect(toggle(page)).toHaveCSS('outline-width', '3px');
+    // Declared, or snapped at this screen's ratio (#805): 2.857px on the 3.5x
+    // phone, 3 on emulated Chrome at 2.75. Read once the ring is drawn, which
+    // the style assertion above waits for.
+    const ring = await toggle(page).evaluate((el) => ({
+      width: parseFloat(getComputedStyle(el).outlineWidth),
+      ratio: window.devicePixelRatio,
+    }));
+    expect(
+      readsAsLineWidth(ring.width, 3, ring.ratio),
+      `the 3px ring: read ${ring.width} at a ratio of ${ring.ratio}`,
+    ).toBe(true);
     await shoot(
       page,
       'the switch focused: its ring is the accent',
@@ -301,13 +312,20 @@ test.describe('storage refused (#142 AC7)', () => {
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
     await errors.expectNone('the theme script threw where storage is refused');
-    // A second page carries no refusal, so it can read what was saved.
+    // A second page carries no refusal, so it can read what was saved. An
+    // ABSOLUTE url, built from the page under test: a page the context opens
+    // has no baseURL of its own, and on the real phone's adopted context `/`
+    // was "an invalid URL" (#808). Closed in `finally`, so a failure here
+    // cannot leave a tab in front of the next test's page (#807).
     const probe = await page.context().newPage();
-    await probe.goto('/');
-    expect(
-      await probe.evaluate(() => localStorage.getItem('theme')),
-    ).toBeNull();
-    await probe.close();
+    try {
+      await probe.goto(new URL('/', page.url()).href);
+      expect(
+        await probe.evaluate(() => localStorage.getItem('theme')),
+      ).toBeNull();
+    } finally {
+      await probe.close();
+    }
   });
 });
 

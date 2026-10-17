@@ -9,8 +9,6 @@ import {
   unclassified,
   unproved,
 } from '../absence-liveness';
-import { ABSENCE_BURN_DOWN } from '../absence-liveness.burn-down';
-import { burnDownBreaches } from '../burn-down';
 import {
   committableFiles,
   filesUnder,
@@ -61,11 +59,12 @@ import {
  * judged only `searched(` calls and saw nothing either. A category the guard
  * cannot see is an exemption by another name.
  *
- * Today's unjudged sites are DEBT, listed in `absence-liveness.burn-down.ts`
- * by `file › test title as written`, and checked for equality both ways: a
- * converted site is red until the list is lowered, and a new unjudged site is
- * red by name. The list only shrinks, and nothing exempts a site by shape,
- * label or reason; the conversions (#610-#617) empty it.
+ * Every unjudged site is red by name, with the test that holds it. The sites
+ * found unjudged when this widened were DEBT, listed by `file › test title as
+ * written` (#609) and burned down by the conversions (#610-#617, #623); the
+ * list emptied with #623 and was retired with it, its shrink-only test and
+ * its floor, by the operator's ruling of 2026-10-09 (#647). Nothing exempts a
+ * site by shape, label or reason.
  *
  * `.not.toEqual([])` is a PRESENCE assertion and is skipped: it fails, loudly,
  * on an empty population, so it cannot hide one.
@@ -94,9 +93,6 @@ const scan = () =>
     bindFiles(tsFiles),
     callGraph(tsFiles).close(DISCOVERY),
   ));
-
-const CEILING_SITES = 3;
-const CEILING_SCOPES = 3;
 
 describe('absence assertions prove the population they searched', () => {
   // Separate from the verdict, and load-bearing: the verdict below is itself
@@ -354,17 +350,14 @@ describe('absence assertions prove the population they searched', () => {
     ).toBeUndefined();
   });
 
-  it('finds every scope holding exactly the unjudged absences listed', () => {
-    // The listed sites are today's debt (#609), keyed by the test that holds
-    // them. Equality both ways: a converted site leaves its key too high and
-    // is red until the list is lowered, and a new unjudged site is red by
-    // name. Nothing is exempt by shape, label or reason.
+  it('finds no absence without its population in the verdict', () => {
+    // Red by name, with the test that holds it: no list excuses a site any
+    // more (#623, #647), and nothing is exempt by shape, label or reason.
     const result = scan();
-    const mismatched = burnDownBreaches(result.unjudged, ABSENCE_BURN_DOWN).map(
-      ({ key, read, listed }) =>
-        read > listed
-          ? `${key}: ${read} absences with no population in the verdict, ${listed} listed. Route each through searched() and check a floor.`
-          : `${key}: ${read} unjudged, ${listed} listed. Lower the entry in tests/absence-liveness.burn-down.ts: the list only shrinks.`,
+    const unjudged = result.unjudgedSites.map(
+      ({ key, at, why }) =>
+        `${at}: ${why} (${key.slice(key.indexOf(' › ') + 3)}). Route it ` +
+        'through searched() and check a floor.',
     );
     expect(
       searched(result.findings, {
@@ -374,26 +367,11 @@ describe('absence assertions prove the population they searched', () => {
       result.findings.join('\n'),
     ).toEqual([]);
     expect(
-      searched(mismatched, { of: result.sites, what: 'absence assertions' }),
-      mismatched.join('\n'),
+      searched(unjudged, { of: result.sites, what: 'absence assertions' }),
+      unjudged.join('\n'),
     ).toEqual([]);
     expect(
       floorBreach('absence-liveness/judged-sites', result.sites.length),
-    ).toBeUndefined();
-  });
-
-  it('only shrinks the burn-down list', () => {
-    // Measured when the list landed (#609); a conversion lowers these with
-    // the list and nothing else raises them. The recorded floor holds the
-    // list's own size, so a key quietly deleted from it is seen.
-    const counts = Object.values(ABSENCE_BURN_DOWN);
-    expect(counts.reduce((sum, n) => sum + n, 0)).toBeLessThanOrEqual(
-      CEILING_SITES,
-    );
-    expect(counts.length).toBeLessThanOrEqual(CEILING_SCOPES);
-    expect(counts.every((n) => Number.isInteger(n) && n >= 1)).toBe(true);
-    expect(
-      floorBreach('absence-liveness/burn-down-scopes', counts.length),
     ).toBeUndefined();
   });
 });

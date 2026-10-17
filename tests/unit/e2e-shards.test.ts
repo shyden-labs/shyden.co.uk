@@ -4,10 +4,10 @@ import {
   accountFileName,
   accountFindings,
   captureAccountFindings,
-  captureFindings,
   docsOnlyFindings,
   isDocsOnlyRun,
   needsFindings,
+  scopedJobFindings,
   shardAccount,
   shardNotice,
   shardOf,
@@ -451,97 +451,146 @@ describe('accountFindings: the shards add up to the suite', () => {
   });
 });
 
-describe('captureFindings: the capture shards ran exactly where scope said (#774)', () => {
-  const checks = { result: 'success', outputs: {} };
-  const scopeSaid = (capture: unknown) => ({
-    result: 'success',
-    outputs: { docs_only: 'false', capture },
-  });
-  const job = (result: string) => ({ result, outputs: {} });
-
-  it('takes a capture that ran where scope said it runs, and hands on the rest', () => {
-    expect(
-      captureFindings({
-        scope: scopeSaid('true'),
-        checks,
-        capture: job('success'),
-      }),
-    ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
-  });
-
-  it('takes a capture skipped where scope said it does not run', () => {
-    expect(
-      captureFindings({
-        scope: scopeSaid('false'),
-        checks,
-        capture: job('skipped'),
-      }),
-    ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
-  });
-
-  it('refuses a capture skipped where scope said it runs', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('true'), capture: job('skipped') })
-        .findings,
-    ).toEqual([
-      'capture finished `skipped` where scope said it runs, not `success`',
-    ]);
-  });
-
-  it('refuses a capture that failed where scope said it runs', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('true'), capture: job('failure') })
-        .findings,
-    ).toEqual([
-      'capture finished `failure` where scope said it runs, not `success`',
-    ]);
-  });
-
-  it('refuses a capture that ran where scope said it does not', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('false'), capture: job('success') })
-        .findings,
-    ).toEqual([
-      'capture finished `success` where scope said it does not run, not `skipped`',
-    ]);
-  });
-
-  it('refuses a scope that handed on no capture verdict', () => {
-    expect(
-      captureFindings({
-        scope: { result: 'success', outputs: { docs_only: 'false' } },
-        capture: job('skipped'),
-      }).findings,
-    ).toEqual([
-      'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
-    ]);
-  });
-
-  it('refuses a capture verdict that is not exactly true or false', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('TRUE'), capture: job('success') })
-        .findings,
-    ).toEqual([
-      'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
-    ]);
-  });
-
-  it('refuses needs that do not include the capture job', () => {
-    expect(captureFindings({ scope: scopeSaid('false'), checks })).toEqual({
-      findings: [
-        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
-      ],
-      rest: { scope: scopeSaid('false'), checks },
+// The two jobs scope decides (#774, #822): each runs exactly where scope's
+// own verdict says, so its skip is a pass there and a refusal elsewhere. One
+// rule, two rows; every message is written out per job, never built from the
+// row it is checked against.
+describe.each([
+  {
+    job: 'capture',
+    verdict: 'capture',
+    absent:
+      'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+  },
+  {
+    job: 'logs',
+    verdict: 'release',
+    absent:
+      'logs is not among the jobs build-and-test stands for, so a release whose logs and audit trails were never checked would pass',
+  },
+] as const)(
+  'scopedJobFindings: $job ran exactly where scope said ($verdict, #774, #822)',
+  ({ job: name, verdict, absent }) => {
+    const checks = { result: 'success', outputs: {} };
+    const scopeSaid = (said: unknown) => ({
+      result: 'success',
+      outputs: { docs_only: 'false', [verdict]: said },
     });
-  });
+    const job = (result: string) => ({ result, outputs: {} });
 
-  it('hands needs it cannot read to the verdict that refuses them', () => {
-    expect(captureFindings('not json')).toEqual({
-      findings: [],
-      rest: 'not json',
+    it('takes a run where scope said it runs, and hands on the rest', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), checks, [name]: job('success') },
+          name,
+        ),
+      ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
     });
-  });
-});
+
+    it('takes a skip where scope said it does not run', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('false'), checks, [name]: job('skipped') },
+          name,
+        ),
+      ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
+    });
+
+    it('refuses a skip where scope said it runs', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), [name]: job('skipped') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `skipped` where scope said it runs, not `success`',
+          logs: 'logs finished `skipped` where scope said it runs, not `success`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a failure where scope said it runs', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), [name]: job('failure') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `failure` where scope said it runs, not `success`',
+          logs: 'logs finished `failure` where scope said it runs, not `success`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a run where scope said it does not', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('false'), [name]: job('success') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `success` where scope said it does not run, not `skipped`',
+          logs: 'logs finished `success` where scope said it does not run, not `skipped`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a scope that handed on no verdict for it', () => {
+      expect(
+        scopedJobFindings(
+          {
+            scope: { result: 'success', outputs: { docs_only: 'false' } },
+            [name]: job('skipped'),
+          },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
+          logs: 'scope handed on no release verdict (undefined), so logs finishing `skipped` cannot be judged',
+        }[name],
+      ]);
+    });
+
+    it('refuses a verdict that is not exactly true or false', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('TRUE'), [name]: job('success') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
+          logs: 'scope handed on no release verdict ("TRUE"), so logs finishing `success` cannot be judged',
+        }[name],
+      ]);
+    });
+
+    it('refuses needs that do not include the job', () => {
+      expect(
+        scopedJobFindings({ scope: scopeSaid('false'), checks }, name),
+      ).toEqual({
+        findings: [absent],
+        rest: { scope: scopeSaid('false'), checks },
+      });
+    });
+
+    it('hands needs it cannot read to the verdict that refuses them', () => {
+      expect(scopedJobFindings('not json', name)).toEqual({
+        findings: [],
+        rest: 'not json',
+      });
+    });
+  },
+);
 
 describe('accountArguments: the e2e accounts, then the capture accounts (#774)', () => {
   it('splits the files at --capture', () => {

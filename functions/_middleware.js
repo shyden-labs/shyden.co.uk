@@ -29,6 +29,7 @@ import {
   basicAuthOk,
   basicAuthChallenge,
 } from './_lib/lockdown.js';
+import { accessOk, privatePath } from './_lib/access.js';
 
 /**
  * @param {{ request: Request, env: Record<string, string | undefined>, next: () => Promise<Response> }} context
@@ -58,8 +59,15 @@ export const onRequest = async ({ request, env, next }) => {
     });
   }
 
-  // Prod = pass through untouched. The gate exists for dev / preview only.
+  // Prod passes through, but for its private paths: those need a Cloudflare
+  // Access sign-in, checked here as well as at the edge (#781). Dev keeps its
+  // own gate below for every path.
   if (isProdHostname(hostname)) {
+    if (privatePath(url.pathname) && !(await accessOk(request, env)))
+      return new Response(null, {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     return next();
   }
 

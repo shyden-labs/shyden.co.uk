@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import { deployedRoutes } from '../site-pages';
+import { expectDocsRendered } from '../api-docs-pages';
 import { PRODUCTS, expectHomepageLinksAt } from '../product-links';
 import { expectNoHorizontalScroll } from '../viewport';
 import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
+import { accessServiceHeaders } from '../access-service-token';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 
 /**
@@ -180,8 +182,9 @@ test(
     },
   },
   async ({ request }) => {
-    // Health only: automation never writes to the production database.
-    await expectReportsBound(request);
+    // Health only: automation never writes to the production database. The
+    // route is private on production (#782): the service token signs in.
+    await expectReportsBound(request, accessServiceHeaders(process.env));
   },
 );
 
@@ -200,5 +203,60 @@ for (const [from, to] of LEGACY_REDIRECTS)
     async ({ request }) => {
       const res = await request.get(from, { maxRedirects: 0 });
       expectMovedTo(res.status(), res.headers()['location'] ?? null, to);
+    },
+  );
+
+// #781: the public API docs render; production lets nothing be written from them.
+test('the public API docs render on production', async ({ page }) => {
+  await expectDocsRendered(page, '/api/docs/');
+});
+
+test(
+  'the public API docs offer no Try it out for the report form on production',
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        "Try it out is switched by the page's hostname (src/lib/api-docs.ts), and a preview is not served from production's",
+    },
+  },
+  async ({ page }) => {
+    await page.goto('/api/docs/');
+    await page.locator('#swagger .opblock-summary-control').first().click();
+    await expect(
+      page.locator('#swagger .opblock-post .opblock-body'),
+    ).toBeVisible();
+    await expect(page.locator('#swagger .try-out__btn')).toHaveCount(0);
+  },
+);
+
+// Production's private paths (#781, #782), each asked with no sign-in.
+for (const [what, path] of [
+  ['the private API docs page', '/api/docs/private/'],
+  ['the report health check', '/api/report/health'],
+] as const)
+  test(
+    `${what} refuses a request with no sign-in`,
+    {
+      tag: '@deployed-only',
+      annotation: {
+        type: 'deployed-only',
+        description:
+          'functions/_middleware.js and Cloudflare Access refuse it, and a preview of dist/ runs neither',
+      },
+    },
+    async ({ request }) => {
+      const response = await request.get(path, { maxRedirects: 0 });
+      // Access, once set up, sends the visitor to its sign-in; until then, and
+      // behind it, the site's own gate answers 403 with nothing in the body.
+      if (response.status() === 302)
+        expect(new URL(response.headers()['location'] ?? '').hostname).toMatch(
+          /\.cloudflareaccess\.com$/,
+        );
+      else {
+        expect(response.status()).toBe(403);
+        expect(await response.text()).toBe('');
+      }
     },
   );

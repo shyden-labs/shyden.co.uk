@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { searched } from '../source-files';
-import { sitePaths } from '../site-pages';
+import { docsPaths, sitePaths } from '../site-pages';
 import { THEME_SCRIPT_SOURCE } from '../themes';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
 
@@ -31,6 +31,10 @@ const OWN_SCRIPTS: Record<string, readonly string[]> = {
   '/yeetalk-calculators': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
   [NOT_FOUND]: [],
+  // #781: the Swagger UI library the page loads into <head>, then the page's
+  // own module, in document order.
+  '/api/docs/': ['external classic in head', 'inline module in body'],
+  '/api/docs/private/': ['external classic in head', 'inline module in body'],
 };
 
 type Script = {
@@ -83,6 +87,7 @@ const BUILT = [
   ...LOCALES.flatMap((locale) =>
     sitePaths().map((route) => ({ route, path: localisePath(route, locale) })),
   ),
+  ...docsPaths().map((route) => ({ route, path: route })),
   { route: NOT_FOUND, path: NOT_FOUND },
 ];
 

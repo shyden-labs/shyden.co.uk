@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  COUNT_SQL,
   FAILURE_NOTICE,
   NOTICE_AUTHOR,
-  REPORTS_DATABASE,
   REQUEST_TIMEOUT_MS,
   countFrom,
   databaseIdFrom,
@@ -12,6 +10,7 @@ import {
   postedToday,
   startOfUtcDay,
 } from '../../src/lib/waiting-reports';
+import { counted } from '../waiting-reports-shared';
 
 /**
  * The waiting-reports count (#349, spec section 15). Every malformed answer
@@ -30,25 +29,9 @@ const listing = (databases: unknown[]) => ({
   result: databases,
 });
 
-/** A D1 query answer to `COUNT_SQL`, in Cloudflare's envelope. */
-const counted = (count: unknown) => ({
-  success: true,
-  errors: [],
-  messages: [],
-  result: [{ success: true, meta: {}, results: [{ 'count(*)': count }] }],
-});
-
+// The statement that reads the reports table and the sentence posted in
+// public are the logs suite's (#822).
 describe('the constants are pinned to their literal values', () => {
-  it('counts every row of the production reports table', () => {
-    expect(COUNT_SQL).toBe('SELECT count(*) FROM reports');
-    expect(REPORTS_DATABASE).toBe('shyden-reports');
-  });
-
-  it('the failure notice is one fixed sentence holding no digit', () => {
-    expect(FAILURE_NOTICE).toBe('The waiting-reports count could not be read.');
-    expect(FAILURE_NOTICE).not.toMatch(/\d/);
-  });
-
   it('the notice author is the workflow token, and requests give up after 30s', () => {
     expect(NOTICE_AUTHOR).toBe('github-actions[bot]');
     expect(REQUEST_TIMEOUT_MS).toBe(30_000);
@@ -130,57 +113,12 @@ describe('databaseIdFrom', () => {
   });
 });
 
+// Stand-in (#822): a count read. Every answer it must refuse rather than
+// read as a count is the logs suite's (tests/logs/waiting-reports.test.ts).
 describe('countFrom', () => {
   it('reads a zero and a three', () => {
     expect(countFrom(counted(0))).toBe(0);
     expect(countFrom(counted(3))).toBe(3);
-  });
-
-  it.each([
-    ['a string', '3'],
-    ['a fraction', 1.5],
-    ['a negative', -1],
-    ['null', null],
-    ['a missing count', undefined],
-    ['an unsafe integer', 2 ** 53],
-  ])('throws on %s, never reading it as a count', (_, value) => {
-    expect(() => countFrom(counted(value))).toThrow(/not a whole number/);
-  });
-
-  it('throws on success: false', () => {
-    expect(() =>
-      countFrom({ ...counted(3), success: false, errors: [] }),
-    ).toThrow('the D1 query says success: false');
-  });
-
-  it('throws when the statement itself failed', () => {
-    const answer = counted(3);
-    answer.result[0].success = false;
-    expect(() => countFrom(answer)).toThrow(/statement failed/);
-  });
-
-  it.each([
-    ['no statement', { success: true, result: [] }, /answered no statement/],
-    [
-      'no rows',
-      { success: true, result: [{ success: true, results: [] }] },
-      /exactly one row/,
-    ],
-    [
-      'two rows',
-      {
-        success: true,
-        result: [
-          {
-            success: true,
-            results: [{ 'count(*)': 1 }, { 'count(*)': 2 }],
-          },
-        ],
-      },
-      /exactly one row/,
-    ],
-  ])('throws on %s', (_, answer, message) => {
-    expect(() => countFrom(answer)).toThrow(message);
   });
 });
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TestModule } from 'vitest/node';
 import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
+import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import LoadReporter from '../load-reporter';
@@ -105,6 +106,7 @@ describe('the reporters of each suite', () => {
     ['guards', guards],
     ['integration', integration],
     ['simulation', simulation],
+    ['logs', logs],
   ] as const)(
     'give the %s suite the verbose listing, then its loading (#696)',
     (suite, config) => {

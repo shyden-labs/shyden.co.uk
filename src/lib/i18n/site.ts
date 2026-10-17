@@ -473,7 +473,7 @@ export const siteVi: SiteStrings = {
     shytalkFeature2: 'Xin một chỗ ngồi, hoặc cứ nghe cho đến khi bạn sẵn sàng',
     shytalkFeature3: 'Buổi học miễn phí cùng giáo viên thật',
     shytalkFeature4:
-      'Có kiểm duyệt, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện',
+      'Có người điều hành, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện',
     shytalkShotAlt:
       'Ứng dụng ShyTalk trên điện thoại, hiển thị một phòng âm thanh trực tuyến với những người trên các chỗ ngồi và khung trò chuyện của phòng ở bên dưới.',
     visitShytalk: 'Truy cập trang ShyTalk',
@@ -495,7 +495,7 @@ export const siteVi: SiteStrings = {
     workCalculatorsTitle: 'Máy tính YeeTalk',
     workCalculatorsBody:
       'Tính số xu, bean và giá trị quà tặng đằng sau mục tiêu glory points của YeeTalk, hoặc một món quà mang lại gì sau khi được nhận.',
-    openCalculators: 'Mở các máy tính',
+    openCalculators: 'Mở các công cụ tính',
     workClassroomTitle: 'Trình tạo nhóm trong lớp học',
     workClassroomBody:
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
@@ -615,7 +615,8 @@ export const siteTh: SiteStrings = {
     shytalkFeature1: 'ห้องเสียงสดรองรับได้สูงสุดแปดที่นั่ง',
     shytalkFeature2: 'ขอที่นั่ง หรือจะฟังไปก่อนจนกว่าคุณจะพร้อม',
     shytalkFeature3: 'บทเรียนฟรีกับครูตัวจริง',
-    shytalkFeature4: 'มีการดูแล แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
+    shytalkFeature4:
+      'มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
     shytalkShotAlt:
       'แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง',
     visitShytalk: 'เยี่ยมชมเว็บไซต์ ShyTalk',
@@ -636,7 +637,7 @@ export const siteTh: SiteStrings = {
     toolBadge: 'พร้อมใช้งาน',
     workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
     workCalculatorsBody:
-      'คำนวณจำนวนเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว',
+      'คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว',
     openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
@@ -647,7 +648,7 @@ export const siteTh: SiteStrings = {
   },
   notFound: {
     title: 'ไม่พบหน้า — Shyden',
-    description: 'หน้าที่คุณกำลังค้นหาไม่มีอยู่',
+    description: 'หน้าเว็บที่คุณกำลังค้นหาไม่มีอยู่',
     heading: 'ไม่พบหน้า',
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
