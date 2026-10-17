@@ -8,6 +8,7 @@ import {
   buildRoster,
   giveEveryoneASex,
   refuseFullscreen,
+  holdFirstGrantUntilTheNext,
   openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
@@ -235,11 +236,67 @@ test.describe('the projector view', () => {
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
   });
 
+  // #231. The other order of the same race, and the one a real Android phone
+  // gives: the first showing's grant lands only once the board is up again,
+  // just ahead of the second showing's own. The fullscreen it brings is the
+  // one the board on screen asked for, so the open showing keeps it: undoing
+  // it as a leftover took the document out of fullscreen under the second
+  // board, and the page's own `fullscreenchange` handler then closed that
+  // board with nobody asking. Measured on CPH2653: 7 of 40 runs of the
+  // Escape test below.
+  test('a grant that lands during the next showing leaves that showing open', async ({
+    page,
+  }) => {
+    // An iPhone has no element fullscreen at all, and neither has
+    // Playwright's mobile-safari: no `Element.prototype.requestFullscreen`
+    // (run 39066325735), so there is no grant to race and its board is the
+    // overlay. Asked of the engine, not of a project name, so an engine that
+    // has the call and refuses it still runs this and fails below.
+    test.skip(
+      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
+      'no element fullscreen on this engine (iPhone Safari): no grant to race',
+    );
+    await holdFirstGrantUntilTheNext(page);
+    await withGroups(page);
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board')).toBeHidden();
+    await clickable(page, '#cg-board-open');
+    const race = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __fullscreenRace: { answered: number; exitsAsked: number };
+            }
+          ).__fullscreenRace,
+      );
+    const { exitsAsked: exitsBefore } = await race();
+
+    await page.getByRole('button', { name: 'Full screen' }).click();
+    // Both answers delivered, and the page's handler for each has run.
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { __fullscreenRace: { answered: number } })
+          .__fullscreenRace.answered === 2,
+    );
+    // The page asked for no exit while its board was up, so nothing is left
+    // in flight to close it: checked here because the close it caused came
+    // one frame after the answers, where a visibility check alone could pass
+    // before it landed.
+    expect((await race()).exitsAsked).toBe(exitsBefore);
+    await expect(page.locator('#cg-board')).toBeVisible();
+    await expect(page.locator('#cg-board #cg-results')).toBeVisible();
+    // …and it is still FULLSCREEN, which is what the teacher asked for. On
+    // an engine that refused both requests the lines above would pass with
+    // nothing raced, so this is also the proof that the race was run.
+    expect(
+      await page.evaluate(() => document.fullscreenElement?.id ?? null),
+    ).toBe('cg-board');
+  });
+
   // The claim is ESCAPE EXITS, twice over: straight away, and again after
-  // the board has been sitting there. The bar's own fading is proven by the
-  // fade tests above and is deliberately NOT a precondition here -- it did
-  // not fire on a second showing on a real Android phone, and requiring it
-  // made this test fail for a reason that has nothing to do with Escape.
+  // the board has been sitting there.
   test('Escape exits, on a fresh board and on a settled one', async ({
     page,
   }) => {
@@ -248,19 +305,18 @@ test.describe('the projector view', () => {
       await page.getByRole('button', { name: 'Full screen' }).click();
       await expect(page.locator('#cg-board')).toBeVisible();
       if (settle) {
-        // "Settled" means the board has ARRIVED and painted -- its content
-        // is on it and a frame has gone by. Deliberately NOT "the reveal
-        // finished": on a real Android phone the last group's `revealed`
-        // does not reliably land on a SECOND showing, and requiring it made
-        // this test fail for a reason with nothing to do with Escape. The
-        // reveal has its own tests, and they pass on that phone.
+        // "Settled" means the reveal has finished and the bar has faded.
+        // Both were once dropped from here because neither landed on a
+        // SECOND showing on a real Android phone. The cause was #231: the
+        // first showing's late grant was undone under the second board,
+        // which then closed itself, and a closed board neither finishes a
+        // reveal nor fades its bar. With that fixed, both returned and
+        // passed 20 of 20 on that phone.
         await expect(page.locator('#cg-board #cg-results')).toBeVisible();
-        await page.evaluate(
-          () =>
-            new Promise((resolve) =>
-              requestAnimationFrame(() => resolve(null)),
-            ),
+        await expect(page.locator('#cg-board .group').last()).toHaveClass(
+          /revealed/,
         );
+        await expectFaded(page);
       }
       await page.keyboard.press('Escape');
       await expect(page.locator('#cg-board')).toBeHidden();
