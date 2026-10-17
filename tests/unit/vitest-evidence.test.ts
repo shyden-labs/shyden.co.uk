@@ -152,6 +152,30 @@ describe('playwrightShapeOfVitest: a Vitest run read as a Playwright report', ()
     );
   });
 
+  it('rounds a test duration to the whole milliseconds Playwright reports', () => {
+    expect(
+      read(vitestReport([assertion({ duration: 1559.7103330000027 })]))[0]
+        .duration,
+    ).toBe(1560);
+  });
+
+  it('refuses a file with no end time, naming it', () => {
+    expect(() =>
+      read(
+        vitestReport(undefined, {
+          testResults: [
+            {
+              name: `${ROOT}/tests/device/ios/journeys.journey.ts`,
+              assertionResults: [assertion()],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(
+      `${ROOT}/tests/device/ios/journeys.journey.ts has no endTime, so the run's wall clock is unknown`,
+    );
+  });
+
   it('refuses a file outside the root it was told', () => {
     expect(() =>
       read(
@@ -165,6 +189,51 @@ describe('playwrightShapeOfVitest: a Vitest run read as a Playwright report', ()
         }),
       ),
     ).toThrow('/elsewhere/x.journey.ts is not under /repo');
+  });
+});
+
+describe("the page's summary of a Vitest run (#354 AC2)", () => {
+  // The page's tiles read Playwright's stats: passed, failed, flaky, skipped
+  // and the wall clock. A real iPhone run of 80 passing tests rendered as
+  // "0 passed ... 0.0s" until the adapter wrote them (measured 2026-10-18).
+  const stats = (report: unknown) =>
+    playwrightShapeOfVitest(report, { project: PROJECT, root: ROOT }).stats;
+
+  it('counts each test once, by the outcome its dot shows', () => {
+    expect(
+      stats(
+        // Three counts that differ, so no outcome can stand in for another.
+        vitestReport([
+          assertion({ title: 'a' }),
+          assertion({ title: 'b' }),
+          assertion({ title: 'c' }),
+          assertion({ title: 'd', status: 'failed' }),
+          assertion({ title: 'e', status: 'failed' }),
+          assertion({ title: 'f', status: 'todo', duration: null }),
+        ]),
+      ),
+    ).toMatchObject({ expected: 3, unexpected: 2, flaky: 0, skipped: 1 });
+  });
+
+  it('gives the wall clock from the run start to the last file to end, in whole milliseconds', () => {
+    const file = (name: string, endTime: number) => ({
+      name: `${ROOT}/tests/device/ios/${name}`,
+      startTime: START_MS,
+      endTime,
+      assertionResults: [assertion()],
+    });
+    expect(
+      stats(
+        vitestReport(undefined, {
+          // The last to end is neither the first file listed nor the last.
+          testResults: [
+            file('early.journey.ts', START_MS + 5_000),
+            file('late.journey.ts', START_MS + 65_287.4),
+            file('middle.journey.ts', START_MS + 30_000),
+          ],
+        }),
+      ).duration,
+    ).toBe(65_287);
   });
 });
 
