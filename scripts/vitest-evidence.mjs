@@ -14,7 +14,8 @@
  * its test name the same journey by construction.
  *
  * Refuses rather than guesses: a status it does not know, a run test with no
- * duration, a file outside the root, a report with no start time.
+ * duration, a file outside the root or with no end time, a report with no
+ * start time.
  */
 import path from 'node:path';
 
@@ -28,7 +29,7 @@ const RAN = new Set(['passed', 'failed']);
  * @param {{ project: string, root: string }} options `project` names the leg
  *   on the page; `root` is the repository, so a file reads as Playwright's
  *   does, relative to it.
- * @returns {{ stats: { startTime: string }, suites: any[] }}
+ * @returns {{ stats: ShapedStats, suites: any[] }}
  */
 export const playwrightShapeOfVitest = (report, { project, root }) => {
   const r = /** @type {Record<string, unknown>} */ (
@@ -42,10 +43,17 @@ export const playwrightShapeOfVitest = (report, { project, root }) => {
   if (!Array.isArray(r.testResults))
     throw new Error('the Vitest report has no testResults list');
 
+  const outcomes = { passed: 0, failed: 0, skipped: 0 };
+  let lastEnd = r.startTime;
   const suites = r.testResults.map((/** @type {any} */ file) => {
     const relative = path.relative(root, String(file.name));
     if (relative.startsWith('..') || path.isAbsolute(relative))
       throw new Error(`${file.name} is not under ${root}`);
+    if (typeof file.endTime !== 'number' || !Number.isFinite(file.endTime))
+      throw new Error(
+        `${file.name} has no endTime, so the run's wall clock is unknown`,
+      );
+    lastEnd = Math.max(lastEnd, file.endTime);
     /** @type {any} */
     const fileSuite = {
       title: relative,
@@ -62,7 +70,9 @@ export const playwrightShapeOfVitest = (report, { project, root }) => {
         if (typeof a.duration !== 'number')
           throw new Error(`${journey}: a ${a.status} test carries no duration`);
         status = a.status;
-        duration = a.duration;
+        // Vitest measures in fractions of a millisecond; Playwright, whose
+        // shape the page reads, reports whole ones.
+        duration = Math.round(a.duration);
       } else if (NOT_RUN.has(a.status)) {
         status = 'skipped';
         duration = 0;
@@ -70,6 +80,7 @@ export const playwrightShapeOfVitest = (report, { project, root }) => {
         throw new Error(
           `${journey}: Vitest status ${JSON.stringify(a.status)} is not one this reader knows`,
         );
+      outcomes[/** @type {'passed' | 'failed' | 'skipped'} */ (status)] += 1;
       // Down the describes, making each one the first time it is met, so two
       // tests in one describe share its suite as Playwright's do.
       let suite = fileSuite;
@@ -96,5 +107,28 @@ export const playwrightShapeOfVitest = (report, { project, root }) => {
     }
     return fileSuite;
   });
-  return { stats: { startTime: new Date(r.startTime).toISOString() }, suites };
+  // The page's summary tiles read these, as they read a Playwright run's.
+  // Vitest retries nothing here, so nothing is flaky.
+  return {
+    stats: {
+      startTime: new Date(r.startTime).toISOString(),
+      duration: Math.round(lastEnd - r.startTime),
+      expected: outcomes.passed,
+      unexpected: outcomes.failed,
+      flaky: 0,
+      skipped: outcomes.skipped,
+    },
+    suites,
+  };
 };
+
+/**
+ * @typedef {{
+ *   startTime: string,
+ *   duration: number,
+ *   expected: number,
+ *   unexpected: number,
+ *   flaky: number,
+ *   skipped: number,
+ * }} ShapedStats
+ */
