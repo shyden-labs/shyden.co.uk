@@ -8,6 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = getSiteStrings(lang).calculators;
 const g = t.glory;
+const gift = t.gift;
 ---
 
 <BaseLayout title={t.title} description={t.description} lang={lang}>
@@ -27,6 +28,7 @@ const g = t.glory;
     <p class="lead">{t.lead}</p>
     <p class="jump">
       <a href="#glory-points">{g.heading}</a>
+      <a href="#gift-value">{gift.heading}</a>
     </p>
     <section id="glory-points" aria-labelledby="glory-heading">
       <h2 id="glory-heading" class="section-heading">
@@ -66,6 +68,39 @@ const g = t.glory;
       </div>
       <p class="assumptions">{g.assumptions}</p>
     </section>
+    <section id="gift-value" aria-labelledby="gift-heading">
+      <h2 id="gift-heading" class="section-heading">
+        {gift.heading}
+      </h2>
+      <div class="how-to">
+        <h3 id="gift-how-to-heading">{gift.howToHeading}</h3>
+        <ol aria-labelledby="gift-how-to-heading">
+          {gift.howToSteps.map((step) => (
+            <li>{step}</li>
+          ))}
+        </ol>
+      </div>
+      <div class="card">
+        <label for="gift-input">{gift.inputLabel}</label>
+        <input
+          id="gift-input"
+          name="gift"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          aria-describedby="gift-error"
+        />
+        <button id="gift-submit" type="button">
+          {gift.calculate}
+        </button>
+        <p id="gift-error" class="error" role="alert" aria-live="assertive"></p>
+        <p id="gift-result" class="result" aria-live="polite"></p>
+        <noscript>
+          <p class="error">{t.needsJs}</p>
+        </noscript>
+      </div>
+      <p class="assumptions">{gift.assumptions}</p>
+    </section>
   </section>
 </BaseLayout>
 <script>
@@ -98,8 +133,17 @@ const g = t.glory;
     border-color: var(--accent);
     color: var(--accent-ink);
   }
+  /* gap, never a space between the links: a flex container discards it. */
   .jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.5rem;
     margin: 0 0 1.5rem;
+  }
+  /* The second calculator sits below the first; the jump links land on each
+     section's own top, so the gap belongs to the section, not the card. */
+  section section + section {
+    margin-top: 2.5rem;
   }
   .jump a {
     display: inline-flex;
