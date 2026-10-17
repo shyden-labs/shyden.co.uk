@@ -148,6 +148,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'i18n-google-read-back.mjs takes no arguments',
   },
+  // Refuses an unknown flag before it reads the store, a key or the
+  // network, so the probe writes nothing and sends nothing (#754 AC10).
+  'i18n-second-read.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: "Unknown option '--no-such-flag'",
+  },
   // Refuses an argument before it reads the store, so the probe writes
   // nothing (#754).
   'i18n-read-back-verdicts.mjs': {

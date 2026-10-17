@@ -281,7 +281,8 @@ export const fromGoogleHtml = (reading: string): string =>
       return NAMED_ENTITIES[name.toLowerCase()] ?? entity;
     });
 
-const record = (value: unknown): Record<string, unknown> =>
+/** A value as a plain object, or an empty one: read fields, never trust them. */
+export const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? { ...value }
     : {};

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { searched } from '../source-files';
+import { floorBreach } from '../floors';
 import {
   GOOGLE_ENGINE,
   type ReadBackStore,
@@ -97,7 +99,13 @@ describe('writersOf: every writer of every line saying a text', () => {
   });
 
   it('a text no line says has no writer', () => {
-    expect(writersOf('th', 'ไม่มี', units, drafts)).toEqual([]);
+    expect(
+      searched(writersOf('th', 'ไม่มี', units, drafts), {
+        of: units,
+        what: 'th fixture lines',
+      }),
+    ).toEqual([]);
+    expect(floorBreach('readers/fixture-lines', units.length)).toBeUndefined();
   });
 });
 
@@ -272,20 +280,28 @@ describe('readerProblems: what a store holds that it must not', () => {
 
 describe('addReadings: a run saves only independent readings', () => {
   it('saves a reading with the writers of its line', () => {
-    const { store, refused } = addReadings(
-      empty(),
-      'th',
-      'Azure Translator',
-      [{ text: 'เพิ่มนักเรียน', english: 'Add a student' }],
-      units,
-      drafts,
-    );
-    expect(refused).toEqual([]);
-    expect(store.readings.th).toEqual({
-      เพิ่มนักเรียน: {
-        writers: ['DeepL'],
-        by: { 'Azure Translator': 'Add a student' },
+    expect(
+      addReadings(
+        empty(),
+        'th',
+        'Azure Translator',
+        [{ text: 'เพิ่มนักเรียน', english: 'Add a student' }],
+        units,
+        drafts,
+      ),
+    ).toEqual({
+      store: {
+        readings: {
+          ...empty().readings,
+          th: {
+            เพิ่มนักเรียน: {
+              writers: ['DeepL'],
+              by: { 'Azure Translator': 'Add a student' },
+            },
+          },
+        },
       },
+      refused: [],
     });
   });
 

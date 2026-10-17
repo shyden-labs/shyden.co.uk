@@ -4,6 +4,7 @@ import {
   READ_ORDER,
   WRITERS,
   fromGoogleHtml,
+  record,
   usableWriters,
   writerOf,
   type ReadBackStore,
@@ -82,11 +83,6 @@ export interface SecondStore {
     Record<ReadLocale, Readonly<Record<string, SecondReading>>>
   >;
 }
-
-const record = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? { ...value }
-    : {};
 
 const isObject = (value: unknown): boolean =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

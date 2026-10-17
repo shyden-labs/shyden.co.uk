@@ -275,4 +275,4 @@ async function main() {
   );
 }
 
-main().catch((error) => die(messageOf(error)));
+if (import.meta.main) await main().catch((error) => die(messageOf(error)));
