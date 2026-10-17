@@ -176,8 +176,15 @@ test.describe('the 404 head', () => {
  * Without it a mobile browser lays the page out at a legacy desktop width
  * (980px on the Android phone, measured on `about:blank`, which has no tag),
  * and the visitor sees every page zoomed out. No test asserted it before #233.
+ *
+ * `interactive-widget=resizes-content` (#807, operator 2026-10-18): Android
+ * Chrome's keyboard otherwise covers the bottom of the page without shrinking
+ * it, and `/classroom-groups`' docked Make Groups bar sat hidden behind the
+ * keyboard while a teacher typed (bar at 703 px, 471 px left visible, measured
+ * on the phone). Safari ignores the key.
  */
-const DEVICE_WIDTH = 'width=device-width, initial-scale=1';
+const DEVICE_WIDTH =
+  'width=device-width, initial-scale=1, interactive-widget=resizes-content';
 
 test.describe('every published page', () => {
   // One test per published page (#422); `the published routes are the
