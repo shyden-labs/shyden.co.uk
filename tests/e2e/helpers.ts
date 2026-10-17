@@ -447,6 +447,74 @@ export const refuseFullscreen = (target: Page | BrowserContext) =>
   });
 
 /**
+ * Answer the first fullscreen request only once the second one is granted.
+ *
+ * The order a real Android phone gives (#231): the board is opened, left with
+ * Escape before its grant lands, and opened again, and only then do both
+ * grants arrive, the first one first. Measured on CPH2653 in 7 of 40 runs of
+ * the Escape test, where the document stayed out of fullscreen through the
+ * whole first showing.
+ *
+ * So the first request never reaches the browser: its promise is parked, and
+ * the second request's real grant settles it, first, and then the second's
+ * own. The page sees exactly the phone's order, on any engine that grants
+ * fullscreen. Asking the browser for both was tried first, and on the phone
+ * the first grant sometimes landed while the board was closed, with its
+ * answer still parked, so the page could not undo it and the document sat in
+ * fullscreen over a hidden board, swallowing every click: a state this helper
+ * made, not one the page can reach.
+ *
+ * `window.__fullscreenRace` counts what a test waits on instead of a clock:
+ * `answered` rises only after the page's own handler for that answer has
+ * run (registered a microtask after the page registers its own), and
+ * `exitsAsked` counts every `exitFullscreen` the page calls.
+ */
+export const holdFirstGrantUntilTheNext = (page: Page) =>
+  page.addInitScript(() => {
+    const race = { answered: 0, exitsAsked: 0 };
+    (window as unknown as { __fullscreenRace: typeof race }).__fullscreenRace =
+      race;
+    const realExit = Document.prototype.exitFullscreen;
+    Document.prototype.exitFullscreen = function () {
+      race.exitsAsked += 1;
+      return realExit.call(this);
+    };
+    const real = Element.prototype.requestFullscreen;
+    const counted = (answer: Promise<void>) => {
+      queueMicrotask(() => {
+        const done = () => {
+          race.answered += 1;
+        };
+        answer.then(done, done);
+      });
+      return answer;
+    };
+    let first: { grant: () => void; refuse: (error: unknown) => void } = {
+      grant: () => {},
+      refuse: () => {},
+    };
+    let calls = 0;
+    Element.prototype.requestFullscreen = function (options) {
+      calls += 1;
+      if (calls === 1) {
+        return counted(
+          new Promise<void>((grant, refuse) => {
+            first = { grant, refuse };
+          }),
+        );
+      }
+      const granted = real.call(this, options);
+      if (calls === 2) {
+        // Settled from the grant's own reaction, registered before the
+        // second answer's, so the first showing's handler runs first.
+        granted.then(first.grant, first.refuse);
+        return counted(granted.then(() => undefined));
+      }
+      return granted;
+    };
+  });
+
+/**
  * The contrast ratio the browser actually PAINTS for an element's text.
  *
  * Not the token values: it resolves `opacity` and walks up for the first
