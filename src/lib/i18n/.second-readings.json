@@ -310,12 +310,6 @@
         "writers": ["DeepL"],
         "by": { "Azure Translator": "YeeTalk Calculator" }
       },
-      "คำนวณจำนวนเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
-        "writers": ["edited after DeepL"],
-        "by": {
-          "Azure Translator": "Calculate the number of beans and the value of the gift behind YeeTalk's glory points goal, or what you get from a gift once earned."
-        }
-      },
       "เปิดเครื่องคำนวณ": {
         "writers": ["DeepL"],
         "by": { "Azure Translator": "Open the calculator." }
@@ -329,6 +323,12 @@
       "เครื่องคำนวณ YeeTalk — Shyden": {
         "writers": ["DeepL"],
         "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
+      },
+      "คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Calculate the number of coins, the number of beans, and the value of the gift behind YeeTalk's glory points goal, or what you get from a gift once earned."
+        }
       }
     },
     "id": {
@@ -775,12 +775,6 @@
           "Azure Translator": "Ask for a seat, or just listen until you're ready"
         }
       },
-      "Có kiểm duyệt, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện": {
-        "writers": ["edited after DeepL"],
-        "by": {
-          "Azure Translator": "Censored, age-segregated, and built to be friendly"
-        }
-      },
       "Không có quảng cáo, không có bộ hẹn giờ năng lượng, không có tiến trình phải trả phí": {
         "writers": ["DeepL"],
         "by": {
@@ -797,10 +791,6 @@
         "writers": ["DeepL"],
         "by": { "Azure Translator": "YeeTalk Calculator" }
       },
-      "Mở các máy tính": {
-        "writers": ["DeepL"],
-        "by": { "Azure Translator": "Open the computer" }
-      },
       "Máy tính YeeTalk — Shyden": {
         "writers": ["DeepL"],
         "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
@@ -811,7 +801,17 @@
           "Azure Translator": "Assuming each point corresponds to 1 coin, each bean corresponds to 0.9 coins, and the gift is converted into beans at a rate of 40%."
         }
       },
-      "có": { "writers": ["DeepL"], "by": { "Azure Translator": "Yes" } }
+      "có": { "writers": ["DeepL"], "by": { "Azure Translator": "Yes" } },
+      "Có người điều hành, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Moderated, age-segregated, and built to be friendly"
+        }
+      },
+      "Mở các công cụ tính": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Open the calculator" }
+      }
     }
   }
 }

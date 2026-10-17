@@ -2353,12 +2353,6 @@
         "verdict": "ambiguous",
         "note": "Thai has no plural; calculators"
       },
-      "คำนวณจำนวนเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
-        "english": "Calculate the number of bean coins and the value of the gift behind a YeeTalk glory points goal, or what you get from a gift once received.",
-        "writers": ["edited after DeepL"],
-        "verdict": "ambiguous",
-        "note": "a space-separated list read as 'bean coins'; the th lists coins, beans and gift value"
-      },
       "วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป": {
         "english": "Enter your student list and get a fair, random group in seconds. Made for teachers. Free forever.",
         "writers": ["edited after DeepL"],
@@ -2572,6 +2566,11 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Corrected #754 with the button (สับใหม่ to สุ่มใหม่, operator ruling 2026-10-16); DeepL reads: refresh the list before displaying it"
+      },
+      "คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
+        "english": "Calculate the number of coins, beans, and gift value behind a YeeTalk glory points goal, or what you get from a gift once received.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
       }
     },
     "id": {
@@ -4992,12 +4991,6 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
-      "Có kiểm duyệt, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện": {
-        "english": "It has censorship, age segregation, and is built to be consistently user-friendly.",
-        "writers": ["edited after DeepL"],
-        "verdict": "ambiguous",
-        "note": "kiểm duyệt (moderated) read in its 'censorship' sense"
-      },
       "Ứng dụng ShyTalk trên điện thoại, hiển thị một phòng âm thanh trực tuyến với những người trên các chỗ ngồi và khung trò chuyện của phòng ở bên dưới.": {
         "english": "The ShyTalk app on your phone displays an online audio room with people seated and the room's chat window at the bottom.",
         "writers": ["edited after DeepL"],
@@ -5060,12 +5053,6 @@
         "english": "Calculate the number of coins, beans, and gift value behind YeeTalk's glory points goal, or what a gift provides after it's received.",
         "writers": ["DeepL"],
         "verdict": "agrees"
-      },
-      "Mở các máy tính": {
-        "english": "Turn on the computers.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "Mở các máy tính (open the calculators) read as 'turn on the computers'"
       },
       "Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.": {
         "english": "Paste your class list and get randomly assigned to fair groups in seconds. For teachers, free forever.",
@@ -5280,6 +5267,17 @@
       },
       "{names} đã gia nhập một nhóm các bạn nam vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.": {
         "english": "{names} joined a group of boys because there weren't enough girls to form a separate group. This is simply a matter of dividing the group, not a mistake that needs correcting.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
+      },
+      "Có người điều hành, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện": {
+        "english": "It has administrators, is divided by age group, and is designed to be consistently friendly.",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "người điều hành (people who run it, the moderators) read as \"administrators\": human oversight is kept and the censorship sense of the old line is gone; Azure reads \"Moderated\""
+      },
+      "Mở các công cụ tính": {
+        "english": "Open the calculator tools",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       }
