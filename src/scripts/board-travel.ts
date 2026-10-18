@@ -106,7 +106,7 @@ export async function travel(
         },
         { opacity: 1, transform: 'none' },
       ],
-      { ...timing, easing: EASE },
+      { ...timing, delay: timing.delay + 50, easing: EASE },
     );
     const hide = chip.animate(
       [{ visibility: 'hidden' }, { visibility: 'hidden' }],
