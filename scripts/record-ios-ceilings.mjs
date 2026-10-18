@@ -1,6 +1,7 @@
 /**
- * Records `tests/ios-ceilings.json`: how many tests and assertions each file
- * under `tests/device/ios/` writes (#858). The ceilings only ever fall. The
+ * Records `tests/ios-ceilings.json`: how many tests, assertions and indirect
+ * checks (calls to a helper that asserts or throws, and throws, inside a test
+ * or hook) each file under `tests/device/ios/` writes (#858). The ceilings only ever fall. The
  * first record takes the figures as measured; after that a fall is written
  * and a rise refuses the whole record, naming it, because the only way a
  * count rises is a check added to an iPhone-only file, and a phone check is
@@ -37,7 +38,7 @@ async function main() {
     const core = /** @type {any} */ (
       await server.ssrLoadModule('/tests/ios-ceilings.ts')
     );
-    const reading = core.judgeSources(core.readIosSources());
+    const reading = core.judgeSources(core.readIosSources(), core.readModule);
     const recorded = existsSync(core.CEILINGS_FILE)
       ? core.readCeilings()
       : undefined;

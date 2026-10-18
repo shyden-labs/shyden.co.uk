@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { posix } from 'node:path';
 import ts from 'typescript';
 import { filesUnder } from './source-files';
 import { withoutTsComments } from './unit/source-text';
@@ -19,6 +20,12 @@ import { withoutTsComments } from './unit/source-text';
  * only where a check is spelled inside a string, and a difference is a
  * finding. A name that would hide a check from both (an aliased or namespace
  * import of vitest, a local bound to a check) is refused by `hiddenCheckNames`.
+ *
+ * A check need not be written as `expect` (Shyden, 2026-10-19: "count calls
+ * to shared check helpers too"): `indirectChecksOf` counts each call, inside a
+ * test or hook, to a function that asserts or throws, followed into every
+ * module it reaches, and each `throw` written there, read through the text
+ * and the parse as well.
  */
 
 export interface CheckCounts {
@@ -26,9 +33,9 @@ export interface CheckCounts {
   readonly assertions: number;
 }
 
-export type Ceilings = Readonly<Record<string, CheckCounts>>;
+export type Ceilings = Readonly<Record<string, FileChecks>>;
 
-export const KINDS = ['tests', 'assertions'] as const;
+export const KINDS = ['tests', 'assertions', 'indirectChecks'] as const;
 
 export const CEILINGS_FILE = 'tests/ios-ceilings.json';
 
@@ -130,29 +137,341 @@ export function hiddenCheckNames(source: string): string[] {
   return hidden;
 }
 
+/** The names a hook is declared by: its body runs around every test. */
+const HOOK_NAMES = new Set([
+  'beforeAll',
+  'beforeEach',
+  'afterAll',
+  'afterEach',
+]);
+
+/** A module's text by its repo-relative path, or undefined when there is none. */
+export type ModuleReader = (path: string) => string | undefined;
+
+interface ModuleFacts {
+  /** Each function the module declares at its top level, by name. */
+  readonly functions: Map<string, ts.Node>;
+  /** Each name bound by a relative import or re-export, to where it comes from. */
+  readonly imports: Map<
+    string,
+    { specifier: string; module?: string; name: string }
+  >;
+  /** Each namespace import of a relative module. */
+  readonly namespaces: Map<string, { specifier: string; module?: string }>;
+  /** `export { local as exported }`, by exported name. */
+  readonly aliases: Map<string, string>;
+}
+
+/** Where a relative import lands, tried as written, then with `.ts`, then as a folder. */
+function resolveModule(
+  from: string,
+  specifier: string,
+  read: ModuleReader,
+): string | undefined {
+  const base = posix.join(posix.dirname(from), specifier);
+  return [base, `${base}.ts`, `${base}/index.ts`].find(
+    (path) => read(path) !== undefined,
+  );
+}
+
+const isFunction = (node: ts.Node | undefined): node is ts.Expression =>
+  node !== undefined &&
+  (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
+
+function factsOf(
+  path: string,
+  source: string,
+  read: ModuleReader,
+): ModuleFacts {
+  const functions = new Map<string, ts.Node>();
+  const imports = new Map<
+    string,
+    { specifier: string; module?: string; name: string }
+  >();
+  const namespaces = new Map<string, { specifier: string; module?: string }>();
+  const aliases = new Map<string, string>();
+  for (const statement of parse(source).statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name)
+      functions.set(statement.name.text, statement);
+    if (ts.isVariableStatement(statement))
+      for (const declaration of statement.declarationList.declarations)
+        if (
+          ts.isIdentifier(declaration.name) &&
+          isFunction(declaration.initializer)
+        )
+          functions.set(declaration.name.text, declaration.initializer);
+    const specifier =
+      (ts.isImportDeclaration(statement) ||
+        ts.isExportDeclaration(statement)) &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text
+        : undefined;
+    const relative = specifier?.startsWith('.') ? specifier : undefined;
+    const module = relative ? resolveModule(path, relative, read) : undefined;
+    if (ts.isImportDeclaration(statement) && relative) {
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings))
+        namespaces.set(bindings.name.text, { specifier: relative, module });
+      if (bindings && ts.isNamedImports(bindings))
+        for (const element of bindings.elements)
+          imports.set(element.name.text, {
+            specifier: relative,
+            module,
+            name: (element.propertyName ?? element.name).text,
+          });
+    }
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    )
+      for (const element of statement.exportClause.elements) {
+        const local = (element.propertyName ?? element.name).text;
+        if (relative)
+          imports.set(element.name.text, {
+            specifier: relative,
+            module,
+            name: local,
+          });
+        else aliases.set(element.name.text, local);
+      }
+  }
+  return { functions, imports, namespaces, aliases };
+}
+
+/**
+ * Which functions check: those whose body asserts, throws, or calls a function
+ * that does, followed through relative imports, re-exports and namespace
+ * imports into every module they reach. A cycle is read as not checking until
+ * it is shown to (a function that only checks through itself never runs one).
+ */
+class CheckingFunctions {
+  private readonly facts = new Map<string, ModuleFacts>();
+  private readonly verdicts = new Map<string, boolean | undefined>();
+
+  constructor(private readonly read: ModuleReader) {}
+
+  factsOf(path: string, source?: string): ModuleFacts | undefined {
+    const known = this.facts.get(path);
+    if (known) return known;
+    const text = source ?? this.read(path);
+    if (text === undefined) return undefined;
+    const facts = factsOf(path, text, this.read);
+    this.facts.set(path, facts);
+    return facts;
+  }
+
+  /** Whether `name` in `path` names a checking function; undefined when it cannot be followed. */
+  checks(path: string, name: string): boolean | undefined {
+    const key = `${path}#${name}`;
+    if (this.verdicts.has(key)) return this.verdicts.get(key) ?? false;
+    this.verdicts.set(key, false);
+    const verdict = this.decide(path, name);
+    this.verdicts.set(key, verdict);
+    return verdict;
+  }
+
+  private decide(path: string, name: string): boolean | undefined {
+    const facts = this.factsOf(path);
+    if (!facts) return undefined;
+    const declared = facts.functions.get(name);
+    if (declared) return this.bodyChecks(path, declared);
+    const alias = facts.aliases.get(name);
+    if (alias !== undefined && alias !== name) return this.checks(path, alias);
+    const imported = facts.imports.get(name);
+    if (imported)
+      return imported.module
+        ? this.checks(imported.module, imported.name)
+        : undefined;
+    return undefined;
+  }
+
+  /** Whether a call's callee, read in `path`, checks; null for a name this reader does not follow. */
+  calleeChecks(
+    path: string,
+    callee: ts.Expression,
+  ): boolean | null | undefined {
+    const chain = calleeChain(callee);
+    const facts = this.factsOf(path);
+    if (!chain || !facts) return null;
+    if (chain.length === 1) {
+      const [name] = chain;
+      if (
+        facts.functions.has(name) ||
+        facts.imports.has(name) ||
+        facts.aliases.has(name)
+      )
+        return this.checks(path, name);
+      return null;
+    }
+    const namespace =
+      chain.length === 2 ? facts.namespaces.get(chain[0]) : undefined;
+    if (namespace)
+      return namespace.module
+        ? this.checks(namespace.module, chain[1])
+        : undefined;
+    return null;
+  }
+
+  bodyChecks(path: string, body: ts.Node): boolean {
+    let found = false;
+    const visit = (node: ts.Node): void => {
+      if (found) return;
+      if (ts.isThrowStatement(node)) found = true;
+      else if (ts.isCallExpression(node)) {
+        const chain = calleeChain(node.expression);
+        if (chain && isAssertion(chain)) found = true;
+        else if (this.calleeChecks(path, node.expression) === true)
+          found = true;
+      }
+      if (!found) ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(body, visit);
+    return found;
+  }
+}
+
+export interface IndirectChecks {
+  /** Calls to a checking helper, and throws, inside test and hook bodies: what the ceiling holds. */
+  readonly inBodies: number;
+  /** The same, over the whole file, read from the parse. */
+  readonly parsedWhole: number;
+  /** The same, over the whole file, read from the comment-stripped text. */
+  readonly textWhole: number;
+  /** What `inBodies` counted, one entry per site: the callee as written, or `throw`. */
+  readonly counted: string[];
+  /** Called names imported from a relative module this reader cannot follow. */
+  readonly refusals: string[];
+}
+
+const escapeRegex = (text: string): string =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The checks `source` (at `file`) makes other than by `expect` or `assert`
+ * (#858, Shyden 2026-10-19: "count calls to shared check helpers too"): a
+ * call to a function that asserts or throws, wherever it is declared, and a
+ * `throw` written in a test or hook itself. A method called on an object
+ * (`session.open(...)`) is not followed: the harness drives the page that way.
+ */
+export function indirectChecksOf(
+  file: string,
+  source: string,
+  read: ModuleReader,
+): IndirectChecks {
+  const known = new CheckingFunctions(read);
+  const facts = known.factsOf(file, source);
+  if (!facts) throw new Error(`${file}: no facts`);
+  const refusals = new Set<string>();
+  let inBodies = 0;
+  let parsedWhole = 0;
+  const checkingNames = new Set<string>();
+  const checkingNamespaced = new Set<string>();
+  const countNode = (node: ts.Node): number => {
+    if (ts.isThrowStatement(node)) return 1;
+    if (
+      ts.isIdentifier(node) &&
+      ts.isCallExpression(node.parent) &&
+      node.parent.arguments.some((argument) => argument === node) &&
+      known.calleeChecks(file, node) === true
+    )
+      refusals.add(
+        `${file}: ${node.text} is passed by reference, so neither reader can count its calls: call it directly`,
+      );
+    if (!ts.isCallExpression(node)) return 0;
+    const chain = calleeChain(node.expression);
+    if (chain && (isAssertion(chain) || TEST_NAMES.has(chain[0]))) return 0;
+    const verdict = known.calleeChecks(file, node.expression);
+    if (verdict === undefined && chain) {
+      const origin =
+        facts.imports.get(chain[0]) ??
+        (chain.length === 2 ? facts.namespaces.get(chain[0]) : undefined);
+      refusals.add(
+        `${file}: ${chain.join('.')} is called, imported from '${origin?.specifier ?? '?'}', which cannot be followed`,
+      );
+    }
+    if (verdict !== true || !chain) return 0;
+    if (chain.length === 1) checkingNames.add(chain[0]);
+    else checkingNamespaced.add(chain.join('.'));
+    return 1;
+  };
+  const counted: string[] = [];
+  const inBody = (node: ts.Node): void => {
+    const found = countNode(node);
+    inBodies += found;
+    if (found > 0)
+      counted.push(
+        ts.isThrowStatement(node)
+          ? 'throw'
+          : (calleeChain((node as ts.CallExpression).expression) ?? []).join(
+              '.',
+            ),
+      );
+    ts.forEachChild(node, inBody);
+  };
+  const visit = (node: ts.Node): void => {
+    parsedWhole += countNode(node);
+    if (ts.isCallExpression(node)) {
+      const chain = calleeChain(node.expression);
+      if (chain && (TEST_NAMES.has(chain[0]) || HOOK_NAMES.has(chain[0])))
+        for (const argument of node.arguments)
+          if (isFunction(argument)) ts.forEachChild(argument, inBody);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parse(source));
+  const code = withoutTsComments(source);
+  const count = (pattern: string): number =>
+    code.match(new RegExp(pattern, 'g'))?.length ?? 0;
+  let textWhole = count('(?<![\\w$])throw\\b');
+  for (const name of checkingNames)
+    textWhole +=
+      count(`(?<![\\w$.])${escapeRegex(name)}\\s*\\(`) -
+      count(`\\bfunction\\s+${escapeRegex(name)}\\s*\\(`);
+  for (const dotted of checkingNamespaced) {
+    const [namespace, member] = dotted.split('.');
+    textWhole += count(
+      `(?<![\\w$.])${escapeRegex(namespace)}\\s*\\.\\s*${escapeRegex(member)}\\s*\\(`,
+    );
+  }
+  return { inBodies, parsedWhole, textWhole, counted, refusals: [...refusals] };
+}
+
+export interface FileChecks extends CheckCounts {
+  readonly indirectChecks: number;
+}
+
 export interface SourceReading {
-  /** Each file's counts, as the stripped text reads them. */
-  readonly counts: Map<string, CheckCounts>;
-  /** Files the two readers disagree on, and names that would hide a check. */
+  /** Each file's counts: tests and assertions from the text, indirect checks from the parse. */
+  readonly counts: Map<string, FileChecks>;
+  /** Files the two readers disagree on, names that would hide a check, and helpers not followed. */
   readonly refusals: string[];
 }
 
 /** Every file counted by both readers, with what neither can be trusted on. */
 export function judgeSources(
   sources: ReadonlyMap<string, string>,
+  read: ModuleReader,
 ): SourceReading {
-  const counts = new Map<string, CheckCounts>();
+  const counts = new Map<string, FileChecks>();
   const refusals: string[] = [];
   for (const [file, source] of sources) {
     const text = countChecks(source);
     const parsed = countChecksParsed(source);
-    counts.set(file, text);
+    const indirect = indirectChecksOf(file, source, read);
+    counts.set(file, { ...text, indirectChecks: indirect.inBodies });
     if (text.tests !== parsed.tests || text.assertions !== parsed.assertions)
       refusals.push(
         `${file}: the text counts ${text.tests} tests and ${text.assertions} assertions, the parse ${parsed.tests} and ${parsed.assertions}: a check is spelled where only one reader sees it`,
       );
+    if (indirect.textWhole !== indirect.parsedWhole)
+      refusals.push(
+        `${file}: the text counts ${indirect.textWhole} helper checks and throws, the parse ${indirect.parsedWhole}: a check is spelled where only one reader sees it`,
+      );
     for (const name of hiddenCheckNames(source))
       refusals.push(`${file}: ${name} would carry a check past both counts`);
+    refusals.push(...indirect.refusals);
   }
   return { counts, refusals };
 }
@@ -161,10 +480,7 @@ const ROSE =
   'A phone check is one test both phones run: put it in the shared spec under tests/e2e/ that Android and the iPhone both run (#839), never in an iPhone-only file.';
 const FELL = 'Lower it: npm run ceilings:record (it only ever lowers).';
 
-const ceilingOf = (
-  ceilings: Ceilings,
-  file: string,
-): CheckCounts | undefined =>
+const ceilingOf = (ceilings: Ceilings, file: string): FileChecks | undefined =>
   Object.hasOwn(ceilings, file) ? ceilings[file] : undefined;
 
 /**
@@ -173,7 +489,7 @@ const ceilingOf = (
  * a check back in up to the old figure. A file with no ceiling has 0.
  */
 export function ceilingBreaches(
-  now: ReadonlyMap<string, CheckCounts>,
+  now: ReadonlyMap<string, FileChecks>,
   ceilings: Ceilings,
 ): string[] {
   const files = [...new Set([...now.keys(), ...Object.keys(ceilings)])].sort();
@@ -203,7 +519,7 @@ export interface CeilingDecision {
  * since the only way a count rises is a check added to an iPhone-only file.
  */
 export function decideCeilings(
-  now: ReadonlyMap<string, CheckCounts>,
+  now: ReadonlyMap<string, FileChecks>,
   recorded: Ceilings | undefined,
 ): CeilingDecision {
   const files = [
@@ -211,7 +527,7 @@ export function decideCeilings(
   ].sort();
   const refusals: string[] = [];
   const deltas: string[] = [];
-  const next: Record<string, CheckCounts> = {};
+  const next: Record<string, FileChecks> = {};
   for (const file of files) {
     const counts = now.get(file);
     const listed = recorded ? ceilingOf(recorded, file) : undefined;
@@ -226,7 +542,11 @@ export function decideCeilings(
         );
     }
     if (counts)
-      next[file] = { tests: counts.tests, assertions: counts.assertions };
+      next[file] = {
+        tests: counts.tests,
+        assertions: counts.assertions,
+        indirectChecks: counts.indirectChecks,
+      };
   }
   return { next: refusals.length > 0 ? undefined : next, refusals, deltas };
 }
@@ -234,6 +554,12 @@ export function decideCeilings(
 /** Every `.ts` file under the iPhone's own directory, from the filesystem. */
 export const iosFiles = (): string[] =>
   filesUnder(IOS_DIR, (path) => path.endsWith('.ts'));
+
+/** A repo file's text, or undefined when there is no such file. */
+export const readModule: ModuleReader = (path) =>
+  existsSync(path) && statSync(path).isFile()
+    ? readFileSync(path, 'utf8')
+    : undefined;
 
 /** Each iPhone file's text, read once. */
 export const readIosSources = (): Map<string, string> =>
@@ -253,7 +579,7 @@ export function readCeilings(file: string = CEILINGS_FILE): Ceilings {
       )
     )
       throw new Error(
-        `${file}: ${key} does not hold whole tests and assertions`,
+        `${file}: ${key} does not hold a whole count of each kind (${KINDS.join(', ')})`,
       );
   return parsed as Ceilings;
 }

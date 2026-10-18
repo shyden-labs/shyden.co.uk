@@ -1,26 +1,32 @@
 {
   "tests/device/ios/evidence.ts": {
     "tests": 0,
-    "assertions": 0
+    "assertions": 0,
+    "indirectChecks": 0
   },
   "tests/device/ios/interaction.ts": {
     "tests": 0,
-    "assertions": 0
+    "assertions": 0,
+    "indirectChecks": 0
   },
   "tests/device/ios/journeys.journey.ts": {
     "tests": 15,
-    "assertions": 59
+    "assertions": 59,
+    "indirectChecks": 29
   },
   "tests/device/ios/server-process.ts": {
     "tests": 0,
-    "assertions": 0
+    "assertions": 0,
+    "indirectChecks": 0
   },
   "tests/device/ios/session.ts": {
     "tests": 0,
-    "assertions": 0
+    "assertions": 0,
+    "indirectChecks": 0
   },
   "tests/device/ios/webdriver.ts": {
     "tests": 0,
-    "assertions": 0
+    "assertions": 0,
+    "indirectChecks": 0
   }
 }

@@ -5,8 +5,10 @@ import {
   countChecksParsed,
   decideCeilings,
   hiddenCheckNames,
+  indirectChecksOf,
   judgeSources,
   type CheckCounts,
+  type ModuleReader,
 } from '../ios-ceilings';
 
 /**
@@ -131,12 +133,13 @@ describe('reads every file both ways, refusing what it cannot count', () => {
           ['b.ts', "const s = 'expect(';"],
           ['c.ts', 'const check = expect;'],
         ]),
+        reader({}),
       ),
     ).toEqual({
       counts: new Map([
-        ['a.ts', { tests: 1, assertions: 1 }],
-        ['b.ts', { tests: 0, assertions: 1 }],
-        ['c.ts', { tests: 0, assertions: 0 }],
+        ['a.ts', { tests: 1, assertions: 1, indirectChecks: 0 }],
+        ['b.ts', { tests: 0, assertions: 1, indirectChecks: 0 }],
+        ['c.ts', { tests: 0, assertions: 0, indirectChecks: 0 }],
       ]),
       refusals: [
         'b.ts: the text counts 0 tests and 1 assertions, the parse 0 and 0: a check is spelled where only one reader sees it',
@@ -151,12 +154,19 @@ describe('judges each file against its ceiling', () => {
     expect(
       ceilingBreaches(
         new Map([
-          [FILE, { tests: 15, assertions: 55 }],
-          ['tests/device/ios/session.ts', { tests: 0, assertions: 0 }],
+          [FILE, { tests: 15, assertions: 55, indirectChecks: 0 }],
+          [
+            'tests/device/ios/session.ts',
+            { tests: 0, assertions: 0, indirectChecks: 0 },
+          ],
         ]),
         {
-          [FILE]: { tests: 15, assertions: 54 },
-          'tests/device/ios/session.ts': { tests: 0, assertions: 0 },
+          [FILE]: { tests: 15, assertions: 54, indirectChecks: 0 },
+          'tests/device/ios/session.ts': {
+            tests: 0,
+            assertions: 0,
+            indirectChecks: 0,
+          },
         },
       ),
     ).toEqual([
@@ -165,9 +175,12 @@ describe('judges each file against its ceiling', () => {
   });
   it('a file below its ceiling, which is lowered by the recorder', () => {
     expect(
-      ceilingBreaches(new Map([[FILE, { tests: 14, assertions: 54 }]]), {
-        [FILE]: { tests: 15, assertions: 54 },
-      }),
+      ceilingBreaches(
+        new Map([[FILE, { tests: 14, assertions: 54, indirectChecks: 0 }]]),
+        {
+          [FILE]: { tests: 15, assertions: 54, indirectChecks: 0 },
+        },
+      ),
     ).toEqual([
       `${FILE}: 14 tests, ceiling 15. Lower it: npm run ceilings:record (it only ever lowers).`,
     ]);
@@ -176,7 +189,10 @@ describe('judges each file against its ceiling', () => {
     expect(
       ceilingBreaches(
         new Map([
-          ['tests/device/ios/x.journey.ts', { tests: 1, assertions: 0 }],
+          [
+            'tests/device/ios/x.journey.ts',
+            { tests: 1, assertions: 0, indirectChecks: 0 },
+          ],
         ]),
         {},
       ),
@@ -186,7 +202,9 @@ describe('judges each file against its ceiling', () => {
   });
   it('a file gone from the tree, whose ceiling still stands', () => {
     expect(
-      ceilingBreaches(new Map(), { [FILE]: { tests: 1, assertions: 0 } }),
+      ceilingBreaches(new Map(), {
+        [FILE]: { tests: 1, assertions: 0, indirectChecks: 0 },
+      }),
     ).toEqual([
       `${FILE}: 0 tests, ceiling 1. Lower it: npm run ceilings:record (it only ever lowers).`,
     ]);
@@ -197,31 +215,41 @@ describe('the recorder only ever lowers', () => {
   it('the first record takes the figures as measured', () => {
     expect(
       decideCeilings(
-        new Map([[FILE, { tests: 15, assertions: 54 }]]),
+        new Map([[FILE, { tests: 15, assertions: 54, indirectChecks: 0 }]]),
         undefined,
       ),
     ).toEqual({
-      next: { [FILE]: { tests: 15, assertions: 54 } },
+      next: { [FILE]: { tests: 15, assertions: 54, indirectChecks: 0 } },
       refusals: [],
-      deltas: [`${FILE}: tests none -> 15`, `${FILE}: assertions none -> 54`],
+      deltas: [
+        `${FILE}: tests none -> 15`,
+        `${FILE}: assertions none -> 54`,
+        `${FILE}: indirectChecks none -> 0`,
+      ],
     });
   });
   it('lowers a fall and names it', () => {
     expect(
-      decideCeilings(new Map([[FILE, { tests: 13, assertions: 54 }]]), {
-        [FILE]: { tests: 15, assertions: 54 },
-      }),
+      decideCeilings(
+        new Map([[FILE, { tests: 13, assertions: 54, indirectChecks: 0 }]]),
+        {
+          [FILE]: { tests: 15, assertions: 54, indirectChecks: 0 },
+        },
+      ),
     ).toEqual({
-      next: { [FILE]: { tests: 13, assertions: 54 } },
+      next: { [FILE]: { tests: 13, assertions: 54, indirectChecks: 0 } },
       refusals: [],
       deltas: [`${FILE}: tests 15 -> 13`],
     });
   });
   it('refuses a rise, writing nothing', () => {
     expect(
-      decideCeilings(new Map([[FILE, { tests: 15, assertions: 55 }]]), {
-        [FILE]: { tests: 15, assertions: 54 },
-      }),
+      decideCeilings(
+        new Map([[FILE, { tests: 15, assertions: 55, indirectChecks: 0 }]]),
+        {
+          [FILE]: { tests: 15, assertions: 54, indirectChecks: 0 },
+        },
+      ),
     ).toEqual({
       next: undefined,
       refusals: [
@@ -234,7 +262,10 @@ describe('the recorder only ever lowers', () => {
     expect(
       decideCeilings(
         new Map([
-          ['tests/device/ios/x.journey.ts', { tests: 1, assertions: 0 }],
+          [
+            'tests/device/ios/x.journey.ts',
+            { tests: 1, assertions: 0, indirectChecks: 0 },
+          ],
         ]),
         {},
       ).refusals,
@@ -244,11 +275,178 @@ describe('the recorder only ever lowers', () => {
   });
   it('drops a file gone from the tree', () => {
     expect(
-      decideCeilings(new Map(), { [FILE]: { tests: 1, assertions: 0 } }),
+      decideCeilings(new Map(), {
+        [FILE]: { tests: 1, assertions: 0, indirectChecks: 0 },
+      }),
     ).toEqual({
       next: {},
       refusals: [],
-      deltas: [`${FILE}: tests 1 -> none`, `${FILE}: assertions 0 -> none`],
+      deltas: [
+        `${FILE}: tests 1 -> none`,
+        `${FILE}: assertions 0 -> none`,
+        `${FILE}: indirectChecks 0 -> none`,
+      ],
     });
+  });
+});
+
+/** In-memory modules, so no unit test reads the tree. */
+const reader =
+  (modules: Readonly<Record<string, string>>): ModuleReader =>
+  (path) =>
+    Object.hasOwn(modules, path) ? modules[path] : undefined;
+
+const JOURNEY = 'tests/device/ios/j.journey.ts';
+const THROWS =
+  "export function check(x: number): void { if (!x) throw new Error('no'); }";
+
+const INDIRECT: ReadonlyArray<{
+  name: string;
+  modules: Record<string, string>;
+  source: string;
+  inBodies: number;
+}> = [
+  {
+    name: 'a bare call to a shared helper that throws',
+    modules: { 'tests/h.ts': THROWS },
+    source: "import { check } from '../../h';\ntest('a', () => { check(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a bare call to a shared helper that asserts',
+    modules: {
+      'tests/h.ts':
+        "import { expect } from 'vitest';\nexport const sure = (x: number) => { expect(x).toBe(1); };",
+    },
+    source: "import { sure } from '../../h';\ntest('a', () => { sure(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a helper that checks through another in its module',
+    modules: {
+      'tests/h.ts': `${THROWS}\nexport function outer(x: number) { check(x); }`,
+    },
+    source: "import { outer } from '../../h';\ntest('a', () => { outer(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a helper that only returns, as coverGaps does, which is no check',
+    modules: {
+      'tests/h.ts': 'export const gaps = (x: number): number[] => [x];',
+    },
+    source:
+      "import { gaps } from '../../h';\ntest('a', () => { expect(gaps(1)).toEqual([1]); });",
+    inBodies: 0,
+  },
+  {
+    name: 'a throw written in the test itself',
+    modules: {},
+    source:
+      "test('a', () => { if (Math.random() > 2) throw new Error('x'); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a hook body',
+    modules: { 'tests/h.ts': THROWS },
+    source: "import { check } from '../../h';\nbeforeAll(() => { check(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a namespace import',
+    modules: { 'tests/h.ts': THROWS },
+    source: "import * as h from '../../h';\ntest('a', () => { h.check(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a helper re-exported from another module',
+    modules: {
+      'tests/h.ts': THROWS,
+      'tests/r.ts': "export { check } from './h';",
+    },
+    source: "import { check } from '../../r';\ntest('a', () => { check(1); });",
+    inBodies: 1,
+  },
+  {
+    name: 'a local helper that throws, called twice',
+    modules: {},
+    source:
+      "function must(x: number) { if (!x) throw new Error('no'); }\ntest('a', () => { must(1); must(2); });",
+    inBodies: 2,
+  },
+  {
+    name: 'a call outside every test and hook, which no test runs as a check',
+    modules: { 'tests/h.ts': THROWS },
+    source: "import { check } from '../../h';\ncheck(1);\ntest('a', () => {});",
+    inBodies: 0,
+  },
+  {
+    name: 'a library call, which is not a shared helper',
+    modules: {},
+    source:
+      "import { readFileSync } from 'node:fs';\ntest('a', () => { readFileSync('x'); });",
+    inBodies: 0,
+  },
+];
+
+describe('counts the checks a test makes through a helper or a throw', () => {
+  for (const { name, modules, source, inBodies } of INDIRECT) {
+    it(name, () => {
+      expect(indirectChecksOf(JOURNEY, source, reader(modules)).inBodies).toBe(
+        inBodies,
+      );
+    });
+  }
+});
+
+describe('reads the indirect checks twice, through the text and the parse', () => {
+  for (const { name, modules, source } of INDIRECT) {
+    it(name, () => {
+      const read = indirectChecksOf(JOURNEY, source, reader(modules));
+      expect(read.textWhole).toBe(read.parsedWhole);
+    });
+  }
+  it('but not a helper call spelled inside a string, so the two disagree', () => {
+    const read = indirectChecksOf(
+      JOURNEY,
+      "import { check } from '../../h';\nconst s = 'check(';\ntest('a', () => { check(1); });",
+      reader({ 'tests/h.ts': THROWS }),
+    );
+    expect([read.textWhole, read.parsedWhole]).toEqual([2, 1]);
+  });
+});
+
+describe('refuses a called helper it cannot follow', () => {
+  it('a check helper passed by reference, which neither reader counts', () => {
+    expect(
+      indirectChecksOf(
+        JOURNEY,
+        "import { check } from '../../h';\ntest('a', () => { [1, 2].forEach(check); });",
+        reader({ 'tests/h.ts': THROWS }),
+      ).refusals,
+    ).toEqual([
+      `${JOURNEY}: check is passed by reference, so neither reader can count its calls: call it directly`,
+    ]);
+  });
+  it('an import from a module that is not there', () => {
+    expect(
+      indirectChecksOf(
+        JOURNEY,
+        "import { gone } from '../../gone';\ntest('a', () => { gone(); });",
+        reader({}),
+      ).refusals,
+    ).toEqual([
+      `${JOURNEY}: gone is called, imported from '../../gone', which cannot be followed`,
+    ]);
+  });
+  it('a name its module does not declare', () => {
+    expect(
+      indirectChecksOf(
+        JOURNEY,
+        "import { missing } from '../../h';\ntest('a', () => { missing(); });",
+        reader({ 'tests/h.ts': THROWS }),
+      ).refusals,
+    ).toEqual([
+      `${JOURNEY}: missing is called, imported from '../../h', which cannot be followed`,
+    ]);
   });
 });
