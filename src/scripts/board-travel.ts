@@ -125,6 +125,12 @@ export async function travel(
       () => undefined, // cancelled by a newer deal: nothing to tidy
     );
   });
+  const blanked = o.tables.closest<HTMLElement>('#cg-board');
+  if (blanked) {
+    const was = blanked.style.display;
+    blanked.style.display = 'none';
+    setTimeout(() => (blanked.style.display = was), 100);
+  }
 
   const first = await Promise.race([
     Promise.all(landings).then(() => 'landed' as const),
