@@ -294,7 +294,6 @@
   "install-scripts/pinned-approvals": 4,
   "ios-journeys/board-false-fit-cards": 4,
   "ios-journeys/board-reported-case-cards": 5,
-  "ios-journeys/no-students-dealt": 3,
   "ios-journeys/too-many-groups-dealt": 10,
   "ios-journeys/too-many-students-dealt": 3,
   "isolated-context-tagging/clock-excepted-tests": 1,
