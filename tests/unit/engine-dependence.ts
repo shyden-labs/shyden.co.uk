@@ -77,6 +77,7 @@ export const ENGINE_DEPENDENT_NAMES: ReadonlySet<string> = new Set([
   // ship them, so the next one cannot be left off.
   'measureBoard',
   'measureBoardScript',
+  'measureCover',
   'measureTypedFields',
   'measureTypedFieldsScript',
   'visibleLinesReader',

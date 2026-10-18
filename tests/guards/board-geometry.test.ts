@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { measureBoard, measureBoardScript } from '../board-geometry';
+import {
+  measureBoard,
+  measureBoardScript,
+  measureCover,
+} from '../board-geometry';
 import { floorBreach } from '../floors';
 import { searched, tsFilesUnder } from '../source-files';
 import { expectClosesOverNothing } from '../unit/closes-over-nothing';
@@ -94,6 +98,34 @@ describe('the board is measured once, and survives being sent somewhere else', (
     ).toEqual(['tests/board-geometry.ts']);
     expect(
       floorBreach('board-geometry/ts-files', files.length),
+    ).toBeUndefined();
+  });
+});
+
+/**
+ * The board's cover of the window is serialised the same way (#837): the
+ * refused-grant test sends `measureCover` into the page. Its imports are
+ * already refused by the module-wide check above.
+ */
+describe('the cover measurement survives being sent somewhere else', () => {
+  it('still names what it measures once serialised', () => {
+    const source = measureCover.toString();
+    const needles = [
+      'cg-board',
+      'getBoundingClientRect',
+      'visualViewport',
+      'innerWidth',
+      'innerHeight',
+      'devicePixelRatio',
+    ];
+    const missing = needles.filter((needle) => !source.includes(needle));
+
+    expect(
+      searched(missing, { of: needles, what: 'serialised cover reads' }),
+      `the serialised cover measurement lost: ${missing.join(', ')}`,
+    ).toEqual([]);
+    expect(
+      floorBreach('board-geometry/cover-needles', needles.length),
     ).toBeUndefined();
   });
 });

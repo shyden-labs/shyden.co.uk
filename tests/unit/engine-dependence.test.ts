@@ -271,7 +271,7 @@ describe('the default name set', () => {
         ...['useInnerText', 'toHaveScreenshot', 'browserName'],
         ...['measureBoard', 'measureBoardScript', 'measureTypedFields'],
         ...['measureTypedFieldsScript', 'visibleLinesReader'],
-        ...['visibleLinesReaderScript'],
+        ...['visibleLinesReaderScript', 'measureCover'],
       ]),
     );
   });

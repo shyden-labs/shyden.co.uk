@@ -14,7 +14,8 @@ import {
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 import { FLOOR_PX } from '../../src/scripts/projector';
-import { measureBoard } from '../board-geometry';
+import { measureBoard, measureCover } from '../board-geometry';
+import { coverGaps } from '../device-pixels';
 import { recorded, shoot } from './evidence';
 
 test.use(recorded);
@@ -118,16 +119,23 @@ test.describe('the projector view', () => {
     // The viewport is read from the PAGE, not from `page.viewportSize()`.
     // On a real device over CDP there is no emulated viewport and that
     // returns `null` -- found on the real Android gauntlet, where this was
-    // the only failure in 339. `window.innerWidth/innerHeight` is the real
-    // viewport on every target, which is what this assertion was always
-    // about; asking Playwright was asking the wrong thing.
-    const box = (await page.locator('#cg-board').boundingBox())!;
-    const vp = await page.evaluate(() => ({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }));
-    expect(box.width).toBeCloseTo(vp.width, 0);
-    expect(box.height).toBeCloseTo(vp.height, 0);
+    // the only failure in 339. And it is judged in device pixels, not
+    // against `innerHeight` to half a CSS pixel: `innerHeight` is the
+    // window's height FLOORED, so the real phone's 1084 device pixels
+    // (309.714 CSS px at a ratio of 3.5) read as 309 and failed a board that
+    // covered the screen exactly (#837).
+    const cover = await page.evaluate(measureCover);
+    const { checked, gaps } = coverGaps(cover);
+    expect(
+      searched(gaps, {
+        of: checked,
+        what: 'checks of the board against the window',
+      }),
+      JSON.stringify(cover),
+    ).toEqual([]);
+    expect(
+      floorBreach('projector/cover-checks', checked.length),
+    ).toBeUndefined();
     // …and the groups are actually ON it, which is the point of falling
     // back rather than merely showing an empty layer.
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
