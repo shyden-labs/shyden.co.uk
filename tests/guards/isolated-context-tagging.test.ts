@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
@@ -15,6 +16,7 @@ import {
   type Declaration,
   type UseCall,
 } from '../playwright-declarations';
+import { CLOCK_TAG } from '../device/clock-declaration';
 
 /**
  * A real device has exactly ONE adopted browser context for the whole run
@@ -53,6 +55,23 @@ import {
  */
 
 const REQUIRES_ISOLATED_CONTEXT_TAG = '@requires-isolated-context';
+
+/**
+ * THE CLOCK RULE (#854). The phone cannot take a clock back out of its one context either:
+ * `clock.install()` registers its script on the context and the protocol has no uninstall, so a
+ * clock one test installed ran every later page on fake time. A test whose own body calls a
+ * method of `.clock` carries `@installs-a-clock`, which runs it in the phone's
+ * `android-chrome-clock` project (playwright.device.config.ts), and a tagged test that calls
+ * none is stale. On the phone an untagged call is also refused at run time
+ * (tests/device/clock-declaration.ts); this catches it at the pull request instead.
+ *
+ * ONE EXCEPTION, granted by the operator on 2026-10-18: the real-device test that proves that
+ * refusal makes an untagged call on purpose. It is named by file and title, and the corpus test
+ * below pins the list to exactly this one entry and checks it still names such a test.
+ */
+const CLOCK_EXCEPTIONS: readonly string[] = [
+  'tests/device/real-device.spec.ts > a clock installed by an untagged test is refused, naming why (#854)',
+];
 
 function useInTestMessage(
   file: string,
@@ -102,6 +121,56 @@ function staleTagMessage(file: string, decl: Declaration): string {
     'restore the javaScriptEnabled: false use it is supposed to describe.'
   );
 }
+
+function untaggedClockMessage(file: string, decl: Declaration): string {
+  return (
+    `${file}:${decl.line} -- test('${decl.title}') calls a clock method, and the real device ` +
+    'cannot remove a clock from its one context, so it would run every later test on fake time ' +
+    `(#854) -- tag it \`${CLOCK_TAG}\` so it runs in android-chrome-clock, a worker of its own.`
+  );
+}
+
+function staleClockTagMessage(file: string, decl: Declaration): string {
+  return (
+    `${file}:${decl.line} -- test('${decl.title}') is tagged \`${CLOCK_TAG}\` but calls no ` +
+    'clock method -- stale tag, running the test in the clock project for nothing. Remove it.'
+  );
+}
+
+/** Whether a test's own body calls a method of `.clock` (`page.clock.install()`, `context.clock.runFor()`), read by the parser, so a comment or a string naming one calls nothing. */
+function usesAClock(decl: Declaration): boolean {
+  let uses = false;
+  // A block body, so `visit` returns nothing: `ts.forEachChild` stops at the
+  // first callback that returns something truthy (tests/unit/ast.ts).
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isPropertyAccessExpression(node.expression.expression) &&
+      node.expression.expression.name.text === 'clock'
+    )
+      uses = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(decl.body);
+  return uses;
+}
+
+function tagInTitleMessage(
+  file: string,
+  decl: Declaration,
+  tag: string,
+): string {
+  return (
+    `${file}:${decl.line} -- ${decl.kind}('${decl.title}') has \`${tag}\` in its title. The ` +
+    "phone's projects select by grep, which reads every title as well as the tags, so the " +
+    'title alone decides where its tests run (#854). Name it without the tag text.'
+  );
+}
+
+/** Whether `decl` in `file` is the operator's one granted clock exception. */
+const excepted = (file: string, decl: Declaration): boolean =>
+  CLOCK_EXCEPTIONS.includes(`${file} > ${decl.title}`);
 
 /** Whether a test's own body calls `newContext()`: a call, read by the parser, so a comment or a string naming it opens nothing. */
 function opensAContext(decl: Declaration): boolean {
@@ -165,6 +234,10 @@ function read(file: string, text: string): Reading {
   }
 
   for (const decl of declarations) {
+    // A group's title is read by grep too, and routes every test in it.
+    for (const tag of [REQUIRES_ISOLATED_CONTEXT_TAG, CLOCK_TAG])
+      if (decl.title.includes(tag))
+        findings.push(tagInTitleMessage(file, decl, tag));
     if (decl.kind !== 'test') continue;
     const covered =
       coversFile ||
@@ -177,6 +250,12 @@ function read(file: string, text: string): Reading {
     else if (opens && !tagged) findings.push(newContextMessage(file, decl));
     else if (!covered && !opens && tagged)
       findings.push(staleTagMessage(file, decl));
+    const clocked = usesAClock(decl);
+    const clockTagged = decl.tags.includes(CLOCK_TAG);
+    if (clocked && !clockTagged && !excepted(file, decl))
+      findings.push(untaggedClockMessage(file, decl));
+    else if (!clocked && clockTagged)
+      findings.push(staleClockTagMessage(file, decl));
   }
 
   const judged = declarations
@@ -195,6 +274,22 @@ describe('a real device has one browser context', () => {
       read,
       declarationsRead('tests read', 'isolated-context-tagging/tests'),
     );
+  });
+
+  it("allows the operator's one clock exception, and no other (#854)", () => {
+    expect(CLOCK_EXCEPTIONS).toEqual([
+      'tests/device/real-device.spec.ts > a clock installed by an untagged test is refused, naming why (#854)',
+    ]);
+  });
+
+  it('the clock exception still names a test that makes an untagged clock call (#854)', () => {
+    const [file, title] = CLOCK_EXCEPTIONS[0].split(' > ');
+    const named = declarationsIn(
+      parseSource(readFileSync(file, 'utf8'), file),
+    ).filter((decl) => decl.kind === 'test' && decl.title === title);
+    expect(named.map((decl) => decl.title)).toEqual([title]);
+    expect(usesAClock(named[0])).toBe(true);
+    expect(named[0].tags).not.toContain(CLOCK_TAG);
   });
 });
 
@@ -545,5 +640,146 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     ]);
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('stale');
+  });
+
+  it('flags an untagged test that calls a clock method, which the real device cannot undo (#854)', () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a timed save', async ({ page }) => {",
+      '  await page.clock.install();',
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('synthetic.spec.ts:3');
+    expect(findings[0]).toContain('clock method');
+    expect(findings[0]).toContain(CLOCK_TAG);
+  });
+
+  it('accepts that test once tagged @installs-a-clock (#854)', () => {
+    const { judged, findings } = judgedBy([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a timed save', { tag: '@installs-a-clock' }, async ({ context }) => {",
+      '  await context.clock.runFor(1_000);',
+      '});',
+      '',
+    ]);
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('isolated-context-tagging/clock-tagged-tests', judged.length),
+    ).toBeUndefined();
+  });
+
+  it('flags @installs-a-clock on a test that calls no clock method as stale (#854)', () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a plain page', { tag: '@installs-a-clock' }, async ({ page }) => {",
+      "  await page.goto('/');",
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('synthetic.spec.ts:3');
+    expect(findings[0]).toContain('stale');
+  });
+
+  it('calls no clock for one written only in a comment or a string (#854)', () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a note', { tag: '@installs-a-clock' }, async ({ page }) => {",
+      '  // page.clock.install() is not called here',
+      "  await page.goto('/page.clock.install()');",
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('stale');
+  });
+
+  it("excepts the operator's granted test by its file and title (#854)", () => {
+    const [file, title] = CLOCK_EXCEPTIONS[0].split(' > ');
+    const { judged, findings } = read(
+      file,
+      [
+        "import { test, expect } from '../e2e/fixtures';",
+        '',
+        `test('${title}', async ({ page }) => {`,
+        '  await expect(page.clock.install()).rejects.toThrow();',
+        '});',
+        '',
+      ].join('\n'),
+    );
+    expect(
+      searched(findings, { of: judged, what: 'tests the scanner judged' }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'isolated-context-tagging/clock-excepted-tests',
+        judged.length,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('excepts that title nowhere else (#854)', () => {
+    const [, title] = CLOCK_EXCEPTIONS[0].split(' > ');
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      `test('${title}', async ({ page }) => {`,
+      '  await page.clock.install();',
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('clock method');
+  });
+
+  it("flags @installs-a-clock written in a test's title, which the phone's grep reads as the tag (#854)", () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('a page not tagged @installs-a-clock', async ({ page }) => {",
+      "  await page.goto('/');",
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('synthetic.spec.ts:3');
+    expect(findings[0]).toContain('in its title');
+  });
+
+  it("flags @requires-isolated-context written in a test's title too (#854)", () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test('runs without @requires-isolated-context', async ({ page }) => {",
+      "  await page.goto('/');",
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('in its title');
+  });
+
+  it("flags the tag written in a group's title, which routes every test in it (#854)", () => {
+    const findings = scanned([
+      "import { test, expect } from './fixtures';",
+      '',
+      "test.describe('pages without @installs-a-clock', () => {",
+      "  test('a page', async ({ page }) => {",
+      "    await page.goto('/');",
+      '  });',
+      '});',
+      '',
+    ]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('synthetic.spec.ts:3');
+    expect(findings[0]).toContain('in its title');
   });
 });
