@@ -87,3 +87,31 @@ export type BoardGeometry = ReturnType<typeof measureBoard>;
  * be asserted.
  */
 export const measureBoardScript = (): string => `return (${measureBoard})();`;
+
+/**
+ * The board's box beside the window's size, both ways the window reports it,
+ * and the device pixel ratio: what `coverGaps` (`tests/device-pixels.ts`)
+ * judges (#837). Self-contained for the same reason as `measureBoard`:
+ * Playwright ships its source into the page.
+ */
+export const measureCover = () => {
+  const board = document.getElementById('cg-board');
+  if (!board)
+    throw new Error(
+      'measureCover: #cg-board is not in the document, so there is no board ' +
+        'to measure against the window.',
+    );
+  const box = board.getBoundingClientRect();
+  const visual = window.visualViewport;
+  return {
+    board: {
+      width: box.width,
+      height: box.height,
+      top: box.top,
+      left: box.left,
+    },
+    inner: { width: window.innerWidth, height: window.innerHeight },
+    visual: visual ? { width: visual.width, height: visual.height } : null,
+    ratio: window.devicePixelRatio,
+  };
+};
