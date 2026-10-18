@@ -236,6 +236,19 @@ export function plannedRun({
   const { source, seconds } = readTimings(timingsText);
   const plan = planShards(units, seconds, shard.total);
   const mine = plan.shards[shard.index - 1];
+  // AC4 MUTANT (measuring branch, never merged): shard 3 swaps one of its spec
+  // files for another shard's file of the same test count, so the counts still
+  // add up while one file runs twice and the other nowhere.
+  if (shard.index === 3) {
+    const count = new Map(units.map(({ key, tests }) => [key, tests]));
+    const others = plan.shards.flatMap((s, i) => (i === 2 ? [] : s.units));
+    const at = mine.units.findIndex((k) =>
+      others.some((o) => count.get(o) === count.get(k)),
+    );
+    mine.units[at] = /** @type {string} */ (
+      others.find((o) => count.get(o) === count.get(mine.units[at]))
+    );
+  }
 
   const lines = [
     `shard ${shard.index} of ${shard.total} runs ${mine.units.length} of ${units.length} spec files, ` +
