@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { floorBreach } from '../floors';
 import {
   IOS_DIR,
+  KINDS,
   ceilingBreaches,
   countChecks,
   countChecksParsed,
+  harnessCallsOf,
+  indirectChecksOf,
   judgeSources,
   readCeilings,
   readIosSources,
+  readModule,
 } from '../ios-ceilings';
 import { committableFiles, searched } from '../source-files';
 
@@ -16,9 +20,11 @@ import { committableFiles, searched } from '../source-files';
  * 2026-10-18, on an assertion added inside the iPhone's own Journey 14:
  * "this is illegal. follow the rules". A phone check is one test that
  * Android and the iPhone both run, from the same files (#839), so every
- * file under `tests/device/ios/` is held to the tests and assertions it
- * wrote when this guard landed (`tests/ios-ceilings.json`), and those
- * figures only fall, through `npm run ceilings:record`.
+ * file under `tests/device/ios/` is held to the tests, assertions and
+ * indirect checks (Shyden, 2026-10-19: "count calls to shared check helpers
+ * too") and calls into the harness (the session's methods, forwarded the
+ * same day) it wrote when this guard landed (`tests/ios-ceilings.json`), and
+ * those figures only fall, through `npm run ceilings:record`.
  */
 
 let read: ReturnType<typeof readIosSources> | undefined;
@@ -27,7 +33,7 @@ const sources = () => (read ??= readIosSources());
 describe('no check is ever added to an iPhone-only file (#858)', () => {
   it('holds every file under tests/device/ios exactly at its ceiling', () => {
     const files = [...sources().keys()];
-    const { counts, refusals } = judgeSources(sources());
+    const { counts, refusals } = judgeSources(sources(), readModule);
     const findings = [...refusals, ...ceilingBreaches(counts, readCeilings())];
     expect(
       searched(findings, { of: files, what: 'files under tests/device/ios' }),
@@ -52,13 +58,16 @@ describe('no check is ever added to an iPhone-only file (#858)', () => {
 
   it('keeps the recorded ceilings at or under their landing figures', () => {
     // A hand edit is the one way past the recorder: the totals recorded when
-    // this landed (2026-10-19: 15 tests, 59 assertions, all in the journeys
-    // file) only ever fall, and fall here by hand with the record.
+    // this landed (2026-10-19: 15 tests, 59 assertions, 29 indirect checks
+    // and 266 calls into the harness, all in the journeys file) only ever
+    // fall, and fall here by hand with the record.
     const ceilings = Object.values(readCeilings());
-    const total = (kind: 'tests' | 'assertions'): number =>
+    const total = (kind: (typeof KINDS)[number]): number =>
       ceilings.reduce((sum, counts) => sum + counts[kind], 0);
     expect(total('tests')).toBeLessThanOrEqual(15);
     expect(total('assertions')).toBeLessThanOrEqual(59);
+    expect(total('indirectChecks')).toBeLessThanOrEqual(29);
+    expect(total('harnessCalls')).toBeLessThanOrEqual(266);
   });
 
   it('counts each file the same way through the text and through the parse', () => {
@@ -66,11 +75,16 @@ describe('no check is ever added to an iPhone-only file (#858)', () => {
     // file, with no figure written here. A reader gone blind to one form
     // disagrees with the other on the file that writes it.
     const disagree = [...sources()]
-      .filter(([, source]) => {
+      .filter(([file, source]) => {
         const text = countChecks(source);
         const parsed = countChecksParsed(source);
+        const indirect = indirectChecksOf(file, source, readModule);
+        const harness = harnessCallsOf(file, source, readModule);
         return (
-          text.tests !== parsed.tests || text.assertions !== parsed.assertions
+          text.tests !== parsed.tests ||
+          text.assertions !== parsed.assertions ||
+          indirect.textWhole !== indirect.parsedWhole ||
+          harness.textWhole !== harness.parsedWhole
         );
       })
       .map(([file]) => file);
