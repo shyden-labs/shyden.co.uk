@@ -92,10 +92,11 @@ interface Tag {
 }
 
 export function decodeXmlPlist(xml: string): PlistValue {
+  // No comment syntax is read: neither libplist nor plistlib writes one, so a
+  // comment fails as "expected a tag" rather than being skipped unseen.
   const body = xml
     .replace(/<\?xml[\s\S]*?\?>/, '')
-    .replace(/<!DOCTYPE[^>]*>/, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+    .replace(/<!DOCTYPE[^>]*>/, '');
   let at = 0;
   /** `\s` includes U+FEFF, so this also steps over a byte-order mark. */
   const skipSpace = (): void => {
