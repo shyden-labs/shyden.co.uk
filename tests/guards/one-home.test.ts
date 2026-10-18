@@ -293,7 +293,15 @@ describe('walking a catalogue has exactly one home', () => {
       scanned.filter((path) =>
         definesACatalogueWalker(readFileSync(path, 'utf8')),
       ),
-    ).toEqual([HOME]);
+    ).toEqual([
+      // Exempt by Shyden's ruling (AskUserQuestion, 2026-10-19, #811): the
+      // iPhone Web Inspector's plist encoders walk a nested message to write
+      // Apple's device protocol, not a catalogue into its leaves, so they
+      // cannot use the home. Exactly these two files, nothing under them.
+      'tests/device/ios/inspector/bplist.ts',
+      'tests/device/ios/inspector/plist-xml.ts',
+      HOME,
+    ]);
   });
 
   it('catches a walker whatever it is called', () => {
