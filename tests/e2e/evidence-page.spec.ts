@@ -977,45 +977,48 @@ test.describe('evidence page sign-off, whatever the write order', () => {
     ).toHaveText(/^Not saved\b.*\bcannot reach storage\b/);
   });
 
-  test('a tick made while the stored sign-off cannot load is never written over it', async ({
-    page,
-  }, testInfo) => {
-    // set() replaces the whole document, so a write made before the stored
-    // sign-off has loaded would erase every tick already in it. The page's
-    // clock lets the save window pass without a real wait.
-    await page.clock.install();
-    const seed = signedOff(TITLES.slice(0, 2));
-    await openEvidencePage(page, testInfo, {
-      order: 'resolve-then-confirm',
-      seed,
-      getFails: true,
-      subscriptionDies: true,
-    });
-    // Both failures land before the status is read.
-    await page.clock.runFor(1_000);
-    await expect(
-      page.locator('#state'),
-      'the failed load is reported',
-    ).toHaveText(/^Could not load the saved sign-off\b.*\bunavailable\b/);
-    await toggle(page, TITLES[2]);
-    await expect(
-      tickBox(page, TITLES[2]),
-      'the tick is shown although nothing has loaded',
-    ).toBeChecked();
-    await expect(
-      page.locator('#state'),
-      'the tick is reported not yet saved',
-    ).toHaveText(/^Not saved yet\b/);
-    await page.clock.runFor(2_000);
-    const after = await page.evaluate((doc) => {
-      const standIn = (window as StandInWindow).__dbStandIn;
-      return { writes: standIn.writes(), stored: standIn.read(doc) };
-    }, DOC);
-    expect(after, 'nothing was written over the stored sign-off').toEqual({
-      writes: 0,
-      stored: seed[DOC],
-    });
-  });
+  test(
+    'a tick made while the stored sign-off cannot load is never written over it',
+    // Installs a clock, so it runs in the phone's clock project (#854).
+    { tag: '@installs-a-clock' },
+    async ({ page }, testInfo) => {
+      // set() replaces the whole document, so a write made before the stored
+      // sign-off has loaded would erase every tick already in it. The page's
+      // clock lets the save window pass without a real wait.
+      await page.clock.install();
+      const seed = signedOff(TITLES.slice(0, 2));
+      await openEvidencePage(page, testInfo, {
+        order: 'resolve-then-confirm',
+        seed,
+        getFails: true,
+        subscriptionDies: true,
+      });
+      // Both failures land before the status is read.
+      await page.clock.runFor(1_000);
+      await expect(
+        page.locator('#state'),
+        'the failed load is reported',
+      ).toHaveText(/^Could not load the saved sign-off\b.*\bunavailable\b/);
+      await toggle(page, TITLES[2]);
+      await expect(
+        tickBox(page, TITLES[2]),
+        'the tick is shown although nothing has loaded',
+      ).toBeChecked();
+      await expect(
+        page.locator('#state'),
+        'the tick is reported not yet saved',
+      ).toHaveText(/^Not saved yet\b/);
+      await page.clock.runFor(2_000);
+      const after = await page.evaluate((doc) => {
+        const standIn = (window as StandInWindow).__dbStandIn;
+        return { writes: standIn.writes(), stored: standIn.read(doc) };
+      }, DOC);
+      expect(after, 'nothing was written over the stored sign-off').toEqual({
+        writes: 0,
+        stored: seed[DOC],
+      });
+    },
+  );
 
   test('a malformed stored sign-off is shown, and written back, only in the shape the page writes', async ({
     page,
@@ -1073,28 +1076,31 @@ test.describe('evidence page sign-off, whatever the write order', () => {
     await shoot(page, 'written back only in its own shape', signOff(page));
   });
 
-  test('a read that fails after live updates have loaded the sign-off changes nothing', async ({
-    page,
-  }, testInfo) => {
-    // A transient `unavailable` rejects a read while the subscription carries
-    // on (db.d.ts), so the sign-off can load first and the read fail after.
-    await page.clock.install();
-    await openEvidencePage(page, testInfo, {
-      order: 'resolve-then-confirm',
-      seed: signedOff(TITLES.slice(0, 1)),
-      getFails: true,
-    });
-    // The late failure lands before anything is read.
-    await page.clock.runFor(1_000);
-    await expect(
-      tickBox(page, TITLES[0]),
-      'the stored tick arrived through live updates',
-    ).toBeChecked();
-    await expect(
-      page.locator('#state'),
-      'the late failure does not undo a load that succeeded',
-    ).toHaveText(/^Ready\b/);
-  });
+  test(
+    'a read that fails after live updates have loaded the sign-off changes nothing',
+    // Installs a clock, so it runs in the phone's clock project (#854).
+    { tag: '@installs-a-clock' },
+    async ({ page }, testInfo) => {
+      // A transient `unavailable` rejects a read while the subscription carries
+      // on (db.d.ts), so the sign-off can load first and the read fail after.
+      await page.clock.install();
+      await openEvidencePage(page, testInfo, {
+        order: 'resolve-then-confirm',
+        seed: signedOff(TITLES.slice(0, 1)),
+        getFails: true,
+      });
+      // The late failure lands before anything is read.
+      await page.clock.runFor(1_000);
+      await expect(
+        tickBox(page, TITLES[0]),
+        'the stored tick arrived through live updates',
+      ).toBeChecked();
+      await expect(
+        page.locator('#state'),
+        'the late failure does not undo a load that succeeded',
+      ).toHaveText(/^Ready\b/);
+    },
+  );
 });
 
 /** The fixture page rebuilt with one journey more, as #188's gained its 13th. */

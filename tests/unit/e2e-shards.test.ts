@@ -4,13 +4,14 @@ import {
   accountFileName,
   accountFindings,
   captureAccountFindings,
-  captureFindings,
   docsOnlyFindings,
   isDocsOnlyRun,
   needsFindings,
+  scopedJobFindings,
   shardAccount,
   shardNotice,
   shardOf,
+  shardTimes,
 } from '../../scripts/e2e-shards.mjs';
 import {
   RUN_WHEN_DOCS_ONLY,
@@ -18,7 +19,13 @@ import {
 } from '../../scripts/docs-only.mjs';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
-import { SUITE, account, whole, docsOnlyNeeds } from '../e2e-shards-shared';
+import {
+  SUITE,
+  WHOLE_UNITS,
+  account,
+  whole,
+  docsOnlyNeeds,
+} from '../e2e-shards-shared';
 
 describe('shardOf: the shard a run was asked for', () => {
   it('reads --shard=i/N', () => {
@@ -90,6 +97,9 @@ describe('shardAccount: what a shard writes down about its own run', () => {
     executed: 7,
     playwrightExitCode: 0,
     listingStatus: 0,
+    seconds: 42,
+    listedUnits: { '[chromium] › a.spec.ts': 7 },
+    ranUnits: { '[chromium] › a.spec.ts': 7 },
   };
 
   // The writer and the reader share this module, so the one account a shard
@@ -144,13 +154,7 @@ describe('shardNotice: what a shard says about its own count', () => {
   // whose count build-and-test judges. The log must not tell a reader looking
   // at a red shard that nothing checks it.
   it('names the shard, its count and who holds the sum', () => {
-    const notice = shardNotice({
-      shard: { index: 2, total: 4 },
-      enumerated: SUITE,
-      executed: 553,
-      playwrightExitCode: 0,
-      listingStatus: 0,
-    });
+    const notice = shardNotice(account(2, 553));
     expect(notice).toMatch(/SHARD 2 of 4/);
     expect(notice).toMatch(/553 of the 2210/);
     expect(notice).toMatch(/build-and-test/);
@@ -336,6 +340,106 @@ describe('docsOnlyFindings: a docs-only pull request skipped exactly what it may
 });
 
 describe('accountFindings: the shards add up to the suite', () => {
+  // The Playwright run's wall time (#607), printed per shard by shardTimes.
+  it('refuses an account whose seconds is negative', () => {
+    const accounts = whole();
+    accounts[0] = account(1, 553, { seconds: -1 });
+    expect(accountFindings(accounts)[0]).toMatch(
+      /^account 1 is not an account/,
+    );
+  });
+
+  it('refuses an account whose seconds is written as a string', () => {
+    const accounts: unknown[] = whole();
+    accounts[0] = { ...account(1, 553), seconds: '600' };
+    expect(accountFindings(accounts)[0]).toMatch(
+      /^account 1 is not an account/,
+    );
+  });
+
+  it('refuses an account with no seconds at all', () => {
+    const { seconds: _dropped, ...rest } = account(1, 553);
+    const accounts: unknown[] = [rest, ...whole().slice(1)];
+    expect(accountFindings(accounts)[0]).toMatch(
+      /^account 1 is not an account/,
+    );
+  });
+
+  // Our own planner splits the suite now, where Playwright's split could
+  // never put one test in two shards; so the sum alone is not "exactly once".
+  it('refuses a spec file run in two shards, though a missing one keeps the sum right', () => {
+    const accounts = whole();
+    accounts[3] = account(4, 552, {
+      ranUnits: { '[chromium] › 3.spec.ts': 552 },
+    });
+    expect(accountFindings(accounts)).toEqual([
+      '[chromium] › 3.spec.ts: the shards ran 1104 of its 552 tests',
+      '[chromium] › 4.spec.ts: the shards ran 0 of its 552 tests',
+    ]);
+  });
+
+  it('refuses a test the shards ran that no listing holds', () => {
+    const accounts = whole();
+    accounts[0] = account(1, 553, {
+      ranUnits: {
+        '[chromium] › 1.spec.ts': 552,
+        '[chromium] › new.spec.ts': 1,
+      },
+    });
+    expect(accountFindings(accounts)).toEqual([
+      '[chromium] › 1.spec.ts: the shards ran 552 of its 553 tests',
+      '[chromium] › new.spec.ts: the shards ran 1 of its 0 tests',
+    ]);
+  });
+
+  it('refuses shards that listed different spec files', () => {
+    const accounts = whole();
+    accounts[1] = account(2, 553, {
+      listedUnits: { ...WHOLE_UNITS, '[chromium] › 5.spec.ts': 1 },
+    });
+    expect(accountFindings(accounts)).toContain(
+      'the shards listed different spec files',
+    );
+  });
+
+  it('names a shard that could not say which spec files it ran', () => {
+    const accounts = whole();
+    accounts[2] = account(3, 552, { ranUnits: null });
+    expect(accountFindings(accounts)).toEqual([
+      'shard 3 of 4 could not say which spec files it ran',
+    ]);
+  });
+
+  it('names a shard that could not list the spec files', () => {
+    const accounts = whole();
+    accounts[2] = account(3, 552, { listedUnits: null });
+    expect(accountFindings(accounts)).toEqual([
+      'shard 3 of 4 could not say which spec files the suite holds',
+    ]);
+  });
+
+  it('refuses an account whose spec-file counts are not counts', () => {
+    const accounts: unknown[] = whole();
+    accounts[0] = {
+      ...account(1, 553),
+      ranUnits: { '[chromium] › 1.spec.ts': -1 },
+    };
+    expect(accountFindings(accounts)[0]).toMatch(
+      /^account 1 is not an account/,
+    );
+  });
+
+  it('accepts a shard whose run could not be timed', () => {
+    const accounts = whole();
+    accounts[0] = account(1, 553, { seconds: null });
+    expect(
+      searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('e2e-shards/untimed-shard-accounts', accounts.length),
+    ).toBeUndefined();
+  });
+
   it('has nothing to say when four shards ran exactly the enumerated suite', () => {
     const accounts = whole();
     expect(
@@ -351,6 +455,7 @@ describe('accountFindings: the shards add up to the suite', () => {
     accounts[2] = account(3, 551);
     expect(accountFindings(accounts)).toEqual([
       expect.stringMatching(/2209 of the 2210/),
+      '[chromium] › 3.spec.ts: the shards ran 551 of its 552 tests',
     ]);
   });
 
@@ -359,6 +464,7 @@ describe('accountFindings: the shards add up to the suite', () => {
     accounts[0] = account(1, 554);
     expect(accountFindings(accounts)).toEqual([
       expect.stringMatching(/2211 of the 2210/),
+      '[chromium] › 1.spec.ts: the shards ran 554 of its 553 tests',
     ]);
   });
 
@@ -451,97 +557,146 @@ describe('accountFindings: the shards add up to the suite', () => {
   });
 });
 
-describe('captureFindings: the capture shards ran exactly where scope said (#774)', () => {
-  const checks = { result: 'success', outputs: {} };
-  const scopeSaid = (capture: unknown) => ({
-    result: 'success',
-    outputs: { docs_only: 'false', capture },
-  });
-  const job = (result: string) => ({ result, outputs: {} });
-
-  it('takes a capture that ran where scope said it runs, and hands on the rest', () => {
-    expect(
-      captureFindings({
-        scope: scopeSaid('true'),
-        checks,
-        capture: job('success'),
-      }),
-    ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
-  });
-
-  it('takes a capture skipped where scope said it does not run', () => {
-    expect(
-      captureFindings({
-        scope: scopeSaid('false'),
-        checks,
-        capture: job('skipped'),
-      }),
-    ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
-  });
-
-  it('refuses a capture skipped where scope said it runs', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('true'), capture: job('skipped') })
-        .findings,
-    ).toEqual([
-      'capture finished `skipped` where scope said it runs, not `success`',
-    ]);
-  });
-
-  it('refuses a capture that failed where scope said it runs', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('true'), capture: job('failure') })
-        .findings,
-    ).toEqual([
-      'capture finished `failure` where scope said it runs, not `success`',
-    ]);
-  });
-
-  it('refuses a capture that ran where scope said it does not', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('false'), capture: job('success') })
-        .findings,
-    ).toEqual([
-      'capture finished `success` where scope said it does not run, not `skipped`',
-    ]);
-  });
-
-  it('refuses a scope that handed on no capture verdict', () => {
-    expect(
-      captureFindings({
-        scope: { result: 'success', outputs: { docs_only: 'false' } },
-        capture: job('skipped'),
-      }).findings,
-    ).toEqual([
-      'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
-    ]);
-  });
-
-  it('refuses a capture verdict that is not exactly true or false', () => {
-    expect(
-      captureFindings({ scope: scopeSaid('TRUE'), capture: job('success') })
-        .findings,
-    ).toEqual([
-      'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
-    ]);
-  });
-
-  it('refuses needs that do not include the capture job', () => {
-    expect(captureFindings({ scope: scopeSaid('false'), checks })).toEqual({
-      findings: [
-        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
-      ],
-      rest: { scope: scopeSaid('false'), checks },
+// The two jobs scope decides (#774, #822): each runs exactly where scope's
+// own verdict says, so its skip is a pass there and a refusal elsewhere. One
+// rule, two rows; every message is written out per job, never built from the
+// row it is checked against.
+describe.each([
+  {
+    job: 'capture',
+    verdict: 'capture',
+    absent:
+      'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+  },
+  {
+    job: 'logs',
+    verdict: 'release',
+    absent:
+      'logs is not among the jobs build-and-test stands for, so a release whose logs and audit trails were never checked would pass',
+  },
+] as const)(
+  'scopedJobFindings: $job ran exactly where scope said ($verdict, #774, #822)',
+  ({ job: name, verdict, absent }) => {
+    const checks = { result: 'success', outputs: {} };
+    const scopeSaid = (said: unknown) => ({
+      result: 'success',
+      outputs: { docs_only: 'false', [verdict]: said },
     });
-  });
+    const job = (result: string) => ({ result, outputs: {} });
 
-  it('hands needs it cannot read to the verdict that refuses them', () => {
-    expect(captureFindings('not json')).toEqual({
-      findings: [],
-      rest: 'not json',
+    it('takes a run where scope said it runs, and hands on the rest', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), checks, [name]: job('success') },
+          name,
+        ),
+      ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
     });
-  });
-});
+
+    it('takes a skip where scope said it does not run', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('false'), checks, [name]: job('skipped') },
+          name,
+        ),
+      ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
+    });
+
+    it('refuses a skip where scope said it runs', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), [name]: job('skipped') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `skipped` where scope said it runs, not `success`',
+          logs: 'logs finished `skipped` where scope said it runs, not `success`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a failure where scope said it runs', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('true'), [name]: job('failure') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `failure` where scope said it runs, not `success`',
+          logs: 'logs finished `failure` where scope said it runs, not `success`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a run where scope said it does not', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('false'), [name]: job('success') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'capture finished `success` where scope said it does not run, not `skipped`',
+          logs: 'logs finished `success` where scope said it does not run, not `skipped`',
+        }[name],
+      ]);
+    });
+
+    it('refuses a scope that handed on no verdict for it', () => {
+      expect(
+        scopedJobFindings(
+          {
+            scope: { result: 'success', outputs: { docs_only: 'false' } },
+            [name]: job('skipped'),
+          },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
+          logs: 'scope handed on no release verdict (undefined), so logs finishing `skipped` cannot be judged',
+        }[name],
+      ]);
+    });
+
+    it('refuses a verdict that is not exactly true or false', () => {
+      expect(
+        scopedJobFindings(
+          { scope: scopeSaid('TRUE'), [name]: job('success') },
+          name,
+        ).findings,
+      ).toEqual([
+        {
+          capture:
+            'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
+          logs: 'scope handed on no release verdict ("TRUE"), so logs finishing `success` cannot be judged',
+        }[name],
+      ]);
+    });
+
+    it('refuses needs that do not include the job', () => {
+      expect(
+        scopedJobFindings({ scope: scopeSaid('false'), checks }, name),
+      ).toEqual({
+        findings: [absent],
+        rest: { scope: scopeSaid('false'), checks },
+      });
+    });
+
+    it('hands needs it cannot read to the verdict that refuses them', () => {
+      expect(scopedJobFindings('not json', name)).toEqual({
+        findings: [],
+        rest: 'not json',
+      });
+    });
+  },
+);
 
 describe('accountArguments: the e2e accounts, then the capture accounts (#774)', () => {
   it('splits the files at --capture', () => {
@@ -583,6 +738,7 @@ describe('captureAccountFindings: the capture shards ran the whole selection (#7
     accounts[1] = account(2, 552);
     expect(captureAccountFindings(true, accounts)).toEqual([
       'the capture: the shards ran 2209 of the 2210 tests the suite holds',
+      'the capture: [chromium] › 2.spec.ts: the shards ran 552 of its 553 tests',
     ]);
   });
 
@@ -614,5 +770,51 @@ describe('captureAccountFindings: the capture shards ran the whole selection (#7
     expect(
       floorBreach('e2e-shards/capture-skipped-cases', cases.length),
     ).toBeUndefined();
+  });
+});
+
+describe('shardTimes: each shard`s run time and how far the slowest is from the mean (#607)', () => {
+  it('names every shard`s minutes in shard order, and the ratio', () => {
+    const accounts = [
+      account(2, 553, { seconds: 660 }),
+      account(1, 553, { seconds: 600 }),
+      account(4, 552, { seconds: 540 }),
+      account(3, 552, { seconds: 600 }),
+    ];
+    expect(shardTimes(accounts)).toBe(
+      [
+        '| shard | minutes |',
+        '| --- | --- |',
+        '| 1 of 4 | 10.0 |',
+        '| 2 of 4 | 11.0 |',
+        '| 3 of 4 | 10.0 |',
+        '| 4 of 4 | 9.0 |',
+        '',
+        'slowest 11.0 min, mean 10.0 min: slowest/mean 1.10',
+      ].join('\n'),
+    );
+  });
+
+  it('marks a shard that could not be timed and leaves it out of the mean', () => {
+    const accounts = [
+      account(1, 553, { seconds: 600 }),
+      account(2, 553, { seconds: null }),
+    ];
+    expect(shardTimes(accounts)).toBe(
+      [
+        '| shard | minutes |',
+        '| --- | --- |',
+        '| 1 of 4 | 10.0 |',
+        '| 2 of 4 | not timed |',
+        '',
+        'slowest 10.0 min, mean 10.0 min: slowest/mean 1.00',
+      ].join('\n'),
+    );
+  });
+
+  it('says so when no shard could be timed', () => {
+    expect(shardTimes([account(1, 553, { seconds: null })])).toBe(
+      '| shard | minutes |\n| --- | --- |\n| 1 of 4 | not timed |\n\nno shard was timed',
+    );
   });
 });

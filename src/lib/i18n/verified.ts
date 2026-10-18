@@ -405,9 +405,9 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     rosterColTogether: 'ด้วยกัน',
     rosterColApart: 'แยก',
     // #161's sheet, read by the operator on 2026-09-23.
-    again: 'สับใหม่',
+    again: 'สุ่มใหม่',
     boardOpen: 'เต็มหน้าจอ',
-    boardShuffle: 'สับใหม่',
+    boardShuffle: 'สุ่มใหม่',
     'csv.columns.absent': 'ไม่มา',
     'csv.columns.apart': 'แยกกัน',
     'csv.columns.together': 'ด้วยกัน',

@@ -114,6 +114,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.verdict.outputs.docs_only }}
       capture: ${{ steps.verdict.outputs.capture }}
+      release: ${{ steps.verdict.outputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -185,11 +186,17 @@ jobs:
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
   # budget, and every pull request waited all of it.
   #
-  # EIGHT, measured rather than guessed. Playwright hands each shard an equal
-  # COUNT of tests in project order, so a shard is roughly one engine's slice,
-  # and the engines differ about threefold per test. At four (run
-  # 35830220134) chromium's shard took 4.9 minutes and the firefox-and-webkit
-  # one 13.2, which is the wall-clock. Eight splits the slow slices.
+  # EIGHT, measured rather than guessed. At four (run 35830220134) the
+  # slowest shard took 13.2 minutes.
+  #
+  # Split by TIME, not count (#607). Playwright's own --shard hands each shard
+  # an equal COUNT of tests in project order, and a WebKit test costs about
+  # three times a Chromium one, so the WebKit shard ran 15.8-19.8 minutes
+  # against a 10.7-11.5 mean and once hit the 20-minute limit. E2E_SHARD_PLAN
+  # makes each shard run whole spec files planned from measured timings
+  # (scripts/e2e-shard-plan.mjs), refreshed by hand from a green run's logs
+  # (scripts/e2e-shard-timings.mjs); build-and-test prints every shard's time
+  # and the slowest/mean ratio, which is where a stale plan shows.
   e2e:
     name: e2e shard ${{ matrix.shard }} of ${{ strategy.job-total }}
     needs: [image, scope]
@@ -239,6 +246,7 @@ jobs:
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           E2E_ACCOUNT_DIR: e2e-accounts
+          E2E_SHARD_PLAN: tests/e2e-shard-timings.json
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
       # `overwrite` because re-running a failed shard uploads its account
@@ -437,8 +445,20 @@ jobs:
   # scripts/deploy-gate.mjs deploys because it passed, so it must go on meaning
   # what it meant when it ran the suite itself: every step ran, and the whole
   # suite ran. It runs none of that now. It stands for the jobs that do.
+  # The logs suite (#822), on the release pull request alone: scope says
+  # `release` for a pull request into main, and this is the one run the suite
+  # starts on by itself (Shyden, 2026-10-16). build-and-test stands for it and
+  # refuses its skip there, so the release cannot merge until it is green.
+  logs:
+    needs: scope
+    if: needs.scope.outputs.release == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/logs.yml
+
   build-and-test:
-    needs: [image, scope, checks, e2e, capture, sanity-on-build, functions]
+    needs:
+      [image, scope, checks, e2e, capture, sanity-on-build, functions, logs]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read
     # green exactly when a shard failed or was skipped (#157). It runs always,

@@ -1,0 +1,41 @@
+name: Logs and audit trails
+# The logs suite (#822): every check of a log line or an audit trail the code
+# writes, keeps or replays (`vitest.logs.config.ts`). Global rule, Shyden
+# 2026-10-16: "separate test suite for logging and auditing. run in ci as a
+# pre-requisite to a release", and on where: "a release cannot be cut until
+# all checks are complete, including this one. and this is the only time that
+# suite is run automatically".
+#
+# So ci.yml calls this on a pull request into `main` and nowhere else (the
+# scope job's `release` verdict), and `build-and-test`, which `main` requires,
+# refuses it skipped or failed there: the release pull request cannot merge
+# until it is green. `workflow_dispatch` is the run by hand.
+#
+# No concurrency block: in a called workflow `github.workflow` is the caller's,
+# so a group here would share ci.yml's and cancel the run that called it.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  logs:
+    name: Logs and audit trails
+    runs-on: ubuntu-26.04
+    # npm ci and about 40 tests held to 1 s each by the suite's own script; a
+    # bound on a stalled install, not the suite's limit, which is the
+    # `--testTimeout` its npm script carries.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:logs

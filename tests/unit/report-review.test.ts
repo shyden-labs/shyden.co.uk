@@ -12,7 +12,6 @@ import { en } from '../../src/lib/i18n/en';
 import { siteEn, siteVi } from '../../src/lib/i18n/site';
 import { vi as viStrings } from '../../src/lib/i18n/vi';
 import { CATALOGUES } from '../../src/lib/i18n/back-translate';
-import { REPORT_COLUMNS } from '../../src/lib/report';
 import {
   REVIEW_DATABASES,
   REVIEW_SELECT,
@@ -22,70 +21,23 @@ import {
   needsBackTranslation,
   reportRows,
   reviewBlock,
-  wranglerArgs,
   type Catalogues,
-  type ReportRow,
 } from '../../src/lib/report-review';
 import { call, readBack } from '../../scripts/back-translate-client.mjs';
 import { backTranslations } from '../../scripts/reports-review.mjs';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 import { codeWithoutComments } from './source-text';
-
-const ESC = String.fromCharCode(92);
-/** LibreTranslate's `GET /languages`, for the locales these tests send. */
-const LANGUAGES = [
-  { code: 'en', targets: ['vi', 'th'] },
-  { code: 'vi', targets: ['en'] },
-  { code: 'th', targets: ['en'] },
-];
-const BELL = String.fromCharCode(7);
-const RLO = String.fromCharCode(0x202e);
-
-/** A row as wrangler prints it: every column a string, `keys` JSON-encoded. */
-const stored = (overrides: Record<string, unknown> = {}) => ({
-  id: 'a7d1a431-a963-49e4-8b9a-02614a2d3017',
-  received_at: '2026-09-26T09:50:40.538Z',
-  locale: 'vi',
-  page: 'home',
-  quote: 'Báo lỗi bản dịch',
-  keys: '["site.report.open"]',
-  suggestion: '',
-  note: '',
-  ...overrides,
-});
-
-/** wrangler's `--json` answer around some rows, as measured on the dev database. */
-const answer = (results: unknown[]) => [
-  { results, success: true, meta: { changes: 0, rows_read: results.length } },
-];
-
-const row = (overrides: Record<string, unknown> = {}): ReportRow =>
-  reportRows(answer([stored(overrides)]))[0];
-
-/** Fixture tables: small, and different in every locale that matters here. */
-const fixture: Catalogues = {
-  en: {
-    strings: { greet: 'Hello', list: ['one', 'two'] },
-    site: { nav: { home: 'Home' } },
-  },
-  id: {
-    strings: { greet: 'Halo', list: ['satu', 'dua'] },
-    site: { nav: { home: 'Beranda' } },
-  },
-  zh: {
-    strings: { greet: '你好', list: ['一', '二'] },
-    site: { nav: { home: '首页' } },
-  },
-  vi: {
-    strings: { greet: 'Xin chào', list: ['một', 'hai'] },
-    site: { nav: { home: 'Trang chủ' } },
-  },
-  th: {
-    strings: { greet: 'สวัสดี', list: ['หนึ่ง', 'สอง'] },
-    site: { nav: { home: 'หน้าแรก' } },
-  },
-};
+import {
+  BELL,
+  ESC,
+  LANGUAGES,
+  RLO,
+  answer,
+  fixture,
+  row,
+  stored,
+} from '../report-review-shared';
 
 describe('the database is named, and only one of two (AC1)', () => {
   it('accepts each of the two databases', () => {
@@ -107,25 +59,14 @@ describe('the database is named, and only one of two (AC1)', () => {
 });
 
 describe('the one command it builds only reads (AC5)', () => {
-  it('selects every stored column, oldest first', () => {
-    expect(REVIEW_SELECT).toBe(
-      `SELECT ${REPORT_COLUMNS.join(', ')} FROM reports ORDER BY received_at, id`,
-    );
+  // Stand-in (#822): the review's one statement only reads. Its columns,
+  // order and the command around it are the logs suite's
+  // (tests/logs/report-review.test.ts).
+  it('stand-in: the one statement it runs only reads', () => {
+    expect(REVIEW_SELECT).toMatch(/^SELECT /);
     expect(REVIEW_SELECT).not.toMatch(
       /;|\b(DELETE|UPDATE|INSERT|DROP|ALTER)\b/i,
     );
-  });
-
-  it('is d1 execute, remote, as JSON, with that SELECT and nothing else', () => {
-    expect(wranglerArgs('shyden-reports-dev')).toEqual([
-      'd1',
-      'execute',
-      'shyden-reports-dev',
-      '--remote',
-      '--json',
-      '--command',
-      REVIEW_SELECT,
-    ]);
   });
 
   it('is the only process the script starts', () => {
@@ -151,66 +92,12 @@ describe('a stored row is checked before it is printed (AC2)', () => {
     });
   });
 
-  it('puts the rows in received order, then by id', () => {
-    const rows = reportRows(
-      answer([
-        stored({ id: 'c', received_at: '2026-09-26T12:00:00.000Z' }),
-        stored({ id: 'b', received_at: '2026-09-26T09:00:00.000Z' }),
-        stored({ id: 'a', received_at: '2026-09-26T12:00:00.000Z' }),
-      ]),
-    );
-    expect(rows.map(({ id }) => id)).toEqual(['b', 'a', 'c']);
-  });
-
-  it('reads an empty table as no reports', () => {
-    const statements = answer([]);
-    expect(
-      searched(reportRows(statements), {
-        of: statements,
-        what: 'statements in the answer',
-      }),
-    ).toEqual([]);
-    expect(
-      floorBreach('report-review/empty-table-statements', statements.length),
-    ).toBeUndefined();
-  });
-
-  it.each([
-    [
-      'a failed statement',
-      [{ results: [], success: false }],
-      /did not succeed/,
-    ],
-    ['no statement', [], /one statement/],
-    ['two statements', [...answer([]), ...answer([])], /one statement/],
-    ['not a list', { results: [] }, /one statement/],
-    [
-      'a missing column',
-      answer([{ ...stored(), note: undefined }]),
-      /a7d1a431.*note/,
-    ],
-    [
-      'a column that is not text',
-      answer([stored({ page: 3 })]),
-      /a7d1a431.*page/,
-    ],
-    [
-      'keys that are not JSON',
-      answer([stored({ keys: 'site.x' })]),
-      /a7d1a431.*keys/,
-    ],
-    [
-      'keys that are not a list of text',
-      answer([stored({ keys: '[1]' })]),
-      /a7d1a431.*keys/,
-    ],
-    [
-      'a locale the site does not have',
-      answer([stored({ locale: 'fr' })]),
-      /a7d1a431.*locale "fr"/,
-    ],
-  ])('refuses %s, naming what is wrong', (_, output, message) => {
-    expect(() => reportRows(output)).toThrow(message);
+  // Stand-in (#822): one refusal of a row it cannot trust. Order, the empty
+  // table and every other refusal are the logs suite's.
+  it('stand-in: refuses a row missing a column, naming it', () => {
+    expect(() =>
+      reportRows(answer([{ ...stored(), note: undefined }])),
+    ).toThrow(/a7d1a431.*note/);
   });
 });
 
@@ -290,33 +177,13 @@ describe('each key is read from the catalogues (AC3)', () => {
   });
 });
 
+// Stand-in (#822): the block opens with the report it prints. Every field
+// it carries is the logs suite's.
 describe('the block carries every field (AC2)', () => {
-  const block = () =>
-    reviewBlock(
-      row({ suggestion: 'Báo cáo lỗi dịch', note: 'seen on a phone' }),
-      fixture,
-      { kind: 'made', text: 'Report a translation error' },
-    );
-
-  it('names the report, when, where and in which language', () => {
-    const text = block();
-    expect(text.split('\n')[0]).toBe(
-      '── report a7d1a431-a963-49e4-8b9a-02614a2d3017',
-    );
-    expect(text).toContain('received    2026-09-26T09:50:40.538Z');
-    expect(text).toContain('locale      vi');
-    expect(text).toContain('page        home');
-    expect(text).toContain('quoted      "Báo lỗi bản dịch"');
-  });
-
-  it('gives the suggestion, what it says in English, and the note marked private', () => {
-    const text = block();
-    expect(text).toContain('suggestion  "Báo cáo lỗi dịch"');
-    expect(text).toContain('  in English "Report a translation error"');
-    expect(text).toContain('note        "seen on a phone"');
-    expect(text).toContain(
-      '            private: never copy the note into a public ticket',
-    );
+  it('stand-in: opens with the report it prints', () => {
+    expect(
+      reviewBlock(row(), fixture, { kind: 'not-needed' }).split('\n')[0],
+    ).toBe('── report a7d1a431-a963-49e4-8b9a-02614a2d3017');
   });
 });
 
@@ -366,46 +233,13 @@ describe('a back-translation is asked for only where it can say something (AC4)'
   });
 });
 
+// Stand-in (#822): the escape itself. Every field it reaches is the logs
+// suite's.
 describe('what a visitor typed prints escaped, never raw (AC6)', () => {
   it('escapes line breaks, control and format characters, and the backslash', () => {
     expect(escaped(`a\nb\tc${BELL}d${RLO}e${ESC}f`)).toBe(
       `a${ESC}nb${ESC}tc${ESC}u{7}d${ESC}u{202e}e${ESC}${ESC}f`,
     );
-  });
-
-  it('leaves every script the site speaks alone', () => {
-    const copy = 'Báo lỗi 报告翻译 รายงานคำแปล Laporkan';
-    expect(escaped(copy)).toBe(copy);
-  });
-
-  it('escapes the page and an engine failure too, which the row and the engine supply', () => {
-    const block = reviewBlock(
-      row({ page: `home${BELL}`, suggestion: 'Báo cáo' }),
-      fixture,
-      {
-        kind: 'failed',
-        reason: `engine said ${String.fromCharCode(27)}[2J`,
-      },
-    );
-    expect(block).toContain(`page        home${ESC}u{7}`);
-    expect(block).toContain(`  in English FAILED: engine said ${ESC}u{1b}[2J`);
-  });
-
-  it('never lets a note put a raw control character on the terminal', () => {
-    const block = reviewBlock(
-      row({
-        note: `line one\nline two${BELL}`,
-        quote: `x${String.fromCharCode(27)}[2J`,
-      }),
-      fixture,
-      { kind: 'not-needed' },
-    );
-    expect(block).toContain(`note        "line one${ESC}nline two${ESC}u{7}"`);
-    expect(block).toContain(`quoted      "x${ESC}u{1b}[2J"`);
-    const body = block.split('\n');
-    for (const line of body)
-      expect(line, line).not.toMatch(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u);
-    expect(body.length).toBeGreaterThan(8);
   });
 });
 

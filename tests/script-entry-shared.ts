@@ -66,6 +66,14 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'GITHUB_REPOSITORY and GITHUB_TOKEN are required',
   },
+  // With no run named and no logs, there are no timings to write, so it
+  // prints its usage and leaves the committed timings alone (#607).
+  'e2e-shard-timings.mjs': {
+    args: [],
+    env: {},
+    status: 2,
+    says: 'usage: node scripts/e2e-shard-timings.mjs',
+  },
   // With no needs to read and no shard accounts, build-and-test's verdict has
   // nothing to vouch for, so it refuses rather than pass on nothing (#163).
   'e2e-shards.mjs': {
@@ -83,11 +91,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: '--shard=0/8 is not a shard',
   },
-  // Neither of these takes an argument, so one is a mistake they refuse
-  // before doing any work (#227). They earned probes by gaining an entry
-  // decision: until then each called `main()` unconditionally, so importing
-  // either ran it -- which is why `dashboard.mjs` kept its own copies of
-  // three helpers rather than importing them.
+  // Neither of these takes an argument it does not know, so one is a mistake
+  // they refuse before doing any work (#227; `test-devices.mjs` knows `--ios`
+  // alone since #623). They earned probes by gaining an entry decision: until
+  // then each called `main()` unconditionally, so importing either ran it --
+  // which is why `dashboard.mjs` kept its own copies of three helpers rather
+  // than importing them.
   'dashboard.mjs': {
     args: ['--no-such-flag'],
     status: 1,
@@ -96,7 +105,7 @@ export const PROBES: Readonly<Record<string, Probe>> = {
   'test-devices.mjs': {
     args: ['--no-such-flag'],
     status: 1,
-    says: 'test-devices.mjs takes no arguments',
+    says: 'usage: test-devices.mjs [--ios] (got --no-such-flag)',
   },
   // With no `docker` on PATH it refuses rather than compare nothing (#202).
   'visual.mjs': {
@@ -146,6 +155,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: ['--no-such-flag'],
     status: 1,
     says: 'i18n-google-read-back.mjs takes no arguments',
+  },
+  // Refuses an unknown flag before it reads the store, a key or the
+  // network, so the probe writes nothing and sends nothing (#754 AC10).
+  'i18n-second-read.mjs': {
+    args: ['--no-such-flag'],
+    status: 1,
+    says: "Unknown option '--no-such-flag'",
   },
   // Refuses an argument before it reads the store, so the probe writes
   // nothing (#754).

@@ -24,9 +24,11 @@ export interface AbsenceScan {
   readonly proved: number;
   /** Assertions the reader refuses outright, as `file:line — why`. */
   readonly findings: string[];
-  /** Unjudged absences by `file › test title as written` (#609). */
-  readonly unjudged: Map<string, number>;
-  /** Each unjudged absence where it is written, with its scope's key and why. */
+  /**
+   * Each unjudged absence where it is written, with its scope's key
+   * (`file › test title as written`, #609) and why. Every one is a finding:
+   * the burn-down list that once excused them emptied with #623.
+   */
   readonly unjudgedSites: { key: string; at: string; why: string }[];
 }
 
@@ -252,8 +254,6 @@ export function scanAbsences(bound: Bound, discoverers: Closure): AbsenceScan {
   const findings: string[] = [];
   const sites: string[] = [];
   const perFile = new Map<string, number>();
-  /** Unjudged absences by `file › test title as written` (#609). */
-  const unjudged = new Map<string, number>();
   const unjudgedSites: AbsenceScan['unjudgedSites'] = [];
   let proved = 0;
   for (const [file, sf] of bound.files) {
@@ -273,14 +273,13 @@ export function scanAbsences(bound: Bound, discoverers: Closure): AbsenceScan {
           if (why === null) proved += 1;
           else {
             const scope = scopeOf(bodies, node);
-            // Fail closed: a site the reader cannot place cannot be listed.
+            // Fail closed: a site the reader cannot place cannot be named.
             if (scope === undefined)
               findings.push(
                 `${where(sf, node)} — an absence in no test and no named function`,
               );
             else {
               const key = `${file} › ${scope.label}`;
-              unjudged.set(key, (unjudged.get(key) ?? 0) + 1);
               unjudgedSites.push({ key, at: where(sf, node), why });
             }
           }
@@ -290,5 +289,5 @@ export function scanAbsences(bound: Bound, discoverers: Closure): AbsenceScan {
     };
     check(sf);
   }
-  return { sites, perFile, proved, findings, unjudged, unjudgedSites };
+  return { sites, perFile, proved, findings, unjudgedSites };
 }

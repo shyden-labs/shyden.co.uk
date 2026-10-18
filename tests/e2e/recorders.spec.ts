@@ -18,11 +18,20 @@ test.describe('the error recorder', () => {
   test('reports an exception nothing caught', async ({ page }) => {
     const reported = recordErrors(page);
     await page.goto('/');
-    await page.evaluate(() => {
-      setTimeout(() => {
-        throw new Error('planted uncaught exception');
-      });
-    });
+    // Raised BEFORE the verdict is asked (#818). Resolving as soon as the
+    // timer was set let the verdict's sentinel run first on WebKit, so the
+    // barrier passed before the exception existed. The second timer is queued
+    // from inside the first, before it throws, so the evaluate resolves only
+    // once the throw has happened, and the sentinel follows it.
+    await page.evaluate(
+      () =>
+        new Promise<void>((thrown) => {
+          setTimeout(() => {
+            setTimeout(thrown);
+            throw new Error('planted uncaught exception');
+          });
+        }),
+    );
     await expect(reported.expectNoUncaught('a planted throw')).rejects.toThrow(
       'planted uncaught exception',
     );

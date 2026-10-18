@@ -143,7 +143,10 @@ const AWAITING_READ: Record<Locale, readonly string[]> = {
   // `site.nav.contact` waited here from #97 (联系我们, "contact us", against
   // the note hint's 联系方式) until #665 made the site speak as one person
   // and the link plain 联系, which agrees with its witness.
-  zh: [],
+  // `groupLabel` 第 {n} 组 (#754): the old {n} 组 read back as "{n} groups"
+  // in Google and DeepL; the ordinal 第 reads "Group {n}" in Google, but no
+  // witness carries 第, so the check cannot agree with it on its own.
+  zh: ['groupLabel'],
   vi: [],
   th: [],
 };
@@ -208,20 +211,32 @@ describe('short labels that disagree with their own locale', () => {
  * has no labels to judge here.
  */
 const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
+  // #636: the Gift Value Calculator heading is new, drafted by DeepL and read
+  // back by LibreTranslate, and awaits the operator's read in every locale.
   id: [
+    'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
   ],
   zh: [
+    'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
   ],
   // #635: YeeTalk Calculators and "Open the calculators" are new English the
   // operator has not read in these two locales. Awaiting his read, then pinned.
-  vi: ['site.calculators.title', 'site.home.openCalculators'],
-  th: ['site.calculators.title', 'site.home.openCalculators'],
+  vi: [
+    'site.calculators.gift.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
+  th: [
+    'site.calculators.gift.heading',
+    'site.calculators.title',
+    'site.home.openCalculators',
+  ],
 };
 
 // One id per locale: the search below runs once per locale over its own labels.

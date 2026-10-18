@@ -27,7 +27,7 @@
  *   NEEDS_JSON='${{ toJSON(needs) }}' node scripts/e2e-shards.mjs \
  *     <e2e account files> --capture <capture account files>
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { messageOf } from './errors.mjs';
 import { isRecord } from '../src/lib/is-record.ts';
 import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
@@ -43,6 +43,9 @@ import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
  *   executed: number | null,
  *   playwrightExitCode: number,
  *   listingStatus: number | null,
+ *   seconds: number | null,
+ *   listedUnits: Record<string, number> | null,
+ *   ranUnits: Record<string, number> | null,
  * }} ShardAccount
  */
 
@@ -109,6 +112,9 @@ export function accountFileName({ index, total }) {
  *   executed: number | null,
  *   playwrightExitCode: number,
  *   listingStatus: number | null,
+ *   seconds: number | null,
+ *   listedUnits: Record<string, number> | null,
+ *   ranUnits: Record<string, number> | null,
  * }} run
  * @returns {{ file: string, account: ShardAccount } | null}
  */
@@ -118,12 +124,24 @@ export function shardAccount({
   executed,
   playwrightExitCode,
   listingStatus,
+  seconds,
+  listedUnits,
+  ranUnits,
 }) {
   const shard = shardOf(argv);
   if (shard === null) return null;
   return {
     file: accountFileName(shard),
-    account: { shard, enumerated, executed, playwrightExitCode, listingStatus },
+    account: {
+      shard,
+      enumerated,
+      executed,
+      playwrightExitCode,
+      listingStatus,
+      seconds,
+      listedUnits,
+      ranUnits,
+    },
   };
 }
 
@@ -179,34 +197,55 @@ export function needsFindings(needs) {
 }
 
 /**
- * The capture shards (#774) run only where the scope job said a pull request
- * can move a release picture, so a skip is a pass there and a refusal
- * everywhere else. Judged here against that verdict, then left out of what
- * the docs-only and full-run verdicts read, which know nothing of it. A
+ * The jobs that run only where the scope job's own verdict says (#774, #822),
+ * with the verdict each one reads and what a verdict that never asked for it
+ * would let through. The capture shards run where a pull request can move a
+ * release picture; the logs suite runs on a pull request into `main`, the
+ * release, and nowhere else (Shyden, 2026-10-16: "a release cannot be cut
+ * until all checks are complete, including this one").
+ */
+const SCOPED_JOBS = {
+  capture: {
+    verdict: 'capture',
+    unguarded: 'a case with no picture would pass',
+  },
+  logs: {
+    verdict: 'release',
+    unguarded:
+      'a release whose logs and audit trails were never checked would pass',
+  },
+};
+
+/**
+ * A scoped job runs only where scope said, so a skip is a pass there and a
+ * refusal everywhere else. Judged here against that verdict, then left out of
+ * what the docs-only and full-run verdicts read, which know nothing of it. A
  * verdict other than exactly `true` or `false` judges nothing, so it refuses:
  * an output that went missing must not read as "skip".
  *
  * @param {unknown} needs The parsed `${{ toJSON(needs) }}`.
+ * @param {keyof typeof SCOPED_JOBS} name The scoped job.
  * @returns {{ findings: string[], rest: unknown }}
  */
-export function captureFindings(needs) {
+export function scopedJobFindings(needs, name) {
   if (!isRecord(needs)) return { findings: [], rest: needs };
-  const { capture, ...rest } = needs;
-  if (capture === undefined)
+  const { verdict, unguarded } = SCOPED_JOBS[name];
+  const { [name]: state, ...rest } = needs;
+  if (state === undefined)
     return {
       findings: [
-        'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
+        `${name} is not among the jobs build-and-test stands for, so ${unguarded}`,
       ],
       rest,
     };
-  const result = isRecord(capture) ? capture.result : undefined;
+  const result = isRecord(state) ? state.result : undefined;
   const outputs = isRecord(needs.scope) ? needs.scope.outputs : undefined;
-  const said = isRecord(outputs) ? outputs.capture : undefined;
+  const said = isRecord(outputs) ? outputs[verdict] : undefined;
   if (said !== 'true' && said !== 'false')
     return {
       findings: [
-        `scope handed on no capture verdict (${JSON.stringify(said)}), ` +
-          `so capture finishing \`${String(result)}\` cannot be judged`,
+        `scope handed on no ${verdict} verdict (${JSON.stringify(said)}), ` +
+          `so ${name} finishing \`${String(result)}\` cannot be judged`,
       ],
       rest,
     };
@@ -217,7 +256,7 @@ export function captureFindings(needs) {
       result === wanted
         ? []
         : [
-            `capture finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
+            `${name} finished \`${String(result)}\` where scope said it ${where}, not \`${wanted}\``,
           ],
     rest,
   };
@@ -295,7 +334,17 @@ const isCount = (value) => Number.isInteger(value) && Number(value) >= 0;
 function readAccount(value) {
   if (!isRecord(value) || !isRecord(value.shard)) return null;
   const { index, total } = value.shard;
-  const { enumerated, executed, playwrightExitCode, listingStatus } = value;
+  const {
+    enumerated,
+    executed,
+    playwrightExitCode,
+    listingStatus,
+    seconds,
+    listedUnits,
+    ranUnits,
+  } = value;
+  const unitsOk = (/** @type {unknown} */ units) =>
+    units === null || (isRecord(units) && Object.values(units).every(isCount));
   const shardOk =
     Number.isInteger(index) &&
     Number.isInteger(total) &&
@@ -308,7 +357,15 @@ function readAccount(value) {
     !countOk(enumerated) ||
     !countOk(executed) ||
     !Number.isInteger(playwrightExitCode) ||
-    !(listingStatus === null || Number.isInteger(listingStatus))
+    !(listingStatus === null || Number.isInteger(listingStatus)) ||
+    // The run's wall time (#607): null where it was never timed, and present
+    // either way, so an account that dropped it is refused, not read as fast.
+    !(
+      seconds === null ||
+      (typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0)
+    ) ||
+    !unitsOk(listedUnits) ||
+    !unitsOk(ranUnits)
   )
     return null;
   return /** @type {ShardAccount} */ (value);
@@ -407,7 +464,90 @@ export function accountFindings(accounts) {
     }
   }
 
+  findings.push(...unitFindings(valid));
   return findings;
+}
+
+/**
+ * EACH SPEC FILE, exactly once (#607). The sum above cannot see a spec file
+ * run by two shards while another of the same size ran in none, and since
+ * the split is this repository's own plan rather than Playwright's, that is
+ * a defect a planner could have. So every shard writes down, per
+ * `[project] › file`, how many tests the listing holds and how many it ran,
+ * and each file's runs across the shards must equal its listed count. That
+ * holds for Playwright's count split too, where one file's tests can
+ * legitimately span two shards.
+ *
+ * @param {readonly ShardAccount[]} valid
+ * @returns {string[]}
+ */
+function unitFindings(valid) {
+  /** @type {string[]} */
+  const findings = [];
+  for (const { shard, listedUnits, ranUnits } of valid) {
+    if (listedUnits === null)
+      findings.push(
+        `${named(shard)} could not say which spec files the suite holds`,
+      );
+    if (ranUnits === null)
+      findings.push(`${named(shard)} could not say which spec files it ran`);
+  }
+  if (findings.length > 0 || valid.length === 0) return findings;
+
+  const canonical = (/** @type {Record<string, number>} */ units) =>
+    JSON.stringify(Object.entries(units).sort(([a], [b]) => (a < b ? -1 : 1)));
+  const listings = new Set(
+    valid.map(({ listedUnits }) =>
+      canonical(/** @type {Record<string, number>} */ (listedUnits)),
+    ),
+  );
+  if (listings.size > 1) return ['the shards listed different spec files'];
+
+  const listed = /** @type {Record<string, number>} */ (valid[0].listedUnits);
+  /** @type {Map<string, number>} */
+  const ran = new Map(Object.keys(listed).map((key) => [key, 0]));
+  for (const { ranUnits } of valid)
+    for (const [key, count] of Object.entries(
+      /** @type {Record<string, number>} */ (ranUnits),
+    ))
+      ran.set(key, (ran.get(key) ?? 0) + count);
+  for (const [key, count] of [...ran].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const holds = Object.hasOwn(listed, key) ? listed[key] : 0;
+    if (count !== holds)
+      findings.push(`${key}: the shards ran ${count} of its ${holds} tests`);
+  }
+  return findings;
+}
+
+/**
+ * Each shard's Playwright run time and how far the slowest is from the mean,
+ * as a Markdown table for the log and the job summary (#607). The split is
+ * planned from timings refreshed by hand (`scripts/e2e-shard-timings.mjs`),
+ * so this is where a plan going stale shows: in every run, not only in one
+ * that hits the job's limit. Accounts that are not accounts are left out;
+ * the verdict already names them.
+ *
+ * @param {readonly unknown[]} accounts
+ */
+export function shardTimes(accounts) {
+  const valid = /** @type {ShardAccount[]} */ (
+    accounts.map(readAccount).filter((account) => account !== null)
+  ).sort((a, b) => a.shard.index - b.shard.index);
+  const rows = valid.map(
+    ({ shard, seconds }) =>
+      `| ${shard.index} of ${shard.total} | ${seconds === null ? 'not timed' : (seconds / 60).toFixed(1)} |`,
+  );
+  const timed = valid
+    .map(({ seconds }) => seconds)
+    .filter((seconds) => seconds !== null);
+  const table = ['| shard | minutes |', '| --- | --- |', ...rows].join('\n');
+  if (timed.length === 0) return `${table}\n\nno shard was timed`;
+  const slowest = Math.max(...timed) / 60;
+  const mean = timed.reduce((sum, s) => sum + s, 0) / timed.length / 60;
+  return (
+    `${table}\n\nslowest ${slowest.toFixed(1)} min, mean ${mean.toFixed(1)} min: ` +
+    `slowest/mean ${(slowest / mean).toFixed(2)}`
+  );
 }
 
 /**
@@ -483,11 +623,12 @@ function main() {
   }
 
   const present = files.filter((file) => existsSync(file));
-  // The capture job first: it is judged against scope's verdict, not by
-  // whether the pull request is docs-only, and the rest never see it.
-  const capture = captureFindings(needs);
-  const docsOnly = isDocsOnlyRun(capture.rest);
-  // Its accounts, wherever scope gave a verdict captureFindings could read;
+  // The scoped jobs first: each is judged against scope's verdict, not by
+  // whether the pull request is docs-only, and the rest never see them.
+  const capture = scopedJobFindings(needs, 'capture');
+  const logs = scopedJobFindings(capture.rest, 'logs');
+  const docsOnly = isDocsOnlyRun(logs.rest);
+  // The capture's accounts, wherever scope gave a verdict it could read;
   // any other verdict is already refused there.
   const said =
     isRecord(needs) && isRecord(needs.scope) && isRecord(needs.scope.outputs)
@@ -519,13 +660,14 @@ function main() {
         : [];
   const findings = [
     ...capture.findings,
+    ...logs.findings,
     ...captureAccounts,
     ...(docsOnly
       ? // No shard runs, and the download is skipped, so the glob arrives
         // unmatched; any account that does exist is refused by name.
-        docsOnlyFindings(capture.rest, present)
+        docsOnlyFindings(logs.rest, present)
       : [
-          ...needsFindings(capture.rest),
+          ...needsFindings(logs.rest),
           ...files
             .filter((file) => !existsSync(file))
             .map(
@@ -535,6 +677,17 @@ function main() {
           ...accountFindings(present.map((file) => loadAccount(file))),
         ]),
   ];
+  // Every run, refused or not: a shard running long matters most in a run
+  // that failed, and this is where a stale plan shows (#607).
+  if (!docsOnly && present.length > 0) {
+    const times = shardTimes(present.map((file) => loadAccount(file)));
+    console.log(`\n${RULE}\n  E2E SHARD TIMES\n${RULE}\n${times}\n`);
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `\n### e2e shard times\n\n${times}\n`,
+      );
+  }
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +

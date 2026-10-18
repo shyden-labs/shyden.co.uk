@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
+import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import { unitProject } from '../vitest-suite-dirs';
@@ -73,6 +74,18 @@ describe('the setup files of each suite', () => {
     expect(simulation.test?.globalSetup).toEqual(unit.test?.globalSetup);
   });
 
+  it('give the logs suite the shared pair, then the load measurement, and nothing that refuses (#822)', () => {
+    expect(logs.test?.setupFiles).toEqual([
+      'tests/git-env-setup.ts',
+      'tests/temporary-files-setup.ts',
+      'tests/load-setup.ts',
+    ]);
+  });
+
+  it('give the logs suite the unit suite global setup (#822)', () => {
+    expect(logs.test?.globalSetup).toEqual(unit.test?.globalSetup);
+  });
+
   it('give the guards suite the unit suite global setup', () => {
     expect(guards.test?.globalSetup).toEqual(unit.test?.globalSetup);
   });
@@ -94,6 +107,10 @@ describe('the CPU limit', () => {
       'tests/unit-cpu-setup.ts',
     );
   });
+
+  it('is not asked of the logs suite (#822)', () => {
+    expect(logs.test?.setupFiles).not.toContain('tests/unit-cpu-setup.ts');
+  });
 });
 
 // The unit load limit (#688) is the unit suite's alone: the other suites
@@ -104,6 +121,7 @@ describe('the load limit', () => {
     ['guards', guards],
     ['integration', integration],
     ['simulation', simulation],
+    ['logs', logs],
   ] as const)('is not asked of the %s suite (#696)', (_name, config) => {
     expect(config.test?.setupFiles).not.toContain(
       'tests/unit-load-limit-setup.ts',

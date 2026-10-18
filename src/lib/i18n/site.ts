@@ -107,6 +107,21 @@ export const siteEn = {
       assumptions:
         'Assumes 1 coin per point, 0.9 coins per bean, and gifts converting to beans at 40%.',
     },
+    gift: {
+      heading: 'Gift Value Calculator',
+      howToHeading: 'How to use it',
+      howToSteps: [
+        'Enter the value of the gift in the box below.',
+        'Select Calculate — or press Enter.',
+        'Read off the beans the gift gives and the coins those beans redeem for.',
+      ],
+      inputLabel: 'Gift value',
+      calculate: 'Calculate',
+      resultLine: (gift: string, beans: string, coins: string) =>
+        `${gift} gift value → ${beans} beans → ${coins} coins`,
+      assumptions:
+        'Assumes gifts convert to beans at 40% and each bean redeems for 0.9 coins, rounded down to whole beans and coins.',
+    },
   },
 
   // `switchTo` (one string meaning "the other language") was removed in #21
@@ -246,6 +261,21 @@ export const siteId: SiteStrings = {
       assumptions:
         'Mengasumsikan 1 koin per poin, 0,9 koin per bean, dan hadiah dikonversi ke bean sebesar 40%.',
     },
+    gift: {
+      heading: 'Kalkulator Nilai Hadiah',
+      howToHeading: 'Cara menggunakannya',
+      howToSteps: [
+        'Masukkan nilai hadiah pada kotak di bawah ini.',
+        'Pilih Hitung — atau tekan Enter.',
+        'Baca bean yang diberikan hadiah dan koin yang bisa ditukarkan dengan bean tersebut.',
+      ],
+      inputLabel: 'Nilai hadiah',
+      calculate: 'Hitung',
+      resultLine: (gift: string, beans: string, coins: string) =>
+        `${gift} nilai hadiah → ${beans} bean → ${coins} koin`,
+      assumptions:
+        'Asumsinya, hadiah dikonversi menjadi bean dengan rasio 40%, dan setiap bean dapat ditukarkan dengan 0,9 koin, dengan jumlah bean dan koin dibulatkan ke bawah ke angka bulat.',
+    },
   },
 
   language: {
@@ -370,6 +400,21 @@ export const siteZh: SiteStrings = {
       assumptions:
         '假设每 1 点需 1 枚金币，每个 bean 可兑换 0.9 枚金币，且礼物按 40% 的比例兑换成 bean。',
     },
+    gift: {
+      heading: '礼物价值计算器',
+      howToHeading: '如何使用',
+      howToSteps: [
+        '请在下方框中输入礼物的价值。',
+        '选择“计算”——或按 Enter 键。',
+        '读取礼物所给的 bean 数量，以及这些 bean 可兑换的金币数量。',
+      ],
+      inputLabel: '礼物价值',
+      calculate: '计算',
+      resultLine: (gift: string, beans: string, coins: string) =>
+        `${gift} 礼物价值 → ${beans} bean → ${coins} 金币`,
+      assumptions:
+        '假设礼物按 40% 的比率转换为 bean，每个 bean 可兑换 0.9 枚金币，bean 和金币的数量均向下取整至整数。',
+    },
   },
   language: {
     label: '语言',
@@ -428,7 +473,7 @@ export const siteVi: SiteStrings = {
     shytalkFeature2: 'Xin một chỗ ngồi, hoặc cứ nghe cho đến khi bạn sẵn sàng',
     shytalkFeature3: 'Buổi học miễn phí cùng giáo viên thật',
     shytalkFeature4:
-      'Có kiểm duyệt, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện',
+      'Có người điều hành, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện',
     shytalkShotAlt:
       'Ứng dụng ShyTalk trên điện thoại, hiển thị một phòng âm thanh trực tuyến với những người trên các chỗ ngồi và khung trò chuyện của phòng ở bên dưới.',
     visitShytalk: 'Truy cập trang ShyTalk',
@@ -450,7 +495,7 @@ export const siteVi: SiteStrings = {
     workCalculatorsTitle: 'Máy tính YeeTalk',
     workCalculatorsBody:
       'Tính số xu, bean và giá trị quà tặng đằng sau mục tiêu glory points của YeeTalk, hoặc một món quà mang lại gì sau khi được nhận.',
-    openCalculators: 'Mở các máy tính',
+    openCalculators: 'Mở các công cụ tính',
     workClassroomTitle: 'Trình tạo nhóm trong lớp học',
     workClassroomBody:
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
@@ -493,6 +538,21 @@ export const siteVi: SiteStrings = {
         `${coins} xu → ${beans} bean → ${gift} tổng giá trị quà tặng`,
       assumptions:
         'Giả định mỗi điểm tương ứng với 1 xu, mỗi bean tương ứng với 0,9 xu, và quà tặng được quy đổi thành bean theo tỷ lệ 40%.',
+    },
+    gift: {
+      heading: 'Máy tính giá trị quà tặng',
+      howToHeading: 'Cách sử dụng',
+      howToSteps: [
+        'Hãy nhập giá trị của món quà vào ô bên dưới.',
+        'Chọn “Tính toán” — hoặc nhấn phím Enter.',
+        'Hãy đọc số bean mà món quà mang lại và số xu mà những bean đó có thể đổi lấy.',
+      ],
+      inputLabel: 'Giá trị quà tặng',
+      calculate: 'Tính toán',
+      resultLine: (gift: string, beans: string, coins: string) =>
+        `${gift} giá trị quà tặng → ${beans} bean → ${coins} xu`,
+      assumptions:
+        'Giả định rằng quà tặng được quy đổi thành bean với tỷ lệ 40% và mỗi bean có thể đổi lấy 0,9 xu, số lượng bean và xu được làm tròn xuống thành số nguyên.',
     },
   },
   language: {
@@ -555,7 +615,8 @@ export const siteTh: SiteStrings = {
     shytalkFeature1: 'ห้องเสียงสดรองรับได้สูงสุดแปดที่นั่ง',
     shytalkFeature2: 'ขอที่นั่ง หรือจะฟังไปก่อนจนกว่าคุณจะพร้อม',
     shytalkFeature3: 'บทเรียนฟรีกับครูตัวจริง',
-    shytalkFeature4: 'มีการดูแล แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
+    shytalkFeature4:
+      'มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
     shytalkShotAlt:
       'แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง',
     visitShytalk: 'เยี่ยมชมเว็บไซต์ ShyTalk',
@@ -576,7 +637,7 @@ export const siteTh: SiteStrings = {
     toolBadge: 'พร้อมใช้งาน',
     workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
     workCalculatorsBody:
-      'คำนวณจำนวนเหรียญ bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว',
+      'คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว',
     openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
@@ -587,7 +648,7 @@ export const siteTh: SiteStrings = {
   },
   notFound: {
     title: 'ไม่พบหน้า — Shyden',
-    description: 'หน้าที่คุณกำลังค้นหาไม่มีอยู่',
+    description: 'หน้าเว็บที่คุณกำลังค้นหาไม่มีอยู่',
     heading: 'ไม่พบหน้า',
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
@@ -620,6 +681,21 @@ export const siteTh: SiteStrings = {
         `${coins} เหรียญ → ${beans} bean → ${gift} มูลค่ารวมของของขวัญ`,
       assumptions:
         'สมมติว่า 1 คะแนนเท่ากับ 1 เหรียญ, 0.9 เหรียญต่อ bean และของขวัญจะถูกแปลงเป็น bean ในอัตรา 40%',
+    },
+    gift: {
+      heading: 'เครื่องคำนวณมูลค่าของขวัญ',
+      howToHeading: 'วิธีใช้',
+      howToSteps: [
+        'กรอกมูลค่าของของขวัญลงในช่องด้านล่าง',
+        'เลือก "คำนวณ" — หรือกด Enter',
+        'อ่านจำนวน bean ที่ของขวัญให้ และจำนวนเหรียญที่ bean เหล่านั้นแลกได้',
+      ],
+      inputLabel: 'มูลค่าของขวัญ',
+      calculate: 'คำนวณ',
+      resultLine: (gift: string, beans: string, coins: string) =>
+        `${gift} มูลค่าของขวัญ → ${beans} bean → ${coins} เหรียญ`,
+      assumptions:
+        'สมมติว่าของขวัญจะแปลงเป็น bean ในอัตรา 40% และแต่ละ bean แลกได้ 0.9 เหรียญ โดยจะปัดลงเป็นจำนวนเต็มของ bean และเหรียญ',
     },
   },
   language: {

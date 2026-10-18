@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import unit from '../../vitest.config';
 import integration from '../../vitest.integration.config';
+import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import { isDocsOnlyPath } from '../../scripts/docs-only.mjs';
 import { floorBreach } from '../floors';
@@ -97,5 +98,9 @@ describe('the tree reading every guard shares (#631)', () => {
 
   it('is read by the config the simulation suite shares (#650)', () => {
     expect(simulation.test?.globalSetup).toBe(unit.test?.globalSetup);
+  });
+
+  it('is read by the config the logs suite shares (#822)', () => {
+    expect(logs.test?.globalSetup).toBe(unit.test?.globalSetup);
   });
 });

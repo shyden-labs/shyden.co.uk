@@ -92,8 +92,8 @@ const ALLOWANCE: Readonly<
   },
   'warnings.SEX_SPILLOVER': {
     reason:
-      'boys and girls change places (English 8 apart); vi and th were not written as a swap, listed on #754 for correction',
-    arms: { M: { zh: 9, th: 22, id: 18, vi: 43 } },
+      'boys and girls change places (English 8 apart); vi and th were rewritten as that swap alone (#754)',
+    arms: { M: { zh: 9, th: 8, id: 18, vi: 4 } },
   },
   'errors.PINNED_TOO_MANY_GROUPS': {
     reason:
