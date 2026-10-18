@@ -1964,3 +1964,62 @@ test.describe('a full roster at the narrow end', () => {
     );
   }
 });
+
+/**
+ * Make Groups is the page's primary action, docked to the bottom of the screen
+ * at every width. On a phone, the on-screen keyboard took that bottom away:
+ * Android Chrome's keyboard covers the page without shrinking it, so the
+ * docked bar sat hidden behind the keyboard while a teacher typed the class
+ * size (bar at 703 px, 471 px left visible, measured on the test phone, issue
+ * 807). The viewport tag's `interactive-widget=resizes-content` shrinks the
+ * page above the keyboard instead (operator decision 2026-10-18).
+ *
+ * Only a device with an on-screen keyboard can answer this: the desktop
+ * engines and the emulated phones open none, so the test asks the device
+ * whether one opened and skips, saying so, when it did not.
+ */
+test.describe('the on-screen keyboard', () => {
+  test('leaves Make Groups on screen while a teacher types', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    const visibleBefore = await page.evaluate(
+      () => visualViewport?.height ?? innerHeight,
+    );
+    // Tapped, as a teacher does: Chrome raises the keyboard only for a field
+    // focused by a gesture, never for one a script focuses (measured on the
+    // phone: `fill` alone opened none).
+    await page.click('#cg-size');
+    await page.keyboard.type('3');
+    // A keyboard rises a few hundred milliseconds after the field takes focus
+    // (about 300 ms on the test phone); three seconds is the stated ceiling.
+    const keyboardOpened = await page
+      .waitForFunction(
+        (before) => (visualViewport?.height ?? innerHeight) < before,
+        visibleBefore,
+        { timeout: 3_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      );
+    test.skip(
+      !keyboardOpened,
+      'no on-screen keyboard opened on this device, so nothing can cover the bar',
+    );
+
+    await expect(page.locator('#cg-size')).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const bar = document.getElementById('cg-go')!.getBoundingClientRect();
+          const view = visualViewport!;
+          return (
+            bar.top >= view.offsetTop &&
+            bar.bottom <= view.offsetTop + view.height
+          );
+        }),
+      )
+      .toBe(true);
+  });
+});

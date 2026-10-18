@@ -1,5 +1,6 @@
 import { adb, renderedScreen } from '../../scripts/adb.mjs';
 import { test, expect } from '../e2e/fixtures';
+import { CHROME_PACKAGE } from './chrome-foreground';
 
 test('the suite is running on the real phone, not an emulated profile', async ({
   page,
@@ -25,6 +26,39 @@ test('the suite is running on the real phone, not an emulated profile', async ({
   // dpr is density/160 on Android, and CSS width is the screen's pixel width divided by it.
   expect(browserSide.dpr).toBeCloseTo(screen.density / 160, 2);
   expect(browserSide.cssWidth).toBeCloseTo(screen.width / browserSide.dpr, 0);
+});
+
+test("a test's tab shows a datalist's suggestions without Chrome crashing", async ({
+  page,
+}) => {
+  // #807: on a tab made over DevTools, this exact sequence killed Chrome 5 times in 5
+  // (AutofillProvider.showDatalistPopup, then a null view), and every later test in the run
+  // failed to connect. The page fixture now hands out a tab Chrome opened for a VIEW intent
+  // (tests/device/visitor-tab.ts); the same Chrome process must still be there afterwards.
+  const chromePid = () => adb(['shell', 'pidof', CHROME_PACKAGE]).trim();
+  const before = chromePid();
+  expect(before, 'Chrome is running before the test').toMatch(/^\d+$/);
+
+  // English draws no report form; Indonesian does.
+  await page.goto('/id/');
+  expect(
+    await page.evaluate(() => document.hasFocus()),
+    "the test's tab holds the phone's focus",
+  ).toBe(true);
+  const report = page.locator('[data-report]');
+  const quote = report.locator('#report-quote');
+  // From the keyboard, as report-form.spec.ts walks the fields: open the form, Tab in.
+  await report.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(quote).toBeFocused();
+  await page.keyboard.type('Tem', { delay: 120 });
+
+  await expect(quote).toHaveValue('Tem');
+  expect(
+    chromePid(),
+    'the same Chrome process, not a crash and a relaunch',
+  ).toBe(before);
 });
 
 test('the bare request fixture resolves a relative URL against baseURL, on the real device', async ({

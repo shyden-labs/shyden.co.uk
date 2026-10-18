@@ -8,6 +8,7 @@ import {
   type APIRequestContext,
 } from '@playwright/test';
 import { ensureChromeForegroundOrRecover } from '../device/chrome-foreground';
+import { openTabsAsAVisitor } from '../device/visitor-tab';
 import {
   DEVICE_DOWNLOAD_BEHAVIOUR,
   emptyDeviceDownloads,
@@ -204,6 +205,9 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     const context = browser.contexts()[0];
     if (!context)
       throw new Error('Real device exposed no browser context over CDP.');
+    // Every tab below, and any a test opens, is one Chrome made for a VIEW intent: a tab
+    // made over DevTools crashes Chrome when a <datalist> shows its suggestions (#807).
+    openTabsAsAVisitor(context);
 
     const resolvedBaseURL = requireBaseURL(baseURL);
     const scratch = await context.newPage();
