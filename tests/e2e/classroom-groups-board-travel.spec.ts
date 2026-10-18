@@ -104,9 +104,15 @@ const startSampler = (page: Page) =>
               .map((a) => a.playState + (a.pending ? ' pending' : ''))
               .join(', ')}]`,
           ].join(', ');
+    const probeFrames: [number, boolean][] = [];
     const tick = () => {
       if (!on) return;
       frame++;
+      if (probeFrames.length < 60)
+        probeFrames.push([
+          Math.round(performance.now() - start),
+          laidOut(document.getElementById('cg-board')),
+        ]);
       const numbers = new Set(
         Array.from(
           document.querySelectorAll<HTMLElement>('#cg-board [data-number]'),
@@ -166,7 +172,14 @@ const startSampler = (page: Page) =>
     requestAnimationFrame(tick);
     (window as unknown as { stopSampler: () => Samples }).stopSampler = () => {
       on = false;
-      return { students: [...tally], flights };
+      const blankAt = (
+        (window as unknown as { blankAt?: number[] }).blankAt ?? []
+      ).map((t) => Math.round(t - start));
+      return {
+        students: [...tally],
+        flights,
+        probe: { blankAt, frames: probeFrames },
+      } as Samples;
     };
   }, measureBoardScript());
 
@@ -263,7 +276,13 @@ test.describe('the board deals by moving students into their cards', () => {
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { students } = await stopSampler(page);
+    const samples = await stopSampler(page);
+    const { students } = samples;
+    // PROBE (do not merge): print when frames landed against the blank.
+    expect(
+      (samples as unknown as { probe: unknown }).probe,
+      'PROBE frames',
+    ).toEqual(null);
     expect(
       searched(
         students.filter(([, t]) => t.both > 0),

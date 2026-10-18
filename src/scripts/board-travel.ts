@@ -129,7 +129,12 @@ export async function travel(
   if (blanked) {
     const was = blanked.style.display;
     blanked.style.display = 'none';
-    setTimeout(() => (blanked.style.display = was), 100);
+    const probe = window as unknown as { blankAt?: number[] };
+    (probe.blankAt ??= []).push(performance.now());
+    setTimeout(() => {
+      blanked.style.display = was;
+      probe.blankAt!.push(performance.now());
+    }, 100);
   }
 
   const first = await Promise.race([
