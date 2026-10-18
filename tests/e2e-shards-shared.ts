@@ -32,9 +32,20 @@ export interface Account {
   executed: number | null;
   playwrightExitCode: number;
   listingStatus: number | null;
+  seconds: number | null;
+  listedUnits: Record<string, number> | null;
+  ranUnits: Record<string, number> | null;
 }
 
 export const SUITE = 2210;
+
+/** The suite's spec files, as every shard of `whole()` lists them. */
+export const WHOLE_UNITS: Record<string, number> = {
+  '[chromium] › 1.spec.ts': 553,
+  '[chromium] › 2.spec.ts': 553,
+  '[chromium] › 3.spec.ts': 552,
+  '[chromium] › 4.spec.ts': 552,
+};
 
 export const account = (
   index: number,
@@ -46,6 +57,10 @@ export const account = (
   executed,
   playwrightExitCode: 0,
   listingStatus: 0,
+  seconds: 600,
+  // One spec file per shard, the four adding up to SUITE (#607).
+  listedUnits: WHOLE_UNITS,
+  ranUnits: { [`[chromium] › ${index}.spec.ts`]: executed },
   ...over,
 });
 

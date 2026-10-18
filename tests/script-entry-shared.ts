@@ -66,6 +66,14 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'GITHUB_REPOSITORY and GITHUB_TOKEN are required',
   },
+  // With no run named and no logs, there are no timings to write, so it
+  // prints its usage and leaves the committed timings alone (#607).
+  'e2e-shard-timings.mjs': {
+    args: [],
+    env: {},
+    status: 2,
+    says: 'usage: node scripts/e2e-shard-timings.mjs',
+  },
   // With no needs to read and no shard accounts, build-and-test's verdict has
   // nothing to vouch for, so it refuses rather than pass on nothing (#163).
   'e2e-shards.mjs': {

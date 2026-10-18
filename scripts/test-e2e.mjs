@@ -46,6 +46,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EVIDENCE_REPORT } from './evidence-files.mjs';
 import { shardAccount, shardNotice, shardOf } from './e2e-shards.mjs';
+import { plannedRun, unitsOfListing } from './e2e-shard-plan.mjs';
 
 /** `playwright test --list` closes with e.g. `Total: 2094 tests in 18 files`. */
 const LIST_FOOTER = /^Total:\s+(\d+)\s+tests?\b/m;
@@ -523,9 +524,37 @@ function main() {
   rmSync(reportPath, { force: true });
 
   try {
+    // CI's e2e step names a timings file, and its shard then runs the spec
+    // files planned for it rather than Playwright's equal count of tests
+    // (scripts/e2e-shard-plan.mjs, #607). Planned from the unfiltered listing
+    // above, so every shard of one run computes the same plan.
+    const planFile = process.env.E2E_SHARD_PLAN;
+    const listPath = join(reportDir, 'shard-test-list.txt');
+    const planned = plannedRun({
+      planFile,
+      shard: shardOf(argv),
+      selection,
+      listing: listing.stdout ?? '',
+      timingsText: planFile ? readFileSync(planFile, 'utf8') : '',
+      passthrough,
+      listPath,
+    });
+    if (planned) {
+      writeFileSync(listPath, planned.testList);
+      console.error(
+        `\n${RULE}\n  E2E SHARD PLAN\n${RULE}\n  ${planned.report.replaceAll('\n', '\n  ')}\n`,
+      );
+    }
+
+    const started = performance.now();
     const run = spawnSync(
       'npx',
-      ['playwright', 'test', `--reporter=${reporter}`, ...passthrough],
+      [
+        'playwright',
+        'test',
+        `--reporter=${reporter}`,
+        ...(planned ? planned.args : passthrough),
+      ],
       {
         stdio: 'inherit',
         env: {
@@ -535,14 +564,19 @@ function main() {
         },
       },
     );
+    // The run's wall time, for build-and-test's table of shard times (#607).
+    const seconds = Math.round((performance.now() - started) / 100) / 10;
 
     let executed = null;
+    /** @type {Record<string, number> | null} */
+    let ranUnits = null;
     let parsed = null;
     /** @type {unknown} */
     let unreadable = null;
     try {
       parsed = JSON.parse(readFileSync(reportPath, 'utf8'));
       executed = countExecuted(parsed.stats);
+      ranUnits = ranByUnit(parsed);
     } catch (cause) {
       unreadable = cause;
     }
@@ -557,6 +591,9 @@ function main() {
       executed,
       playwrightExitCode: run.status ?? 1,
       listingStatus: listing.status,
+      seconds,
+      listedUnits: listedByUnit(listing.stdout ?? ''),
+      ranUnits,
     });
     const accountDir = process.env.E2E_ACCOUNT_DIR;
     if (recorded && accountDir) {
@@ -692,6 +729,43 @@ function* reportTests(report) {
     }
   }
   yield* visit(report?.suites);
+}
+
+/**
+ * How many tests the report holds for each `[project] › file`, every
+ * outcome counted, as `countExecuted` counts the report's `stats`. A shard
+ * writes it into its account, and build-and-test holds each file's runs
+ * across the shards to the listing's count of it (#607).
+ *
+ * @param {Record<string, any>} report
+ * @returns {Record<string, number>}
+ */
+export function ranByUnit(report) {
+  /** @type {Record<string, number>} */
+  const ran = {};
+  for (const { spec, test } of reportTests(report)) {
+    const key = `[${test.projectName}] › ${spec.file}`;
+    ran[key] = (ran[key] ?? 0) + 1;
+  }
+  return ran;
+}
+
+/**
+ * The listing's count of each `[project] › file`, or null where the listing
+ * cannot be read: build-and-test then names the shard rather than holding
+ * the suite to nothing.
+ *
+ * @param {string} stdout
+ * @returns {Record<string, number> | null}
+ */
+export function listedByUnit(stdout) {
+  try {
+    return Object.fromEntries(
+      unitsOfListing(stdout).map(({ key, tests }) => [key, tests]),
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
