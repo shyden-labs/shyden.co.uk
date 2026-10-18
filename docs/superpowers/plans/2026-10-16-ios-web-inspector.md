@@ -10,9 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-16-ios-web-inspector-design.md`
 
-## Status (2026-10-16)
+## Status (2026-10-19)
 
-**On hold after Task 3** until the zero-code probe in the spec's section 8 (Safari's own Web Inspector on the phone's page, while WebDriverAgent runs: Shyden's ruling of 2026-10-18 retired `safaridriver`). Its attaching step (a) answered yes by hand on 2026-10-18 (#838 comment 6246973024); steps (b)-(e) remain. Tasks 4-9 (link, usbmux, lockdown, Web Inspector RPC, JSON protocol, the certificate pin and the TLS wiring) are written after it, from what the phone shows; Tasks 1-3 are the codecs any route needs.
+**Tasks 1-3 are built** (2026-10-19, 95 unit tests; the code below is the reviewed code, folded back after review pass 1 ran it). **On hold after Task 3** until the zero-code probe in the spec's section 8 (Safari's own Web Inspector on the phone's page, while WebDriverAgent runs: Shyden's ruling of 2026-10-18 retired `safaridriver`). Its attaching step (a) answered yes by hand on 2026-10-18 (#838 comment 6246973024); steps (b)-(e) remain. Tasks 4-9 (link, usbmux, lockdown, Web Inspector RPC, JSON protocol, the certificate pin and the TLS wiring) are written after it, from what the phone shows; Tasks 1-3 are the codecs any route needs.
 
 ## Scope
 
@@ -64,7 +64,11 @@ import {
  * plistlib (`plistlib.dumps(value, fmt=FMT_BINARY, sort_keys=False)`), an
  * encoder independent of this one, on 2026-10-16.
  */
-const PLISTLIB: ReadonlyArray<{ name: string; hex: string; value: PlistValue }> = [
+const PLISTLIB: ReadonlyArray<{
+  name: string;
+  hex: string;
+  value: PlistValue;
+}> = [
   {
     name: 'a one-key dictionary',
     hex: '62706c6973743030d1010251611001080b0d000000000000010100000000000000030000000000000000000000000000000f',
@@ -153,38 +157,48 @@ describe('keeps a __proto__ key as data', () => {
 
 describe('refuses what it does not read, by name', () => {
   it('a document without the bplist00 magic', () => {
-    expect(() => decodeBinaryPlist(Buffer.from('<?xml version="1.0"?><plist/>' + ' '.repeat(40)))).toThrow(
-      /not a bplist00 document/,
-    );
+    expect(() =>
+      decodeBinaryPlist(
+        Buffer.from('<?xml version="1.0"?><plist/>' + ' '.repeat(40)),
+      ),
+    ).toThrow(/not a bplist00 document/);
   });
   it('a date, which no message this client reads carries', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from('330000000000000000', 'hex')]))).toThrow(
-      /object marker 0x33 at byte 8/,
-    );
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from('330000000000000000', 'hex')])),
+    ).toThrow(/object marker 0x33 at byte 8/);
   });
   it('a 16-byte integer', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from('14' + '00'.repeat(16), 'hex')]))).toThrow(
-      /a 16-byte integer/,
-    );
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from('14' + '00'.repeat(16), 'hex')])),
+    ).toThrow(/a 16-byte integer/);
   });
   it('a dictionary key that is not a string', () => {
     expect(() =>
-      decodeBinaryPlist(document([Buffer.from([0xd1, 0x01, 0x01]), Buffer.from([0x10, 0x01])])),
+      decodeBinaryPlist(
+        document([Buffer.from([0xd1, 0x01, 0x01]), Buffer.from([0x10, 0x01])]),
+      ),
     ).toThrow(/dictionary key 0 at 8 is not a string/);
   });
   it('an array that contains itself', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from([0xa1, 0x00])]))).toThrow(/nested deeper than 64/);
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from([0xa1, 0x00])])),
+    ).toThrow(/nested deeper than 64/);
   });
   it('an ASCII string holding a byte above 0x7f', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from([0x51, 0xe9])]))).toThrow(/ASCII string at 8 holds 0xe9/);
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from([0x51, 0xe9])])),
+    ).toThrow(/ASCII string at 8 holds 0xe9/);
   });
   it('a string that runs past the object area', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from([0x55, 0x61])]))).toThrow(/run past the object area/);
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from([0x55, 0x61])])),
+    ).toThrow(/run past the object area/);
   });
   it('a reference to an object that is not there', () => {
-    expect(() => decodeBinaryPlist(document([Buffer.from([0xa1, 0x05])]))).toThrow(
-      /a reference to object 5 of 1/,
-    );
+    expect(() =>
+      decodeBinaryPlist(document([Buffer.from([0xa1, 0x05])])),
+    ).toThrow(/a reference to object 5 of 1/);
   });
   it('a real that is not finite, on the way out', () => {
     expect(() => encodeBinaryPlist(Number.NaN)).toThrow(PlistFormatError);
@@ -218,7 +232,8 @@ Expected: FAIL, `Failed to resolve import "../device/ios/inspector/bplist"`.
  * the unit tests compare bytes with it.
  */
 
-export type PlistValue = string | number | boolean | Buffer | readonly PlistValue[] | PlistDictionary;
+export type PlistValue =
+  string | number | boolean | Buffer | readonly PlistValue[] | PlistDictionary;
 
 export interface PlistDictionary {
   readonly [key: string]: PlistValue;
@@ -238,12 +253,25 @@ const TRAILER_LENGTH = 32;
 const MAX_DEPTH = 64;
 
 export function isPlistDictionary(value: PlistValue): value is PlistDictionary {
-  return typeof value === 'object' && !Buffer.isBuffer(value) && !Array.isArray(value);
+  return (
+    typeof value === 'object' &&
+    !Buffer.isBuffer(value) &&
+    !Array.isArray(value)
+  );
 }
 
 /** Sets `key` as an own property, so a key named `__proto__` stays data. */
-export function setEntry(target: Record<string, PlistValue>, key: string, value: PlistValue): void {
-  Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
+export function setEntry(
+  target: Record<string, PlistValue>,
+  key: string,
+  value: PlistValue,
+): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
 }
 
 function hex(byte: number): string {
@@ -264,7 +292,12 @@ function readUnsigned(bytes: Buffer, offset: number, size: number): number {
   throw new PlistFormatError(`no ${size}-byte unsigned integer`);
 }
 
-function writeUnsigned(target: Buffer, value: number, offset: number, size: number): void {
+function writeUnsigned(
+  target: Buffer,
+  value: number,
+  offset: number,
+  size: number,
+): void {
   if (size === 1) target.writeUInt8(value, offset);
   else if (size === 2) target.writeUInt16BE(value, offset);
   else if (size === 4) target.writeUInt32BE(value, offset);
@@ -280,7 +313,10 @@ function sizeFor(count: number): number {
 }
 
 export function decodeBinaryPlist(bytes: Buffer): PlistValue {
-  if (bytes.length < MAGIC.length + TRAILER_LENGTH || !bytes.subarray(0, MAGIC.length).equals(MAGIC)) {
+  if (
+    bytes.length < MAGIC.length + TRAILER_LENGTH ||
+    !bytes.subarray(0, MAGIC.length).equals(MAGIC)
+  ) {
     throw new PlistFormatError(
       `not a bplist00 document: ${bytes.length} bytes starting ${JSON.stringify(bytes.subarray(0, 8).toString('latin1'))}`,
     );
@@ -291,40 +327,65 @@ export function decodeBinaryPlist(bytes: Buffer): PlistValue {
   const objectCount = readUnsigned(bytes, end + 8, 8);
   const topObject = readUnsigned(bytes, end + 16, 8);
   const tableStart = readUnsigned(bytes, end + 24, 8);
-  if (tableStart < MAGIC.length || tableStart + objectCount * offsetSize > end) {
+  if (
+    tableStart < MAGIC.length ||
+    tableStart + objectCount * offsetSize > end
+  ) {
     throw new PlistFormatError(
       `an offset table of ${objectCount} x ${offsetSize} bytes at ${tableStart} does not fit before the trailer at ${end}`,
     );
   }
   const span = (start: number, length: number): Buffer => {
     if (start + length > tableStart) {
-      throw new PlistFormatError(`${length} bytes at ${start} run past the object area`);
+      throw new PlistFormatError(
+        `${length} bytes at ${start} run past the object area`,
+      );
     }
     return bytes.subarray(start, start + length);
   };
   const offsetOf = (ref: number): number => {
-    if (ref >= objectCount) throw new PlistFormatError(`a reference to object ${ref} of ${objectCount}`);
-    const offset = readUnsigned(bytes, tableStart + ref * offsetSize, offsetSize);
+    if (ref >= objectCount)
+      throw new PlistFormatError(
+        `a reference to object ${ref} of ${objectCount}`,
+      );
+    const offset = readUnsigned(
+      bytes,
+      tableStart + ref * offsetSize,
+      offsetSize,
+    );
     if (offset < MAGIC.length || offset >= tableStart) {
-      throw new PlistFormatError(`object ${ref} is said to start at ${offset}, outside the object area`);
+      throw new PlistFormatError(
+        `object ${ref} is said to start at ${offset}, outside the object area`,
+      );
     }
     return offset;
   };
-  const lengthAfter = (offset: number, low: number): { length: number; start: number } => {
+  const lengthAfter = (
+    offset: number,
+    low: number,
+  ): { length: number; start: number } => {
     if (low !== 0x0f) return { length: low, start: offset + 1 };
     const marker = span(offset + 1, 1).readUInt8(0);
     if (marker >> 4 !== 0x1 || (marker & 0x0f) > 3) {
-      throw new PlistFormatError(`a length at ${offset + 1} has marker 0x${hex(marker)}, not an integer`);
+      throw new PlistFormatError(
+        `a length at ${offset + 1} has marker 0x${hex(marker)}, not an integer`,
+      );
     }
     const size = 1 << (marker & 0x0f);
-    return { length: readUnsigned(span(offset + 2, size), 0, size), start: offset + 2 + size };
+    return {
+      length: readUnsigned(span(offset + 2, size), 0, size),
+      start: offset + 2 + size,
+    };
   };
   const refsAt = (start: number, count: number): number[] => {
     const area = span(start, count * refSize);
-    return Array.from({ length: count }, (_, index) => readUnsigned(area, index * refSize, refSize));
+    return Array.from({ length: count }, (_, index) =>
+      readUnsigned(area, index * refSize, refSize),
+    );
   };
   const read = (ref: number, depth: number): PlistValue => {
-    if (depth > MAX_DEPTH) throw new PlistFormatError(`nested deeper than ${MAX_DEPTH}`);
+    if (depth > MAX_DEPTH)
+      throw new PlistFormatError(`nested deeper than ${MAX_DEPTH}`);
     const offset = offsetOf(ref);
     const marker = bytes.readUInt8(offset);
     const high = marker >> 4;
@@ -332,25 +393,40 @@ export function decodeBinaryPlist(bytes: Buffer): PlistValue {
     if (marker === 0x08) return false;
     if (marker === 0x09) return true;
     if (high === 0x1) {
-      if (low > 3) throw new PlistFormatError(`a ${2 ** low}-byte integer at ${offset}`);
+      if (low > 3)
+        throw new PlistFormatError(`a ${2 ** low}-byte integer at ${offset}`);
       const size = 1 << low;
       const body = span(offset + 1, size);
       if (size < 8) return readUnsigned(body, 0, size);
       const value = body.readBigInt64BE(0);
-      if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
-        throw new PlistFormatError(`the integer ${value} at ${offset} is past the safe range`);
+      if (
+        value > BigInt(Number.MAX_SAFE_INTEGER) ||
+        value < BigInt(Number.MIN_SAFE_INTEGER)
+      ) {
+        throw new PlistFormatError(
+          `the integer ${value} at ${offset} is past the safe range`,
+        );
       }
       return Number(value);
     }
     if (marker === 0x22) return span(offset + 1, 4).readFloatBE(0);
     if (marker === 0x23) return span(offset + 1, 8).readDoubleBE(0);
-    if (high === 0x4 || high === 0x5 || high === 0x6 || high === 0xa || high === 0xd) {
+    if (
+      high === 0x4 ||
+      high === 0x5 ||
+      high === 0x6 ||
+      high === 0xa ||
+      high === 0xd
+    ) {
       const { length, start } = lengthAfter(offset, low);
       if (high === 0x4) return Buffer.from(span(start, length));
       if (high === 0x5) {
         const body = span(start, length);
         const wide = body.find((byte) => byte > 0x7f);
-        if (wide !== undefined) throw new PlistFormatError(`the ASCII string at ${offset} holds 0x${hex(wide)}`);
+        if (wide !== undefined)
+          throw new PlistFormatError(
+            `the ASCII string at ${offset} holds 0x${hex(wide)}`,
+          );
         return body.toString('latin1');
       }
       if (high === 0x6) {
@@ -358,28 +434,36 @@ export function decodeBinaryPlist(bytes: Buffer): PlistValue {
         units.swap16();
         return units.toString('utf16le');
       }
-      if (high === 0xa) return refsAt(start, length).map((child) => read(child, depth + 1));
+      if (high === 0xa)
+        return refsAt(start, length).map((child) => read(child, depth + 1));
       const refs = refsAt(start, length * 2);
       const result: Record<string, PlistValue> = {};
       for (let index = 0; index < length; index += 1) {
         const key = read(refs[index], depth + 1);
         if (typeof key !== 'string') {
-          throw new PlistFormatError(`dictionary key ${index} at ${offset} is not a string`);
+          throw new PlistFormatError(
+            `dictionary key ${index} at ${offset} is not a string`,
+          );
         }
         setEntry(result, key, read(refs[length + index], depth + 1));
       }
       return result;
     }
-    throw new PlistFormatError(`object marker 0x${hex(marker)} at byte ${offset} is not one this client reads`);
+    throw new PlistFormatError(
+      `object marker 0x${hex(marker)} at byte ${offset} is not one this client reads`,
+    );
   };
   if (topObject >= objectCount) {
-    throw new PlistFormatError(`the top object ${topObject} is not among ${objectCount}`);
+    throw new PlistFormatError(
+      `the top object ${topObject} is not among ${objectCount}`,
+    );
   }
   return read(topObject, 0);
 }
 
 function encodeInteger(value: number): Buffer {
-  if (!Number.isSafeInteger(value)) throw new PlistFormatError(`${value} is not a safe integer`);
+  if (!Number.isSafeInteger(value))
+    throw new PlistFormatError(`${value} is not a safe integer`);
   if (value >= 0 && value <= 0xff) return Buffer.from([0x10, value]);
   if (value >= 0 && value <= 0xffff) {
     const bytes = Buffer.alloc(3);
@@ -401,7 +485,10 @@ function encodeInteger(value: number): Buffer {
 
 function marker(high: number, length: number): Buffer {
   if (length < 0x0f) return Buffer.from([(high << 4) | length]);
-  return Buffer.concat([Buffer.from([(high << 4) | 0x0f]), encodeInteger(length)]);
+  return Buffer.concat([
+    Buffer.from([(high << 4) | 0x0f]),
+    encodeInteger(length),
+  ]);
 }
 
 function isAscii(text: string): boolean {
@@ -411,47 +498,70 @@ function isAscii(text: string): boolean {
   return true;
 }
 
-function encodeObject(value: PlistValue, refs: readonly number[], refSize: number): Buffer {
+function encodeObject(
+  value: PlistValue,
+  refs: readonly number[],
+  refSize: number,
+): Buffer {
   if (typeof value === 'boolean') return Buffer.from([value ? 0x09 : 0x08]);
   if (typeof value === 'number') {
     if (Number.isInteger(value)) return encodeInteger(value);
-    if (!Number.isFinite(value)) throw new PlistFormatError(`${value} is not a finite real`);
+    if (!Number.isFinite(value))
+      throw new PlistFormatError(`${value} is not a finite real`);
     const bytes = Buffer.alloc(9);
     bytes.writeUInt8(0x23, 0);
     bytes.writeDoubleBE(value, 1);
     return bytes;
   }
   if (typeof value === 'string') {
-    if (isAscii(value)) return Buffer.concat([marker(0x5, value.length), Buffer.from(value, 'latin1')]);
+    if (isAscii(value))
+      return Buffer.concat([
+        marker(0x5, value.length),
+        Buffer.from(value, 'latin1'),
+      ]);
     const units = Buffer.from(value, 'utf16le');
     units.swap16();
     return Buffer.concat([marker(0x6, units.length / 2), units]);
   }
-  if (Buffer.isBuffer(value)) return Buffer.concat([marker(0x4, value.length), value]);
+  if (Buffer.isBuffer(value))
+    return Buffer.concat([marker(0x4, value.length), value]);
   const refBytes = Buffer.alloc(refs.length * refSize);
-  refs.forEach((ref, index) => writeUnsigned(refBytes, ref, index * refSize, refSize));
+  refs.forEach((ref, index) =>
+    writeUnsigned(refBytes, ref, index * refSize, refSize),
+  );
   const isArray = Array.isArray(value);
-  return Buffer.concat([marker(isArray ? 0xa : 0xd, isArray ? refs.length : refs.length / 2), refBytes]);
+  return Buffer.concat([
+    marker(isArray ? 0xa : 0xd, isArray ? refs.length : refs.length / 2),
+    refBytes,
+  ]);
 }
 
 export function encodeBinaryPlist(value: PlistValue): Buffer {
   const nodes: { readonly value: PlistValue; refs: number[] }[] = [];
   const visit = (node: PlistValue, depth: number): number => {
-    if (depth > MAX_DEPTH) throw new PlistFormatError(`nested deeper than ${MAX_DEPTH}`);
+    if (depth > MAX_DEPTH)
+      throw new PlistFormatError(`nested deeper than ${MAX_DEPTH}`);
     const entry = { value: node, refs: [] as number[] };
     const index = nodes.push(entry) - 1;
     if (Array.isArray(node)) {
-      entry.refs = (node as readonly PlistValue[]).map((child) => visit(child, depth + 1));
+      entry.refs = (node as readonly PlistValue[]).map((child) =>
+        visit(child, depth + 1),
+      );
     } else if (isPlistDictionary(node)) {
       const keys = Object.keys(node);
       const keyRefs = keys.map((key) => visit(key, depth + 1));
-      entry.refs = [...keyRefs, ...keys.map((key) => visit(node[key], depth + 1))];
+      entry.refs = [
+        ...keyRefs,
+        ...keys.map((key) => visit(node[key], depth + 1)),
+      ];
     }
     return index;
   };
   visit(value, 0);
   const refSize = sizeFor(nodes.length);
-  const bodies = nodes.map((node) => encodeObject(node.value, node.refs, refSize));
+  const bodies = nodes.map((node) =>
+    encodeObject(node.value, node.refs, refSize),
+  );
   const offsets: number[] = [];
   let at = MAGIC.length;
   for (const body of bodies) {
@@ -460,7 +570,9 @@ export function encodeBinaryPlist(value: PlistValue): Buffer {
   }
   const offsetSize = sizeFor(at);
   const table = Buffer.alloc(offsets.length * offsetSize);
-  offsets.forEach((offset, index) => writeUnsigned(table, offset, index * offsetSize, offsetSize));
+  offsets.forEach((offset, index) =>
+    writeUnsigned(table, offset, index * offsetSize, offsetSize),
+  );
   const trailer = Buffer.alloc(TRAILER_LENGTH);
   trailer.writeUInt8(offsetSize, 6);
   trailer.writeUInt8(refSize, 7);
@@ -500,7 +612,11 @@ git commit -m "The iPhone inspector reads and writes binary plists, byte for byt
 ```ts
 import { describe, expect, it } from 'vitest';
 import { encodeBinaryPlist } from '../device/ios/inspector/bplist';
-import { decodeAnyPlist, decodeXmlPlist, encodeXmlPlist } from '../device/ios/inspector/plist-xml';
+import {
+  decodeAnyPlist,
+  decodeXmlPlist,
+  encodeXmlPlist,
+} from '../device/ios/inspector/plist-xml';
 
 /**
  * XML plists: usbmuxd's messages and the pair record it hands out are XML
@@ -528,7 +644,8 @@ const PLISTLIB_XML = [
   '',
 ].join('\n');
 
-const plist = (body: string): string => `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">${body}</plist>`;
+const plist = (body: string): string =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">${body}</plist>`;
 
 describe('reads XML plists', () => {
   it('what plistlib writes, doctype, whitespace and entities included', () => {
@@ -541,22 +658,29 @@ describe('reads XML plists', () => {
     });
   });
   it('empty elements', () => {
-    expect(decodeXmlPlist(plist('<array><string/><dict/><array/><data/><false/></array>'))).toEqual([
-      '',
-      {},
-      [],
-      Buffer.alloc(0),
-      false,
-    ]);
+    expect(
+      decodeXmlPlist(
+        plist('<array><string/><dict/><array/><data/><false/></array>'),
+      ),
+    ).toEqual(['', {}, [], Buffer.alloc(0), false]);
   });
   it('a negative integer and a real', () => {
-    expect(decodeXmlPlist(plist('<array><integer>-12</integer><real>2.5</real></array>'))).toEqual([-12, 2.5]);
+    expect(
+      decodeXmlPlist(
+        plist('<array><integer>-12</integer><real>2.5</real></array>'),
+      ),
+    ).toEqual([-12, 2.5]);
+  });
+  it('a byte-order mark before the declaration', () => {
+    expect(decodeXmlPlist(`\uFEFF${plist('<true/>')}`)).toBe(true);
   });
   it('numeric character references', () => {
     expect(decodeXmlPlist(plist('<string>&#65;&#x42;</string>'))).toBe('AB');
   });
   it('a __proto__ key as an own property', () => {
-    const value = decodeXmlPlist(plist('<dict><key>__proto__</key><integer>7</integer></dict>')) as Record<string, unknown>;
+    const value = decodeXmlPlist(
+      plist('<dict><key>__proto__</key><integer>7</integer></dict>'),
+    ) as Record<string, unknown>;
     expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
     expect(Object.getOwnPropertyDescriptor(value, '__proto__')?.value).toBe(7);
   });
@@ -564,7 +688,15 @@ describe('reads XML plists', () => {
 
 describe('writes XML plists it reads back', () => {
   it('every type, with markup characters escaped', () => {
-    const value = { s: 'a<b>&c', n: 62078, r: 0.5, t: true, f: false, d: Buffer.from([1, 2, 3]), a: ['x', { y: 1 }] };
+    const value = {
+      s: 'a<b>&c',
+      n: 62078,
+      r: 0.5,
+      t: true,
+      f: false,
+      d: Buffer.from([1, 2, 3]),
+      a: ['x', { y: 1 }],
+    };
     const text = encodeXmlPlist(value).toString('utf8');
     expect(text).toContain('<string>a&lt;b&gt;&amp;c</string>');
     expect(decodeXmlPlist(text)).toEqual(value);
@@ -573,25 +705,49 @@ describe('writes XML plists it reads back', () => {
 
 describe('refuses what it does not read, by name', () => {
   it('a date element', () => {
-    expect(() => decodeXmlPlist(plist('<date>2026-10-16T00:00:00Z</date>'))).toThrow(/<date> is not a plist element/);
+    expect(() =>
+      decodeXmlPlist(plist('<date>2026-10-16T00:00:00Z</date>')),
+    ).toThrow(/<date> is not a plist element/);
   });
   it('markup inside a string', () => {
-    expect(() => decodeXmlPlist(plist('<string>a<b/></string>'))).toThrow(/<string> holds markup/);
+    expect(() => decodeXmlPlist(plist('<string>a<b/></string>'))).toThrow(
+      /<string> holds markup/,
+    );
   });
   it('an unknown entity', () => {
-    expect(() => decodeXmlPlist(plist('<string>&nbsp;</string>'))).toThrow(/unknown entity &nbsp;/);
+    expect(() => decodeXmlPlist(plist('<string>&nbsp;</string>'))).toThrow(
+      /unknown entity &nbsp;/,
+    );
   });
   it('an integer that is not one', () => {
-    expect(() => decodeXmlPlist(plist('<integer>1e3</integer>'))).toThrow(/"1e3" is not an integer/);
+    expect(() => decodeXmlPlist(plist('<integer>1e3</integer>'))).toThrow(
+      /"1e3" is not an integer/,
+    );
+  });
+  it('a character reference past the last code point', () => {
+    expect(() => decodeXmlPlist(plist('<string>&#x110000;</string>'))).toThrow(
+      /&#x110000; is past the last code point/,
+    );
+  });
+  it('a real written in hexadecimal', () => {
+    expect(() => decodeXmlPlist(plist('<real>0x10</real>'))).toThrow(
+      /"0x10" is not a real/,
+    );
   });
   it('data that is not base64', () => {
-    expect(() => decodeXmlPlist(plist('<data>a*b</data>'))).toThrow(/is not base64/);
+    expect(() => decodeXmlPlist(plist('<data>a*b</data>'))).toThrow(
+      /is not base64/,
+    );
   });
   it('a dictionary entry without its key', () => {
-    expect(() => decodeXmlPlist(plist('<dict><string>x</string></dict>'))).toThrow(/expected <key>, got <string>/);
+    expect(() =>
+      decodeXmlPlist(plist('<dict><string>x</string></dict>')),
+    ).toThrow(/expected <key>, got <string>/);
   });
   it('anything after the closing plist tag', () => {
-    expect(() => decodeXmlPlist(`${plist('<true/>')}<true/>`)).toThrow(/trailing content/);
+    expect(() => decodeXmlPlist(`${plist('<true/>')}<true/>`)).toThrow(
+      /trailing content/,
+    );
   });
   it('a document with no plist element', () => {
     expect(() => decodeXmlPlist('<dict></dict>')).toThrow(/expected <plist>/);
@@ -600,10 +756,18 @@ describe('refuses what it does not read, by name', () => {
 
 describe('reads either kind from bytes', () => {
   it('a binary plist, by its magic', () => {
-    expect(decodeAnyPlist(encodeBinaryPlist({ Port: 49152 }))).toEqual({ Port: 49152 });
+    expect(decodeAnyPlist(encodeBinaryPlist({ Port: 49152 }))).toEqual({
+      Port: 49152,
+    });
   });
   it('an XML plist otherwise', () => {
-    expect(decodeAnyPlist(Buffer.from(plist('<dict><key>Number</key><integer>0</integer></dict>')))).toEqual({ Number: 0 });
+    expect(
+      decodeAnyPlist(
+        Buffer.from(
+          plist('<dict><key>Number</key><integer>0</integer></dict>'),
+        ),
+      ),
+    ).toEqual({ Number: 0 });
   });
 });
 ```
@@ -622,9 +786,9 @@ Expected: FAIL, `Failed to resolve import "../device/ios/inspector/plist-xml"`.
  * as bplist.ts; anything else is refused by name.
  *
  * The writer leaves out the DOCTYPE line Apple's tools add: usbmuxd parses
- * with libplist, which does not need it (measured in step 1 of the plan
- * that uses this), and leaving it out keeps a third-party URL out of the
- * source.
+ * with libplist, which does not need it (assumed until the phone probe in
+ * the design's section 8 records an exchange), and leaving it out keeps a
+ * third-party URL out of the source.
  */
 import {
   PlistFormatError,
@@ -635,22 +799,44 @@ import {
 } from './bplist';
 
 const HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n';
+/** A decimal real as plistlib and libplist write it; `Number` alone would also take `0x10`. */
+const REAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 const MAGIC = Buffer.from('bplist00', 'latin1');
 
 function escape(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-const ENTITIES: Readonly<Record<string, string>> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const MAX_CODE_POINT = 0x10ffff;
+const ENTITIES: Readonly<Record<string, string>> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+};
 
 function unescape(text: string): string {
-  return text.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z]+);/g, (whole: string, name: string) => {
-    if (name.startsWith('#x')) return String.fromCodePoint(Number.parseInt(name.slice(2), 16));
-    if (name.startsWith('#')) return String.fromCodePoint(Number.parseInt(name.slice(1), 10));
-    const known = ENTITIES[name];
-    if (known === undefined) throw new PlistFormatError(`unknown entity ${whole}`);
-    return known;
-  });
+  return text.replace(
+    /&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z]+);/g,
+    (whole: string, name: string) => {
+      if (name.startsWith('#')) {
+        const code = name.startsWith('#x')
+          ? Number.parseInt(name.slice(2), 16)
+          : Number.parseInt(name.slice(1), 10);
+        if (code > MAX_CODE_POINT)
+          throw new PlistFormatError(`${whole} is past the last code point`);
+        return String.fromCodePoint(code);
+      }
+      const known = ENTITIES[name];
+      if (known === undefined)
+        throw new PlistFormatError(`unknown entity ${whole}`);
+      return known;
+    },
+  );
 }
 
 function element(value: PlistValue): string {
@@ -658,16 +844,22 @@ function element(value: PlistValue): string {
   if (typeof value === 'boolean') return value ? '<true/>' : '<false/>';
   if (typeof value === 'number') {
     if (Number.isInteger(value)) {
-      if (!Number.isSafeInteger(value)) throw new PlistFormatError(`${value} is not a safe integer`);
+      if (!Number.isSafeInteger(value))
+        throw new PlistFormatError(`${value} is not a safe integer`);
       return `<integer>${value}</integer>`;
     }
-    if (!Number.isFinite(value)) throw new PlistFormatError(`${value} is not a finite real`);
+    if (!Number.isFinite(value))
+      throw new PlistFormatError(`${value} is not a finite real`);
     return `<real>${value}</real>`;
   }
   if (Buffer.isBuffer(value)) return `<data>${value.toString('base64')}</data>`;
-  if (Array.isArray(value)) return `<array>${(value as readonly PlistValue[]).map(element).join('')}</array>`;
-  if (!isPlistDictionary(value)) throw new PlistFormatError('a value of no plist type');
-  const entries = Object.keys(value).map((key) => `<key>${escape(key)}</key>${element(value[key])}`);
+  if (Array.isArray(value))
+    return `<array>${(value as readonly PlistValue[]).map(element).join('')}</array>`;
+  if (!isPlistDictionary(value))
+    throw new PlistFormatError('a value of no plist type');
+  const entries = Object.keys(value).map(
+    (key) => `<key>${escape(key)}</key>${element(value[key])}`,
+  );
   return `<dict>${entries.join('')}</dict>`;
 }
 
@@ -683,11 +875,11 @@ interface Tag {
 
 export function decodeXmlPlist(xml: string): PlistValue {
   const body = xml
-    .replace(/^﻿/, '')
     .replace(/<\?xml[\s\S]*?\?>/, '')
     .replace(/<!DOCTYPE[^>]*>/, '')
     .replace(/<!--[\s\S]*?-->/g, '');
   let at = 0;
+  /** `\s` includes U+FEFF, so this also steps over a byte-order mark. */
   const skipSpace = (): void => {
     while (at < body.length && /\s/.test(body.charAt(at))) at += 1;
   };
@@ -695,15 +887,24 @@ export function decodeXmlPlist(xml: string): PlistValue {
     skipSpace();
     const match = /^<(\/?)([A-Za-z]+)(?:\s[^>]*?)?(\/?)>/.exec(body.slice(at));
     if (!match) {
-      throw new PlistFormatError(`expected a tag at character ${at}: ${JSON.stringify(body.slice(at, at + 24))}`);
+      throw new PlistFormatError(
+        `expected a tag at character ${at}: ${JSON.stringify(body.slice(at, at + 24))}`,
+      );
     }
     at += match[0].length;
-    return { name: match[2], closing: match[1] === '/', empty: match[3] === '/' };
+    return {
+      name: match[2],
+      closing: match[1] === '/',
+      empty: match[3] === '/',
+    };
   };
   const text = (name: string): string => {
     const close = `</${name}>`;
     const end = body.indexOf(close, at);
-    if (end < 0) throw new PlistFormatError(`<${name}> at character ${at} is never closed`);
+    if (end < 0)
+      throw new PlistFormatError(
+        `<${name}> at character ${at} is never closed`,
+      );
     const raw = body.slice(at, end);
     at = end + close.length;
     if (raw.includes('<')) throw new PlistFormatError(`<${name}> holds markup`);
@@ -712,7 +913,8 @@ export function decodeXmlPlist(xml: string): PlistValue {
   const closeOf = (open: Tag): void => {
     if (open.empty) return;
     const next = tag();
-    if (!next.closing || next.name !== open.name) throw new PlistFormatError(`<${open.name}> is not closed`);
+    if (!next.closing || next.name !== open.name)
+      throw new PlistFormatError(`<${open.name}> is not closed`);
   };
   const value = (open: Tag): PlistValue => {
     if (open.closing) throw new PlistFormatError(`unexpected </${open.name}>`);
@@ -721,15 +923,20 @@ export function decodeXmlPlist(xml: string): PlistValue {
         return open.empty ? '' : text('string');
       case 'integer': {
         const raw = text('integer').trim();
-        if (!/^[+-]?\d+$/.test(raw)) throw new PlistFormatError(`${JSON.stringify(raw)} is not an integer`);
+        if (!/^[+-]?\d+$/.test(raw))
+          throw new PlistFormatError(
+            `${JSON.stringify(raw)} is not an integer`,
+          );
         const number = Number(raw);
-        if (!Number.isSafeInteger(number)) throw new PlistFormatError(`${raw} is past the safe range`);
+        if (!Number.isSafeInteger(number))
+          throw new PlistFormatError(`${raw} is past the safe range`);
         return number;
       }
       case 'real': {
         const raw = text('real').trim();
         const number = Number(raw);
-        if (raw === '' || !Number.isFinite(number)) throw new PlistFormatError(`${JSON.stringify(raw)} is not a real`);
+        if (!REAL.test(raw) || !Number.isFinite(number))
+          throw new PlistFormatError(`${JSON.stringify(raw)} is not a real`);
         return number;
       }
       case 'true':
@@ -741,7 +948,10 @@ export function decodeXmlPlist(xml: string): PlistValue {
       case 'data': {
         if (open.empty) return Buffer.alloc(0);
         const raw = text('data').replace(/\s+/g, '');
-        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw)) throw new PlistFormatError(`${JSON.stringify(raw.slice(0, 24))} is not base64`);
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw))
+          throw new PlistFormatError(
+            `${JSON.stringify(raw.slice(0, 24))} is not base64`,
+          );
         return Buffer.from(raw, 'base64');
       }
       case 'array': {
@@ -750,7 +960,8 @@ export function decodeXmlPlist(xml: string): PlistValue {
         for (;;) {
           const next = tag();
           if (next.closing) {
-            if (next.name !== 'array') throw new PlistFormatError(`</${next.name}> closes an <array>`);
+            if (next.name !== 'array')
+              throw new PlistFormatError(`</${next.name}> closes an <array>`);
             return items;
           }
           items.push(value(next));
@@ -762,31 +973,41 @@ export function decodeXmlPlist(xml: string): PlistValue {
         for (;;) {
           const next = tag();
           if (next.closing) {
-            if (next.name !== 'dict') throw new PlistFormatError(`</${next.name}> closes a <dict>`);
+            if (next.name !== 'dict')
+              throw new PlistFormatError(`</${next.name}> closes a <dict>`);
             return result;
           }
-          if (next.name !== 'key') throw new PlistFormatError(`expected <key>, got <${next.name}>`);
+          if (next.name !== 'key')
+            throw new PlistFormatError(`expected <key>, got <${next.name}>`);
           const key = next.empty ? '' : text('key');
           setEntry(result, key, value(tag()));
         }
       }
       default:
-        throw new PlistFormatError(`<${open.name}> is not a plist element this client reads`);
+        throw new PlistFormatError(
+          `<${open.name}> is not a plist element this client reads`,
+        );
     }
   };
   const root = tag();
-  if (root.name !== 'plist' || root.closing || root.empty) throw new PlistFormatError(`expected <plist>, got <${root.name}>`);
+  if (root.name !== 'plist' || root.closing || root.empty)
+    throw new PlistFormatError(`expected <plist>, got <${root.name}>`);
   const result = value(tag());
   const end = tag();
-  if (!end.closing || end.name !== 'plist') throw new PlistFormatError(`expected </plist>, got <${end.name}>`);
+  if (!end.closing || end.name !== 'plist')
+    throw new PlistFormatError(`expected </plist>, got <${end.name}>`);
   skipSpace();
-  if (at !== body.length) throw new PlistFormatError(`trailing content after </plist> at character ${at}`);
+  if (at !== body.length)
+    throw new PlistFormatError(
+      `trailing content after </plist> at character ${at}`,
+    );
   return result;
 }
 
 /** Lockdown answers in either kind: a binary plist starts with its magic. */
 export function decodeAnyPlist(bytes: Buffer): PlistValue {
-  if (bytes.subarray(0, MAGIC.length).equals(MAGIC)) return decodeBinaryPlist(bytes);
+  if (bytes.subarray(0, MAGIC.length).equals(MAGIC))
+    return decodeBinaryPlist(bytes);
   return decodeXmlPlist(bytes.toString('utf8'));
 }
 ```
@@ -840,7 +1061,9 @@ const LENGTH = encodeLengthFrame(PAYLOAD);
 
 describe('writes frames', () => {
   it('a usbmuxd header: length 23, version 1, type 8, tag 5, little-endian', () => {
-    expect(USBMUX.subarray(0, 16).toString('hex')).toBe('17000000010000000800000005000000');
+    expect(USBMUX.subarray(0, 16).toString('hex')).toBe(
+      '17000000010000000800000005000000',
+    );
     expect(USBMUX.subarray(16)).toEqual(PAYLOAD);
   });
   it('a length frame: 7, big-endian, then the payload', () => {
@@ -852,8 +1075,12 @@ describe('reads a usbmuxd frame split at every byte', () => {
   for (let split = 1; split < USBMUX.length; split += 1) {
     it(`split after byte ${split}`, () => {
       const reader = new FrameReader('usbmux');
-      expect(reader.push(USBMUX.subarray(0, split))).toEqual([]);
-      expect(reader.push(USBMUX.subarray(split))).toEqual([{ tag: 5, payload: PAYLOAD }]);
+      // Both pushes in one verdict: the first yields nothing, the second the frame.
+      const yielded = [
+        reader.push(USBMUX.subarray(0, split)),
+        reader.push(USBMUX.subarray(split)),
+      ];
+      expect(yielded).toEqual([[], [{ tag: 5, payload: PAYLOAD }]]);
     });
   }
 });
@@ -862,8 +1089,12 @@ describe('reads a length frame split at every byte', () => {
   for (let split = 1; split < LENGTH.length; split += 1) {
     it(`split after byte ${split}`, () => {
       const reader = new FrameReader('length');
-      expect(reader.push(LENGTH.subarray(0, split))).toEqual([]);
-      expect(reader.push(LENGTH.subarray(split))).toEqual([{ tag: 0, payload: PAYLOAD }]);
+      // Both pushes in one verdict: the first yields nothing, the second the frame.
+      const yielded = [
+        reader.push(LENGTH.subarray(0, split)),
+        reader.push(LENGTH.subarray(split)),
+      ];
+      expect(yielded).toEqual([[], [{ tag: 0, payload: PAYLOAD }]]);
     });
   }
 });
@@ -889,17 +1120,23 @@ describe('refuses a frame it cannot trust, by name', () => {
   it('a usbmuxd version other than 1', () => {
     const frame = Buffer.from(USBMUX);
     frame.writeUInt32LE(2, 4);
-    expect(() => new FrameReader('usbmux').push(frame)).toThrow(/usbmuxd frame of version 2, type 8/);
+    expect(() => new FrameReader('usbmux').push(frame)).toThrow(
+      /usbmuxd frame of version 2, type 8/,
+    );
   });
   it('a usbmuxd length shorter than its own header', () => {
     const frame = Buffer.from(USBMUX);
     frame.writeUInt32LE(4, 0);
-    expect(() => new FrameReader('usbmux').push(frame)).toThrow(/claims 4 bytes, less than its 16-byte header/);
+    expect(() => new FrameReader('usbmux').push(frame)).toThrow(
+      /claims 4 bytes, less than its 16-byte header/,
+    );
   });
   it('a length past the ceiling', () => {
     const header = Buffer.alloc(4);
     header.writeUInt32BE(MAX_FRAME_LENGTH + 1, 0);
-    expect(() => new FrameReader('length').push(header)).toThrow(/past the 20971520-byte ceiling/);
+    expect(() => new FrameReader('length').push(header)).toThrow(
+      /past the 20971520-byte ceiling/,
+    );
   });
 });
 ```
@@ -920,36 +1157,62 @@ import {
 } from '../device/ios/inspector/fields';
 
 /** Fields read off a decoded message, each refusing the wrong kind by name (#811). */
-const MESSAGE = { s: 'x', n: 3, d: Buffer.from('b'), a: [1], m: { k: 'v' }, t: true, one: 1, zero: 0 };
+const MESSAGE = {
+  s: 'x',
+  n: 3,
+  d: Buffer.from('b'),
+  a: [1],
+  m: { k: 'v' },
+  t: true,
+  one: 1,
+  zero: 0,
+};
 
 describe('reads each kind of field', () => {
   it('a string', () => expect(stringField(MESSAGE, 's', 'probe')).toBe('x'));
   it('a number', () => expect(numberField(MESSAGE, 'n', 'probe')).toBe(3));
-  it('data', () => expect(dataField(MESSAGE, 'd', 'probe')).toEqual(Buffer.from('b')));
+  it('data', () =>
+    expect(dataField(MESSAGE, 'd', 'probe')).toEqual(Buffer.from('b')));
   it('an array', () => expect(arrayField(MESSAGE, 'a', 'probe')).toEqual([1]));
-  it('a dictionary', () => expect(dictionaryField(MESSAGE, 'm', 'probe')).toEqual({ k: 'v' }));
-  it('a boolean flag', () => expect(flagOr(MESSAGE, 't', false, 'probe')).toBe(true));
-  it('a flag written as 1', () => expect(flagOr(MESSAGE, 'one', false, 'probe')).toBe(true));
-  it('a flag written as 0', () => expect(flagOr(MESSAGE, 'zero', true, 'probe')).toBe(false));
-  it('a missing flag, as the fallback', () => expect(flagOr(MESSAGE, 'absent', true, 'probe')).toBe(true));
-  it('a missing string, as the fallback', () => expect(stringOr(MESSAGE, 'absent', '', 'probe')).toBe(''));
+  it('a dictionary', () =>
+    expect(dictionaryField(MESSAGE, 'm', 'probe')).toEqual({ k: 'v' }));
+  it('a boolean flag', () =>
+    expect(flagOr(MESSAGE, 't', false, 'probe')).toBe(true));
+  it('a flag written as 1', () =>
+    expect(flagOr(MESSAGE, 'one', false, 'probe')).toBe(true));
+  it('a flag written as 0', () =>
+    expect(flagOr(MESSAGE, 'zero', true, 'probe')).toBe(false));
+  it('a missing flag, as the fallback', () =>
+    expect(flagOr(MESSAGE, 'absent', true, 'probe')).toBe(true));
+  it('a missing string, as the fallback', () =>
+    expect(stringOr(MESSAGE, 'absent', '', 'probe')).toBe(''));
 });
 
 describe('refuses the wrong kind, naming the message, the key and what came', () => {
   it('a number where a string was expected', () => {
-    expect(() => stringField(MESSAGE, 'n', 'ListDevices')).toThrow('ListDevices: expected n to be a string, got the number 3');
+    expect(() => stringField(MESSAGE, 'n', 'ListDevices')).toThrow(
+      'ListDevices: expected n to be a string, got the number 3',
+    );
   });
   it('a missing number', () => {
-    expect(() => numberField(MESSAGE, 'absent', 'Connect')).toThrow('Connect: expected absent to be a number, got nothing');
+    expect(() => numberField(MESSAGE, 'absent', 'Connect')).toThrow(
+      'Connect: expected absent to be a number, got nothing',
+    );
   });
   it('a string where a flag was expected', () => {
-    expect(() => flagOr(MESSAGE, 's', false, 'StartService')).toThrow('StartService: expected s to be a flag, got the string "x"');
+    expect(() => flagOr(MESSAGE, 's', false, 'StartService')).toThrow(
+      'StartService: expected s to be a flag, got the string "x"',
+    );
   });
   it('an array where a dictionary was expected', () => {
-    expect(() => dictionaryOf([1], 'a usbmuxd answer')).toThrow('a usbmuxd answer: expected a dictionary, got an array of 1');
+    expect(() => dictionaryOf([1], 'a usbmuxd answer')).toThrow(
+      'a usbmuxd answer: expected a dictionary, got an array of 1',
+    );
   });
-  it('an inherited key, which is not the message own', () => {
-    expect(() => stringField(MESSAGE, 'toString', 'probe')).toThrow('probe: expected toString to be a string, got nothing');
+  it("an inherited key, which is not the message's own", () => {
+    expect(() => stringField(MESSAGE, 'toString', 'probe')).toThrow(
+      'probe: expected toString to be a string, got nothing',
+    );
   });
 });
 ```
@@ -1021,29 +1284,42 @@ export class FrameReader {
 
   /** Adds bytes as they arrive; returns every frame now whole, in order. */
   push(chunk: Buffer): Frame[] {
-    this.pending = this.pending.length === 0 ? chunk : Buffer.concat([this.pending, chunk]);
+    this.pending =
+      this.pending.length === 0 ? chunk : Buffer.concat([this.pending, chunk]);
     const frames: Frame[] = [];
-    const headerLength = this.kind === 'usbmux' ? USBMUX_HEADER_LENGTH : LENGTH_HEADER;
+    const headerLength =
+      this.kind === 'usbmux' ? USBMUX_HEADER_LENGTH : LENGTH_HEADER;
     for (;;) {
       if (this.pending.length < headerLength) return frames;
       const total =
-        this.kind === 'usbmux' ? this.pending.readUInt32LE(0) : LENGTH_HEADER + this.pending.readUInt32BE(0);
+        this.kind === 'usbmux'
+          ? this.pending.readUInt32LE(0)
+          : LENGTH_HEADER + this.pending.readUInt32BE(0);
       if (total < headerLength) {
-        throw new FrameError(`a usbmuxd frame claims ${total} bytes, less than its ${headerLength}-byte header`);
+        throw new FrameError(
+          `a usbmuxd frame claims ${total} bytes, less than its ${headerLength}-byte header`,
+        );
       }
       if (total - headerLength > MAX_FRAME_LENGTH) {
-        throw new FrameError(`a ${this.kind} frame of ${total - headerLength} bytes is past the ${MAX_FRAME_LENGTH}-byte ceiling`);
+        throw new FrameError(
+          `a ${this.kind} frame of ${total - headerLength} bytes is past the ${MAX_FRAME_LENGTH}-byte ceiling`,
+        );
       }
       if (this.kind === 'usbmux') {
         const version = this.pending.readUInt32LE(4);
         const type = this.pending.readUInt32LE(8);
         if (version !== USBMUX_VERSION || type !== USBMUX_PLIST) {
-          throw new FrameError(`a usbmuxd frame of version ${version}, type ${type}: this client reads version 1, type 8`);
+          throw new FrameError(
+            `a usbmuxd frame of version ${version}, type ${type}: this client reads version 1, type 8`,
+          );
         }
       }
       if (this.pending.length < total) return frames;
       const tag = this.kind === 'usbmux' ? this.pending.readUInt32LE(12) : 0;
-      frames.push({ tag, payload: Buffer.from(this.pending.subarray(headerLength, total)) });
+      frames.push({
+        tag,
+        payload: Buffer.from(this.pending.subarray(headerLength, total)),
+      });
       this.pending = this.pending.subarray(total);
     }
   }
@@ -1066,7 +1342,11 @@ export class FrameReader {
  * instead: a renamed key on a new iOS reads as that, never as `undefined`
  * travelling on.
  */
-import { isPlistDictionary, type PlistDictionary, type PlistValue } from './bplist';
+import {
+  isPlistDictionary,
+  type PlistDictionary,
+  type PlistValue,
+} from './bplist';
 
 export class ProtocolShapeError extends Error {
   constructor(message: string) {
@@ -1075,10 +1355,12 @@ export class ProtocolShapeError extends Error {
   }
 }
 
-function describe(value: PlistValue | undefined): string {
+function summarise(value: PlistValue | undefined): string {
   if (value === undefined) return 'nothing';
-  if (typeof value === 'string') return `the string ${JSON.stringify(value.slice(0, 80))}`;
-  if (typeof value === 'number' || typeof value === 'boolean') return `the ${typeof value} ${value}`;
+  if (typeof value === 'string')
+    return `the string ${JSON.stringify(value.slice(0, 80))}`;
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return `the ${typeof value} ${value}`;
   if (Buffer.isBuffer(value)) return `${value.length} bytes of data`;
   if (Array.isArray(value)) return `an array of ${value.length}`;
   return `a dictionary of ${Object.keys(value).join(', ') || 'nothing'}`;
@@ -1089,49 +1371,87 @@ function own(message: PlistDictionary, key: string): PlistValue | undefined {
   return Object.hasOwn(message, key) ? message[key] : undefined;
 }
 
-function refuse(what: string, key: string, kind: string, value: PlistValue | undefined): never {
-  throw new ProtocolShapeError(`${what}: expected ${key} to be ${kind}, got ${describe(value)}`);
+function refuse(
+  what: string,
+  key: string,
+  kind: string,
+  value: PlistValue | undefined,
+): never {
+  throw new ProtocolShapeError(
+    `${what}: expected ${key} to be ${kind}, got ${summarise(value)}`,
+  );
 }
 
-export function dictionaryOf(value: PlistValue | undefined, what: string): PlistDictionary {
+export function dictionaryOf(
+  value: PlistValue | undefined,
+  what: string,
+): PlistDictionary {
   if (value === undefined || !isPlistDictionary(value)) {
-    throw new ProtocolShapeError(`${what}: expected a dictionary, got ${describe(value)}`);
+    throw new ProtocolShapeError(
+      `${what}: expected a dictionary, got ${summarise(value)}`,
+    );
   }
   return value;
 }
 
-export function dictionaryField(message: PlistDictionary, key: string, what: string): PlistDictionary {
+export function dictionaryField(
+  message: PlistDictionary,
+  key: string,
+  what: string,
+): PlistDictionary {
   const value = own(message, key);
-  if (value === undefined || !isPlistDictionary(value)) refuse(what, key, 'a dictionary', value);
+  if (value === undefined || !isPlistDictionary(value))
+    refuse(what, key, 'a dictionary', value);
   return value;
 }
 
-export function arrayField(message: PlistDictionary, key: string, what: string): readonly PlistValue[] {
+export function arrayField(
+  message: PlistDictionary,
+  key: string,
+  what: string,
+): readonly PlistValue[] {
   const value = own(message, key);
   if (!Array.isArray(value)) refuse(what, key, 'an array', value);
   return value as readonly PlistValue[];
 }
 
-export function stringField(message: PlistDictionary, key: string, what: string): string {
+export function stringField(
+  message: PlistDictionary,
+  key: string,
+  what: string,
+): string {
   const value = own(message, key);
   if (typeof value !== 'string') refuse(what, key, 'a string', value);
   return value;
 }
 
-export function numberField(message: PlistDictionary, key: string, what: string): number {
+export function numberField(
+  message: PlistDictionary,
+  key: string,
+  what: string,
+): number {
   const value = own(message, key);
   if (typeof value !== 'number') refuse(what, key, 'a number', value);
   return value;
 }
 
-export function dataField(message: PlistDictionary, key: string, what: string): Buffer {
+export function dataField(
+  message: PlistDictionary,
+  key: string,
+  what: string,
+): Buffer {
   const value = own(message, key);
   if (!Buffer.isBuffer(value)) refuse(what, key, 'data', value);
   return value;
 }
 
 /** A flag the phone writes as a boolean or as 0/1; `fallback` when absent. */
-export function flagOr(message: PlistDictionary, key: string, fallback: boolean, what: string): boolean {
+export function flagOr(
+  message: PlistDictionary,
+  key: string,
+  fallback: boolean,
+  what: string,
+): boolean {
   const value = own(message, key);
   if (value === undefined) return fallback;
   if (typeof value === 'boolean') return value;
@@ -1139,7 +1459,12 @@ export function flagOr(message: PlistDictionary, key: string, fallback: boolean,
   return refuse(what, key, 'a flag', value);
 }
 
-export function stringOr(message: PlistDictionary, key: string, fallback: string, what: string): string {
+export function stringOr(
+  message: PlistDictionary,
+  key: string,
+  fallback: string,
+  what: string,
+): string {
   const value = own(message, key);
   if (value === undefined) return fallback;
   if (typeof value !== 'string') refuse(what, key, 'a string', value);
