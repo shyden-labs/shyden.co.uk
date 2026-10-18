@@ -32,7 +32,28 @@ const board = (page: Page) => page.locator('#cg-board');
 const press = (page: Page, name: 'Make Groups' | 'Shuffle again') =>
   bar(page).getByRole('button', { name }).click();
 
-type Tally = { chip: number; row: number; none: number; both: number };
+/**
+ * One frame in which a student was seen nowhere, or twice: what the board,
+ * the list, the chip and the row looked like then. A failure carries these,
+ * so it says whether one frame blanked the whole board (every student shares
+ * a frame) or each student blinked at their own takeoff (their row's
+ * animations still pending), instead of only a count (#806).
+ */
+type Sighting = {
+  frame: number;
+  ms: number;
+  board: boolean;
+  list: boolean;
+  chip: string;
+  row: string;
+};
+type Tally = {
+  chip: number;
+  row: number;
+  none: number;
+  both: number;
+  odd: Sighting[];
+};
 /** One frame with a student travelling: who, and what the board looked like. */
 type Flight = {
   flying: number[];
@@ -48,7 +69,8 @@ type Samples = {
 /**
  * Every animation frame until stopped: for each student, whether their chip
  * (laid out and not `visibility: hidden`) and their row (laid out, computed
- * opacity above 0) can be seen; while any row travels, which rows do, the
+ * opacity above 0) can be seen, and for a frame that shows a student nowhere
+ * or twice, what it showed (`Sighting`); while any row travels, which rows do, the
  * list's height, every card's box and the stage's sideways overflow. The overflow is read by
  * `measureBoard`, shipped in as the script the iOS leg sends, so the stage is
  * measured in its one home (`tests/guards/board-geometry.test.ts`).
@@ -59,12 +81,32 @@ const startSampler = (page: Page) =>
     const tally = new Map<number, Tally>();
     const flights: Flight[] = [];
     let on = true;
+    let frame = 0;
+    const start = performance.now();
+    // The first few odd frames per student: enough to tell one blank frame
+    // from a blink per takeoff, and a small report when every frame is odd.
+    const kept = 3;
+    const laidOut = (el: Element | null) =>
+      !!el && el.getClientRects().length > 0;
     const shown = (
       el: Element | null,
       test: (s: CSSStyleDeclaration) => boolean,
-    ) => !!el && el.getClientRects().length > 0 && test(getComputedStyle(el));
+    ) => laidOut(el) && test(getComputedStyle(el!));
+    const describe = (el: Element | null, prop: 'visibility' | 'opacity') =>
+      !el
+        ? 'absent'
+        : [
+            laidOut(el) ? 'laid out' : 'no box',
+            `${prop} ${getComputedStyle(el)[prop]}`,
+            `class "${el.className}"`,
+            `animations [${el
+              .getAnimations()
+              .map((a) => a.playState + (a.pending ? ' pending' : ''))
+              .join(', ')}]`,
+          ].join(', ');
     const tick = () => {
       if (!on) return;
+      frame++;
       const numbers = new Set(
         Array.from(
           document.querySelectorAll<HTMLElement>('#cg-board [data-number]'),
@@ -72,21 +114,34 @@ const startSampler = (page: Page) =>
         ),
       );
       for (const n of numbers) {
-        const chip = shown(
-          document.querySelector(
-            `#cg-board .waiting-student[data-number="${n}"]`,
-          ),
-          (s) => s.visibility !== 'hidden',
+        const chipEl = document.querySelector(
+          `#cg-board .waiting-student[data-number="${n}"]`,
         );
-        const row = shown(
-          document.querySelector(`#cg-board .student[data-number="${n}"]`),
-          (s) => Number(s.opacity) > 0,
+        const rowEl = document.querySelector(
+          `#cg-board .student[data-number="${n}"]`,
         );
-        const t = tally.get(n) ?? { chip: 0, row: 0, none: 0, both: 0 };
+        const chip = shown(chipEl, (s) => s.visibility !== 'hidden');
+        const row = shown(rowEl, (s) => Number(s.opacity) > 0);
+        const t = tally.get(n) ?? {
+          chip: 0,
+          row: 0,
+          none: 0,
+          both: 0,
+          odd: [],
+        };
         if (chip && row) t.both++;
         else if (chip) t.chip++;
         else if (row) t.row++;
         else t.none++;
+        if (chip === row && t.odd.length < kept)
+          t.odd.push({
+            frame,
+            ms: Math.round(performance.now() - start),
+            board: laidOut(document.getElementById('cg-board')),
+            list: laidOut(document.getElementById('cg-waiting')),
+            chip: describe(chipEl, 'visibility'),
+            row: describe(rowEl, 'opacity'),
+          });
         tally.set(n, t);
       }
       const flying = Array.from(
