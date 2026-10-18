@@ -12,7 +12,7 @@
 
 ## Status (2026-10-19)
 
-**Tasks 1-3 are built** (2026-10-19, 95 unit tests; the code below is the reviewed code, folded back after review pass 1 ran it). **On hold after Task 3** until the zero-code probe in the spec's section 8 (Safari's own Web Inspector on the phone's page, while WebDriverAgent runs: Shyden's ruling of 2026-10-18 retired `safaridriver`). Its attaching step (a) answered yes by hand on 2026-10-18 (#838 comment 6246973024); steps (b)-(e) remain. Tasks 4-9 (link, usbmux, lockdown, Web Inspector RPC, JSON protocol, the certificate pin and the TLS wiring) are written after it, from what the phone shows; Tasks 1-3 are the codecs any route needs.
+**Tasks 1-3 are built** (2026-10-19, 95 unit tests; the code below is the reviewed code, folded back after review pass 1 ran it and again in pass 2, when the XML reader stopped reading comment syntax). `tests/guards/one-home.test.ts` exempts the two plist encoders from the one-catalogue-walk rule by Shyden's ruling (AskUserQuestion, 2026-10-19). **On hold after Task 3** until the zero-code probe in the spec's section 8 (Safari's own Web Inspector on the phone's page, while WebDriverAgent runs: Shyden's ruling of 2026-10-18 retired `safaridriver`). Its attaching step (a) answered yes by hand on 2026-10-18 (#838 comment 6246973024); steps (b)-(e) remain. Tasks 4-9 (link, usbmux, lockdown, Web Inspector RPC, JSON protocol, the certificate pin and the TLS wiring) are written after it, from what the phone shows; Tasks 1-3 are the codecs any route needs.
 
 ## Scope
 
@@ -874,10 +874,11 @@ interface Tag {
 }
 
 export function decodeXmlPlist(xml: string): PlistValue {
+  // No comment syntax is read: neither libplist nor plistlib writes one, so a
+  // comment fails as "expected a tag" rather than being skipped unseen.
   const body = xml
     .replace(/<\?xml[\s\S]*?\?>/, '')
-    .replace(/<!DOCTYPE[^>]*>/, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+    .replace(/<!DOCTYPE[^>]*>/, '');
   let at = 0;
   /** `\s` includes U+FEFF, so this also steps over a byte-order mark. */
   const skipSpace = (): void => {
