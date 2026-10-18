@@ -186,11 +186,17 @@ jobs:
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
   # budget, and every pull request waited all of it.
   #
-  # EIGHT, measured rather than guessed. Playwright hands each shard an equal
-  # COUNT of tests in project order, so a shard is roughly one engine's slice,
-  # and the engines differ about threefold per test. At four (run
-  # 35830220134) chromium's shard took 4.9 minutes and the firefox-and-webkit
-  # one 13.2, which is the wall-clock. Eight splits the slow slices.
+  # EIGHT, measured rather than guessed. At four (run 35830220134) the
+  # slowest shard took 13.2 minutes.
+  #
+  # Split by TIME, not count (#607). Playwright's own --shard hands each shard
+  # an equal COUNT of tests in project order, and a WebKit test costs about
+  # three times a Chromium one, so the WebKit shard ran 15.8-19.8 minutes
+  # against a 10.7-11.5 mean and once hit the 20-minute limit. E2E_SHARD_PLAN
+  # makes each shard run whole spec files planned from measured timings
+  # (scripts/e2e-shard-plan.mjs), refreshed by hand from a green run's logs
+  # (scripts/e2e-shard-timings.mjs); build-and-test prints every shard's time
+  # and the slowest/mean ratio, which is where a stale plan shows.
   e2e:
     name: e2e shard ${{ matrix.shard }} of ${{ strategy.job-total }}
     needs: [image, scope]
@@ -240,6 +246,7 @@ jobs:
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           E2E_ACCOUNT_DIR: e2e-accounts
+          E2E_SHARD_PLAN: tests/e2e-shard-timings.json
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
       # `overwrite` because re-running a failed shard uploads its account
