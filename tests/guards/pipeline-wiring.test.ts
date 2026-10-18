@@ -27,6 +27,7 @@ import { REQUIRED_CHECKS } from '../../scripts/deploy-gate.mjs';
 import { SKIPPED_WHEN_DOCS_ONLY } from '../../scripts/docs-only.mjs';
 import { CAPTURE_ENTRIES } from '../../scripts/capture-scope.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
+import { TIMINGS_FILE } from '../../scripts/e2e-shard-timings.mjs';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { floorBreach } from '../floors';
 
@@ -2042,6 +2043,23 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     );
     expect(upload?.if).toBe('always()');
     expect(upload?.with?.['if-no-files-found']).toBe('error');
+  });
+
+  it('each e2e shard runs the split planned from the committed timings (#607)', () => {
+    const steps = ciParsed().jobs.e2e?.steps ?? [];
+    const run = steps.find((step) => step.run?.includes('npm run test:e2e'));
+    expect(run?.env?.E2E_SHARD_PLAN).toBe(TIMINGS_FILE);
+    expect(existsSync(TIMINGS_FILE)).toBe(true);
+  });
+
+  // A capture shard counts the selection it was handed, and a plan built
+  // from the whole suite would hand it spec files outside it; test-e2e.mjs
+  // refuses the pair, so this keeps the refusal from ever reaching CI.
+  it('no capture shard is planned, since it counts its selection (#607)', () => {
+    const steps = ciParsed().jobs.capture?.steps ?? [];
+    const run = steps.find((step) => step.run === CAPTURE_SHARD_SCRIPT);
+    expect(run?.env?.E2E_ENUMERATE).toBe('selection');
+    expect(run?.env).not.toHaveProperty('E2E_SHARD_PLAN');
   });
 
   it('each capture shard counts its selection and writes its account where build-and-test reads it (#774)', () => {
