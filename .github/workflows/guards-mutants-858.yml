@@ -1,0 +1,48 @@
+# AC4 of #858, a MEASURING branch: never merged. One job per mutant, each
+# applying its plant (anchor asserted) and running the ios-ceilings guard as
+# the guards suite does. A RED mutant fails its job; `none` and
+# `expect-in-comment` must pass. Read every job by name.
+name: Guards mutants (#858 AC4)
+
+on:
+  push:
+    branches: [858-mutants-b]
+
+permissions:
+  contents: read
+
+jobs:
+  mutant:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mutant:
+          - none
+          - journey-expect
+          - new-journey-test
+          - expect-in-comment
+          - expect-in-string
+          - aliased-import
+          - hand-raised-ceiling
+          - empty-walk
+          - parse-blind
+          - bare-helper-call
+          - planted-throw
+          - helper-by-reference
+          - imports-unfollowed
+          - planted-session-call
+          - type-args-blind
+    name: mutant ${{ matrix.mutant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: python3 .github/mutants-858.py "${{ matrix.mutant }}" && git diff --stat && git status --short
+      - run: npx vitest run --config vitest.guards.config.ts --testTimeout=25000 tests/guards/ios-ceilings.test.ts
