@@ -125,6 +125,14 @@ export async function travel(
       () => undefined, // cancelled by a newer deal: nothing to tidy
     );
   });
+  const blanked = o.tables.closest<HTMLElement>('#cg-board');
+  if (blanked) {
+    const was = blanked.style.display;
+    blanked.style.display = 'none';
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => (blanked.style.display = was)),
+    );
+  }
 
   const first = await Promise.race([
     Promise.all(landings).then(() => 'landed' as const),
