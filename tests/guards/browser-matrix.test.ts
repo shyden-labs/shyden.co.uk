@@ -76,7 +76,8 @@ type ResolvedProject = {
   testDir: string;
   testMatch: unknown;
   testIgnore: unknown;
-  use: { colorScheme?: unknown };
+  use: { colorScheme?: unknown; installsAClock?: unknown };
+  grep: RegExp | RegExp[];
 };
 
 const requireCjs = createRequire(import.meta.url);
@@ -503,6 +504,46 @@ describe('the real-device config (#194)', () => {
     // equality check and drifts the day one of the two is edited.
     const declared = device.projects?.find((p) => p.name === 'android-chrome');
     expect([declared?.testIgnore].flat()).toContain(VISUAL_PROJECT.testMatch);
+  });
+
+  // A clock cannot be taken back out of the phone's one context, so the tests that install one
+  // run in a project of their own, whose worker ends before any other test runs (#854).
+  const selects = (project: ResolvedProject, title: string): boolean =>
+    [project.grep].flat().some((pattern) => pattern.test(title));
+  const byName = (name: string): ResolvedProject => {
+    const found = projects.filter((p) => p.name === name);
+    expect(found.map((p) => p.name)).toEqual([name]);
+    return found[0];
+  };
+
+  it('runs the clock project before android-chrome, the order the real-device clock pair reads (#854)', () => {
+    const names = projects.map((p) => p.name);
+    expect(names.indexOf('android-chrome-clock')).toBeGreaterThan(-1);
+    expect(names.indexOf('android-chrome-clock')).toBeLessThan(
+      names.indexOf('android-chrome'),
+    );
+  });
+
+  it('gives the clock option to the clock project alone (#854)', () => {
+    expect(
+      projects.filter((p) => p.use.installsAClock === true).map((p) => p.name),
+    ).toEqual(['android-chrome-clock']);
+  });
+
+  it('takes a test tagged @installs-a-clock into the clock project, and nothing else (#854)', () => {
+    const clock = byName('android-chrome-clock');
+    expect(
+      selects(clock, 'evidence-page.spec.ts a tick @installs-a-clock'),
+    ).toBe(true);
+    expect(selects(clock, 'evidence-page.spec.ts a tick')).toBe(false);
+  });
+
+  it('keeps every test tagged @installs-a-clock out of android-chrome, and takes the rest (#854)', () => {
+    const android = byName('android-chrome');
+    expect(
+      selects(android, 'evidence-page.spec.ts a tick @installs-a-clock'),
+    ).toBe(false);
+    expect(selects(android, 'evidence-page.spec.ts a tick')).toBe(true);
   });
 
   it('writes no baseline a phone run was never asked for', () => {

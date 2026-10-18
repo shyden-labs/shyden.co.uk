@@ -19,6 +19,7 @@ import {
   disposeAll,
   type InitScriptDisposable,
 } from '../device/init-script-disposals';
+import { refuseUndeclaredClock } from '../device/clock-declaration';
 
 const CDP_URL = process.env.ANDROID_CDP_URL ?? 'http://127.0.0.1:9222';
 
@@ -150,6 +151,13 @@ const INIT_SCRIPT_PATCHED = Symbol('shyden-context-addinitscript-patch');
 let currentTestInitScriptDisposals: InitScriptDisposable[] = [];
 
 /**
+ * Whether the running test declares the clock it installs (`installsAClock`, #854), set at the
+ * top of every test's `context` fixture and read by the clock guard installed once on the
+ * shared context. Plain module state for the same reason as the array above.
+ */
+let currentTestDeclaresClock = false;
+
+/**
  * Every fixture below that needs `baseURL` calls this instead of trusting it -- a bare `!`
  * assertion crashes with a generic, unnamed "Cannot read properties of undefined" if it is
  * ever wrong, and silently falling back to the unresolved URL (what the `goto`/`request`
@@ -174,8 +182,18 @@ function requireBaseURL(baseURL: string | undefined): string {
  * is made once, at module load, rather than per test. Desktop keeps `base` verbatim: an
  * override that merely *reproduced* the defaults would be one refactor away from dropping
  * the emulation options that the mobile-chrome and mobile-safari projects depend on.
+ *
+ * `installsAClock` (#854) is set only by the phone's `android-chrome-clock` project
+ * (playwright.device.config.ts), which runs the tests tagged `@installs-a-clock` in a worker
+ * of their own. Playwright cannot take a clock back out of the phone's one context, so that
+ * worker's CDP connection ends, and the clock with it, before any other test runs
+ * (tests/device/clock-declaration.ts).
  */
-const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
+const realDeviceTest = base.extend<
+  { context: BrowserContext; page: Page },
+  { installsAClock: boolean }
+>({
+  installsAClock: [false, { scope: 'worker', option: true }],
   browser: [
     async ({}, use) => {
       const browser = await chromium.connectOverCDP(CDP_URL);
@@ -198,7 +216,7 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     { scope: 'worker' },
   ],
 
-  context: async ({ browser, baseURL }, use) => {
+  context: async ({ browser, baseURL, installsAClock }, use) => {
     // The phone has exactly one context and newContext() is unsupported, so every test
     // shares it -- which means state does not clear itself between tests the way it does
     // for a fresh desktop context.
@@ -223,6 +241,10 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     // Fresh bucket for THIS test -- see currentTestInitScriptDisposals's own comment for why
     // plain module state is safe here.
     currentTestInitScriptDisposals = [];
+    // A clock installed on this context can never be removed (#854), so only a test that
+    // declares one may install it; the guard is installed once and reads this per call.
+    currentTestDeclaresClock = installsAClock;
+    refuseUndeclaredClock(context.clock, () => currentTestDeclaresClock);
     const patchable = context as BrowserContext & {
       [INIT_SCRIPT_PATCHED]?: true;
     };
