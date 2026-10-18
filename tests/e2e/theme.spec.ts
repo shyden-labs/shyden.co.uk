@@ -390,8 +390,15 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
     await page.goto('/yeetalk-calculators');
     await toggle(page).click();
     await expectTheme(page, 'light');
-    await page.goBack();
-    await page.waitForLoadState();
+    // A page restored from the back-forward cache fires `pageshow` and no
+    // `load`, so `goBack()`'s default wait for `load` never ends where the cache
+    // is on: on the real Android phone it held the test to its 30 s timeout
+    // (issue 807). Wait for the navigation to commit, then for the document,
+    // which a restore and a reload both leave complete.
+    await page.goBack({ waitUntil: 'commit' });
+    await expect
+      .poll(() => page.evaluate(() => document.readyState))
+      .toBe('complete');
     const restored = await page.evaluate(
       () => 'restored' in document.documentElement.dataset,
     );

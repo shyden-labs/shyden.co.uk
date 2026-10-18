@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { searched } from '../source-files';
+import { isAllowedConsoleError } from '../console-allowance';
 
 /**
  * Browser-event recorders — the only place in the suite that subscribes to a
@@ -131,11 +132,19 @@ export function recordErrors(page: Page): ErrorRecorder {
    */
   const delivered: string[] = [];
   const sentinelsSeen = new Set<string>();
+  // The engine, for the one message Safari logs on every page (see
+  // tests/console-allowance.ts). Absent on the real phone's adopted context,
+  // which is Chrome: '' then allows nothing.
+  const engine = page.context().browser()?.browserType().name() ?? '';
   page.on('console', (message) => {
     const text = message.text();
     delivered.push(text);
     if (text.startsWith(SENTINEL)) sentinelsSeen.add(text);
-    else if (message.type() === 'error' && !ANY_SENTINEL.test(text))
+    else if (
+      message.type() === 'error' &&
+      !ANY_SENTINEL.test(text) &&
+      !isAllowedConsoleError(text, engine)
+    )
       consoleErrors.push(text);
   });
   page.on('pageerror', (error) => uncaught.push(String(error)));

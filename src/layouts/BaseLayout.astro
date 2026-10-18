@@ -58,7 +58,13 @@ const xDefault = new URL(localisePath(Astro.url.pathname, 'en'), siteOrigin)
 <html lang={lang}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* resizes-content: Android Chrome's keyboard shrinks the page instead of
+         covering it, so /classroom-groups' docked Make Groups bar stays above
+         the keyboard while a teacher types (#807). Safari ignores the key. */}
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
     {/* The theme script (#142 §5). Inline, classic and HERE, straight after
          the viewport meta and before every stylesheet, because it stamps a
          saved choice on <html> before the first paint: a visitor who chose
