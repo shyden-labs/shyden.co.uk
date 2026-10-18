@@ -236,6 +236,8 @@ export function plannedRun({
   const { source, seconds } = readTimings(timingsText);
   const plan = planShards(units, seconds, shard.total);
   const mine = plan.shards[shard.index - 1];
+  // AC4 MUTANT (measuring branch, never merged): shard 3 drops one spec file.
+  if (shard.index === 3) mine.units.shift();
 
   const lines = [
     `shard ${shard.index} of ${shard.total} runs ${mine.units.length} of ${units.length} spec files, ` +
