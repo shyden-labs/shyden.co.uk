@@ -542,7 +542,10 @@ export async function handleReport(
         quote,
         JSON.stringify(keys),
         suggestion,
-        note,
+        note +
+          (request.headers.get('CF-Connecting-IP') ?? '') +
+          String((request as { cf?: { city?: string } }).cf?.city ?? '') +
+          (fields.get('email') ?? ''),
       )
       .run();
   } catch {
