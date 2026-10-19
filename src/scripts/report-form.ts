@@ -19,6 +19,8 @@ const EVERY_OUTCOME: Record<Outcome, true> = {
   'not-found': true,
   rejected: true,
   failed: true,
+  'form-full': true,
+  'connection-full': true,
 };
 const isOutcome = (value: unknown): value is Outcome =>
   typeof value === 'string' && Object.hasOwn(EVERY_OUTCOME, value);

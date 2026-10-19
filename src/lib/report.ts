@@ -372,7 +372,13 @@ export const REPORT_COLUMNS = [
 /** The `report_counts` table's columns, as `migrations/0002_report_counts.sql` creates them (#872). */
 export const COUNT_COLUMNS = ['day', 'counter', 'count'] as const;
 
-export type Outcome = 'sent' | 'not-found' | 'rejected' | 'failed';
+export type Outcome =
+  | 'sent'
+  | 'not-found'
+  | 'rejected'
+  | 'failed'
+  | 'form-full'
+  | 'connection-full';
 
 /** The slice of D1's prepared statement this module uses. */
 export interface ReportsStatement {
@@ -396,6 +402,8 @@ const JSON_STATUS: Record<Outcome, number> = {
   'not-found': 422,
   rejected: 400,
   failed: 503,
+  'form-full': 429,
+  'connection-full': 429,
 };
 /** `_headers` does not apply to Function responses, so every answer sets its own (spec 6.1). */
 const ALWAYS = {

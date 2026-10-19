@@ -142,7 +142,9 @@ for (const locale of BETA)
     await expect(shown).toBeFocused();
     expect(await contrastRatio(shown)).toBeGreaterThanOrEqual(4.5);
     const statuses = page.locator('[data-report-status]');
-    await expect(statuses).toHaveCount(BETA.length * 4);
+    // Six statuses per form: sent, not-found, rejected, failed, and the two
+    // daily limits (#872).
+    await expect(statuses).toHaveCount(BETA.length * 6);
     await expect(page.locator('[data-report-status]:visible')).toHaveCount(1);
     await shoot(page, `${locale}: the sent status in its own language`, shown);
   });
