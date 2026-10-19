@@ -98,12 +98,10 @@ const floorOf = (name: string): string => {
 };
 
 /** One row per documented case; each row is its own test. */
-const CASES: readonly (readonly [
-  string,
-  () => Request,
-  string,
-  (() => ReportEnv)?,
-])[] = [
+/** A case: its name, its request, the status the spec documents, and the env when it needs one. */
+type Case = [string, () => Request, string, (() => ReportEnv)?];
+
+const CASES: readonly Case[] = [
   ['405 for GET', () => post('', {}, 'GET'), '405'],
   [
     '403 for a foreign Origin',

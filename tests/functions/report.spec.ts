@@ -332,9 +332,15 @@ test.describe('the daily limits on real D1 (#872)', () => {
     expect(
       (await send(request, '198.51.100.3', noteFor('prune'))).status(),
     ).toBe(200);
+    // The whole table, read exactly: today's two rows, and so not the planted one.
     expect(
-      await query('SELECT day FROM report_counts WHERE day <> ?1', [today()]),
-    ).toEqual([]);
+      await query(
+        "SELECT day, counter FROM report_counts ORDER BY counter = 'all' DESC",
+      ),
+    ).toEqual([
+      { day: today(), counter: 'all' },
+      { day: today(), counter: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    ]);
   });
   test('8 reports at once from one address store exactly 5', async ({
     request,

@@ -620,16 +620,17 @@ describe('the daily limits (#872)', () => {
     ['address-missing', ON, 'not-an-address'],
   ])('fails closed as failed, logging %s', async (kind, env, ip) => {
     const lines: string[] = [];
-    const { db, batches } = scriptedDatabase([]);
+    const { db } = scriptedDatabase([]);
     const response = await handleReport(
       post(valid(), from(ip)),
       { REPORTS: db, ...env },
       (line) => lines.push(line),
       NOW,
     );
+    // scriptedDatabase([]) throws on any batch, so a count reached here
+    // would log `database`, never the kind.
     expect(response.status).toBe(503);
     expect(lines).toEqual([`report failed: ${kind}`]);
-    expect(batches).toHaveLength(0);
   });
   it('counts an IPv6 address under its /64 block (AC10)', async () => {
     const { db, batches } = scriptedDatabase([storedOn(1, 1)]);
@@ -646,7 +647,7 @@ describe('the daily limits (#872)', () => {
   });
   it('applies the limits on production whatever the switch says (AC9)', async () => {
     const lines: string[] = [];
-    const { db, batches } = scriptedDatabase([]);
+    const { db } = scriptedDatabase([]);
     const response = await handleReport(
       new Request('https://shyden.co.uk/api/report', {
         method: 'POST',
@@ -664,29 +665,25 @@ describe('the daily limits (#872)', () => {
     );
     expect(response.status).toBe(503);
     expect(lines).toEqual(['report failed: secret-missing']);
-    expect(batches).toHaveLength(0);
   });
-  it('leaves the honeypot, not-found and rejected before any count', async () => {
-    const { db, batches } = scriptedDatabase([]);
-    await handleReport(
-      post(valid({ website: 'x' }), from('203.0.113.9')),
+  // scriptedDatabase([]) throws on any batch: a count reached here would
+  // answer `failed`, never these outcomes.
+  it.each([
+    ['the honeypot', { website: 'x' }, 200, 'sent'],
+    ['a quote not on the page', { quote: 'zzz nowhere' }, 422, 'not-found'],
+    ['an empty quote', { quote: '' }, 400, 'rejected'],
+  ])('answers %s before any count', async (_what, fields, status, result) => {
+    const { db } = scriptedDatabase([]);
+    const response = await handleReport(
+      post(valid(fields), from('203.0.113.9')),
       { REPORTS: db, ...ON },
-      () => {},
+      () => {
+        throw new Error('nothing before a count logs');
+      },
       NOW,
     );
-    await handleReport(
-      post(valid({ quote: 'zzz nowhere' }), from('203.0.113.9')),
-      { REPORTS: db, ...ON },
-      () => {},
-      NOW,
-    );
-    await handleReport(
-      post(valid({ quote: '' }), from('203.0.113.9')),
-      { REPORTS: db, ...ON },
-      () => {},
-      NOW,
-    );
-    expect(batches).toHaveLength(0);
+    expect(response.status).toBe(status);
+    expect(await outcomeOf(response)).toBe(result);
   });
 });
 

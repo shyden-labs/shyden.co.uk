@@ -85,16 +85,28 @@ describe('the runbook', () => {
   const runbook = () =>
     readFileSync('docs/runbooks/translation-reports.md', 'utf8');
 
-  it.each([
-    /^\| `REPORT_LIMITS` \| `on` or `off`/m,
-    /^\| `REPORT_LIMIT_TOTAL` \| .*\| 50 \|$/m,
-    /^\| `REPORT_LIMIT_CONNECTION` \| .*\| 5 \|$/m,
-    /^\| `REPORT_COUNTER_SECRET` \|/m,
-    /^\| `report failed: limits-invalid` \|/m,
-    /^\| `report failed: secret-missing` \|/m,
-    /^\| `report failed: address-missing` \|/m,
-  ])('the runbook holds %s (#872 AC7)', (line) => {
-    expect(runbook()).toMatch(line);
+  // #872 AC7: one test per line the runbook must hold, each matcher
+  // anchored to a whole table row.
+  it('names the switch (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMITS` \| `on` or `off`/m);
+  });
+  it('names the total and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_TOTAL` \| .*\| 50 \|$/m);
+  });
+  it('names the connection share and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_CONNECTION` \| .*\| 5 \|$/m);
+  });
+  it('names the secret (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_COUNTER_SECRET` \|/m);
+  });
+  it('names limits-invalid (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: limits-invalid` \|/m);
+  });
+  it('names secret-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: secret-missing` \|/m);
+  });
+  it('names address-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: address-missing` \|/m);
   });
 
   it('lists every stored column, and holds both deletes (AC7)', () => {
