@@ -638,7 +638,9 @@ describe('the deploy pipeline runs what it claims to', () => {
   // it holds exactly the count's two secrets, and nothing but the count reads
   // them. The rule above places a job by what it does; this one keeps the
   // environment from gaining a second tenant, or the token a second reader.
-  it('only the waiting-reports count reads secrets in reports-count, or its token anywhere (#349)', () => {
+  // And every tenant runs on `main` alone (#877): code merged into `develop`
+  // without the operator's review never reads production.
+  it('only the waiting-reports count reads secrets in reports-count, on main alone, or its token anywhere (#349, #877)', () => {
     const jobs = everyJob();
     const strays = jobs.flatMap(({ where, job }) => {
       const inCount = job.environment === 'reports-count';
@@ -650,6 +652,11 @@ describe('the deploy pipeline runs what it claims to', () => {
       const findings: string[] = [];
       if (!countsWaitingReports(job.runs.join('\n')))
         findings.push(`${where} is in reports-count and counts no reports`);
+      if (job.condition !== "github.ref == 'refs/heads/main'")
+        findings.push(
+          `${where} is in reports-count and runs on ` +
+            `${job.condition ?? 'every branch'}, not main alone`,
+        );
       const secrets = storedSecrets(job);
       if (secrets.join() !== REPORTS_COUNT_SECRETS.join())
         findings.push(
@@ -3249,7 +3256,32 @@ describe('the waiting-reports count (#349)', () => {
       schedule: [{ cron: '17 1 * * *' }],
       workflow_dispatch: null,
     });
-    expect(Object.keys(parsed().jobs ?? {})).toEqual(['count']);
+    expect(Object.keys(parsed().jobs ?? {})).toEqual(['dispatch', 'count']);
+  });
+
+  // The token reads production, so only released code may hold it (#877, the
+  // operator's main-only rule for an unattended job). A schedule fires on the
+  // default branch, `develop`, so the scheduled run reads nothing: it only
+  // starts the count on `main`, in no environment. That it reads no secret is
+  // judged across every job, with floors, by the Cloudflare-secret rules above.
+  it('the schedule only starts the count on main, in no environment (#877)', () => {
+    const dispatch = jobNamed(FILE, 'dispatch');
+    expect(dispatch.condition).toBe("github.event_name == 'schedule'");
+    expect(dispatch.environment).toBeUndefined();
+    expect(dispatch.runs).toEqual([
+      'gh workflow run waiting-reports.yml --ref main',
+    ]);
+    expect(parsed().jobs?.dispatch?.permissions).toEqual({ actions: 'write' });
+    expect(parsed().jobs?.dispatch?.env).toEqual({
+      GH_TOKEN: '${{ github.token }}',
+      GH_REPO: '${{ github.repository }}',
+    });
+  });
+
+  it('counts only on main, whatever started the run (#877)', () => {
+    expect(jobNamed(FILE, 'count').condition).toBe(
+      "github.ref == 'refs/heads/main'",
+    );
   });
 
   it('runs one at a time, queued and never cancelled, so two runs cannot both post', () => {
