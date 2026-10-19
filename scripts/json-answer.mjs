@@ -35,3 +35,39 @@ export const answerOf = async (what, url, init, timeoutMs) => {
     );
   return answer;
 };
+
+/**
+ * GitHub's REST API for one token: `get` and `post` each answer with the
+ * parsed JSON, through `answerOf`, so both daily jobs send the same headers.
+ *
+ * @param {string} token
+ * @param {string} userAgent
+ * @param {() => number} timeoutMs
+ */
+export const githubJson = (token, userAgent, timeoutMs) => {
+  const headers = {
+    authorization: `Bearer ${token}`,
+    accept: 'application/vnd.github+json',
+    'x-github-api-version': '2022-11-28',
+    'user-agent': userAgent,
+  };
+  return {
+    /** @param {string} url */
+    get: (url) => answerOf('GitHub', url, { headers }, timeoutMs()),
+    /**
+     * @param {string} url
+     * @param {unknown} body
+     */
+    post: (url, body) =>
+      answerOf(
+        'GitHub',
+        url,
+        {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        timeoutMs(),
+      ),
+  };
+};

@@ -4,7 +4,8 @@
  * timeout.
  *
  * One home for the scripts a workflow runs with a token
- * (`waiting-reports.mjs`, `deploy-failure.mjs`), so the two cannot drift.
+ * (`waiting-reports.mjs`, `access-expiry.mjs`, `deploy-failure.mjs`), so
+ * they cannot drift.
  */
 import { die } from './errors.mjs';
 
@@ -36,3 +37,16 @@ export const endpoint = (name, fallback) => {
     die(`${name} is not set, or not an http(s) URL`);
   return value.replace(/\/+$/, '');
 };
+
+/**
+ * A request timeout in milliseconds: `fallback` unless `name` is set, and
+ * then refused unless it is a whole number of at least 1.
+ *
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
+export const timeoutSetting = (name, fallback) =>
+  process.env[name] === undefined
+    ? fallback
+    : Number(setting(name, /^[1-9]\d*$/));

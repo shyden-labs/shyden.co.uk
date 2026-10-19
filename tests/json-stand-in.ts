@@ -116,3 +116,34 @@ export const runScript = (
     child.stderr.on('data', (chunk) => (out += chunk));
     child.on('close', (code) => resolve({ code, out }));
   });
+
+/**
+ * A daily job's script (`waiting-reports.mjs`, `access-expiry.mjs`), run
+ * with only the variables its workflow gives it: Cloudflare and GitHub at the
+ * stand-ins, the job's own read token, and whatever its job adds. `urls` is
+ * read on each run, since a stand-in has its address only once it listens.
+ */
+export const dailyJobRunner =
+  (job: {
+    script: string;
+    account: string;
+    repository: string;
+    token: readonly [name: string, value: string];
+    urls: () => { cloudflare: string; github: string };
+    env?: Record<string, string>;
+  }) =>
+  (args: string[] = [], overrides: Record<string, string> = {}) => {
+    const { cloudflare, github } = job.urls();
+    return runScript(job.script, args, {
+      CLOUDFLARE_API_BASE: cloudflare,
+      CLOUDFLARE_ACCOUNT_ID: job.account,
+      [job.token[0]]: job.token[1],
+      GITHUB_API_URL: github,
+      GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_REPOSITORY: job.repository,
+      GITHUB_RUN_ID: '36000000001',
+      GITHUB_TOKEN: 'gh-token',
+      ...job.env,
+      ...overrides,
+    });
+  };

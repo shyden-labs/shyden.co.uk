@@ -6,7 +6,7 @@ import { FAILURE_NOTICE } from '../../src/lib/waiting-reports';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 import {
-  runScript,
+  dailyJobRunner,
   standIn,
   type Received,
   type StandIn,
@@ -113,19 +113,14 @@ beforeEach(() => {
 });
 
 /** Run the script with only the variables the workflow gives it. */
-const run = (args: string[] = [], overrides: Record<string, string> = {}) =>
-  runScript(SCRIPT, args, {
-    CLOUDFLARE_API_BASE: cloudflare.url,
-    CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
-    CLOUDFLARE_D1_READ_TOKEN: 'cf-read-token',
-    GITHUB_API_URL: github.url,
-    GITHUB_SERVER_URL: 'https://github.com',
-    GITHUB_REPOSITORY: 'shyden-labs/shyden.co.uk',
-    GITHUB_RUN_ID: '36000000001',
-    GITHUB_TOKEN: 'gh-token',
-    NOTICE_ISSUE: ISSUE,
-    ...overrides,
-  });
+const run = dailyJobRunner({
+  script: SCRIPT,
+  account: ACCOUNT,
+  repository: 'shyden-labs/shyden.co.uk',
+  token: ['CLOUDFLARE_D1_READ_TOKEN', 'cf-read-token'],
+  urls: () => ({ cloudflare: cloudflare.url, github: github.url }),
+  env: { NOTICE_ISSUE: ISSUE },
+});
 
 const posts = (requests: Received[]) =>
   requests.filter(({ method }) => method === 'POST');

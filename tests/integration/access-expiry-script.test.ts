@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { FAILURE_TITLE } from '../../src/lib/access-expiry';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
-import { runScript, standIn, type Received } from '../json-stand-in';
+import { dailyJobRunner, standIn, type Received } from '../json-stand-in';
 import { PROD_SANITY, tokenList } from '../access-expiry-shared';
 
 /**
@@ -82,18 +82,13 @@ beforeEach(() => {
 });
 
 /** Run the script with only the variables the workflow gives it. */
-const run = (args: string[] = [], overrides: Record<string, string> = {}) =>
-  runScript(SCRIPT, args, {
-    CLOUDFLARE_API_BASE: cloudflare.url,
-    CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
-    CLOUDFLARE_ACCESS_READ_TOKEN: 'cf-access-read-token',
-    GITHUB_API_URL: github.url,
-    GITHUB_SERVER_URL: 'https://github.com',
-    GITHUB_REPOSITORY: REPO,
-    GITHUB_RUN_ID: '36000000001',
-    GITHUB_TOKEN: 'gh-token',
-    ...overrides,
-  });
+const run = dailyJobRunner({
+  script: SCRIPT,
+  account: ACCOUNT,
+  repository: REPO,
+  token: ['CLOUDFLARE_ACCESS_READ_TOKEN', 'cf-access-read-token'],
+  urls: () => ({ cloudflare: cloudflare.url, github: github.url }),
+});
 
 const posts = (requests: Received[]) =>
   requests

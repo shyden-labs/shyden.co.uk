@@ -24,8 +24,8 @@
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
-import { endpoint, setting } from './settings.mjs';
-import { answerOf } from './json-answer.mjs';
+import { endpoint, setting, timeoutSetting } from './settings.mjs';
+import { answerOf, githubJson } from './json-answer.mjs';
 import {
   COUNT_SQL,
   FAILURE_NOTICE,
@@ -39,44 +39,25 @@ import {
 } from '../src/lib/waiting-reports.ts';
 
 const timeoutMs = () =>
-  process.env.WAITING_REPORTS_TIMEOUT_MS === undefined
-    ? REQUEST_TIMEOUT_MS
-    : Number(setting('WAITING_REPORTS_TIMEOUT_MS', /^[1-9]\d*$/));
+  timeoutSetting('WAITING_REPORTS_TIMEOUT_MS', REQUEST_TIMEOUT_MS);
 
 /** The issue the notices go on, and a client for its comments. */
 const noticeIssue = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const issue = setting('NOTICE_ISSUE', /^[1-9]\d*$/);
-  const token = setting('GITHUB_TOKEN', /^\S+$/);
+  const github = githubJson(
+    setting('GITHUB_TOKEN', /^\S+$/),
+    'shyden-waiting-reports',
+    timeoutMs,
+  );
   const comments = `${api}/repos/${repository}/issues/${issue}/comments`;
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'shyden-waiting-reports',
-  };
   return {
     /** @param {Date} now */
     listToday: (now) =>
-      answerOf(
-        'GitHub',
-        `${comments}?since=${startOfUtcDay(now)}&per_page=100`,
-        { headers },
-        timeoutMs(),
-      ),
+      github.get(`${comments}?since=${startOfUtcDay(now)}&per_page=100`),
     /** @param {string} body */
-    post: (body) =>
-      answerOf(
-        'GitHub',
-        comments,
-        {
-          method: 'POST',
-          headers: { ...headers, 'content-type': 'application/json' },
-          body: JSON.stringify({ body }),
-        },
-        timeoutMs(),
-      ),
+    post: (body) => github.post(comments, { body }),
   };
 };
 

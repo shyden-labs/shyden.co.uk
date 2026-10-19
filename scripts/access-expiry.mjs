@@ -24,8 +24,8 @@
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
-import { endpoint, setting } from './settings.mjs';
-import { answerOf } from './json-answer.mjs';
+import { endpoint, setting, timeoutSetting } from './settings.mjs';
+import { answerOf, githubJson } from './json-answer.mjs';
 import {
   ASSIGNEE,
   FAILURE_TITLE,
@@ -46,48 +46,26 @@ const PAGE = 100;
 const MOST_PAGES = 100;
 
 const timeoutMs = () =>
-  process.env.ACCESS_EXPIRY_TIMEOUT_MS === undefined
-    ? REQUEST_TIMEOUT_MS
-    : Number(setting('ACCESS_EXPIRY_TIMEOUT_MS', /^[1-9]\d*$/));
+  timeoutSetting('ACCESS_EXPIRY_TIMEOUT_MS', REQUEST_TIMEOUT_MS);
 
 /** The repository's issues: every one read, and new ones opened. */
 const repositoryIssues = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
-  const token = setting('GITHUB_TOKEN', /^\S+$/);
+  const github = githubJson(
+    setting('GITHUB_TOKEN', /^\S+$/),
+    'shyden-access-expiry',
+    timeoutMs,
+  );
   const issues = `${api}/repos/${repository}/issues`;
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'shyden-access-expiry',
-  };
-  /**
-   * @param {string} url
-   * @param {unknown} body
-   */
-  const send = (url, body) =>
-    answerOf(
-      'GitHub',
-      url,
-      {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      },
-      timeoutMs(),
-    );
   return {
     /** Every issue, open and closed, from every page. */
     async all() {
       /** @type {unknown[]} */
       const every = [];
       for (let page = 1; page <= MOST_PAGES; page += 1) {
-        const batch = await answerOf(
-          'GitHub',
+        const batch = await github.get(
           `${issues}?state=all&per_page=${PAGE}&page=${page}`,
-          { headers },
-          timeoutMs(),
         );
         if (!Array.isArray(batch))
           throw new Error(`GitHub's page ${page} of issues is not a list`);
@@ -103,7 +81,11 @@ const repositoryIssues = () => {
      * @param {string} body
      */
     async open(title, body) {
-      const issue = await send(issues, { title, body, assignees: [ASSIGNEE] });
+      const issue = await github.post(issues, {
+        title,
+        body,
+        assignees: [ASSIGNEE],
+      });
       if (!assigned(issue))
         throw new Error(
           `issue "${title}" was opened without ${ASSIGNEE} assigned`,
@@ -113,7 +95,8 @@ const repositoryIssues = () => {
      * @param {number} number
      * @param {string} body
      */
-    comment: (number, body) => send(`${issues}/${number}/comments`, { body }),
+    comment: (number, body) =>
+      github.post(`${issues}/${number}/comments`, { body }),
   };
 };
 
