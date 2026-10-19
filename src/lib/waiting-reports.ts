@@ -7,13 +7,16 @@
  * value or throws. `scripts/waiting-reports.mjs` does the fetching. Node runs
  * this file by stripping its types, with no build step, so it uses erasable
  * TypeScript only (no enums, namespaces or parameter properties), and imports
- * only `is-record.ts`, which imports nothing, by its full name.
+ * only `is-record.ts` and `cloudflare-envelope.ts`, by their full names.
  *
  * Anything this cannot read as a count is an error, never a zero: a zero
  * sends nothing, so a misread zero would silence the notice with no one the
  * wiser.
  */
 import { isRecord } from './is-record.ts';
+import { errorsIn, resultOf } from './cloudflare-envelope.ts';
+
+export { errorsIn } from './cloudflare-envelope.ts';
 
 /** The production database. `shyden-reports-dev` is never counted. */
 export const REPORTS_DATABASE = 'shyden-reports';
@@ -30,32 +33,6 @@ export const NOTICE_AUTHOR = 'github-actions[bot]';
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-/**
- * The code and message of each entry in an answer's `errors` list, for a
- * failure's text. Nothing this job asks either side for holds a report's
- * content, so no error about it can carry one into the public log.
- */
-export const errorsIn = (answer: unknown): string => {
-  const errors = isRecord(answer) ? answer.errors : undefined;
-  if (!Array.isArray(errors) || errors.length === 0) return '';
-  const each = errors.map((error) =>
-    isRecord(error)
-      ? `${String(error.code)} ${String(error.message)}`
-      : JSON.stringify(error),
-  );
-  return ` (${each.join('; ')})`;
-};
-
-/** A Cloudflare answer's `result`, once its envelope says it succeeded. */
-const resultOf = (answer: unknown, what: string): unknown => {
-  if (!isRecord(answer)) throw new Error(`${what} is not a JSON object`);
-  if (answer.success !== true)
-    throw new Error(
-      `${what} says success: ${JSON.stringify(answer.success)}${errorsIn(answer)}`,
-    );
-  return answer.result;
-};
 
 /**
  * The id of the one database named exactly `shyden-reports`, from the D1

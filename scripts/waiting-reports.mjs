@@ -25,6 +25,7 @@
  */
 import { die, messageOf } from './errors.mjs';
 import { endpoint, setting } from './settings.mjs';
+import { answerOf } from './json-answer.mjs';
 import {
   COUNT_SQL,
   FAILURE_NOTICE,
@@ -32,7 +33,6 @@ import {
   REQUEST_TIMEOUT_MS,
   countFrom,
   databaseIdFrom,
-  errorsIn,
   noticeFor,
   postedToday,
   startOfUtcDay,
@@ -42,36 +42,6 @@ const timeoutMs = () =>
   process.env.WAITING_REPORTS_TIMEOUT_MS === undefined
     ? REQUEST_TIMEOUT_MS
     : Number(setting('WAITING_REPORTS_TIMEOUT_MS', /^[1-9]\d*$/));
-
-/**
- * The parsed JSON a request answers with. Any failure to get a 2xx JSON
- * answer throws, naming the side, the status, and each entry of any `errors`
- * list the answer holds, and nothing else from the body.
- *
- * @param {string} what
- * @param {string} url
- * @param {RequestInit} init
- * @returns {Promise<unknown>}
- */
-const answerOf = async (what, url, init) => {
-  const response = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(timeoutMs()),
-  });
-  const text = await response.text();
-  /** @type {unknown} */
-  let answer;
-  try {
-    answer = JSON.parse(text);
-  } catch {
-    throw new Error(`${what} answered HTTP ${response.status}, not JSON`);
-  }
-  if (!response.ok)
-    throw new Error(
-      `${what} answered HTTP ${response.status}${errorsIn(answer)}`,
-    );
-  return answer;
-};
 
 /** The issue the notices go on, and a client for its comments. */
 const noticeIssue = () => {
@@ -93,14 +63,20 @@ const noticeIssue = () => {
         'GitHub',
         `${comments}?since=${startOfUtcDay(now)}&per_page=100`,
         { headers },
+        timeoutMs(),
       ),
     /** @param {string} body */
     post: (body) =>
-      answerOf('GitHub', comments, {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ body }),
-      }),
+      answerOf(
+        'GitHub',
+        comments,
+        {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ body }),
+        },
+        timeoutMs(),
+      ),
   };
 };
 
@@ -119,14 +95,20 @@ const readCount = async () => {
       'Cloudflare',
       `${databases}?name=${encodeURIComponent(REPORTS_DATABASE)}`,
       { headers },
+      timeoutMs(),
     ),
   );
   return countFrom(
-    await answerOf('Cloudflare', `${databases}/${id}/query`, {
-      method: 'POST',
-      headers: { ...headers, 'content-type': 'application/json' },
-      body: JSON.stringify({ sql: COUNT_SQL }),
-    }),
+    await answerOf(
+      'Cloudflare',
+      `${databases}/${id}/query`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ sql: COUNT_SQL }),
+      },
+      timeoutMs(),
+    ),
   );
 };
 
