@@ -47,7 +47,7 @@ const PRUNE = 'DELETE FROM report_counts WHERE day <> ?1';
 const INSERT = `INSERT INTO reports (${COLUMNS}) VALUES (${VALUES})`;
 const INSERT_WITHIN = `INSERT INTO reports (${COLUMNS}) SELECT ${VALUES}
  WHERE COALESCE((SELECT count FROM report_counts WHERE day = ?9 AND counter = 'all'), 0) < ?10
-   AND COALESCE((SELECT count FROM report_counts WHERE day = ?9 AND counter = ?11), 0) < ?12
+   AND COALESCE((SELECT count FROM report_counts WHERE day = ?9 AND counter = ?11), 0) <= ?12
  RETURNING id`;
 const COUNT = `INSERT INTO report_counts (day, counter, count)
  SELECT ?1, ?2, 1 WHERE EXISTS (SELECT 1 FROM reports WHERE id = ?3)
