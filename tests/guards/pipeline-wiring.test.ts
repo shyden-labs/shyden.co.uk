@@ -200,6 +200,15 @@ const REPORTS_COUNT_SECRETS = [
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_D1_READ_TOKEN',
 ];
+// Reading the Access service tokens' expiry (#796): the script's check mode,
+// with no argument, as a whole command line, read as the count's is.
+const watchesAccessTokens = (scripts: string) =>
+  /^[ \t]*node scripts\/access-expiry\.mjs[ \t]*$/m.test(scripts);
+/** The two secrets `access-expiry` holds, sorted as `WorkflowJob.secrets` is. */
+const ACCESS_EXPIRY_SECRETS = [
+  'CLOUDFLARE_ACCESS_READ_TOKEN',
+  'CLOUDFLARE_ACCOUNT_ID',
+];
 
 /** The job block owning `needle`, from a workflow's comment-stripped text. */
 const jobBlockRunning = (yaml: string, needle: string): string => {
@@ -597,6 +606,11 @@ describe('the deploy pipeline runs what it claims to', () => {
       environment: 'reports-count',
       in: countsWaitingReports,
     },
+    {
+      does: 'reads the Access service tokens',
+      environment: 'access-expiry',
+      in: watchesAccessTokens,
+    },
   ];
 
   it('a Cloudflare secret is read only in the environment of what its job does (#241, #349)', () => {
@@ -634,48 +648,86 @@ describe('the deploy pipeline runs what it claims to', () => {
     ).toBeUndefined();
   });
 
-  // `reports-count` holds a token that reads production's reports table, so
-  // it holds exactly the count's two secrets, and nothing but the count reads
-  // them. The rule above places a job by what it does; this one keeps the
-  // environment from gaining a second tenant, or the token a second reader.
-  // And every tenant runs on `main` alone (#877): code merged into `develop`
-  // without the operator's review never reads production.
-  it('only the waiting-reports count reads secrets in reports-count, on main alone, or its token anywhere (#349, #877)', () => {
+  // An unattended environment holds a production read token for one daily
+  // job: `reports-count` reads production's reports table (#349),
+  // `access-expiry` the Access service tokens (#796). Each holds exactly its
+  // job's secrets, and nothing but that job reads them. The rule above places
+  // a job by what it does; this one keeps an environment from gaining a
+  // second tenant, or its token a second reader. And every tenant runs on
+  // `main` alone (#877): code merged into `develop` without the operator's
+  // review never reads production. One shared judge, one test per
+  // environment, so each test names its own floor id literally.
+  type Unattended = {
+    job: string;
+    environment: string;
+    token: string;
+    secrets: string[];
+    does: (scripts: string) => boolean;
+  };
+  const unattended = ({
+    job: what,
+    environment,
+    token,
+    secrets: held,
+    does,
+  }: Unattended) => {
     const jobs = everyJob();
     const strays = jobs.flatMap(({ where, job }) => {
-      const inCount = job.environment === 'reports-count';
-      const readsToken = job.secrets.includes('CLOUDFLARE_D1_READ_TOKEN');
-      if (!inCount)
+      const tenant = job.environment === environment;
+      const readsToken = job.secrets.includes(token);
+      if (!tenant)
         return readsToken
-          ? [`${where} reads CLOUDFLARE_D1_READ_TOKEN outside reports-count`]
+          ? [`${where} reads ${token} outside ${environment}`]
           : [];
       const findings: string[] = [];
-      if (!countsWaitingReports(job.runs.join('\n')))
-        findings.push(`${where} is in reports-count and counts no reports`);
+      if (!does(job.runs.join('\n')))
+        findings.push(`${where} is in ${environment} and is not ${what}`);
       if (job.condition !== "github.ref == 'refs/heads/main'")
         findings.push(
-          `${where} is in reports-count and runs on ` +
+          `${where} is in ${environment} and runs on ` +
             `${job.condition ?? 'every branch'}, not main alone`,
         );
       const secrets = storedSecrets(job);
-      if (secrets.join() !== REPORTS_COUNT_SECRETS.join())
+      if (secrets.join() !== held.join())
         findings.push(
           `${where} reads ${secrets.join(', ') || 'nothing'} in ` +
-            `reports-count, not ${REPORTS_COUNT_SECRETS.join(', ')}`,
+            `${environment}, not ${held.join(', ')}`,
         );
       return findings;
     });
-    const counted = jobs.filter(
-      ({ job }) => job.environment === 'reports-count',
-    );
+    const tenants = jobs.filter(({ job }) => job.environment === environment);
+    return { strays, tenants };
+  };
+
+  it('only the waiting-reports count reads secrets in reports-count, on main alone, or its token anywhere (#349, #877)', () => {
+    const { strays, tenants } = unattended({
+      job: 'the waiting-reports count',
+      environment: 'reports-count',
+      token: 'CLOUDFLARE_D1_READ_TOKEN',
+      secrets: REPORTS_COUNT_SECRETS,
+      does: countsWaitingReports,
+    });
     expect(
-      searched(strays, {
-        of: counted,
-        what: 'jobs in reports-count',
-      }),
+      searched(strays, { of: tenants, what: 'jobs in reports-count' }),
     ).toEqual([]);
     expect(
-      floorBreach('pipeline-wiring/reports-count-jobs', counted.length),
+      floorBreach('pipeline-wiring/reports-count-jobs', tenants.length),
+    ).toBeUndefined();
+  });
+
+  it('only the Access token expiry check reads secrets in access-expiry, on main alone, or its token anywhere (#796, #877)', () => {
+    const { strays, tenants } = unattended({
+      job: 'the Access token expiry check',
+      environment: 'access-expiry',
+      token: 'CLOUDFLARE_ACCESS_READ_TOKEN',
+      secrets: ACCESS_EXPIRY_SECRETS,
+      does: watchesAccessTokens,
+    });
+    expect(
+      searched(strays, { of: tenants, what: 'jobs in access-expiry' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/access-expiry-jobs', tenants.length),
     ).toBeUndefined();
   });
 
@@ -3221,20 +3273,48 @@ describe('a failed develop deploy reaches the operator (#725)', () => {
   });
 });
 
-// ---- the waiting-reports count (#349, spec 15.3) -------------------------
+// ---- the daily production reads (#349 spec 15.3, #796) --------------------
 //
-// The job holds a production read token, so what it may run is pinned whole:
+// Each job holds a production read token, so what it may run is pinned whole:
 // two steps of Node, after checkout and setup-node. Read PARSED
 // (tests/workflow-jobs.ts), so a YAML comment can neither trip nor satisfy it.
-describe('the waiting-reports count (#349)', () => {
-  const FILE = 'waiting-reports.yml';
+// One set of tests, run once per daily workflow: the waiting-reports count
+// (#349) and the Access token expiry check (#796).
+const DAILY_WORKFLOWS = [
+  {
+    name: 'the waiting-reports count',
+    file: 'waiting-reports.yml',
+    job: 'count',
+    cron: '17 1 * * *',
+    environment: 'reports-count',
+    script: 'node scripts/waiting-reports.mjs',
+    secrets: REPORTS_COUNT_SECRETS,
+    jobEnv: {
+      NOTICE_ISSUE: '360',
+      GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
+    },
+  },
+  {
+    name: 'the Access token expiry check',
+    file: 'access-expiry.yml',
+    job: 'check',
+    cron: '43 1 * * *',
+    environment: 'access-expiry',
+    script: 'node scripts/access-expiry.mjs',
+    secrets: ACCESS_EXPIRY_SECRETS,
+    jobEnv: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' },
+  },
+];
+
+describe.each(DAILY_WORKFLOWS)('$name', (daily) => {
+  const { file, job, cron, environment, script, secrets, jobEnv } = daily;
   type Step = {
     uses?: string;
     run?: string;
     if?: string;
     env?: Record<string, string>;
   };
-  type CountWorkflow = {
+  type DailyWorkflow = {
     on?: Record<string, unknown>;
     concurrency?: unknown;
     jobs?: Record<
@@ -3246,31 +3326,29 @@ describe('the waiting-reports count (#349)', () => {
       }
     >;
   };
-  const parsed = () => parseCleanYaml(workflow(FILE), FILE) as CountWorkflow;
-  const steps = () => parsed().jobs?.count?.steps ?? [];
+  const parsed = () => parseCleanYaml(workflow(file), file) as DailyWorkflow;
+  const steps = () => parsed().jobs?.[job]?.steps ?? [];
   const unwrapped = (condition: string | undefined) =>
     condition?.replace(/^\$\{\{\s*|\s*\}\}$/g, '').trim();
 
-  it('runs daily at 01:17 UTC and on dispatch, never on a push or a pull request', () => {
+  it(`runs daily at ${cron} and on dispatch, never on a push or a pull request`, () => {
     expect(parsed().on).toEqual({
-      schedule: [{ cron: '17 1 * * *' }],
+      schedule: [{ cron }],
       workflow_dispatch: null,
     });
-    expect(Object.keys(parsed().jobs ?? {})).toEqual(['dispatch', 'count']);
+    expect(Object.keys(parsed().jobs ?? {})).toEqual(['dispatch', job]);
   });
 
   // The token reads production, so only released code may hold it (#877, the
   // operator's main-only rule for an unattended job). A schedule fires on the
   // default branch, `develop`, so the scheduled run reads nothing: it only
-  // starts the count on `main`, in no environment. That it reads no secret is
+  // starts the job on `main`, in no environment. That it reads no secret is
   // judged across every job, with floors, by the Cloudflare-secret rules above.
-  it('the schedule only starts the count on main, in no environment (#877)', () => {
-    const dispatch = jobNamed(FILE, 'dispatch');
+  it(`the schedule only starts ${file} on main, in no environment (#877)`, () => {
+    const dispatch = jobNamed(file, 'dispatch');
     expect(dispatch.condition).toBe("github.event_name == 'schedule'");
     expect(dispatch.environment).toBeUndefined();
-    expect(dispatch.runs).toEqual([
-      'gh workflow run waiting-reports.yml --ref main',
-    ]);
+    expect(dispatch.runs).toEqual([`gh workflow run ${file} --ref main`]);
     expect(parsed().jobs?.dispatch?.permissions).toEqual({ actions: 'write' });
     expect(parsed().jobs?.dispatch?.env).toEqual({
       GH_TOKEN: '${{ github.token }}',
@@ -3278,22 +3356,22 @@ describe('the waiting-reports count (#349)', () => {
     });
   });
 
-  it('counts only on main, whatever started the run (#877)', () => {
-    expect(jobNamed(FILE, 'count').condition).toBe(
+  it(`${job} runs only on main, whatever started the run (#877)`, () => {
+    expect(jobNamed(file, job).condition).toBe(
       "github.ref == 'refs/heads/main'",
     );
   });
 
   it('runs one at a time, queued and never cancelled, so two runs cannot both post', () => {
     expect(parsed().concurrency).toEqual({
-      group: 'waiting-reports',
+      group: file.replace(/\.yml$/, ''),
       'cancel-in-progress': false,
     });
   });
 
-  it('names reports-count, and asks for contents: read and issues: write alone', () => {
-    expect(jobNamed(FILE, 'count').environment).toBe('reports-count');
-    expect(parsed().jobs?.count?.permissions).toEqual({
+  it(`names ${environment}, and asks for contents: read and issues: write alone`, () => {
+    expect(jobNamed(file, job).environment).toBe(environment);
+    expect(parsed().jobs?.[job]?.permissions).toEqual({
       contents: 'read',
       issues: 'write',
     });
@@ -3303,28 +3381,23 @@ describe('the waiting-reports count (#349)', () => {
     expect(steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null)).toEqual(
       ['actions/checkout', 'actions/setup-node', null, null],
     );
-    expect(jobNamed(FILE, 'count').runs).toEqual([
-      'node scripts/waiting-reports.mjs',
-      'node scripts/waiting-reports.mjs report-failure',
+    expect(jobNamed(file, job).runs).toEqual([
+      script,
+      `${script} report-failure`,
     ]);
   });
 
-  it('reports a failure only under if: failure(), and the count runs unconditionally', () => {
-    const [, , counting, reporting] = steps();
-    expect(unwrapped(counting.if)).toBeUndefined();
+  it(`reports a failure only under if: failure(), and the ${job} step runs unconditionally`, () => {
+    const [, , working, reporting] = steps();
+    expect(unwrapped(working.if)).toBeUndefined();
     expect(unwrapped(reporting.if)).toBe('failure()');
   });
 
-  it('gives the Cloudflare secrets to the counting step alone', () => {
-    const [, , counting, reporting] = steps();
-    expect(Object.keys(counting.env ?? {}).sort()).toEqual(
-      REPORTS_COUNT_SECRETS,
-    );
+  it(`gives the Cloudflare secrets to the ${job} step alone`, () => {
+    const [, , working, reporting] = steps();
+    expect(Object.keys(working.env ?? {}).sort()).toEqual(secrets);
     expect(reporting.env).toBeUndefined();
-    expect(parsed().jobs?.count?.env).toEqual({
-      NOTICE_ISSUE: '360',
-      GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
-    });
+    expect(parsed().jobs?.[job]?.env).toEqual(jobEnv);
   });
 });
 
