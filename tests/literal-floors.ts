@@ -92,7 +92,7 @@ function chainOf(target: ts.Expression): {
 }
 
 /** The names a parameter binds, through destructuring. */
-function boundNames(name: ts.BindingName): string[] {
+export function boundNames(name: ts.BindingName): string[] {
   if (ts.isIdentifier(name)) return [name.text];
   return name.elements.flatMap((element) =>
     ts.isOmittedExpression(element) ? [] : boundNames(element.name),
