@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, type Page } from '@playwright/test';
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Page,
+} from '@playwright/test';
 import {
   LOCALES,
   getSiteStrings,
@@ -10,11 +15,23 @@ import { pagePath } from '../../src/lib/report';
 import { expectReportsBound } from '../report-health';
 import { floorBreach } from '../floors';
 import { searched } from '../source-files';
-import { plantReport, reportsStartingWith, reportsWithNote } from './local.mjs';
+import {
+  BASE_URL,
+  plantReport,
+  query,
+  reportsStartingWith,
+  reportsWithNote,
+} from './local.mjs';
 
 const vi = getSiteStrings('vi').report;
 const tool = getStrings('vi');
 const noteFor = (what: string) => `functions test ${what} ${randomUUID()}`;
+
+// Each test starts the day with no counts (#872): the limits are on here,
+// so every report below also runs the counting batch on real D1.
+test.beforeEach(async () => {
+  await query('DELETE FROM report_counts');
+});
 
 async function fillReport(page: Page, quote: string, note: string) {
   await page.locator('[data-report] summary').click();
@@ -245,5 +262,102 @@ test.describe('on a tool page', () => {
     await expect(page.locator('#report-not-found')).toBeHidden();
     await expect(page.locator('.report-status:visible')).toHaveCount(1);
     expect(await reportsWithNote(note)).toHaveLength(1);
+  });
+});
+
+const today = () => new Date().toISOString().slice(0, 10);
+const send = (request: APIRequestContext, ip: string, note: string) =>
+  request.post('/api/report', {
+    headers: {
+      Origin: BASE_URL,
+      Accept: 'application/json',
+      'CF-Connecting-IP': ip,
+    },
+    form: {
+      locale: 'vi',
+      page: 'home',
+      quote: vi.open,
+      suggestion: '',
+      note,
+      website: '',
+    },
+  });
+
+test.describe('the daily limits on real D1 (#872)', () => {
+  test('a 6th report from one address is refused; another address is not', async ({
+    request,
+  }) => {
+    const note = noteFor('connection-limit');
+    const five: number[] = [];
+    for (let at = 1; at <= 5; at++)
+      five.push((await send(request, '203.0.113.9', note)).status());
+    expect(five).toEqual([200, 200, 200, 200, 200]);
+    const sixth = await send(request, '203.0.113.9', note);
+    expect(sixth.status()).toBe(429);
+    expect(await sixth.json()).toEqual({ outcome: 'connection-full' });
+    expect((await send(request, '203.0.113.10', note)).status()).toBe(200);
+    expect(await reportsWithNote(note)).toHaveLength(6);
+  });
+  test('two addresses in one IPv6 /64 share one count', async ({ request }) => {
+    const note = noteFor('ipv6-block');
+    const five: number[] = [];
+    for (let at = 1; at <= 5; at++)
+      five.push((await send(request, `2001:db8:1:2::${at}`, note)).status());
+    expect(five).toEqual([200, 200, 200, 200, 200]);
+    expect((await send(request, '2001:db8:1:2:ffff::9', note)).status()).toBe(
+      429,
+    );
+    expect((await send(request, '2001:db8:1:3::1', note)).status()).toBe(200);
+  });
+  test('the 50th report is stored and the 51st refused', async ({
+    request,
+  }) => {
+    await query(
+      "INSERT INTO report_counts (day, counter, count) VALUES (?1, 'all', 49)",
+      [today()],
+    );
+    const note = noteFor('total-limit');
+    expect((await send(request, '198.51.100.1', note)).status()).toBe(200);
+    const last = await send(request, '198.51.100.2', note);
+    expect(last.status()).toBe(429);
+    expect(await last.json()).toEqual({ outcome: 'form-full' });
+    expect(await reportsWithNote(note)).toHaveLength(1);
+  });
+  test("yesterday's counts are gone after today's first report", async ({
+    request,
+  }) => {
+    await query(
+      "INSERT INTO report_counts (day, counter, count) VALUES ('2000-01-01', 'all', 3)",
+    );
+    expect(
+      (await send(request, '198.51.100.3', noteFor('prune'))).status(),
+    ).toBe(200);
+    expect(
+      await query('SELECT day FROM report_counts WHERE day <> ?1', [today()]),
+    ).toEqual([]);
+  });
+  test('8 reports at once from one address store exactly 5', async ({
+    request,
+  }) => {
+    const note = noteFor('concurrent');
+    const statuses = (
+      await Promise.all(
+        Array.from({ length: 8 }, () => send(request, '203.0.113.50', note)),
+      )
+    ).map((response) => response.status());
+    expect(statuses.filter((status) => status === 200)).toHaveLength(5);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(3);
+    expect(await reportsWithNote(note)).toHaveLength(5);
+  });
+  test('no count row holds an address', async ({ request }) => {
+    await send(request, '203.0.113.77', noteFor('no-address'));
+    const rows = await query('SELECT day, counter, count FROM report_counts');
+    expect(rows).toHaveLength(2);
+    expect(JSON.stringify(rows)).not.toContain('203.0.113');
+    const counters = rows.map(({ counter }) => counter);
+    expect(counters).toContain('all');
+    expect(counters.filter((counter) => counter !== 'all')).toEqual([
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    ]);
   });
 });

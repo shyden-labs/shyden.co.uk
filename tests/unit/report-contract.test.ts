@@ -4,8 +4,9 @@ import {
   reportHealth,
   PAGE_IDS,
   REPORT_COLUMNS,
+  type ReportEnv,
 } from '../../src/lib/report';
-import { tableWith } from '../report-fakes';
+import { refusedOn, scriptedDatabase, tableWith } from '../report-fakes';
 import { onRequest } from '../../functions/_middleware.js';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
 import { floorBreach } from '../floors';
@@ -76,6 +77,10 @@ const FLOOR_OF: Readonly<Record<string, string>> = {
     'report-contract/422-not-found-for-a-quote-the-page-does-not-say-json-mode',
   '503 failed with no database (JSON mode)':
     'report-contract/503-failed-with-no-database-json-mode',
+  '429 form-full when the day has taken its total (JSON mode)':
+    'report-contract/429-form-full-when-the-day-has-taken-its-total-json-mode',
+  '429 connection-full when the connection has taken its share (JSON mode)':
+    'report-contract/429-connection-full-when-the-connection-has-taken-its-share-json-mode',
   '200 ok:true for the migrated table':
     'report-contract/health-200-ok-true-for-the-migrated-table',
   '503 ok:false with no database':
@@ -93,7 +98,12 @@ const floorOf = (name: string): string => {
 };
 
 /** One row per documented case; each row is its own test. */
-const CASES: readonly (readonly [string, () => Request, string])[] = [
+const CASES: readonly (readonly [
+  string,
+  () => Request,
+  string,
+  (() => ReportEnv)?,
+])[] = [
   ['405 for GET', () => post('', {}, 'GET'), '405'],
   [
     '403 for a foreign Origin',
@@ -140,11 +150,31 @@ const CASES: readonly (readonly [string, () => Request, string])[] = [
     () => post(form(), JSON_MODE),
     '503',
   ],
+  [
+    '429 form-full when the day has taken its total (JSON mode)',
+    () => post(form(), { ...JSON_MODE, 'CF-Connecting-IP': '203.0.113.9' }),
+    '429',
+    () => ({
+      REPORTS: scriptedDatabase([refusedOn(50, 1)]).db,
+      REPORT_LIMITS: 'on',
+      REPORT_COUNTER_SECRET: 's'.repeat(32),
+    }),
+  ],
+  [
+    '429 connection-full when the connection has taken its share (JSON mode)',
+    () => post(form(), { ...JSON_MODE, 'CF-Connecting-IP': '203.0.113.9' }),
+    '429',
+    () => ({
+      REPORTS: scriptedDatabase([refusedOn(7, 5)]).db,
+      REPORT_LIMITS: 'on',
+      REPORT_COUNTER_SECRET: 's'.repeat(32),
+    }),
+  ],
 ];
 
 describe('POST /api/report answers as openapi/report.yaml says', () => {
-  it.each(CASES)('%s', async (name, request, status) => {
-    const response = await handleReport(request(), {}, () => {});
+  it.each(CASES)('%s', async (name, request, status, env = () => ({})) => {
+    const response = await handleReport(request(), env(), () => {});
     expect(String(response.status)).toBe(status);
     const { findings, checked } = await checkResponse(
       SPEC,

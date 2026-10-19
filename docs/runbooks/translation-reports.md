@@ -47,6 +47,12 @@ A failure writes one line to the Functions log (Cloudflare dashboard → Workers
 | `report health: binding-missing` | The health check found no `REPORTS` binding. |
 | `report health: database` | The health check's query failed. |
 | `report health: the reports table does not match the migration` | The table's columns differ from `migrations/0001_reports.sql`. |
+| `report failed: limits-invalid` | A limit variable holds a value that is not `on`, `off` or a whole number from 1 to 1000000 (see _The daily limits_). |
+| `report failed: secret-missing` | The limits are on (always, on production) and `REPORT_COUNTER_SECRET` is missing or under 32 characters. |
+| `report failed: address-missing` | The limits are on and the request carried no readable `CF-Connecting-IP`. |
+| `report health: limits-invalid` | The health check found a limit variable it cannot read. |
+| `report health: secret-missing` | The health check found the limits on and no usable secret. |
+| `report health: the report_counts table does not match the migration` | The counts table is missing, or its columns differ from `migrations/0002_report_counts.sql`. |
 
 ## The rate limit (operator, before the production release)
 
@@ -58,6 +64,62 @@ per visitor. In the dashboard, Security → WAF → Rate limiting rules:
 Then confirm which Workers plan the account is on. On Free, D1's daily limits
 answer with errors, which the endpoint reports as `failed`. On Paid, usage
 beyond the included amount is billed, and this rule is the only cap on cost.
+
+## The daily limits (#872)
+
+One person, or a bot, can put only so many reports in front of the operator
+in a day. A report is refused, and nothing is stored, once the form has taken
+its total for the UTC day, or once one internet connection has taken its
+share. The visitor is told which, politely, with no time of reset: the day
+turns at 00:00 UTC (07:00 in Jakarta and Bangkok).
+
+| Variable | Values | Default |
+| --- | --- | --- |
+| `REPORT_LIMITS` | `on` or `off`; read only off production | off |
+| `REPORT_LIMIT_TOTAL` | a whole number from 1 to 1000000: reports a day, from everyone | 50 |
+| `REPORT_LIMIT_CONNECTION` | a whole number from 1 to 1000000: reports a day, from one connection | 5 |
+| `REPORT_COUNTER_SECRET` | at least 32 characters, an encrypted variable | none |
+
+**Production always applies the limits**, whatever `REPORT_LIMITS` says; only
+the two numbers can change there. Every other host (dev, a Pages preview) has
+them off unless `REPORT_LIMITS` is `on`, so dev's automated check, which sends
+one real report per deploy, never meets them. A value that is not one of the
+above fails closed: every report is refused as `failed`, and the health check
+answers 503.
+
+To change one: Cloudflare dashboard → Workers & Pages → the project →
+Settings → Variables and Secrets, edit it, then re-run the deploy (Actions →
+the deploy workflow → Run workflow), because Pages applies a variable at the
+next deployment. To test the limits on dev, set `REPORT_LIMITS` to `on` and
+small numbers (`REPORT_LIMIT_CONNECTION` = `1` makes the second report the
+refused one), redeploy, test, then set it back to `off` and redeploy.
+
+The secret: `openssl rand -hex 32`, pasted as an encrypted variable on each
+environment, never written anywhere else. Production needs it always, and
+dev only while its limits are on. Changing it starts that day's
+per-connection counts again; nothing else is lost.
+
+**What is kept:** the `report_counts` table (`migrations/0002_report_counts.sql`),
+one row per counter per UTC day: the day, `all` or a 64-character
+HMAC-SHA-256 of the day and the connection under the secret, and a count.
+Never an IP address, and nothing that links a count to a report. Someone
+holding the secret and a guessed address could confirm that the address
+reported that day, so the rows are pseudonymous rather than anonymous; every
+report deletes the rows of any other day, so none outlives its day. An IPv4
+address is counted whole; an IPv6 address by its /64 block, the part one line
+is usually given (Shyden 2026-10-19), so moving within it does not reset the
+count.
+
+The connection is read from `CF-Connecting-IP`, which Cloudflare sets. Keep
+the zone's Network → Pseudo IPv4 setting Off or "Add header": "Overwrite
+Headers" would put a made-up IPv4 address there and undo the /64 rule. Read it
+before the first production release with the limits.
+
+Before the code reaches an environment, run the migration in that database's
+D1 console (`shyden-reports-dev` before the merge into `develop`,
+`shyden-reports` before the release), pasting the `CREATE TABLE` from
+`migrations/0002_report_counts.sql`. Until it runs, the health check answers
+503 and every report fails.
 
 ## The daily count (#349)
 

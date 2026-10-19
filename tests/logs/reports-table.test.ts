@@ -85,6 +85,18 @@ describe('the runbook', () => {
   const runbook = () =>
     readFileSync('docs/runbooks/translation-reports.md', 'utf8');
 
+  it.each([
+    /^\| `REPORT_LIMITS` \| `on` or `off`/m,
+    /^\| `REPORT_LIMIT_TOTAL` \| .*\| 50 \|$/m,
+    /^\| `REPORT_LIMIT_CONNECTION` \| .*\| 5 \|$/m,
+    /^\| `REPORT_COUNTER_SECRET` \|/m,
+    /^\| `report failed: limits-invalid` \|/m,
+    /^\| `report failed: secret-missing` \|/m,
+    /^\| `report failed: address-missing` \|/m,
+  ])('the runbook holds %s (#872 AC7)', (line) => {
+    expect(runbook()).toMatch(line);
+  });
+
   it('lists every stored column, and holds both deletes (AC7)', () => {
     const text = runbook();
     const select = /^SELECT (.+)$/m.exec(text)?.[1];
