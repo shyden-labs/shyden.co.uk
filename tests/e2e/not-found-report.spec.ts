@@ -119,9 +119,13 @@ test('a block walks its own fields from the keyboard, each labelled and describe
   await expect(
     details.getByLabel(t.quoteLabel, { exact: true }),
   ).toHaveAccessibleDescription(t.quoteHint);
+  // Both free-text boxes announce this block's own line (#830).
+  await expect(
+    details.getByLabel(t.suggestionLabel, { exact: true }),
+  ).toHaveAccessibleDescription(t.personalDetailsHint);
   await expect(
     details.getByLabel(t.noteLabel, { exact: true }),
-  ).toHaveAccessibleDescription(t.noteHint);
+  ).toHaveAccessibleDescription(t.personalDetailsHint);
   await shoot(page, 'the open block, walked to its send button', details);
 });
 

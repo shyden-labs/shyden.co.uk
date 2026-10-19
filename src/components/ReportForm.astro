@@ -61,22 +61,23 @@ const statuses: ReadonlyArray<[Outcome, string]> = [
             <option value={option} />
           ))}
         </datalist>
+        <p id={id('personal-details-hint')} class="hint">
+          {t.personalDetailsHint}
+        </p>
         <label for={id('suggestion')}>{t.suggestionLabel}</label>
         <textarea
           id={id('suggestion')}
           name="suggestion"
           maxlength={MAX_FIELD_UNITS}
+          aria-describedby={id('personal-details-hint')}
         ></textarea>
         <label for={id('note')}>{t.noteLabel}</label>
         <textarea
           id={id('note')}
           name="note"
           maxlength={MAX_FIELD_UNITS}
-          aria-describedby={id('note-hint')}
+          aria-describedby={id('personal-details-hint')}
         ></textarea>
-        <p id={id('note-hint')} class="hint">
-          {t.noteHint}
-        </p>
         <div class="visually-hidden" aria-hidden="true">
           <label for={id('website')}>{t.honeypotLabel}</label>
           <input
