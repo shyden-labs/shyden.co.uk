@@ -90,8 +90,8 @@ paths:
         '303':
           description: >-
             Form mode, every outcome after the request is understood: back to
-            the page, with `-sent`, `-not-found`, `-rejected` or `-failed` at
-            the end of the fragment.
+            the page, with `-sent`, `-not-found`, `-rejected`, `-failed`,
+            `-form-full` or `-connection-full` at the end of the fragment.
           headers:
             Location:
               required: true
@@ -217,6 +217,37 @@ paths:
                   outcome:
                     type: string
                     const: not-found
+        '429':
+          description: >-
+            JSON mode, a daily limit is reached and nothing was stored:
+            `form-full` when the form has taken its total for the day,
+            `connection-full` when this internet connection has taken its
+            share. Production always applies the limits; other environments
+            only while switched on.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+            X-Content-Type-Options:
+              required: true
+              schema:
+                type: string
+                const: nosniff
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - outcome
+                properties:
+                  outcome:
+                    type: string
+                    enum:
+                      - form-full
+                      - connection-full
         '503':
           description: JSON mode, the report could not be stored.
           headers:

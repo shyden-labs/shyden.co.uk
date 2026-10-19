@@ -70,8 +70,10 @@ paths:
                 const: nosniff
         '503':
           description: >-
-            The binding is missing or fails, or the table does not match the
-            migration. The reason goes to the log, never the answer.
+            The binding is missing or fails, a table does not match its
+            migration, or the daily limits cannot run (a variable is not a
+            valid value, or the secret is missing where they are on). The
+            reason goes to the log, never the answer.
           headers:
             Cache-Control:
               required: true
