@@ -10,7 +10,15 @@ import {
   schemaMatches,
 } from '../../src/lib/report';
 import { getSiteStrings } from '../../src/lib/i18n';
-import { failingWith, recordingTable, tableWith } from '../report-fakes';
+import {
+  STORED_OFF,
+  failingWith,
+  recordingTable,
+  refusedOn,
+  scriptedDatabase,
+  storedOn,
+  tableWith,
+} from '../report-fakes';
 import { codeWithoutComments } from './source-text';
 import {
   FORM,
@@ -509,34 +517,6 @@ describe('the health check', () => {
   });
 });
 
-describe('the health check reads both tables (#872)', () => {
-  it('pins the count columns', () => {
-    expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
-  });
-  it('answers 503 when report_counts is missing', async () => {
-    const lines: string[] = [];
-    const response = await reportHealth(
-      new Request(HEALTH),
-      { REPORTS: tableWith(REPORT_COLUMNS, []) },
-      (line) => lines.push(line),
-    );
-    expect(response.status).toBe(503);
-    expect(lines).toEqual([
-      'report health: the report_counts table does not match the migration',
-    ]);
-  });
-  it('answers 200 when both tables match', async () => {
-    const response = await reportHealth(
-      new Request(HEALTH),
-      { REPORTS: tableWith(REPORT_COLUMNS) },
-      () => {
-        throw new Error('a healthy check logs nothing');
-      },
-    );
-    expect(response.status).toBe(200);
-  });
-});
-
 describe('the Pages Functions are plumbing only', () => {
   it.each([
     ['functions/api/report/index.js', 'handleReport'],
@@ -607,5 +587,211 @@ describe('the runbook', () => {
     expect(runbook()).toMatch(
       /^.*`\/api\/report`.*more than 2 requests in 10 s.*Block for 10 s\.$/m,
     );
+  });
+});
+
+describe('the health check reads both tables (#872)', () => {
+  it('pins the count columns', () => {
+    expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
+  });
+  it('answers 503 when report_counts is missing', async () => {
+    const lines: string[] = [];
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS, []) },
+      (line) => lines.push(line),
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual([
+      'report health: the report_counts table does not match the migration',
+    ]);
+  });
+  it('answers 200 when both tables match', async () => {
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS) },
+      () => {
+        throw new Error('a healthy check logs nothing');
+      },
+    );
+    expect(response.status).toBe(200);
+  });
+});
+
+const SECRET = 'unit-test-secret-0123456789abcdef';
+const ON = { REPORT_LIMITS: 'on', REPORT_COUNTER_SECRET: SECRET };
+const NOW = () => new Date('2026-10-19T08:00:00.000Z');
+const from = (ip: string) => ({
+  json: true,
+  headers: { 'CF-Connecting-IP': ip },
+});
+
+describe('the daily limits (#872)', () => {
+  it('stores and answers sent while within both limits', async () => {
+    const { db, batches } = scriptedDatabase([storedOn(1, 1)]);
+    const response = await handleReport(
+      post(valid(), from('203.0.113.9')),
+      { REPORTS: db, ...ON },
+      () => {},
+      NOW,
+    );
+    expect(response.status).toBe(200);
+    expect(await outcomeOf(response)).toBe('sent');
+    expect(batches[0]![3]!.values).toEqual([
+      '2026-10-19',
+      '245a1b83ed3a0c41bb3ba3f6beb7fef1811168275c045a8af6a8ac0452dc803b',
+      expect.any(String),
+    ]);
+  });
+  it.each([
+    ['form-full', refusedOn(50, 1)],
+    ['connection-full', refusedOn(7, 5)],
+  ])('answers %s with 429 in JSON mode', async (outcome, answer) => {
+    const { db } = scriptedDatabase([answer]);
+    const response = await handleReport(
+      post(valid(), from('203.0.113.9')),
+      { REPORTS: db, ...ON },
+      () => {},
+      NOW,
+    );
+    expect(response.status).toBe(429);
+    expect(await outcomeOf(response)).toBe(outcome);
+  });
+  it.each([
+    ['form-full', refusedOn(50, 1)],
+    ['connection-full', refusedOn(7, 5)],
+  ])('redirects to the %s status in form mode', async (outcome, answer) => {
+    const { db } = scriptedDatabase([answer]);
+    const response = await handleReport(
+      post(valid(), { headers: { 'CF-Connecting-IP': '203.0.113.9' } }),
+      { REPORTS: db, ...ON },
+      () => {},
+      NOW,
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get('Location')).toBe(`/vi/#report-${outcome}`);
+  });
+  it('counts nothing with the limits off, and needs no secret', async () => {
+    const { db, batches } = scriptedDatabase([STORED_OFF]);
+    const response = await handleReport(
+      post(valid(), { json: true }),
+      { REPORTS: db },
+      () => {},
+      NOW,
+    );
+    expect(await outcomeOf(response)).toBe('sent');
+    expect(batches[0]).toHaveLength(2);
+  });
+  it.each([
+    ['limits-invalid', { REPORT_LIMITS: 'yes' }, '203.0.113.9'],
+    ['secret-missing', { REPORT_LIMITS: 'on' }, '203.0.113.9'],
+    [
+      'secret-missing',
+      { REPORT_LIMITS: 'on', REPORT_COUNTER_SECRET: 'x'.repeat(31) },
+      '203.0.113.9',
+    ],
+    ['address-missing', ON, 'not-an-address'],
+  ])('fails closed as failed, logging %s', async (kind, env, ip) => {
+    const lines: string[] = [];
+    const { db } = scriptedDatabase([]);
+    const response = await handleReport(
+      post(valid(), from(ip)),
+      { REPORTS: db, ...env },
+      (line) => lines.push(line),
+      NOW,
+    );
+    // scriptedDatabase([]) throws on any batch, so a count reached here
+    // would log `database`, never the kind.
+    expect(response.status).toBe(503);
+    expect(lines).toEqual([`report failed: ${kind}`]);
+  });
+  it('counts an IPv6 address under its /64 block (AC10)', async () => {
+    const { db, batches } = scriptedDatabase([storedOn(1, 1)]);
+    await handleReport(
+      post(valid(), from('2001:db8:1:2::9')),
+      { REPORTS: db, ...ON },
+      () => {},
+      NOW,
+    );
+    // HMAC-SHA-256(SECRET, '2026-10-19 2001:0db8:0001:0002::/64'), node:crypto 2026-10-19.
+    expect(batches[0]![3]!.values[1]).toBe(
+      '314a3b541e2cf3c62d6af6c2c44671ab471b44098a11e991b63e30e6c493f733',
+    );
+  });
+  it('applies the limits on production whatever the switch says (AC9)', async () => {
+    const lines: string[] = [];
+    const { db } = scriptedDatabase([]);
+    const response = await handleReport(
+      new Request('https://shyden.co.uk/api/report', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://shyden.co.uk',
+          'Content-Type': FORM,
+          Accept: 'application/json',
+          'CF-Connecting-IP': '203.0.113.9',
+        },
+        body: new URLSearchParams(valid()).toString(),
+      }),
+      { REPORTS: db, REPORT_LIMITS: 'off' },
+      (line) => lines.push(line),
+      NOW,
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual(['report failed: secret-missing']);
+  });
+  // scriptedDatabase([]) throws on any batch: a count reached here would
+  // answer `failed`, never these outcomes.
+  it.each([
+    ['the honeypot', { website: 'x' }, 200, 'sent'],
+    ['a quote not on the page', { quote: 'zzz nowhere' }, 422, 'not-found'],
+    ['an empty quote', { quote: '' }, 400, 'rejected'],
+  ])('answers %s before any count', async (_what, fields, status, result) => {
+    const { db } = scriptedDatabase([]);
+    const response = await handleReport(
+      post(valid(fields), from('203.0.113.9')),
+      { REPORTS: db, ...ON },
+      () => {
+        throw new Error('nothing before a count logs');
+      },
+      NOW,
+    );
+    expect(response.status).toBe(status);
+    expect(await outcomeOf(response)).toBe(result);
+  });
+});
+
+describe('the health check sees the limits (#872 AC8)', () => {
+  it.each([
+    ['limits-invalid', { REPORT_LIMITS: 'yes' }],
+    ['secret-missing', { REPORT_LIMITS: 'on' }],
+  ])('answers 503 and logs %s', async (kind, env) => {
+    const lines: string[] = [];
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS), ...env },
+      (line) => lines.push(line),
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual([`report health: ${kind}`]);
+  });
+  it('answers 200 with the limits on and a secret', async () => {
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS), ...ON },
+      () => {
+        throw new Error('a healthy check logs nothing');
+      },
+    );
+    expect(response.status).toBe(200);
+  });
+  it('needs a secret on production even with the switch off', async () => {
+    const lines: string[] = [];
+    const response = await reportHealth(
+      new Request('https://shyden.co.uk/api/report/health'),
+      { REPORTS: tableWith(REPORT_COLUMNS), REPORT_LIMITS: 'off' },
+      (line) => lines.push(line),
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual(['report health: secret-missing']);
   });
 });
