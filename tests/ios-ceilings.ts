@@ -384,9 +384,12 @@ export function indirectChecksOf(
   let parsedWhole = 0;
   const checkingNames = new Set<string>();
   const checkingNamespaced = new Set<string>();
-  const countNode = (node: ts.Node): number => {
+  // A refusal is made only inside a test or hook (`inTest`), the only place
+  // a call is counted: library code under the directory refuses nothing.
+  const countNode = (node: ts.Node, inTest: boolean): number => {
     if (ts.isThrowStatement(node)) return 1;
     if (
+      inTest &&
       ts.isIdentifier(node) &&
       ts.isCallExpression(node.parent) &&
       node.parent.arguments.some((argument) => argument === node) &&
@@ -399,7 +402,7 @@ export function indirectChecksOf(
     const chain = calleeChain(node.expression);
     if (chain && (isAssertion(chain) || TEST_NAMES.has(chain[0]))) return 0;
     const verdict = known.calleeChecks(file, node.expression);
-    if (verdict === undefined && chain) {
+    if (verdict === undefined && chain && inTest) {
       const origin =
         facts.imports.get(chain[0]) ??
         (chain.length === 2 ? facts.namespaces.get(chain[0]) : undefined);
@@ -414,7 +417,7 @@ export function indirectChecksOf(
   };
   const counted: string[] = [];
   const inBody = (node: ts.Node): void => {
-    const found = countNode(node);
+    const found = countNode(node, true);
     inBodies += found;
     if (found > 0)
       counted.push(
@@ -427,7 +430,7 @@ export function indirectChecksOf(
     ts.forEachChild(node, inBody);
   };
   const visit = (node: ts.Node): void => {
-    parsedWhole += countNode(node);
+    parsedWhole += countNode(node, false);
     if (ts.isCallExpression(node)) {
       const chain = calleeChain(node.expression);
       if (chain && (TEST_NAMES.has(chain[0]) || HOOK_NAMES.has(chain[0])))

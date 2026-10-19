@@ -498,6 +498,28 @@ describe('reads the indirect checks twice, through the text and the parse', () =
 });
 
 describe('refuses a called helper it cannot follow', () => {
+  it('but not one passed by reference outside every test, which nothing counts', () => {
+    const read = indirectChecksOf(
+      JOURNEY,
+      "import { check } from '../../h';\n[1].forEach(check);\ntest('a', () => { check(1); });",
+      reader({ 'tests/h.ts': THROWS }),
+    );
+    expect({ refusals: read.refusals, inBodies: read.inBodies }).toEqual({
+      refusals: [],
+      inBodies: 1,
+    });
+  });
+  it('nor an unfollowed import called outside every test', () => {
+    const read = indirectChecksOf(
+      JOURNEY,
+      "import { gone } from '../../gone';\nimport { check } from '../../h';\ngone();\ntest('a', () => { check(1); });",
+      reader({ 'tests/h.ts': THROWS }),
+    );
+    expect({ refusals: read.refusals, inBodies: read.inBodies }).toEqual({
+      refusals: [],
+      inBodies: 1,
+    });
+  });
   it('a check helper passed by reference, which neither reader counts', () => {
     expect(
       indirectChecksOf(
