@@ -68,7 +68,8 @@ export async function storeReport(
   }
   const id = row[0];
   const { counter, limits } = count;
-  const results = await db.batch<{ counter?: string; count?: number }>([
+  // MUTANT: the five statements run one by one, outside a transaction.
+  const statements = [
     prune,
     db
       .prepare(INSERT_WITHIN)
@@ -76,7 +77,10 @@ export async function storeReport(
     db.prepare(COUNT).bind(day, 'all', id),
     db.prepare(COUNT).bind(day, counter, id),
     db.prepare(READ).bind(day, counter),
-  ]);
+  ];
+  const results: { results: { counter?: string; count?: number }[] }[] = [];
+  for (const statement of statements)
+    results.push(await statement.all<{ counter?: string; count?: number }>());
   if ((results[1]?.results.length ?? 0) === 1) return 'sent';
   const all =
     results[4]?.results.find((result) => result.counter === 'all')?.count ?? 0;
