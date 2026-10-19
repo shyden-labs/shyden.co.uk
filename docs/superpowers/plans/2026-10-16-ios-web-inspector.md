@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A zero-dependency client that reaches Safari's Web Inspector on the paired iPhone, so the iPhone mirror can emulate media, run early scripts, read the console and stub the network as Android does.
+**Goal:** A zero-dependency client that reaches Safari's Web Inspector on the paired iPhone, so the shared suite, run on the iPhone (#839), can emulate media, run early scripts, read the console and stub the network as Android does.
 
 **Architecture:** Small layers under `tests/device/ios/inspector/`, each taking its transport as a parameter: plist codecs, framing, a length-framed plist link, then the usbmuxd, lockdown, Web Inspector RPC and JSON protocol clients. Only `connect.ts` touches `node:net` and `node:tls`; everything else is unit-tested over in-memory `duplexPair()` streams.
 
