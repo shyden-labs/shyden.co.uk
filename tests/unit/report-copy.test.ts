@@ -30,6 +30,11 @@ describe('the report copy is the approved English (#97)', () => {
         "That report couldn't be sent. Please check the form and try again.",
       failed:
         "Something went wrong and your report wasn't sent. Please try again later.",
+      formFull:
+        // #872, Shyden 2026-10-19: polite, names no period and no reset time.
+        'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+      connectionFull:
+        'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
     });
   });
 });

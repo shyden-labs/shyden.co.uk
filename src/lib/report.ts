@@ -25,6 +25,23 @@ import {
   parseMessage,
   type MessagePart,
 } from './i18n/message';
+import {
+  COUNT_COLUMNS,
+  REPORT_COLUMNS,
+  storeReport,
+  type ReportsDatabase,
+  type Stored,
+} from './report-store';
+import {
+  SECRET_MIN_LENGTH,
+  connectionOf,
+  counterKey,
+  limitsSetting,
+  utcDay,
+  type LimitsEnv,
+  type LimitsSetting,
+  type ReportLimits,
+} from './report-limits';
 
 /** The pages whose footer carries the form: one form, the locale in the path. */
 export const FOOTER_PAGE_IDS = [
@@ -358,35 +375,21 @@ export function matchingKeys(
 
 export const MAX_FIELD_UNITS = 1000;
 export const MAX_BODY_BYTES = 65536;
-/** The `reports` table's columns, as `migrations/0001_reports.sql` creates them. */
-export const REPORT_COLUMNS = [
-  'id',
-  'received_at',
-  'locale',
-  'page',
-  'quote',
-  'keys',
-  'suggestion',
-  'note',
-] as const;
+export { COUNT_COLUMNS, REPORT_COLUMNS } from './report-store';
+export type { ReportsDatabase, ReportsStatement } from './report-store';
 
-export type Outcome = 'sent' | 'not-found' | 'rejected' | 'failed';
-
-/** The slice of D1's prepared statement this module uses. */
-export interface ReportsStatement {
-  bind(...values: unknown[]): ReportsStatement;
-  run(): Promise<unknown>;
-  all<T>(): Promise<{ results: T[] }>;
-}
-
-/** The slice of a D1 binding this module uses. */
-export interface ReportsDatabase {
-  prepare(query: string): ReportsStatement;
-}
+export type Outcome =
+  | 'sent'
+  | 'not-found'
+  | 'rejected'
+  | 'failed'
+  | 'form-full'
+  | 'connection-full';
 
 /** The Pages Functions' `env`: absent `REPORTS` is a real failure, reported as such. */
-export interface ReportEnv {
+export interface ReportEnv extends LimitsEnv {
   readonly REPORTS?: ReportsDatabase;
+  readonly REPORT_COUNTER_SECRET?: string;
 }
 
 const JSON_STATUS: Record<Outcome, number> = {
@@ -394,6 +397,8 @@ const JSON_STATUS: Record<Outcome, number> = {
   'not-found': 422,
   rejected: 400,
   failed: 503,
+  'form-full': 429,
+  'connection-full': 429,
 };
 /** `_headers` does not apply to Function responses, so every answer sets its own (spec 6.1). */
 const ALWAYS = {
@@ -401,8 +406,8 @@ const ALWAYS = {
   'X-Content-Type-Options': 'nosniff',
 } as const;
 const FORM_TYPE = 'application/x-www-form-urlencoded';
-const INSERT = `INSERT INTO reports (${REPORT_COLUMNS.join(', ')}) VALUES (${REPORT_COLUMNS.map((_, at) => `?${at + 1}`).join(', ')})`;
-const HEALTH_QUERY = "SELECT name FROM pragma_table_info('reports')";
+const HEALTH_QUERY =
+  "SELECT 'reports' AS tbl, name FROM pragma_table_info('reports') UNION ALL SELECT 'report_counts' AS tbl, name FROM pragma_table_info('report_counts')";
 
 const plain = (status: number, extra: Record<string, string> = {}): Response =>
   new Response(null, { status, headers: { ...ALWAYS, ...extra } });
@@ -454,7 +459,26 @@ const field = (fields: URLSearchParams, name: string): string =>
  * included, so it is never read into a log line: personal data is left out
  * of logs by default (global rule, Shyden 2026-10-16).
  */
-type FailureKind = 'binding-missing' | 'database';
+type FailureKind =
+  | 'binding-missing'
+  | 'database'
+  | 'limits-invalid'
+  | 'secret-missing'
+  | 'address-missing';
+
+/** Whether the limits can run here, or the kind of failure that stops them (#872 AC8, AC9). */
+function limitsProblem(
+  env: ReportEnv,
+  setting: LimitsSetting,
+): FailureKind | null {
+  if (setting.kind === 'invalid') return 'limits-invalid';
+  if (
+    setting.kind === 'on' &&
+    (env.REPORT_COUNTER_SECRET ?? '').length < SECRET_MIN_LENGTH
+  )
+    return 'secret-missing';
+  return null;
+}
 
 /**
  * The body, or null once it passes `cap` bytes. A chunked body declares no
@@ -490,6 +514,7 @@ export async function handleReport(
   request: Request,
   env: ReportEnv,
   log: (line: string) => void = console.error,
+  now: () => Date = () => new Date(),
 ): Promise<Response> {
   if (request.method !== 'POST') return plain(405, { Allow: 'POST' });
   const origin = request.headers.get('Origin');
@@ -532,29 +557,56 @@ export async function handleReport(
     log(`report failed: ${'binding-missing' satisfies FailureKind}`);
     return outcome('failed', request, locale, page);
   }
+  const setting = limitsSetting(env, new URL(request.url).hostname);
+  const problem = limitsProblem(env, setting);
+  if (problem) {
+    log(`report failed: ${problem}`);
+    return outcome('failed', request, locale, page);
+  }
+  const at = now();
+  const day = utcDay(at);
+  let count: { counter: string; limits: ReportLimits } | null = null;
+  if (setting.kind === 'on') {
+    const connection = connectionOf(request.headers.get('CF-Connecting-IP'));
+    if (!connection) {
+      log(`report failed: ${'address-missing' satisfies FailureKind}`);
+      return outcome('failed', request, locale, page);
+    }
+    count = {
+      counter: await counterKey(env.REPORT_COUNTER_SECRET!, day, connection),
+      limits: setting.limits,
+    };
+  }
+  let stored: Stored;
   try {
-    await env.REPORTS.prepare(INSERT)
-      .bind(
+    stored = await storeReport(
+      env.REPORTS,
+      [
         crypto.randomUUID(),
-        new Date().toISOString(),
+        at.toISOString(),
         locale,
         page,
         quote,
         JSON.stringify(keys),
         suggestion,
         note,
-      )
-      .run();
+      ],
+      day,
+      count,
+    );
   } catch {
     log(`report failed: ${'database' satisfies FailureKind}`);
     return outcome('failed', request, locale, page);
   }
-  return outcome('sent', request, locale, page);
+  return outcome(stored, request, locale, page);
 }
 
-export const schemaMatches = (columns: readonly string[]): boolean =>
-  columns.length === REPORT_COLUMNS.length &&
-  REPORT_COLUMNS.every((column) => columns.includes(column));
+export const schemaMatches = (
+  columns: readonly string[],
+  expected: readonly string[] = REPORT_COLUMNS,
+): boolean =>
+  columns.length === expected.length &&
+  expected.every((column) => columns.includes(column));
 
 /** Proves the binding and the migration without writing a row, and returns no counts or content (spec 6.2). */
 export async function reportHealth(
@@ -568,13 +620,30 @@ export async function reportHealth(
     log(`report health: ${'binding-missing' satisfies FailureKind}`);
     return json({ ok }, 503);
   }
+  const problem = limitsProblem(
+    env,
+    limitsSetting(env, new URL(request.url).hostname),
+  );
+  if (problem) {
+    log(`report health: ${problem}`);
+    return json({ ok }, 503);
+  }
   try {
     const { results } = await env.REPORTS.prepare(HEALTH_QUERY).all<{
+      tbl: string;
       name: string;
     }>();
-    ok = schemaMatches(results.map(({ name }) => name));
-    if (!ok)
+    const of = (table: string) =>
+      results.filter(({ tbl }) => tbl === table).map(({ name }) => name);
+    const reports = schemaMatches(of('reports'));
+    const counts = schemaMatches(of('report_counts'), COUNT_COLUMNS);
+    if (!reports)
       log('report health: the reports table does not match the migration');
+    if (!counts)
+      log(
+        'report health: the report_counts table does not match the migration',
+      );
+    ok = reports && counts;
   } catch {
     log(`report health: ${'database' satisfies FailureKind}`);
   }
