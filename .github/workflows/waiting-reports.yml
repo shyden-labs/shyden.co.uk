@@ -3,10 +3,13 @@
 # on the notice issue, assigned to the operator. The comment carries the count
 # and nothing else: this repository, its issues and its logs are public.
 #
-# It reads its two secrets in `reports-count`, which accepts `develop` alone
-# and holds nothing else: a D1 Read token and the account id. It runs no npm
-# package code, so no `npm ci`: the script uses Node's own `fetch`, and imports
-# only this repository's own modules. Runbook:
+# It reads its two secrets in `reports-count`, which accepts `main` alone and
+# holds nothing else: a D1 Read token and the account id. Only released code
+# reads production (#877, the operator's main-only rule for an unattended job):
+# the schedule fires on the default branch, `develop`, so the scheduled run
+# only starts the count on `main`, and the count runs on `main` alone. It runs
+# no npm package code, so no `npm ci`: the script uses Node's own `fetch`, and
+# imports only this repository's own modules. Runbook:
 # docs/runbooks/translation-reports.md.
 name: Waiting reports
 
@@ -27,7 +30,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Holds no secret and names no environment: it only asks for a run on main.
+  dispatch:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Start the count on main
+        run: gh workflow run waiting-reports.yml --ref main
+
   count:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: reports-count
