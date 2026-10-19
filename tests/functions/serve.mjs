@@ -7,6 +7,7 @@
  */
 import { readdirSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
+import { nonEmpty } from '../../scripts/errors.mjs';
 import { DATABASE_ID, PASSWORD, PERSIST, PORT, SECRET, d1 } from './local.mjs';
 
 /**
@@ -23,9 +24,14 @@ const step = (command, args) => {
 
 rmSync(PERSIST, { recursive: true, force: true });
 step('npm', ['run', 'build']);
-for (const file of readdirSync('migrations')
-  .filter((name) => name.endsWith('.sql'))
-  .sort())
+// Every migration, in order, read from the directory: a new one is applied
+// the day it is added (#872). nonEmpty fails the run on an empty read.
+for (const file of nonEmpty(
+  readdirSync('migrations')
+    .filter((name) => name.endsWith('.sql'))
+    .sort(),
+  'migrations',
+))
   d1(['--file', `migrations/${file}`]);
 
 const server = spawn(

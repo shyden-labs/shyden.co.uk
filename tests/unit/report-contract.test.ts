@@ -97,8 +97,10 @@ const floorOf = (name: string): string => {
   return id;
 };
 
-/** One row per documented case; each row is its own test. */
-/** A case: its name, its request, the status the spec documents, and the env when it needs one. */
+/**
+ * One row per documented case; each row is its own test: its name, its
+ * request, the status the spec documents, and the env when it needs one.
+ */
 type Case = [string, () => Request, string, (() => ReportEnv)?];
 
 const CASES: readonly Case[] = [
