@@ -15,6 +15,9 @@ export const PERSIST = '.wrangler/functions-test';
 export const CONFIG = 'tests/functions/wrangler.toml';
 export const DATABASE = 'reports-local';
 export const DATABASE_ID = '00000000-0000-4000-8000-000000000097';
+/** The counter secret the local server is given (#872): 64 hex, a test value only. */
+export const SECRET =
+  '6b1f0e0c5d4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0';
 /**
  * The longest a statement waits for the dev server's D1 before the call
  * fails, naming the server it was queued on (#737). Well under Playwright's
