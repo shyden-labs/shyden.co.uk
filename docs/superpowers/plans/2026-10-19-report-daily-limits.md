@@ -52,7 +52,7 @@
 | `tests/functions/*` (modify) | Both migrations, the variables, a count reset per test, the real-D1 cap tests. |
 | `docs/runbooks/translation-reports.md` (modify) | AC7. |
 
-**Before Task 1:** if #830 (PR #871) has merged into `develop`, merge `origin/develop` into this branch first; its `recordingTable` in `tests/report-fakes.ts` is converted to `batch` in Task 4 Step 1. If it has not, leave `recordingTable` to #830's own branch, which then merges this design in.
+**Before Task 1:** #830 merged into `develop` at `93f39097` (2026-10-19). Merge `origin/develop` into this branch first. Its `recordingTable` in `tests/report-fakes.ts` (used by `tests/logs/report-row.test.ts` and the unit stand-in in `report-endpoint.test.ts`) is converted to `batch` in Task 4 Step 1: `rows` becomes the bound values of each batch statement whose query starts `INSERT INTO reports`, and `batch` answers `STORED_OFF` for a two-statement batch and `storedOn(1, 1)` for a five-statement one.
 
 ---
 
@@ -703,7 +703,7 @@ const statuses: ReadonlyArray<[Outcome, string]> = [
 ];
 ```
 
-Sweep for every other list of four outcomes: `git grep -nE "'rejected'" -- src tests` and `git grep -nE "\* 4\b" -- tests/e2e`; update each, and say in the commit which were found.
+`tests/e2e/not-found-report.spec.ts:141`: `toHaveCount(BETA.length * 4)` becomes `toHaveCount(BETA.length * 6)`, with a comment naming the six (review pass 4: left at 4, it failed 40 times, 4 locales x 5 engines in e2e and again in capture). Then sweep for every other list of four outcomes: `git grep -nE "'rejected'" -- src tests` and `git grep -nE "\* 4\b" -- tests/e2e`; update each, and say in the commit which were found.
 
 - [ ] **Step 5: Run unit, typecheck, format, lint**
 
@@ -806,7 +806,45 @@ export const refusedOn = (all: number, connection: number) => [
 ];
 ```
 
-`failingWith`: drop `run`, add `batch: async () => { throw new Error(message); }` on the database object. `tableWith`: drop `run`, add the `batch` that throws (shown in Task 1). If `recordingTable` exists (#830): its `rows` become the values of each batch's statement whose query starts `INSERT INTO reports`; implement `batch` by pushing those values and answering `STORED_OFF`-shaped results for an off setting or `storedOn(1, 1)` when the batch has five statements.
+`failingWith`: drop `run`, add `batch: async () => { throw new Error(message); }` on the database object. `tableWith`: drop `run`, add the `batch` that throws (shown in Task 1). `recordingTable` (#830, on develop since `93f39097`) becomes, importing `type ReportsStatement` beside `ReportsDatabase`:
+
+```ts
+export function recordingTable(): {
+  db: ReportsDatabase;
+  rows: unknown[][];
+} {
+  const rows: unknown[][] = [];
+  interface Recorded extends ReportsStatement {
+    readonly query: string;
+    readonly values: unknown[];
+  }
+  const statement = (query: string, values: unknown[] = []): Recorded => ({
+    query,
+    values,
+    bind: (...bound: unknown[]) => statement(query, bound),
+    all: async () => {
+      throw new Error('a report reads nothing back');
+    },
+  });
+  return {
+    rows,
+    db: {
+      prepare: (query) => statement(query),
+      // A report's one batch (#872): the row is what its `INSERT INTO
+      // reports` bound, and the answer is a stored report's, limits off
+      // (two statements) or on (five).
+      batch: async <T>(statements: ReportsStatement[]) => {
+        const recorded = statements as Recorded[];
+        for (const { query, values } of recorded)
+          if (query.startsWith('INSERT INTO reports')) rows.push(values);
+        return (recorded.length === 2 ? STORED_OFF : storedOn(1, 1)) as {
+          results: T[];
+        }[];
+      },
+    },
+  };
+}
+```
 
 - [ ] **Step 2: Write the failing store tests**
 
@@ -1288,8 +1326,13 @@ git commit -m "A report is stored and counted in one batch, and refused at eithe
 
 In `tests/unit/report-contract.test.ts`, widen `CASES` rows to an optional fourth element. The row type must be a MUTABLE tuple, or `it.each` falls to an overload that cannot spread it (review pass 3: ts2345/ts2349/ts2722 at the call):
 
+The existing docblock above `CASES` absorbs the row's description (two docblocks in a row are refused by `stranded-docblocks`, review pass 4):
+
 ```ts
-/** A case: its name, its request, the status the spec documents, and the env when it needs one. */
+/**
+ * One row per documented case; each row is its own test: its name, its
+ * request, the status the spec documents, and the env when it needs one.
+ */
 type Case = [string, () => Request, string, (() => ReportEnv)?];
 
 const CASES: readonly Case[] = [
@@ -1416,9 +1459,20 @@ export const SECRET = '6b1f0e0c5d4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d
 `serve.mjs`: replace the single `d1(['--file', 'migrations/0001_reports.sql'])` with every file in `migrations/`, sorted, derived from the filesystem:
 
 ```js
-for (const file of readdirSync('migrations').filter((name) => name.endsWith('.sql')).sort())
+import { nonEmpty } from '../../scripts/errors.mjs';
+// …
+// Every migration, in order, read from the directory: a new one is applied
+// the day it is added (#872). nonEmpty fails the run on an empty read.
+for (const file of nonEmpty(
+  readdirSync('migrations')
+    .filter((name) => name.endsWith('.sql'))
+    .sort(),
+  'migrations',
+))
   d1(['--file', `migrations/${file}`]);
 ```
+
+The bare `readdirSync` form is refused by `tests/guards/one-home.test.ts` (*a directory read cannot reach a guard unproved*); `nonEmpty` at the point of reading is its accepted idiom (review pass 4).
 
 and add to the `wrangler pages dev` arguments `'--binding', 'REPORT_LIMITS=on', '--binding', `REPORT_COUNTER_SECRET=${SECRET}``. Defaults 50/5 apply.
 
@@ -1664,3 +1718,5 @@ With Shyden's dev variables set to `REPORT_LIMITS=on`, `REPORT_LIMIT_CONNECTION=
 - **Pass 1 (2026-10-19)**, scratch worktree `../shyden.co.uk-872-plan` off `develop` `d4471b84`, with Tasks 1-4's code applied from this file and English stand-ins in the four beta locales. `npm run typecheck`: 1 error, then 0/0/0 after the fix below. `npm run test:unit`: 3,971 passed, 35 failed of 4,006, every failure read: 13 copy guards predicted red by the stand-ins (`i18n` 5, `report-limit-copy` 8), 21 floor growths (19 floor ids, recorded in CI), 1 plan defect. Findings, all fixed in this file: (F1) the `Outcome` union cannot grow in a commit without its copy, because `report-presence.spec.ts:76` maps it in a `Record` (ts2739), so the outcomes-and-copy task now comes before the store task; (F2) `report-presence.spec.ts` already tests every `#report-<outcome>` per locale, so Task 5's form-mode e2e test was a duplicate and is gone, and that spec's list now derives from its `Record`; (F3) the "limits off" endpoint test posted in form mode and read JSON. Also fixed while writing: an import cycle (`report-store.ts` imported `REPORT_COLUMNS` from `report.ts`, which imports it back), and loops of assertions changed to one test per case.
 - **Pass 2 (2026-10-19)**, same probe with F3 fixed: the five report unit files 141 of 141 green. The plan's 8 predicted unit mutations (Task 2: 1-5; Task 4: 2, 4, 5) each went RED, plus 3 extra mutants of my own: health skipping the limits went RED; keying the counter on the raw address, and `handleReport` ignoring the host, both stayed GREEN. Findings, fixed here: (F4) the endpoint's counter test used IPv4, where address and connection are the same text, so an IPv6 case now pins the /64 counter; (F5) no endpoint test posted to the production host, so a production-with-switch-off case is added. With both, each mutant goes RED (61 of 61 green unmutated, then 1 red each). Still to run: the guards, logs, functions and e2e suites, which run in CI only. The unit suite must be green first (guards follow unit in `ci.yml`'s `checks` job), so the probe needs the real translations: pass 3.
 - **Pass 3 (2026-10-19)**, the probe with every task's code, the real DeepL drafts and Google's readings. Unit: 3,968 passed, 40 failed of 4,008, every failure a floor GROWTH (37 ids, none a fall), recorded in CI. Typecheck 0/0/0; `lint:tests` 0 findings in 13 changed test files after the fixes. Findings, fixed here: (F6, my slip) a whole-locale `id` DeepL send credited DeepL with 27 hand-written Indonesian lines and voided their second readings (`read-back-coverage` red): Task 3 now keeps only the new `id` drafts, and the eight read lines are in Task 3; (F7) the contract's optional fourth tuple element does not type through `it.each` unless the row type is mutable; (F8) `lint:tests` refused 7 assertions: 6 absences with no population (now exact whole-result assertions, or a fake that throws when called) and 1 `toMatch` through a variable (now one literal anchored matcher per test). Also added: the in-place 429 e2e tests take their `shoot` picture. Probe branch `872-plan-probe` pushed; its floor record and CI (guards, logs, functions, e2e) are pass 4.
+- **Pass 4 (2026-10-19)**, CI on the probe. Floor record 39198294479 refused 2 guards: (F9) `serve.mjs` read `migrations/` with a bare `readdirSync` (`one-home.test.ts`), now `nonEmpty(...)` at the point of reading; (F10) two docblocks stacked on the contract rows (`stranded-docblocks`), now one. Record 39200135755 green; CI 39205037914 at `3566355`: `checks` (unit + guards), `functions` (the real-D1 cap, /64, total, prune, 8-at-once and no-address tests), `sanity-on-build` and `visual` green; logs run 39205435684 green, 70 of 70, the three AC3 tests and ten migration/runbook tests among them. Red: one test, `not-found-report.spec.ts:129`, 40 times (4 locales x 5 engines, e2e and capture): `BETA.length * 4` statuses. The plan already listed the change; the probe had missed it. Task 3 now spells it out. Then develop (#830, `93f39097`) was merged into the probe: two conflicts (`tests/floors.json`, three-way by `floors-three-way.py`, re-recorded; one import line), and #830's `recordingTable` converted to `batch` (code now in Task 4 Step 1). Laptop after the merge: typecheck 0/0/0, unit 4,013 of 4,016 (3 floor growths), `lint:tests` 0 findings in 15 files. Pass 5: record 39217956162, then CI.
+- **Pass 5 (2026-10-19)**, the probe with develop merged in. Record 39217956162 green (`Record the floors`, `Fold the figures…`, `Start CI on the new head`), which folded the floors into `54d77c13`. CI 39224644386 on `54d77c13`, all 20 jobs read by name and green: `checks` (format, build, typecheck, unit, guards, simulation, integration), `functions`, `sanity-on-build`, `visual`, e2e shards 1-8, capture shards 1-4, `scope`, `image` and `build-and-test`. `logs` is skipped in `ci.yml` and runs in its own workflow: logs run 39225181113 on `54d77c13`, green. The 15 skipped steps are all of four kinds, each keeping traces, a diff or a report from a failing run. Findings: none. **Clean pass: plan approved 2026-10-19 (self-approved under the review-to-zero rule).**
