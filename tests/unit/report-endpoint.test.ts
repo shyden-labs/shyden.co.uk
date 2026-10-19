@@ -631,6 +631,41 @@ describe('the daily limits (#872)', () => {
     expect(lines).toEqual([`report failed: ${kind}`]);
     expect(batches).toHaveLength(0);
   });
+  it('counts an IPv6 address under its /64 block (AC10)', async () => {
+    const { db, batches } = scriptedDatabase([storedOn(1, 1)]);
+    await handleReport(
+      post(valid(), from('2001:db8:1:2::9')),
+      { REPORTS: db, ...ON },
+      () => {},
+      NOW,
+    );
+    // HMAC-SHA-256(SECRET, '2026-10-19 2001:0db8:0001:0002::/64'), node:crypto 2026-10-19.
+    expect(batches[0]![3]!.values[1]).toBe(
+      '314a3b541e2cf3c62d6af6c2c44671ab471b44098a11e991b63e30e6c493f733',
+    );
+  });
+  it('applies the limits on production whatever the switch says (AC9)', async () => {
+    const lines: string[] = [];
+    const { db, batches } = scriptedDatabase([]);
+    const response = await handleReport(
+      new Request('https://shyden.co.uk/api/report', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://shyden.co.uk',
+          'Content-Type': FORM,
+          Accept: 'application/json',
+          'CF-Connecting-IP': '203.0.113.9',
+        },
+        body: new URLSearchParams(valid()).toString(),
+      }),
+      { REPORTS: db, REPORT_LIMITS: 'off' },
+      (line) => lines.push(line),
+      NOW,
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual(['report failed: secret-missing']);
+    expect(batches).toHaveLength(0);
+  });
   it('leaves the honeypot, not-found and rejected before any count', async () => {
     const { db, batches } = scriptedDatabase([]);
     await handleReport(
