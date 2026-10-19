@@ -20,6 +20,38 @@ export const tableWith = (columns: readonly string[]): ReportsDatabase => ({
 });
 
 /**
+ * A reports table that keeps every row the endpoint writes, as the values it
+ * bound in column order, so a test can read the stored row WHOLE (#830).
+ */
+export function recordingTable(): {
+  db: ReportsDatabase;
+  rows: unknown[][];
+} {
+  const rows: unknown[][] = [];
+  return {
+    rows,
+    db: {
+      prepare: () => {
+        let bound: unknown[] = [];
+        const statement = {
+          bind(...values: unknown[]) {
+            bound = values;
+            return statement;
+          },
+          run: async () => {
+            rows.push(bound);
+          },
+          all: async <T>(): Promise<{ results: T[] }> => {
+            throw new Error('a report reads nothing back');
+          },
+        };
+        return statement;
+      },
+    },
+  };
+}
+
+/**
  * A binding whose every call fails with `message`, as a D1 error can, its
  * text naming whatever was bound (#829): the log must never repeat it.
  */
