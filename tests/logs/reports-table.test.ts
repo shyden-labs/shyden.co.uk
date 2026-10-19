@@ -37,6 +37,25 @@ describe('the migration', () => {
     expect(columns).toEqual([...REPORT_COLUMNS]);
   });
 
+  it('bounds every text column the way check 7 does', () => {
+    // Anchored to each column's own line, so no other text can satisfy them
+    // (`anchored-presence.test.ts`). The literal 1000 is tied to check 7 by
+    // the pin on MAX_FIELD_UNITS.
+    expect(MAX_FIELD_UNITS).toBe(1000);
+    const text = sql();
+    expect(text).toMatch(
+      /^\s*quote\s+TEXT NOT NULL CHECK \(length\(quote\) BETWEEN 1 AND 1000\),\s*$/m,
+    );
+    expect(text).toMatch(
+      /^\s*suggestion\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(suggestion\) <= 1000\),\s*$/m,
+    );
+    expect(text).toMatch(
+      /^\s*note\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(note\) <= 1000\)\s*$/m,
+    );
+  });
+});
+
+describe('the counts migration (#872)', () => {
   const countsSql = () =>
     withoutSqlComments(
       readFileSync('migrations/0002_report_counts.sql', 'utf8'),
@@ -59,29 +78,36 @@ describe('the migration', () => {
     ]);
     expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
   });
-
-  it('bounds every text column the way check 7 does', () => {
-    // Anchored to each column's own line, so no other text can satisfy them
-    // (`anchored-presence.test.ts`). The literal 1000 is tied to check 7 by
-    // the pin on MAX_FIELD_UNITS.
-    expect(MAX_FIELD_UNITS).toBe(1000);
-    const text = sql();
-    expect(text).toMatch(
-      /^\s*quote\s+TEXT NOT NULL CHECK \(length\(quote\) BETWEEN 1 AND 1000\),\s*$/m,
-    );
-    expect(text).toMatch(
-      /^\s*suggestion\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(suggestion\) <= 1000\),\s*$/m,
-    );
-    expect(text).toMatch(
-      /^\s*note\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(note\) <= 1000\)\s*$/m,
-    );
-  });
 });
 
 describe('the runbook', () => {
   // Anchored to whole lines, so the block's own `--` notes cannot satisfy them.
   const runbook = () =>
     readFileSync('docs/runbooks/translation-reports.md', 'utf8');
+
+  // #872 AC7: one test per line the runbook must hold, each matcher
+  // anchored to a whole table row.
+  it('names the switch (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMITS` \| `on` or `off`/m);
+  });
+  it('names the total and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_TOTAL` \| .*\| 50 \|$/m);
+  });
+  it('names the connection share and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_CONNECTION` \| .*\| 5 \|$/m);
+  });
+  it('names the secret (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_COUNTER_SECRET` \|/m);
+  });
+  it('names limits-invalid (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: limits-invalid` \|/m);
+  });
+  it('names secret-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: secret-missing` \|/m);
+  });
+  it('names address-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: address-missing` \|/m);
+  });
 
   it('lists every stored column, and holds both deletes (AC7)', () => {
     const text = runbook();
