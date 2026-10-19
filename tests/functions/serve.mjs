@@ -5,9 +5,10 @@
  * never reusing a server, so each run and each mutation meets a fresh build
  * and a fresh database. The first test proves the binding and the migration.
  */
-import { rmSync } from 'node:fs';
+import { readdirSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
-import { DATABASE_ID, PASSWORD, PERSIST, PORT, d1 } from './local.mjs';
+import { nonEmpty } from '../../scripts/errors.mjs';
+import { DATABASE_ID, PASSWORD, PERSIST, PORT, SECRET, d1 } from './local.mjs';
 
 /**
  * @param {string} command
@@ -23,7 +24,15 @@ const step = (command, args) => {
 
 rmSync(PERSIST, { recursive: true, force: true });
 step('npm', ['run', 'build']);
-d1(['--file', 'migrations/0001_reports.sql']);
+// Every migration, in order, read from the directory: a new one is applied
+// the day it is added (#872). nonEmpty fails the run on an empty read.
+for (const file of nonEmpty(
+  readdirSync('migrations')
+    .filter((name) => name.endsWith('.sql'))
+    .sort(),
+  'migrations',
+))
+  d1(['--file', `migrations/${file}`]);
 
 const server = spawn(
   'npx',
@@ -44,6 +53,12 @@ const server = spawn(
     PERSIST,
     '--binding',
     `DEV_PASSWORD=${PASSWORD}`,
+    // #872: the limits on, at their defaults, so every report below runs
+    // the counting batch on real D1.
+    '--binding',
+    'REPORT_LIMITS=on',
+    '--binding',
+    `REPORT_COUNTER_SECRET=${SECRET}`,
   ],
   {
     stdio: 'inherit',

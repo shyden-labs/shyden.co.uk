@@ -67,18 +67,20 @@ for (const locale of PREFIXED_LOCALES)
       expect(offered.length).toBe(reportOptions(page, locale).length);
     });
 
-const OUTCOMES: readonly Outcome[] = [
-  'sent',
-  'not-found',
-  'rejected',
-  'failed',
-];
-const COPY: Record<Outcome, 'sent' | 'notFound' | 'rejected' | 'failed'> = {
+// A Record, so an outcome added to the union without its copy fails to
+// compile; the list is the Record's keys.
+const COPY: Record<
+  Outcome,
+  'sent' | 'notFound' | 'rejected' | 'failed' | 'formFull' | 'connectionFull'
+> = {
   sent: 'sent',
   'not-found': 'notFound',
   rejected: 'rejected',
   failed: 'failed',
+  'form-full': 'formFull',
+  'connection-full': 'connectionFull',
 };
+const OUTCOMES = Object.keys(COPY) as Outcome[];
 
 for (const locale of PREFIXED_LOCALES)
   for (const outcome of OUTCOMES)

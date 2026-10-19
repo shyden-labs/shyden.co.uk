@@ -1282,6 +1282,18 @@
         "english": "Assuming gifts are converted into beans at a rate of 40%, each bean can be exchanged for 0.9 gold coins, and the quantities of beans and gold coins are rounded down to the nearest integer.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
+      },
+      "感谢您的帮助。该表单目前已接收了其能处理的最大数量的报告，因此此条报告未被发送。请稍后再试。": {
+        "english": "Thank you for your help. This form has currently received the maximum number of reports it can process, therefore this report has not been sent. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "感谢您的帮助。为了确保本表单的可靠性，每个互联网连接发送的报告数量有限，而您的连接已达到该上限。使用同一网络连接的其他用户发送的报告也会计入该上限。请稍后再试。": {
+        "english": "Thank you for your help. To ensure the reliability of this form, there is a limit to the number of reports that can be sent per internet connection, and your connection has reached that limit. Reports sent by other users using the same network connection will also count towards this limit. Please try again later.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "edited after DeepL by the agent; to the operator's reads (#844)"
       }
     },
     "th": {
@@ -2621,6 +2633,18 @@
         "english": "Assume that gifts are converted into beans at a rate of 40%, and each bean is worth $0.9, rounded down to the nearest whole number of beans and coins.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
+      },
+      "ขอบคุณสำหรับความช่วยเหลือของคุณ แบบฟอร์มนี้ได้รับรายงานครบตามจำนวนที่รับได้ชั่วคราวแล้ว ดังนั้นรายงานนี้จึงไม่ถูกส่งไป โปรดลองอีกครั้งในภายหลัง": {
+        "english": "Thank you for your assistance. This form has reached its temporary capacity for receiving reports, therefore this report will not be submitted. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "ขอบคุณสำหรับความช่วยเหลือของคุณ เพื่อรักษาความน่าเชื่อถือของแบบฟอร์มนี้ แต่ละการเชื่อมต่ออินเทอร์เน็ตสามารถส่งรายงานได้เพียงจำนวนจำกัด และการเชื่อมต่อของคุณได้ถึงขีดจำกัดแล้ว รายงานจากผู้ใช้อื่น ๆ ที่ใช้การเชื่อมต่อเดียวกันก็ถูกนับรวมในขีดจำกัดนี้ด้วย โปรดลองอีกครั้งในภายหลัง": {
+        "english": "Thank you for your assistance. To maintain the reliability of this form, each internet connection can only submit a limited number of reports, and your connection has reached that limit. Reports from other users using the same connection are also included in this limit. Please try again later.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "edited after DeepL by the agent; to the operator's reads (#844)"
       }
     },
     "id": {
@@ -4020,6 +4044,18 @@
         "writers": ["edited after DeepL"],
         "verdict": "ambiguous",
         "note": "hadiah (gift) read as 'prize/reward'"
+      },
+      "Terima kasih atas bantuannya. Formulir ini telah menerima laporan sebanyak yang dapat ditampung untuk saat ini, sehingga laporan ini tidak terkirim. Silakan coba lagi nanti.": {
+        "english": "Thank you for your help. This form has received as many reports as it can currently accommodate, so it was not submitted. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "Terima kasih atas bantuannya. Untuk menjaga keandalan formulir ini, setiap koneksi internet hanya dapat mengirimkan sejumlah laporan tertentu, dan koneksi Anda telah mencapai batas tersebut. Laporan dari pengguna lain yang menggunakan koneksi yang sama juga dihitung dalam batas tersebut. Silakan coba lagi nanti.": {
+        "english": "Thank you for your help. To maintain the reliability of this form, each internet connection can only send a certain number of reports, and your connection has reached that limit. Reports from other users on the same connection also count towards that limit. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
       }
     },
     "vi": {
@@ -5385,6 +5421,18 @@
         "english": "Assuming that the gift is converted into beans at a rate of 40% and each bean can be exchanged for 0.9 cents, the number of beans and cents is rounded down to an integer.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
+      },
+      "Cảm ơn bạn đã giúp đỡ. Hiện tại, biểu mẫu này đã nhận đủ số lượng báo cáo tối đa, do đó báo cáo này chưa được gửi đi. Vui lòng thử lại sau.": {
+        "english": "Thank you for your help. Currently, this form has reached its maximum number of reports, so this report has not been submitted. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "Cảm ơn bạn đã giúp đỡ. Để đảm bảo tính đáng tin cậy của biểu mẫu này, mỗi kết nối internet chỉ có thể gửi một số lượng báo cáo giới hạn, và kết nối của bạn đã đạt đến giới hạn đó. Các báo cáo từ những người khác sử dụng chung kết nối này cũng được tính vào giới hạn đó. Vui lòng thử lại sau.": {
+        "english": "Thank you for your help. To ensure the reliability of this form, each internet connection can only submit a limited number of reports, and your connection has reached that limit. Reports from other users sharing this connection also count towards that limit. Please try again later.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "DeepL draft; names no period (#872 AC6)"
       }
     }
   },

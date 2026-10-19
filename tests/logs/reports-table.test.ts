@@ -11,7 +11,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MAX_FIELD_UNITS, REPORT_COLUMNS } from '../../src/lib/report';
+import {
+  COUNT_COLUMNS,
+  MAX_FIELD_UNITS,
+  REPORT_COLUMNS,
+} from '../../src/lib/report';
 import { withoutSqlComments } from '../unit/source-text';
 
 describe('the migration', () => {
@@ -51,10 +55,59 @@ describe('the migration', () => {
   });
 });
 
+describe('the counts migration (#872)', () => {
+  const countsSql = () =>
+    withoutSqlComments(
+      readFileSync('migrations/0002_report_counts.sql', 'utf8'),
+    );
+
+  it('creates exactly the count columns the endpoint writes, keyed by day and counter (#872)', () => {
+    const body = /CREATE TABLE report_counts \(([\s\S]*)\);/.exec(
+      countsSql(),
+    )?.[1];
+    expect(body, 'a CREATE TABLE report_counts statement').toBeDefined();
+    const lines = body!
+      .split('\n')
+      .map((line) => line.trim().replace(/,$/, ''))
+      .filter(Boolean);
+    expect(lines).toEqual([
+      'day     TEXT NOT NULL',
+      'counter TEXT NOT NULL',
+      'count   INTEGER NOT NULL CHECK (count >= 1)',
+      'PRIMARY KEY (day, counter)',
+    ]);
+    expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
+  });
+});
+
 describe('the runbook', () => {
   // Anchored to whole lines, so the block's own `--` notes cannot satisfy them.
   const runbook = () =>
     readFileSync('docs/runbooks/translation-reports.md', 'utf8');
+
+  // #872 AC7: one test per line the runbook must hold, each matcher
+  // anchored to a whole table row.
+  it('names the switch (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMITS` \| `on` or `off`/m);
+  });
+  it('names the total and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_TOTAL` \| .*\| 50 \|$/m);
+  });
+  it('names the connection share and its default (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_LIMIT_CONNECTION` \| .*\| 5 \|$/m);
+  });
+  it('names the secret (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `REPORT_COUNTER_SECRET` \|/m);
+  });
+  it('names limits-invalid (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: limits-invalid` \|/m);
+  });
+  it('names secret-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: secret-missing` \|/m);
+  });
+  it('names address-missing (#872 AC7)', () => {
+    expect(runbook()).toMatch(/^\| `report failed: address-missing` \|/m);
+  });
 
   it('lists every stored column, and holds both deletes (AC7)', () => {
     const text = runbook();

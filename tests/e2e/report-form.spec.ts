@@ -277,3 +277,31 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
     floorBreach('report-form/report-send-requests', heard.length),
   ).toBeUndefined();
 });
+
+// #872: a daily limit's 429 shows its own message in place, and no other.
+// Form mode is report-presence.spec.ts's, per locale.
+for (const [outcome, key] of [
+  ['form-full', 'formFull'],
+  ['connection-full', 'connectionFull'],
+] as const)
+  test(`/vi/classroom-groups: a 429 ${outcome} shows its message in place`, async ({
+    page,
+  }) => {
+    const t = getSiteStrings('vi').report;
+    await page.route('**/api/report', (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ outcome }),
+      }),
+    );
+    await page.goto(pagePath('classroom-groups', 'vi'));
+    await page.locator('[data-report] summary').click();
+    await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
+    await page.getByRole('button', { name: t.send }).click();
+    const shown = page.locator(`#report-${outcome}`);
+    await expect(shown).toBeVisible();
+    await expect(shown).toHaveText(t[key]);
+    await expect(page.locator('[data-report-status]:visible')).toHaveCount(1);
+    await shoot(page, `The ${outcome} message, in place`, shown);
+  });
