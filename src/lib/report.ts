@@ -369,6 +369,8 @@ export const REPORT_COLUMNS = [
   'suggestion',
   'note',
 ] as const;
+/** The `report_counts` table's columns, as `migrations/0002_report_counts.sql` creates them (#872). */
+export const COUNT_COLUMNS = ['day', 'counter', 'count'] as const;
 
 export type Outcome = 'sent' | 'not-found' | 'rejected' | 'failed';
 
@@ -402,7 +404,8 @@ const ALWAYS = {
 } as const;
 const FORM_TYPE = 'application/x-www-form-urlencoded';
 const INSERT = `INSERT INTO reports (${REPORT_COLUMNS.join(', ')}) VALUES (${REPORT_COLUMNS.map((_, at) => `?${at + 1}`).join(', ')})`;
-const HEALTH_QUERY = "SELECT name FROM pragma_table_info('reports')";
+const HEALTH_QUERY =
+  "SELECT 'reports' AS tbl, name FROM pragma_table_info('reports') UNION ALL SELECT 'report_counts' AS tbl, name FROM pragma_table_info('report_counts')";
 
 const plain = (status: number, extra: Record<string, string> = {}): Response =>
   new Response(null, { status, headers: { ...ALWAYS, ...extra } });
@@ -552,9 +555,12 @@ export async function handleReport(
   return outcome('sent', request, locale, page);
 }
 
-export const schemaMatches = (columns: readonly string[]): boolean =>
-  columns.length === REPORT_COLUMNS.length &&
-  REPORT_COLUMNS.every((column) => columns.includes(column));
+export const schemaMatches = (
+  columns: readonly string[],
+  expected: readonly string[] = REPORT_COLUMNS,
+): boolean =>
+  columns.length === expected.length &&
+  expected.every((column) => columns.includes(column));
 
 /** Proves the binding and the migration without writing a row, and returns no counts or content (spec 6.2). */
 export async function reportHealth(
@@ -570,11 +576,20 @@ export async function reportHealth(
   }
   try {
     const { results } = await env.REPORTS.prepare(HEALTH_QUERY).all<{
+      tbl: string;
       name: string;
     }>();
-    ok = schemaMatches(results.map(({ name }) => name));
-    if (!ok)
+    const of = (table: string) =>
+      results.filter(({ tbl }) => tbl === table).map(({ name }) => name);
+    const reports = schemaMatches(of('reports'));
+    const counts = schemaMatches(of('report_counts'), COUNT_COLUMNS);
+    if (!reports)
       log('report health: the reports table does not match the migration');
+    if (!counts)
+      log(
+        'report health: the report_counts table does not match the migration',
+      );
+    ok = reports && counts;
   } catch {
     log(`report health: ${'database' satisfies FailureKind}`);
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  COUNT_COLUMNS,
   MAX_BODY_BYTES,
   MAX_FIELD_UNITS,
   REPORT_COLUMNS,
@@ -9,7 +10,7 @@ import {
   schemaMatches,
 } from '../../src/lib/report';
 import { getSiteStrings } from '../../src/lib/i18n';
-import { failingWith, recordingTable } from '../report-fakes';
+import { failingWith, recordingTable, tableWith } from '../report-fakes';
 import { codeWithoutComments } from './source-text';
 import {
   FORM,
@@ -505,6 +506,34 @@ describe('the health check', () => {
     expect(schemaMatches([])).toBe(false);
     // Same count, one name changed: a length check alone would pass it.
     expect(schemaMatches([...REPORT_COLUMNS.slice(1), 'status'])).toBe(false);
+  });
+});
+
+describe('the health check reads both tables (#872)', () => {
+  it('pins the count columns', () => {
+    expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
+  });
+  it('answers 503 when report_counts is missing', async () => {
+    const lines: string[] = [];
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS, []) },
+      (line) => lines.push(line),
+    );
+    expect(response.status).toBe(503);
+    expect(lines).toEqual([
+      'report health: the report_counts table does not match the migration',
+    ]);
+  });
+  it('answers 200 when both tables match', async () => {
+    const response = await reportHealth(
+      new Request(HEALTH),
+      { REPORTS: tableWith(REPORT_COLUMNS) },
+      () => {
+        throw new Error('a healthy check logs nothing');
+      },
+    );
+    expect(response.status).toBe(200);
   });
 });
 

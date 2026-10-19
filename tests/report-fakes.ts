@@ -1,11 +1,15 @@
-import type { ReportsDatabase } from '../src/lib/report';
+import { COUNT_COLUMNS, type ReportsDatabase } from '../src/lib/report';
 
 /**
- * A reports table that answers `columns` to the health query and refuses
- * anything else. The real D1 in tests/functions always holds the migrated
- * table, so only a stand-in can show what health says about drift.
+ * A database whose two tables answer the health query with the `reports`
+ * and `counts` columns given, and that refuses anything else. The real D1 in
+ * tests/functions always holds the migrated tables, so only a stand-in can
+ * show what health says about drift.
  */
-export const tableWith = (columns: readonly string[]): ReportsDatabase => ({
+export const tableWith = (
+  reports: readonly string[],
+  counts: readonly string[] = COUNT_COLUMNS,
+): ReportsDatabase => ({
   prepare: () => ({
     bind() {
       throw new Error('health binds nothing');
@@ -14,7 +18,10 @@ export const tableWith = (columns: readonly string[]): ReportsDatabase => ({
       throw new Error('health writes nothing');
     },
     all: async <T>() => ({
-      results: columns.map((name) => ({ name })) as T[],
+      results: [
+        ...reports.map((name) => ({ tbl: 'reports', name })),
+        ...counts.map((name) => ({ tbl: 'report_counts', name })),
+      ] as T[],
     }),
   }),
 });
