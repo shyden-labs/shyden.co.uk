@@ -1,22 +1,28 @@
-import type { ReportsDatabase } from '../src/lib/report';
+import { COUNT_COLUMNS, type ReportsDatabase } from '../src/lib/report';
 
 /**
  * A reports table that answers `columns` to the health query and refuses
  * anything else. The real D1 in tests/functions always holds the migrated
  * table, so only a stand-in can show what health says about drift.
  */
-export const tableWith = (columns: readonly string[]): ReportsDatabase => ({
+export const tableWith = (
+  reports: readonly string[],
+  counts: readonly string[] = COUNT_COLUMNS,
+): ReportsDatabase => ({
   prepare: () => ({
     bind() {
       throw new Error('health binds nothing');
     },
-    run() {
-      throw new Error('health writes nothing');
-    },
     all: async <T>() => ({
-      results: columns.map((name) => ({ name })) as T[],
+      results: [
+        ...reports.map((name) => ({ tbl: 'reports', name })),
+        ...counts.map((name) => ({ tbl: 'report_counts', name })),
+      ] as T[],
     }),
   }),
+  batch: async () => {
+    throw new Error('health writes nothing');
+  },
 });
 
 /**
@@ -26,12 +32,80 @@ export const tableWith = (columns: readonly string[]): ReportsDatabase => ({
 export const failingWith = (message: string): ReportsDatabase => {
   const statement = {
     bind: () => statement,
-    run: async () => {
-      throw new Error(message);
-    },
     all: async <T>(): Promise<{ results: T[] }> => {
       throw new Error(message);
     },
   };
-  return { prepare: () => statement };
+  return {
+    prepare: () => statement,
+    batch: async () => {
+      throw new Error(message);
+    },
+  };
 };
+
+/**
+ * A database that answers each `batch` with the next scripted list of
+ * results and records every statement it was given, query and bound values
+ * (#872), so a test can read exactly what reached D1.
+ */
+export function scriptedDatabase(
+  answers: readonly (readonly { results: unknown[] }[])[],
+): {
+  db: ReportsDatabase;
+  batches: { query: string; values: unknown[] }[][];
+} {
+  const batches: { query: string; values: unknown[] }[][] = [];
+  let next = 0;
+  const statement = (query: string, values: unknown[] = []) => ({
+    query,
+    values,
+    bind: (...bound: unknown[]) => statement(query, bound),
+    all: async () => {
+      throw new Error('a report runs its statements in one batch');
+    },
+  });
+  return {
+    batches,
+    db: {
+      prepare: (query) => statement(query),
+      batch: async <T>(statements: unknown[]) => {
+        batches.push(
+          (statements as { query: string; values: unknown[] }[]).map(
+            ({ query, values }) => ({ query, values }),
+          ),
+        );
+        const answer = answers[next++];
+        if (!answer) throw new Error(`no scripted answer for batch ${next}`);
+        return answer as { results: T[] }[];
+      },
+    },
+  };
+}
+
+/** The batch answers a report meets: stored, or refused with the day's total at `all`. */
+export const STORED_OFF = [{ results: [] }, { results: [] }];
+export const storedOn = (all: number, connection: number) => [
+  { results: [] },
+  { results: [{ id: 'stored' }] },
+  { results: [] },
+  { results: [] },
+  {
+    results: [
+      { counter: 'all', count: all },
+      { counter: 'x', count: connection },
+    ],
+  },
+];
+export const refusedOn = (all: number, connection: number) => [
+  { results: [] },
+  { results: [] },
+  { results: [] },
+  { results: [] },
+  {
+    results: [
+      { counter: 'all', count: all },
+      { counter: 'x', count: connection },
+    ],
+  },
+];

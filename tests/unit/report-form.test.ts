@@ -14,6 +14,8 @@ describe('outcomeOf', () => {
     ['not-found', 422],
     ['rejected', 400],
     ['failed', 503],
+    ['form-full', 429],
+    ['connection-full', 429],
   ])('reads %s from its own status', async (outcome, status) => {
     expect(await outcomeOf(json({ outcome }, status))).toBe(outcome);
   });

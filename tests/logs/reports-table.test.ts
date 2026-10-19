@@ -11,7 +11,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MAX_FIELD_UNITS, REPORT_COLUMNS } from '../../src/lib/report';
+import {
+  COUNT_COLUMNS,
+  MAX_FIELD_UNITS,
+  REPORT_COLUMNS,
+} from '../../src/lib/report';
 import { withoutSqlComments } from '../unit/source-text';
 
 describe('the migration', () => {
@@ -48,6 +52,31 @@ describe('the migration', () => {
     expect(text).toMatch(
       /^\s*note\s+TEXT NOT NULL DEFAULT '' CHECK \(length\(note\) <= 1000\)\s*$/m,
     );
+  });
+});
+
+describe('the counts migration (#872)', () => {
+  const countsSql = () =>
+    withoutSqlComments(
+      readFileSync('migrations/0002_report_counts.sql', 'utf8'),
+    );
+
+  it('creates exactly the count columns the endpoint writes, keyed by day and counter (#872)', () => {
+    const body = /CREATE TABLE report_counts \(([\s\S]*)\);/.exec(
+      countsSql(),
+    )?.[1];
+    expect(body, 'a CREATE TABLE report_counts statement').toBeDefined();
+    const lines = body!
+      .split('\n')
+      .map((line) => line.trim().replace(/,$/, ''))
+      .filter(Boolean);
+    expect(lines).toEqual([
+      'day     TEXT NOT NULL',
+      'counter TEXT NOT NULL',
+      'count   INTEGER NOT NULL CHECK (count >= 1)',
+      'PRIMARY KEY (day, counter)',
+    ]);
+    expect(COUNT_COLUMNS).toEqual(['day', 'counter', 'count']);
   });
 });
 

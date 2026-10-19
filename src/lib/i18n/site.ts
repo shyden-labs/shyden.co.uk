@@ -159,6 +159,10 @@ export const siteEn = {
       "That report couldn't be sent. Please check the form and try again.",
     failed:
       "Something went wrong and your report wasn't sent. Please try again later.",
+    formFull:
+      'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+    connectionFull:
+      'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
   },
 };
 
@@ -303,6 +307,10 @@ export const siteId: SiteStrings = {
       'Laporan itu tidak dapat dikirim. Silakan periksa formulir dan coba lagi.',
     failed:
       'Terjadi kesalahan dan laporan Anda tidak terkirim. Silakan coba lagi nanti.',
+    formFull:
+      'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+    connectionFull:
+      'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
   },
 };
 
@@ -437,6 +445,10 @@ export const siteZh: SiteStrings = {
       '这页上没有这些词。请从列表中选择，或者复制一段较短的文字，其中不能包含任何人名或数字。',
     rejected: '该报告无法发送。请检查表单后重试。',
     failed: '出现问题，您的报告未能发送。请稍后再试。',
+    formFull:
+      'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+    connectionFull:
+      'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
   },
 };
 
@@ -580,6 +592,10 @@ export const siteVi: SiteStrings = {
       'Không thể gửi báo cáo đó. Vui lòng kiểm tra biểu mẫu và thử lại.',
     failed:
       'Đã xảy ra lỗi và báo cáo của bạn chưa được gửi. Vui lòng thử lại sau.',
+    formFull:
+      'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+    connectionFull:
+      'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
   },
 };
 
@@ -719,6 +735,10 @@ export const siteTh: SiteStrings = {
       'คำเหล่านั้นไม่มีอยู่ในหน้านี้ ให้เลือกจากรายชื่อ หรือคัดลอกข้อความที่สั้นกว่า ซึ่งไม่มีชื่อหรือตัวเลขใดๆ',
     rejected: 'ไม่สามารถส่งรายงานนั้นได้ โปรดตรวจสอบแบบฟอร์มแล้วลองอีกครั้ง',
     failed: 'เกิดข้อผิดพลาด รายงานของคุณยังไม่ได้ส่ง โปรดลองอีกครั้งในภายหลัง',
+    formFull:
+      'Thank you for your help. The form has received as many reports as it can take for now, so this one was not sent. Please try again later.',
+    connectionFull:
+      'Thank you for your help. To keep this form reliable, each internet connection can send a limited number of reports, and yours has reached that limit. Reports from other people on a shared connection count towards it too. Please try again later.',
   },
 };
 
