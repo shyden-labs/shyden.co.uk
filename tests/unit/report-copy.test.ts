@@ -16,9 +16,10 @@ describe('the report copy is the approved English (#97)', () => {
       quoteLabel: 'Which words are wrong?',
       quoteHint:
         'Start typing and choose the words from the list, or copy them from the page.',
+      // #830: one line above both free-text boxes (Shyden 2026-10-19).
+      personalDetailsHint: "Please don't include names or contact details.",
       suggestionLabel: 'What should it say? (optional)',
       noteLabel: 'Anything else? (optional)',
-      noteHint: "Please don't include names or contact details.",
       honeypotLabel: 'Leave this field empty',
       send: 'Send report',
       sent: 'Thank you. Your report has been sent.',

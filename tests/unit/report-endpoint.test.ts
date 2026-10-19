@@ -13,6 +13,7 @@ import { getSiteStrings } from '../../src/lib/i18n';
 import {
   STORED_OFF,
   failingWith,
+  recordingTable,
   refusedOn,
   scriptedDatabase,
   storedOn,
@@ -34,7 +35,8 @@ import {
  * Real `Request` objects, no stand-in database (spec 10). Checks 1–8 return
  * before the database is touched, so they need none; `failed` runs with the
  * REPORTS binding absent, which is a real failure the health check also
- * reports. Check 9 succeeding is proved on a real local D1 (Task 10).
+ * reports. Check 9 succeeding is proved on a real local D1 (Task 10); the
+ * row it stores is read here from a recording table (#830).
  */
 const answer = async (request: Request, lines: string[] = []) =>
   handleReport(request, NO_DB, (line) => lines.push(line));
@@ -362,6 +364,54 @@ describe('check 9 with no database: failed, and a clean log line', () => {
   });
 });
 
+describe('check 9 stored: the row keeps the form and nothing of the visitor (#830)', () => {
+  const storedRow = async (request: Request) => {
+    const table = recordingTable();
+    const response = await handleReport(request, { REPORTS: table.db });
+    expect(response.headers.get('Location')).toBe('/vi/#report-sent');
+    expect(table.rows).toHaveLength(1);
+    return table.rows[0]!;
+  };
+
+  // Stand-in: one fixed request, one planted header. Every header, every
+  // `request.cf` property and every unread field is the logs suite's
+  // (tests/logs/report-row.test.ts).
+  it('stores the form values whole, and no User-Agent', async () => {
+    const [id, receivedAt, ...rest] = await storedRow(
+      post(valid({ suggestion: 'đúng hơn', note: 'xem lại' }), {
+        headers: { 'User-Agent': 'agent-5d1c' },
+      }),
+    );
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(receivedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(rest).toEqual([
+      'vi',
+      'home',
+      quote,
+      '["site.report.open"]',
+      'đúng hơn',
+      'xem lại',
+    ]);
+  });
+
+  // AC4, Shyden 2026-10-16: "no, don't refuse it, just tell them in the
+  // form". The form's own words are the whole measure.
+  it.each([
+    ['suggestion', 'ana.putri@example.com'],
+    ['note', 'WhatsApp +62 812 3456 7890'],
+  ])(
+    'accepts and stores a %s that looks like contact details',
+    async (field, typed) => {
+      const row = await storedRow(post(valid({ [field]: typed })));
+      expect(row[REPORT_COLUMNS.indexOf(field as 'suggestion' | 'note')]).toBe(
+        typed,
+      );
+    },
+  );
+});
+
 describe('JSON mode', () => {
   it.each([
     [valid({ website: 'x' }), 200, 'sent'],
@@ -508,6 +558,29 @@ describe('the runbook', () => {
     expect(script, 'an npm run reports:review line').toBeGreaterThanOrEqual(0);
     expect(firstDelete, 'a DELETE line').toBeGreaterThanOrEqual(0);
     expect(script).toBeLessThan(firstDelete);
+  });
+
+  it('says the table holds no personal information, and deletes a report that does (#830 AC3)', () => {
+    const text = runbook();
+    const section =
+      /^## Personal information \(#830\)$([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(
+        text,
+      )?.[1];
+    expect(section, 'a "## Personal information (#830)" section').toBeDefined();
+    expect(section).toMatch(
+      /^The table holds no personal information by design\b/m,
+    );
+    // The delete it names is the one the SQL block runs, not a second spelling.
+    expect(text).toMatch(/^DELETE FROM reports WHERE id = '<id>';$/m);
+    // Each paragraph folded to one line, so its line breaks are prose and the
+    // matcher is anchored to the whole paragraph.
+    const asked = section!
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+      .find((paragraph) => paragraph.startsWith('The form asks visitors'));
+    expect(asked).toMatch(
+      /^The form asks visitors, above both free-text boxes, not to include names or contact details, .* holds personal details anyway .* delete it at once with `DELETE FROM reports WHERE id = '<id>';`, before any ticket is raised from it\.$/,
+    );
   });
 
   it('documents the WAF rate limit for the operator (AC5)', () => {

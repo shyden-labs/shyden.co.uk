@@ -54,6 +54,21 @@ A failure writes one line to the Functions log (Cloudflare dashboard → Workers
 | `report health: secret-missing` | The health check found the limits on and no usable secret. |
 | `report health: the report_counts table does not match the migration` | The counts table is missing, or its columns differ from `migrations/0002_report_counts.sql`. |
 
+## Personal information (#830)
+
+The table holds no personal information by design: no IP address, user agent,
+cookie, referrer or account, only the columns the `SELECT` above lists, every
+one of them the page, its words or what the visitor typed. Shyden ruled on
+2026-10-16 that a translation report needs nothing that identifies the
+visitor. The logs suite proves it before every release
+(`tests/logs/report-row.test.ts`).
+
+The form asks visitors, above both free-text boxes, not to include names or
+contact details, and the endpoint does not refuse a report that does. A
+report whose suggestion or note holds personal details anyway is dealt with
+first: copy out any translation fix it carries, then delete it at once with
+`DELETE FROM reports WHERE id = '<id>';`, before any ticket is raised from it.
+
 ## The rate limit (operator, before the production release)
 
 The endpoint validates every report, but only Cloudflare can count requests

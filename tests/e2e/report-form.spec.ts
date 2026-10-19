@@ -46,9 +46,25 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
   await expect(
     page.getByLabel(t.quoteLabel, { exact: true }),
   ).toHaveAccessibleDescription(t.quoteHint);
+  // One line, above both free-text boxes, says to leave personal details out,
+  // and each box announces it (#830, Shyden 2026-10-19: one line above both).
+  await expect(
+    page.getByLabel(t.suggestionLabel, { exact: true }),
+  ).toHaveAccessibleDescription(t.personalDetailsHint);
   await expect(
     page.getByLabel(t.noteLabel, { exact: true }),
-  ).toHaveAccessibleDescription(t.noteHint);
+  ).toHaveAccessibleDescription(t.personalDetailsHint);
+  const form = page.locator('[data-report] form');
+  const hint = form.getByText(t.personalDetailsHint, { exact: true });
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveCount(1);
+  const [quoteHint, between, suggestion] = await Promise.all([
+    form.getByText(t.quoteHint, { exact: true }).boundingBox(),
+    hint.boundingBox(),
+    form.getByText(t.suggestionLabel, { exact: true }).boundingBox(),
+  ]);
+  expect(between!.y).toBeGreaterThanOrEqual(quoteHint!.y + quoteHint!.height);
+  expect(between!.y + between!.height).toBeLessThanOrEqual(suggestion!.y);
   // A formatter that re-wraps `<textarea></textarea>` gives it a default
   // value of whitespace, which a visitor would then submit.
   await expect(page.getByLabel(t.suggestionLabel, { exact: true })).toHaveValue(

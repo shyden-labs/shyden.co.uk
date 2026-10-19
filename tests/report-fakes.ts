@@ -1,4 +1,8 @@
-import { COUNT_COLUMNS, type ReportsDatabase } from '../src/lib/report';
+import {
+  COUNT_COLUMNS,
+  type ReportsDatabase,
+  type ReportsStatement,
+} from '../src/lib/report';
 
 /**
  * A reports table that answers `columns` to the health query and refuses
@@ -24,6 +28,46 @@ export const tableWith = (
     throw new Error('health writes nothing');
   },
 });
+
+/**
+ * A reports table that keeps every row the endpoint writes, as the values it
+ * bound in column order, so a test can read the stored row WHOLE (#830).
+ */
+export function recordingTable(): {
+  db: ReportsDatabase;
+  rows: unknown[][];
+} {
+  const rows: unknown[][] = [];
+  interface Recorded extends ReportsStatement {
+    readonly query: string;
+    readonly values: unknown[];
+  }
+  const statement = (query: string, values: unknown[] = []): Recorded => ({
+    query,
+    values,
+    bind: (...bound: unknown[]) => statement(query, bound),
+    all: async () => {
+      throw new Error('a report reads nothing back');
+    },
+  });
+  return {
+    rows,
+    db: {
+      prepare: (query) => statement(query),
+      // A report's one batch (#872): the row is what its `INSERT INTO
+      // reports` bound, and the answer is a stored report's, limits off
+      // (two statements) or on (five).
+      batch: async <T>(statements: ReportsStatement[]) => {
+        const recorded = statements as Recorded[];
+        for (const { query, values } of recorded)
+          if (query.startsWith('INSERT INTO reports')) rows.push(values);
+        return (recorded.length === 2 ? STORED_OFF : storedOn(1, 1)) as {
+          results: T[];
+        }[];
+      },
+    },
+  };
+}
 
 /**
  * A binding whose every call fails with `message`, as a D1 error can, its
