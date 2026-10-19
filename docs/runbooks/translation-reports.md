@@ -95,7 +95,10 @@ workflow that does not run posts nothing, not even the failure notice. Under
 Actions, select _Waiting reports_, and _Enable workflow_ turns it back on.
 
 The job reads two secrets from the `reports-count` environment, which accepts
-`develop` alone and holds nothing else:
+`main` alone and holds nothing else (#877): only released code reads
+production. GitHub fires the schedule on the default branch, `develop`, so that
+run only starts the count on `main` (`gh workflow run waiting-reports.yml --ref
+main`); the count itself runs on `main` alone.
 
 - `CLOUDFLARE_ACCOUNT_ID`;
 - `CLOUDFLARE_D1_READ_TOKEN`, an API token with one permission,
@@ -111,9 +114,10 @@ To rotate the token:
    with the permission `Account › D1 › Read` and this account only.
 2. In GitHub, go to Settings → Environments → `reports-count`, and replace
    `CLOUDFLARE_D1_READ_TOKEN`.
-3. Go to Actions → _Waiting reports_ → Run workflow, on `develop`. The log
-   shows `Waiting reports: <n>`.
+3. Go to Actions → _Waiting reports_ → Run workflow, on `main` (or
+   `gh workflow run waiting-reports.yml --ref main`). The log shows
+   `Waiting reports: <n>`.
 4. Delete the old token in Cloudflare.
 
-A run from any branch other than `develop` is refused by the environment before
-a secret is read.
+A run from any branch other than `main` counts nothing: the count job is
+skipped, and the environment would refuse it before a secret is read.
