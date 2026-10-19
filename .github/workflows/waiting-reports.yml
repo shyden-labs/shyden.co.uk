@@ -42,7 +42,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Start the count on main
-        run: gh workflow run waiting-reports.yml --ref main
+        run: gh workflow run waiting-reports.yml --ref develop
 
   count:
     if: github.ref == 'refs/heads/main'
