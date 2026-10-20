@@ -26,7 +26,22 @@ describe('resultOf reads a Cloudflare envelope (#796)', () => {
     expect(() => resultOf(answer, 'the list')).toThrow(message);
   });
 
+  it('errorsIn lists each code and message', () => {
+    expect(
+      errorsIn({
+        errors: [
+          { code: 7500, message: 'not authorized' },
+          { code: 7403, message: 'forbidden' },
+        ],
+      }),
+    ).toBe(' (7500 not authorized; 7403 forbidden)');
+  });
+
   it('errorsIn is empty for an answer with no errors', () => {
     expect(errorsIn({ errors: [] })).toBe('');
+  });
+
+  it('errorsIn is empty for an answer that is not an object', () => {
+    expect(errorsIn('<html>')).toBe('');
   });
 });

@@ -16,8 +16,6 @@
 import { isRecord } from './is-record.ts';
 import { errorsIn, resultOf } from './cloudflare-envelope.ts';
 
-export { errorsIn } from './cloudflare-envelope.ts';
-
 /** The production database. `shyden-reports-dev` is never counted. */
 export const REPORTS_DATABASE = 'shyden-reports';
 
