@@ -121,6 +121,12 @@ export async function travel(
         fly.cancel();
         hide.cancel();
         if (landingsToSound(i, finishedEarly)) o.onLand(i);
+        if (i === 0) {
+          const end = performance.now() + 400;
+          while (performance.now() < end) {
+            /* MUTANT 856 AC3 */
+          }
+        }
       },
       () => undefined, // cancelled by a newer deal: nothing to tidy
     );
