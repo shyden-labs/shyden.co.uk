@@ -97,7 +97,7 @@ type Samples = {
  * mobile-safari 130 and webkit 188 ms, WebKit varying up to 2x run to run.
  * The longer gap before any student moves, the click's own work, is #883's.
  */
-const FRAME_GAP_CEILING_MS = 250;
+const FRAME_GAP_CEILING_MS = 50;
 
 /**
  * Every animation frame until stopped: for each student, whether their chip
