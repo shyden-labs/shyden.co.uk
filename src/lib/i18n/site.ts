@@ -51,6 +51,10 @@ export const siteEn = {
     yaweloIdleFeature4:
       'Miss a day and lose nothing. Nobody is forced to study.',
     visitYaweloIdle: 'Visit the Yawelo Idle site',
+    yaweloIdleVideoName: 'A 10-second preview of Yawelo Idle',
+    yaweloIdleVideoShows: 'What the video shows',
+    yaweloIdleVideoDescription:
+      "A 10-second preview with music and no speech. 'Learn by playing' introduces Yawelo Idle over a night sky of floating islands. Three points follow: learn Indonesian and English, no ads or paywalls, and learn at your own pace, because the words you pick up power the game. It ends on 'Yawelo Idle, coming soon' and the address yawelo-idle.shyden.co.uk.",
     toolsHeading: "While you're waiting, try these.",
     toolsLead:
       "Two tools I've already built. Free, no sign-up, and working right now.",
@@ -212,6 +216,10 @@ export const siteId: SiteStrings = {
     yaweloIdleFeature4:
       'Lewatkan sehari dan Anda tidak kehilangan apa pun. Tidak ada yang dipaksa belajar.',
     visitYaweloIdle: 'Kunjungi situs Yawelo Idle',
+    yaweloIdleVideoName: 'Cuplikan 10 detik Yawelo Idle',
+    yaweloIdleVideoShows: 'Isi video',
+    yaweloIdleVideoDescription:
+      "Cuplikan 10 detik dengan musik, tanpa narasi. 'Belajar dengan bermain' memperkenalkan Yawelo Idle dengan latar langit malam dan pulau-pulau yang melayang. Lalu muncul tiga poin: belajar bahasa Indonesia dan Inggris, tanpa iklan atau dinding berbayar, dan belajar sesuai kecepatan Anda sendiri, karena kata-kata yang Anda pelajari menggerakkan permainan. Cuplikan ditutup dengan 'Yawelo Idle, segera hadir' dan alamat yawelo-idle.shyden.co.uk.",
     toolsHeading: 'Sambil menunggu, coba ini.',
     toolsLead:
       'Dua alat yang sudah saya buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
@@ -358,6 +366,10 @@ export const siteZh: SiteStrings = {
     yaweloIdleFeature3: '无广告、无能量计时器、无付费解锁',
     yaweloIdleFeature4: '哪怕错过一天，也不会有什么损失。没人会被强迫学习。',
     visitYaweloIdle: '访问 Yawelo Idle 网站',
+    yaweloIdleVideoName: 'Yawelo Idle 的 10 秒预告片',
+    yaweloIdleVideoShows: '视频内容',
+    yaweloIdleVideoDescription:
+      '一段10秒的预告片，配有音乐但无旁白。“通过游戏学习”的宣传语在夜空中漂浮的岛屿背景下，引出了 Yawelo Idle。随后呈现三点核心信息：学习印尼语和英语、无广告且无付费墙、按自己的节奏学习——因为你掌握的单词将驱动游戏进程。预告片以“Yawelo Idle，即将推出”以及网址 yawelo-idle.shyden.co.uk 收尾。',
     toolsHeading: '等待期间，先试试这些。',
     toolsLead: '我已经开发了两个工具。免费、无需注册，而且现在就可以使用。',
     toolBadge: '已上线',
@@ -500,6 +512,10 @@ export const siteVi: SiteStrings = {
     yaweloIdleFeature4:
       'Bỏ lỡ một ngày cũng chẳng mất mát gì. Không ai bị ép buộc phải học cả.',
     visitYaweloIdle: 'Truy cập trang Yawelo Idle',
+    yaweloIdleVideoName: 'Đoạn giới thiệu 10 giây về Yawelo Idle',
+    yaweloIdleVideoShows: 'Nội dung của video',
+    yaweloIdleVideoDescription:
+      'Một đoạn giới thiệu dài 10 giây có nhạc nền và không có lời thoại. Slogan “Học qua trò chơi” giới thiệu Yawelo Idle trên nền bầu trời đêm với những hòn đảo lơ lửng. Ba điểm chính được nêu ra: học tiếng Indonesia và tiếng Anh, không có quảng cáo hay rào cản thanh toán, và học theo tốc độ của riêng bạn, bởi vì những từ vựng bạn học được sẽ là động lực cho trò chơi. Đoạn video kết thúc với dòng chữ “Yawelo Idle, sắp ra mắt” và địa chỉ yawelo-idle.shyden.co.uk.',
     toolsHeading: 'Trong lúc chờ, hãy thử những công cụ này.',
     toolsLead:
       'Hai công cụ mà tôi đã phát triển. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.',
@@ -647,6 +663,10 @@ export const siteTh: SiteStrings = {
     yaweloIdleFeature4:
       'พลาดไปหนึ่งวัน ก็ไม่เสียอะไรเลย ไม่มีใครถูกบังคับให้เรียน',
     visitYaweloIdle: 'เยี่ยมชมเว็บไซต์ Yawelo Idle',
+    yaweloIdleVideoName: 'คลิปตัวอย่าง 10 วินาทีของ Yawelo Idle',
+    yaweloIdleVideoShows: 'เนื้อหาในวิดีโอ',
+    yaweloIdleVideoDescription:
+      "คลิปตัวอย่าง 10 วินาที พร้อมเพลงและไม่มีเสียงพูด 'เรียนรู้ผ่านการเล่น' แนะนำเกม Yawelo Idle บนท้องฟ้ายามค่ำคืนที่มีเกาะลอยอยู่ ตามมาด้วยสามจุดสำคัญ: เรียนภาษาอินโดนีเซียและภาษาอังกฤษ ไม่มีโฆษณาหรือระบบจ่ายเพื่อเข้าถึงเนื้อหา และเรียนตามจังหวะของคุณเอง เพราะคำที่คุณเรียนรู้จะขับเคลื่อนเกมไปข้างหน้า วิดีโอจบด้วยข้อความ 'Yawelo Idle, เร็วๆ นี้' และที่อยู่เว็บไซต์ yawelo-idle.shyden.co.uk",
     toolsHeading: 'ระหว่างที่รอ ลองสิ่งเหล่านี้ดู',
     toolsLead:
       'เครื่องมือสองตัวที่พัฒนาไว้แล้ว ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',

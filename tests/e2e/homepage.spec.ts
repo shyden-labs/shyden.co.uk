@@ -1,7 +1,12 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { recordErrors } from './recorders';
+import {
+  recordErrors,
+  recordRequests,
+  requestsEveryEngineMakes,
+  urlMatching,
+} from './recorders';
 import { SHYTALK_MARK, asComputedRgb } from '../../src/lib/shytalk-brand';
 import {
   LOCALES,
@@ -449,7 +454,8 @@ test.describe('two products, both coming soon (#403)', () => {
       await expect(link).toHaveAttribute('href', YAWELO_IDLE_URL);
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       await expect(link).toHaveAttribute('target', '_blank');
-      // Text-only: Yawelo Idle has no art yet, and none is invented here.
+      // No image is invented here: its one picture is the preview video's
+      // poster, from the shared media host (the preview's tests below).
       await expect(section.locator('img, svg, picture')).toHaveCount(0);
       await shoot(
         page,
@@ -1343,4 +1349,195 @@ test.describe('the ShyTalk phone frame', () => {
     expect(drawn.ratio, "the capture's aspect-ratio").toBe('280 / 616');
     await shoot(page, 'the ShyTalk phone frame draws its bezel');
   });
+});
+
+// The Yawelo Idle preview video, #835. Its files come from the shared media
+// host (yawelo-idle#713), which the shared fixture answers from tests/e2e/stand-ins/ (see
+// yawelo-media.ts), so these read the page's markup and behaviour; the real
+// host is played on the deployed dev site. Literal URLs and types, never the
+// page's own constant: a value compared with its source asserts nothing.
+const PROMO = 'https://media.shyden.co.uk/yawelo-idle-promo';
+// MP4 first (Shyden, 2026-10-20): with WebM first the real iPhone stuck on
+// the poster. The codec lists let an engine that cannot play one skip it.
+const PROMO_SOURCES = [
+  [`${PROMO}.mp4`, 'video/mp4; codecs="avc1.64001F, mp4a.40.2"'],
+  [`${PROMO}.webm`, 'video/webm; codecs="vp9, opus"'],
+];
+const PROMO_WIDTHS = [320, 375, 768, 1280] as const;
+
+test.describe('the Yawelo Idle preview video', () => {
+  for (const locale of LOCALES)
+    test(`${locale}: the preview is a native player with its poster, sized before it loads`, async ({
+      page,
+    }) => {
+      const t = getSiteStrings(locale).home;
+      await page.goto(localisePath('/', locale));
+      const video = page.locator('#yawelo-idle video');
+      await expect(video).toHaveCount(1);
+      await expect(video).toBeVisible();
+      await expect(video).toHaveAttribute('controls', '');
+      await expect(video).toHaveAttribute('preload', 'none');
+      await expect(video).toHaveAttribute('playsinline', '');
+      await expect(video).toHaveAttribute('width', '1280');
+      await expect(video).toHaveAttribute('height', '720');
+      await expect(video).toHaveAttribute('poster', `${PROMO}-poster.jpg`);
+      // Tap to play, ruled 2026-10-16: nothing starts on its own.
+      await expect(video).not.toHaveAttribute('autoplay');
+      await expect(video).not.toHaveAttribute('muted');
+      await expect(video).not.toHaveAttribute('loop');
+      await expect(video).toHaveAccessibleName(t.yaweloIdleVideoName);
+      expect(
+        await video
+          .locator('source')
+          .evaluateAll((sources) =>
+            sources.map((s) => [s.getAttribute('src'), s.getAttribute('type')]),
+          ),
+        'the sources, in order',
+      ).toEqual(PROMO_SOURCES);
+      // Explicit width and height give the box its 16:9 before a byte loads.
+      const box = await video.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width / box!.height).toBeCloseTo(16 / 9, 1);
+    });
+
+  for (const locale of LOCALES)
+    test(`${locale}: what the video shows is one tap away, and describes the video`, async ({
+      page,
+    }) => {
+      const t = getSiteStrings(locale).home;
+      await page.goto(localisePath('/', locale));
+      const shows = page.locator('#yawelo-idle details');
+      const summary = shows.locator('summary');
+      const description = shows.locator('p');
+      await expect(summary).toBeVisible();
+      await expect(summary).toHaveText(t.yaweloIdleVideoShows);
+      await expect(description).toHaveCount(1);
+      await expect(description).toBeHidden();
+      const box = await summary.boundingBox();
+      expect(box).not.toBeNull();
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+      await summary.click();
+      await expect(description).toBeVisible();
+      await expect(description).toHaveText(t.yaweloIdleVideoDescription);
+      // The description is the video's own, closed or open.
+      await expect(
+        page.locator('#yawelo-idle video'),
+      ).toHaveAccessibleDescription(t.yaweloIdleVideoDescription);
+      await shoot(page, `${locale}: what the Yawelo Idle preview shows`, shows);
+    });
+
+  test('nothing of the video downloads before it is played', async ({
+    page,
+  }) => {
+    const seen = recordRequests(page);
+    await page.goto('/');
+    // Liveness: the recorder heard the poster, which loads with the page.
+    await expect
+      .poll(() => seen.matching(urlMatching(/yawelo-idle-promo-poster\.jpg$/)))
+      .toEqual([`${PROMO}-poster.jpg`]);
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect(
+      searched(seen.matching(urlMatching(/yawelo-idle-promo\.(mp4|webm)$/)), {
+        of: heard,
+        what: 'requests the homepage made',
+      }),
+      'preload="none": no rendition is fetched until the visitor plays it',
+    ).toEqual([]);
+    expect(
+      floorBreach('homepage/promo-requests', heard.length),
+    ).toBeUndefined();
+  });
+
+  test('every request the homepage makes is ours or the media host', async ({
+    page,
+  }) => {
+    const seen = recordRequests(page);
+    await page.goto('/');
+    await expect
+      .poll(() => seen.matching(urlMatching(/yawelo-idle-promo-poster\.jpg$/)))
+      .toHaveLength(1);
+    const origins = new Set(seen.all.map(({ url }) => new URL(url).origin));
+    expect(
+      [...origins].sort(),
+      'the hosts a homepage load reaches: this site, and the video host by name',
+    ).toEqual(
+      [new URL(page.url()).origin, 'https://media.shyden.co.uk'].sort(),
+    );
+  });
+
+  test('pressing play plays the preview', async ({ page }) => {
+    await page.goto('/');
+    const video = page.locator('#yawelo-idle video');
+    await expect(video).toBeVisible();
+    // Muted, so no engine's autoplay rule refuses a play that is not a tap;
+    // what is under test is that a source loads and time moves.
+    await video.evaluate((v: HTMLVideoElement) => {
+      v.muted = true;
+      return v.play();
+    });
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0.2);
+    const chosen = await video.evaluate((v: HTMLVideoElement) => v.currentSrc);
+    test
+      .info()
+      .annotations.push({ type: 'source played', description: chosen });
+    expect(PROMO_SOURCES.map(([src]) => src)).toContain(chosen);
+    await shoot(page, `the preview plays (${chosen.split('/').pop()})`, video);
+  });
+
+  for (const width of PROMO_WIDTHS)
+    test(
+      `at ${width}px the preview and its description stay inside the card`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        await page.locator('#yawelo-idle summary').click();
+        await expect(page.locator('#yawelo-idle details p')).toBeVisible();
+        const boxes = await page.evaluate(() => {
+          const rect = (selector: string) => {
+            const el = document.querySelector(selector);
+            if (!el) throw new Error(`${selector} missing`);
+            const r = el.getBoundingClientRect();
+            return {
+              left: r.left,
+              right: r.right,
+              width: r.width,
+              height: r.height,
+            };
+          };
+          return {
+            card: rect('#yawelo-idle'),
+            player: rect('#yawelo-idle video'),
+            shows: rect('#yawelo-idle details'),
+          };
+        });
+        expect(
+          boxes.player.left,
+          "the player's left edge",
+        ).toBeGreaterThanOrEqual(boxes.card.left - 0.5);
+        expect(
+          boxes.player.right,
+          "the player's right edge",
+        ).toBeLessThanOrEqual(boxes.card.right + 0.5);
+        expect(boxes.shows.left, "shows's left edge").toBeGreaterThanOrEqual(
+          boxes.card.left - 0.5,
+        );
+        expect(boxes.shows.right, "shows's right edge").toBeLessThanOrEqual(
+          boxes.card.right + 0.5,
+        );
+        // The player is the tap target that plays it.
+        const box = await page.locator('#yawelo-idle video').boundingBox();
+        expect(box).not.toBeNull();
+        expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+        await expectNoHorizontalScroll(page, `${width}px`);
+        await shoot(
+          page,
+          `${width}px: the Yawelo Idle preview in its card`,
+          page.locator('#yawelo-idle'),
+        );
+      },
+    );
 });

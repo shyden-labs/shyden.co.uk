@@ -20,6 +20,7 @@ import {
   type InitScriptDisposable,
 } from '../device/init-script-disposals';
 import { refuseUndeclaredClock } from '../device/clock-declaration';
+import { servingYaweloMedia } from './yawelo-media';
 
 const CDP_URL = process.env.ANDROID_CDP_URL ?? 'http://127.0.0.1:9222';
 
@@ -285,7 +286,7 @@ const realDeviceTest = base.extend<
       patchable[INIT_SCRIPT_PATCHED] = true;
     }
 
-    await use(context);
+    await servingYaweloMedia(context, () => use(context));
 
     // Undo every init script THIS test added -- see the patch comment above. Order does not
     // matter: each disposal only ever removes its own script. A refusal fails the test once
@@ -399,5 +400,14 @@ const realDeviceTest = base.extend<
   },
 });
 
-export const test = onRealDevice() ? realDeviceTest : base;
+/**
+ * The desktop engines' fixtures are Playwright's own, with one addition: the
+ * media host is answered from the stand-ins (see yawelo-media.ts).
+ */
+const desktopTest = base.extend<{ context: BrowserContext }>({
+  context: async ({ context }, use) =>
+    servingYaweloMedia(context, () => use(context)),
+});
+
+export const test = onRealDevice() ? realDeviceTest : desktopTest;
 export { expect };

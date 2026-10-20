@@ -27,6 +27,22 @@ const shytalkUrl =
 const yaweloIdleUrl =
   import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yawelo-idle.shyden.co.uk';
 
+// The preview video (#835) is published by the Yawelo Idle project to the
+// shared media host (Cloudflare R2, yawelo-idle#713), never copied here. One
+// host for every build, unlike the link above: it answers byte ranges, which
+// Safari asks for, and its `same-site` resource policy admits dev.shyden.co.uk
+// as well as shyden.co.uk. MP4 first (Shyden, 2026-10-20): with WebM first
+// the real iPhone stuck on the poster. Each type names its codecs, so an
+// engine that cannot play one moves to the next.
+const yaweloIdlePromo = 'https://media.shyden.co.uk/yawelo-idle-promo';
+const promoSources = [
+  {
+    src: `${yaweloIdlePromo}.mp4`,
+    type: 'video/mp4; codecs="avc1.64001F, mp4a.40.2"',
+  },
+  { src: `${yaweloIdlePromo}.webm`, type: 'video/webm; codecs="vp9, opus"' },
+];
+
 // The hero offers both products with equal weight, ShyTalk then Yawelo Idle.
 // Each button carries its own "opens <host>" line so the visitor knows the
 // link leaves the site, and WHERE to. The host is derived from the URL, so it
@@ -101,8 +117,8 @@ const yaweloIdleFeatures = [
     <PhoneFrame lang={lang} alt={t.shytalkShotAlt} />
   </section>
 
-  {/* Text-only: Yawelo Idle is pre-alpha and has no art yet, so none is
-      invented here, and its name is set as text, never translated. */}
+  {/* Yawelo Idle is pre-alpha: its one picture is its own preview video, and
+      its name is set as text, never translated. */}
   <section id="yawelo-idle" class="wrap showcase">
     <div class="showcase-copy">
       <p class="kicker">{t.yaweloIdleKicker}</p>
@@ -122,6 +138,30 @@ const yaweloIdleFeatures = [
         </Button>
       </p>
     </div>
+    {/* Tap to play, poster first, no script (ruled 2026-10-16): nothing of
+        the video downloads until it is played, and the width and height
+        hold its 16:9 box before a byte arrives. */}
+    <figure class="promo">
+      <video
+        controls
+        preload="none"
+        playsinline
+        width="1280"
+        height="720"
+        poster={`${yaweloIdlePromo}-poster.jpg`}
+        aria-label={t.yaweloIdleVideoName}
+        aria-describedby="yawelo-idle-video-shows"
+      >
+        {promoSources.map((source) => (
+          <source {...source} />
+        ))}
+      </video>
+      {/* Music and no speech, so a description rather than captions. */}
+      <details class="promo-shows">
+        <summary>{t.yaweloIdleVideoShows}</summary>
+        <p id="yawelo-idle-video-shows">{t.yaweloIdleVideoDescription}</p>
+      </details>
+    </figure>
   </section>
 
   <section id="tools" class="wrap">
@@ -278,6 +318,35 @@ const yaweloIdleFeatures = [
     letter-spacing: -0.03em;
     color: var(--ink);
   }
+  /* The preview fills its column on a phone and sits beside the copy from
+     880px, where ShyTalk's phone frame sits. min-width: 0 lets the grid track
+     shrink below the video's 1280px intrinsic width. */
+  .promo {
+    margin: 0;
+    min-width: 0;
+  }
+  .promo video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 14px;
+  }
+  .promo-shows {
+    margin-top: 0.75rem;
+    color: var(--ink-soft);
+  }
+  /* A 44px touch target, as a block: a flex summary would eat the space
+     between the marker and the words. */
+  .promo-shows summary {
+    min-height: 44px;
+    padding-block: 0.6rem;
+    box-sizing: border-box;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .promo-shows p {
+    margin: 0.25rem 0 0;
+  }
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr;
@@ -304,6 +373,9 @@ const yaweloIdleFeatures = [
     .showcase {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 4rem;
+    }
+    .promo {
+      width: 24rem;
     }
   }
   /* ShyTalk brand wordmark — the exact two-tone mark from shytalk.shyden.co.uk:
