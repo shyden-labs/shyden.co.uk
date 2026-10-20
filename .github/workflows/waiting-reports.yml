@@ -30,44 +30,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Holds no secret and names no environment: it only asks for a run on main.
+  # Holds no Cloudflare secret and names no environment: it only asks for a
+  # run on main, and says so when it cannot (#882). The count then never runs,
+  # and a count that never runs posts nothing; until the release puts this file
+  # on main, that is every scheduled run. Its failure steps post the count's
+  # own failure notice, with this run's link, as the count's do.
   dispatch:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    # The dispatch needs the first; checkout and the comment the other two.
     permissions:
       actions: write
+      contents: read
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Start the count on main
         run: gh workflow run waiting-reports.yml --ref main
-
-  # A schedule that cannot start the count must say so (#882): the count then
-  # never runs, and a count that never runs posts nothing. Until the release
-  # puts this file on main, that is every scheduled run. Posts the count's own
-  # failure notice, with this run's link, and holds no Cloudflare secret.
-  dispatch-failed:
-    needs: dispatch
-    if: failure()
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    # checkout needs the first, the comment the second.
-    permissions:
-      contents: read
-      issues: write
-    env:
-      NOTICE_ISSUE: '360'
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: failure()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - if: failure()
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
       - name: Say the count could not be started
+        if: failure()
+        env:
+          NOTICE_ISSUE: '360'
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/waiting-reports.mjs report-failure
 
   count:
