@@ -3256,7 +3256,11 @@ describe('the waiting-reports count (#349)', () => {
       schedule: [{ cron: '17 1 * * *' }],
       workflow_dispatch: null,
     });
-    expect(Object.keys(parsed().jobs ?? {})).toEqual(['dispatch', 'count']);
+    expect(Object.keys(parsed().jobs ?? {})).toEqual([
+      'dispatch',
+      'dispatch-failed',
+      'count',
+    ]);
   });
 
   // The token reads production, so only released code may hold it (#877, the
@@ -3325,6 +3329,77 @@ describe('the waiting-reports count (#349)', () => {
       NOTICE_ISSUE: '360',
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
     });
+  });
+
+  // A schedule that cannot start the count must say so (#882): until the
+  // release puts this file on `main`, and after it whenever the dispatch is
+  // refused, the count never runs, and a count that never runs posts nothing.
+  // The notice is the count's own failure notice, on the same issue, by a job
+  // of its own, so the dispatcher keeps `actions: write` alone.
+  it('a schedule that cannot start the count posts the failure notice (#882)', () => {
+    const failed = jobNamed(FILE, 'dispatch-failed');
+    expect(failed.needs).toEqual(['dispatch']);
+    expect(failed.condition).toBe('failure()');
+    expect(failed.environment).toBeUndefined();
+    expect(parsed().jobs?.['dispatch-failed']?.permissions).toEqual({
+      contents: 'read',
+      issues: 'write',
+    });
+    expect(parsed().jobs?.['dispatch-failed']?.env).toEqual({
+      NOTICE_ISSUE: '360',
+      GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
+    });
+    expect(
+      (parsed().jobs?.['dispatch-failed']?.steps ?? []).map(
+        ({ uses }) => uses?.replace(/@.*/, '') ?? null,
+      ),
+    ).toEqual(['actions/checkout', 'actions/setup-node', null]);
+    expect(failed.runs).toEqual([
+      'node scripts/waiting-reports.mjs report-failure',
+    ]);
+  });
+});
+
+// ---- no scheduled dispatch to main fails silently (#882) -----------------
+//
+// A daily job that only released code may run starts itself on `main` from
+// its schedule (#877). When that start fails, the job's check never runs, and
+// a check that never runs warns no one. So every job that starts a workflow
+// on `main` has a job of its own that needs it, runs on its failure alone,
+// and reports it. Derived from every workflow file, so a daily job added
+// later is held to it the day it appears.
+describe('no scheduled dispatch to main fails silently (#882)', () => {
+  const STARTS_ON_MAIN = /^gh workflow run \S+ --ref main$/;
+
+  it('every job that starts a workflow on main has a failure report beside it', () => {
+    const dispatchers = workflowGraphs().flatMap(({ name, jobs }) =>
+      jobs
+        .filter((job) =>
+          job.runs.some((run) => STARTS_ON_MAIN.test(run.trim())),
+        )
+        .map((job) => ({ name, job, jobs })),
+    );
+    const silent = dispatchers
+      .filter(
+        ({ job, jobs }) =>
+          !jobs.some(
+            (other) =>
+              other.needs.includes(job.id) &&
+              other.condition === 'failure()' &&
+              other.runs.some((run) => / report-failure$/.test(run.trim())),
+          ),
+      )
+      .map(({ name, job }) => `${name}: ${job.id}`);
+    expect(
+      searched(silent, {
+        of: dispatchers,
+        what: 'jobs that start a workflow on main',
+      }),
+      'jobs that start a workflow on main with no failure report needing them',
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/main-dispatchers', dispatchers.length),
+    ).toBeUndefined();
   });
 });
 
