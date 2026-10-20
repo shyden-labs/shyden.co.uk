@@ -3221,6 +3221,10 @@ describe('a failed develop deploy reaches the operator (#725)', () => {
   });
 });
 
+/** A step or job `if:`, unwrapped from `${{ }}`; `undefined` when absent. */
+const unwrapped = (condition: string | undefined) =>
+  condition?.replace(/^\$\{\{\s*|\s*\}\}$/g, '').trim();
+
 // ---- the waiting-reports count (#349, spec 15.3) -------------------------
 //
 // The job holds a production read token, so what it may run is pinned whole:
@@ -3248,8 +3252,6 @@ describe('the waiting-reports count (#349)', () => {
   };
   const parsed = () => parseCleanYaml(workflow(FILE), FILE) as CountWorkflow;
   const steps = () => parsed().jobs?.count?.steps ?? [];
-  const unwrapped = (condition: string | undefined) =>
-    condition?.replace(/^\$\{\{\s*|\s*\}\}$/g, '').trim();
 
   it('runs daily at 01:17 UTC and on dispatch, never on a push or a pull request', () => {
     expect(parsed().on).toEqual({
@@ -3270,8 +3272,13 @@ describe('the waiting-reports count (#349)', () => {
     expect(dispatch.environment).toBeUndefined();
     expect(dispatch.runs).toEqual([
       'gh workflow run waiting-reports.yml --ref main',
+      'node scripts/waiting-reports.mjs report-failure',
     ]);
-    expect(parsed().jobs?.dispatch?.permissions).toEqual({ actions: 'write' });
+    expect(parsed().jobs?.dispatch?.permissions).toEqual({
+      actions: 'write',
+      contents: 'read',
+      issues: 'write',
+    });
     expect(parsed().jobs?.dispatch?.env).toEqual({
       GH_TOKEN: '${{ github.token }}',
       GH_REPO: '${{ github.repository }}',
@@ -3325,6 +3332,81 @@ describe('the waiting-reports count (#349)', () => {
       NOTICE_ISSUE: '360',
       GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
     });
+  });
+
+  // A schedule that cannot start the count must say so (#882): until the
+  // release puts this file on `main`, and after it whenever the dispatch is
+  // refused, the count never runs, and a count that never runs posts nothing.
+  // The notice is the count's own failure notice, on the same issue, from
+  // steps that run on the start's failure alone, as the count's own do.
+  it('a schedule that cannot start the count posts the failure notice (#882)', () => {
+    const dispatching = parsed().jobs?.dispatch?.steps ?? [];
+    expect(
+      dispatching.map(({ uses }) => uses?.replace(/@.*/, '') ?? null),
+    ).toEqual([null, 'actions/checkout', 'actions/setup-node', null]);
+    expect(dispatching.map(({ if: when }) => unwrapped(when))).toEqual([
+      undefined,
+      'failure()',
+      'failure()',
+      'failure()',
+    ]);
+    const [, , , reporting] = dispatching;
+    expect(reporting.env).toEqual({
+      NOTICE_ISSUE: '360',
+      GITHUB_TOKEN: '${{ github.token }}',
+    });
+  });
+});
+
+// ---- no scheduled dispatch to main fails silently (#882) -----------------
+//
+// A daily job that only released code may run starts itself on `main` from
+// its schedule (#877). When that start fails, the job's check never runs, and
+// a check that never runs warns no one. So every job that starts a workflow
+// on `main` follows that start with a step that runs on its failure alone
+// and reports it, as the count's own failure step does. Derived from every
+// workflow file, so a daily job added later is held to it the day it appears.
+describe('no scheduled dispatch to main fails silently (#882)', () => {
+  const STARTS_ON_MAIN = /^gh workflow run \S+ --ref main$/;
+  const REPORTS = / report-failure$/;
+  type Step = { run?: string; if?: string };
+  type Jobs = { jobs?: Record<string, { steps?: Step[] }> };
+
+  it('every job that starts a workflow on main reports that start failing', () => {
+    const dispatchers = workflowGraphs().flatMap(({ name, jobs }) =>
+      jobs
+        .filter((job) =>
+          job.runs.some((run) => STARTS_ON_MAIN.test(run.trim())),
+        )
+        .map((job) => ({ name, job })),
+    );
+    const silent = dispatchers
+      .filter(({ name, job }) => {
+        const steps =
+          (parseCleanYaml(workflow(name), name) as Jobs).jobs?.[job.id]
+            ?.steps ?? [];
+        const start = steps.findIndex((step) =>
+          STARTS_ON_MAIN.test(step.run?.trim() ?? ''),
+        );
+        return !steps
+          .slice(start + 1)
+          .some(
+            (step) =>
+              unwrapped(step.if) === 'failure()' &&
+              REPORTS.test(step.run?.trim() ?? ''),
+          );
+      })
+      .map(({ name, job }) => `${name}: ${job.id}`);
+    expect(
+      searched(silent, {
+        of: dispatchers,
+        what: 'jobs that start a workflow on main',
+      }),
+      'jobs that start a workflow on main with no failure report after the start',
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/main-dispatchers', dispatchers.length),
+    ).toBeUndefined();
   });
 });
 

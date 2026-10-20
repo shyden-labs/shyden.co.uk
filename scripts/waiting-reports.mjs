@@ -9,7 +9,8 @@
  * The count comes first: GitHub is not touched until D1 has answered with a
  * count above zero, so a failure or a zero sends GitHub nothing. At most one
  * count is posted per UTC day, on issue `NOTICE_ISSUE`. `report-failure` never
- * reads a Cloudflare variable, and posts a sentence that names no count.
+ * reads a Cloudflare variable, and posts a sentence that names no count: first
+ * asking GitHub for the workflow on `main`, whose absence it names (#882).
  *
  * Reads `NOTICE_ISSUE`, `GITHUB_TOKEN` and `GITHUB_REPOSITORY` in both modes;
  * `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_D1_READ_TOKEN` in count mode only;
@@ -27,12 +28,13 @@ import { die, messageOf } from './errors.mjs';
 import { endpoint, setting } from './settings.mjs';
 import {
   COUNT_SQL,
-  FAILURE_NOTICE,
   REPORTS_DATABASE,
   REQUEST_TIMEOUT_MS,
+  WORKFLOW_FILE,
   countFrom,
   databaseIdFrom,
   errorsIn,
+  failureNoticeFor,
   noticeFor,
   postedToday,
   startOfUtcDay,
@@ -73,19 +75,27 @@ const answerOf = async (what, url, init) => {
   return answer;
 };
 
-/** The issue the notices go on, and a client for its comments. */
-const noticeIssue = () => {
+/** The repository's API root, and the headers every GitHub request carries. */
+const github = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
-  const issue = setting('NOTICE_ISSUE', /^[1-9]\d*$/);
   const token = setting('GITHUB_TOKEN', /^\S+$/);
-  const comments = `${api}/repos/${repository}/issues/${issue}/comments`;
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'shyden-waiting-reports',
+  return {
+    root: `${api}/repos/${repository}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: 'application/vnd.github+json',
+      'x-github-api-version': '2022-11-28',
+      'user-agent': 'shyden-waiting-reports',
+    },
   };
+};
+
+/** The issue the notices go on, and a client for its comments. */
+const noticeIssue = () => {
+  const { root, headers } = github();
+  const issue = setting('NOTICE_ISSUE', /^[1-9]\d*$/);
+  const comments = `${root}/issues/${issue}/comments`;
   return {
     /** @param {Date} now */
     listToday: (now) =>
@@ -145,12 +155,38 @@ const count = async () => {
   console.log('Posted.');
 };
 
+/**
+ * The HTTP status GitHub answers when asked for `WORKFLOW_FILE` on `main`
+ * (#882), or `undefined` when the question itself fails, since the failure
+ * notice is posted either way.
+ */
+const workflowStatusOnMain = async () => {
+  const { root, headers } = github();
+  try {
+    const response = await fetch(`${root}/contents/${WORKFLOW_FILE}?ref=main`, {
+      headers,
+      signal: AbortSignal.timeout(timeoutMs()),
+    });
+    await response.body?.cancel();
+    console.log(
+      `GitHub answered HTTP ${response.status} for the workflow on main.`,
+    );
+    return response.status;
+  } catch (error) {
+    console.log(
+      `Could not ask GitHub for the workflow on main: ${messageOf(error)}`,
+    );
+    return undefined;
+  }
+};
+
 const reportFailure = async () => {
   const server = endpoint('GITHUB_SERVER_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);
+  const notice = failureNoticeFor(await workflowStatusOnMain());
   await noticeIssue().post(
-    `${FAILURE_NOTICE}\n\n${server}/${repository}/actions/runs/${run}`,
+    `${notice}\n\n${server}/${repository}/actions/runs/${run}`,
   );
   console.log('Posted the failure notice.');
 };
