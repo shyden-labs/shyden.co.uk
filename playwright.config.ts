@@ -361,7 +361,13 @@ export default defineConfig({
     // engine could see it -- this half of the matrix is not negotiable.
     ...ENGINES.map(({ name, device }) => ({
       name,
-      use: { ...devices[device] },
+      use: {
+        ...devices[device],
+        // PROBE (#856, throwaway): PROBE_DPR overrides the pixel ratio.
+        ...(process.env.PROBE_DPR
+          ? { deviceScaleFactor: Number(process.env.PROBE_DPR) }
+          : {}),
+      },
       testIgnore: [contentOnly, visualOnly],
     })),
     ...(process.env.VISUAL === '1' ? [VISUAL_PROJECT] : []),

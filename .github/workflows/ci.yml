@@ -243,10 +243,11 @@ jobs:
       # so the two cannot disagree. Each shard enumerates the WHOLE suite and
       # writes down what it ran (scripts/test-e2e.mjs), for build-and-test to
       # add up.
-      # PROBE (#856, throwaway, never merged): the frame-gap test alone, ten
-      # times per engine, tracing as configured on shards 1-4 and off on 5-8.
-      - run: npx playwright test tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=10 --project=chromium --project=webkit --project=mobile-safari --trace=${{ matrix.shard <= 4 && 'retain-on-failure' || 'off' }}
+      # PROBE (#856, throwaway, never merged): the frame-gap test alone, twenty
+      # times on mobile-safari, pixel ratio 3 (its own) on shards 1-4, 1 on 5-8.
+      - run: npx playwright test tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=20 --project=mobile-safari --trace=off
         env:
+          PROBE_DPR: ${{ matrix.shard <= 4 && '3' || '1' }}
           E2E_ACCOUNT_DIR: e2e-accounts
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
