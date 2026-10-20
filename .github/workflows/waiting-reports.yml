@@ -33,8 +33,9 @@ jobs:
   # Holds no Cloudflare secret and names no environment: it only asks for a
   # run on main, and says so when it cannot (#882). The count then never runs,
   # and a count that never runs posts nothing; until the release puts this file
-  # on main, that is every scheduled run. Its failure steps post the count's
-  # own failure notice, with this run's link, as the count's do.
+  # on main, that is every scheduled run. Its failure steps post on the count's
+  # issue, with this run's link, as the count's do: saying the file is not on
+  # main when GitHub answers 404 for it there, and the ordinary notice if not.
   dispatch:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-26.04
