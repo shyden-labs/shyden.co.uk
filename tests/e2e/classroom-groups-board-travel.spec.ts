@@ -71,6 +71,8 @@ type Samples = {
   students: [number, Tally][];
   flights: Flight[];
   gap: Gap;
+  /** The same, counted only from the first student's flight on: the deal itself. */
+  flightGap: Gap;
   /** The most one frame of the sampler's own work took, in ms. */
   slowestTick: number;
   /**
@@ -115,6 +117,7 @@ const startSampler = (page: Page) =>
     const start = performance.now();
     let last = start;
     let gap: Gap = { ms: 0, before: 0, after: 0 };
+    let flightGap: Gap = { ms: 0, before: 0, after: 0 };
     let slowestTick = 0;
     const since = (at: number) => Math.round(at - start);
     const timeline: Samples['timeline'] = {
@@ -161,12 +164,15 @@ const startSampler = (page: Page) =>
       frame++;
       // Timed by the frame's own timestamp, so the gap is between frames the
       // browser drew, not between this callback's turns.
-      if (drawn - last > gap.ms)
-        gap = {
-          ms: Math.round(drawn - last),
-          before: Math.round(last - start),
-          after: Math.round(drawn - start),
-        };
+      const between: Gap = {
+        ms: Math.round(drawn - last),
+        before: Math.round(last - start),
+        after: Math.round(drawn - start),
+      };
+      if (between.ms > gap.ms) gap = between;
+      // Set by an earlier frame, so this gap began with a student in flight.
+      if (timeline.firstFlight !== null && between.ms > flightGap.ms)
+        flightGap = between;
       last = drawn;
       const numbers = new Set(
         Array.from(
@@ -233,6 +239,7 @@ const startSampler = (page: Page) =>
         students: [...tally],
         flights,
         gap,
+        flightGap,
         slowestTick: Math.round(slowestTick),
         timeline,
       };
@@ -332,10 +339,13 @@ test.describe('the board deals by moving students into their cards', () => {
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { students, gap, slowestTick, timeline } = await stopSampler(page);
+    const { students, gap, flightGap, slowestTick, timeline } =
+      await stopSampler(page);
     const blindness =
       `${test.info().project.name}: no frame drawn for ${gap.ms} ms ` +
       `(frames at ${gap.before} and ${gap.after} ms); ` +
+      `from the first flight on, ${flightGap.ms} ms ` +
+      `(frames at ${flightGap.before} and ${flightGap.after} ms); ` +
       `the sampler's slowest frame of its own work took ${slowestTick} ms; ` +
       `click at ${timeline.click} ms, first flight at ${timeline.firstFlight} ms, ` +
       `long tasks [${timeline.longTasks.join(', ') || 'none reported'}]`;
