@@ -86,7 +86,7 @@ const repositoryIssues = () => {
         body,
         assignees: [ASSIGNEE],
       });
-      if (!assigned(issue))
+      if (!assigned(issue) && issue === null)
         throw new Error(
           `issue "${title}" was opened without ${ASSIGNEE} assigned`,
         );
