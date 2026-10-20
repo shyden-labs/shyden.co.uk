@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -256,5 +257,161 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(run.status).not.toBe(0);
     // Stopped by its own guard, not by curl failing to reach the proxy.
     expect(run.log).toMatch(/^::error::No deployment to roll back to: /m);
+  });
+});
+
+describe('record-floors.yml hands the recorder the mode it was dispatched with (#608)', () => {
+  // The record step's script, RUN in bash as the runner runs it, with a
+  // stand-in `npm` ahead on PATH that writes each argument it was given on a
+  // line of its own and records nothing.
+  type Step = { name?: string; run?: unknown; env?: Record<string, unknown> };
+  type Recorder = {
+    on?: {
+      workflow_dispatch?: {
+        inputs?: Record<string, { type?: string; options?: string[] }>;
+      };
+    };
+    jobs?: { record?: { steps?: Step[] } };
+  };
+  const recorder = () =>
+    parseCleanYaml(
+      workflow('record-floors.yml'),
+      'record-floors.yml',
+    ) as Recorder;
+  const recordStep = (): Step => {
+    const step = nonEmpty(
+      recorder().jobs?.record?.steps ?? [],
+      'steps in the record job',
+    ).find((each) => each.name === 'Record the floors');
+    expect(
+      step,
+      "record-floors.yml has no step named 'Record the floors'",
+    ).toBeDefined();
+    return step!;
+  };
+  const dispatch = (mode: string, specs: string) => {
+    const script = String(recordStep().run ?? '');
+    expect(script, 'an expression reaches a script through env').not.toMatch(
+      /\$\{\{/,
+    );
+    const dir = mkdtempSync(join(tmpdir(), 'record-step-'));
+    const bin = join(dir, 'bin');
+    const args = join(dir, 'args');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'npm'),
+      `#!/bin/sh\nfor a; do printf '%s\\n' "$a"; done > '${args}'\n`,
+    );
+    chmodSync(join(bin, 'npm'), 0o755);
+    try {
+      const run = spawnSync(
+        'bash',
+        ['--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
+        {
+          encoding: 'utf8',
+          timeout: 10_000,
+          env: {
+            PATH: `${bin}:${process.env.PATH ?? ''}`,
+            RUNNER_TEMP: dir,
+            FLOORS_RECORD_IN_IMAGE: '1',
+            MODE: mode,
+            SPECS: specs,
+          },
+        },
+      );
+      return {
+        status: run.status,
+        log: `${run.stdout}${run.stderr}`,
+        npm: existsSync(args)
+          ? readFileSync(args, 'utf8').split('\n').slice(0, -1)
+          : undefined,
+      };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('offers the four modes and a specs input, and hands both to the step through env', () => {
+    const inputs = recorder().on?.workflow_dispatch?.inputs;
+    expect(inputs?.mode?.options).toEqual([
+      'full',
+      'unit',
+      'functions',
+      'specs',
+    ]);
+    expect(inputs?.specs?.type).toBe('string');
+    expect(recordStep().env).toEqual({
+      FLOORS_RECORD_IN_IMAGE: '1',
+      MODE: '${{ inputs.mode }}',
+      SPECS: '${{ inputs.specs }}',
+    });
+  });
+
+  it('runs a full record with no flag', () => {
+    const run = dispatch('full', '');
+    expect(run.status, run.log).toBe(0);
+    expect(run.npm).toEqual(['run', 'floors:record', '--']);
+  });
+
+  it('runs mode unit as --unit', () => {
+    const run = dispatch('unit', '');
+    expect(run.status, run.log).toBe(0);
+    expect(run.npm).toEqual(['run', 'floors:record', '--', '--unit']);
+  });
+
+  it('runs mode functions as --functions', () => {
+    const run = dispatch('functions', '');
+    expect(run.status, run.log).toBe(0);
+    expect(run.npm).toEqual(['run', 'floors:record', '--', '--functions']);
+  });
+
+  it('runs mode specs as one --specs per file named', () => {
+    const run = dispatch('specs', ' tests/e2e/a.spec.ts  tests/e2e/b.spec.ts ');
+    expect(run.status, run.log).toBe(0);
+    expect(run.npm).toEqual([
+      'run',
+      'floors:record',
+      '--',
+      '--specs',
+      'tests/e2e/a.spec.ts',
+      '--specs',
+      'tests/e2e/b.spec.ts',
+    ]);
+  });
+
+  it('hands a glob in the specs input to the recorder as written, expanding nothing', () => {
+    // Run from the checkout, where this glob matches every spec.
+    const run = dispatch('specs', 'tests/e2e/*.spec.ts');
+    expect(run.status, run.log).toBe(0);
+    expect(run.npm).toEqual([
+      'run',
+      'floors:record',
+      '--',
+      '--specs',
+      'tests/e2e/*.spec.ts',
+    ]);
+  });
+
+  it('refuses mode specs naming no file, before the recorder runs', () => {
+    const run = dispatch('specs', '  ');
+    expect(run.status).toBe(1);
+    expect(run.log).toMatch(/^::error::mode specs names no spec file: /m);
+    expect(run.npm).toBeUndefined();
+  });
+
+  it('refuses a specs input given in another mode, before the recorder runs', () => {
+    const run = dispatch('unit', 'tests/e2e/a.spec.ts');
+    expect(run.status).toBe(1);
+    expect(run.log).toMatch(
+      /^::error::the specs input is read in mode specs only \(mode unit\)$/m,
+    );
+    expect(run.npm).toBeUndefined();
+  });
+
+  it('refuses a mode it does not know, before the recorder runs', () => {
+    const run = dispatch('everything', '');
+    expect(run.status).toBe(1);
+    expect(run.log).toMatch(/^::error::unknown mode everything$/m);
+    expect(run.npm).toBeUndefined();
   });
 });

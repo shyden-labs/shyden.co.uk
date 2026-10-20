@@ -56,7 +56,7 @@ const TRAILER = /^[A-Za-z][A-Za-z0-9-]*: \S/;
  *
  * @param {string} original the measured commit's message
  * @param {readonly Move[]} moves
- * @param {string} mode `full`, `unit` or `functions`
+ * @param {string} mode `full`, `unit`, `functions` or `specs`
  * @returns {string}
  */
 export const amendedMessage = (original, moves, mode) =>

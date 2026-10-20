@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  chosenSpecs,
   describeMoves,
   recordArguments,
   retireRefusals,
@@ -98,19 +99,24 @@ describe('describeMoves prints a retired id beside the moved floors', () => {
 
 describe('recordArguments reads the mode and the ids to retire', () => {
   it('reads no argument as a full record retiring nothing', () => {
-    expect(recordArguments([])).toEqual({ mode: undefined, retired: [] });
+    expect(recordArguments([])).toEqual({
+      mode: undefined,
+      retired: [],
+      specs: [],
+    });
   });
 
   it('reads a mode with ids to retire, in any order', () => {
     expect(
       recordArguments(['--retire', 'x/one', '--unit', '--retire', 'x/two']),
-    ).toEqual({ mode: '--unit', retired: ['x/one', 'x/two'] });
+    ).toEqual({ mode: '--unit', retired: ['x/one', 'x/two'], specs: [] });
   });
 
   it('reads --unit-suite as a mode beside ids to retire (#658)', () => {
     expect(recordArguments(['--unit-suite', '--retire', 'x/one'])).toEqual({
       mode: '--unit-suite',
       retired: ['x/one'],
+      specs: [],
     });
   });
 
@@ -118,34 +124,74 @@ describe('recordArguments reads the mode and the ids to retire', () => {
     expect(recordArguments(['--device', '--retire', 'x/one'])).toEqual({
       mode: '--device',
       retired: ['x/one'],
+      specs: [],
     });
+  });
+
+  it('reads each --specs file as one --specs record (#608)', () => {
+    expect(
+      recordArguments([
+        '--specs',
+        'tests/e2e/a.spec.ts',
+        '--retire',
+        'x/one',
+        '--specs',
+        'tests/e2e/b.spec.ts',
+      ]),
+    ).toEqual({
+      mode: '--specs',
+      retired: ['x/one'],
+      specs: ['tests/e2e/a.spec.ts', 'tests/e2e/b.spec.ts'],
+    });
+  });
+
+  it('refuses --specs with no file after it (#608)', () => {
+    expect(recordArguments(['--specs'])).toBe(
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device | --specs <file>...] [--retire <id>]... (got --specs)',
+    );
+  });
+
+  it('refuses --specs followed by a flag instead of a file (#608)', () => {
+    expect(recordArguments(['--specs', '--unit'])).toBe(
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device | --specs <file>...] [--retire <id>]... (got --specs --unit)',
+    );
+  });
+
+  it('refuses --specs beside another mode (#608)', () => {
+    expect(recordArguments(['--unit', '--specs', 'tests/e2e/a.spec.ts'])).toBe(
+      'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
+        '--device | --specs <file>...] [--retire <id>]... ' +
+        '(got --unit --specs tests/e2e/a.spec.ts)',
+    );
   });
 
   it('refuses --retire with no id after it', () => {
     expect(recordArguments(['--unit', '--retire'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --unit --retire)',
+        '--device | --specs <file>...] [--retire <id>]... (got --unit --retire)',
     );
   });
 
   it('refuses --retire followed by a flag instead of an id', () => {
     expect(recordArguments(['--retire', '--unit'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --retire --unit)',
+        '--device | --specs <file>...] [--retire <id>]... (got --retire --unit)',
     );
   });
 
   it('refuses two modes at once', () => {
     expect(recordArguments(['--unit', '--functions'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --unit --functions)',
+        '--device | --specs <file>...] [--retire <id>]... (got --unit --functions)',
     );
   });
 
   it('refuses an argument it does not know', () => {
     expect(recordArguments(['--units'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --units)',
+        '--device | --specs <file>...] [--retire <id>]... (got --units)',
     );
   });
 });
@@ -226,6 +272,47 @@ describe('untrackedTreeRefusal asks git, with the process stood in (#547)', () =
     });
     expect(untrackedTreeRefusal(run)).toBe(
       'the untracked-file listing did not start: spawnSync git ENOENT',
+    );
+  });
+});
+
+/**
+ * The spec files a `--specs` record runs (#608). Each named file must be one
+ * the full record would run, a Playwright spec that calls `floorBreach`:
+ * anything else would run, measure nothing, and read as a record with nothing
+ * to move. Playwright reads no file filter as every spec, so naming none is
+ * refused too.
+ */
+describe('chosenSpecs: a --specs record runs only floor specs, named', () => {
+  const available = ['tests/e2e/a.spec.ts', 'tests/e2e/b.spec.ts'];
+
+  it('runs the floor specs named, in the record order, once each', () => {
+    expect(
+      chosenSpecs(
+        ['tests/e2e/b.spec.ts', './tests/e2e/a.spec.ts', 'tests/e2e/b.spec.ts'],
+        available,
+      ),
+    ).toEqual(['tests/e2e/a.spec.ts', 'tests/e2e/b.spec.ts']);
+  });
+
+  it('refuses each named file that calls no floorBreach, by name', () => {
+    expect(
+      chosenSpecs(
+        ['tests/e2e/a.spec.ts', 'tests/e2e/plain.spec.ts', 'tests/e2e/typo.ts'],
+        available,
+      ),
+    ).toBe(
+      'nothing recorded:\n' +
+        '  tests/e2e/plain.spec.ts is not a Playwright spec that calls ' +
+        'floorBreach: a record of it would measure nothing\n' +
+        '  tests/e2e/typo.ts is not a Playwright spec that calls ' +
+        'floorBreach: a record of it would measure nothing',
+    );
+  });
+
+  it('refuses naming no spec, which Playwright would read as every spec', () => {
+    expect(chosenSpecs([], available)).toBe(
+      'nothing recorded: --specs named no spec file',
     );
   });
 });

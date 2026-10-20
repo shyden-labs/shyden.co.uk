@@ -40,6 +40,11 @@ describe('the suites each record mode runs (#658)', () => {
     { mode: '--unit-suite', pass: 1, runs: ['unit'] },
     { mode: '--device', pass: 1, runs: ['device'] },
     {
+      mode: '--specs',
+      pass: 1,
+      runs: ['unit', 'guards', 'integration', 'logs', 'playwright'],
+    },
+    {
       mode: undefined,
       pass: 2,
       runs: ['unit', 'guards', 'integration', 'logs'],
@@ -56,6 +61,11 @@ describe('the suites each record mode runs (#658)', () => {
     },
     { mode: '--unit-suite', pass: 2, runs: ['unit'] },
     { mode: '--device', pass: 2, runs: ['unit'] },
+    {
+      mode: '--specs',
+      pass: 2,
+      runs: ['unit', 'guards', 'integration', 'logs'],
+    },
   ])('mode $mode, pass $pass, runs exactly $runs', ({ mode, pass, runs }) => {
     const suites = recordSuites(mode, pass);
     expect(
@@ -157,6 +167,62 @@ describe('the ids each record mode carries unmeasured (#658)', () => {
       'functions/rows',
       'unit/files',
       'guards/scanned',
+    ]);
+  });
+});
+
+describe('a --specs record carries every floor outside the specs it ran (#608)', () => {
+  const texts = {
+    specTexts: [
+      "expect(floorBreach('e2e/named', 1)).toBeUndefined();",
+      "expect(floorBreach('e2e/other', 1)).toBeUndefined();",
+    ],
+    functionsTexts: [
+      "expect(floorBreach('functions/rows', 1)).toBeUndefined();",
+    ],
+    deviceTexts: ["expect(floorBreach('device/cards', 1)).toBeUndefined();"],
+    otherSpecTexts: ["expect(floorBreach('e2e/other', 1)).toBeUndefined();"],
+  };
+  const ids = [
+    'e2e/named',
+    'e2e/other',
+    'functions/rows',
+    'unit/files',
+    'device/cards',
+  ];
+
+  it('carries the ids a spec it did not run, a functions spec or an iPhone journey spells', () => {
+    expect(carriedFor('--specs', ids, new Set(['e2e/named']), texts)).toEqual([
+      'e2e/other',
+      'functions/rows',
+      'device/cards',
+    ]);
+  });
+
+  it('never carries an id a spec it ran spells and did not assert: that floor lost its test', () => {
+    // None asserted: the named spec's id and the unit id are left to the judge,
+    // which refuses each as recorded and asserted by no test.
+    expect(carriedFor('--specs', ids, new Set(), texts)).toEqual([
+      'e2e/other',
+      'functions/rows',
+      'device/cards',
+    ]);
+  });
+
+  it('carries no browser floor when it is given no other spec text', () => {
+    expect(
+      carriedFor('--specs', ids, new Set(), { ...texts, otherSpecTexts: [] }),
+    ).toEqual(['functions/rows', 'device/cards']);
+  });
+
+  it('names what it carried under its own flag', () => {
+    expect(
+      carriedLines('--specs', ['e2e/other', 'device/cards'], texts.deviceTexts),
+    ).toEqual([
+      '--specs: not measured, carried unchanged for CI to judge: e2e/other',
+      '--specs: the iPhone floors, carried unchanged: only ' +
+        'npm run floors:record -- --device, on the phone, measures them: ' +
+        'device/cards',
     ]);
   });
 });
