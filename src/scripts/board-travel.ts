@@ -121,6 +121,14 @@ export async function travel(
         fly.cancel();
         hide.cancel();
         if (landingsToSound(i, finishedEarly)) o.onLand(i);
+        if (i === 0) {
+          o.tables.style.visibility = 'hidden';
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              o.tables.style.visibility = '';
+            }),
+          ); /* MUTANT 856 AC4 */
+        }
       },
       () => undefined, // cancelled by a newer deal: nothing to tidy
     );
