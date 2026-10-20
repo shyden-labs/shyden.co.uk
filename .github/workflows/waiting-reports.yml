@@ -60,7 +60,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Say the count could not be started
-        if: failure()
+        if: always()
         env:
           NOTICE_ISSUE: '360'
           GITHUB_TOKEN: ${{ github.token }}
