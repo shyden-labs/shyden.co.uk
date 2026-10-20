@@ -25,7 +25,8 @@
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
-import { endpoint, setting } from './settings.mjs';
+import { endpoint, setting, timeoutSetting } from './settings.mjs';
+import { answerOf, githubJson, statusOnMain } from './json-answer.mjs';
 import {
   COUNT_SQL,
   REPORTS_DATABASE,
@@ -33,7 +34,6 @@ import {
   WORKFLOW_FILE,
   countFrom,
   databaseIdFrom,
-  errorsIn,
   failureNoticeFor,
   noticeFor,
   postedToday,
@@ -41,76 +41,33 @@ import {
 } from '../src/lib/waiting-reports.ts';
 
 const timeoutMs = () =>
-  process.env.WAITING_REPORTS_TIMEOUT_MS === undefined
-    ? REQUEST_TIMEOUT_MS
-    : Number(setting('WAITING_REPORTS_TIMEOUT_MS', /^[1-9]\d*$/));
+  timeoutSetting('WAITING_REPORTS_TIMEOUT_MS', REQUEST_TIMEOUT_MS);
 
-/**
- * The parsed JSON a request answers with. Any failure to get a 2xx JSON
- * answer throws, naming the side, the status, and each entry of any `errors`
- * list the answer holds, and nothing else from the body.
- *
- * @param {string} what
- * @param {string} url
- * @param {RequestInit} init
- * @returns {Promise<unknown>}
- */
-const answerOf = async (what, url, init) => {
-  const response = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(timeoutMs()),
-  });
-  const text = await response.text();
-  /** @type {unknown} */
-  let answer;
-  try {
-    answer = JSON.parse(text);
-  } catch {
-    throw new Error(`${what} answered HTTP ${response.status}, not JSON`);
-  }
-  if (!response.ok)
-    throw new Error(
-      `${what} answered HTTP ${response.status}${errorsIn(answer)}`,
-    );
-  return answer;
-};
-
-/** The repository's API root, and the headers every GitHub request carries. */
-const github = () => {
+/** The repository's API root, and a GitHub client for its token. */
+const repositoryApi = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
-  const token = setting('GITHUB_TOKEN', /^\S+$/);
   return {
     root: `${api}/repos/${repository}`,
-    headers: {
-      authorization: `Bearer ${token}`,
-      accept: 'application/vnd.github+json',
-      'x-github-api-version': '2022-11-28',
-      'user-agent': 'shyden-waiting-reports',
-    },
+    github: githubJson(
+      setting('GITHUB_TOKEN', /^\S+$/),
+      'shyden-waiting-reports',
+      timeoutMs,
+    ),
   };
 };
 
 /** The issue the notices go on, and a client for its comments. */
 const noticeIssue = () => {
-  const { root, headers } = github();
+  const { root, github } = repositoryApi();
   const issue = setting('NOTICE_ISSUE', /^[1-9]\d*$/);
   const comments = `${root}/issues/${issue}/comments`;
   return {
     /** @param {Date} now */
     listToday: (now) =>
-      answerOf(
-        'GitHub',
-        `${comments}?since=${startOfUtcDay(now)}&per_page=100`,
-        { headers },
-      ),
+      github.get(`${comments}?since=${startOfUtcDay(now)}&per_page=100`),
     /** @param {string} body */
-    post: (body) =>
-      answerOf('GitHub', comments, {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ body }),
-      }),
+    post: (body) => github.post(comments, { body }),
   };
 };
 
@@ -129,14 +86,20 @@ const readCount = async () => {
       'Cloudflare',
       `${databases}?name=${encodeURIComponent(REPORTS_DATABASE)}`,
       { headers },
+      timeoutMs(),
     ),
   );
   return countFrom(
-    await answerOf('Cloudflare', `${databases}/${id}/query`, {
-      method: 'POST',
-      headers: { ...headers, 'content-type': 'application/json' },
-      body: JSON.stringify({ sql: COUNT_SQL }),
-    }),
+    await answerOf(
+      'Cloudflare',
+      `${databases}/${id}/query`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ sql: COUNT_SQL }),
+      },
+      timeoutMs(),
+    ),
   );
 };
 
@@ -155,36 +118,14 @@ const count = async () => {
   console.log('Posted.');
 };
 
-/**
- * The HTTP status GitHub answers when asked for `WORKFLOW_FILE` on `main`
- * (#882), or `undefined` when the question itself fails, since the failure
- * notice is posted either way.
- */
-const workflowStatusOnMain = async () => {
-  const { root, headers } = github();
-  try {
-    const response = await fetch(`${root}/contents/${WORKFLOW_FILE}?ref=main`, {
-      headers,
-      signal: AbortSignal.timeout(timeoutMs()),
-    });
-    await response.body?.cancel();
-    console.log(
-      `GitHub answered HTTP ${response.status} for the workflow on main.`,
-    );
-    return response.status;
-  } catch (error) {
-    console.log(
-      `Could not ask GitHub for the workflow on main: ${messageOf(error)}`,
-    );
-    return undefined;
-  }
-};
-
 const reportFailure = async () => {
   const server = endpoint('GITHUB_SERVER_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);
-  const notice = failureNoticeFor(await workflowStatusOnMain());
+  const { root, github } = repositoryApi();
+  const notice = failureNoticeFor(
+    await statusOnMain(github, root, WORKFLOW_FILE),
+  );
   await noticeIssue().post(
     `${notice}\n\n${server}/${repository}/actions/runs/${run}`,
   );
