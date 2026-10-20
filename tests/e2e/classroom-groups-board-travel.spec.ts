@@ -342,6 +342,8 @@ test.describe('the board deals by moving students into their cards', () => {
     test
       .info()
       .annotations.push({ type: 'largest frame gap', description: blindness });
+    // Printed on a pass too, so every engine's gap is in the run's log.
+    console.log(`largest frame gap: ${blindness}`);
     expect(
       searched(
         students.filter(([, t]) => t.both > 0),
