@@ -94,6 +94,16 @@ without a readable `expires_at`, a refused request) fails, and its last step
 comments the run on the open issue titled _The Access service token expiry
 check could not run_, or opens it.
 
+The scheduled run that cannot start the check on `main` reports the same way
+(#882), after asking GitHub for the workflow on `main`. While `main` lacks
+both this workflow and `waiting-reports.yml`, it posts nothing: the
+waiting-reports count's daily notice on #360 already says `main` lacks its
+workflow, and one notice a day is enough (operator, 2026-10-20). Until the
+first release, that is every day. Missing alone, its comment starts _The Access
+service token expiry check was not started: main has no
+.github/workflows/access-expiry.yml_, which after a release means the file was
+renamed or removed on `main`.
+
 One-time setup (the operator):
 
 1. **Cloudflare → My Profile → API Tokens → Create Token → Custom token**,

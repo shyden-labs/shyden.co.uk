@@ -30,19 +30,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Holds no secret and names no environment: it only asks for a run on main.
+  # Holds no Cloudflare secret and names no environment: it only asks for a
+  # run on main, and says so when it cannot (#882). The check then never runs,
+  # and a check that never runs reports nothing; until the release puts this
+  # file on main, that is every scheduled run. Its failure steps report on the
+  # check's own failure issue, with this run's link, as the check's do: saying
+  # the file is not on main when GitHub answers 404 for it there, and posting
+  # nothing while main lacks waiting-reports.yml too, whose notice says so.
   dispatch:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    # The dispatch needs the first; checkout and the issue the other two.
     permissions:
       actions: write
+      contents: read
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Start the check on main
         run: gh workflow run access-expiry.yml --ref main
+      - if: failure()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: failure()
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Say the check could not be started
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/access-expiry.mjs report-failure
 
   check:
     if: github.ref == 'refs/heads/main'

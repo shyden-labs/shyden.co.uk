@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ASSIGNEE,
   ISSUE_AUTHOR,
+  NOT_ON_MAIN_NOTICE,
   REQUEST_TIMEOUT_MS,
   WARN_DAYS,
   assigned,
   dueSoon,
+  failureBodyFor,
   missingTitles,
   openFailureIssue,
   tokensFrom,
@@ -42,6 +44,35 @@ describe('the constants are pinned to their literal values', () => {
     expect(ASSIGNEE).toBe('ShydenMcM');
     expect(REQUEST_TIMEOUT_MS).toBe(30_000);
   });
+});
+
+// A schedule whose start on `main` fails asks GitHub for the workflow file on
+// `main` first (#882). Until the release puts it there, the failure is
+// expected; and while `main` lacks the waiting-reports workflow too, that
+// count's daily notice on #360 already says so, and one notice a day is
+// enough (Shyden, 2026-10-20), so nothing is posted.
+describe('failureBodyFor', () => {
+  const RUN = 'https://github.com/o/r/actions/runs/1';
+
+  it('posts nothing while main lacks this workflow and the shared one alike', () => {
+    expect(failureBodyFor(404, 404, RUN)).toBeNull();
+  });
+
+  it.each([[200], [500], [undefined]])(
+    'puts the not-on-main notice above the run when only this workflow is missing (shared: %s)',
+    (shared) => {
+      expect(failureBodyFor(404, shared, RUN)).toBe(
+        `${NOT_ON_MAIN_NOTICE}\n\n${RUN}`,
+      );
+    },
+  );
+
+  it.each([[200], [403], [500], [undefined]])(
+    'is the run alone on %s, so a failed check still reports',
+    (status) => {
+      expect(failureBodyFor(status, undefined, RUN)).toBe(RUN);
+    },
+  );
 });
 
 describe('tokensFrom reads every token, or throws', () => {

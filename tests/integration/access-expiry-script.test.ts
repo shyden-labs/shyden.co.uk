@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { join } from 'node:path';
-import { FAILURE_TITLE } from '../../src/lib/access-expiry';
+import { FAILURE_TITLE, NOT_ON_MAIN_NOTICE } from '../../src/lib/access-expiry';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 import { dailyJobRunner, standIn, type Received } from '../json-stand-in';
@@ -19,6 +19,11 @@ const REPO = 'shyden-labs/shyden.co.uk';
 const ISSUES = `/repos/${REPO}/issues`;
 const DAY_MS = 86_400_000;
 const RUN_URL = `https://github.com/${REPO}/actions/runs/36000000001`;
+const WORKFLOW_ON_MAIN = `/repos/${REPO}/contents/.github/workflows/access-expiry.yml?ref=main`;
+const SHARED_ON_MAIN = `/repos/${REPO}/contents/.github/workflows/waiting-reports.yml?ref=main`;
+/** GitHub's status for each workflow file on main, per scenario (#882). */
+let workflowOnMain: number;
+let sharedOnMain: number;
 
 const cloudflare = standIn();
 const github = standIn();
@@ -59,6 +64,8 @@ beforeEach(() => {
   tokensAnswer = { status: 200, body: tokenList([PROD_SANITY]) };
   issuePages = [[]];
   assignees = [{ login: 'ShydenMcM' }];
+  workflowOnMain = 200;
+  sharedOnMain = 200;
   cloudflare.answer(({ method, url }) =>
     method === 'GET' &&
     url === `/accounts/${ACCOUNT}/access/service_tokens?per_page=1000`
@@ -77,6 +84,10 @@ beforeEach(() => {
       /^\/repos\/[^/]+\/[^/]+\/issues\/\d+\/comments$/.test(url)
     )
       return { status: 201, body: { id: 1 } };
+    if (method === 'GET' && url === WORKFLOW_ON_MAIN)
+      return { status: workflowOnMain, body: {} };
+    if (method === 'GET' && url === SHARED_ON_MAIN)
+      return { status: sharedOnMain, body: {} };
     return { status: 404, body: {} };
   });
 });
@@ -311,6 +322,59 @@ describe('the report-failure mode', () => {
     expect(code, out).toBe(0);
     expect(posts(await github.record())).toEqual([
       { url: `${ISSUES}/7/comments`, body: { body: RUN_URL } },
+    ]);
+  });
+
+  it('asks GitHub for the workflow on main, with the token, first (#882)', async () => {
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    const [first] = await github.record();
+    expect([first.method, first.url, first.auth]).toEqual([
+      'GET',
+      WORKFLOW_ON_MAIN,
+      'Bearer gh-token',
+    ]);
+  });
+
+  it('posts nothing while main lacks the waiting-reports workflow too (#882)', async () => {
+    workflowOnMain = 404;
+    sharedOnMain = 404;
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    const sent = await github.record();
+    expect(sent.map(({ method, url }) => [method, url])).toEqual([
+      ['GET', WORKFLOW_ON_MAIN],
+      ['GET', SHARED_ON_MAIN],
+    ]);
+    expect(out).toContain('nothing posted');
+  });
+
+  it('says the workflow is not on main when only it is missing there (#882)', async () => {
+    workflowOnMain = 404;
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    expect(posts(await github.record())).toEqual([
+      {
+        url: ISSUES,
+        body: {
+          title: FAILURE_TITLE,
+          body: `${NOT_ON_MAIN_NOTICE}\n\n${RUN_URL}`,
+          assignees: ['ShydenMcM'],
+        },
+      },
+    ]);
+  });
+
+  it('posts the run alone when the question about main itself fails (#882)', async () => {
+    workflowOnMain = 500;
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    expect(out).toContain('GitHub answered HTTP 500 for the workflow on main.');
+    expect(posts(await github.record())).toEqual([
+      {
+        url: ISSUES,
+        body: { title: FAILURE_TITLE, body: RUN_URL, assignees: ['ShydenMcM'] },
+      },
     ]);
   });
 });

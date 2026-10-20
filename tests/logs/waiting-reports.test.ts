@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
 import {
   COUNT_SQL,
   FAILURE_NOTICE,
+  NOT_ON_MAIN_NOTICE,
   REPORTS_DATABASE,
+  WORKFLOW_FILE,
   countFrom,
 } from '../../src/lib/waiting-reports';
 import { counted } from '../waiting-reports-shared';
@@ -24,6 +26,17 @@ describe('the statement it reads and the sentence it posts', () => {
   it('the failure notice is one fixed sentence holding no digit', () => {
     expect(FAILURE_NOTICE).toBe('The waiting-reports count could not be read.');
     expect(FAILURE_NOTICE).not.toMatch(/\d/);
+  });
+
+  it('the not-on-main notice names the file and says why, holding no digit (#882)', () => {
+    expect(WORKFLOW_FILE).toBe('.github/workflows/waiting-reports.yml');
+    expect(NOT_ON_MAIN_NOTICE).toBe(
+      'The waiting-reports count was not started: `main` has no ' +
+        '`.github/workflows/waiting-reports.yml`, so the scheduled run could ' +
+        'not start it, and no count was read. Until the first release puts ' +
+        'the file on `main`, this is expected.',
+    );
+    expect(NOT_ON_MAIN_NOTICE).not.toMatch(/\d/);
   });
 });
 

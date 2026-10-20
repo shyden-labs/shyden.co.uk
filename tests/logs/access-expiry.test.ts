@@ -7,6 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   FAILURE_TITLE,
+  NOT_ON_MAIN_NOTICE,
+  SHARED_NOTICE_WORKFLOW,
+  WORKFLOW_FILE,
   bodyFor,
   titleFor,
   tokensFrom,
@@ -26,6 +29,20 @@ describe('the titles it opens issues under', () => {
       'The Access service token expiry check could not run',
     );
     expect(FAILURE_TITLE).not.toMatch(/\d/);
+  });
+
+  it('the not-on-main notice names the file and says why, holding no digit (#882)', () => {
+    expect(WORKFLOW_FILE).toBe('.github/workflows/access-expiry.yml');
+    expect(SHARED_NOTICE_WORKFLOW).toBe(
+      '.github/workflows/waiting-reports.yml',
+    );
+    expect(NOT_ON_MAIN_NOTICE).toBe(
+      'The Access service token expiry check was not started: `main` has ' +
+        'no `.github/workflows/access-expiry.yml`, so the scheduled run ' +
+        'could not start it, and no token was read. Until the first release ' +
+        'puts the file on `main`, this is expected.',
+    );
+    expect(NOT_ON_MAIN_NOTICE).not.toMatch(/\d/);
   });
 
   it("a warning's title names the token and its expiry day", () => {

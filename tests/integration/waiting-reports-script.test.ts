@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { FAILURE_NOTICE } from '../../src/lib/waiting-reports';
+import {
+  FAILURE_NOTICE,
+  NOT_ON_MAIN_NOTICE,
+} from '../../src/lib/waiting-reports';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 import {
@@ -28,6 +31,8 @@ const ACCOUNT = '0123456789abcdef0123456789abcdef';
 const PROD_ID = '0b9e6c1a-2f4d-4e8a-9c3b-5d7e1f2a3b4c';
 const DEV_ID = '7f3a2b1c-9d8e-4f6a-8b5c-1e2d3c4b5a69';
 const ISSUE = '4242';
+const WORKFLOW_ON_MAIN =
+  '/repos/shyden-labs/shyden.co.uk/contents/.github/workflows/waiting-reports.yml?ref=main';
 
 /**
  * The shared stand-in (tests/json-stand-in.ts), with this file's check that
@@ -59,6 +64,8 @@ let databases: unknown[];
 let queryAnswer: { status: number; body: unknown };
 /** GitHub's list of the issue's comments, per scenario. */
 let comments: unknown[];
+/** GitHub's status for the workflow file on main, per scenario (#882). */
+let workflowOnMain: number;
 
 const envelope = (result: unknown) => ({
   success: true,
@@ -90,6 +97,7 @@ beforeEach(() => {
   ];
   queryAnswer = waiting(3);
   comments = [];
+  workflowOnMain = 200;
   cloudflare.answer(({ method, url }) => {
     if (
       method === 'GET' &&
@@ -108,6 +116,8 @@ beforeEach(() => {
     if (method === 'GET' && url.startsWith(`${path}?`))
       return { status: 200, body: comments };
     if (method === 'POST' && url === path) return { status: 201, body: {} };
+    if (method === 'GET' && url === WORKFLOW_ON_MAIN)
+      return { status: workflowOnMain, body: {} };
     return { status: 404, body: {} };
   });
 });
@@ -326,6 +336,56 @@ describe('the report-failure mode', () => {
       },
     ]);
     await cloudflare.expectNothingReceived();
+  });
+
+  it('asks GitHub for the workflow on main, with the token, before it posts (#882)', async () => {
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    expect(
+      (await github.record()).map(({ method, url, auth }) => [
+        method,
+        url,
+        auth,
+      ]),
+    ).toEqual([
+      ['GET', WORKFLOW_ON_MAIN, 'Bearer gh-token'],
+      [
+        'POST',
+        `/repos/shyden-labs/shyden.co.uk/issues/${ISSUE}/comments`,
+        'Bearer gh-token',
+      ],
+    ]);
+  });
+
+  it('says the workflow is not on main when GitHub answers 404 for it (#882)', async () => {
+    workflowOnMain = 404;
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    expect(
+      posts(await github.record()).map(({ body }) => JSON.parse(body)),
+    ).toEqual([
+      {
+        body:
+          `${NOT_ON_MAIN_NOTICE}\n\n` +
+          'https://github.com/shyden-labs/shyden.co.uk/actions/runs/36000000001',
+      },
+    ]);
+  });
+
+  it('posts the ordinary notice when the question about main itself fails (#882)', async () => {
+    workflowOnMain = 500;
+    const { code, out } = await run(['report-failure']);
+    expect(code, out).toBe(0);
+    expect(out).toContain('GitHub answered HTTP 500 for the workflow on main.');
+    expect(
+      posts(await github.record()).map(({ body }) => JSON.parse(body)),
+    ).toEqual([
+      {
+        body:
+          `${FAILURE_NOTICE}\n\n` +
+          'https://github.com/shyden-labs/shyden.co.uk/actions/runs/36000000001',
+      },
+    ]);
   });
 
   it.each([[['report-failures']], [['report-failure', 'extra']]])(

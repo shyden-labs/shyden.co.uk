@@ -36,6 +36,46 @@ export const REQUEST_TIMEOUT_MS = 30_000;
 export const FAILURE_TITLE =
   'The Access service token expiry check could not run';
 
+/** The workflow a schedule starts on `main` (#877), asked for when it cannot. */
+export const WORKFLOW_FILE = '.github/workflows/access-expiry.yml';
+
+/**
+ * Said above the run when a start failed because `main` lacks the workflow
+ * (#882): until the first release puts it there, that is every scheduled run.
+ * Holds no digit, as the failure title does not.
+ */
+export const NOT_ON_MAIN_NOTICE =
+  'The Access service token expiry check was not started: `main` has no ' +
+  `\`${WORKFLOW_FILE}\`, so the scheduled run could not start it, and no ` +
+  'token was read. Until the first release puts the file on `main`, this is ' +
+  'expected.';
+
+/**
+ * The daily job whose not-on-main notice speaks for this one too: while `main`
+ * lacks both workflows, the gap is the same release, and one notice a day is
+ * enough (Shyden, 2026-10-20, #882). Asked for only after a 404.
+ */
+export const SHARED_NOTICE_WORKFLOW = '.github/workflows/waiting-reports.yml';
+
+/**
+ * A failure's issue body or comment, given the HTTP statuses GitHub answered
+ * for `WORKFLOW_FILE` and then `SHARED_NOTICE_WORKFLOW` on `main` (`undefined`
+ * where it gave none, or was not asked), or `null` when nothing is posted.
+ * Nothing is posted only when both are known missing, since the shared
+ * notice then says so; this workflow missing alone adds the notice above the
+ * run; any other answer, or none, leaves the run alone, so a check that
+ * itself fails still reports.
+ */
+export const failureBodyFor = (
+  workflowStatus: number | undefined,
+  sharedStatus: number | undefined,
+  runUrl: string,
+): string | null => {
+  if (workflowStatus !== 404) return runUrl;
+  if (sharedStatus === 404) return null;
+  return `${NOT_ON_MAIN_NOTICE}\n\n${runUrl}`;
+};
+
 const DAY_MS = 86_400_000;
 
 /** A full ISO time with a zone: nothing looser `Date.parse` would accept. */

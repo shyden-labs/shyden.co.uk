@@ -25,15 +25,18 @@
  */
 import { die, messageOf } from './errors.mjs';
 import { endpoint, setting, timeoutSetting } from './settings.mjs';
-import { answerOf, githubJson } from './json-answer.mjs';
+import { answerOf, githubJson, statusOnMain } from './json-answer.mjs';
 import {
   ASSIGNEE,
   FAILURE_TITLE,
   REQUEST_TIMEOUT_MS,
+  SHARED_NOTICE_WORKFLOW,
   WARN_DAYS,
+  WORKFLOW_FILE,
   assigned,
   bodyFor,
   dueSoon,
+  failureBodyFor,
   missingTitles,
   openFailureIssue,
   titleFor,
@@ -57,8 +60,11 @@ const repositoryIssues = () => {
     'shyden-access-expiry',
     timeoutMs,
   );
-  const issues = `${api}/repos/${repository}/issues`;
+  const root = `${api}/repos/${repository}`;
+  const issues = `${root}/issues`;
   return {
+    root,
+    github,
     /** Every issue, open and closed, from every page. */
     async all() {
       /** @type {unknown[]} */
@@ -146,11 +152,27 @@ const reportFailure = async () => {
   const server = endpoint('GITHUB_SERVER_URL');
   const repo = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);
-  const url = `${server}/${repo}/actions/runs/${run}`;
   const repository = repositoryIssues();
+  const { github, root } = repository;
+  const status = await statusOnMain(github, root, WORKFLOW_FILE);
+  const shared =
+    status === 404
+      ? await statusOnMain(github, root, SHARED_NOTICE_WORKFLOW)
+      : undefined;
+  const body = failureBodyFor(
+    status,
+    shared,
+    `${server}/${repo}/actions/runs/${run}`,
+  );
+  if (body === null) {
+    console.log(
+      `main lacks ${SHARED_NOTICE_WORKFLOW} too, whose daily notice says so; nothing posted.`,
+    );
+    return;
+  }
   const open = openFailureIssue(await repository.all());
-  if (open === undefined) await repository.open(FAILURE_TITLE, url);
-  else await repository.comment(open, url);
+  if (open === undefined) await repository.open(FAILURE_TITLE, body);
+  else await repository.comment(open, body);
   console.log('Reported the failure.');
 };
 

@@ -9,7 +9,8 @@
  * The count comes first: GitHub is not touched until D1 has answered with a
  * count above zero, so a failure or a zero sends GitHub nothing. At most one
  * count is posted per UTC day, on issue `NOTICE_ISSUE`. `report-failure` never
- * reads a Cloudflare variable, and posts a sentence that names no count.
+ * reads a Cloudflare variable, and posts a sentence that names no count: first
+ * asking GitHub for the workflow on `main`, whose absence it names (#882).
  *
  * Reads `NOTICE_ISSUE`, `GITHUB_TOKEN` and `GITHUB_REPOSITORY` in both modes;
  * `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_D1_READ_TOKEN` in count mode only;
@@ -25,14 +26,15 @@
  */
 import { die, messageOf } from './errors.mjs';
 import { endpoint, setting, timeoutSetting } from './settings.mjs';
-import { answerOf, githubJson } from './json-answer.mjs';
+import { answerOf, githubJson, statusOnMain } from './json-answer.mjs';
 import {
   COUNT_SQL,
-  FAILURE_NOTICE,
   REPORTS_DATABASE,
   REQUEST_TIMEOUT_MS,
+  WORKFLOW_FILE,
   countFrom,
   databaseIdFrom,
+  failureNoticeFor,
   noticeFor,
   postedToday,
   startOfUtcDay,
@@ -41,17 +43,25 @@ import {
 const timeoutMs = () =>
   timeoutSetting('WAITING_REPORTS_TIMEOUT_MS', REQUEST_TIMEOUT_MS);
 
-/** The issue the notices go on, and a client for its comments. */
-const noticeIssue = () => {
+/** The repository's API root, and a GitHub client for its token. */
+const repositoryApi = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
+  return {
+    root: `${api}/repos/${repository}`,
+    github: githubJson(
+      setting('GITHUB_TOKEN', /^\S+$/),
+      'shyden-waiting-reports',
+      timeoutMs,
+    ),
+  };
+};
+
+/** The issue the notices go on, and a client for its comments. */
+const noticeIssue = () => {
+  const { root, github } = repositoryApi();
   const issue = setting('NOTICE_ISSUE', /^[1-9]\d*$/);
-  const github = githubJson(
-    setting('GITHUB_TOKEN', /^\S+$/),
-    'shyden-waiting-reports',
-    timeoutMs,
-  );
-  const comments = `${api}/repos/${repository}/issues/${issue}/comments`;
+  const comments = `${root}/issues/${issue}/comments`;
   return {
     /** @param {Date} now */
     listToday: (now) =>
@@ -112,8 +122,12 @@ const reportFailure = async () => {
   const server = endpoint('GITHUB_SERVER_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);
+  const { root, github } = repositoryApi();
+  const notice = failureNoticeFor(
+    await statusOnMain(github, root, WORKFLOW_FILE),
+  );
   await noticeIssue().post(
-    `${FAILURE_NOTICE}\n\n${server}/${repository}/actions/runs/${run}`,
+    `${notice}\n\n${server}/${repository}/actions/runs/${run}`,
   );
   console.log('Posted the failure notice.');
 };

@@ -24,6 +24,29 @@ export const COUNT_SQL = 'SELECT count(*) FROM reports';
 /** Holds no digit, so no reading of it can pass for a count. */
 export const FAILURE_NOTICE = 'The waiting-reports count could not be read.';
 
+/** The workflow a schedule starts on `main` (#877), asked for when it cannot. */
+export const WORKFLOW_FILE = '.github/workflows/waiting-reports.yml';
+
+/**
+ * The notice for a start that failed because `main` lacks the workflow (#882):
+ * until the first release puts it there, that is every scheduled run. Holds no
+ * digit, as the failure notice does not.
+ */
+export const NOT_ON_MAIN_NOTICE =
+  'The waiting-reports count was not started: `main` has no ' +
+  `\`${WORKFLOW_FILE}\`, so the scheduled run could not start it, and no ` +
+  'count was read. Until the first release puts the file on `main`, this is ' +
+  'expected.';
+
+/**
+ * The failure notice, given the HTTP status GitHub answered when asked for
+ * `WORKFLOW_FILE` on `main`, or `undefined` when it gave none. Only a 404 says
+ * the file is missing; any other answer, or none, posts the ordinary notice,
+ * so a check that itself fails still reports.
+ */
+export const failureNoticeFor = (workflowStatus: number | undefined): string =>
+  workflowStatus === 404 ? NOT_ON_MAIN_NOTICE : FAILURE_NOTICE;
+
 /** Who posts with the workflow's `GITHUB_TOKEN`. */
 export const NOTICE_AUTHOR = 'github-actions[bot]';
 
