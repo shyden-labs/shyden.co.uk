@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { spawn } from 'node:child_process';
-import { createServer, type Server } from 'node:http';
+import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import {
@@ -9,6 +8,12 @@ import {
 } from '../../src/lib/waiting-reports';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
+import {
+  dailyJobRunner,
+  standIn,
+  type Received,
+  type StandIn,
+} from '../json-stand-in';
 
 /**
  * `scripts/waiting-reports.mjs` as a real process (#349, spec 15.5), against
@@ -16,8 +21,9 @@ import { floorBreach } from '../floors';
  * stand-in records what it received, so "no request reached GitHub" is read
  * off GitHub's own record, after a sentinel proves that record is live (#118).
  *
- * Spawned with async `spawn`, never `spawnSync`: the stand-ins answer from
- * this process's event loop, which `spawnSync` would block.
+ * Run by `runScript`, which spawns with async `spawn`, never `spawnSync`: the
+ * stand-ins answer from this process's event loop, which `spawnSync` would
+ * block.
  */
 
 const SCRIPT = join(process.cwd(), 'scripts/waiting-reports.mjs');
@@ -25,88 +31,21 @@ const ACCOUNT = '0123456789abcdef0123456789abcdef';
 const PROD_ID = '0b9e6c1a-2f4d-4e8a-9c3b-5d7e1f2a3b4c';
 const DEV_ID = '7f3a2b1c-9d8e-4f6a-8b5c-1e2d3c4b5a69';
 const ISSUE = '4242';
-const SENTINEL = '/sentinel';
 const WORKFLOW_ON_MAIN =
   '/repos/shyden-labs/shyden.co.uk/contents/.github/workflows/waiting-reports.yml?ref=main';
 
-type Received = { method: string; url: string; body: string; auth: string };
-
-/** A local HTTP server that records each request and answers via `respond`. */
-const standIn = (side: string) => {
-  const received: Received[] = [];
-  let respond: (
-    request: Received,
-  ) => { status: number; body: unknown } | null = () => ({
-    status: 404,
-    body: {},
-  });
-  let server: Server;
-  let url = '';
-  return {
-    received,
-    get url() {
-      return url;
-    },
-    answer(next: typeof respond) {
-      respond = next;
-    },
-    async start() {
-      server = createServer((request, response) => {
-        let body = '';
-        request.on('data', (chunk) => (body += chunk));
-        request.on('end', () => {
-          const got = {
-            method: request.method ?? '',
-            url: request.url ?? '',
-            body,
-            auth: request.headers.authorization ?? '',
-          };
-          received.push(got);
-          if (got.url === SENTINEL) {
-            response.writeHead(200).end('{}');
-            return;
-          }
-          const reply = respond(got);
-          if (reply === null) return; // never answer: the script must time out
-          response.writeHead(reply.status, {
-            'content-type': 'application/json',
-          });
-          // A string body goes out as it is, so a test can send what is not JSON.
-          response.end(
-            typeof reply.body === 'string'
-              ? reply.body
-              : JSON.stringify(reply.body),
-          );
-        });
-      });
-      await new Promise<void>((resolve) =>
-        server.listen(0, '127.0.0.1', resolve),
-      );
-      url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    },
-    stop: () =>
-      new Promise<void>((resolve) => {
-        server.closeAllConnections();
-        server.close(() => resolve());
-      }),
-    /** What reached this stand-in, closed by a sentinel it must also hold. */
-    async record() {
-      await fetch(`${url}${SENTINEL}`);
-      expect(received.at(-1)?.url, 'the stand-in is recording').toBe(SENTINEL);
-      return received.slice(0, -1);
-    },
-    /**
-     * That nothing reached this stand-in: the requests before the sentinel,
-     * searched with the sentinel in the population, so an empty record is
-     * proved to be a live one (#118).
-     */
+/**
+ * The shared stand-in (tests/json-stand-in.ts), with this file's check that
+ * nothing reached it: the requests before the sentinel, searched with the
+ * sentinel in the population, so an empty record is proved to be a live one
+ * (#118).
+ */
+const checked = (side: string, stand: StandIn) =>
+  Object.assign(stand, {
     async expectNothingReceived() {
-      await fetch(`${url}${SENTINEL}`);
-      const all = [...received];
-      expect(all.at(-1)?.url, 'the stand-in is recording').toBe(SENTINEL);
-      const before = all.slice(0, -1);
+      const all = await stand.everything();
       expect(
-        searched(before, {
+        searched(all.slice(0, -1), {
           of: all,
           what: `requests the ${side} stand-in recorded, the sentinel included`,
         }),
@@ -115,11 +54,10 @@ const standIn = (side: string) => {
         floorBreach('waiting-reports-script/stand-in-requests', all.length),
       ).toBeUndefined();
     },
-  };
-};
+  });
 
-const cloudflare = standIn('Cloudflare');
-const github = standIn('GitHub');
+const cloudflare = checked('Cloudflare', standIn());
+const github = checked('GitHub', standIn());
 
 /** Cloudflare's answers, per scenario. */
 let databases: unknown[];
@@ -185,31 +123,14 @@ beforeEach(() => {
 });
 
 /** Run the script with only the variables the workflow gives it. */
-const run = (
-  args: string[] = [],
-  overrides: Record<string, string> = {},
-): Promise<{ code: number | null; out: string }> =>
-  new Promise((resolve) => {
-    const child = spawn(process.execPath, [SCRIPT, ...args], {
-      env: {
-        PATH: process.env.PATH,
-        CLOUDFLARE_API_BASE: cloudflare.url,
-        CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
-        CLOUDFLARE_D1_READ_TOKEN: 'cf-read-token',
-        GITHUB_API_URL: github.url,
-        GITHUB_SERVER_URL: 'https://github.com',
-        GITHUB_REPOSITORY: 'shyden-labs/shyden.co.uk',
-        GITHUB_RUN_ID: '36000000001',
-        GITHUB_TOKEN: 'gh-token',
-        NOTICE_ISSUE: ISSUE,
-        ...overrides,
-      },
-    });
-    let out = '';
-    child.stdout.on('data', (chunk) => (out += chunk));
-    child.stderr.on('data', (chunk) => (out += chunk));
-    child.on('close', (code) => resolve({ code, out }));
-  });
+const run = dailyJobRunner({
+  script: SCRIPT,
+  account: ACCOUNT,
+  repository: 'shyden-labs/shyden.co.uk',
+  token: ['CLOUDFLARE_D1_READ_TOKEN', 'cf-read-token'],
+  urls: () => ({ cloudflare: cloudflare.url, github: github.url }),
+  env: { NOTICE_ISSUE: ISSUE },
+});
 
 const posts = (requests: Received[]) =>
   requests.filter(({ method }) => method === 'POST');

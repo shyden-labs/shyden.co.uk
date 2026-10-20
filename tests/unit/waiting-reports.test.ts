@@ -6,7 +6,6 @@ import {
   REQUEST_TIMEOUT_MS,
   countFrom,
   databaseIdFrom,
-  errorsIn,
   failureNoticeFor,
   noticeFor,
   postedToday,
@@ -130,21 +129,6 @@ describe('noticeFor', () => {
     expect(noticeFor(1)).toBe('1 translation report is waiting.');
     expect(noticeFor(2)).toBe('2 translation reports are waiting.');
     expect(noticeFor(117)).toBe('117 translation reports are waiting.');
-  });
-});
-
-describe('errorsIn', () => {
-  it('lists each code and message, and is empty when there are none', () => {
-    expect(
-      errorsIn({
-        errors: [
-          { code: 7500, message: 'not authorized' },
-          { code: 7403, message: 'forbidden' },
-        ],
-      }),
-    ).toBe(' (7500 not authorized; 7403 forbidden)');
-    expect(errorsIn({ errors: [] })).toBe('');
-    expect(errorsIn('<html>')).toBe('');
   });
 });
 
