@@ -157,10 +157,6 @@ const startSampler = (page: Page) =>
     const kept = 3;
     const laidOut = (el: Element | null) =>
       !!el && el.getClientRects().length > 0;
-    const shown = (
-      el: Element | null,
-      test: (s: CSSStyleDeclaration) => boolean,
-    ) => laidOut(el) && test(getComputedStyle(el!));
     const describe = (el: Element | null, prop: 'visibility' | 'opacity') =>
       !el
         ? 'absent'
@@ -202,8 +198,21 @@ const startSampler = (page: Page) =>
         const rowEl = document.querySelector(
           `#cg-board .student[data-number="${n}"]`,
         );
-        const chip = shown(chipEl, (s) => s.visibility !== 'hidden');
-        const row = shown(rowEl, (s) => Number(s.opacity) > 0);
+        // Both places judged the same way, for both ways to blank (#856
+        // AC4): visibility is inherited, so the element's own value already
+        // says whether a hidden container hides it; opacity is not, so a
+        // container faded to nothing is found by walking up to the board.
+        const visible = (el: Element | null) => {
+          if (!laidOut(el) || getComputedStyle(el!).visibility === 'hidden')
+            return false;
+          for (let up: Element | null = el; up; up = up.parentElement) {
+            if (Number(getComputedStyle(up).opacity) === 0) return false;
+            if (up.id === 'cg-board') break;
+          }
+          return true;
+        };
+        const chip = visible(chipEl);
+        const row = visible(rowEl);
         const t = tally.get(n) ?? {
           chip: 0,
           row: 0,
