@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { readFloors, FLOORS_FILE } from '../floors';
+import { nonEmpty } from '../source-files';
 import {
   carriedIds,
   carriedLines,
@@ -399,7 +400,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
       '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --units)\n',
+        '--device | --specs <file>...] [--retire <id>]... (got --units)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -409,7 +410,7 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
       '✗ usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
-        '--device] [--retire <id>]... (got --unit --functions)\n',
+        '--device | --specs <file>...] [--retire <id>]... (got --unit --functions)\n',
     );
     expect(run.stdout).toBe('');
   });
@@ -681,6 +682,139 @@ describe('record-floors.mjs refuses a run it cannot trust, and writes nothing', 
       `${FLOORS_FILE}: ids were added, so the unit suite runs ` +
         'again (pass 2): a floor may count the ids the record holds\n',
     );
+  });
+
+  /**
+   * `--specs` (#608): the one floor spec named, and every other floor spec,
+   * read from the checkout's copies. The named spec must spell an id, or the
+   * carrying below proves nothing.
+   */
+  const namedAndOthers = () => {
+    const [named, ...others] = nonEmpty(floorSpecs(), 'floor specs');
+    const namedIds = carriedIds(
+      recordedKeys({}),
+      [readFileSync(named!, 'utf8')],
+      new Set(),
+    );
+    expect(namedIds.length, `ids ${named} spells`).toBeGreaterThan(0);
+    expect(others.length, 'floor specs besides the named one').toBeGreaterThan(
+      0,
+    );
+    return { named: named!, others, namedIds };
+  };
+
+  it('with --specs, refuses a named file that calls no floorBreach, by name, before any suite runs (#608)', () => {
+    // No npx on PATH: had the unit suite been reached, this would be its
+    // refusal instead.
+    const run = recordWith(
+      { docker: DOCKER_VERSION_ONLY },
+      ['--specs', 'tests/e2e/plain.spec.ts'],
+      {
+        prepare: (checkout) =>
+          writeFileSync(
+            join(checkout, 'tests/e2e/plain.spec.ts'),
+            "test('plain', () => {});\n",
+          ),
+      },
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toBe(
+      '✗ nothing recorded:\n' +
+        '  tests/e2e/plain.spec.ts is not a Playwright spec that calls ' +
+        'floorBreach: a record of it would measure nothing\n',
+    );
+    expect(run.stdout).toBe('');
+  });
+
+  it('with --specs, hands the Playwright run the named spec and no other (#608)', () => {
+    const { named } = namedAndOthers();
+    const run = recordWith(
+      {
+        npx: PASSING_NPX,
+        docker:
+          '#!/bin/sh\n[ "$1" = --version ] && exit 0\n' +
+          'for a; do case "$a" in *.spec.ts) echo "spec: $a";; esac; done\n' +
+          'exit 4\n',
+      },
+      ['--specs', named],
+    );
+    expect(run.stderr).toBe(
+      '✗ the Playwright run failed in record mode (exit 4): nothing recorded\n',
+    );
+    expect(run.stdout.split('\n')).toEqual([
+      `Recording the Playwright floors in ${localImage()}: ${named}`,
+      `spec: ${named}`,
+      '',
+    ]);
+  });
+
+  it('with --specs, records the named spec and carries every other floor spec, naming them (#608)', () => {
+    const { named, others, namedIds } = namedAndOthers();
+    const carried = carriedIds(
+      recordedKeys({}),
+      [
+        ...others.map((file) => readFileSync(file, 'utf8')),
+        ...deviceTexts(),
+        plantedSpec([]),
+      ],
+      new Set(),
+    );
+    const owned = recordedKeys({}).filter(
+      (id) => !carried.includes(id) && !namedIds.includes(id),
+    );
+    const floors = readFloors();
+    const run = recordWith(
+      {
+        npx: npxAsserting(owned),
+        docker: dockerWriting(
+          namedIds.map((id) =>
+            JSON.stringify({ id, actual: floors[id], site: `${named}:1` }),
+          ),
+          0,
+        ),
+      },
+      ['--specs', named],
+      { writes: true },
+    );
+    expect({ status: run.status, stderr: run.stderr }).toEqual({
+      status: 0,
+      stderr: '',
+    });
+    expect(run.stdout).toBe(
+      [
+        `Recording the Playwright floors in ${localImage()}: ${named}`,
+        ...carriedLines('--specs', carried, deviceTexts()),
+        `${FLOORS_FILE}: every floor already matches ` +
+          `(${owned.length + namedIds.length} read)`,
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('with --specs, refuses a floor the named spec spells and the run did not assert (#608)', () => {
+    const { named, namedIds } = namedAndOthers();
+    const [missing] = namedIds;
+    const floors = readFloors();
+    const run = recordWith(
+      {
+        npx: PASSING_NPX,
+        docker: dockerWriting(
+          namedIds
+            .filter((id) => id !== missing)
+            .map((id) =>
+              JSON.stringify({ id, actual: floors[id], site: `${named}:1` }),
+            ),
+          0,
+        ),
+      },
+      ['--specs', named],
+    );
+    expect(run.status).toBe(1);
+    expect(
+      run.stderr.split('\n').filter((line) => line.startsWith(`  ${missing} `)),
+    ).toEqual([
+      `  ${missing} is recorded but no test asserted it: remove it from ` +
+        `${FLOORS_FILE} with the floor that used it, or run the whole suite`,
+    ]);
   });
 
   it('judges what the Playwright run saw together with the unit run', () => {

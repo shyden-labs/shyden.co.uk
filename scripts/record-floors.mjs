@@ -49,6 +49,14 @@
  * iPhone floors unchanged and names them; `tests/guards/floors.test.ts` holds
  * every id a journey checks to the record, since nothing else measures them.
  *
+ * `npm run floors:record -- --specs <file>` (#608, repeatable) runs what
+ * `--unit` runs and, in the pinned image, only the Playwright specs it names,
+ * on every project: for a change that moves the floors of a few specs, where a
+ * full record re-runs every floor spec (40 to 60 minutes in CI). It carries
+ * every other Playwright, functions and iPhone floor unchanged, naming them,
+ * and refuses a named file that calls no `floorBreach`. An id a named spec
+ * spells and the run did not assert is refused, as in every mode.
+ *
  * `npm run floors:record -- --retire <id>` (#640, any mode, repeatable) drops
  * an id the branch itself created and no test spells any more, in the same run
  * that records its replacement: the floors that count the record's ids are
@@ -78,7 +86,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { isAbsolute, join, posix, relative, sep } from 'node:path';
+import { isAbsolute, join, normalize, posix, relative, sep } from 'node:path';
 import { argv, env } from 'node:process';
 
 import { listDevices, pickIphone } from './devicectl.mjs';
@@ -96,6 +104,7 @@ const UNIT_ONLY = '--unit';
 const FUNCTIONS_ONLY = '--functions';
 const UNIT_SUITE_ONLY = '--unit-suite';
 const DEVICE_ONLY = '--device';
+const SPECS_ONLY = '--specs';
 const MODES = [UNIT_ONLY, FUNCTIONS_ONLY, UNIT_SUITE_ONLY, DEVICE_ONLY];
 
 /**
@@ -406,7 +415,8 @@ export const carriedOutside = (ids, functionsTexts, asserted) =>
  * and never Playwright, the functions suite or the iPhone; `--unit-suite` and
  * `--device` rerun the unit suite alone, since the laptop runs nothing else.
  * The iPhone journeys run in `--device` alone (#623): a full record runs in
- * CI, which has no phone.
+ * CI, which has no phone. `--specs` (#608) runs what `--unit` runs and the
+ * Playwright specs it names, never the functions suite.
  *
  * @param {string | undefined} mode the one argument, or none for a full record
  * @param {number} pass
@@ -420,7 +430,7 @@ export const recordSuites = (mode, pass) => {
     guards: vitest && !unitAlone,
     integration: vitest && !unitAlone,
     logs: vitest && !unitAlone,
-    playwright: pass === 1 && mode === undefined,
+    playwright: pass === 1 && (mode === undefined || mode === SPECS_ONLY),
     functions: pass === 1 && (mode === undefined || mode === FUNCTIONS_ONLY),
     device: pass === 1 && mode === DEVICE_ONLY,
   };
@@ -429,6 +439,9 @@ export const recordSuites = (mode, pass) => {
 /**
  * The recorded ids a mode carries unmeasured, given the ids the run asserted
  * (#658): `--unit` those a Playwright, functions or iPhone test spells (#548);
+ * `--specs` those a floor spec it did not run (`otherSpecTexts`), a functions
+ * spec or an iPhone journey spells (#608), so an id a spec it ran spells and
+ * did not assert is refused, as `--unit` refuses a unit floor;
  * `--functions` every one no functions spec spells (#610); `--device` every
  * one no iPhone journey spells (#623); a full record those an iPhone journey
  * spells, since CI has no phone. In those modes an id its own suite spells and
@@ -442,7 +455,8 @@ export const recordSuites = (mode, pass) => {
  * @param {string | undefined} mode
  * @param {readonly string[]} ids the recorded ids
  * @param {ReadonlySet<string>} asserted
- * @param {{ specTexts: readonly string[], functionsTexts: readonly string[], deviceTexts: readonly string[] }} texts
+ * @param {{ specTexts: readonly string[], functionsTexts: readonly string[], deviceTexts: readonly string[], otherSpecTexts?: readonly string[] }} texts
+ *   `otherSpecTexts` are the floor specs a `--specs` record did not run
  * @returns {string[]}
  */
 export const carriedFor = (mode, ids, asserted, texts) =>
@@ -452,13 +466,23 @@ export const carriedFor = (mode, ids, asserted, texts) =>
         [...texts.specTexts, ...texts.functionsTexts, ...texts.deviceTexts],
         asserted,
       )
-    : mode === FUNCTIONS_ONLY
-      ? carriedOutside(ids, texts.functionsTexts, asserted)
-      : mode === UNIT_SUITE_ONLY
-        ? ids.filter((id) => !asserted.has(id))
-        : mode === DEVICE_ONLY
-          ? carriedOutside(ids, texts.deviceTexts, asserted)
-          : carriedIds(ids, texts.deviceTexts, asserted);
+    : mode === SPECS_ONLY
+      ? carriedIds(
+          ids,
+          [
+            ...(texts.otherSpecTexts ?? []),
+            ...texts.functionsTexts,
+            ...texts.deviceTexts,
+          ],
+          asserted,
+        )
+      : mode === FUNCTIONS_ONLY
+        ? carriedOutside(ids, texts.functionsTexts, asserted)
+        : mode === UNIT_SUITE_ONLY
+          ? ids.filter((id) => !asserted.has(id))
+          : mode === DEVICE_ONLY
+            ? carriedOutside(ids, texts.deviceTexts, asserted)
+            : carriedIds(ids, texts.deviceTexts, asserted);
 
 /**
  * What a record says of the ids it carried unmeasured, one line per kind
@@ -671,32 +695,67 @@ export const retireRefusals = (ids, { recorded, develop, spelledIn }) =>
 const RETIRE = '--retire';
 
 /**
- * The record's mode (`--unit`, `--functions`, `--unit-suite`, or the full
- * record) and the ids
- * to retire, or the usage line naming what was given.
+ * The record's mode (`--unit`, `--functions`, `--unit-suite`, `--device`,
+ * `--specs`, or the full record), the ids to retire and the spec files a
+ * `--specs` record runs (#608), or the usage line naming what was given. Each
+ * `--specs` names one file, and any number of them make one mode.
  *
  * @param {readonly string[]} args
- * @returns {{ mode: string | undefined, retired: string[] } | string}
+ * @returns {{ mode: string | undefined, retired: string[], specs: string[] } | string}
  */
 export const recordArguments = (args) => {
   const usage =
-    `usage: npm run floors:record [-- ${MODES.join(' | ')}] ` +
-    `[${RETIRE} <id>]... (got ${args.join(' ')})`;
-  /** @type {string[]} */
-  const modes = [];
+    `usage: npm run floors:record [-- ${MODES.join(' | ')} | ` +
+    `${SPECS_ONLY} <file>...] [${RETIRE} <id>]... (got ${args.join(' ')})`;
+  /** @type {Set<string>} */
+  const modes = new Set();
   /** @type {string[]} */
   const retired = [];
+  /** @type {string[]} */
+  const specs = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === RETIRE) {
-      const id = args[i + 1];
-      if (id === undefined || id.startsWith('-')) return usage;
-      retired.push(id);
+    if (arg === RETIRE || arg === SPECS_ONLY) {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) return usage;
+      if (arg === RETIRE) retired.push(value);
+      else {
+        modes.add(arg);
+        specs.push(value);
+      }
       i++;
-    } else if (MODES.includes(arg)) modes.push(arg);
+    } else if (MODES.includes(arg) && !modes.has(arg)) modes.add(arg);
     else return usage;
   }
-  return modes.length > 1 ? usage : { mode: modes[0], retired };
+  return modes.size > 1 ? usage : { mode: [...modes][0], retired, specs };
+};
+
+/**
+ * The floor specs a `--specs` record runs (#608), in the order a full record
+ * runs them and once each, or why it runs none. A named file that is not a
+ * Playwright spec calling `floorBreach` is refused by name: it would run,
+ * measure nothing, and read as a record with nothing to move. Naming none is
+ * refused too, since Playwright reads no file filter as every spec.
+ *
+ * @param {readonly string[]} named the files given to `--specs`
+ * @param {readonly string[]} available what `floorSpecs()` names
+ * @returns {string[] | string}
+ */
+export const chosenSpecs = (named, available) => {
+  if (named.length === 0)
+    return `nothing recorded: ${SPECS_ONLY} named no spec file`;
+  const wanted = new Set(named.map((file) => normalize(file)));
+  const unknown = [...wanted].filter((file) => !available.includes(file));
+  return unknown.length > 0
+    ? 'nothing recorded:\n' +
+        unknown
+          .map(
+            (file) =>
+              `  ${file} is not a Playwright spec that calls floorBreach: ` +
+              'a record of it would measure nothing',
+          )
+          .join('\n')
+    : available.filter((file) => wanted.has(file));
 };
 
 /** Passes a record may take before its ids are called unsettled. */
@@ -871,7 +930,7 @@ const main = () => {
     die('CI never records floors: run npm run floors:record locally');
   const parsed = recordArguments(argv.slice(2));
   if (typeof parsed === 'string') die(parsed);
-  const { mode, retired } = parsed;
+  const { mode, retired, specs: named } = parsed;
 
   // Before anything runs, and before anything is asked of Docker (#547): a
   // record of a tree holding an untracked file is a figure CI will not read.
@@ -913,6 +972,10 @@ const main = () => {
   const specs = floorSpecs();
   if (specs.length === 0)
     die('no Playwright spec calls floorBreach: nothing to record there');
+  // `--specs` runs the floor specs it names and no other (#608), judged
+  // before any suite runs, so a wrong path costs nothing.
+  const chosen = mode === SPECS_ONLY ? chosenSpecs(named, specs) : specs;
+  if (typeof chosen === 'string') die(chosen);
   const functionsSpecs = floorSpecs(FUNCTIONS_DIR);
   if (functionsSpecs.length === 0)
     die('no functions spec calls floorBreach: nothing to record there');
@@ -961,6 +1024,9 @@ const main = () => {
           specTexts: textsOf(specs),
           functionsTexts: textsOf(functionsSpecs),
           deviceTexts: textsOf(deviceJourneys),
+          otherSpecTexts: textsOf(
+            specs.filter((file) => !chosen.includes(file)),
+          ),
         });
         return carried;
       },
@@ -1029,14 +1095,14 @@ const main = () => {
           const image = inImage ? 'the running container' : localImage();
           const e2e = join(dir, 'e2e.jsonl');
           console.log(
-            `Recording the Playwright floors in ${image}: ${specs.join(' ')}`,
+            `Recording the Playwright floors in ${image}: ${chosen.join(' ')}`,
           );
           const run = playwrightRecordRun({
             inImage,
             image,
             cwd,
             record: e2e,
-            specs,
+            specs: chosen,
           });
           const e2eRefusal = runRefusal(
             PLAYWRIGHT,

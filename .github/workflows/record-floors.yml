@@ -10,6 +10,11 @@ name: record-floors
 #
 #   gh workflow run record-floors.yml --ref develop -f branch=<your-branch>
 #
+# and, for a change that moves only a few browser specs' floors (#608):
+#
+#   gh workflow run record-floors.yml --ref develop -f branch=<your-branch> \
+#     -f mode=specs -f specs='tests/e2e/homepage.spec.ts'
+#
 # then wait for it, and take the bot's amended head with
 # `git fetch origin <branch> && git reset --keep origin/<branch>` (it rewrote
 # the head, so a plain `git pull` would merge the old one back in), and read
@@ -64,7 +69,7 @@ on:
         required: true
         type: string
       mode:
-        description: full records every floor; unit and functions record their suites alone
+        description: full records every floor; unit and functions record their suites alone; specs records what unit records and the named floor specs
         required: true
         default: full
         type: choice
@@ -72,6 +77,12 @@ on:
           - full
           - unit
           - functions
+          - specs
+      specs:
+        description: In mode specs only, the floor spec files to re-measure, separated by spaces (tests/e2e/homepage.spec.ts)
+        required: false
+        default: ''
+        type: string
 
 # One record per branch at a time, queued and never cancelled: a cancelled
 # record would leave the branch as it was, but a second one running beside the
@@ -152,14 +163,30 @@ jobs:
         env:
           FLOORS_RECORD_IN_IMAGE: '1'
           MODE: ${{ inputs.mode }}
+          SPECS: ${{ inputs.specs }}
         run: |
+          # `read -ra` splits on spaces and expands no glob, so a pattern in
+          # the input reaches the recorder as written and is refused there.
+          read -ra named <<< "$SPECS"
+          if [ "$MODE" != specs ] && [ "${#named[@]}" -gt 0 ]; then
+            echo "::error::the specs input is read in mode specs only (mode $MODE)"
+            exit 1
+          fi
+          flags=()
           case "$MODE" in
-            full) flag='' ;;
-            unit) flag='--unit' ;;
-            functions) flag='--functions' ;;
+            full) ;;
+            unit) flags=(--unit) ;;
+            functions) flags=(--functions) ;;
+            specs)
+              if [ "${#named[@]}" -eq 0 ]; then
+                echo '::error::mode specs names no spec file: give them in the specs input'
+                exit 1
+              fi
+              for spec in "${named[@]}"; do flags+=(--specs "$spec"); done
+              ;;
             *) echo "::error::unknown mode $MODE"; exit 1 ;;
           esac
-          npm run floors:record -- $flag 2>&1 | tee "$RUNNER_TEMP/record.log"
+          npm run floors:record -- "${flags[@]}" 2>&1 | tee "$RUNNER_TEMP/record.log"
       - name: Put the recorder's refusal in the summary
         if: failure()
         run: |
