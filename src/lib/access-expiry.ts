@@ -79,8 +79,6 @@ export const tokensFrom = (answer: unknown): WatchedToken[] => {
   const result = resultOf(answer, what);
   if (!Array.isArray(result))
     throw new Error(`${what} holds no list of tokens`);
-  if (result.length === 0)
-    throw new Error(`${what} is empty, so no token can be watched`);
   const info = isRecord(answer) ? answer.result_info : undefined;
   const pages = isRecord(info) ? info.total_pages : undefined;
   if (pages !== 1)
