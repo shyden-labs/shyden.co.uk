@@ -1541,3 +1541,52 @@ test.describe('the Yawelo Idle preview video', () => {
       },
     );
 });
+
+// PROBE (#835, throwaway, never merged): what each engine reports about the
+// two sources, and every request the video makes, before and after play.
+test('PROBE video sources per engine', async ({ page }) => {
+  const seen: string[] = [];
+  page.on('request', (r) => {
+    if (/yawelo-idle-promo/.test(r.url()))
+      seen.push(
+        `${r.url().split('/').pop()} range=${r.headers()['range'] ?? '-'}`,
+      );
+  });
+  await page.goto('/');
+  await page.waitForTimeout(1500);
+  const before = [...seen];
+  const facts = await page
+    .locator('#yawelo-idle video')
+    .evaluate(async (v: HTMLVideoElement) => {
+      const types = Array.from(
+        v.querySelectorAll('source'),
+        (s) => `${s.type} => "${v.canPlayType(s.type)}"`,
+      );
+      const state0 = {
+        currentSrc: v.currentSrc,
+        networkState: v.networkState,
+        readyState: v.readyState,
+      };
+      v.muted = true;
+      let played = 'ok';
+      try {
+        await v.play();
+      } catch (e) {
+        played = String(e);
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+      return {
+        types,
+        state0,
+        played,
+        currentSrc: v.currentSrc,
+        currentTime: v.currentTime,
+        networkState: v.networkState,
+        readyState: v.readyState,
+        error: v.error ? `${v.error.code} ${v.error.message}` : null,
+      };
+    });
+  console.log(
+    `PROBE ${test.info().project.name} ${JSON.stringify({ before, after: seen, facts })}`,
+  );
+});

@@ -243,7 +243,8 @@ jobs:
       # so the two cannot disagree. Each shard enumerates the WHOLE suite and
       # writes down what it ran (scripts/test-e2e.mjs), for build-and-test to
       # add up.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      # PROBE (#835, throwaway, never merged)
+      - run: npx playwright test tests/e2e/homepage.spec.ts -g "PROBE video sources" --project=chromium --project=firefox --project=webkit --project=mobile-safari --project=mobile-chrome --reporter=line
         env:
           E2E_ACCOUNT_DIR: e2e-accounts
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
