@@ -28,6 +28,12 @@ const APPROVED_HOME = {
   yaweloIdleFeature3: 'No ads, no energy timers, no paid progress',
   yaweloIdleFeature4: 'Miss a day and lose nothing. Nobody is forced to study.',
   visitYaweloIdle: 'Visit the Yawelo Idle site',
+  // The promo video's name, disclosure and description (#835, approved
+  // 2026-10-20).
+  yaweloIdleVideoName: 'A 10-second preview of Yawelo Idle',
+  yaweloIdleVideoShows: 'What the video shows',
+  yaweloIdleVideoDescription:
+    "A 10-second preview with music and no speech. 'Learn by playing' introduces Yawelo Idle over a night sky of floating islands. Three points follow: learn Indonesian and English, no ads or paywalls, and learn at your own pace, because the words you pick up power the game. It ends on 'Yawelo Idle, coming soon' and the address yawelo-idle.shyden.co.uk.",
 } as const;
 
 describe('the homepage says what the operator approved (#403)', () => {
