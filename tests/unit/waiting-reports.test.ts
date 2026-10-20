@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   FAILURE_NOTICE,
   NOTICE_AUTHOR,
+  NOT_ON_MAIN_NOTICE,
   REQUEST_TIMEOUT_MS,
   countFrom,
   databaseIdFrom,
-  errorsIn,
+  failureNoticeFor,
   noticeFor,
   postedToday,
   startOfUtcDay,
@@ -131,19 +132,20 @@ describe('noticeFor', () => {
   });
 });
 
-describe('errorsIn', () => {
-  it('lists each code and message, and is empty when there are none', () => {
-    expect(
-      errorsIn({
-        errors: [
-          { code: 7500, message: 'not authorized' },
-          { code: 7403, message: 'forbidden' },
-        ],
-      }),
-    ).toBe(' (7500 not authorized; 7403 forbidden)');
-    expect(errorsIn({ errors: [] })).toBe('');
-    expect(errorsIn('<html>')).toBe('');
+// A schedule whose start on `main` fails asks GitHub for the workflow file on
+// `main` first (#882): until the release puts it there, the failure is
+// expected, and the notice says so rather than read as an outage.
+describe('failureNoticeFor', () => {
+  it('says the workflow is not on main when GitHub answers 404 for it', () => {
+    expect(failureNoticeFor(404)).toBe(NOT_ON_MAIN_NOTICE);
   });
+
+  it.each([[200], [403], [500], [undefined]])(
+    'posts the ordinary failure notice on %s, so a failed check still reports',
+    (status) => {
+      expect(failureNoticeFor(status)).toBe(FAILURE_NOTICE);
+    },
+  );
 });
 
 describe('startOfUtcDay', () => {
@@ -204,6 +206,17 @@ describe('postedToday', () => {
         'ShydenMcM',
         '1 translation report is waiting.',
         '2026-09-26T01:00:00Z',
+      ),
+    ];
+    expect(postedToday(comments, NOW)).toBe(false);
+  });
+
+  it('does not count a not-on-main notice, so a re-run still reports', () => {
+    const comments = [
+      comment(
+        NOTICE_AUTHOR,
+        `${NOT_ON_MAIN_NOTICE}\n\nhttps://github.com/o/r/actions/runs/1`,
+        '2026-09-26T01:17:10Z',
       ),
     ];
     expect(postedToday(comments, NOW)).toBe(false);

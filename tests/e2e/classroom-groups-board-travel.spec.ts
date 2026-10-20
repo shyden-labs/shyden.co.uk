@@ -61,9 +61,56 @@ type Flight = {
   cards: string;
   overflow: number;
 };
+/**
+ * The longest the browser went without drawing while sampled, and when: the
+ * frame times either side, in ms from the sampler's start. A blank shorter
+ * than this can fall between two frames and never be seen.
+ */
+type Gap = { ms: number; before: number; after: number };
 type Samples = {
   students: [number, Tally][];
   flights: Flight[];
+  gap: Gap;
+  /** The same, counted only from the first student's flight on: the deal itself. */
+  flightGap: Gap;
+  /** The most one frame of the sampler's own work took, in ms. */
+  slowestTick: number;
+  /**
+   * When, in ms from the sampler's start, the deal's click reached the page
+   * and its first student was seen travelling, and the page's long tasks
+   * (`start+duration`, where the engine reports them): what places a gap
+   * in the click's own work or in the flight.
+   */
+  timeline: {
+    click: number | null;
+    firstFlight: number | null;
+    longTasks: string[];
+  };
+};
+
+/**
+ * The longest gap between two drawn frames, from the first flight on, the
+ * frame test accepts (Shyden, 2026-10-20, #856: one limit for every engine,
+ * 250 ms). With every in-flight gap within it, a whole-board blank of 250 ms
+ * or more during the deal is drawn in some frame and seen. Over five CI runs
+ * the worst in-flight gaps were chromium 33, firefox 34, mobile-chrome 17,
+ * mobile-safari 130 and webkit 188 ms, WebKit varying up to 2x run to run.
+ * The longer gap before any student moves, the click's own work, is #883's.
+ */
+const FRAME_GAP_CEILING_MS = 250;
+
+/**
+ * mobile-safari draws the frame test at pixel ratio 1, not its iPhone 13's 3
+ * (Shyden, 2026-10-20, #856). CI's WebKit paints in software, so ratio 3 is 9x
+ * the pixels per frame, and the gaps follow the pixels: over 80 runs each,
+ * ratio 3 gave 58-314 ms in flight (8 over 250), ratio 1 gave 21-62 ms (none),
+ * with tracing off (probe runs 39392029935 and 39406394146). The deal runs the
+ * same code at any ratio, so a blank we cause is still caught; real-device
+ * painting at ratio 3 is the real iPhone's to judge. Every other engine keeps
+ * its device's own ratio.
+ */
+const FRAME_TEST_PIXEL_RATIO: Readonly<Record<string, number>> = {
+  'mobile-safari': 1,
 };
 
 /**
@@ -83,15 +130,33 @@ const startSampler = (page: Page) =>
     let on = true;
     let frame = 0;
     const start = performance.now();
+    let last = start;
+    let gap: Gap = { ms: 0, before: 0, after: 0 };
+    let flightGap: Gap = { ms: 0, before: 0, after: 0 };
+    let slowestTick = 0;
+    const since = (at: number) => Math.round(at - start);
+    const timeline: Samples['timeline'] = {
+      click: null,
+      firstFlight: null,
+      longTasks: [],
+    };
+    document.addEventListener(
+      'click',
+      () => (timeline.click ??= since(performance.now())),
+      { capture: true },
+    );
+    if (PerformanceObserver.supportedEntryTypes?.includes('longtask'))
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries())
+          timeline.longTasks.push(
+            `${since(entry.startTime)}+${Math.round(entry.duration)}`,
+          );
+      }).observe({ type: 'longtask' });
     // The first few odd frames per student: enough to tell one blank frame
     // from a blink per takeoff, and a small report when every frame is odd.
     const kept = 3;
     const laidOut = (el: Element | null) =>
       !!el && el.getClientRects().length > 0;
-    const shown = (
-      el: Element | null,
-      test: (s: CSSStyleDeclaration) => boolean,
-    ) => laidOut(el) && test(getComputedStyle(el!));
     const describe = (el: Element | null, prop: 'visibility' | 'opacity') =>
       !el
         ? 'absent'
@@ -104,9 +169,22 @@ const startSampler = (page: Page) =>
               .map((a) => a.playState + (a.pending ? ' pending' : ''))
               .join(', ')}]`,
           ].join(', ');
-    const tick = () => {
+    const tick = (drawn: DOMHighResTimeStamp) => {
       if (!on) return;
+      const began = performance.now();
       frame++;
+      // Timed by the frame's own timestamp, so the gap is between frames the
+      // browser drew, not between this callback's turns.
+      const between: Gap = {
+        ms: Math.round(drawn - last),
+        before: Math.round(last - start),
+        after: Math.round(drawn - start),
+      };
+      if (between.ms > gap.ms) gap = between;
+      // Set by an earlier frame, so this gap began with a student in flight.
+      if (timeline.firstFlight !== null && between.ms > flightGap.ms)
+        flightGap = between;
+      last = drawn;
       const numbers = new Set(
         Array.from(
           document.querySelectorAll<HTMLElement>('#cg-board [data-number]'),
@@ -120,8 +198,21 @@ const startSampler = (page: Page) =>
         const rowEl = document.querySelector(
           `#cg-board .student[data-number="${n}"]`,
         );
-        const chip = shown(chipEl, (s) => s.visibility !== 'hidden');
-        const row = shown(rowEl, (s) => Number(s.opacity) > 0);
+        // Both places judged the same way, for both ways to blank (#856
+        // AC4): visibility is inherited, so the element's own value already
+        // says whether a hidden container hides it; opacity is not, so a
+        // container faded to nothing is found by walking up to the board.
+        const visible = (el: Element | null) => {
+          if (!laidOut(el) || getComputedStyle(el!).visibility === 'hidden')
+            return false;
+          for (let up: Element | null = el; up; up = up.parentElement) {
+            if (Number(getComputedStyle(up).opacity) === 0) return false;
+            if (up.id === 'cg-board') break;
+          }
+          return true;
+        };
+        const chip = visible(chipEl);
+        const row = visible(rowEl);
         const t = tally.get(n) ?? {
           chip: 0,
           row: 0,
@@ -148,6 +239,7 @@ const startSampler = (page: Page) =>
         document.querySelectorAll<HTMLElement>('#cg-board .student.travelling'),
         (e) => Number(e.dataset.number),
       );
+      if (flying.length) timeline.firstFlight ??= since(performance.now());
       if (flying.length)
         flights.push({
           flying,
@@ -161,12 +253,20 @@ const startSampler = (page: Page) =>
           ).join(';'),
           overflow: measure().overflowX,
         });
+      slowestTick = Math.max(slowestTick, performance.now() - began);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
     (window as unknown as { stopSampler: () => Samples }).stopSampler = () => {
       on = false;
-      return { students: [...tally], flights };
+      return {
+        students: [...tally],
+        flights,
+        gap,
+        flightGap,
+        slowestTick: Math.round(slowestTick),
+        timeline,
+      };
     };
   }, measureBoardScript());
 
@@ -256,39 +356,78 @@ const animationsMade = (page: Page): Promise<Made[]> =>
   );
 
 test.describe('the board deals by moving students into their cards', () => {
-  test('every student is seen exactly once at every frame, chip then row', async ({
-    page,
-  }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
-    await startSampler(page);
-    await press(page, 'Make Groups');
-    await expectDealt(page);
-    const { students } = await stopSampler(page);
-    expect(
-      searched(
-        students.filter(([, t]) => t.both > 0),
-        { of: students, what: 'students sampled' },
-      ),
-      'students seen twice in one frame',
-    ).toEqual([]);
-    expect(
-      searched(
-        students.filter(([, t]) => t.none > 0),
-        { of: students, what: 'students sampled' },
-      ),
-      'students seen nowhere in one frame',
-    ).toEqual([]);
-    // The sampler's own liveness: it saw every student in both places.
-    expect(
-      searched(
-        students.filter(([, t]) => t.chip === 0 || t.row === 0),
-        { of: students, what: 'students sampled' },
-      ),
-      'students the sampler never saw as a chip and as a row',
-    ).toEqual([]);
-    expect(
-      floorBreach('board-travel/students-sampled', students.length),
-    ).toBeUndefined();
+  test.describe('frame by frame', () => {
+    test.use({
+      deviceScaleFactor: async ({}, use, testInfo) =>
+        use(
+          FRAME_TEST_PIXEL_RATIO[testInfo.project.name] ??
+            testInfo.project.use.deviceScaleFactor,
+        ),
+    });
+
+    test('every student is seen exactly once at every frame, chip then row', async ({
+      page,
+    }) => {
+      await openWaitingBoard(page, String(COUNT), '4');
+      // The ratio the page really draws at, so the override cannot stop
+      // applying unseen: its project's own, or the frame test's from above.
+      const project = test.info().project;
+      expect(await page.evaluate(() => window.devicePixelRatio)).toBe(
+        FRAME_TEST_PIXEL_RATIO[project.name] ??
+          project.use.deviceScaleFactor ??
+          1,
+      );
+      await startSampler(page);
+      await press(page, 'Make Groups');
+      await expectDealt(page);
+      const { students, gap, flightGap, slowestTick, timeline } =
+        await stopSampler(page);
+      const blindness =
+        `${test.info().project.name}: no frame drawn for ${gap.ms} ms ` +
+        `(frames at ${gap.before} and ${gap.after} ms); ` +
+        `from the first flight on, ${flightGap.ms} ms ` +
+        `(frames at ${flightGap.before} and ${flightGap.after} ms); ` +
+        `the sampler's slowest frame of its own work took ${slowestTick} ms; ` +
+        `click at ${timeline.click} ms, first flight at ${timeline.firstFlight} ms, ` +
+        `long tasks [${timeline.longTasks.join(', ') || 'none reported'}]`;
+      test.info().annotations.push({
+        type: 'largest frame gap',
+        description: blindness,
+      });
+      // Printed on a pass too, so every engine's gap is in the run's log.
+      console.log(`largest frame gap: ${blindness}`);
+      expect(
+        searched(
+          students.filter(([, t]) => t.both > 0),
+          { of: students, what: 'students sampled' },
+        ),
+        'students seen twice in one frame',
+      ).toEqual([]);
+      expect(
+        searched(
+          students.filter(([, t]) => t.none > 0),
+          { of: students, what: 'students sampled' },
+        ),
+        'students seen nowhere in one frame',
+      ).toEqual([]);
+      // The sampler's own liveness: it saw every student in both places.
+      expect(
+        searched(
+          students.filter(([, t]) => t.chip === 0 || t.row === 0),
+          { of: students, what: 'students sampled' },
+        ),
+        'students the sampler never saw as a chip and as a row',
+      ).toEqual([]);
+      expect(
+        floorBreach('board-travel/students-sampled', students.length),
+      ).toBeUndefined();
+      // Last, so a frame the checks above saw is reported whatever this says:
+      // a gap over the ceiling means a blank that long could have gone undrawn.
+      // The in-flight gap is measured only once a flight is seen, so a run that
+      // saw none would hold a gap of 0: it must have seen one.
+      expect(timeline.firstFlight, blindness).not.toBeNull();
+      expect(flightGap.ms, blindness).toBeLessThanOrEqual(FRAME_GAP_CEILING_MS);
+    });
   });
 
   test('the list keeps its size while students travel, then folds away', async ({

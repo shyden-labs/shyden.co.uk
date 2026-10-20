@@ -1,0 +1,95 @@
+# The Access service token expiry check (#796). Once a day, read every
+# Cloudflare Access service token's expiry and open one issue per token per
+# expiry date, assigned to the operator, from 45 days before it lapses. A run
+# that cannot read every expiry fails, and says so on an issue.
+#
+# It reads its two secrets in `access-expiry`, which accepts `main` alone and
+# holds nothing else: an Access: Service Tokens Read token and the account id.
+# Only released code reads them (the operator's main-only rule for an
+# unattended job, #877): the schedule fires on the default branch, `develop`,
+# so the scheduled run only starts the check on `main`, and the check runs on
+# `main` alone. It runs no npm package code, so no `npm ci`: the script uses
+# Node's own `fetch`, and imports only this repository's own modules.
+# Runbook: docs/runbooks/cloudflare-access.md.
+name: Access token expiry
+
+on:
+  # 01:43 UTC, 08:43 in WIB: off the hour, and off waiting-reports' 01:17.
+  schedule:
+    - cron: '43 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time. Two at once, a dispatch during the scheduled run, could
+# each find a warning missing and each open it. Queued, never cancelled, so
+# no run is cut off mid-check.
+concurrency:
+  group: access-expiry
+  cancel-in-progress: false
+
+jobs:
+  # Holds no Cloudflare secret and names no environment: it only asks for a
+  # run on main, and says so when it cannot (#882). The check then never runs,
+  # and a check that never runs reports nothing; until the release puts this
+  # file on main, that is every scheduled run. Its failure steps report on the
+  # check's own failure issue, with this run's link, as the check's do: saying
+  # the file is not on main when GitHub answers 404 for it there, and posting
+  # nothing while main lacks waiting-reports.yml too, whose notice says so.
+  dispatch:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    # The dispatch needs the first; checkout and the issue the other two.
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Start the check on main
+        run: gh workflow run access-expiry.yml --ref main
+      - if: failure()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: failure()
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Say the check could not be started
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/access-expiry.mjs report-failure
+
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: access-expiry
+    # checkout needs the first, the issues the second.
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Read every service token's expiry, and warn of any due
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_READ_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_READ_TOKEN }}
+        run: node scripts/access-expiry.mjs
+      # A check that keeps failing must be seen, not quietly stop warning.
+      - name: Say the check could not run
+        if: failure()
+        run: node scripts/access-expiry.mjs report-failure
