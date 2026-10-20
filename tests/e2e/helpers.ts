@@ -515,6 +515,65 @@ export const holdFirstGrantUntilTheNext = (page: Page) =>
   });
 
 /**
+ * Land the first fullscreen grant while the board is closed, and hold the
+ * page's own exit that undoes it.
+ *
+ * The neighbouring order to `holdFirstGrantUntilTheNext`'s: the board is
+ * opened and left with Escape before its grant lands, the grant then lands in
+ * the gap, and the page undoes it (`projector.ts`, the `!open` branch). Logged
+ * on CPH2653 in 6 of 105 runs, with that exit landing 11.7 to 33.4 ms after
+ * the call. While it is in flight the document is still in fullscreen, over a
+ * board that is hidden.
+ *
+ * The first request is parked until `landFirst()` passes it to the browser,
+ * inside the click's transient activation, so the grant is a real one. The
+ * first `exitFullscreen` the page asks for is parked until `releaseExit()`,
+ * so the in-flight window lasts as long as the test needs to act inside it.
+ * `window.__tidyUpRace` counts what a test waits on instead of a clock.
+ */
+export const holdTheTidyUpExit = (page: Page) =>
+  page.addInitScript(() => {
+    const race = { firstAnswered: false, exitsAsked: 0, exitHeld: false };
+    const controls = {
+      race,
+      landFirst: () => {},
+      releaseExit: () => {},
+    };
+    (window as unknown as { __tidyUpRace: typeof controls }).__tidyUpRace =
+      controls;
+    const realRequest = Element.prototype.requestFullscreen;
+    const realExit = Document.prototype.exitFullscreen;
+    let requests = 0;
+    Element.prototype.requestFullscreen = function (options) {
+      requests += 1;
+      if (requests !== 1) return realRequest.call(this, options);
+      return new Promise<void>((grant, refuse) => {
+        controls.landFirst = () => {
+          const answered = realRequest.call(this, options);
+          answered.then(grant, refuse);
+          // Counted from a reaction registered after the page's own, so a
+          // test waiting on it knows the page's handler has run.
+          answered.then(
+            () => queueMicrotask(() => (race.firstAnswered = true)),
+            () => queueMicrotask(() => (race.firstAnswered = true)),
+          );
+        };
+      });
+    };
+    Document.prototype.exitFullscreen = function () {
+      race.exitsAsked += 1;
+      if (race.exitsAsked !== 1) return realExit.call(this);
+      race.exitHeld = true;
+      return new Promise<void>((done, fail) => {
+        controls.releaseExit = () => {
+          race.exitHeld = false;
+          realExit.call(this).then(done, fail);
+        };
+      });
+    };
+  });
+
+/**
  * The contrast ratio the browser actually PAINTS for an element's text.
  *
  * Not the token values: it resolves `opacity` and walks up for the first
