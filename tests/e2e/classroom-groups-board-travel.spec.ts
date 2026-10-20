@@ -348,14 +348,6 @@ const animationsMade = (page: Page): Promise<Made[]> =>
 
 test.describe('the board deals by moving students into their cards', () => {
   test.describe('frame by frame', () => {
-    test.use({
-      deviceScaleFactor: async ({}, use, testInfo) =>
-        use(
-          FRAME_TEST_PIXEL_RATIO[testInfo.project.name] ??
-            testInfo.project.use.deviceScaleFactor,
-        ),
-    });
-
     test('every student is seen exactly once at every frame, chip then row', async ({
       page,
     }) => {
