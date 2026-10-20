@@ -89,14 +89,15 @@ type Samples = {
 };
 
 /**
- * The longest gap between two drawn frames the frame test accepts (Shyden,
- * 2026-10-20, #856: fail above it, at 100 ms). With every gap within it, a
- * whole-board blank of 100 ms or more is drawn in some frame and seen. CI's
- * WebKit went 252 ms without a frame (mobile-safari 295 ms), and passed a
- * planted 100 ms blank it never drew; chromium, firefox and mobile-chrome
- * measured 40, 51 and 39 ms.
+ * The longest gap between two drawn frames, from the first flight on, the
+ * frame test accepts (Shyden, 2026-10-20, #856: one limit for every engine,
+ * 250 ms). With every in-flight gap within it, a whole-board blank of 250 ms
+ * or more during the deal is drawn in some frame and seen. Over five CI runs
+ * the worst in-flight gaps were chromium 33, firefox 34, mobile-chrome 17,
+ * mobile-safari 130 and webkit 188 ms, WebKit varying up to 2x run to run.
+ * The longer gap before any student moves, the click's own work, is #883's.
  */
-const FRAME_GAP_CEILING_MS = 100;
+const FRAME_GAP_CEILING_MS = 250;
 
 /**
  * Every animation frame until stopped: for each student, whether their chip
@@ -381,7 +382,10 @@ test.describe('the board deals by moving students into their cards', () => {
     ).toBeUndefined();
     // Last, so a frame the checks above saw is reported whatever this says:
     // a gap over the ceiling means a blank that long could have gone undrawn.
-    expect(gap.ms, blindness).toBeLessThanOrEqual(FRAME_GAP_CEILING_MS);
+    // The in-flight gap is measured only once a flight is seen, so a run that
+    // saw none would hold a gap of 0: it must have seen one.
+    expect(timeline.firstFlight, blindness).not.toBeNull();
+    expect(flightGap.ms, blindness).toBeLessThanOrEqual(FRAME_GAP_CEILING_MS);
   });
 
   test('the list keeps its size while students travel, then folds away', async ({
