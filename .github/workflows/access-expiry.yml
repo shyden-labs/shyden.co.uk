@@ -42,7 +42,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Start the check on main
-        run: gh workflow run access-expiry.yml --ref main
+        run: gh workflow run access-expiry.yml --ref develop
 
   check:
     if: github.ref == 'refs/heads/main'
