@@ -149,7 +149,16 @@ because the repository and its Actions logs are public.
 
 `The waiting-reports count could not be read.`, followed by a run's link, means
 the job failed, and its log says why. The likely causes are an expired or
-revoked token, a renamed database, or Cloudflare's API being down.
+revoked token, a renamed database, or Cloudflare's API being down. The same
+notice comes from the scheduled run itself when it cannot start the count on
+`main` for any other reason (#882), and then the count has not run at all.
+
+`The waiting-reports count was not started: main has no
+.github/workflows/waiting-reports.yml`, followed by a run's link, means the
+scheduled run asked GitHub for the workflow on `main` and was told it is not
+there (#882). Until the first release puts it on `main`, that is every day and
+needs nothing. After a release, it means the file was renamed or removed on
+`main`, and the count stops until it is back.
 
 **No comment for days while reports wait?** In a public repository, GitHub
 disables a scheduled workflow after 60 days without repository activity. A
