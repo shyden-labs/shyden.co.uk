@@ -61,10 +61,29 @@ type Flight = {
   cards: string;
   overflow: number;
 };
+/**
+ * The longest the browser went without drawing while sampled, and when: the
+ * frame times either side, in ms from the sampler's start. A blank shorter
+ * than this can fall between two frames and never be seen.
+ */
+type Gap = { ms: number; before: number; after: number };
 type Samples = {
   students: [number, Tally][];
   flights: Flight[];
+  gap: Gap;
+  /** The most one frame of the sampler's own work took, in ms. */
+  slowestTick: number;
 };
+
+/**
+ * The longest gap between two drawn frames the frame test accepts (Shyden,
+ * 2026-10-20, #856: fail above it, at 100 ms). With every gap within it, a
+ * whole-board blank of 100 ms or more is drawn in some frame and seen. CI's
+ * WebKit went 252 ms without a frame (mobile-safari 295 ms), and passed a
+ * planted 100 ms blank it never drew; chromium, firefox and mobile-chrome
+ * measured 40, 51 and 39 ms.
+ */
+const FRAME_GAP_CEILING_MS = 100;
 
 /**
  * Every animation frame until stopped: for each student, whether their chip
@@ -83,6 +102,9 @@ const startSampler = (page: Page) =>
     let on = true;
     let frame = 0;
     const start = performance.now();
+    let last = start;
+    let gap: Gap = { ms: 0, before: 0, after: 0 };
+    let slowestTick = 0;
     // The first few odd frames per student: enough to tell one blank frame
     // from a blink per takeoff, and a small report when every frame is odd.
     const kept = 3;
@@ -104,9 +126,19 @@ const startSampler = (page: Page) =>
               .map((a) => a.playState + (a.pending ? ' pending' : ''))
               .join(', ')}]`,
           ].join(', ');
-    const tick = () => {
+    const tick = (drawn: DOMHighResTimeStamp) => {
       if (!on) return;
+      const began = performance.now();
       frame++;
+      // Timed by the frame's own timestamp, so the gap is between frames the
+      // browser drew, not between this callback's turns.
+      if (drawn - last > gap.ms)
+        gap = {
+          ms: Math.round(drawn - last),
+          before: Math.round(last - start),
+          after: Math.round(drawn - start),
+        };
+      last = drawn;
       const numbers = new Set(
         Array.from(
           document.querySelectorAll<HTMLElement>('#cg-board [data-number]'),
@@ -161,12 +193,18 @@ const startSampler = (page: Page) =>
           ).join(';'),
           overflow: measure().overflowX,
         });
+      slowestTick = Math.max(slowestTick, performance.now() - began);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
     (window as unknown as { stopSampler: () => Samples }).stopSampler = () => {
       on = false;
-      return { students: [...tally], flights };
+      return {
+        students: [...tally],
+        flights,
+        gap,
+        slowestTick: Math.round(slowestTick),
+      };
     };
   }, measureBoardScript());
 
@@ -263,7 +301,14 @@ test.describe('the board deals by moving students into their cards', () => {
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { students } = await stopSampler(page);
+    const { students, gap, slowestTick } = await stopSampler(page);
+    const blindness =
+      `${test.info().project.name}: no frame drawn for ${gap.ms} ms ` +
+      `(frames at ${gap.before} and ${gap.after} ms); ` +
+      `the sampler's slowest frame of its own work took ${slowestTick} ms`;
+    test
+      .info()
+      .annotations.push({ type: 'largest frame gap', description: blindness });
     expect(
       searched(
         students.filter(([, t]) => t.both > 0),
@@ -289,6 +334,9 @@ test.describe('the board deals by moving students into their cards', () => {
     expect(
       floorBreach('board-travel/students-sampled', students.length),
     ).toBeUndefined();
+    // Last, so a frame the checks above saw is reported whatever this says:
+    // a gap over the ceiling means a blank that long could have gone undrawn.
+    expect(gap.ms, blindness).toBeLessThanOrEqual(FRAME_GAP_CEILING_MS);
   });
 
   test('the list keeps its size while students travel, then folds away', async ({
