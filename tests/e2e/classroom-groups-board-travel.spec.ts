@@ -216,7 +216,6 @@ const startSampler = (page: Page) =>
         document.querySelectorAll<HTMLElement>('#cg-board .student.travelling'),
         (e) => Number(e.dataset.number),
       );
-      if (flying.length) timeline.firstFlight ??= since(performance.now());
       if (flying.length)
         flights.push({
           flying,
