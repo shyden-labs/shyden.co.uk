@@ -73,6 +73,17 @@ type Samples = {
   gap: Gap;
   /** The most one frame of the sampler's own work took, in ms. */
   slowestTick: number;
+  /**
+   * When, in ms from the sampler's start, the deal's click reached the page
+   * and its first student was seen travelling, and the page's long tasks
+   * (`start+duration`, where the engine reports them): what places a gap
+   * in the click's own work or in the flight.
+   */
+  timeline: {
+    click: number | null;
+    firstFlight: number | null;
+    longTasks: string[];
+  };
 };
 
 /**
@@ -105,6 +116,24 @@ const startSampler = (page: Page) =>
     let last = start;
     let gap: Gap = { ms: 0, before: 0, after: 0 };
     let slowestTick = 0;
+    const since = (at: number) => Math.round(at - start);
+    const timeline: Samples['timeline'] = {
+      click: null,
+      firstFlight: null,
+      longTasks: [],
+    };
+    document.addEventListener(
+      'click',
+      () => (timeline.click ??= since(performance.now())),
+      { capture: true },
+    );
+    if (PerformanceObserver.supportedEntryTypes?.includes('longtask'))
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries())
+          timeline.longTasks.push(
+            `${since(entry.startTime)}+${Math.round(entry.duration)}`,
+          );
+      }).observe({ type: 'longtask' });
     // The first few odd frames per student: enough to tell one blank frame
     // from a blink per takeoff, and a small report when every frame is odd.
     const kept = 3;
@@ -180,6 +209,7 @@ const startSampler = (page: Page) =>
         document.querySelectorAll<HTMLElement>('#cg-board .student.travelling'),
         (e) => Number(e.dataset.number),
       );
+      if (flying.length) timeline.firstFlight ??= since(performance.now());
       if (flying.length)
         flights.push({
           flying,
@@ -204,6 +234,7 @@ const startSampler = (page: Page) =>
         flights,
         gap,
         slowestTick: Math.round(slowestTick),
+        timeline,
       };
     };
   }, measureBoardScript());
@@ -301,11 +332,13 @@ test.describe('the board deals by moving students into their cards', () => {
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { students, gap, slowestTick } = await stopSampler(page);
+    const { students, gap, slowestTick, timeline } = await stopSampler(page);
     const blindness =
       `${test.info().project.name}: no frame drawn for ${gap.ms} ms ` +
       `(frames at ${gap.before} and ${gap.after} ms); ` +
-      `the sampler's slowest frame of its own work took ${slowestTick} ms`;
+      `the sampler's slowest frame of its own work took ${slowestTick} ms; ` +
+      `click at ${timeline.click} ms, first flight at ${timeline.firstFlight} ms, ` +
+      `long tasks [${timeline.longTasks.join(', ') || 'none reported'}]`;
     test
       .info()
       .annotations.push({ type: 'largest frame gap', description: blindness });
