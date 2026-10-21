@@ -230,6 +230,20 @@ describe('the verdict on the changed lines (#896)', () => {
     ).toEqual([{ file: 'src/a.ts', line: 4, kind: 'branch' }]);
   });
 
+  it('reports two untaken arms first met on the same changed line once', () => {
+    expect(
+      judge(changed('src/a.ts', 4), {
+        'src/a.ts': covered(
+          [[4, 4, 1]],
+          [
+            [4, 6, 0],
+            [4, 9, 0],
+          ],
+        ),
+      }).unrun,
+    ).toEqual([{ file: 'src/a.ts', line: 4, kind: 'branch' }]);
+  });
+
   it('does not judge a changed line with no statement, such as a comment', () => {
     expect(
       judge(changed('src/a.ts', 1), { 'src/a.ts': covered([[2, 2, 0]]) }),
