@@ -596,7 +596,7 @@ jobs:
   a:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
       - run: echo actions/checkout@v7
       - uses: actions/checkout@v4
   b:

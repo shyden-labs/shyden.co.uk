@@ -2,7 +2,7 @@
 # root, where Pages would take it as both projects' source of truth and
 # displace their dashboard bindings (spec section 11, assumption 2).
 name = "shyden-site-functions-test"
-compatibility_date = "2026-09-01"
+compatibility_date = "2026-09-30"
 
 [[d1_databases]]
 binding = "REPORTS"
