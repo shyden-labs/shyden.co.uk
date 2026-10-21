@@ -219,7 +219,7 @@ describe('the measured commit keeps its message and gains the moves (#651)', () 
 
   it('summarises a record that moved nothing, and dispatches nothing', () => {
     expect(summaryLines([], 'full')).toEqual([
-      'No floor moved (full): nothing committed, nothing dispatched.',
+      'No floor moved (full): no artifact uploaded, nothing to fold.',
     ]);
   });
 
