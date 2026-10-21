@@ -88,9 +88,10 @@ describe('the dev deploy gate only skips the suite for bytes that passed it', ()
     });
 
     it('refuses a root commit with no parents at all', () => {
-      const result = decideDeploy({ ...sound(), parents: [] });
-      expect(result.deploy).toBe(false);
-      expect(result.reason).toMatch(/parent/i);
+      expect(decideDeploy({ ...sound(), parents: [] })).toEqual({
+        deploy: false,
+        reason: `6695877 has no parents: no tested head can stand for it, so the suite has to run here.`,
+      });
     });
 
     it('refuses when the merge tree differs from the tested tree', () => {
@@ -327,6 +328,13 @@ describe('a squash deploys only as the pull request head it landed (#892)', () =
     expect(decideDeploy(squashed('pulls for 5a5a5a5: HTTP 502'))).toEqual({
       deploy: false,
       reason: `could not read the pull requests of 5a5a5a5 (pulls for 5a5a5a5: HTTP 502): refusing rather than assuming none.`,
+    });
+  });
+
+  it('refuses a root commit even when a merged pull request names it', () => {
+    expect(decideDeploy({ ...squashed(), parents: [] })).toEqual({
+      deploy: false,
+      reason: `5a5a5a5 has no parents: no tested head can stand for it, so the suite has to run here.`,
     });
   });
 
