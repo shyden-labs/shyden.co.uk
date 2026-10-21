@@ -33,9 +33,15 @@ interface ProjectTest {
  * One of the unit suite's projects (#688), by name: `unit`, or `unit-parser`
  * for the files that load the TypeScript parser. Throws for a name the config
  * does not define, so a renamed project is a red test, not an empty one.
+ * `from` reads the same projects from a config built on the unit one, such as
+ * `vitest.coverage.config.ts` (#896).
  */
-export function unitProject(name: string): ProjectTest {
-  const found = (unit.test?.projects ?? [])
+export function unitProject(
+  name: string,
+  from: { readonly test?: { readonly projects?: readonly unknown[] } } = unit,
+  file = 'vitest.config.ts',
+): ProjectTest {
+  const found = (from.test?.projects ?? [])
     .map((project) =>
       typeof project === 'object' && project !== null && 'test' in project
         ? (project.test as ProjectTest | undefined)
@@ -43,6 +49,6 @@ export function unitProject(name: string): ProjectTest {
     )
     .find((test) => test?.name === name);
   if (found === undefined)
-    throw new Error(`vitest.config.ts defines no unit project named ${name}`);
+    throw new Error(`${file} defines no unit project named ${name}`);
   return found;
 }

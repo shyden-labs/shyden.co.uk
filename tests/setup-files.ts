@@ -15,9 +15,12 @@ export const SHARED_SETUP: readonly string[] = [
   'tests/temporary-files-setup.ts',
 ];
 
+/** The unit suite's own-CPU judge (#632). */
+const UNIT_CPU_SETUP = 'tests/unit-cpu-setup.ts';
+
 export const UNIT_ONLY_SETUP: readonly string[] = [
   'tests/unit-refusal-setup.ts',
-  'tests/unit-cpu-setup.ts',
+  UNIT_CPU_SETUP,
 ];
 
 /**
@@ -33,6 +36,17 @@ export const LOAD_SETUP = 'tests/load-setup.ts';
  * report their loading and are not limited by it (#696).
  */
 export const UNIT_LOAD_LIMIT_SETUP = 'tests/unit-load-limit-setup.ts';
+
+/**
+ * The unit suite's two judges (#896): own CPU and file load. The coverage run
+ * leaves out exactly these, because instrumentation spends CPU and load time
+ * that is not the test's own; the 1 s step, which runs without coverage,
+ * judges both.
+ */
+export const UNIT_JUDGES: readonly string[] = [
+  UNIT_CPU_SETUP,
+  UNIT_LOAD_LIMIT_SETUP,
+];
 
 /**
  * The parser project's setup (#688): loads `typescript` before the load
