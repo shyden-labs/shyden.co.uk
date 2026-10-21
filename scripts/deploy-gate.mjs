@@ -26,8 +26,15 @@ import { die, messageOf } from './errors.mjs';
  *
  * So this verifies tree equality instead of trusting a status to exist, which
  * is strictly stronger: it refuses BY CONSTRUCTION whenever the deployed bytes
- * are not the bytes that passed — a direct push or a squash/rebase merge (one
- * parent), a dispatched branch, or any tree that differs.
+ * are not the bytes that passed — a direct push, a dispatched branch, or any
+ * tree that differs.
+ *
+ * A squash merge (#892; every PR into `develop` squashes since 2026-10-21) has
+ * one parent, so its tested head is found another way: GitHub records the pull
+ * request a squash came from, as that pull request's `merge_commit_sha`.
+ * `strict: true` holds there too, so the squash's tree is the tested head's,
+ * and the gate demands exactly that, and the same checks. A one-parent commit
+ * no merged pull request into `develop` landed is a direct push, and refused.
  *
  * The only dangerous failure here is a false GREEN, so every ambiguous case
  * refuses: an unresolvable tree, an absent check-run, a null conclusion. An
@@ -47,6 +54,65 @@ export const REQUIRED_CHECKS = ['build-and-test', 'visual'];
 
 /** @param {unknown} sha */
 const short = (sha) => String(sha ?? '').slice(0, 7);
+
+/** The branch whose pushes deploy to dev, and so the only base a squash may land on. */
+export const DEPLOY_BASE = 'develop';
+
+/**
+ * One pull request, reduced to the fields that decide whether it landed a
+ * commit: from `GET /repos/{repo}/commits/{sha}/pulls`.
+ *
+ * @typedef {{
+ *   number: number,
+ *   merged: boolean,
+ *   mergeCommitSha: string | null,
+ *   headSha: string,
+ *   baseRef: string,
+ * }} Pull
+ */
+
+/**
+ * The head whose checks speak for `sha`, or why there is none. A merge
+ * commit's is its second parent. A squash's is the head of the one merged pull
+ * request into `DEPLOY_BASE` that landed it as its merge commit (#892).
+ *
+ * @param {{ sha: string, parents: readonly string[], pulls?: readonly Pull[] | string }} input
+ * @returns {{ tested: string, as: string } | { refusal: string }}
+ */
+const testedHeadOf = ({ sha, parents, pulls }) => {
+  if (parents.length >= 2) return { tested: parents[1] ?? '', as: '' };
+  if (parents.length === 0)
+    return {
+      refusal: `${short(sha)} has no parents: no tested head can stand for it, so the suite has to run here.`,
+    };
+  if (pulls === undefined)
+    return {
+      refusal: `${short(sha)} has one parent and its pull requests were never read: refusing rather than assuming none.`,
+    };
+  if (typeof pulls === 'string')
+    return {
+      refusal: `could not read the pull requests of ${short(sha)} (${pulls}): refusing rather than assuming none.`,
+    };
+  const landing = pulls.filter(
+    (pull) =>
+      pull.merged &&
+      pull.baseRef === DEPLOY_BASE &&
+      pull.mergeCommitSha === sha,
+  );
+  const [pull, ...others] = landing;
+  if (pull === undefined)
+    return {
+      refusal: `${short(sha)} has one parent and no merged pull request into ${DEPLOY_BASE} landed it as its merge commit: a direct push, so the suite has to run here.`,
+    };
+  if (others.length > 0)
+    return {
+      refusal: `${short(sha)} is the merge commit of pull requests ${landing.map(({ number }) => `#${number}`).join(' and ')}: refusing rather than choosing which head was tested.`,
+    };
+  return {
+    tested: pull.headSha,
+    as: `squash ${short(sha)} of pull request #${pull.number}: `,
+  };
+};
 
 /**
  * Sort key for "which run of this name is current".
@@ -79,6 +145,7 @@ const finishedAt = (run) =>
  * @param {{
  *   sha: string,
  *   parents?: readonly string[],
+ *   pulls?: readonly Pull[] | string,
  *   treeOf?: Record<string, string | undefined>,
  *   checks?: readonly CheckRun[],
  * }} input
@@ -87,20 +154,13 @@ const finishedAt = (run) =>
 export const decideDeploy = ({
   sha,
   parents = [],
+  pulls,
   treeOf = {},
   checks = [],
 }) => {
-  if (parents.length < 2) {
-    return {
-      deploy: false,
-      reason:
-        `${short(sha)} has ${parents.length} parent(s). Only a merge commit carries a second ` +
-        `parent whose tree was tested; a direct push, a squash merge or a rebase merge does ` +
-        `not, so the suite has to run here.`,
-    };
-  }
-
-  const tested = parents[1];
+  const head = testedHeadOf({ sha, parents, pulls });
+  if ('refusal' in head) return { deploy: false, reason: head.refusal };
+  const { tested, as } = head;
   const mergeTree = treeOf[sha];
   const testedTree = treeOf[tested];
 
@@ -149,7 +209,7 @@ export const decideDeploy = ({
   return {
     deploy: true,
     reason:
-      `tree ${short(mergeTree)} is identical to tested head ${short(tested)}, which passed ` +
+      `${as}tree ${short(mergeTree)} is identical to tested head ${short(tested)}, which passed ` +
       `${REQUIRED_CHECKS.join(' + ')}.`,
   };
 };
@@ -158,20 +218,21 @@ export const decideDeploy = ({
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
 /**
- * The check-runs on `sha`, from the API the runner names in GITHUB_API_URL
- * (Actions sets it on every runner, and `tests/integration/deploy-gate-script.test.ts`
- * points it at a stand-in).
+ * One GET against the API the runner names in GITHUB_API_URL (Actions sets it
+ * on every runner, and `tests/integration/deploy-gate-script.test.ts` points
+ * it at a stand-in).
  *
  * Node's `fetch` rejects an unreachable host with only "fetch failed" and
  * keeps the reason on `cause`, so the refusal names the request and the cause.
  *
- * @param {string} repo
- * @param {string} sha
+ * @param {string} path below the API root, e.g. `/repos/o/r/commits/x/pulls`
  * @param {string} token
+ * @param {string} what what the answer is, for a refusal
+ * @returns {Promise<unknown>}
  */
-const checkRunsFor = async (repo, sha, token) => {
+const getJson = async (path, token, what) => {
   const api = process.env.GITHUB_API_URL ?? 'https://api.github.com';
-  const url = `${api}/repos/${repo}/commits/${sha}/check-runs?per_page=100`;
+  const url = `${api}${path}`;
   /** @type {Response} */
   let res;
   try {
@@ -186,17 +247,92 @@ const checkRunsFor = async (repo, sha, token) => {
     const cause = error instanceof Error ? (error.cause ?? error) : error;
     throw new Error(`GET ${url} could not be reached: ${messageOf(cause)}`);
   }
-  if (!res.ok)
-    throw new Error(`check-runs for ${short(sha)}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${what}: HTTP ${res.status}`);
+  return res.json();
+};
+
+/**
+ * The check-runs on `sha`.
+ *
+ * @param {string} repo
+ * @param {string} sha
+ * @param {string} token
+ * @returns {Promise<CheckRun[]>}
+ */
+const checkRunsFor = async (repo, sha, token) => {
   const body =
-    /** @type {{ check_runs?: { name: string, status: string, conclusion: string | null, completed_at: string | null }[] }} */ (
-      await res.json()
+    /** @type {{ check_runs?: { name: string, conclusion: string | null, completed_at: string | null }[] }} */ (
+      await getJson(
+        `/repos/${repo}/commits/${sha}/check-runs?per_page=100`,
+        token,
+        `check-runs for ${short(sha)}`,
+      )
     );
   return (body.check_runs ?? []).map((run) => ({
     name: run.name,
     conclusion: run.conclusion,
     completedAt: run.completed_at,
   }));
+};
+
+/**
+ * The pull requests GitHub associates with `sha`, or why they could not be
+ * read: a squash's own pull request is among them, as its merge commit (#892).
+ *
+ * @param {string} repo
+ * @param {string} sha
+ * @param {string} token
+ * @returns {Promise<Pull[] | string>}
+ */
+const pullsFor = async (repo, sha, token) => {
+  try {
+    const body =
+      /** @type {{ number: number, merged_at: string | null, merge_commit_sha: string | null, head: { sha: string }, base: { ref: string } }[]} */ (
+        await getJson(
+          `/repos/${repo}/commits/${sha}/pulls?per_page=100`,
+          token,
+          `pulls for ${short(sha)}`,
+        )
+      );
+    return body.map((pull) => ({
+      number: pull.number,
+      merged: pull.merged_at !== null,
+      mergeCommitSha: pull.merge_commit_sha,
+      headSha: pull.head.sha,
+      baseRef: pull.base.ref,
+    }));
+  } catch (error) {
+    return messageOf(error);
+  }
+};
+
+/**
+ * A commit's tree, from git when the checkout holds the commit, else from the
+ * API: a squashed pull request's head may be on no branch the checkout
+ * fetched. `undefined` when neither can say, which the gate refuses.
+ *
+ * @param {string} repo
+ * @param {string} sha
+ * @param {string} token
+ * @returns {Promise<string | undefined>}
+ */
+const treeFor = async (repo, sha, token) => {
+  try {
+    return git('rev-parse', `${sha}^{tree}`);
+  } catch {
+    try {
+      const body = /** @type {{ tree?: { sha?: string } }} */ (
+        await getJson(
+          `/repos/${repo}/git/commits/${sha}`,
+          token,
+          `commit ${short(sha)}`,
+        )
+      );
+      return body.tree?.sha;
+    } catch {
+      return undefined;
+    }
+  }
 };
 
 const main = async () => {
@@ -210,25 +346,31 @@ const main = async () => {
   const parents = git('rev-list', '--parents', '-n', '1', sha)
     .split(/\s+/)
     .slice(1);
-  const treeOf = Object.fromEntries(
-    [sha, ...parents].map((ref) => {
-      try {
-        return [ref, git('rev-parse', `${ref}^{tree}`)];
-      } catch {
-        return [ref, undefined];
-      }
-    }),
-  );
+  const pulls =
+    parents.length === 1 ? await pullsFor(repo, sha, token) : undefined;
+  // The head whose tree and checks are read, by the same rule decideDeploy
+  // judges with: a refusal reads nothing more, and decideDeploy says why.
+  const head = testedHeadOf({ sha, parents, pulls });
+  const tested = 'tested' in head ? head.tested : undefined;
+  /** @type {Record<string, string | undefined>} */
+  const treeOf = {};
+  for (const ref of [sha, ...(tested === undefined ? [] : [tested])])
+    treeOf[ref] = await treeFor(repo, ref, token);
   /** @type {CheckRun[]} */
   let checks = [];
   try {
-    if (parents.length > 1)
-      checks = await checkRunsFor(repo, parents[1], token);
+    if (tested !== undefined) checks = await checkRunsFor(repo, tested, token);
   } catch (error) {
     die(`deploy-gate: REFUSE — ${messageOf(error)}`);
   }
 
-  const { deploy, reason } = decideDeploy({ sha, parents, treeOf, checks });
+  const { deploy, reason } = decideDeploy({
+    sha,
+    parents,
+    pulls,
+    treeOf,
+    checks,
+  });
   console.log(`deploy-gate: ${deploy ? 'PROCEED' : 'REFUSE'} — ${reason}`);
   if (!deploy) process.exit(1);
 };
