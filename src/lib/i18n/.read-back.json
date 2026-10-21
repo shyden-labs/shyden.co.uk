@@ -1294,6 +1294,24 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "edited after DeepL by the agent; to the operator's reads (#844)"
+      },
+      "Yawelo Idle 的 10 秒预告片": {
+        "english": "10-second trailer for Yawelo Idle",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "\"trailer\" for preview; same meaning"
+      },
+      "视频内容": {
+        "english": "Video content",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "a label: \"video content\" names the same thing"
+      },
+      "一段10秒的预告片，配有音乐但无旁白。“通过游戏学习”的宣传语在夜空中漂浮的岛屿背景下，引出了 Yawelo Idle。随后呈现三点核心信息：学习印尼语和英语、无广告且无付费墙、按自己的节奏学习——因为你掌握的单词将驱动游戏进程。预告片以“Yawelo Idle，即将推出”以及网址 yawelo-idle.shyden.co.uk 收尾。": {
+        "english": "A 10-second trailer, accompanied by music but without narration, introduces the Yawelo Idle against a backdrop of floating islands in the night sky, with the tagline \"Learn through games.\" It then presents three key messages: learn Indonesian and English, no ads or paywalls, and learn at your own pace—because the words you master will drive your gameplay. The trailer concludes with \"Yawelo Idle, coming soon\" and the website yawelo-idle.shyden.co.uk.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "every point carried; the tagline reads \"Learn through games\", the site's own zh kicker"
       }
     },
     "th": {
@@ -2645,6 +2663,24 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "edited after DeepL by the agent; to the operator's reads (#844)"
+      },
+      "คลิปตัวอย่าง 10 วินาทีของ Yawelo Idle": {
+        "english": "A 10-second preview clip of Yawelo Idle.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "word for word"
+      },
+      "เนื้อหาในวิดีโอ": {
+        "english": "Content in the video",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "a label: \"content in the video\" names the same thing"
+      },
+      "คลิปตัวอย่าง 10 วินาที พร้อมเพลงและไม่มีเสียงพูด 'เรียนรู้ผ่านการเล่น' แนะนำเกม Yawelo Idle บนท้องฟ้ายามค่ำคืนที่มีเกาะลอยอยู่ ตามมาด้วยสามจุดสำคัญ: เรียนภาษาอินโดนีเซียและภาษาอังกฤษ ไม่มีโฆษณาหรือระบบจ่ายเพื่อเข้าถึงเนื้อหา และเรียนตามจังหวะของคุณเอง เพราะคำที่คุณเรียนรู้จะขับเคลื่อนเกมไปข้างหน้า วิดีโอจบด้วยข้อความ 'Yawelo Idle, เร็วๆ นี้' และที่อยู่เว็บไซต์ yawelo-idle.shyden.co.uk": {
+        "english": "This 10-second teaser clip, with music and no narration, introduces the Yawelo Idle game in a night sky with floating islands. It follows three key points: learning Indonesian and English, no ads or pay-to-play content, and learning at your own pace, as the words you learn drive the game forward. The video ends with the message 'Yawelo Idle, Coming Soon' and the website address yawelo-idle.shyden.co.uk.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "every point carried; Google's reading leaves out the quoted tagline the line holds (the site's th kicker); \"pay-to-play\" for paywalls"
       }
     },
     "id": {
@@ -4056,6 +4092,24 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "Cuplikan 10 detik Yawelo Idle": {
+        "english": "Yawelo Idle 10-second clip",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "\"clip\" for preview; same meaning"
+      },
+      "Isi video": {
+        "english": "Video content",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "a label: \"video content\" names the same thing"
+      },
+      "Cuplikan 10 detik dengan musik, tanpa narasi. 'Belajar dengan bermain' memperkenalkan Yawelo Idle dengan latar langit malam dan pulau-pulau yang melayang. Lalu muncul tiga poin: belajar bahasa Indonesia dan Inggris, tanpa iklan atau dinding berbayar, dan belajar sesuai kecepatan Anda sendiri, karena kata-kata yang Anda pelajari menggerakkan permainan. Cuplikan ditutup dengan 'Yawelo Idle, segera hadir' dan alamat yawelo-idle.shyden.co.uk.": {
+        "english": "A 10-second clip with music, no narration. 'Learn by playing' introduces Yawelo Idle against a backdrop of a night sky and floating islands. Three key points are then made: learn Indonesian and English, without ads or paywalls, and learn at your own pace, as the words you learn drive the game. The clip closes with 'Yawelo Idle, coming soon' and the address yawelo-idle.shyden.co.uk.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "every point carried"
       }
     },
     "vi": {
@@ -5433,6 +5487,24 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "DeepL draft; names no period (#872 AC6)"
+      },
+      "Đoạn giới thiệu 10 giây về Yawelo Idle": {
+        "english": "A 10-second trailer for Yawelo Idle",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "\"trailer\" for preview; same meaning"
+      },
+      "Nội dung của video": {
+        "english": "Video content",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "a label: \"video content\" names the same thing"
+      },
+      "Một đoạn giới thiệu dài 10 giây có nhạc nền và không có lời thoại. Slogan “Học qua trò chơi” giới thiệu Yawelo Idle trên nền bầu trời đêm với những hòn đảo lơ lửng. Ba điểm chính được nêu ra: học tiếng Indonesia và tiếng Anh, không có quảng cáo hay rào cản thanh toán, và học theo tốc độ của riêng bạn, bởi vì những từ vựng bạn học được sẽ là động lực cho trò chơi. Đoạn video kết thúc với dòng chữ “Yawelo Idle, sắp ra mắt” và địa chỉ yawelo-idle.shyden.co.uk.": {
+        "english": "A 10-second trailer with background music and no dialogue. The slogan “Learn through games” introduces Yawelo Idle against a backdrop of a night sky with floating islands. Three main points are highlighted: learn Indonesian and English, no ads or payment barriers, and learn at your own pace, because the vocabulary you learn will motivate the game. The video ends with the text “Yawelo Idle, coming soon” and the address yawelo-idle.shyden.co.uk.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "every point carried; \"will motivate the game\" reads the phrase the approved vi yaweloIdleBody uses for \"power the game\""
       }
     }
   },

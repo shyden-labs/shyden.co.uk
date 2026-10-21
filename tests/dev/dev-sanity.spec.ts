@@ -132,6 +132,38 @@ test(
   },
 );
 
+// The homepage's Yawelo Idle preview plays from the shared media host itself,
+// the real files, not the suite's stand-ins (#835).
+test(
+  "the homepage's Yawelo Idle preview plays from the media host",
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'the video host sends Cross-Origin-Resource-Policy: same-site, which admits a page on shyden.co.uk and refuses a preview on localhost',
+    },
+  },
+  async ({ page }) => {
+    await page.goto('/');
+    const video = page.locator('#yawelo-idle video');
+    await expect(video).toBeVisible();
+    // Muted, so no engine's autoplay rule refuses a play that is not a tap.
+    await video.evaluate((v: HTMLVideoElement) => {
+      v.muted = true;
+      return v.play();
+    });
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0.5);
+    expect(
+      await video.evaluate(
+        (v: HTMLVideoElement) => new URL(v.currentSrc).origin,
+      ),
+    ).toBe('https://media.shyden.co.uk');
+  },
+);
+
 test(
   'an unauthenticated request is challenged with 401',
   {
