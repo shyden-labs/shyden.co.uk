@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * What the CI visual capture (#654) folds back into a branch: the baselines a
+ * What the CI visual capture (#654) hands back to fold (#889): the baselines a
  * `--update-snapshots=all` run changed, and nothing else.
  *
  *   node scripts/visual-capture.mjs <status> <head-message> <message-out> <list-out>
@@ -10,9 +10,10 @@
  * byte-identically where nothing moved (#678: run 38122176791 rewrote four
  * pages its change never touched, by 1 to 17 pixels), so each rewrite is
  * judged by `capturedBaselines` against the committed picture at `HEAD`, and
- * only one past `CAPTURE_PIXEL_RULE` is committed. Anything in the status that
- * is not a baseline is refused: the job that commits runs no branch code and
- * must not carry branch code's side effects either.
+ * only one past `CAPTURE_PIXEL_RULE` is handed back. Anything in the status
+ * that is not a baseline is refused: a capture hands back baselines and
+ * nothing else, so the fold (`scripts/fold-record.mjs`, #889) carries no
+ * other side effect of the branch's code.
  *
  * Writes the measured commit's message with the committed baselines added to
  * `<message-out>`, their paths one per line to `<list-out>`, the summary
@@ -29,12 +30,26 @@ import { decodePng, differingPixels } from './png-pixels.mjs';
 /** Where `playwright.config.ts`'s `snapshotPathTemplate` keeps baselines. */
 export const BASELINE_DIR = 'tests/e2e/__screenshots__/';
 
+const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
+  /[.*+?^${}()|[\]\\]/g,
+  '\\$&',
+);
+
 /**
  * A rewritten or new PNG directly in the baseline folder. A path git had to
  * quote starts with `"`, so it misses the folder and is refused as `other`.
  */
 const BASELINE = new RegExp(
-  `^( M|M |MM|\\?\\?) (${BASELINE_DIR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^/\\s]+\\.png)$`,
+  `^( M|M |MM|\\?\\?) (${BASELINE_DIR_PATTERN}[^/\\s]+\\.png)$`,
+);
+
+/**
+ * A path a capture may hand back: one PNG directly in the baseline directory,
+ * no quote or space in its name. `scripts/fold-record.mjs` judges the
+ * artifact's list by it again before it copies anything (#889).
+ */
+export const BASELINE_PATH = new RegExp(
+  `^${BASELINE_DIR_PATTERN}[^/"\\s]+\\.png$`,
 );
 
 /**
@@ -154,7 +169,7 @@ const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
  */
 export const captureSummary = ({ commit, kept }) => {
   if (commit.length === 0 && kept.length === 0)
-    return 'No baseline changed: nothing committed, nothing dispatched.';
+    return 'No baseline changed: no artifact uploaded, nothing to fold.';
   return [
     `${plural(commit.length, 'baseline', 'baselines')} committed (more than ${CAPTURE_PIXEL_RULE} pixels differ, new, or a new size; #678):`,
     ...commit.map(judgedLine),
