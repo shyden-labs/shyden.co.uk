@@ -36,10 +36,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: The frame test with sound off on webkit, 150 times
+      - name: GStreamer's audio sinks in the image
+        run: gst-inspect-1.0 2>/dev/null | grep -iE "audiosink|fakeaudio|pulse|alsa" || echo "gst-inspect-1.0 not in the image"
+      - name: The frame test with sound on and a fake audio sink on webkit, 300 times
         env:
-          PROBE_SOUND_OFF: '1'
-        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=150 --reporter=line
-      - name: The frame test with sound on on webkit, 150 times
-        if: always()
-        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=150 --reporter=line
+          GST_PLUGIN_FEATURE_RANK: fakeaudiosink:MAX
+        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=300 --reporter=line
