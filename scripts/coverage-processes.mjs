@@ -23,7 +23,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convert } from 'ast-v8-to-istanbul';
-import { parseAstAsync } from 'vitest/node';
+import { parse } from 'vite';
 import { MEASURED, NOT_MEASURED } from '../tests/coverage-options.ts';
 import { die } from './errors.mjs';
 
@@ -120,13 +120,23 @@ export const convertScripts = async (scripts, read, root) => {
       continue;
     }
     const absolute = path.posix.join(root, file);
+    // The options Vitest's own (deprecated) parseAstAsync passes, so the tree
+    // is the one its report places statements on. `parse` reports a syntax
+    // error beside an empty program instead of throwing, so it is refused
+    // here, never converted as a file with no statements.
+    const parsed = await parse(file, text, {
+      lang: TYPESCRIPT.test(file) ? 'ts' : 'js',
+      preserveParens: false,
+    });
+    if (parsed.errors.length > 0)
+      return {
+        refusal: `coverage-processes: ${file} does not parse (${parsed.errors[0]?.message}), so its counts have nowhere to go`,
+      };
     /** @type {Record<string, FileCoverage>} */
     const converted = JSON.parse(
       JSON.stringify(
         await convert({
-          ast: parseAstAsync(text, {
-            lang: TYPESCRIPT.test(file) ? 'ts' : 'js',
-          }),
+          ast: parsed.program,
           code: text,
           wrapperLength: 0,
           coverage: { functions: script.functions, url: script.url },

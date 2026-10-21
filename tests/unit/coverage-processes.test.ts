@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   convertScripts,
@@ -124,6 +125,22 @@ describe('raw V8 coverage from a process converts to the joined shape (#899)', (
     ).toEqual(['1:12-1:35=2', '2:0-6:null=2', '3:2-3:null=2', '5:2-5:null=0']);
   });
 
+  // Measured 2026-10-22: for this text vite's `parse` returns one error and an
+  // EMPTY program, so a converter that read only `program` would report the
+  // file with no statements at all rather than fail.
+  it('a file that does not parse is refused, naming the parser’s error', async () => {
+    const broken = JS.replace('if (ran) {', 'if (ran) {{');
+    const result = await convertScripts(
+      [script('file:///repo/scripts/broken.mjs', broken.length, [74, 107])],
+      (file) => (file === 'scripts/broken.mjs' ? broken : read(file)),
+      ROOT,
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: scripts/broken.mjs does not parse (Unexpected token), so its counts have nowhere to go',
+    });
+  });
+
   it('nothing measured at all is refused, never written as an empty report', async () => {
     expect(await convertScripts([], read, ROOT)).toEqual({
       refusal:
@@ -160,4 +177,33 @@ describe('which file an entry is (#899)', () => {
       'tests/device-pixels.ts',
     );
   });
+});
+
+/**
+ * The converter's two packages, declared by Shyden's rulings ("Yes, if
+ * needed" for the converter, #899; `vite` for its non-deprecated `parse`,
+ * 2026-10-21) at the versions already installed under Vitest and Astro, as
+ * `yaml` was in #157. An exact pin, because a range lets `npm install` on a
+ * laptop resolve a release CI's `npm ci` never ran.
+ */
+describe('the converter’s packages are pinned to the versions installed (#899)', () => {
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    devDependencies: Record<string, string>;
+  };
+  const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+    packages: Record<string, { version?: string }>;
+  };
+
+  it.each(['vite', 'ast-v8-to-istanbul'])(
+    '%s is declared at exactly the version the lockfile installs',
+    (name) => {
+      expect([
+        manifest.devDependencies[name],
+        lock.packages[`node_modules/${name}`]?.version,
+      ]).toEqual([
+        expect.stringMatching(/^\d+\.\d+\.\d+$/),
+        manifest.devDependencies[name],
+      ]);
+    },
+  );
 });
