@@ -85,7 +85,7 @@ jobs:
           REF: ${{ inputs.ref }}
         run: |
           case "$REF" in
-            *) ;;
+            refs/floors/?*) ;;
             *)
               echo "::error::floors are recorded on a scratch ref under refs/floors/, never on $REF: push the unpushed commit there first"
               exit 1
