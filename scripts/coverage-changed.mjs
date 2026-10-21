@@ -24,9 +24,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { argv } from 'node:process';
 import { die } from './errors.mjs';
 
-/** @typedef {import('./coverage-merge.mjs').LocatedCoverage} LocatedCoverage */
-/** @typedef {{ file: string, line: number, kind: 'line' | 'branch' }} Finding */
-/** @typedef {{ unrun: Finding[], unmeasured: Finding[], judged: number }} Verdict */
+/**
+ * @typedef {import('./coverage-merge.mjs').LocatedCoverage} LocatedCoverage
+ * @typedef {{ file: string, line: number, kind: 'line' | 'branch' }} Finding
+ * @typedef {{ unrun: Finding[], unmeasured: Finding[], judged: number }} Verdict
+ */
 
 const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs|astro)$/;
 const NOT_JUDGED = /(\.d\.ts|\.test\.ts|\.spec\.ts)$/;

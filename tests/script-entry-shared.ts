@@ -51,6 +51,20 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: node scripts/capture-coverage.mjs',
   },
+  // It takes no argument, so one it was not asked for is refused before any
+  // report is read: a skipped main() would exit 0 and write nothing (#896).
+  'coverage-merge.mjs': {
+    args: ['--unknown'],
+    status: 1,
+    says: 'usage: coverage-merge.mjs',
+  },
+  // A flag it does not know is refused before any git or report is read; a
+  // skipped main() would exit 0 and print no verdict at all (#896).
+  'coverage-changed.mjs': {
+    args: ['--unknown'],
+    status: 1,
+    says: 'usage: coverage-changed.mjs [--report-only]',
+  },
   // With nowhere to hand its verdict on, it refuses rather than decide
   // nothing, which would leave the browser jobs to a missing output (#582).
   'docs-only.mjs': {

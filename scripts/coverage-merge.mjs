@@ -23,10 +23,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { die } from './errors.mjs';
 
-/** @typedef {{ line?: number, column?: number }} Position */
-/** @typedef {{ start?: Position, end?: Position }} Location */
 /**
- * One file as Istanbul writes it.
+ * A place in a file, and a span between two; `FileCoverage` is one file as
+ * Istanbul writes it; `LocatedCoverage` is one file joined, every statement
+ * and branch arm by where it is, with its `Counted` lines and runs.
+ *
+ * @typedef {{ line?: number, column?: number }} Position
+ * @typedef {{ start?: Position, end?: Position }} Location
  * @typedef {{
  *   path: string,
  *   statementMap: Record<string, Location>,
@@ -36,10 +39,7 @@ import { die } from './errors.mjs';
  *   fnMap: Record<string, unknown>,
  *   f: Record<string, number>,
  * }} FileCoverage
- */
-/** @typedef {{ start: number, end: number, count: number }} Counted */
-/**
- * One file, joined: every statement and branch arm by where it is.
+ * @typedef {{ start: number, end: number, count: number }} Counted
  * @typedef {{ statements: Record<string, Counted>, branches: Record<string, Counted> }} LocatedCoverage
  */
 
@@ -106,6 +106,7 @@ export const mergeMaps = (maps, root) => {
 };
 
 const main = () => {
+  if (process.argv.length > 2) die('usage: coverage-merge.mjs');
   const root = process.cwd();
   const reports = SUITES.map((suite) =>
     path.join('coverage', suite, 'coverage-final.json'),
