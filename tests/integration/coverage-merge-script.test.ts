@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scratchGit, withoutLocalGit } from '../git-env';
 
 /**
- * `scripts/coverage-merge.mjs` as CI runs it after the four suites (#896): in
+ * `scripts/coverage-merge.mjs` as CI runs it after the three suites (#896): in
  * a real repository, so the tree it records is git's own answer.
  * `tests/unit/coverage-merge.test.ts` holds the joining itself.
  */
@@ -22,7 +22,7 @@ const SCRIPT = path.resolve(
   import.meta.dirname,
   '../../scripts/coverage-merge.mjs',
 );
-const SUITES = ['unit', 'guards', 'simulation', 'integration'];
+const SUITES = ['unit', 'simulation', 'integration'];
 
 let repo: string;
 let git: (args: readonly string[]) => string;
@@ -73,7 +73,7 @@ const merge = () =>
   });
 
 describe('coverage-merge.mjs in a real repository', () => {
-  it('joins the four reports and records the tree they measured', () => {
+  it('joins the three reports and records the tree they measured', () => {
     SUITES.forEach((suite, index) => report(suite, index));
     const run = merge();
     expect([run.status, run.stderr]).toEqual([0, '']);
@@ -83,7 +83,7 @@ describe('coverage-merge.mjs in a real repository', () => {
       ),
     ).toEqual({
       'src/a.ts': {
-        statements: { '1:0-1:9': { start: 1, end: 1, count: 6 } },
+        statements: { '1:0-1:9': { start: 1, end: 1, count: 3 } },
         branches: {},
       },
     });
@@ -93,13 +93,13 @@ describe('coverage-merge.mjs in a real repository', () => {
   });
 
   it('refuses when a suite wrote no report, naming it', () => {
-    SUITES.filter((suite) => suite !== 'guards').forEach((suite) =>
+    SUITES.filter((suite) => suite !== 'simulation').forEach((suite) =>
       report(suite, 1),
     );
     const run = merge();
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ coverage-merge: no report at coverage/guards/coverage-final.json. A suite that failed writes none; run it with --coverage first.\n',
+      '✗ coverage-merge: no report at coverage/simulation/coverage-final.json. A suite that failed writes none; run it with --coverage first.\n',
     );
   });
 });

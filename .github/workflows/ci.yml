@@ -181,21 +181,25 @@ jobs:
       # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
-  # Coverage of the changed lines (#896): the four Vitest suites again, each
+  # Coverage of the changed lines (#896): three Vitest suites again, each
   # under V8 coverage, joined, then the verdict on every line this pull request
   # changes, printed in the job summary. It reports and gates nothing yet:
   # #902 makes it a gate once #899-#901 measure child processes, workerd and
   # the browser (Shyden 2026-10-21, "Measure all first"). A suite that fails
   # writes no report, and a missing or stale report fails the job either way.
   # The unit suite's own 1 s step stays in `checks`, without coverage.
+  # Not guards: under coverage the duplication guard's whole-tree scan took
+  # 64 s against the suite's 25 s limit (run 39612796552), and no limit is
+  # raised, so code only a guard runs reads as unrun.
   coverage:
     needs: [image, scope]
     # Skipped on a docs-only pull request (#582), like every job that builds.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The four suites took 73-95 s in `checks` (runs 39586345113,
-    # 39574987257); coverage's own cost on the runner is not measured yet, so
-    # this is that sum with room, to be cut to a measured figure (#896).
+    # Run 39612796552: unit under coverage took 20 s; simulation and
+    # integration take 26-32 s together in `checks` (39586345113,
+    # 39574987257) and have not yet run under coverage, so this is room
+    # until they have, then cut to a measured figure (#896).
     timeout-minutes: 10
     permissions:
       contents: read
@@ -214,7 +218,6 @@ jobs:
       # The integration suite serves the built site.
       - run: npm run build
       - run: npm run test:coverage
-      - run: npm run test:coverage:guards
       - run: npm run test:coverage:simulation
       - run: npm run test:coverage:integration
       - run: node scripts/coverage-merge.mjs

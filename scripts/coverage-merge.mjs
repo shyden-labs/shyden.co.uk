@@ -44,7 +44,10 @@ import { die } from './errors.mjs';
  */
 
 /** The suites whose reports are joined, in the order they are read. */
-export const SUITES = ['unit', 'guards', 'simulation', 'integration'];
+// Not guards: under coverage its whole-tree scans cannot meet the suite's
+// 25 s limit (the duplication guard took 64 s on PR #903's first run), and no
+// limit is raised. Code only a guard runs therefore reads as unrun.
+export const SUITES = ['unit', 'simulation', 'integration'];
 
 /** @param {Location} loc */
 const placed = (loc) =>

@@ -10,7 +10,7 @@
  */
 const CODE = '{ts,tsx,mts,cts,js,mjs,cjs}';
 
-export type CoveredSuite = 'unit' | 'guards' | 'simulation' | 'integration';
+export type CoveredSuite = 'unit' | 'simulation' | 'integration';
 
 export const coverageFor = (suite: CoveredSuite) => ({
   provider: 'v8' as const,

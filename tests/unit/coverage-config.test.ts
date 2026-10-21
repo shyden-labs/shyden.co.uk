@@ -109,7 +109,6 @@ describe('every Vitest suite measures the same code with V8', () => {
 
   it.each([
     ['unit', coverage],
-    ['guards', guards],
     ['simulation', simulation],
     ['integration', integration],
   ] as const)('the %s suite writes to its own directory', (suite, config) => {
@@ -117,5 +116,13 @@ describe('every Vitest suite measures the same code with V8', () => {
       ...MEASURED,
       reportsDirectory: `coverage/${suite}`,
     });
+  });
+
+  // Measured on PR #903's first run (39612796552): under V8 coverage the
+  // duplication guard's whole-tree scan took 64,345 ms against the suite's
+  // 25 s limit, which is never raised. The guards' cost is the tree, so they
+  // stay out: code only a guard runs reads as unrun, which errs strict.
+  it('leaves the guards suite out, since its scans cannot meet their limit under coverage', () => {
+    expect(guards.test?.coverage).toBeUndefined();
   });
 });

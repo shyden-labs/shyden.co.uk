@@ -1,7 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config.ts';
 import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
-import { coverageFor } from './tests/coverage-options.ts';
 
 /**
  * The guards suite (#638): every test whose cost is reading or parsing the
@@ -25,7 +24,5 @@ export default defineConfig({
     // line replaces this whole list), then what loading each file cost.
     reporters: ['verbose', ['./tests/load-reporter.ts', { suite: 'guards' }]],
     globalSetup: unit.test?.globalSetup,
-    // Inert until a command passes --coverage (#896).
-    coverage: coverageFor('guards'),
   },
 });
