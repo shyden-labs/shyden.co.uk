@@ -47,9 +47,18 @@ updates:
         update-types:
           - 'version-update:semver-major'
     groups:
+      # vitest and its coverage provider in one pull request (#896): the
+      # provider peers on its own vitest release, so apart they cannot install.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
       patch-updates:
         update-types:
           - 'patch'
+        exclude-patterns:
+          - 'vitest'
+          - '@vitest/*'
 
   - package-ecosystem: 'github-actions'
     directory: '/'

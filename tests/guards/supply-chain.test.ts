@@ -499,6 +499,47 @@ describe('prettier-plugin-astro is pinned to the version the lockfile resolves',
   });
 });
 
+/**
+ * vitest and its coverage provider move as one (#896).
+ *
+ * `@vitest/coverage-v8` declares a peer dependency on its own vitest release,
+ * so the two at different versions refuse to install together (measured: npm
+ * refused 5.0.1 beside vitest 5.0.3 with ERESOLVE). The provider is pinned
+ * exactly to the vitest the lockfile resolves, and Dependabot updates both in
+ * one pull request. Its catch-all excludes the group's patterns, because
+ * Dependabot scores groups rather than reading them in order (2026-10-20).
+ */
+describe('vitest and @vitest/coverage-v8 move together', () => {
+  it('pins the coverage provider to the vitest the lockfile resolves', () => {
+    expect(
+      declaredDevVersion('@vitest/coverage-v8'),
+      'the provider must be the exact vitest release, or npm refuses the pair',
+    ).toBe(lockedVersion('vitest'));
+  });
+
+  it('updates vitest and every @vitest package in one npm group, which the catch-all leaves alone', () => {
+    const config = parseCleanYaml(dependabot(), DEPENDABOT) as {
+      updates?: {
+        'package-ecosystem'?: string;
+        groups?: Record<
+          string,
+          { patterns?: string[]; 'exclude-patterns'?: string[] }
+        >;
+      }[];
+    };
+    const groups =
+      config.updates?.find((entry) => entry['package-ecosystem'] === 'npm')
+        ?.groups ?? {};
+    expect([
+      groups.vitest?.patterns,
+      groups['patch-updates']?.['exclude-patterns'],
+    ]).toEqual([
+      ['vitest', '@vitest/*'],
+      ['vitest', '@vitest/*'],
+    ]);
+  });
+});
+
 /** Whether a plain `x.y.z` release is at least `floor`; anything else throws. */
 const atLeast = (version: string, floor: string): boolean => {
   const parts = (v: string) => {

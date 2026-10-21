@@ -88,6 +88,7 @@ export const docsOnlyNeeds = (
     image: { result: 'success', outputs: { ref: 'image@sha256:x' } },
     scope: { result: 'success', outputs: { docs_only: 'true' } },
     checks: { result: 'success', outputs: {} },
+    coverage: { result: 'skipped', outputs: {} },
     e2e: { result: 'skipped', outputs: {} },
     'sanity-on-build': { result: 'skipped', outputs: {} },
     functions: { result: 'skipped', outputs: {} },
