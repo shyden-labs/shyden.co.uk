@@ -113,7 +113,7 @@ jobs:
     # raise this.
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
     # The same pinned image and options as ci.yml's e2e shards, so a figure
     # measured here is the figure the gate reads.
     container:
