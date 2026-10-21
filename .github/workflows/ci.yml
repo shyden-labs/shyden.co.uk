@@ -45,10 +45,10 @@ jobs:
       - if: always()
         run: node scripts/probe-913.mjs "$RUNNER_TEMP/v8" "$RUNNER_TEMP/pwcache"
       - if: always()
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/probe.tgz" v8 pwcache && ls -la "$RUNNER_TEMP/pwcache" | head -5
+      - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: probe-913
-          path: |
-            ${{ runner.temp }}/v8
-            ${{ runner.temp }}/pwcache
+          path: ${{ runner.temp }}/probe.tgz
           retention-days: 3

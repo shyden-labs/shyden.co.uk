@@ -37,7 +37,8 @@ for (const file of walk(cacheDir).filter((f) => f.endsWith('.map'))) {
   const text = readFileSync(file.replace(/\.map$/, '.js'), 'utf8');
   const code = text.slice(text.indexOf('\n') + 1);
   const source = path.resolve(path.dirname(file), map.sources?.[0] ?? '');
-  for (const key of [map.sources?.[0] ?? '', source]) {
+  // Keyed by the source text itself: the map names only a bare file name.
+  for (const key of [map.sourcesContent?.[0] ?? '', source]) {
     const list = cache.get(key) ?? [];
     list.push({ code, map });
     cache.set(key, list);
@@ -70,8 +71,8 @@ for (const name of readdirSync(v8dir)) {
 let matched = 0;
 for (const [file, { ranLength, processes }] of [...ran].sort()) {
   const rel = path.relative(root, file);
-  const entries = cache.get(file) ?? cache.get(rel) ?? [];
   const current = readFileSync(file, 'utf8');
+  const entries = cache.get(current) ?? [];
   const match = entries.find(
     (e) =>
       e.code.length === ranLength &&
@@ -87,7 +88,7 @@ console.log(
 );
 
 const target = path.join(root, 'tests/device-pixels.ts');
-const entry = (cache.get(target) ?? [])[0];
+const entry = (cache.get(readFileSync(target, 'utf8')) ?? [])[0];
 if (entry) {
   for (const name of readdirSync(v8dir)) {
     const { result } = /** @type {{ result: V8Script[] }} */ (
