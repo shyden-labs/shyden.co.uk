@@ -1,4 +1,4 @@
-# PROBE for #906, never merged: the WebKit frame test, 20 times, on this tree.
+# PROBE for #906, never merged: the WebKit frame test, 60 times, on this tree.
 name: CI
 on:
   workflow_dispatch:
@@ -37,4 +37,4 @@ jobs:
           cache: npm
       - run: npm ci
       - name: The frame test on webkit, 20 times
-        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=20 --reporter=line
+        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=60 --reporter=line
