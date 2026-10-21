@@ -157,3 +157,147 @@ describe('the suites’ reports join into one (#896)', () => {
     });
   });
 });
+
+/**
+ * A process's report and Vitest's describe the same statements at shifted
+ * columns (#899, measured: Vitest's transform moves `export const`'s start and
+ * drops end columns), in the same order and on the same lines. They join by
+ * order, and only when every pair agrees on its lines.
+ */
+describe('reports whose places differ join by order (#899)', () => {
+  const vitestLike = file({
+    statementMap: { '0': at(1, 13, 1, 30), '1': at(2, 2, 2, 20) },
+    s: { '0': 0, '1': 0 },
+  });
+  const processLike = (over: Partial<FileCoverage> = {}) =>
+    file({
+      statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 2, 40) },
+      s: { '0': 1, '1': 0 },
+      ...over,
+    });
+
+  it('sums each statement onto the first report’s place, pairing them by order', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          { [`${ROOT}/src/lib/a.ts`]: processLike() },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      merged: {
+        'src/lib/a.ts': {
+          statements: {
+            '1:13-1:30': { start: 1, end: 1, count: 1 },
+            '2:2-2:20': { start: 2, end: 2, count: 0 },
+          },
+          branches: {},
+        },
+      },
+    });
+  });
+
+  it('refuses reports holding different numbers of statements, naming the file', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          {
+            [`${ROOT}/src/lib/a.ts`]: processLike({
+              statementMap: { '0': at(1, 32, 1, 30) },
+              s: { '0': 1 },
+            }),
+          },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
+    });
+  });
+
+  it('refuses a pair that disagrees on its lines, naming both places', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          {
+            [`${ROOT}/src/lib/a.ts`]: processLike({
+              statementMap: { '0': at(1, 32, 1, 30), '1': at(3, 2, 3, 40) },
+            }),
+          },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 3:2-3:40 in another, on other lines, so their counts cannot be joined',
+    });
+  });
+
+  it('pairs branch arms by order too', () => {
+    const arms = (first: number, second: number, counts: [number, number]) =>
+      file({
+        branchMap: {
+          '0': {
+            loc: at(2, 0, 4, 1),
+            locations: [at(2, first, 2, 9), at(3, second, 4, 1)],
+          },
+        },
+        b: { '0': counts },
+      });
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: arms(4, 4, [0, 0]) },
+          { [`${ROOT}/src/lib/a.ts`]: arms(6, 7, [2, 0]) },
+        ],
+        ROOT,
+      ),
+    ).toMatchObject({
+      merged: {
+        'src/lib/a.ts': {
+          branches: {
+            '2:4-2:9#0': { start: 2, end: 2, count: 2 },
+            '3:4-4:1#1': { start: 3, end: 4, count: 0 },
+          },
+        },
+      },
+    });
+  });
+
+  it('refuses reports holding different numbers of branch arms, naming the file', () => {
+    expect(
+      mergeMaps(
+        [
+          {
+            [`${ROOT}/src/lib/a.ts`]: file({
+              branchMap: {
+                '0': { loc: at(2, 0, 4, 1), locations: [at(2, 4, 2, 9)] },
+              },
+              b: { '0': [0] },
+            }),
+          },
+          {
+            [`${ROOT}/src/lib/a.ts`]: file({
+              statementMap: { '0': at(1, 2, 1, 10) },
+              branchMap: {
+                '0': {
+                  loc: at(2, 0, 4, 1),
+                  locations: [at(2, 6, 2, 9), at(3, 4, 4, 1)],
+                },
+              },
+              b: { '0': [1, 0] },
+            }),
+          },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts holds a different number of branch arms in two reports (1 and 2), so their counts cannot be joined',
+    });
+  });
+});
