@@ -105,6 +105,10 @@ describe('every Vitest suite measures the same code with V8', () => {
     ],
     exclude: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
     reportOnFailure: false,
+    // Every process a test starts is measured too (#899): Vitest gives each
+    // child process and worker thread NODE_V8_COVERAGE and converts what
+    // they wrote with its own transform, so their places are its places.
+    autoAttachSubprocess: true,
   };
 
   it.each([

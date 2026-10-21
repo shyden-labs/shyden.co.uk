@@ -23,5 +23,10 @@ export const coverageFor = (suite: CoveredSuite) => ({
   ],
   exclude: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
   reportOnFailure: false,
+  // Code a test runs in a process of its own (#899): Vitest hands each child
+  // process and worker thread NODE_V8_COVERAGE and converts what they wrote
+  // with its own transform. Measured 2026-10-21: a child's taken arm reads
+  // run and its other arm unrun; without this, the child's file reads 0.
+  autoAttachSubprocess: true,
   reportsDirectory: `coverage/${suite}`,
 });
