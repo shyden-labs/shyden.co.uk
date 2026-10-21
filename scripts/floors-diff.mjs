@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * What the CI recorder (#651) tells the branch it commits to: which floors
+ * What the CI recorder (#651) tells the commit it hands back (#889): which floors
  * moved, `id: old -> new`, computed from the two JSON files themselves and
  * never from a hand-kept list.
  *
@@ -99,7 +99,7 @@ export const withBlock = (original, block) => {
  */
 export const summaryLines = (moves, mode) =>
   moves.length === 0
-    ? [`No floor moved (${mode}): nothing committed, nothing dispatched.`]
+    ? [`No floor moved (${mode}): no artifact uploaded, nothing to fold.`]
     : [
         `${moves.length} floor${moves.length === 1 ? '' : 's'} moved (${mode}):`,
         ...moves.map((move) => `- \`${line(move)}\``),

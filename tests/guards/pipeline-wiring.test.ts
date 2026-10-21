@@ -3527,41 +3527,11 @@ describe('CI never records the guards’ floors (#468), bar the dispatched recor
 
 const RECORDER_WORKFLOW = 'record-floors.yml';
 
-/** Whether a parsed workflow can be started by hand, so by a bot's dispatch. */
-const dispatchable = (parsed: unknown): boolean => {
-  const trigger = (parsed as { on?: unknown } | null)?.on;
-  if (typeof trigger === 'string') return trigger === 'workflow_dispatch';
-  if (Array.isArray(trigger)) return trigger.includes('workflow_dispatch');
-  return (
-    typeof trigger === 'object' &&
-    trigger !== null &&
-    'workflow_dispatch' in trigger
-  );
-};
-
-describe('dispatchable reads the parsed trigger, not the text (#651)', () => {
-  it('accepts the mapping, string and list forms', () => {
-    expect(
-      dispatchable({ on: { pull_request: null, workflow_dispatch: null } }),
-    ).toBe(true);
-    expect(dispatchable({ on: 'workflow_dispatch' })).toBe(true);
-    expect(dispatchable({ on: ['pull_request', 'workflow_dispatch'] })).toBe(
-      true,
-    );
-  });
-
-  it('refuses a workflow without it, a commented one included', () => {
-    expect(
-      dispatchable({ on: { pull_request: null, workflow_call: null } }),
-    ).toBe(false);
-    expect(dispatchable({ on: 'pull_request' })).toBe(false);
-    expect(dispatchable({})).toBe(false);
-  });
-});
-
-describe('the floor recorder commits to a branch and starts CI on it (#651)', () => {
+describe('the floor recorder measures a scratch ref and pushes nothing (#651, #889)', () => {
   type Step = {
     id?: string;
+    name?: string;
+    if?: string;
     run?: string;
     uses?: string;
     env?: Record<string, string>;
@@ -3575,7 +3545,7 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
     steps?: Step[];
   };
   type Parsed = {
-    on?: Record<string, unknown>;
+    on?: Record<string, { inputs?: Record<string, { required?: boolean }> }>;
     permissions?: Record<string, string>;
     jobs: Record<string, Job>;
   };
@@ -3589,13 +3559,21 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
   };
   const steps = (id: string) => job(id).steps ?? [];
   const runsOf = (id: string) => steps(id).flatMap(({ run }) => run ?? []);
+  const linesOf = (run: string | undefined) =>
+    (run ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
 
-  it('starts on workflow_dispatch and on nothing else', () => {
+  it('starts on workflow_dispatch and on nothing else, naming the scratch ref and the mode', () => {
     expect(Object.keys(recorder().on ?? {})).toEqual(['workflow_dispatch']);
+    const inputs = recorder().on?.workflow_dispatch?.inputs ?? {};
+    expect(Object.keys(inputs)).toEqual(['ref', 'mode']);
+    expect(inputs.ref?.required).toBe(true);
   });
 
-  it('is one job set of image, record and commit', () => {
-    expect(Object.keys(recorder().jobs)).toEqual(['image', 'record', 'commit']);
+  it('is one job set of image and record', () => {
+    expect(Object.keys(recorder().jobs)).toEqual(['image', 'record']);
   });
 
   it('is not referenced by ci.yml, and no job of ci.yml needs it', () => {
@@ -3611,98 +3589,36 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
           `${name} calls the recorder`,
         ).not.toContain(`./.github/workflows/${RECORDER_WORKFLOW}`);
     expect(REQUIRED_CHECKS).not.toContain('record');
-    expect(REQUIRED_CHECKS).not.toContain('commit');
   });
 
-  it('makes ci.yml dispatchable, so a dispatched run can start on the commit', () => {
-    expect(dispatchable(parsed('ci.yml'))).toBe(true);
-    expect(jobNamed(RECORDER_WORKFLOW, 'commit').runs.join('\n')).toMatch(
-      /^gh workflow run ci\.yml --ref "\$BRANCH"$/m,
-    );
-  });
-
-  it('starts closing-keywords on the new head too: a token push starts no pull_request run', () => {
-    // `closing-keywords` is a required check and pr-body.yml starts only on
-    // pull_request events, so after the bot's commit it would never report.
-    const body = parsed('pr-body.yml') as Parsed & {
-      on?: { workflow_dispatch?: { inputs?: { pr?: { required?: boolean } } } };
-    };
-    expect(dispatchable(body)).toBe(true);
-    expect(body.on?.workflow_dispatch?.inputs?.pr?.required).toBe(true);
-    // The check keeps its context name, and judges with the same script.
-    expect(Object.keys(body.jobs)).toEqual(['closing-keywords']);
-    const bodyRuns = (body.jobs['closing-keywords']?.steps ?? [])
-      .flatMap(({ run }) => run ?? [])
-      .join('\n');
-    expect(bodyRuns).toMatch(/^\s*gh pr view "\$PR_NUMBER" --json body /m);
-    expect(bodyRuns).toMatch(/^\s*node scripts\/closing-keywords\.mjs /m);
-    // Read-only, scoped to the job; the workflow's own token stays contents: read.
-    expect(body.permissions).toEqual({ contents: 'read' });
-    expect(body.jobs['closing-keywords']?.permissions).toEqual({
-      contents: 'read',
-      'pull-requests': 'read',
-    });
-    const dispatching = runsOf('commit').join('\n');
-    expect(dispatching).toMatch(
-      /^\s*PR="\$\(gh pr list --head "\$BRANCH" --state open --json number /m,
-    );
-    expect(dispatching).toMatch(
-      /^\s*gh workflow run pr-body\.yml --ref "\$BRANCH" -f pr="\$PR"$/m,
-    );
-  });
-
-  it('refuses a dispatched pr-body run whose pull request is not the one that owns the ref', () => {
-    // The check attaches to the dispatched ref's head; judging another pull
-    // request's clean body would turn that head green unread.
-    const body = parsed('pr-body.yml') as Parsed;
-    const bodySteps = (body.jobs['closing-keywords']?.steps ?? []) as (Step & {
-      if?: string;
-      name?: string;
-    })[];
-    const guardAt = bodySteps.findIndex(({ run }) =>
-      run?.includes('--json headRefName,headRefOid,state'),
-    );
-    const judgingAt = bodySteps.flatMap(({ run }, index) =>
-      run?.includes('node scripts/closing-keywords.mjs') ? [index] : [],
-    );
-    expect(guardAt).toBeGreaterThan(-1);
-    expect(judgingAt).toHaveLength(2);
-    expect(judgingAt.every((index) => index > guardAt)).toBe(true);
-    const guard = bodySteps[guardAt]!;
-    expect(guard.if).toBe("github.event_name == 'workflow_dispatch'");
-    expect(guard.env).toMatchObject({
-      REF_NAME: '${{ github.ref_name }}',
-      SHA: '${{ github.sha }}',
-      PR_NUMBER: '${{ inputs.pr }}',
-    });
-    const run = guard.run ?? '';
-    expect(run).toMatch(/^\s*if \[ "\$STATE" != OPEN \]; then$/m);
-    expect(run).toMatch(/^\s*if \[ "\$HEAD_REF" != "\$REF_NAME" \]; then$/m);
-    expect(run).toMatch(/^\s*if \[ "\$HEAD_SHA" != "\$SHA" \]; then$/m);
-    expect(run.match(/::error::/g)).toHaveLength(3);
-    expect(run.match(/exit 1/g)).toHaveLength(3);
-    expect(run).not.toContain('${{');
-  });
-
-  it('keeps the visual check reporting on a dispatched ci.yml: it has no event condition', () => {
-    const ci = parsed('ci.yml') as Parsed & {
-      jobs: Record<string, Job & { if?: string }>;
-    };
-    expect(ci.jobs.visual).toBeDefined();
-    expect(ci.jobs.visual?.if).toBeUndefined();
-    expect(jobNamed('ci.yml', 'visual').condition).toBeUndefined();
-  });
-
-  it('refuses develop and main as the branch, before it checks anything out', () => {
+  it('refuses any ref outside refs/floors/, develop and main included, before it checks anything out', () => {
     const [first, ...rest] = steps('image');
-    expect(first?.run).toMatch(/develop \| main\)/);
-    expect(first?.run).toMatch(/exit 1/);
-    expect(first?.env).toEqual({ BRANCH: '${{ inputs.branch }}' });
+    expect(first?.env).toEqual({ REF: '${{ inputs.ref }}' });
+    // Every line, so a widened pattern or a dropped exit is seen.
+    expect(linesOf(first?.run)).toEqual([
+      'case "$REF" in',
+      'refs/floors/?*) ;;',
+      '*)',
+      'echo "::error::floors are recorded on a scratch ref under refs/floors/, never on $REF: push the unpushed commit there first"',
+      'exit 1',
+      ';;',
+      'esac',
+    ]);
     expect(rest[0]?.uses).toMatch(/^actions\/checkout@/);
   });
 
+  it('checks out the ref it refused nothing for, and keeps no credential', () => {
+    const checkouts = ['image', 'record'].flatMap((id) =>
+      steps(id).filter(({ uses }) => uses?.startsWith('actions/checkout@')),
+    );
+    expect(checkouts.map((step) => step.with)).toEqual([
+      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
+      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
+    ]);
+  });
+
   it('never interpolates an input into a script', () => {
-    const scripts = ['image', 'record', 'commit'].flatMap(runsOf);
+    const scripts = ['image', 'record'].flatMap(runsOf);
     expect(
       searched(
         scripts.filter((run) => run.includes('${{')),
@@ -3714,102 +3630,45 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
     ).toBeUndefined();
   });
 
-  it('holds a workflow token of nothing, a read-only record, and a commit job that writes', () => {
-    expect(recorder().permissions).toEqual({});
-    expect(job('image').permissions).toEqual({ contents: 'read' });
-    expect(job('record').permissions).toEqual({ contents: 'read' });
-    expect(job('commit').permissions).toEqual({
-      contents: 'write',
-      actions: 'write',
-      'pull-requests': 'read',
-    });
-  });
-
-  it('runs no branch code in the job that can write', () => {
-    const scripts = runsOf('commit');
-    expect(scripts.length).toBeGreaterThan(0);
-    expect(
-      searched(
-        scripts.filter((run) => /\b(npm|npx|node|yarn|pnpm)\b/.test(run)),
-        { of: scripts, what: 'commit job scripts' },
-      ),
-    ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/commit-job-scripts', scripts.length),
-    ).toBeUndefined();
-  });
-
-  // The figures are folded into the commit they were measured on (operator
-  // 2026-10-10, "Bot folds into the head"), so every commit stays green on
-  // its own. The amend replaces exactly that commit: the push is leased to
-  // the SHA `record` measured, so a branch that moved since is refused, not
-  // overwritten, and the amended commit must keep that commit's parents.
-  it('folds the figures into the commit it measured, and leases the push to that commit alone', () => {
-    const lines = runsOf('commit')
-      .join('\n')
-      .split('\n')
-      .map((line) => line.trim());
-    // Each set exactly, so a second commit or a dropped check is seen too.
-    expect(lines.filter((line) => /^git commit\b/.test(line))).toEqual([
-      'git commit --amend -F floors-record/message.txt',
-    ]);
-    expect(lines.filter((line) => line.includes('PARENTS'))).toEqual([
-      'PARENTS="$(git log -1 --format=%P HEAD)"',
-      'if [ "$(git log -1 --format=%P HEAD)" != "$PARENTS" ]; then',
-    ]);
-    const pushLines = lines.filter(
-      (line) => /\bpush\b/.test(line) && line.includes('git'),
-    );
-    expect(pushLines).toEqual([
-      // The token reaches the push alone, never .git/config (#395).
-      'git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"',
-    ]);
-    const amend = steps('commit').find(({ run }) => run?.includes('--amend'));
-    expect(amend?.env?.SHA).toBe('${{ needs.record.outputs.sha }}');
-    expect(lines.filter((line) => line.startsWith('git config '))).toEqual([
-      "git config user.name 'github-actions[bot]'",
-      "git config user.email '41898282+github-actions[bot]@users.noreply.github.com'",
-    ]);
-    const checkout = steps('commit')[0];
-    expect(checkout?.with?.ref).toBe('${{ needs.record.outputs.sha }}');
-    expect(checkout?.with?.['persist-credentials']).toBe(false);
-    // Depth 1 would make the measured commit shallow, and an amend of a
-    // shallow commit has NO parents: the push would orphan the branch.
-    expect(checkout?.with?.['fetch-depth']).toBe(2);
-  });
-
-  it('never forces a push any other way', () => {
-    const pushLines = runsOf('commit')
-      .join('\n')
-      .split('\n')
-      .filter((line) => /\bpush\b/.test(line) && line.includes('git'));
-    // A forcing refspec is `+` at the start of a word, quoted or not
-    // (`+HEAD:…`, `"+HEAD:…"`).
-    const forced = pushLines.filter((line) =>
-      /(?:\s--force|\s-f)(?=\s|$)|(?:^|[\s"'])\+|--force-with-lease(?!="refs\/heads\/\$BRANCH:\$SHA")/.test(
-        line,
-      ),
-    );
-    expect(
-      searched(forced, { of: pushLines, what: 'push lines in the commit job' }),
-    ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/commit-job-push-lines', pushLines.length),
-    ).toBeUndefined();
-  });
-
-  it('composes the amended message where the branch code runs, never where the token is', () => {
-    const record = runsOf('record')
-      .join('\n')
-      .split('\n')
-      .map((line) => line.trim());
+  it('composes the amended message from the measured commit, for the fold to use unchanged', () => {
+    const record = runsOf('record').flatMap(linesOf);
     expect(record.filter((line) => line.startsWith('git log '))).toEqual([
       'git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"',
     ]);
   });
 
+  it('hands back the figures, the message, the measured SHA and the ref, only when a floor moved', () => {
+    expect(runsOf('record').join('\n')).toMatch(
+      /^git rev-parse HEAD > "\$RUNNER_TEMP\/sha\.txt"$/m,
+    );
+    const keep = steps('record').find(
+      ({ name }) => name === 'Keep the figures for the session to fold',
+    );
+    expect(keep?.if).toBe("steps.diff.outputs.changed == 'true'");
+    expect(keep?.env).toEqual({ REF: '${{ inputs.ref }}' });
+    expect(linesOf(keep?.run)).toEqual([
+      'mkdir floors-record',
+      'cp tests/floors.json floors-record/floors.json',
+      'cp "$RUNNER_TEMP/message.txt" floors-record/message.txt',
+      'cp "$RUNNER_TEMP/sha.txt" floors-record/sha.txt',
+      `printf '%s\\n' "$REF" > floors-record/ref.txt`,
+    ]);
+    const upload = steps('record').find(({ uses }) =>
+      uses?.startsWith('actions/upload-artifact@'),
+    );
+    expect(upload?.if).toBe("steps.diff.outputs.changed == 'true'");
+    expect(upload?.with).toEqual({
+      name: 'floors-record',
+      path: 'floors-record',
+      'retention-days': 7,
+      'if-no-files-found': 'error',
+    });
+  });
+
   it('records in the image CI runs the e2e suite in, with the recorder told so', () => {
-    const ci = parsed('ci.yml');
+    const ci = parsed('ci.yml') as Parsed & {
+      jobs: Record<string, Job & { steps?: Step[] }>;
+    };
     expect(job('record').container).toEqual(ci.jobs.e2e?.container);
     expect(job('record').container?.image).toBe(
       '${{ needs.image.outputs.ref }}',
@@ -3838,6 +3697,82 @@ describe('the floor recorder commits to a branch and starts CI on it (#651)', ()
     // unit and functions modes took 1.5 to 3.4. The 120 it replaced was the
     // e2e policy's ceiling, set before any record had run.
     expect(job('record')['timeout-minutes']).toBe(60);
+  });
+});
+
+/**
+ * The dispatched paths the old bot push needed (#651), kept pinned until #891
+ * removes them: since #889 nothing dispatches either workflow.
+ */
+describe('the dispatch paths #891 retires stay safe while they remain', () => {
+  type Step = {
+    if?: string;
+    name?: string;
+    run?: string;
+    env?: Record<string, string>;
+  };
+  type Parsed = { jobs: Record<string, { if?: string; steps?: Step[] }> };
+  const parsed = (file: string) =>
+    parseCleanYaml(workflow(file), file) as Parsed;
+
+  it('refuses a dispatched pr-body run whose pull request is not the one that owns the ref', () => {
+    // The check attaches to the dispatched ref's head; judging another pull
+    // request's clean body would turn that head green unread.
+    const bodySteps =
+      parsed('pr-body.yml').jobs['closing-keywords']?.steps ?? [];
+    const guardAt = bodySteps.findIndex(({ run }) =>
+      run?.includes('--json headRefName,headRefOid,state'),
+    );
+    const judgingAt = bodySteps.flatMap(({ run }, index) =>
+      run?.includes('node scripts/closing-keywords.mjs') ? [index] : [],
+    );
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(judgingAt).toHaveLength(2);
+    expect(judgingAt.every((index) => index > guardAt)).toBe(true);
+    const guard = bodySteps[guardAt]!;
+    expect(guard.if).toBe("github.event_name == 'workflow_dispatch'");
+    expect(guard.env).toMatchObject({
+      REF_NAME: '${{ github.ref_name }}',
+      SHA: '${{ github.sha }}',
+      PR_NUMBER: '${{ inputs.pr }}',
+    });
+    const run = guard.run ?? '';
+    expect(run).toMatch(/^\s*if \[ "\$STATE" != OPEN \]; then$/m);
+    expect(run).toMatch(/^\s*if \[ "\$HEAD_REF" != "\$REF_NAME" \]; then$/m);
+    expect(run).toMatch(/^\s*if \[ "\$HEAD_SHA" != "\$SHA" \]; then$/m);
+    expect(run.match(/::error::/g)).toHaveLength(3);
+    expect(run.match(/exit 1/g)).toHaveLength(3);
+    expect(run).not.toContain('${{');
+  });
+
+  it('keeps a dispatched pr-body run read-only, judging the body of the pull request it names', () => {
+    // Pinned with the bot's commit job until #889, which retired that test;
+    // the dispatch path itself stays until #891, so its limits stay pinned.
+    const body = parseCleanYaml(workflow('pr-body.yml'), 'pr-body.yml') as {
+      on?: { workflow_dispatch?: { inputs?: { pr?: { required?: boolean } } } };
+      permissions?: unknown;
+      jobs: Record<string, { permissions?: unknown; steps?: Step[] }>;
+    };
+    expect(body.on?.workflow_dispatch?.inputs?.pr?.required).toBe(true);
+    // The check keeps its context name, and judges with the same script.
+    expect(Object.keys(body.jobs)).toEqual(['closing-keywords']);
+    const bodyRuns = (body.jobs['closing-keywords']?.steps ?? [])
+      .flatMap(({ run }) => run ?? [])
+      .join('\n');
+    expect(bodyRuns).toMatch(/^\s*gh pr view "\$PR_NUMBER" --json body /m);
+    expect(bodyRuns).toMatch(/^\s*node scripts\/closing-keywords\.mjs /m);
+    // Read-only, scoped to the job; the workflow's own token stays contents: read.
+    expect(body.permissions).toEqual({ contents: 'read' });
+    expect(body.jobs['closing-keywords']?.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+  });
+
+  it('keeps the visual check reporting on a dispatched ci.yml: it has no event condition', () => {
+    expect(parsed('ci.yml').jobs.visual).toBeDefined();
+    expect(parsed('ci.yml').jobs.visual?.if).toBeUndefined();
+    expect(jobNamed('ci.yml', 'visual').condition).toBeUndefined();
   });
 });
 
@@ -3919,16 +3854,18 @@ describe('a docs-only pull request skips the browser jobs and nothing else (#582
 
 const CAPTURE_WORKFLOW = 'visual-capture.yml';
 
-describe('the visual capture commits only baselines to a branch and starts CI on it (#654)', () => {
+describe('the visual capture measures a scratch ref and hands back only baselines (#654, #889)', () => {
   // Operator 2026-10-09 (global): visual runs are CI's, never the laptop's.
-  // Baselines change ONE way: this workflow, dispatched by hand. Built on
-  // record-floors.yml's split (#651): the job that runs the branch's code has
-  // a read-only token, and the job that can write runs none of it.
+  // Baselines change ONE way: this workflow, dispatched by hand, on a scratch
+  // ref; `scripts/fold-record.mjs` folds what it hands back.
   type Step = {
     id?: string;
+    name?: string;
+    if?: string;
     run?: string;
     uses?: string;
     env?: Record<string, string>;
+    with?: Record<string, unknown>;
   };
   type Job = {
     needs?: unknown;
@@ -3951,26 +3888,51 @@ describe('the visual capture commits only baselines to a branch and starts CI on
     expect(found, `${CAPTURE_WORKFLOW} defines no job '${id}'`).toBeDefined();
     return found!;
   };
+  const steps = (id: string) => job(id).steps ?? [];
   const runsOf = (id: string) =>
-    (job(id).steps ?? []).flatMap(({ run }) => run ?? []).join('\n');
+    steps(id)
+      .flatMap(({ run }) => run ?? [])
+      .join('\n');
+  const linesOf = (run: string | undefined) =>
+    (run ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
 
-  it('starts on workflow_dispatch and on nothing else, naming the branch', () => {
+  it('starts on workflow_dispatch and on nothing else, naming the scratch ref', () => {
     expect(Object.keys(capture().on ?? {})).toEqual(['workflow_dispatch']);
-    expect(capture().on?.workflow_dispatch?.inputs?.branch?.required).toBe(
-      true,
+    const inputs = capture().on?.workflow_dispatch?.inputs ?? {};
+    expect(Object.keys(inputs)).toEqual(['ref', 'grep']);
+    expect(inputs.ref?.required).toBe(true);
+  });
+
+  it('is one job set of image and capture', () => {
+    expect(Object.keys(capture().jobs)).toEqual(['image', 'capture']);
+  });
+
+  it('refuses any ref outside refs/visual/, develop and main included, before it reads anything', () => {
+    const [first, ...rest] = steps('image');
+    expect(first?.env).toEqual({ REF: '${{ inputs.ref }}' });
+    expect(linesOf(first?.run)).toEqual([
+      'case "$REF" in',
+      'refs/visual/?*) ;;',
+      '*)',
+      'echo "::error::baselines are captured on a scratch ref under refs/visual/, never on $REF: push the unpushed commit there first"',
+      'exit 1',
+      ';;',
+      'esac',
+    ]);
+    expect(rest[0]?.uses).toMatch(/^actions\/checkout@/);
+  });
+
+  it('checks out the ref it refused nothing for, and keeps no credential', () => {
+    const checkouts = ['image', 'capture'].flatMap((id) =>
+      steps(id).filter(({ uses }) => uses?.startsWith('actions/checkout@')),
     );
-  });
-
-  it('is one job set of image, capture and commit, with no token by default', () => {
-    expect(Object.keys(capture().jobs)).toEqual(['image', 'capture', 'commit']);
-    expect(capture().permissions).toEqual({});
-  });
-
-  it('refuses develop and main before it reads anything', () => {
-    const refusal = runsOf('image');
-    expect(refusal).toMatch(/^\s*case "\$BRANCH" in$/m);
-    expect(refusal).toMatch(/^\s*develop \| main\)$/m);
-    expect(refusal).toMatch(/^\s*exit 1$/m);
+    expect(checkouts.map((step) => step.with)).toEqual([
+      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
+      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
+    ]);
   });
 
   it('picks its image the way ci.yml does, and captures in the visual gate’s own container', () => {
@@ -3981,8 +3943,7 @@ describe('the visual capture commits only baselines to a branch and starts CI on
   });
 
   it('runs the visual suite with --update-snapshots=all, never the bare flag', () => {
-    const steps = job('capture').steps ?? [];
-    const capturing = steps.filter(({ run }) =>
+    const capturing = steps('capture').filter(({ run }) =>
       /npx playwright test --project=visual --update-snapshots=all\b/.test(
         run ?? '',
       ),
@@ -3992,58 +3953,37 @@ describe('the visual capture commits only baselines to a branch and starts CI on
     expect(runsOf('capture')).not.toMatch(/--update-snapshots(?!=all\b)/);
   });
 
-  it('gives the job that runs branch code a read-only token', () => {
-    expect(job('image').permissions).toEqual({ contents: 'read' });
-    expect(job('capture').permissions).toEqual({ contents: 'read' });
-  });
-
   it('lets the capture script judge what changed, refusing anything that is not a baseline', () => {
     expect(runsOf('capture')).toMatch(
       /^\s*node scripts\/visual-capture\.mjs /m,
     );
   });
 
-  it('commits from a job that runs no branch code', () => {
-    expect(job('commit').needs).toBe('capture');
-    expect(job('commit').if).toBe("needs.capture.outputs.changed == 'true'");
-    expect(job('commit').permissions).toEqual({
-      contents: 'write',
-      actions: 'write',
-      'pull-requests': 'read',
+  it('hands back the baselines, their list, the message, the measured SHA and the ref, only when one changed', () => {
+    expect(runsOf('capture')).toMatch(
+      /^\s*git rev-parse HEAD > "\$RUNNER_TEMP\/sha\.txt"$/m,
+    );
+    const keep = steps('capture').find(
+      ({ name }) => name === 'Keep the baselines for the session to fold',
+    );
+    expect(keep?.if).toBe("steps.diff.outputs.changed == 'true'");
+    expect(keep?.env).toEqual({ REF: '${{ inputs.ref }}' });
+    expect(linesOf(keep?.run)).toEqual([
+      'mkdir -p visual-capture/files',
+      'cp "$RUNNER_TEMP/message.txt" "$RUNNER_TEMP/baselines.txt" "$RUNNER_TEMP/sha.txt" visual-capture/',
+      `printf '%s\\n' "$REF" > visual-capture/ref.txt`,
+      'xargs -a "$RUNNER_TEMP/baselines.txt" cp --parents -t visual-capture/files',
+    ]);
+    const upload = steps('capture').find(({ uses }) =>
+      uses?.startsWith('actions/upload-artifact@'),
+    );
+    expect(upload?.if).toBe("steps.diff.outputs.changed == 'true'");
+    expect(upload?.with).toEqual({
+      name: 'visual-capture',
+      path: 'visual-capture',
+      'retention-days': 7,
+      'if-no-files-found': 'error',
     });
-    expect(runsOf('commit')).not.toMatch(/(^|\s)(npm|npx|node)\s/m);
-  });
-
-  it('judges the artifact’s list again before it copies, and copies only what it lists', () => {
-    // The list comes from the job that ran branch code; the job that can
-    // write trusts none of it.
-    const commit = runsOf('commit');
-    expect(commit).toMatch(
-      /^\s*if grep -vxE 'tests\/e2e\/__screenshots__\/\[\^\/"\[:space:\]\]\+\[\.\]png' visual-capture\/baselines\.txt; then$/m,
-    );
-    expect(commit).toMatch(/^\s*cp "visual-capture\/files\/\$file" "\$file"$/m);
-    expect(commit).not.toMatch(/cp -R/);
-  });
-
-  it('folds the baselines into the captured commit and pushes leased to it', () => {
-    const commit = runsOf('commit');
-    expect(commit).toMatch(
-      /^\s*git commit --amend -F visual-capture\/message\.txt$/m,
-    );
-    expect(commit).toMatch(
-      /^\s*git -c "http\.https:\/\/github\.com\/\.extraheader=AUTHORIZATION: basic \$AUTH" push --force-with-lease="refs\/heads\/\$BRANCH:\$SHA" origin "HEAD:refs\/heads\/\$BRANCH"$/m,
-    );
-    expect(commit).toMatch(
-      /^\s*echo "::error::the amend changed the parents of \$SHA: nothing pushed"$/m,
-    );
-  });
-
-  it('starts ci.yml and the pull request’s closing-keywords on the new head', () => {
-    const commit = runsOf('commit');
-    expect(commit).toMatch(/^\s*gh workflow run ci\.yml --ref "\$BRANCH"$/m);
-    expect(commit).toMatch(
-      /^\s*gh workflow run pr-body\.yml --ref "\$BRANCH" -f pr="\$PR"$/m,
-    );
   });
 
   it('is not part of the gate: ci.yml does not call it and no check is named for it', () => {
@@ -4055,43 +3995,193 @@ describe('the visual capture commits only baselines to a branch and starts CI on
 });
 
 /**
- * A head pushed with a workflow's own token has its `pull_request` runs held.
- *
- * MEASURED 2026-10-10 to 2026-10-12 (#663): after `record-floors.yml` or
- * `visual-capture.yml` folds its commit into a branch with an open pull
- * request, every `pull_request` run on the new head (CI, PR body,
- * back-translation) waits as `action_required`, and the pull request stays
- * BLOCKED although the dispatched checks pass on the same SHA. Re-running the
- * held runs as the App let them run, and #703 merged on them. The operator
- * ruled that re-run the standard step (2026-10-12 01:03Z), written where each
- * workflow's usage is: its header, read here as the documentation it is.
+ * A CI bot never pushes to a branch (operator, 2026-10-21, every project;
+ * #889). Neither bot holds a token that could, uses an action that might, or
+ * runs a line that would: the permission is the stop, and the other two make
+ * a change that tries it fail here rather than at GitHub.
  */
-describe('a bot-pushed head’s held runs are re-run as the App (#663)', () => {
-  /** The comment block a workflow opens with, above its `on:`. */
-  const header = (file: string) => {
-    const lines = workflow(file).split('\n');
-    const end = lines.findIndex((line) => /^on:/.test(line));
-    expect(end, `${file} has no top-level on:`).toBeGreaterThan(0);
-    return lines.slice(0, end).join('\n');
+describe('neither bot can push, commit or amend (#889)', () => {
+  type Step = { run?: string; uses?: string };
+  type Job = { uses?: string; permissions?: unknown; steps?: Step[] };
+  type Parsed = { permissions?: unknown; jobs: Record<string, Job> };
+  const parsed = (file: string) =>
+    parseCleanYaml(workflow(file), file) as Parsed;
+  const permissionsOf = (file: string) => {
+    const { permissions, jobs } = parsed(file);
+    return {
+      workflow: permissions,
+      // A job's own `uses:` would run another workflow with its own token.
+      jobs: Object.fromEntries(
+        Object.entries(jobs).map(([id, { permissions, uses }]) => [
+          id,
+          { permissions, uses },
+        ]),
+      ),
+    };
   };
+  /** Every action a workflow's steps use, by name, lower-cased: GitHub reads them so. */
+  const actionsOf = (file: string) => [
+    ...new Set(
+      Object.values(parsed(file).jobs).flatMap(({ steps }) =>
+        (steps ?? []).flatMap(({ uses }) =>
+          uses === undefined ? [] : [uses.split('@')[0]!.toLowerCase()],
+        ),
+      ),
+    ),
+  ];
+  /** Every line of every step's script, trimmed, blank lines left out. */
+  const scriptLines = (file: string) =>
+    Object.values(parsed(file).jobs).flatMap(({ steps }) =>
+      (steps ?? []).flatMap(({ run }) =>
+        (run ?? '')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== ''),
+      ),
+    );
+  /**
+   * A git subcommand that writes history or a ref, anywhere after `git` on
+   * the line, so no global option can hide it (the old bots' push was
+   * `git -c "...: basic $AUTH" push`, a quoted value with spaces in it); an
+   * amend however it is spelled; or any `gh` at all, since neither bot needs
+   * the API. It fails closed: a word like these in a read is refused too.
+   */
+  const WRITES =
+    /\bgit\b.*\s(?:push|commit|merge|rebase|cherry-pick|revert|am|tag|update-ref|reset|notes|stash)\b|--amend\b|\bgh\b/;
+
+  it('holds the recorder to no token, and each of its jobs to reading the repository', () => {
+    expect(permissionsOf(RECORDER_WORKFLOW)).toEqual({
+      workflow: {},
+      jobs: {
+        image: { permissions: { contents: 'read' }, uses: undefined },
+        record: { permissions: { contents: 'read' }, uses: undefined },
+      },
+    });
+  });
+
+  it('holds the capture to no token, and each of its jobs to reading the repository', () => {
+    expect(permissionsOf(CAPTURE_WORKFLOW)).toEqual({
+      workflow: {},
+      jobs: {
+        image: { permissions: { contents: 'read' }, uses: undefined },
+        capture: { permissions: { contents: 'read' }, uses: undefined },
+      },
+    });
+  });
 
   it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
-    '%s documents listing the held runs on the bot’s head',
+    '%s uses checkout, setup-node and upload-artifact, and no other action',
     (file) => {
-      expect(header(file)).toMatch(
-        /^#\s+gh run list --branch <branch> --status action_required \\$/m,
-      );
-      expect(header(file)).toMatch(
-        /^#\s+--json databaseId,headSha --jq '\.\[\] \| select\(\.headSha == "<sha>"\) \| \.databaseId'$/m,
-      );
+      expect(actionsOf(file).sort()).toEqual([
+        'actions/checkout',
+        'actions/setup-node',
+        'actions/upload-artifact',
+      ]);
     },
   );
 
+  it('runs no recorder line that pushes, commits or amends, and calls no gh', () => {
+    const lines = scriptLines(RECORDER_WORKFLOW);
+    expect(
+      searched(
+        lines.filter((line) => WRITES.test(line)),
+        { of: lines, what: `script lines in ${RECORDER_WORKFLOW}` },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/recorder-script-lines', lines.length),
+    ).toBeUndefined();
+  });
+
+  it('runs no capture line that pushes, commits or amends, and calls no gh', () => {
+    const lines = scriptLines(CAPTURE_WORKFLOW);
+    expect(
+      searched(
+        lines.filter((line) => WRITES.test(line)),
+        { of: lines, what: `script lines in ${CAPTURE_WORKFLOW}` },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/capture-script-lines', lines.length),
+    ).toBeUndefined();
+  });
+
+  // The pattern's own plants, written by hand (#446), one test each: every
+  // form it must refuse, the old bots' own push and amend among them.
+  it.each([
+    'git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"',
+    'git commit --amend -F floors-record/message.txt',
+    'git push origin HEAD:refs/heads/x',
+    'git -C "a dir" commit -m x',
+    'git --git-dir=.git update-ref refs/heads/x HEAD',
+    'cp a b && git tag v1',
+    'gh workflow run ci.yml --ref "$BRANCH"',
+    'gh api -X PATCH repos/o/r/git/refs/heads/x',
+  ])('the write pattern refuses %s', (line) => {
+    expect(WRITES.test(line)).toBe(true);
+  });
+
+  // And every git line the two bots run today, which it must let pass.
+  it.each([
+    'git rev-parse HEAD > "$RUNNER_TEMP/sha.txt"',
+    'git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"',
+    'git status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/status.txt"',
+    'git config --global --add safe.directory "$GITHUB_WORKSPACE"',
+  ])('the write pattern lets %s pass', (line) => {
+    expect(WRITES.test(line)).toBe(false);
+  });
+});
+
+/** The comment block a workflow opens with, above its `on:`. */
+const workflowHeader = (file: string) => {
+  const lines = workflow(file).split('\n');
+  const end = lines.findIndex((line) => /^on:/.test(line));
+  expect(end, `${file} has no top-level on:`).toBeGreaterThan(0);
+  return lines.slice(0, end).join('\n');
+};
+
+/**
+ * Each bot's usage is written where it is used, its header, and read here as
+ * the documentation it is: the push-free round trip (#889), and none of the
+ * old one's steps (the reset onto a bot's head, the held runs re-run).
+ */
+describe('each bot documents the push-free round trip (#889)', () => {
+  it('documents pushing to refs/floors/, dispatching the recorder from develop, folding, pushing once and deleting the ref', () => {
+    const header = workflowHeader(RECORDER_WORKFLOW);
+    expect(header).toMatch(
+      /^#\s+git push origin HEAD:refs\/floors\/<branch>$/m,
+    );
+    expect(header).toMatch(
+      /^#\s+gh workflow run record-floors\.yml --ref develop -f ref=refs\/floors\/<branch>$/m,
+    );
+    expect(header).toMatch(/^#\s+node scripts\/fold-record\.mjs <run-id>$/m);
+    expect(header).toMatch(/^#\s+git push origin <branch>$/m);
+    expect(header).toMatch(
+      /^#\s+git push origin --delete refs\/floors\/<branch>$/m,
+    );
+  });
+
+  it('documents pushing to refs/visual/, dispatching the capture from develop, folding, pushing once and deleting the ref', () => {
+    const header = workflowHeader(CAPTURE_WORKFLOW);
+    expect(header).toMatch(
+      /^#\s+git push origin HEAD:refs\/visual\/<branch>$/m,
+    );
+    expect(header).toMatch(
+      /^#\s+gh workflow run visual-capture\.yml --ref develop -f ref=refs\/visual\/<branch>$/m,
+    );
+    expect(header).toMatch(/^#\s+node scripts\/fold-record\.mjs <run-id>$/m);
+    expect(header).toMatch(/^#\s+git push origin <branch>$/m);
+    expect(header).toMatch(
+      /^#\s+git push origin --delete refs\/visual\/<branch>$/m,
+    );
+  });
+
   it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
-    '%s documents re-running each one as the App',
+    '%s no longer documents the reset onto a bot’s head or the held runs',
     (file) => {
-      expect(header(file)).toMatch(/^#\s+gh run rerun <id>$/m);
-      expect(header(file)).toMatch(/^#.*\bas the App\b/m);
+      expect(workflowHeader(file)).not.toMatch(
+        /reset --keep|action_required|gh run rerun/,
+      );
     },
   );
 });
