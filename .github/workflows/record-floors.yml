@@ -127,7 +127,6 @@ jobs:
       # The commit the record is made on, handed back with the figures, so
       # `scripts/fold-record.mjs` folds them into that commit and no other.
       - run: git rev-parse HEAD > "$RUNNER_TEMP/sha.txt"
-      - run: git push origin HEAD
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
