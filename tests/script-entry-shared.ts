@@ -233,6 +233,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: floors-diff.mjs',
   },
+  // Without a run id it prints its usage and refuses, before git or gh (#889).
+  'fold-record.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: fold-record.mjs <run-id>',
+  },
   // Without its four paths it prints its usage and refuses (#654).
   'visual-capture.mjs': {
     args: [],

@@ -9,6 +9,7 @@ import {
   giveEveryoneASex,
   refuseFullscreen,
   holdFirstGrantUntilTheNext,
+  holdTheTidyUpExit,
   openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
@@ -301,6 +302,98 @@ test.describe('the projector view', () => {
     expect(
       await page.evaluate(() => document.fullscreenElement?.id ?? null),
     ).toBe('cg-board');
+  });
+
+  // The neighbouring order: the first showing's grant lands in the gap,
+  // while the board is closed, and the page undoes it. Were the board
+  // reopened while that exit is in flight, with the second grant settled
+  // first, the exit's `fullscreenchange` would find a showing that got
+  // fullscreen and close it. The window is the in-flight exit, and for all
+  // of it the document is in fullscreen over a hidden board, so the question
+  // is whether a teacher's click can reach the Full screen button there.
+  test('a reopen cannot reach the page while the last showing is still being undone', async ({
+    page,
+  }) => {
+    test.skip(
+      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
+      'no element fullscreen on this engine (iPhone Safari): no grant to race',
+    );
+    await holdTheTidyUpExit(page);
+    await withGroups(page);
+    const open = page.getByRole('button', { name: 'Full screen' });
+    await open.click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board')).toBeHidden();
+    // Read here, not before the click: on a phone the click scrolls the button
+    // into view, and a box read before it points off the screen afterwards.
+    const box = (await open.boundingBox())!;
+
+    type Race = {
+      firstAnswered: boolean;
+      exitsAsked: number;
+      exitHeld: boolean;
+    };
+    const race = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __tidyUpRace: { race: Race } }).__tidyUpRace
+            .race,
+      );
+    await page.evaluate(() =>
+      (
+        window as unknown as { __tidyUpRace: { landFirst: () => void } }
+      ).__tidyUpRace.landFirst(),
+    );
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { __tidyUpRace: { race: Race } }).__tidyUpRace
+          .race.firstAnswered,
+    );
+    // The order is reached: a real grant, on the closed board, with the page's
+    // exit for it asked for and still in flight.
+    expect(await race()).toEqual({
+      firstAnswered: true,
+      exitsAsked: 1,
+      exitHeld: true,
+    });
+    expect(
+      await page.evaluate(() => document.fullscreenElement?.id ?? null),
+    ).toBe('cg-board');
+
+    const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const hit = await page.evaluate(({ x, y }) => {
+      const top = document.elementFromPoint(x, y);
+      return top === null ? null : top.id || top.tagName;
+    }, centre);
+    test
+      .info()
+      .annotations.push({ type: 'hit-in-flight', description: String(hit) });
+    // A teacher's click, where the button was: a raw pointer, with no
+    // actionability wait, which would hold it until the window had closed.
+    await page.mouse.click(centre.x, centre.y);
+    const reopened = await page.evaluate(
+      () => !document.getElementById('cg-board')!.hidden,
+    );
+    test.info().annotations.push({
+      type: 'reopened-in-flight',
+      description: String(reopened),
+    });
+
+    await page.evaluate(() =>
+      (
+        window as unknown as { __tidyUpRace: { releaseExit: () => void } }
+      ).__tidyUpRace.releaseExit(),
+    );
+    await page.waitForFunction(() => document.fullscreenElement === null);
+    test.info().annotations.push({
+      type: 'open-after-exit',
+      description: String(
+        await page.evaluate(() => !document.getElementById('cg-board')!.hidden),
+      ),
+    });
+    expect(hit).toBe('HTML');
+    expect(reopened).toBe(false);
+    await expect(page.locator('#cg-board')).toBeHidden();
   });
 
   // The claim is ESCAPE EXITS, twice over: straight away, and again after

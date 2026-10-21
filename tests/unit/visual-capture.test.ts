@@ -10,7 +10,7 @@ import {
 import { pngOf, rampPixels, withChangedPixels } from '../png-fixture';
 
 /**
- * What the CI capture (#654) commits back to a branch: the baselines a
+ * What the CI capture (#654) hands back to fold (#889): the baselines a
  * `--update-snapshots=all` run changed, and nothing else. `git status` after
  * it lists every rewritten file; a rewrite is committed only past the pixel
  * rule (#678). Anything else it changed is refused, never committed: the job
@@ -209,7 +209,7 @@ describe('captureSummary names every page committed and every page kept', () => 
 
   it('says plainly when nothing was committed', () => {
     expect(captureSummary({ commit: [], kept: [] })).toBe(
-      'No baseline changed: nothing committed, nothing dispatched.',
+      'No baseline changed: no artifact uploaded, nothing to fold.',
     );
   });
 

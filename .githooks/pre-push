@@ -21,9 +21,10 @@
 # them here rather than one CI round trip later.
 #
 # And no test suite runs here, not even unit (operator, 2026-10-12, a global
-# rule; #713). Floors are recorded by `record-floors.yml` on the pushed branch,
-# so a branch that adds or moves a floor fails the unit suite until that job
-# has run, and a unit run here refused the very push the record needs (#658).
+# rule; #713). Floors are recorded by `record-floors.yml` on a scratch ref the
+# commit is pushed to first (#889), so a commit that adds or moves a floor
+# fails the unit suite until that run is folded in, and a unit run here
+# refused the very push the record needs (#658).
 # Run `npm run test:unit` by hand before each push; CI runs every suite on the
 # pull request.
 #
