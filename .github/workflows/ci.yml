@@ -36,5 +36,5 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: A minimal animating page's click on webkit, 100 times
-        run: npx playwright test --project=webkit tests/e2e/probe-919.spec.ts --repeat-each=100 --reporter=line
+      - name: The frame test with sound off on webkit, 60 times
+        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=60 --reporter=line
