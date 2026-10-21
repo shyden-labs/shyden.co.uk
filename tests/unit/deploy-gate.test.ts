@@ -22,8 +22,10 @@ import { REQUIRED_CHECKS, decideDeploy } from '../../scripts/deploy-gate.mjs';
  *
  * So the gate verifies tree equality rather than trusting a status to exist.
  * That is strictly stronger: it refuses BY CONSTRUCTION whenever the deployed
- * bytes are not the bytes that passed — a direct push (one parent), a squash or
- * rebase merge (one parent), a dispatched branch, or any tree that differs.
+ * bytes are not the bytes that passed — a direct push, a dispatched branch, or
+ * any tree that differs. A squash merge (#892, one parent) finds its tested
+ * head through the pull request GitHub records it came from, and is held to
+ * the same tree equality and the same checks.
  *
  * Every branch below refuses. That is deliberate: this gate's only dangerous
  * failure is a false GREEN, so the tests are weighted towards proving it says no.
@@ -79,10 +81,10 @@ describe('the dev deploy gate only skips the suite for bytes that passed it', ()
   });
 
   describe('refuses when the deployed bytes were never tested as this tree', () => {
-    it('refuses a commit with no second parent — a direct push or squash merge', () => {
+    it('refuses a one-parent commit whose pull requests were never read', () => {
       const result = decideDeploy({ ...sound(), parents: [HEAD] });
       expect(result.deploy).toBe(false);
-      expect(result.reason).toMatch(/parent/i);
+      expect(result.reason).toMatch(/pull request/i);
     });
 
     it('refuses a root commit with no parents at all', () => {
@@ -231,5 +233,147 @@ describe('the dev deploy gate only skips the suite for bytes that passed it', ()
     expect(refusals.every((r) => r.deploy === false)).toBe(true);
     for (const r of refusals)
       expect(r.reason.trim().length).toBeGreaterThan(20);
+  });
+});
+
+/** The squash develop's pull request #900 landed as, one parent. */
+const SQUASH = '5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a';
+const DEVELOP_BEFORE = '0000000000000000000000000000000000000000';
+
+/** A pull request as the gate reads it off `/commits/{sha}/pulls`. */
+type Pull = {
+  number: number;
+  merged: boolean;
+  mergeCommitSha: string | null;
+  headSha: string;
+  baseRef: string;
+};
+
+const landed = (over: Partial<Pull> = {}): Pull => ({
+  number: 900,
+  merged: true,
+  mergeCommitSha: SQUASH,
+  headSha: HEAD,
+  baseRef: 'develop',
+  ...over,
+});
+
+/** A squash whose tree provably matches the head its pull request tested. */
+const squashed = (
+  pulls: readonly Pull[] | string = [landed()],
+  checks: CheckRun[] = REQUIRED_CHECKS.map((n) => passing(n)),
+) => ({
+  sha: SQUASH,
+  parents: [DEVELOP_BEFORE],
+  pulls,
+  treeOf: { [SQUASH]: TREE, [HEAD]: TREE },
+  checks,
+});
+
+/** What every one-parent commit no merged pull request into develop landed gets. */
+const DIRECT_PUSH =
+  '5a5a5a5 has one parent and no merged pull request into develop landed it as its merge commit: a direct push, so the suite has to run here.';
+
+describe('a squash deploys only as the pull request head it landed (#892)', () => {
+  it('deploys a squash whose pull request head has its tree and passed every check', () => {
+    expect(decideDeploy(squashed())).toEqual({
+      deploy: true,
+      reason: `squash 5a5a5a5 of pull request #900: tree eb26eb4 is identical to tested head 49fd9c5, which passed build-and-test + visual.`,
+    });
+  });
+
+  it('refuses a one-parent commit no pull request landed: a direct push', () => {
+    expect(decideDeploy(squashed([]))).toEqual({
+      deploy: false,
+      reason: DIRECT_PUSH,
+    });
+  });
+
+  it('refuses a commit a pull request only contains, rather than landed', () => {
+    expect(
+      decideDeploy(squashed([landed({ mergeCommitSha: 'a'.repeat(40) })])),
+    ).toMatchObject({
+      deploy: false,
+      reason: DIRECT_PUSH,
+    });
+  });
+
+  it('refuses a squash two pull requests claim, rather than choosing one', () => {
+    expect(decideDeploy(squashed([landed(), landed({ number: 901 })]))).toEqual(
+      {
+        deploy: false,
+        reason: `5a5a5a5 is the merge commit of pull requests #900 and #901: refusing rather than choosing which head was tested.`,
+      },
+    );
+  });
+
+  it('refuses a pull request into another base', () => {
+    expect(decideDeploy(squashed([landed({ baseRef: 'main' })]))).toMatchObject(
+      {
+        deploy: false,
+        reason: DIRECT_PUSH,
+      },
+    );
+  });
+
+  it('refuses a pull request that is not merged', () => {
+    expect(decideDeploy(squashed([landed({ merged: false })]))).toMatchObject({
+      deploy: false,
+      reason: DIRECT_PUSH,
+    });
+  });
+
+  it('refuses when the pull requests could not be read, naming why', () => {
+    expect(decideDeploy(squashed('pulls for 5a5a5a5: HTTP 502'))).toEqual({
+      deploy: false,
+      reason: `could not read the pull requests of 5a5a5a5 (pulls for 5a5a5a5: HTTP 502): refusing rather than assuming none.`,
+    });
+  });
+
+  it('refuses a squash whose tree is not its pull request head’s', () => {
+    expect(
+      decideDeploy({
+        ...squashed(),
+        treeOf: { [SQUASH]: OTHER_TREE, [HEAD]: TREE },
+      }),
+    ).toEqual({
+      deploy: false,
+      reason: `tree mismatch: 5a5a5a5 is fffffff but its tested head 49fd9c5 is eb26eb4. The bytes being deployed are not the bytes that passed.`,
+    });
+  });
+
+  it('refuses when the pull request head’s tree could not be resolved', () => {
+    expect(
+      decideDeploy({ ...squashed(), treeOf: { [SQUASH]: TREE } }),
+    ).toMatchObject({
+      deploy: false,
+      reason: expect.stringContaining('49fd9c5'),
+    });
+  });
+
+  it('refuses a squash whose pull request head has no check-runs', () => {
+    expect(decideDeploy(squashed([landed()], []))).toMatchObject({
+      deploy: false,
+      reason: expect.stringContaining(
+        'no build-and-test check-run on the tested head 49fd9c5',
+      ),
+    });
+  });
+
+  it('refuses a squash whose pull request head failed visual', () => {
+    expect(
+      decideDeploy(
+        squashed(
+          [landed()],
+          [
+            passing('build-and-test'),
+            { ...passing('visual'), conclusion: 'failure' },
+          ],
+        ),
+      ),
+    ).toMatchObject({
+      deploy: false,
+      reason: expect.stringContaining('visual on 49fd9c5 is failure'),
+    });
   });
 });

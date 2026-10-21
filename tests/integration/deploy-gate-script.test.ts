@@ -48,6 +48,9 @@ let dir = '';
 let base = '';
 let tested = '';
 let merge = '';
+/** A second pull request's head, and the squash develop landed it as (#892). */
+let squashedHead = '';
+let squash = '';
 
 const short = (sha: string) => sha.slice(0, 7);
 
@@ -95,6 +98,17 @@ beforeAll(async () => {
   git(['checkout', '-q', 'develop']);
   git(['merge', '-q', '--no-ff', 'feature', '-m', 'merge']);
   merge = head();
+  git(['checkout', '-q', '-b', 'second']);
+  writeFileSync(path.join(dir, 'c.txt'), 'c\n');
+  git(['add', 'c.txt']);
+  git(['commit', '-q', '-m', 'second tested head']);
+  squashedHead = head();
+  git(['checkout', '-q', 'develop']);
+  git(['merge', '-q', '--squash', 'second']);
+  git(['commit', '-q', '-m', 'second, squashed (#900)']);
+  squash = head();
+  // The merge stays checked out: GITHUB_SHA names the commit each test judges.
+  git(['checkout', '-q', merge]);
 });
 
 afterAll(async () => {
@@ -134,6 +148,38 @@ const checksOnTested = (visual: string | null = 'success') => {
         }
       : { status: 404, body: { message: 'Not Found' } };
 };
+
+const PULLS_PATH = (sha: string) =>
+  `/repos/${REPO}/commits/${sha}/pulls?per_page=100`;
+const CHECKS_OF = (sha: string) =>
+  `/repos/${REPO}/commits/${sha}/check-runs?per_page=100`;
+
+/** GitHub answering exactly these paths, and 404 for any other. */
+const serve = (bodies: Record<string, unknown>) => {
+  answer = (url) =>
+    Object.hasOwn(bodies, url)
+      ? { status: 200, body: bodies[url] }
+      : { status: 404, body: { message: 'Not Found' } };
+};
+
+/** Both required checks passed. */
+const PASSED = {
+  check_runs: ['build-and-test', 'visual'].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: 'success',
+    completed_at: '2026-10-21T10:00:00Z',
+  })),
+};
+
+/** The pull request #900 as `/commits/{sha}/pulls` lists it, landed as `squash`. */
+const pull900 = (headSha: string) => ({
+  number: 900,
+  merged_at: '2026-10-21T10:05:00Z',
+  merge_commit_sha: squash,
+  head: { sha: headSha },
+  base: { ref: 'develop' },
+});
 
 /**
  * Run the script with the runner's variables. Asynchronously, and that is not
@@ -201,16 +247,18 @@ describe('the deploy gate, run in a checkout against the checks API', () => {
   });
 
   it('judges the commit in GITHUB_SHA, not whatever is checked out', async () => {
-    checksOnTested();
-
     // The checkout is at the merge; the commit to judge is the tested head,
-    // which has one parent and so cannot be vouched for by its checks.
+    // which has one parent and no pull request landed: a direct push.
+    serve({ [PULLS_PATH(tested)]: [] });
     const { code, out } = await run({ GITHUB_SHA: tested });
 
     expect(out).toContain(
-      `deploy-gate: REFUSE — ${short(tested)} has 1 parent(s).`,
+      `deploy-gate: REFUSE — ${short(tested)} has one parent and no merged pull request into develop landed it`,
     );
-    expect(await requestsThenSentinel()).toEqual(['/sentinel']);
+    expect(await requestsThenSentinel()).toEqual([
+      PULLS_PATH(tested),
+      '/sentinel',
+    ]);
     expect(code).toBe(1);
     expect(short(base)).not.toBe(short(tested));
   });
@@ -253,6 +301,78 @@ describe('the deploy gate, run in a checkout against the checks API', () => {
 
     expect(err).toContain('GITHUB_REPOSITORY and GITHUB_TOKEN are required');
     expect(await requestsThenSentinel()).toEqual(['/sentinel']);
+    expect(code).toBe(1);
+  });
+});
+
+describe('the deploy gate on a squash, run in a checkout against the API (#892)', () => {
+  it('proceeds on a squash whose pull request head has its tree and passed, and says why', async () => {
+    serve({
+      [PULLS_PATH(squash)]: [pull900(squashedHead)],
+      [CHECKS_OF(squashedHead)]: PASSED,
+    });
+    const tree = scratchGit(dir)(['rev-parse', `${squash}^{tree}`]).trim();
+
+    const { code, out, err } = await run({ GITHUB_SHA: squash });
+
+    expect(err).toBe('');
+    expect(out).toBe(
+      `deploy-gate: PROCEED — squash ${short(squash)} of pull request #900: ` +
+        `tree ${short(tree)} is identical to tested head ${short(squashedHead)}, ` +
+        'which passed build-and-test + visual.\n',
+    );
+    expect(code).toBe(0);
+    expect(await requestsThenSentinel()).toEqual([
+      PULLS_PATH(squash),
+      CHECKS_OF(squashedHead),
+      '/sentinel',
+    ]);
+  });
+
+  it('refuses a squash whose pull request names a head with another tree', async () => {
+    serve({
+      [PULLS_PATH(squash)]: [pull900(tested)],
+      [CHECKS_OF(tested)]: PASSED,
+    });
+
+    const { code, out } = await run({ GITHUB_SHA: squash });
+
+    expect(out).toContain(
+      `deploy-gate: REFUSE — tree mismatch: ${short(squash)} is `,
+    );
+    expect(code).toBe(1);
+  });
+
+  it('reads the head’s tree from the API when the checkout does not hold the head', async () => {
+    const tree = scratchGit(dir)(['rev-parse', `${squash}^{tree}`]).trim();
+    const gone = 'c'.repeat(40);
+    serve({
+      [PULLS_PATH(squash)]: [pull900(gone)],
+      [`/repos/${REPO}/git/commits/${gone}`]: { tree: { sha: tree } },
+      [CHECKS_OF(gone)]: PASSED,
+    });
+
+    const { code, out } = await run({ GITHUB_SHA: squash });
+
+    expect(out).toContain(
+      `deploy-gate: PROCEED — squash ${short(squash)} of pull request #900: `,
+    );
+    expect(code).toBe(0);
+  });
+
+  it('refuses a squash whose pull requests cannot be read', async () => {
+    serve({});
+
+    const { code, out } = await run({ GITHUB_SHA: squash });
+
+    expect(out).toContain(
+      `deploy-gate: REFUSE — could not read the pull requests of ${short(squash)} ` +
+        `(pulls for ${short(squash)}: HTTP 404)`,
+    );
+    expect(await requestsThenSentinel()).toEqual([
+      PULLS_PATH(squash),
+      '/sentinel',
+    ]);
     expect(code).toBe(1);
   });
 });

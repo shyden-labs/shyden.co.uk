@@ -47,9 +47,10 @@ jobs:
   # on this commit. `ci.yml` never runs on a push (pull_request and this
   # file's own workflow_call are its only triggers), so there is no status
   # here to read; what there IS, because `develop` sets `strict: true`,
-  # is a second parent whose TREE is identical to this one. `deploy-gate.mjs`
-  # proves that equality and reads the check-runs from that parent, refusing on
-  # anything ambiguous. See scripts/deploy-gate.mjs for why every doubtful case
+  # is a tested head whose TREE is identical to this one: a merge commit's
+  # second parent, or the head of the pull request a squash landed (#892).
+  # `deploy-gate.mjs` proves that equality and reads the check-runs from that
+  # head, refusing on anything ambiguous. See scripts/deploy-gate.mjs for why every doubtful case
   # refuses: the only dangerous failure here is a false green (#157).
   gate:
     name: Gate — this tree already passed on its PR
@@ -59,6 +60,8 @@ jobs:
     permissions:
       contents: read
       checks: read
+      # A squash's pull request, read off `/commits/{sha}/pulls` (#892).
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -331,6 +331,9 @@ describe('the deploy pipeline runs what it claims to', () => {
     // check-runs live behind their own scope; without it the API 404s and the
     // gate refuses every deploy.
     expect(gate).toContain('checks: read');
+    // A squash finds its tested head through its pull request (#892); without
+    // the scope that lookup fails and the gate refuses every squash.
+    expect(gate).toMatch(/^\s*pull-requests: read$/m);
   });
 
   it('a dispatched branch still runs everything, because it has no tested parent', () => {
