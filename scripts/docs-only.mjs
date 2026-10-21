@@ -52,6 +52,7 @@ export const DOCS_READ_BY_CODE = Object.freeze([
  * exactly this list.
  */
 export const SKIPPED_WHEN_DOCS_ONLY = Object.freeze([
+  'coverage',
   'e2e',
   'functions',
   'sanity-on-build',

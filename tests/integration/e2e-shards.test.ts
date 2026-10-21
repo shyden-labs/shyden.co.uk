@@ -215,7 +215,7 @@ describe('the verdict, run as build-and-test runs it', () => {
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
     expect(run.stdout).toMatch(/docs-only/);
-    expect(run.stdout).toMatch(/e2e, functions, sanity-on-build/);
+    expect(run.stdout).toMatch(/coverage, e2e, functions, sanity-on-build/);
   });
 
   it('fails a docs-only verdict when a shard ran anyway', () => {

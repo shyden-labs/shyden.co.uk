@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config.ts';
 import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
+import { coverageFor } from './tests/coverage-options.ts';
 
 /**
  * The integration suite (#630): every test that starts a process (a script run
@@ -26,5 +27,7 @@ export default defineConfig({
       ['./tests/load-reporter.ts', { suite: 'integration' }],
     ],
     globalSetup: unit.test?.globalSetup,
+    // Inert until a command passes --coverage (#896).
+    coverage: coverageFor('integration'),
   },
 });

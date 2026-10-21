@@ -181,6 +181,55 @@ jobs:
       # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
+  # Coverage of the changed lines (#896): three Vitest suites again, each
+  # under V8 coverage, joined, then the verdict on every line this pull request
+  # changes, printed in the job summary. It reports and gates nothing yet:
+  # #902 makes it a gate once #899-#901 measure child processes, workerd and
+  # the browser (Shyden 2026-10-21, "Measure all first"). A suite that fails
+  # writes no report, and a missing or stale report fails the job either way.
+  # The unit suite's own 1 s step stays in `checks`, without coverage.
+  # Not guards: under coverage the duplication guard's whole-tree scan took
+  # 64 s against the suite's 25 s limit (run 39612796552), and no limit is
+  # raised, so code only a guard runs reads as unrun.
+  coverage:
+    needs: [image, scope]
+    # Skipped on a docs-only pull request (#582), like every job that builds.
+    if: needs.scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-26.04
+    # Run 39612796552: unit under coverage took 20 s; simulation and
+    # integration take 26-32 s together in `checks` (39586345113,
+    # 39574987257) and have not yet run under coverage, so this is room
+    # until they have, then cut to a measured figure (#896).
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The verdict diffs against the merge base with develop.
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: git fetch --no-tags origin develop:refs/remotes/origin/develop
+      - run: npm ci
+      # The integration suite serves the built site.
+      - run: npm run build
+      - run: npm run test:coverage
+      - run: npm run test:coverage:simulation
+      - run: npm run test:coverage:integration
+      - run: node scripts/coverage-merge.mjs
+      - name: The changed lines, against the coverage of every suite
+        run: node scripts/coverage-changed.mjs --report-only >> "$GITHUB_STEP_SUMMARY"
+      # For SonarCloud's coverage on new code (#851).
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-lcov
+          path: coverage/*/lcov.info
+          if-no-files-found: error
+
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
   # budget, and every pull request waited all of it.
@@ -457,7 +506,17 @@ jobs:
 
   build-and-test:
     needs:
-      [image, scope, checks, e2e, capture, sanity-on-build, functions, logs]
+      [
+        image,
+        scope,
+        checks,
+        coverage,
+        e2e,
+        capture,
+        sanity-on-build,
+        functions,
+        logs,
+      ]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read
     # green exactly when a shard failed or was skipped (#157). It runs always,

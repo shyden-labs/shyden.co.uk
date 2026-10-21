@@ -39,3 +39,6 @@ dashboard-state/
 # npm run floors:record's scratch directories, on the container's mount (#475)
 /.floors-record-*/
 .remember/
+
+# V8 coverage reports (#896)
+coverage/
