@@ -3715,35 +3715,41 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
   const parsed = (file: string) =>
     parseCleanYaml(workflow(file), file) as Parsed;
 
-  it('refuses a dispatched pr-body run whose pull request is not the one that owns the ref', () => {
-    // The check attaches to the dispatched ref's head; judging another pull
-    // request's clean body would turn that head green unread.
-    const bodySteps =
-      parsed('pr-body.yml').jobs['closing-keywords']?.steps ?? [];
-    const guardAt = bodySteps.findIndex(({ run }) =>
-      run?.includes('--json headRefName,headRefOid,state'),
-    );
-    const judgingAt = bodySteps.flatMap(({ run }, index) =>
-      run?.includes('node scripts/closing-keywords.mjs') ? [index] : [],
-    );
-    expect(guardAt).toBeGreaterThan(-1);
-    expect(judgingAt).toHaveLength(2);
-    expect(judgingAt.every((index) => index > guardAt)).toBe(true);
-    const guard = bodySteps[guardAt]!;
-    expect(guard.if).toBe("github.event_name == 'workflow_dispatch'");
-    expect(guard.env).toMatchObject({
-      REF_NAME: '${{ github.ref_name }}',
-      SHA: '${{ github.sha }}',
-      PR_NUMBER: '${{ inputs.pr }}',
-    });
-    const run = guard.run ?? '';
-    expect(run).toMatch(/^\s*if \[ "\$STATE" != OPEN \]; then$/m);
-    expect(run).toMatch(/^\s*if \[ "\$HEAD_REF" != "\$REF_NAME" \]; then$/m);
-    expect(run).toMatch(/^\s*if \[ "\$HEAD_SHA" != "\$SHA" \]; then$/m);
-    expect(run.match(/::error::/g)).toHaveLength(3);
-    expect(run.match(/exit 1/g)).toHaveLength(3);
-    expect(run).not.toContain('${{');
-  });
+  // Each pr-body job judges one pull request (#897 adds gaps-checked).
+  it.each([
+    ['closing-keywords', 'node scripts/closing-keywords.mjs', 2],
+    ['gaps-checked', 'node scripts/gaps-checked.mjs', 1],
+  ] as const)(
+    'refuses a dispatched %s run whose pull request is not the one that owns the ref',
+    (job, script, judging) => {
+      // The check attaches to the dispatched ref's head; judging another pull
+      // request's clean body or commits would turn that head green unread.
+      const bodySteps = parsed('pr-body.yml').jobs[job]?.steps ?? [];
+      const guardAt = bodySteps.findIndex(({ run }) =>
+        run?.includes('--json headRefName,headRefOid,state'),
+      );
+      const judgingAt = bodySteps.flatMap(({ run }, index) =>
+        run?.includes(script) ? [index] : [],
+      );
+      expect(guardAt).toBeGreaterThan(-1);
+      expect(judgingAt).toHaveLength(judging);
+      expect(judgingAt.every((index) => index > guardAt)).toBe(true);
+      const guard = bodySteps[guardAt]!;
+      expect(guard.if).toBe("github.event_name == 'workflow_dispatch'");
+      expect(guard.env).toMatchObject({
+        REF_NAME: '${{ github.ref_name }}',
+        SHA: '${{ github.sha }}',
+        PR_NUMBER: '${{ inputs.pr }}',
+      });
+      const run = guard.run ?? '';
+      expect(run).toMatch(/^\s*if \[ "\$STATE" != OPEN \]; then$/m);
+      expect(run).toMatch(/^\s*if \[ "\$HEAD_REF" != "\$REF_NAME" \]; then$/m);
+      expect(run).toMatch(/^\s*if \[ "\$HEAD_SHA" != "\$SHA" \]; then$/m);
+      expect(run.match(/::error::/g)).toHaveLength(3);
+      expect(run.match(/exit 1/g)).toHaveLength(3);
+      expect(run).not.toContain('${{');
+    },
+  );
 
   it('keeps a dispatched pr-body run read-only, judging the body of the pull request it names', () => {
     // Pinned with the bot's commit job until #889, which retired that test;
@@ -3755,7 +3761,10 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
     };
     expect(body.on?.workflow_dispatch?.inputs?.pr?.required).toBe(true);
     // The check keeps its context name, and judges with the same script.
-    expect(Object.keys(body.jobs)).toEqual(['closing-keywords']);
+    expect(Object.keys(body.jobs)).toEqual([
+      'closing-keywords',
+      'gaps-checked',
+    ]);
     const bodyRuns = (body.jobs['closing-keywords']?.steps ?? [])
       .flatMap(({ run }) => run ?? [])
       .join('\n');
@@ -3764,6 +3773,10 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
     // Read-only, scoped to the job; the workflow's own token stays contents: read.
     expect(body.permissions).toEqual({ contents: 'read' });
     expect(body.jobs['closing-keywords']?.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+    expect(body.jobs['gaps-checked']?.permissions).toEqual({
       contents: 'read',
       'pull-requests': 'read',
     });
