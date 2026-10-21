@@ -368,8 +368,9 @@ test.describe('the board deals by moving students into their cards', () => {
     test('every student is seen exactly once at every frame, chip then row', async ({
       page,
     }) => {
-      // PROBE-919, never merged: sound off, to test the audio hypothesis.
-      await page.addInitScript(() => localStorage.setItem('cg-sound', 'off'));
+      // PROBE-919, never merged: sound off when asked, to test the audio hypothesis.
+      if (process.env.PROBE_SOUND_OFF === '1')
+        await page.addInitScript(() => localStorage.setItem('cg-sound', 'off'));
       await openWaitingBoard(page, String(COUNT), '4');
       // The ratio the page really draws at, so the override cannot stop
       // applying unseen: its project's own, or the frame test's from above.

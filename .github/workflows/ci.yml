@@ -36,5 +36,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: The frame test with sound off on webkit, 60 times
-        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=60 --reporter=line
+      - name: The frame test with sound off on webkit, 150 times
+        env:
+          PROBE_SOUND_OFF: '1'
+        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=150 --reporter=line
+      - name: The frame test with sound on on webkit, 150 times
+        if: always()
+        run: npx playwright test --project=webkit tests/e2e/classroom-groups-board-travel.spec.ts -g "every student is seen exactly once" --repeat-each=150 --reporter=line
