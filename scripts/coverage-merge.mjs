@@ -102,21 +102,47 @@ const placesOf = (coverage) => ({
 });
 
 /**
+ * Whether one report's place and another's, paired by order, are one node.
+ * Lines that agree are; lines that differ are only where Vitest's remap moved
+ * a parenthesis. Vitest re-prints a module with its parentheses dropped and
+ * printed back with no mapping, so a node that opens with `(` is placed on
+ * the token before it, and one whose last line opens with `)` ends a line
+ * early (PR #926, runs 39715493288 and 39729419429: back-translate.ts's
+ * `return (` … `);` 284-287 against Vitest's 284-286, its arm
+ * `(sorted[…] + …) / 2` at 525:6 against 524:13, message.ts's
+ * `(kind === …) ?? …` at 171:8 against 170:12). The process report, joined
+ * last, holds the file's own places; with no text read, no line may move.
+ *
+ * @param {Counted} seen the place joined so far (Vitest's)
+ * @param {Location} loc the place being joined (the process report's)
+ * @param {readonly string[] | undefined} lines
+ */
+const sameNode = (seen, loc, lines) => {
+  const start = loc.start?.line ?? 0;
+  const end = loc.end?.line ?? 0;
+  const opensWithParen = lines?.[start - 1]?.[loc.start?.column ?? -1] === '(';
+  const closesWithParen = /^\s*\)/.test(lines?.[end - 1] ?? '');
+  return (
+    (seen.start === start || (seen.start < start && opensWithParen)) &&
+    (seen.end === end || (seen.end < end && closesWithParen))
+  );
+};
+
+/**
  * Adds one report's places to a file's join: by place when the join already
  * holds every one of them, otherwise by order (#899), which a report converted
  * outside Vitest needs, since Vitest's transform shifts columns. By order only
- * when both hold as many and every pair shares its start line. Not its end
- * line: Vitest's source-map remap can end a statement a line early
- * (`back-translate.ts`'s `return (` … `);`, 284-287 in its own text, 284-286
- * in Vitest's, PR #926), so an end line is no evidence of a mismatch.
+ * when both hold as many and every pair shares its lines, or differs only
+ * where Vitest's remap moves a parenthesis (`movedByParens`).
  *
  * @param {Record<string, Counted>} into
  * @param {readonly Place[]} from
  * @param {string} file
  * @param {'statement' | 'branch arm'} what
+ * @param {readonly string[] | undefined} lines the file's own text, if it was read
  * @returns {string | undefined} the refusal, if they cannot be joined
  */
-const join = (into, from, file, what) => {
+const join = (into, from, file, what, lines) => {
   const keys = Object.keys(into);
   if (keys.length === 0 || from.every(({ key }) => key in into)) {
     for (const { key, loc, count } of from) add(into, key, loc, count);
@@ -127,7 +153,7 @@ const join = (into, from, file, what) => {
   for (const [index, { key, loc, count }] of from.entries()) {
     const ours = keys[index] ?? '';
     const seen = /** @type {Counted} */ (into[ours]);
-    if (seen.start !== loc.start?.line)
+    if (!sameNode(seen, loc, lines))
       return `coverage-merge: ${file} ${what} ${ours} in one report is ${key} in another, on other lines, so their counts cannot be joined`;
     seen.count += count;
   }
@@ -137,9 +163,10 @@ const join = (into, from, file, what) => {
 /**
  * @param {readonly Record<string, FileCoverage>[]} maps
  * @param {string} root the repository, absolute
+ * @param {(file: string) => string | undefined} [read] a file's own text, by its relative path; none read by default
  * @returns {{ merged: Record<string, LocatedCoverage> } | { refusal: string }}
  */
-export const mergeMaps = (maps, root) => {
+export const mergeMaps = (maps, root, read = () => undefined) => {
   if (maps.length === 0)
     return { refusal: 'coverage-merge: no report to merge' };
   /** @type {Record<string, LocatedCoverage>} */
@@ -156,9 +183,16 @@ export const mergeMaps = (maps, root) => {
         };
       const into = (merged[relative] ??= { statements: {}, branches: {} });
       const places = placesOf(coverage);
+      const lines = read(relative)?.split('\n');
       const refusal =
-        join(into.statements, places.statements, relative, 'statement') ??
-        join(into.branches, places.branches, relative, 'branch arm');
+        join(
+          into.statements,
+          places.statements,
+          relative,
+          'statement',
+          lines,
+        ) ??
+        join(into.branches, places.branches, relative, 'branch arm', lines);
       if (refusal) refusals.push(refusal);
     }
   return refusals.length > 0 ? { refusal: refusals.join('\n') } : { merged };
@@ -183,6 +217,12 @@ const main = () => {
         ),
     ),
     root,
+    // The file's own text, for the parenthesis Vitest's remap moves; a file
+    // not in this checkout gets no such allowance.
+    (file) => {
+      const own = path.join(root, file);
+      return existsSync(own) ? readFileSync(own, 'utf8') : undefined;
+    },
   );
   if ('refusal' in result) die(result.refusal);
   mkdirSync(path.join('coverage', 'merged'), { recursive: true });
