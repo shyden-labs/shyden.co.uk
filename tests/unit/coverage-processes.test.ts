@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  awaitWriters,
   convertScripts,
   fileOf,
+  readRaw,
+  writerPid,
   type V8Script,
 } from '../../scripts/coverage-processes.mjs';
 
@@ -301,4 +304,116 @@ describe('the converter’s packages are pinned to the versions installed (#899)
       ]);
     },
   );
+});
+
+/**
+ * Issue 936: once in 16 integration runs, a raw file read as cut-off JSON and
+ * the reader died with `Unexpected end of JSON input`, naming nothing. Node
+ * writes each process's file at its exit, named `coverage-<pid>-<time>-<n>`,
+ * so the reader waits for every writer it can name, and a file it still
+ * cannot parse is refused with its name, size and writer.
+ */
+describe('which process wrote a raw file (#936)', () => {
+  it("reads the pid from Node's file name", () => {
+    expect(writerPid('coverage-4822-1792704304712-0.json')).toBe(4822);
+  });
+
+  it('names no pid for a file Node did not name', () => {
+    expect(writerPid('coverage-final.json')).toBeUndefined();
+  });
+});
+
+/** A clock that moves only when the reader pauses. */
+const steppedClock = () => {
+  let at = 0;
+  const pauses: number[] = [];
+  return {
+    pauses,
+    now: () => at,
+    pause: async (ms: number) => {
+      pauses.push(ms);
+      at += ms;
+    },
+  };
+};
+
+describe('the reader waits for every writer still running (#936)', () => {
+  it('does not wait when no writer runs', async () => {
+    const clock = steppedClock();
+    const waited = await awaitWriters(['coverage-11-1-0.json'], {
+      ...clock,
+      isRunning: () => false,
+      ceilingMs: 30_000,
+    });
+    expect([waited, clock.pauses]).toEqual([{ waitedFor: [] }, []]);
+  });
+
+  it('waits until a running writer exits, then names it', async () => {
+    const clock = steppedClock();
+    const waited = await awaitWriters(
+      ['coverage-11-1-0.json', 'coverage-12-1-0.json'],
+      {
+        ...clock,
+        isRunning: (pid) => pid === 12 && clock.now() < 150,
+        ceilingMs: 30_000,
+      },
+    );
+    expect([waited, clock.pauses]).toEqual([{ waitedFor: [12] }, [50, 50, 50]]);
+  });
+
+  it('asks about a pid named by two files once per look', async () => {
+    const clock = steppedClock();
+    const asked: number[] = [];
+    await awaitWriters(['coverage-7-1-0.json', 'coverage-7-2-1.json'], {
+      ...clock,
+      isRunning: (pid) => {
+        asked.push(pid);
+        return false;
+      },
+      ceilingMs: 30_000,
+    });
+    expect(asked).toEqual([7]);
+  });
+
+  it('refuses a writer still running at the ceiling, naming it', async () => {
+    const clock = steppedClock();
+    const waited = await awaitWriters(['coverage-12-1-0.json'], {
+      ...clock,
+      isRunning: () => true,
+      ceilingMs: 200,
+    });
+    expect(waited).toEqual({
+      refusal:
+        'coverage-processes: process 12 was still running after 200 ms, so its raw coverage file may be unfinished (coverage-12-1-0.json)',
+    });
+  });
+});
+
+describe('a raw file that is not whole JSON is refused, naming it (#936)', () => {
+  it('reads a whole file', () => {
+    expect(readRaw('coverage-12-1-0.json', '{"result":[]}', false)).toEqual({
+      result: [],
+    });
+  });
+
+  it('names a cut-off file, its size and a writer that has exited', () => {
+    expect(readRaw('coverage-12-1-0.json', '{"res', false)).toEqual({
+      refusal:
+        'coverage-processes: coverage-12-1-0.json (5 bytes, written by process 12, which has exited) is not whole JSON: Unterminated string in JSON at position 5 (line 1 column 6)',
+    });
+  });
+
+  it('names an empty file and a writer still running', () => {
+    expect(readRaw('coverage-12-1-0.json', '', true)).toEqual({
+      refusal:
+        'coverage-processes: coverage-12-1-0.json (0 bytes, written by process 12, which is still running) is not whole JSON: Unexpected end of JSON input',
+    });
+  });
+
+  it('names a file with no pid in its name', () => {
+    expect(readRaw('stray.json', '', false)).toEqual({
+      refusal:
+        'coverage-processes: stray.json (0 bytes, written by an unnamed process) is not whole JSON: Unexpected end of JSON input',
+    });
+  });
 });
