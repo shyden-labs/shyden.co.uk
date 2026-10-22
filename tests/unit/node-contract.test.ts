@@ -152,6 +152,52 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
     expect(npmrc().get('engine-strict')).toBe('true');
   });
 
+  // #929: on 2026-10-22 from about 02:30 to 03:15Z every CI job's `npm ci`
+  // took 301-303 s instead of 5 (47 jobs over three runs), npm's default
+  // 300 s fetch-timeout waited out in silence, and sanity-on-build's 5-minute
+  // limit cancelled it on every pull request. A stalled request now fails at
+  // once, naming its URL, and is never retried (Shyden, 2026-10-02: a retry
+  // is not a fix).
+  it('retries no request npm makes (#929)', () => {
+    expect(npmrc().get('fetch-retries')).toBe('0');
+  });
+
+  it('fails a request at the measured fetch-timeout (#929)', () => {
+    // Measured on probe run 39731697441: 20 installs in CI's image, 10 with
+    // the npm cache and 10 cold, all green in 4-8 s; the slowest single
+    // request 6,770 ms (the astro tarball, cold), the slowest warm 2,011 ms
+    // (the audit). 60 s is about nine times the slowest.
+    expect(npmrc().get('fetch-timeout')).toBe('60000');
+  });
+
+  it('lets no workflow or package script set npm’s fetch settings over .npmrc (#929)', () => {
+    // A flag (`--fetch-retries=2`) or an environment variable
+    // (`npm_config_fetch_timeout`) beats .npmrc for that one install.
+    const sources: [string, string][] = [
+      ...workflowBodies(),
+      ...Object.entries(
+        (packageJson().scripts as Record<string, string> | undefined) ?? {},
+      ).map(([name, script]): [string, string] => [
+        `package.json › ${name}`,
+        script,
+      ]),
+    ];
+    const overriding = sources
+      .filter(([, body]) =>
+        /fetch[-_](?:retries|retry[-_]|timeout)/i.test(body),
+      )
+      .map(([source]) => source);
+    expect(
+      searched(overriding, {
+        of: sources,
+        what: 'workflow files and package scripts',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach('node-contract/fetch-setting-sources', sources.length),
+    ).toBeUndefined();
+  });
+
   it('keeps the highest engines.node floor and .nvmrc on the same major, in both directions', () => {
     // One assertion, two failure modes: bumping either file alone breaks it.
     // The highest floor is the line CI runs; a lower alternative (#646's 24)

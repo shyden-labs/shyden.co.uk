@@ -1,0 +1,304 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  convertScripts,
+  fileOf,
+  type V8Script,
+} from '../../scripts/coverage-processes.mjs';
+
+/**
+ * Raw V8 coverage from a process Node ran outside Vitest's workers, converted
+ * to the Istanbul shape `scripts/coverage-merge.mjs` joins (#899). The ranges
+ * below were recorded from real runs of these two files under
+ * `NODE_V8_COVERAGE` (Node 26.12, 2026-10-22): the `else` arm never ran.
+ */
+const ROOT = '/repo';
+
+const JS = [
+  'const ran = process.argv.length > 0;',
+  'if (ran) {',
+  '  globalThis.taken = 1;',
+  '} else {',
+  '  globalThis.taken = 2;',
+  '}',
+  '',
+].join('\n');
+
+const TS = [
+  'const ran: boolean = process.argv.length > 0;',
+  'if (ran) {',
+  '  (globalThis as { taken?: number }).taken = 1;',
+  '} else {',
+  '  (globalThis as { taken?: number }).taken = 2;',
+  '}',
+  '',
+].join('\n');
+
+/** One script entry: its whole-script range ends at `end`, its `else` block never ran. */
+const script = (
+  url: string,
+  end: number,
+  elseBlock: [number, number],
+): V8Script => ({
+  url,
+  functions: [
+    {
+      functionName: '',
+      isBlockCoverage: true,
+      ranges: [
+        { startOffset: 0, endOffset: end, count: 1 },
+        { startOffset: elseBlock[0], endOffset: elseBlock[1], count: 0 },
+      ],
+    },
+  ],
+});
+
+const JS_URL = 'file:///repo/scripts/branch.mjs';
+const TS_URL = 'file:///repo/scripts/branch.ts';
+// Node appends `\n\n//# sourceURL=<url>` to TypeScript it strips: 164 + 46.
+const jsEntry = script(JS_URL, 107, [73, 106]);
+const tsEntry = script(TS_URL, 210, [106, 163]);
+
+const texts: Record<string, string> = {
+  'scripts/branch.mjs': JS,
+  'scripts/branch.ts': TS,
+};
+const read = (file: string) => {
+  const text = texts[file];
+  if (text === undefined) throw new Error(`no fixture text for ${file}`);
+  return text;
+};
+
+/** Each statement as `place=count`, in the report's own order. */
+const statements = (report: Record<string, unknown>, file: string) => {
+  const coverage = report[`${ROOT}/${file}`] as {
+    statementMap: Record<
+      string,
+      {
+        start: { line: number; column: number };
+        end: { line: number; column: number | null };
+      }
+    >;
+    s: Record<string, number>;
+  };
+  return Object.entries(coverage.statementMap).map(
+    ([id, { start, end }]) =>
+      `${start.line}:${start.column}-${end.line}:${end.column}=${coverage.s[id]}`,
+  );
+};
+
+describe('raw V8 coverage from a process converts to the joined shape (#899)', () => {
+  it('a plain .mjs entry gives each statement its count, the unrun arm 0', async () => {
+    const result = await convertScripts([jsEntry], read, ROOT);
+    expect(
+      'report' in result && statements(result.report, 'scripts/branch.mjs'),
+    ).toEqual(['1:12-1:35=1', '2:0-6:null=1', '3:2-3:null=1', '5:2-5:null=0']);
+  });
+
+  it('a TypeScript entry is read from its own text, past the suffix Node appends', async () => {
+    const result = await convertScripts([tsEntry], read, ROOT);
+    expect(
+      'report' in result && statements(result.report, 'scripts/branch.ts'),
+    ).toEqual(['1:21-1:44=1', '2:0-6:null=1', '3:2-3:null=1', '5:2-5:null=0']);
+  });
+
+  it('an entry whose code is not the file’s own text is skipped, naming why', async () => {
+    const result = await convertScripts(
+      [jsEntry, script(TS_URL, 300, [106, 163])],
+      read,
+      ROOT,
+    );
+    expect('report' in result && result.skipped).toEqual([
+      {
+        file: 'scripts/branch.ts',
+        url: TS_URL,
+        reason:
+          'ran code 300 characters long, not its own text (164, or 210 with the sourceURL Node appends)',
+      },
+    ]);
+  });
+
+  it('two processes’ entries for one file are summed', async () => {
+    const result = await convertScripts([jsEntry, jsEntry], read, ROOT);
+    expect(
+      'report' in result && statements(result.report, 'scripts/branch.mjs'),
+    ).toEqual(['1:12-1:35=2', '2:0-6:null=2', '3:2-3:null=2', '5:2-5:null=0']);
+  });
+
+  // Measured 2026-10-22: for this text vite's `parse` returns one error and an
+  // EMPTY program, so a converter that read only `program` would report the
+  // file with no statements at all rather than fail.
+  it('a file that does not parse is refused, naming the parser’s error', async () => {
+    const broken = JS.replace('if (ran) {', 'if (ran) {{');
+    const result = await convertScripts(
+      [script('file:///repo/scripts/broken.mjs', broken.length, [74, 107])],
+      (file) => (file === 'scripts/broken.mjs' ? broken : read(file)),
+      ROOT,
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: scripts/broken.mjs does not parse (Unexpected token), so its counts have nowhere to go',
+    });
+  });
+
+  it('nothing measured at all is refused, never written as an empty report', async () => {
+    expect(await convertScripts([], read, ROOT)).toEqual({
+      refusal:
+        'coverage-processes: no process ran a measured file, so there is nothing to report',
+    });
+  });
+});
+
+/**
+ * Vitest converts the module vite's SSR transform wrote, where an imported
+ * `X.prop` reads `__vite_ssr_import_N__.X.prop`, and coverage-v8 5.0.5 ignores
+ * every declarator initialised that way (`provider.js`, "SSR transformed
+ * import binding"). The converter reads the file's own text, so it skips the
+ * same declarators, or the two reports of a file would not join (#899, PR
+ * #926: `scripts/dashboard.mjs` held 142 and 145). Which declarators Vitest
+ * drops was measured on Vitest's own route for both texts below (2026-10-22,
+ * `.superpowers/sdd/899/stmt-diff.mjs`); counting them is #928.
+ */
+const READS = [
+  "import { env } from 'node:process';",
+  "import processDefault from 'node:process';",
+  "import * as nodePath from 'node:path';",
+  'const fromNamed = env.HOME;',
+  'const fromDefault = processDefault.pid;',
+  'const fromNamespace = nodePath.sep;',
+  'const whole = env;',
+  'const deeper = env.HOME.length;',
+  "const computed = env['HOME'];",
+  'export const exported = env.PATH;',
+  'function inner() {',
+  '  const nested = env.USER;',
+  '  return nested;',
+  '}',
+  'globalThis.out = [fromNamed, fromDefault, fromNamespace, whole, deeper, computed, inner()];',
+  '',
+].join('\n');
+const SHADOW = [
+  "import { env } from 'node:process';",
+  'function read(env) {',
+  '  const home = env.HOME;',
+  '  return home;',
+  '}',
+  "globalThis.out = read({ HOME: '/' });",
+  '',
+].join('\n');
+const REBOUND_UNREAD = [
+  "import { join } from 'node:path';",
+  'function wrap(join) {',
+  '  return join;',
+  '}',
+  "globalThis.out = [wrap(1), join('a', 'b')];",
+  '',
+].join('\n');
+const whole = (file: string, text: string) =>
+  script(`file:///repo/${file}`, text.length, [text.length, text.length]);
+const only = (file: string, text: string) => (name: string) => {
+  if (name !== file) throw new Error(`no fixture text for ${name}`);
+  return text;
+};
+const lines = (
+  result: Awaited<ReturnType<typeof convertScripts>>,
+  file: string,
+) =>
+  'report' in result
+    ? statements(result.report, file).map((place) => place.split(':')[0])
+    : result;
+
+describe('a declarator read from an import counts as Vitest counts it (#899)', () => {
+  it('skips one read from a named or default import, computed, exported or nested, and counts the rest', async () => {
+    const file = 'scripts/reads.mjs';
+    expect(
+      lines(
+        await convertScripts([whole(file, READS)], only(file, READS), ROOT),
+        file,
+      ),
+    ).toEqual(['6', '7', '8', '13', '15']);
+  });
+
+  it('refuses a file that binds an import’s name again where such a read uses it', async () => {
+    const file = 'scripts/shadow.mjs';
+    expect(
+      await convertScripts([whole(file, SHADOW)], only(file, SHADOW), ROOT),
+    ).toEqual({
+      refusal:
+        'coverage-processes: scripts/shadow.mjs binds env again, and a declarator on line 3 reads env.HOME, so whether it reads the import (which Vitest skips) cannot be told',
+    });
+  });
+
+  it('converts a file that binds an import’s name again where no such read uses it', async () => {
+    const file = 'scripts/rebound.mjs';
+    expect(
+      lines(
+        await convertScripts(
+          [whole(file, REBOUND_UNREAD)],
+          only(file, REBOUND_UNREAD),
+          ROOT,
+        ),
+        file,
+      ),
+    ).toEqual(['3', '5']);
+  });
+});
+
+describe('which file an entry is (#899)', () => {
+  it('a URL with a query names the file before the query', () => {
+    expect(
+      fileOf(`${TS_URL}?fresh-import-o21ff6dltkj=0,file:///repo/x`, ROOT),
+    ).toBe('scripts/branch.ts');
+  });
+
+  it('a file outside the repository is left out', () => {
+    expect(fileOf('file:///elsewhere/scripts/branch.mjs', ROOT)).toBeNull();
+  });
+
+  it('a file outside the measured set is left out', () => {
+    expect(fileOf('file:///repo/tests/unit/a.test.ts', ROOT)).toBeNull();
+  });
+
+  it('a node: built-in is left out', () => {
+    expect(fileOf('node:internal/main/run_main_module', ROOT)).toBeNull();
+  });
+
+  it('a measured file outside the root’s own folders is left out', () => {
+    expect(fileOf('file:///repo/node_modules/a/index.mjs', ROOT)).toBeNull();
+  });
+
+  it('a measured helper directly under tests/ is kept', () => {
+    expect(fileOf('file:///repo/tests/device-pixels.ts', ROOT)).toBe(
+      'tests/device-pixels.ts',
+    );
+  });
+});
+
+/**
+ * The converter's two packages, declared by Shyden's rulings ("Yes, if
+ * needed" for the converter, #899; `vite` for its non-deprecated `parse`,
+ * 2026-10-21) at the versions already installed under Vitest and Astro, as
+ * `yaml` was in #157. An exact pin, because a range lets `npm install` on a
+ * laptop resolve a release CI's `npm ci` never ran.
+ */
+describe('the converter’s packages are pinned to the versions installed (#899)', () => {
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    devDependencies: Record<string, string>;
+  };
+  const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+    packages: Record<string, { version?: string }>;
+  };
+
+  it.each(['vite', 'ast-v8-to-istanbul'])(
+    '%s is declared at exactly the version the lockfile installs',
+    (name) => {
+      expect([
+        manifest.devDependencies[name],
+        lock.packages[`node_modules/${name}`]?.version,
+      ]).toEqual([
+        expect.stringMatching(/^\d+\.\d+\.\d+$/),
+        manifest.devDependencies[name],
+      ]);
+    },
+  );
+});
