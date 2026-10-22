@@ -23,6 +23,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
+  // With no message file and no --range it has nothing to judge, so it
+  // refuses; a skipped `main()` would pass every commit in silence (#897).
+  'gaps-checked.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/gaps-checked.mjs',
+  },
   // Without its three paths it prints its usage and refuses.
   'build-evidence-page.mjs': {
     args: [],
@@ -57,6 +64,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: ['--unknown'],
     status: 1,
     says: 'usage: coverage-merge.mjs',
+  },
+  // With no raw directory or suite there is nothing to convert, so it
+  // refuses; a skipped main() would exit 0 and write no report (#899).
+  'coverage-processes.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: coverage-processes.mjs <raw-dir> <suite>',
   },
   // A flag it does not know is refused before any git or report is read; a
   // skipped main() would exit 0 and print no verdict at all (#896).

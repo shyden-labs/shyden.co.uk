@@ -220,6 +220,9 @@ jobs:
       - run: npm run test:coverage
       - run: npm run test:coverage:simulation
       - run: npm run test:coverage:integration
+      # What the integration suite's child processes ran (#899): the suite
+      # runs under NODE_V8_COVERAGE, and each process it starts writes there.
+      - run: node scripts/coverage-processes.mjs coverage/raw/integration processes
       - run: node scripts/coverage-merge.mjs
       - name: The changed lines, against the coverage of every suite
         run: node scripts/coverage-changed.mjs --report-only >> "$GITHUB_STEP_SUMMARY"
@@ -228,6 +231,16 @@ jobs:
         with:
           name: coverage-lcov
           path: coverage/*/lcov.info
+          if-no-files-found: error
+      # What the child processes measured, and what they ran that was not a
+      # file's own text (#899).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-processes
+          path: |
+            coverage/processes/coverage-final.json
+            coverage/processes/skipped.txt
+            coverage/merged/coverage.json
           if-no-files-found: error
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7

@@ -22,7 +22,7 @@ const SCRIPT = path.resolve(
   import.meta.dirname,
   '../../scripts/coverage-merge.mjs',
 );
-const SUITES = ['unit', 'simulation', 'integration'];
+const SUITES = ['unit', 'simulation', 'integration', 'processes'];
 
 let repo: string;
 let git: (args: readonly string[]) => string;
@@ -73,7 +73,7 @@ const merge = () =>
   });
 
 describe('coverage-merge.mjs in a real repository', () => {
-  it('joins the three reports and records the tree they measured', () => {
+  it('joins the four reports and records the tree they measured', () => {
     SUITES.forEach((suite, index) => report(suite, index));
     const run = merge();
     expect([run.status, run.stderr]).toEqual([0, '']);
@@ -83,7 +83,7 @@ describe('coverage-merge.mjs in a real repository', () => {
       ),
     ).toEqual({
       'src/a.ts': {
-        statements: { '1:0-1:9': { start: 1, end: 1, count: 3 } },
+        statements: { '1:0-1:9': { start: 1, end: 1, count: 6 } },
         branches: {},
       },
     });

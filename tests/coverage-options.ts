@@ -12,16 +12,23 @@ const CODE = '{ts,tsx,mts,cts,js,mjs,cjs}';
 
 export type CoveredSuite = 'unit' | 'simulation' | 'integration';
 
+/**
+ * The measured set, shared with `scripts/coverage-processes.mjs` (#899), so
+ * code a child process runs is judged by the same globs as Vitest's own.
+ */
+export const MEASURED = [
+  `src/**/*.${CODE}`,
+  `scripts/**/*.${CODE}`,
+  `functions/**/*.${CODE}`,
+  `tests/*.${CODE}`,
+];
+export const NOT_MEASURED = ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'];
+
 export const coverageFor = (suite: CoveredSuite) => ({
   provider: 'v8' as const,
   reporter: ['json', 'lcovonly'],
-  include: [
-    `src/**/*.${CODE}`,
-    `scripts/**/*.${CODE}`,
-    `functions/**/*.${CODE}`,
-    `tests/*.${CODE}`,
-  ],
-  exclude: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
+  include: MEASURED,
+  exclude: NOT_MEASURED,
   reportOnFailure: false,
   reportsDirectory: `coverage/${suite}`,
 });
