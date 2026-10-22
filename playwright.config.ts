@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { ENGINES } from './tests/engines';
+import { ENGINES, engineUse } from './tests/engines';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 /**
@@ -361,7 +361,7 @@ export default defineConfig({
     // engine could see it -- this half of the matrix is not negotiable.
     ...ENGINES.map(({ name, device }) => ({
       name,
-      use: { ...devices[device] },
+      use: engineUse(devices[device], process.env),
       testIgnore: [contentOnly, visualOnly],
     })),
     ...(process.env.VISUAL === '1' ? [VISUAL_PROJECT] : []),
