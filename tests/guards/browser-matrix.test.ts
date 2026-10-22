@@ -76,7 +76,13 @@ type ResolvedProject = {
   testDir: string;
   testMatch: unknown;
   testIgnore: unknown;
-  use: { colorScheme?: unknown; installsAClock?: unknown };
+  use: {
+    colorScheme?: unknown;
+    installsAClock?: unknown;
+    browserName?: string;
+    defaultBrowserType?: string;
+    launchOptions?: { env?: Record<string, unknown> };
+  };
   grep: RegExp | RegExp[];
 };
 
@@ -711,6 +717,116 @@ describe('every project declares its colour scheme (#142)', () => {
     ).toEqual([]);
     expect(
       floorBreach('browser-matrix/colour-scheme-projects', projects.length),
+    ).toBeUndefined();
+  });
+});
+
+describe('WebKit plays its sound into a silent sink (#919)', () => {
+  // Playwright's WebKit plays sound through its own GStreamer, which ranks a
+  // real output first; a CI container has none, and on 1.64.1 a click that
+  // started the deal's sound drew no frame for about 3.1 s, 4 times in 231
+  // runs. With `fakeaudiosink` ranked first: 0 in 300, sound still playing.
+  // Shyden ruled 2026-10-21: the sink for the WebKit projects, pinned here.
+  type Reading = {
+    id: string;
+    engine: string;
+    env: Record<string, unknown> | undefined;
+  };
+  const webkit: Reading[] = [];
+  const others: Reading[] = [];
+
+  beforeAll(async () => {
+    for (const file of rootConfigs()) {
+      const loaded = await importConfig(file);
+      const extra =
+        file === 'playwright.config.ts'
+          ? [VISUAL_PROJECT, VISUAL_MEASURE_PROJECT]
+          : [];
+      for (const project of resolvedProjects(
+        { ...loaded, projects: [...(loaded.projects ?? []), ...extra] },
+        file,
+      )) {
+        // Playwright's own default: `browserName`, else the device's, else
+        // Chromium.
+        const engine =
+          project.use.browserName ??
+          project.use.defaultBrowserType ??
+          'chromium';
+        (engine === 'webkit' ? webkit : others).push({
+          id: `${file} › ${project.name}`,
+          engine,
+          env: project.use.launchOptions?.env,
+        });
+      }
+    }
+  });
+
+  it('ranks the fake audio sink first for every WebKit project', () => {
+    expect(
+      searched(
+        webkit
+          .filter(
+            ({ env }) => env?.GST_PLUGIN_FEATURE_RANK !== 'fakeaudiosink:MAX',
+          )
+          .map(
+            ({ id, env }) =>
+              `${id}: GST_PLUGIN_FEATURE_RANK ${String(env?.GST_PLUGIN_FEATURE_RANK)}`,
+          ),
+        { of: webkit, what: 'WebKit projects' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/webkit-sink-projects', webkit.length),
+    ).toBeUndefined();
+  });
+
+  it('launches every WebKit project with the environment it would inherit', () => {
+    // A launch's `env` replaces the browser's environment: one written as the
+    // sink alone would start WebKit with no PATH, HOME or display.
+    const inherited = nonEmpty(
+      Object.entries(process.env).filter(
+        ([name, value]) =>
+          value !== undefined && name !== 'GST_PLUGIN_FEATURE_RANK',
+      ),
+      'variables in the environment a browser would inherit',
+    );
+    expect(
+      searched(
+        webkit.flatMap(({ id, env }) => {
+          const missing = inherited.filter(
+            ([name, value]) => env?.[name] !== value,
+          );
+          return missing.length === 0
+            ? []
+            : [
+                `${id}: ${missing.length} of ${inherited.length} inherited variables not passed (${missing
+                  .slice(0, 3)
+                  .map(([name]) => name)
+                  .join(', ')})`,
+              ];
+        }),
+        { of: webkit, what: 'WebKit projects' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/webkit-env-projects', webkit.length),
+    ).toBeUndefined();
+  });
+
+  it('gives no other engine the sink, as ruled', () => {
+    expect(
+      searched(
+        others
+          .filter(({ env }) => env?.GST_PLUGIN_FEATURE_RANK !== undefined)
+          .map(
+            ({ id, engine, env }) =>
+              `${id} (${engine}): GST_PLUGIN_FEATURE_RANK ${String(env?.GST_PLUGIN_FEATURE_RANK)}`,
+          ),
+        { of: others, what: 'projects on other engines' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/other-engine-sink-projects', others.length),
     ).toBeUndefined();
   });
 });
