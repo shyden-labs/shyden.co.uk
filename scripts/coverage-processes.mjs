@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { convert } from 'ast-v8-to-istanbul';
 import { parse } from 'vite';
 import { MEASURED, NOT_MEASURED } from '../tests/coverage-options.ts';
-import { die, nonEmpty } from './errors.mjs';
+import { die, messageOf, nonEmpty } from './errors.mjs';
 
 /**
  * One V8 function's block counts, and one script's functions, as
@@ -320,10 +320,19 @@ const main = async () => {
   if (!dir || !suite || rest.length > 0)
     die('usage: coverage-processes.mjs <raw-dir> <suite>');
   const root = process.cwd();
-  /** @type {V8Script[]} */
   // An empty directory means no process was measured at all; one holding
   // only processes that ran no measured file is refused by convertScripts.
-  const scripts = nonEmpty(readdirSync(dir), `raw V8 coverage files in ${dir}`)
+  // Either refusal, and a directory that is not there, ends in one line, not
+  // a stack trace.
+  /** @type {string[]} */
+  let names;
+  try {
+    names = nonEmpty(readdirSync(dir), `raw V8 coverage files in ${dir}`);
+  } catch (error) {
+    die(messageOf(error));
+  }
+  /** @type {V8Script[]} */
+  const scripts = names
     .filter((name) => name.endsWith('.json'))
     .flatMap(
       (name) =>

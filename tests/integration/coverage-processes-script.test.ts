@@ -115,10 +115,25 @@ describe('coverage-processes.mjs on a real child process', () => {
         env: { ...process.env, NODE_V8_COVERAGE: '' },
       },
     );
-    expect([run.status, run.stdout]).toEqual([1, '']);
-    expect(run.stderr).toContain(
-      `found no raw V8 coverage files in ${path.join(repo, 'empty')} — the walk is broken`,
-    );
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      `✗ found no raw V8 coverage files in ${path.join(repo, 'empty')} — the walk is broken, not the subject clean. A guard handed an empty list asserts nothing at all (#84).\n`,
+    ]);
+  });
+
+  it('a directory that is not there is refused in one line, naming it', () => {
+    const missing = path.join(repo, 'missing');
+    const run = spawnSync(process.execPath, [SCRIPT, missing, 'processes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: '' },
+    });
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      `✗ ENOENT: no such file or directory, scandir '${missing}'\n`,
+    ]);
   });
 
   it('a process that ran no measured file is refused, naming the directory', () => {
