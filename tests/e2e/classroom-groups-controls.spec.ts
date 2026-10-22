@@ -2022,4 +2022,53 @@ test.describe('the on-screen keyboard', () => {
       )
       .toBe(true);
   });
+
+  /**
+   * Issue 853. Safari's keyboard shrinks only the visual viewport, leaving
+   * the layout viewport, and so the sticky row's dock, at full height
+   * (measured on the iPhone: 746px layout, 423px visible). The real case
+   * runs on the iPhone through the test above once the iPhone runs these
+   * spec files (issue 840). Until then this STAND-IN gives every engine a
+   * visual viewport that shrinks the same way, and checks the row is lifted
+   * to rest on its new bottom edge.
+   */
+  test('lifts Make Groups above a keyboard that shrinks only the visual viewport (stand-in)', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const view = new EventTarget();
+      let hidden = 0;
+      Object.defineProperties(view, {
+        offsetTop: { get: () => 0 },
+        height: { get: () => innerHeight - hidden },
+      });
+      // `visualViewport` is a [Replaceable] attribute, so the page script
+      // reads this one from its first line.
+      Object.defineProperty(window, 'visualViewport', {
+        value: view,
+        configurable: true,
+      });
+      Object.assign(window, {
+        keyboardRises: (height: number) => {
+          hidden = height;
+          view.dispatchEvent(new Event('resize'));
+        },
+      });
+    });
+    await page.goto('/classroom-groups');
+    const rowBottom = () =>
+      page.evaluate(
+        () =>
+          document.querySelector('.actions')!.getBoundingClientRect().bottom,
+      );
+    const layoutHeight = await page.evaluate(() => innerHeight);
+    await expect.poll(rowBottom).toBeCloseTo(layoutHeight, 0);
+
+    await page.evaluate(() =>
+      (
+        window as unknown as { keyboardRises(height: number): void }
+      ).keyboardRises(200),
+    );
+    await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
+  });
 });

@@ -2932,7 +2932,10 @@ const sexWhyText = sexWhy(roster, t);
   @media screen {
     .actions {
       position: sticky;
-      bottom: 0;
+      /* Above the on-screen keyboard where it hides the layout viewport's
+         bottom (Safari, issue 853), set by classroom-groups.ts; 0 anywhere
+         else. */
+      bottom: var(--keyboard-overlap, 0px);
       /* Flush to the fold. The row's own bottom margin would otherwise hold
          the bar 16px clear of the edge, which reads as a gap rather than as
          a bar resting on it. */
