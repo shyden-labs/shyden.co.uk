@@ -126,3 +126,26 @@ describe('every Vitest suite measures the same code with V8', () => {
     expect(guards.test?.coverage).toBeUndefined();
   });
 });
+
+// #916: under V8 coverage the sweep cases took 747-888 ms against the
+// simulation suite's 700 ms limit, failing 3 of 7 coverage runs on
+// 2026-10-21. That limit timed the instrumentation, not the engine. Shyden,
+// 2026-10-21: the coverage run judges coverage only. The 700 ms limit still
+// judges every case, on the uninstrumented `npm run test:simulation` step in
+// `checks` (pinned by suite-budgets.test.ts), so no limit is raised.
+describe('the simulation suite under coverage judges coverage only (#916)', () => {
+  it('runs with no per-test limit, which the uninstrumented step keeps', () => {
+    const scripts = (
+      JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts;
+    expect([
+      scripts['test:coverage:simulation'],
+      scripts['test:simulation'],
+    ]).toEqual([
+      'vitest run --config vitest.simulation.config.ts --coverage --testTimeout=0',
+      'vitest run --config vitest.simulation.config.ts --testTimeout=700',
+    ]);
+  });
+});
