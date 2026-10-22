@@ -26,12 +26,17 @@ jobs:
       - id: pick
         run: node scripts/playwright-image.mjs
 
-  container:
+  install:
     needs: image
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        cache: [warm, cold]
     container:
       image: ${{ needs.image.outputs.ref }}
       options: --user 1001 --ipc=host
@@ -39,50 +44,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - if: matrix.cache == 'warm'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
-      - name: The registry and the audit endpoint, timed
-        run: |
-          curl -sS -o /dev/null -w 'registry root: %{http_code} in %{time_total}s\n' https://registry.npmjs.org/ || true
-          curl -sS -o /dev/null -w 'audit bulk: %{http_code} in %{time_total}s\n' -X POST -H 'content-type: application/json' -d '{}' https://registry.npmjs.org/-/npm/v1/security/advisories/bulk --max-time 320 || true
-      - name: npm ci without the audit, every request timed
-        shell: bash
-        run: |
-          set +e
-          start=$(date +%s)
-          npm ci --no-audit --no-fund --loglevel http > npm.log 2>&1; rc=$?
-          echo "rc=$rc in $(( $(date +%s) - start ))s"
-          grep -vE ' \(cache (hit|revalidated|updated)\)$' npm.log | tail -40
-      - name: npm ci with the audit, every request timed
-        shell: bash
-        run: |
-          set +e
-          rm -rf node_modules
-          start=$(date +%s)
-          npm ci --no-fund --loglevel http > npm.log 2>&1; rc=$?
-          echo "rc=$rc in $(( $(date +%s) - start ))s"
-          grep -vE ' \(cache (hit|revalidated|updated)\)$' npm.log | tail -40
-
-  host:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - if: matrix.cache == 'cold'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - name: npm ci with the audit, every request timed
+      - name: npm ci as CI runs it, every request timed
         shell: bash
         run: |
           set +e
           start=$(date +%s)
-          npm ci --no-fund --loglevel http > npm.log 2>&1; rc=$?
-          echo "rc=$rc in $(( $(date +%s) - start ))s"
-          grep -vE ' \(cache (hit|revalidated|updated)\)$' npm.log | tail -40
+          npm ci --loglevel http > npm.log 2>&1; rc=$?
+          echo "INSTALL rc=$rc in $(( $(date +%s) - start ))s, $(grep -c 'npm http fetch' npm.log) requests"
+          grep -oE 'npm http fetch [A-Z]+ [0-9]+ [^ ]+ [0-9]+ms.*' npm.log | awk '{ ms=$7; sub(/ms/,"",ms); print ms, $0 }' | sort -rn | head -5 | sed 's/^[0-9]* /SLOWEST /'
