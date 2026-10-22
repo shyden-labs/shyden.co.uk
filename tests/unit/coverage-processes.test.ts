@@ -149,6 +149,101 @@ describe('raw V8 coverage from a process converts to the joined shape (#899)', (
   });
 });
 
+/**
+ * Vitest converts the module vite's SSR transform wrote, where an imported
+ * `X.prop` reads `__vite_ssr_import_N__.X.prop`, and coverage-v8 5.0.5 ignores
+ * every declarator initialised that way (`provider.js`, "SSR transformed
+ * import binding"). The converter reads the file's own text, so it skips the
+ * same declarators, or the two reports of a file would not join (#899, PR
+ * #926: `scripts/dashboard.mjs` held 142 and 145). Which declarators Vitest
+ * drops was measured on Vitest's own route for both texts below (2026-10-22,
+ * `.superpowers/sdd/899/stmt-diff.mjs`); counting them is #928.
+ */
+const READS = [
+  "import { env } from 'node:process';",
+  "import processDefault from 'node:process';",
+  "import * as nodePath from 'node:path';",
+  'const fromNamed = env.HOME;',
+  'const fromDefault = processDefault.pid;',
+  'const fromNamespace = nodePath.sep;',
+  'const whole = env;',
+  'const deeper = env.HOME.length;',
+  "const computed = env['HOME'];",
+  'export const exported = env.PATH;',
+  'function inner() {',
+  '  const nested = env.USER;',
+  '  return nested;',
+  '}',
+  'globalThis.out = [fromNamed, fromDefault, fromNamespace, whole, deeper, computed, inner()];',
+  '',
+].join('\n');
+const SHADOW = [
+  "import { env } from 'node:process';",
+  'function read(env) {',
+  '  const home = env.HOME;',
+  '  return home;',
+  '}',
+  "globalThis.out = read({ HOME: '/' });",
+  '',
+].join('\n');
+const REBOUND_UNREAD = [
+  "import { join } from 'node:path';",
+  'function wrap(join) {',
+  '  return join;',
+  '}',
+  "globalThis.out = [wrap(1), join('a', 'b')];",
+  '',
+].join('\n');
+const whole = (file: string, text: string) =>
+  script(`file:///repo/${file}`, text.length, [text.length, text.length]);
+const only = (file: string, text: string) => (name: string) => {
+  if (name !== file) throw new Error(`no fixture text for ${name}`);
+  return text;
+};
+const lines = (
+  result: Awaited<ReturnType<typeof convertScripts>>,
+  file: string,
+) =>
+  'report' in result
+    ? statements(result.report, file).map((place) => place.split(':')[0])
+    : result;
+
+describe('a declarator read from an import counts as Vitest counts it (#899)', () => {
+  it('skips one read from a named or default import, computed, exported or nested, and counts the rest', async () => {
+    const file = 'scripts/reads.mjs';
+    expect(
+      lines(
+        await convertScripts([whole(file, READS)], only(file, READS), ROOT),
+        file,
+      ),
+    ).toEqual(['6', '7', '8', '13', '15']);
+  });
+
+  it('refuses a file that binds an import’s name again where such a read uses it', async () => {
+    const file = 'scripts/shadow.mjs';
+    expect(
+      await convertScripts([whole(file, SHADOW)], only(file, SHADOW), ROOT),
+    ).toEqual({
+      refusal:
+        'coverage-processes: scripts/shadow.mjs binds env again, and a declarator on line 3 reads env.HOME, so whether it reads the import (which Vitest skips) cannot be told',
+    });
+  });
+
+  it('converts a file that binds an import’s name again where no such read uses it', async () => {
+    const file = 'scripts/rebound.mjs';
+    expect(
+      lines(
+        await convertScripts(
+          [whole(file, REBOUND_UNREAD)],
+          only(file, REBOUND_UNREAD),
+          ROOT,
+        ),
+        file,
+      ),
+    ).toEqual(['3', '5']);
+  });
+});
+
 describe('which file an entry is (#899)', () => {
   it('a URL with a query names the file before the query', () => {
     expect(

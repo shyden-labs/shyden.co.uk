@@ -82,6 +82,150 @@ const ownLengths = (file, text, url) =>
     : [text.length];
 
 /**
+ * The names a binding pattern binds: `a`, `{ a, b: c, ...d }`, `[a, , b = 1]`.
+ *
+ * @param {any} node
+ * @returns {string[]}
+ */
+const patternNames = (node) => {
+  switch (node?.type) {
+    case 'Identifier':
+      return [node.name];
+    case 'ObjectPattern':
+      return node.properties.flatMap((/** @type {any} */ property) =>
+        patternNames(
+          property.type === 'RestElement' ? property.argument : property.value,
+        ),
+      );
+    case 'ArrayPattern':
+      return node.elements.flatMap((/** @type {any} */ element) =>
+        patternNames(element),
+      );
+    case 'AssignmentPattern':
+      return patternNames(node.left);
+    case 'RestElement':
+      return patternNames(node.argument);
+    case 'TSParameterProperty':
+      return patternNames(node.parameter);
+    default:
+      return [];
+  }
+};
+
+/**
+ * Every name the program binds, once per binding: declarations, function and
+ * class names, parameters, catch parameters and imports.
+ *
+ * @param {any} program
+ * @returns {Map<string, number>}
+ */
+const bindingCounts = (program) => {
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  /** @param {readonly string[]} names */
+  const bind = (names) => {
+    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  };
+  /** @param {any} node */
+  const visit = (node) => {
+    switch (node.type) {
+      case 'VariableDeclarator':
+        bind(patternNames(node.id));
+        break;
+      case 'FunctionDeclaration':
+      case 'FunctionExpression':
+      case 'ArrowFunctionExpression':
+        bind([...patternNames(node.id), ...node.params.flatMap(patternNames)]);
+        break;
+      case 'ClassDeclaration':
+      case 'ClassExpression':
+        bind(patternNames(node.id));
+        break;
+      case 'CatchClause':
+        bind(patternNames(node.param));
+        break;
+      case 'ImportSpecifier':
+      case 'ImportDefaultSpecifier':
+      case 'ImportNamespaceSpecifier':
+        bind([node.local.name]);
+        break;
+    }
+    for (const value of Object.values(node))
+      for (const child of Array.isArray(value) ? value : [value])
+        if (
+          child &&
+          typeof child === 'object' &&
+          typeof child.type === 'string'
+        )
+          visit(child);
+  };
+  visit(program);
+  return counts;
+};
+
+/**
+ * The declarators Vitest's coverage never counts (#928): vite's SSR transform
+ * rewrites an imported `X.prop` as `__vite_ssr_import_N__.X.prop`, and
+ * coverage-v8 5.0.5 ignores every declarator initialised that way
+ * (`provider.js`, "SSR transformed import binding"). A namespace import is
+ * the `__vite_ssr_import_N__` object itself, so its `ns.prop` keeps its count.
+ * Measured on Vitest's own route (`tests/unit/coverage-processes.test.ts`).
+ * The transform follows scope, which this does not: where the import's name
+ * is bound again, such a read is refused rather than guessed.
+ *
+ * @param {any} program
+ * @param {string} text
+ * @param {string} file
+ * @returns {{ skip: Set<number> } | { refusal: string }} the declarators to skip, by start offset
+ */
+const importReads = (program, text, file) => {
+  const imported = new Set(
+    program.body
+      .filter((/** @type {any} */ node) => node.type === 'ImportDeclaration')
+      .flatMap((/** @type {any} */ declaration) => declaration.specifiers)
+      .filter(
+        (/** @type {any} */ specifier) =>
+          specifier.type !== 'ImportNamespaceSpecifier',
+      )
+      .map((/** @type {any} */ specifier) => specifier.local.name),
+  );
+  /** @type {Set<number>} */
+  const skip = new Set();
+  if (imported.size === 0) return { skip };
+  const counts = bindingCounts(program);
+  /** @type {string | undefined} */
+  let refusal;
+  /** @param {any} node */
+  const visit = (node) => {
+    if (refusal !== undefined) return;
+    if (
+      node.type === 'VariableDeclarator' &&
+      node.init?.type === 'MemberExpression' &&
+      node.init.object.type === 'Identifier' &&
+      imported.has(node.init.object.name)
+    ) {
+      const name = node.init.object.name;
+      if ((counts.get(name) ?? 0) > 1) {
+        const line = text.slice(0, node.start).split('\n').length;
+        refusal = `coverage-processes: ${file} binds ${name} again, and a declarator on line ${line} reads ${text.slice(node.init.start, node.init.end)}, so whether it reads the import (which Vitest skips) cannot be told`;
+        return;
+      }
+      skip.add(node.start);
+    }
+    for (const value of Object.values(node))
+      for (const child of Array.isArray(value) ? value : [value])
+        if (
+          child &&
+          typeof child === 'object' &&
+          typeof child.type === 'string'
+        )
+          visit(child);
+  };
+  visit(program);
+  return refusal === undefined ? { skip } : { refusal };
+};
+
+/**
  * @param {FileCoverage} into
  * @param {FileCoverage} from
  */
@@ -132,6 +276,8 @@ export const convertScripts = async (scripts, read, root) => {
       return {
         refusal: `coverage-processes: ${file} does not parse (${parsed.errors[0]?.message}), so its counts have nowhere to go`,
       };
+    const reads = importReads(parsed.program, text, file);
+    if ('refusal' in reads) return reads;
     /** @type {Record<string, FileCoverage>} */
     const converted = JSON.parse(
       JSON.stringify(
@@ -140,6 +286,17 @@ export const convertScripts = async (scripts, read, root) => {
           code: text,
           wrapperLength: 0,
           coverage: { functions: script.functions, url: script.url },
+          ignoreNode: (node, type) =>
+            type === 'statement' &&
+            node.type === 'VariableDeclarator' &&
+            // The tree is vite's (oxc), whose nodes carry offsets the ESTree
+            // type ast-v8-to-istanbul declares does not.
+            reads.skip.has(
+              /** @type {{ start: number }} */ (/** @type {unknown} */ (node))
+                .start,
+            )
+              ? true
+              : undefined,
         }),
       ),
     );
