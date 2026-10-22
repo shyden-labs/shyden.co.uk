@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { BASE_URL, PASSWORD } from './tests/functions/local.mjs';
-import { ENGINES } from './tests/engines';
+import { ENGINES, engineUse } from './tests/engines';
 
 /**
  * The Functions-runtime suite (#97, spec 10): real submissions to the real
@@ -32,6 +32,6 @@ export default defineConfig({
   },
   projects: ENGINES.map(({ name, device }) => ({
     name,
-    use: { ...devices[device] },
+    use: engineUse(devices[device], process.env),
   })),
 });
