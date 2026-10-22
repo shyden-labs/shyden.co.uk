@@ -14,7 +14,7 @@
     "lint:tests": "node scripts/lint-changed-tests.mjs",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
-    "test:coverage:simulation": "npm run test:simulation -- --coverage",
+    "test:coverage:simulation": "vitest run --config vitest.simulation.config.ts --coverage --testTimeout=0",
     "test:coverage:integration": "npm run test:integration -- --coverage",
     "test:guards": "vitest run --config vitest.guards.config.ts --testTimeout=25000",
     "test:simulation": "vitest run --config vitest.simulation.config.ts --testTimeout=700",

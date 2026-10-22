@@ -13,7 +13,9 @@ import { coverageFor } from './tests/coverage-options.ts';
  * two share the repo's setup files. There is NO time limit in this file: the
  * suite's one measured limit is on the command that runs it
  * (`npm run test:simulation`), pinned by
- * `tests/unit/suite-budgets.test.ts`.
+ * `tests/unit/suite-budgets.test.ts`. The coverage run of this suite
+ * (`npm run test:coverage:simulation`) sets no limit: instrumentation took
+ * sweep cases past 700 ms, so there the limit timed V8, not the engine (#916).
  */
 export default defineConfig({
   test: {
