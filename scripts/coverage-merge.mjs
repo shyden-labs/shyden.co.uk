@@ -105,7 +105,10 @@ const placesOf = (coverage) => ({
  * Adds one report's places to a file's join: by place when the join already
  * holds every one of them, otherwise by order (#899), which a report converted
  * outside Vitest needs, since Vitest's transform shifts columns. By order only
- * when both hold as many and every pair shares its start and end lines.
+ * when both hold as many and every pair shares its start line. Not its end
+ * line: Vitest's source-map remap can end a statement a line early
+ * (`back-translate.ts`'s `return (` … `);`, 284-287 in its own text, 284-286
+ * in Vitest's, PR #926), so an end line is no evidence of a mismatch.
  *
  * @param {Record<string, Counted>} into
  * @param {readonly Place[]} from
@@ -124,7 +127,7 @@ const join = (into, from, file, what) => {
   for (const [index, { key, loc, count }] of from.entries()) {
     const ours = keys[index] ?? '';
     const seen = /** @type {Counted} */ (into[ours]);
-    if (seen.start !== loc.start?.line || seen.end !== loc.end?.line)
+    if (seen.start !== loc.start?.line)
       return `coverage-merge: ${file} ${what} ${ours} in one report is ${key} in another, on other lines, so their counts cannot be joined`;
     seen.count += count;
   }
@@ -141,6 +144,9 @@ export const mergeMaps = (maps, root) => {
     return { refusal: 'coverage-merge: no report to merge' };
   /** @type {Record<string, LocatedCoverage>} */
   const merged = {};
+  // Every file that cannot be joined is named, so one run lists them all.
+  /** @type {string[]} */
+  const refusals = [];
   for (const map of maps)
     for (const [file, coverage] of Object.entries(map)) {
       const relative = path.posix.relative(root, file);
@@ -153,9 +159,9 @@ export const mergeMaps = (maps, root) => {
       const refusal =
         join(into.statements, places.statements, relative, 'statement') ??
         join(into.branches, places.branches, relative, 'branch arm');
-      if (refusal) return { refusal };
+      if (refusal) refusals.push(refusal);
     }
-  return { merged };
+  return refusals.length > 0 ? { refusal: refusals.join('\n') } : { merged };
 };
 
 const main = () => {

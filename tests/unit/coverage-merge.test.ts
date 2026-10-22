@@ -237,6 +237,61 @@ describe('reports whose places differ join by order (#899)', () => {
     });
   });
 
+  // Measured on PR #926 (run 39715493288): `src/lib/i18n/back-translate.ts`'s
+  // `return (` … `);` runs from line 284 to 287 in its own text, and Vitest's
+  // source-map remap ends it on 286, so an end line is no evidence that a
+  // pair is mismatched; the start line is.
+  it('pairs a statement whose end line moved, keeping the first report’s place', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          {
+            [`${ROOT}/src/lib/a.ts`]: processLike({
+              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 3, 3) },
+              s: { '0': 1, '1': 4 },
+            }),
+          },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      merged: {
+        'src/lib/a.ts': {
+          statements: {
+            '1:13-1:30': { start: 1, end: 1, count: 1 },
+            '2:2-2:20': { start: 2, end: 2, count: 4 },
+          },
+          branches: {},
+        },
+      },
+    });
+  });
+
+  it('names every file it cannot join, not only the first', () => {
+    const twoPlaces = (path: string) => ({ [`${ROOT}/${path}`]: vitestLike });
+    const onePlace = (path: string) => ({
+      [`${ROOT}/${path}`]: processLike({
+        statementMap: { '0': at(1, 32, 1, 30) },
+        s: { '0': 1 },
+      }),
+    });
+    expect(
+      mergeMaps(
+        [
+          { ...twoPlaces('src/lib/a.ts'), ...twoPlaces('src/lib/b.ts') },
+          { ...onePlace('src/lib/a.ts'), ...onePlace('src/lib/b.ts') },
+        ],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal: [
+        'coverage-merge: src/lib/a.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
+        'coverage-merge: src/lib/b.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
+      ].join('\n'),
+    });
+  });
+
   it('pairs branch arms by order too', () => {
     const arms = (first: number, second: number, counts: [number, number]) =>
       file({
