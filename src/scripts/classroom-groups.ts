@@ -86,7 +86,7 @@ import { todayISO } from '../lib/csv';
 import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
 import { avatarSymbolId } from '../lib/avatars';
-import { keyboardOverlap } from '../lib/keyboard-dock';
+import { liftFor } from '../lib/keyboard-dock';
 import { landAssetIndex, SFX_ASSET_GAIN } from '../lib/sfxAssets';
 // Six real, mastered CC0 samples (src/assets/sfx/CREDITS.md has provenance
 // and licence) -- imported through Vite so a missing file fails the BUILD,
@@ -394,18 +394,21 @@ if (form) {
   // so the Make Groups row, docked to the layout viewport's bottom, sat
   // behind the keys while a teacher typed. The row's `bottom` reads
   // `--keyboard-overlap` (ClassroomGroupsPage.astro), kept here at what the
-  // keyboard hides; where the keyboard resizes the page instead (Android,
-  // issue 807) that is 0 and the row stays where it was.
+  // keyboard hides while a field that takes typing has focus; where the
+  // keyboard resizes the page instead (Android, issue 807) that is 0. A
+  // pinch zoom never moves it (Shyden, 2026-10-23), hence the focus.
   const dockedRow = goButton.parentElement!;
   const view = window.visualViewport;
   if (view) {
     const keepAboveKeyboard = () =>
       dockedRow.style.setProperty(
         '--keyboard-overlap',
-        `${keyboardOverlap(window.innerHeight, view)}px`,
+        `${liftFor(window.innerHeight, view, document.activeElement as HTMLElement | null)}px`,
       );
     view.addEventListener('resize', keepAboveKeyboard);
     view.addEventListener('scroll', keepAboveKeyboard);
+    document.addEventListener('focusin', keepAboveKeyboard);
+    document.addEventListener('focusout', keepAboveKeyboard);
     keepAboveKeyboard();
   }
 

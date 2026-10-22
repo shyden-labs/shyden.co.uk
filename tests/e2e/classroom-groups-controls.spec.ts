@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
 import { MAX_STUDENTS } from '../../src/lib/grouping';
@@ -2028,13 +2029,13 @@ test.describe('the on-screen keyboard', () => {
    * the layout viewport, and so the sticky row's dock, at full height
    * (measured on the iPhone: 746px layout, 423px visible). The real case
    * runs on the iPhone through the test above once the iPhone runs these
-   * spec files (issue 840). Until then this STAND-IN gives every engine a
-   * visual viewport that shrinks the same way, and checks the row is lifted
-   * to rest on its new bottom edge.
+   * spec files (issue 840). Until then these STAND-INS give every engine a
+   * visual viewport that shrinks the same way: with a field being typed in
+   * (a keyboard), the row is lifted to rest on the new bottom edge; with
+   * nothing focused (a pinch zoom, which Shyden ruled 2026-10-23 never
+   * moves the bar), it stays docked where it was.
    */
-  test('lifts Make Groups above a keyboard that shrinks only the visual viewport (stand-in)', async ({
-    page,
-  }) => {
+  const shrinkingViewport = async (page: Page) => {
     await page.addInitScript(() => {
       const view = new EventTarget();
       let hidden = 0;
@@ -2049,7 +2050,7 @@ test.describe('the on-screen keyboard', () => {
         configurable: true,
       });
       Object.assign(window, {
-        keyboardRises: (height: number) => {
+        viewShrinks: (height: number) => {
           hidden = height;
           view.dispatchEvent(new Event('resize'));
         },
@@ -2063,12 +2064,39 @@ test.describe('the on-screen keyboard', () => {
       );
     const layoutHeight = await page.evaluate(() => innerHeight);
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight, 0);
+    const shrink = (height: number) =>
+      page.evaluate(
+        (by) =>
+          (
+            window as unknown as { viewShrinks(height: number): void }
+          ).viewShrinks(by),
+        height,
+      );
+    return { rowBottom, layoutHeight, shrink };
+  };
 
-    await page.evaluate(() =>
-      (
-        window as unknown as { keyboardRises(height: number): void }
-      ).keyboardRises(200),
+  test('lifts Make Groups above a keyboard that shrinks only the visual viewport (stand-in)', async ({
+    page,
+  }) => {
+    const { rowBottom, layoutHeight, shrink } = await shrinkingViewport(page);
+    await page.focus('#cg-size');
+    await shrink(200);
+    await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
+  });
+
+  test('leaves Make Groups docked when a pinch zoom shrinks the visual viewport (stand-in)', async ({
+    page,
+  }) => {
+    const { rowBottom, layoutHeight, shrink } = await shrinkingViewport(page);
+    await shrink(200);
+    // The resize has been handled once the page has painted after it.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
     );
+    await expect.poll(rowBottom).toBeCloseTo(layoutHeight, 0);
+    // Liveness: the view really is 200px short, as a field taking typing shows.
+    await page.focus('#cg-size');
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
 });
