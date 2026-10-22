@@ -172,3 +172,68 @@ jobs:
           test -s "${RUNNER_TEMP}/commits.txt" ||
             { echo 'no commit messages in the range: the range is wrong, not the pull request clean'; exit 1; }
           node scripts/closing-keywords.mjs "${RUNNER_TEMP}/commits.txt" "a commit message in this pull request"
+
+  # Every commit in the pull request carries its Gaps checked section (#897),
+  # or changes only .md files, each judged by its own message and its own
+  # files against its first parent, so a commit made inside a script or past
+  # a skipped git hook is still read. One home: scripts/gaps-checked.mjs,
+  # which .githooks/commit-msg also runs. The range is the closing-keywords
+  # step's own: the pull request's commits on top of its base, merges
+  # included (an "Update branch" merge is judged like any other).
+  gaps-checked:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: A dispatched run judges only the pull request that owns its head
+        # The check attaches to the dispatched ref's head, so the body and the
+        # commits judged must be that head's own pull request: a clean body
+        # from another pull request must never turn this head green (#651).
+        # Refused before either check below can pass. Through the environment,
+        # never expanded into the script.
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PR_NUMBER: ${{ inputs.pr }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          PR_JSON="$(gh pr view "$PR_NUMBER" --json headRefName,headRefOid,state)"
+          STATE="$(jq -r .state <<< "$PR_JSON")"
+          HEAD_REF="$(jq -r .headRefName <<< "$PR_JSON")"
+          HEAD_SHA="$(jq -r .headRefOid <<< "$PR_JSON")"
+          if [ "$STATE" != OPEN ]; then
+            echo "::error::pull request #$PR_NUMBER is $STATE, not OPEN: nothing to judge"
+            exit 1
+          fi
+          if [ "$HEAD_REF" != "$REF_NAME" ]; then
+            echo "::error::pull request #$PR_NUMBER is on branch $HEAD_REF, but this run is on $REF_NAME"
+            exit 1
+          fi
+          if [ "$HEAD_SHA" != "$SHA" ]; then
+            echo "::error::pull request #$PR_NUMBER head is $HEAD_SHA, but this run is on $SHA"
+            exit 1
+          fi
+      - name: Every commit in it carries its Gaps checked section
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            TIP='HEAD'
+            BASE_REF="$(gh pr view "$PR_NUMBER" --json baseRefName --jq .baseRefName)"
+          fi
+          node scripts/gaps-checked.mjs --range "origin/${BASE_REF}..${TIP:-HEAD^2}"

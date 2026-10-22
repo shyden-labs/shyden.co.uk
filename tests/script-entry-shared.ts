@@ -23,6 +23,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
+  // With no message file and no --range it has nothing to judge, so it
+  // refuses; a skipped `main()` would pass every commit in silence (#897).
+  'gaps-checked.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/gaps-checked.mjs',
+  },
   // Without its three paths it prints its usage and refuses.
   'build-evidence-page.mjs': {
     args: [],
