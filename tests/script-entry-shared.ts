@@ -58,6 +58,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: coverage-merge.mjs',
   },
+  // With no raw directory or suite there is nothing to convert, so it
+  // refuses; a skipped main() would exit 0 and write no report (#899).
+  'coverage-processes.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: coverage-processes.mjs <raw-dir> <suite>',
+  },
   // A flag it does not know is refused before any git or report is read; a
   // skipped main() would exit 0 and print no verdict at all (#896).
   'coverage-changed.mjs': {
