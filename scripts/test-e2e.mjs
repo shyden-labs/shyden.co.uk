@@ -45,7 +45,12 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EVIDENCE_REPORT } from './evidence-files.mjs';
-import { shardAccount, shardNotice, shardOf } from './e2e-shards.mjs';
+import {
+  shardAccount,
+  shardDeadlineMs,
+  shardNotice,
+  shardOf,
+} from './e2e-shards.mjs';
 import { plannedRun, unitsOfListing } from './e2e-shard-plan.mjs';
 
 /** `playwright test --list` closes with e.g. `Total: 2094 tests in 18 files`. */
@@ -546,6 +551,13 @@ function main() {
       );
     }
 
+    // A CI shard ends itself before its job's limit, which would throw its
+    // log away (#938): Playwright's global timeout, from the job's clock.
+    const deadlineMs = shardDeadlineMs(
+      argv,
+      process.env,
+      Math.floor(Date.now() / 1000),
+    );
     const started = performance.now();
     const run = spawnSync(
       'npx',
@@ -553,6 +565,7 @@ function main() {
         'playwright',
         'test',
         `--reporter=${reporter}`,
+        ...(deadlineMs === null ? [] : [`--global-timeout=${deadlineMs}`]),
         ...(planned ? planned.args : passthrough),
       ],
       {

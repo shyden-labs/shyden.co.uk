@@ -1883,6 +1883,31 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
       jobs: Record<string, Job>;
     };
 
+  // #938: a shard ends itself 17 minutes after its job starts, which only
+  // the job's first step can time. Derived: every ci.yml job with a step that
+  // runs a shard, e2e and capture alike.
+  it('every job that runs a shard writes its job clock in its first step (#938)', () => {
+    const jobs = Object.entries(ciParsed().jobs);
+    const sharded = jobs.filter(([, job]) =>
+      (job.steps ?? []).some((step) =>
+        step.run?.includes('npm run test:e2e -- --shard='),
+      ),
+    );
+    const unclocked = sharded
+      .filter(
+        ([, job]) =>
+          job.steps?.[0]?.run?.trim() !==
+          'echo "E2E_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"',
+      )
+      .map(([id]) => id);
+    expect(
+      searched(unclocked, { of: sharded, what: 'ci.yml jobs running a shard' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/clocked-shard-jobs', sharded.length),
+    ).toBeUndefined();
+  });
+
   // A skipped required check is reported to branch protection as PASSING. An
   // aggregate whose condition could turn false would read green exactly when a
   // shard failed or was skipped (#157), so it has no condition that can: it

@@ -10,6 +10,7 @@ import {
   scopedJobFindings,
   shardAccount,
   shardNotice,
+  shardDeadlineMs,
   shardOf,
   shardTimes,
 } from '../../scripts/e2e-shards.mjs';
@@ -815,6 +816,49 @@ describe('shardTimes: each shard`s run time and how far the slowest is from the 
   it('says so when no shard could be timed', () => {
     expect(shardTimes([account(1, 553, { seconds: null })])).toBe(
       '| shard | minutes |\n| --- | --- |\n| 1 of 4 | not timed |\n\nno shard was timed',
+    );
+  });
+});
+
+/**
+ * Issue 938: a shard that hung ran out its job's 20-minute limit, and GitHub
+ * threw the job's log away. Each CI shard now ends itself 17 minutes after
+ * its job started (Shyden, 2026-10-22), through Playwright's global timeout,
+ * so its report and traces are kept. The job's first step writes the time.
+ */
+describe('a CI shard ends itself before its job limit (#938)', () => {
+  const shard = ['--shard=3/10'];
+  const ci = { CI: 'true', E2E_JOB_STARTED: '1000' };
+
+  it('leaves an unsharded run without a deadline', () => {
+    expect(shardDeadlineMs([], ci, 1100)).toBeNull();
+  });
+
+  it('leaves a sharded run off CI without a deadline', () => {
+    expect(shardDeadlineMs(shard, {}, 1100)).toBeNull();
+  });
+
+  it('gives a CI shard what is left of 17 minutes from its job start', () => {
+    // 1020 s from the job's start, which ran up to 36 s before its first
+    // step wrote 1000: the run may last until 1984.
+    expect(shardDeadlineMs(shard, ci, 1100)).toBe(884_000);
+  });
+
+  it('refuses a CI shard whose job never wrote its start', () => {
+    expect(() => shardDeadlineMs(shard, { CI: 'true' }, 1100)).toThrow(
+      "a CI shard needs E2E_JOB_STARTED, the epoch second its job's first step ran (#938)",
+    );
+  });
+
+  it('refuses a start that is not a whole number of seconds', () => {
+    expect(() =>
+      shardDeadlineMs(shard, { CI: 'true', E2E_JOB_STARTED: '10.5' }, 1100),
+    ).toThrow('E2E_JOB_STARTED must be whole epoch seconds, not "10.5" (#938)');
+  });
+
+  it('refuses a shard whose 17 minutes ran out before its tests began', () => {
+    expect(() => shardDeadlineMs(shard, ci, 1984)).toThrow(
+      "the shard's 17 minutes ran out before its tests began: 984 s since its first step (#938)",
     );
   });
 });

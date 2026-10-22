@@ -88,6 +88,56 @@ export function shardOf(argv = []) {
 }
 
 /**
+ * How long a CI shard may run, from its job's start, before it ends itself
+ * (#938; Shyden, 2026-10-22: 17 minutes, inside the job's 20). A shard that
+ * hung ran into the job limit instead, and GitHub threw the job's log away,
+ * so nothing said what hung; ending three minutes early leaves the reporter
+ * and the failing-shard steps time to keep the report and traces.
+ */
+const SHARD_LIMIT_SECONDS = 17 * 60;
+
+/**
+ * The most a job spent before its first step ran, measured over 241 e2e and
+ * 100 capture shard jobs on 2026-10-22 (36 s and 34 s): the first step's
+ * clock starts that much after the job's.
+ */
+const JOB_START_TO_FIRST_STEP_SECONDS = 36;
+
+/**
+ * Playwright's global timeout for a CI shard, in ms: what is left of its 17
+ * minutes. `E2E_JOB_STARTED` is the epoch second the job's first step ran.
+ * A run that is not a shard, or not on CI, gets none (null).
+ *
+ * @param {readonly string[]} argv
+ * @param {Record<string, string | undefined>} env
+ * @param {number} nowSeconds
+ * @returns {number | null}
+ */
+export function shardDeadlineMs(argv, env, nowSeconds) {
+  if (shardOf(argv) === null) return null;
+  const started = env.E2E_JOB_STARTED;
+  if (started === undefined || started === '') {
+    if (env.CI)
+      throw new Error(
+        "a CI shard needs E2E_JOB_STARTED, the epoch second its job's first step ran (#938)",
+      );
+    return null;
+  }
+  if (!/^\d+$/.test(started))
+    throw new Error(
+      `E2E_JOB_STARTED must be whole epoch seconds, not ${JSON.stringify(started)} (#938)`,
+    );
+  const end =
+    Number(started) + SHARD_LIMIT_SECONDS - JOB_START_TO_FIRST_STEP_SECONDS;
+  const left = end - nowSeconds;
+  if (left <= 0)
+    throw new Error(
+      `the shard's 17 minutes ran out before its tests began: ${nowSeconds - Number(started)} s since its first step (#938)`,
+    );
+  return left * 1000;
+}
+
+/**
  * The file one shard's account is written to.
  *
  * Unique per shard, because the aggregating job downloads every shard's
