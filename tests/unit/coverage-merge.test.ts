@@ -283,6 +283,44 @@ describe('reports whose places differ join by order (#899)', () => {
     expect(pair(at(2, 2, 4, 3))).toEqual(joined);
   });
 
+  it('joins a pair whose end Vitest placed a line early, where its own last line closes a template', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          {
+            [`${ROOT}/src/lib/a.ts`]: processLike({
+              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 4, 3) },
+              s: { '0': 1, '1': 4 },
+            }),
+          },
+        ],
+        ROOT,
+        reading(['const a = 1;', '  return `${', '    total', '  }`;']),
+      ),
+    ).toEqual(joined);
+  });
+
+  it('refuses a pair whose end differs where its own last line closes a block', () => {
+    expect(
+      mergeMaps(
+        [
+          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
+          {
+            [`${ROOT}/src/lib/a.ts`]: processLike({
+              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 4, 3) },
+            }),
+          },
+        ],
+        ROOT,
+        reading(['const a = 1;', '  if (total) {', '    run();', '  }']),
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 2:2-4:3 in another, on other lines, so their counts cannot be joined',
+    });
+  });
+
   it('refuses a pair whose end differs where its own last line does not open with )', () => {
     expect(pair(at(2, 2, 3, 9))).toEqual({
       refusal:

@@ -106,11 +106,13 @@ const placesOf = (coverage) => ({
  * Lines that agree are; lines that differ are only where Vitest's remap moved
  * a parenthesis. Vitest re-prints a module with its parentheses dropped and
  * printed back with no mapping, so a node that opens with `(` is placed on
- * the token before it, and one whose last line opens with `)` ends a line
- * early (PR #926, runs 39715493288 and 39729419429: back-translate.ts's
+ * the token before it, and one whose last line opens with `)`, or with a
+ * template's closing `}` and backtick, ends a line early (PR #926, runs 39715493288 and 39729419429: back-translate.ts's
  * `return (` … `);` 284-287 against Vitest's 284-286, its arm
  * `(sorted[…] + …) / 2` at 525:6 against 524:13, message.ts's
- * `(kind === …) ?? …` at 171:8 against 170:12). The process report, joined
+ * `(kind === …) ?? …` at 171:8 against 170:12; report-review.ts's
+ * ``return `… ${`` … ``}`;`` 216-220 against 216-219, run 39731806003; a bare
+ * `}` closing a block does not qualify). The process report, joined
  * last, holds the file's own places; with no text read, no line may move.
  *
  * @param {Counted} seen the place joined so far (Vitest's)
@@ -121,7 +123,7 @@ const sameNode = (seen, loc, lines) => {
   const start = loc.start?.line ?? 0;
   const end = loc.end?.line ?? 0;
   const opensWithParen = lines?.[start - 1]?.[loc.start?.column ?? -1] === '(';
-  const closesWithParen = /^\s*\)/.test(lines?.[end - 1] ?? '');
+  const closesWithParen = /^\s*(?:\)|\}`)/.test(lines?.[end - 1] ?? '');
   return (
     (seen.start === start || (seen.start < start && opensWithParen)) &&
     (seen.end === end || (seen.end < end && closesWithParen))
