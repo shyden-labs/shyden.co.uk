@@ -115,9 +115,30 @@ describe('coverage-processes.mjs on a real child process', () => {
         env: { ...process.env, NODE_V8_COVERAGE: '' },
       },
     );
+    expect([run.status, run.stdout]).toEqual([1, '']);
+    expect(run.stderr).toContain(
+      `found no raw V8 coverage files in ${path.join(repo, 'empty')} — the walk is broken`,
+    );
+  });
+
+  it('a process that ran no measured file is refused, naming the directory', () => {
+    mkdirSync(path.join(repo, 'unmeasured'));
+    writeFileSync(
+      path.join(repo, 'unmeasured', 'coverage-1.json'),
+      JSON.stringify({ result: [] }),
+    );
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'unmeasured'), 'processes'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
     expect([run.status, run.stderr]).toEqual([
       1,
-      `✗ coverage-processes: no process ran a measured file, so there is nothing to report (read ${path.join(repo, 'empty')})\n`,
+      `✗ coverage-processes: no process ran a measured file, so there is nothing to report (read ${path.join(repo, 'unmeasured')})\n`,
     ]);
   });
 });
