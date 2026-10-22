@@ -14,7 +14,7 @@
     "lint:tests": "node scripts/lint-changed-tests.mjs",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
-    "test:coverage:simulation": "npm run test:simulation -- --coverage",
+    "test:coverage:simulation": "vitest run --config vitest.simulation.config.ts --coverage --testTimeout=0",
     "test:coverage:integration": "npm run test:integration -- --coverage",
     "test:guards": "vitest run --config vitest.guards.config.ts --testTimeout=25000",
     "test:simulation": "vitest run --config vitest.simulation.config.ts --testTimeout=700",
@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "1.64.1",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "5.0.5",
     "prettier": "3.9.10",

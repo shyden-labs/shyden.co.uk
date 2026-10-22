@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { openWaitingBoard } from './helpers';
+import { onRealDevice } from '../device/device-downloads';
 import { recorded } from './evidence';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
@@ -371,12 +372,17 @@ test.describe('the board deals by moving students into their cards', () => {
       await openWaitingBoard(page, String(COUNT), '4');
       // The ratio the page really draws at, so the override cannot stop
       // applying unseen: its project's own, or the frame test's from above.
+      // A real phone over CDP draws at its own ratio (3.5 on the Android)
+      // and no ratio can be set there, so its project must name none (#908).
       const project = test.info().project;
-      expect(await page.evaluate(() => window.devicePixelRatio)).toBe(
-        FRAME_TEST_PIXEL_RATIO[project.name] ??
-          project.use.deviceScaleFactor ??
-          1,
-      );
+      const set =
+        FRAME_TEST_PIXEL_RATIO[project.name] ?? project.use.deviceScaleFactor;
+      if (onRealDevice())
+        expect(set, 'no ratio can be set on a real phone').toBeUndefined();
+      else
+        expect(await page.evaluate(() => window.devicePixelRatio)).toBe(
+          set ?? 1,
+        );
       await startSampler(page);
       await press(page, 'Make Groups');
       await expectDealt(page);
