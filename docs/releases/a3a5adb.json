@@ -3,7 +3,7 @@
   "headline": "Everything since 13 August, before it reaches production",
   "lede": "One page for the whole release: what changes for a visitor, the journeys that show it on five engines, and the checks that stay yours.",
   "signoff": {
-    "lede": "Production changes only on your decision. Approving here records that this release may be promoted; the promotion itself stays yours.",
+    "lede": "Production changes only on your decision. Approving here records that this release may be cut and released; the release itself stays yours.",
     "approve": "Signed off — may release to production"
   },
   "gapGroup": "Shown by no journey: check by hand",

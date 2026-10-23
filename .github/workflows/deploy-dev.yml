@@ -1,5 +1,5 @@
-name: Deploy to dev (deploy + verify, gates promotion to main)
-# THE PROMOTION GATE. Fires on every push to `develop`. Proves the merged tree
+name: Deploy to dev (deploy + verify, gates what may reach main)
+# THE GATE BEFORE MAIN. Fires on every push to `develop`. Proves the merged tree
 # is the tree that passed on its PR (a dispatched branch runs the full suite
 # instead), deploys to dev, then VERIFIES the deployed dev site and posts a
 # `dev-verified` commit status on the SHA.
@@ -204,8 +204,8 @@ jobs:
         # Deploy and verify whatever ref a dispatch points at, but publish the
         # STATUS only for develop. `dev-verified` is what branch protection on
         # `main` requires, so an unguarded dispatch would let any feature branch
-        # earn it and then open a PR straight into `main` — skipping develop and
-        # the integration it exists to force.
+        # earn it and then be cut and released into `main` — skipping develop
+        # and the integration it exists to force.
         if: github.ref_name == 'develop'
         env:
           GH_TOKEN: ${{ github.token }}

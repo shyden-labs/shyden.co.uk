@@ -2008,6 +2008,27 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     });
   });
 
+  // A release comes from a frozen release/* cut of develop (#941). main no
+  // longer demands a branch be up to date (Shyden, 2026-10-23), so this job
+  // is what keeps the landed tree the tested one, on the release alone.
+  it('checks the head is a frozen cut only where scope says the run is a release (#941)', () => {
+    const cut = jobNamed('ci.yml', 'release-cut');
+    expect({
+      condition: cut.condition,
+      needs: cut.needs,
+      runs: cut.runs,
+      stood: jobNamed('ci.yml', 'build-and-test').needs.includes('release-cut'),
+    }).toEqual({
+      condition: "needs.scope.outputs.release == 'true'",
+      needs: ['scope'],
+      runs: [
+        'git fetch --no-tags origin develop:refs/remotes/origin/develop main:refs/remotes/origin/main',
+        'node scripts/release-cut.mjs',
+      ],
+      stood: true,
+    });
+  });
+
   it('starts the logs suite nowhere else: one job runs it, one job calls that (#822)', () => {
     const graphs = workflowGraphs();
     const where = (has: (job: WorkflowJob) => boolean) =>
