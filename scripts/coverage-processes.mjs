@@ -26,6 +26,7 @@ import { convert } from 'ast-v8-to-istanbul';
 import { parse } from 'vite';
 import { MEASURED, NOT_MEASURED } from '../tests/coverage-options.ts';
 import { die, messageOf, nonEmpty } from './errors.mjs';
+import { processRuns } from './process-runs.mjs';
 
 /**
  * One V8 function's block counts, and one script's functions, as
@@ -315,6 +316,92 @@ export const convertScripts = async (scripts, read, root) => {
   return { report, skipped };
 };
 
+/**
+ * The pid Node writes into a raw file's name, `coverage-<pid>-<time>-<n>.json`
+ * (#936), or undefined for a file Node did not name.
+ *
+ * @param {string} name
+ * @returns {number | undefined}
+ */
+export const writerPid = (name) => {
+  const match = /^coverage-(\d+)-\d+-\d+\.json$/.exec(name);
+  return match ? Number(match[1]) : undefined;
+};
+
+/** How often a running writer is looked at again, in ms. */
+const WRITER_LOOK_MS = 50;
+
+/**
+ * Waits for every process named by a raw file's name to exit (#936). Node
+ * writes a process's file as that process exits, so a file whose writer
+ * still runs may be unfinished: once in 16 integration runs the reader met
+ * cut-off JSON. A writer still running at the ceiling is refused, named,
+ * never read half-written.
+ *
+ * @param {string[]} names
+ * @param {{ isRunning: (pid: number) => boolean, pause: (ms: number) => Promise<void>, now: () => number, ceilingMs: number }} how
+ * @returns {Promise<{ waitedFor: number[] } | { refusal: string }>}
+ */
+export const awaitWriters = async (
+  names,
+  { isRunning, pause, now, ceilingMs },
+) => {
+  const pids = [
+    ...new Set(names.map(writerPid).filter((pid) => pid !== undefined)),
+  ];
+  const start = now();
+  /** @type {Set<number>} */
+  const waitedFor = new Set();
+  for (;;) {
+    const running = pids.filter((pid) => isRunning(pid));
+    if (running.length === 0) return { waitedFor: [...waitedFor] };
+    for (const pid of running) waitedFor.add(pid);
+    if (now() - start >= ceilingMs) {
+      const files = names.filter((name) =>
+        running.includes(writerPid(name) ?? -1),
+      );
+      return {
+        refusal: `coverage-processes: process ${running.join(', ')} was still running after ${ceilingMs} ms, so its raw coverage file may be unfinished (${files.join(', ')})`,
+      };
+    }
+    await pause(WRITER_LOOK_MS);
+  }
+};
+
+/**
+ * One raw file's entries, or a refusal naming the file, its size and its
+ * writer (#936): `Unexpected end of JSON input` alone named nothing.
+ *
+ * @param {string} name
+ * @param {string} text
+ * @param {boolean} running whether the writer named in `name` still runs
+ * @returns {{ result: V8Script[] } | { refusal: string }}
+ */
+export const readRaw = (name, text, running) => {
+  try {
+    return {
+      result: /** @type {{ result: V8Script[] }} */ (JSON.parse(text)).result,
+    };
+  } catch (error) {
+    const pid = writerPid(name);
+    const writer =
+      pid === undefined
+        ? 'an unnamed process'
+        : `process ${pid}, which ${running ? 'is still running' : 'has exited'}`;
+    return {
+      refusal: `coverage-processes: ${name} (${Buffer.byteLength(text)} bytes, written by ${writer}) is not whole JSON: ${messageOf(error)}`,
+    };
+  }
+};
+
+/**
+ * A stated ceiling, not a measured one: how long a writer still exiting when
+ * the reader starts may take to finish its file. The whole integration suite
+ * runs in about 40 s (probe run 39856943389), and the largest file it leaves
+ * is 4.4 MB.
+ */
+const WRITER_CEILING_MS = 30_000;
+
 const main = async () => {
   const [dir, suite, ...rest] = process.argv.slice(2);
   if (!dir || !suite || rest.length > 0)
@@ -331,15 +418,29 @@ const main = async () => {
   } catch (error) {
     die(messageOf(error));
   }
-  /** @type {V8Script[]} */
-  const scripts = names
-    .filter((name) => name.endsWith('.json'))
-    .flatMap(
-      (name) =>
-        /** @type {{ result: V8Script[] }} */ (
-          JSON.parse(readFileSync(path.join(dir, name), 'utf8'))
-        ).result,
+  const raw = names.filter((name) => name.endsWith('.json'));
+  const waited = await awaitWriters(raw, {
+    isRunning: processRuns,
+    pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+    ceilingMs: WRITER_CEILING_MS,
+  });
+  if ('refusal' in waited) die(waited.refusal);
+  else if (waited.waitedFor.length > 0)
+    console.log(
+      `coverage-processes: waited for process ${waited.waitedFor.join(', ')} to finish writing`,
     );
+  /** @type {V8Script[]} */
+  const scripts = raw.flatMap((name) => {
+    const pid = writerPid(name);
+    const read = readRaw(
+      name,
+      readFileSync(path.join(dir, name), 'utf8'),
+      pid !== undefined && processRuns(pid),
+    );
+    if ('refusal' in read) die(read.refusal);
+    return read.result;
+  });
   const result = await convertScripts(
     scripts,
     (file) => readFileSync(path.join(root, file), 'utf8'),

@@ -65,7 +65,8 @@ describe('the verdict, run as build-and-test runs it', () => {
 
   /**
    * `needs` with the capture job (#774) as scope's verdict leaves it, beside a
-   * logs suite (#822) skipped as on every pull request that is not a release.
+   * logs suite (#822) and a release-cut check (#941) skipped as on every pull
+   * request that is not a release.
    */
   const capturing = (
     needs: Record<string, unknown>,
@@ -76,6 +77,7 @@ describe('the verdict, run as build-and-test runs it', () => {
       { outputs?: Record<string, string> } | undefined;
     return {
       logs: { result: 'skipped', outputs: {} },
+      'release-cut': { result: 'skipped', outputs: {} },
       ...needs,
       scope: {
         result: 'success',
@@ -90,13 +92,21 @@ describe('the verdict, run as build-and-test runs it', () => {
     };
   };
 
-  /** `needs` on a release pull request (#822): scope says the logs suite runs. */
-  const releasing = (needs: Record<string, unknown>, result: string) => {
+  /**
+   * `needs` on a release pull request (#822, #941): scope says the logs suite
+   * and the release-cut check run.
+   */
+  const releasing = (
+    needs: Record<string, unknown>,
+    logs: string,
+    cut = 'success',
+  ) => {
     const scope = needs.scope as { outputs: Record<string, string> };
     return {
       ...needs,
       scope: { ...scope, outputs: { ...scope.outputs, release: 'true' } },
-      logs: { result, outputs: {} },
+      logs: { result: logs, outputs: {} },
+      'release-cut': { result: cut, outputs: {} },
     };
   };
 
@@ -243,6 +253,7 @@ describe('the verdict, run as build-and-test runs it', () => {
       },
       capture: { result: 'skipped', outputs: {} },
       logs: { result: 'skipped', outputs: {} },
+      'release-cut': { result: 'skipped', outputs: {} },
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(/e2e finished `skipped`, not `success`/);
@@ -282,6 +293,17 @@ describe('the verdict, run as build-and-test runs it', () => {
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(
       /logs finished `skipped` where scope said it runs, not `success`/,
+    );
+  });
+
+  it('fails a release whose head failed the release-cut check (#941)', () => {
+    const run = verdict(
+      accountFiles(whole()),
+      releasing(succeeded, 'success', 'failure'),
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toMatch(
+      /release-cut finished `failure` where scope said it runs, not `success`/,
     );
   });
 

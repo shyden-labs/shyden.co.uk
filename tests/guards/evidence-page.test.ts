@@ -687,6 +687,21 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
     expect(location.path).toBe(join(location.dir, EVIDENCE_REPORT));
   });
 
+  // A CI shard keeps its report for the failing-shard upload (#938).
+  it('keeps the report in E2E_REPORT_DIR when a run names one', () => {
+    expect(reportLocation({ E2E_REPORT_DIR: '/r' })).toEqual({
+      dir: '/r',
+      path: join('/r', EVIDENCE_REPORT),
+      ephemeral: false,
+    });
+  });
+
+  it('writes an evidence run into its evidence directory whatever E2E_REPORT_DIR says', () => {
+    expect(
+      reportLocation({ EVIDENCE_DIR: '/e', E2E_REPORT_DIR: '/r' }).dir,
+    ).toBe('/e');
+  });
+
   it('never deletes a directory the operator was asked to keep', () => {
     // `reportLocation` returning `ephemeral: false` is only half the control:
     // it is the CALL SITE that deletes, and an unconditional `rmSync` there

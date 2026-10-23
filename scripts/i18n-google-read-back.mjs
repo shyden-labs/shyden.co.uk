@@ -79,6 +79,7 @@ import {
 import { withGoogleWriters, writersOf } from '../src/lib/i18n/readers.ts';
 import { VERIFIED } from '../src/lib/i18n/verified.ts';
 import { messageOf } from './errors.mjs';
+import { processRuns } from './process-runs.mjs';
 
 const STORE = new URL('../src/lib/i18n/.read-back.json', import.meta.url);
 const DRAFTS = new URL('../src/lib/i18n/.translations.json', import.meta.url);
@@ -126,15 +127,7 @@ const files = {
 const clock = {
   now: () => Date.now(),
   wait: (ms) => delay(ms),
-  alive: (pid) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      // EPERM: the process runs, as someone this one cannot signal.
-      return codeOf(error) === 'EPERM';
-    }
-  },
+  alive: processRuns,
   say: (line) => console.log(line),
 };
 
