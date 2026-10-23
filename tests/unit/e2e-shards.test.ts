@@ -559,9 +559,9 @@ describe('accountFindings: the shards add up to the suite', () => {
   });
 });
 
-// The three jobs scope decides (#774, #822, #941): each runs exactly where scope's
+// The two jobs scope decides (#774, #822): each runs exactly where scope's
 // own verdict says, so its skip is a pass there and a refusal elsewhere. One
-// rule, three rows; every message is written out per job, never built from the
+// rule, two rows; every message is written out per job, never built from the
 // row it is checked against.
 describe.each([
   {
@@ -575,12 +575,6 @@ describe.each([
     verdict: 'release',
     absent:
       'logs is not among the jobs build-and-test stands for, so a release whose logs and audit trails were never checked would pass',
-  },
-  {
-    job: 'release-cut',
-    verdict: 'release',
-    absent:
-      'release-cut is not among the jobs build-and-test stands for, so a release from a head that is not a frozen cut of develop would pass',
   },
 ] as const)(
   'scopedJobFindings: $job ran exactly where scope said ($verdict, #774, #822)',
@@ -621,8 +615,6 @@ describe.each([
           capture:
             'capture finished `skipped` where scope said it runs, not `success`',
           logs: 'logs finished `skipped` where scope said it runs, not `success`',
-          'release-cut':
-            'release-cut finished `skipped` where scope said it runs, not `success`',
         }[name],
       ]);
     });
@@ -638,8 +630,6 @@ describe.each([
           capture:
             'capture finished `failure` where scope said it runs, not `success`',
           logs: 'logs finished `failure` where scope said it runs, not `success`',
-          'release-cut':
-            'release-cut finished `failure` where scope said it runs, not `success`',
         }[name],
       ]);
     });
@@ -655,8 +645,6 @@ describe.each([
           capture:
             'capture finished `success` where scope said it does not run, not `skipped`',
           logs: 'logs finished `success` where scope said it does not run, not `skipped`',
-          'release-cut':
-            'release-cut finished `success` where scope said it does not run, not `skipped`',
         }[name],
       ]);
     });
@@ -675,8 +663,6 @@ describe.each([
           capture:
             'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
           logs: 'scope handed on no release verdict (undefined), so logs finishing `skipped` cannot be judged',
-          'release-cut':
-            'scope handed on no release verdict (undefined), so release-cut finishing `skipped` cannot be judged',
         }[name],
       ]);
     });
@@ -692,8 +678,6 @@ describe.each([
           capture:
             'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
           logs: 'scope handed on no release verdict ("TRUE"), so logs finishing `success` cannot be judged',
-          'release-cut':
-            'scope handed on no release verdict ("TRUE"), so release-cut finishing `success` cannot be judged',
         }[name],
       ]);
     });

@@ -542,36 +542,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/logs.yml
 
-  # A release comes from a frozen `release/*` cut of develop (#941; Shyden,
-  # 2026-10-17: "we only deploy to production the contents of the release cut,
-  # nothing more"). main does not demand a branch be up to date (Shyden,
-  # 2026-10-23), because each release lands as a merge commit develop never
-  # holds, so this job stands where that rule stood: the head is a release/
-  # branch develop holds, the merge lands exactly its tree, and main holds
-  # nothing but merges of earlier cuts (scripts/release-cut.mjs). The head's
-  # name and commit arrive as env vars, never spliced into the script.
-  release-cut:
-    needs: scope
-    if: needs.scope.outputs.release == 'true'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-      - run: git fetch --no-tags origin develop:refs/remotes/origin/develop main:refs/remotes/origin/main
-      - name: The head is a frozen cut of develop, and its merge lands exactly its tree
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/release-cut.mjs
-
   build-and-test:
     needs:
       [
@@ -584,7 +554,6 @@ jobs:
         sanity-on-build,
         functions,
         logs,
-        release-cut,
       ]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read

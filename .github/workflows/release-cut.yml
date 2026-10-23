@@ -1,0 +1,49 @@
+# A pull request into main merges only a frozen release/* cut of develop
+# (#941; Shyden, 2026-10-17: "we only deploy to production the contents of the
+# release cut, nothing more"). main does not demand a branch be up to date
+# (Shyden, 2026-10-23), because each release lands as a merge commit develop
+# never holds, so this check stands where that rule stood: the head is a
+# release/ branch develop holds, GitHub's merge of it lands exactly its tree,
+# and main holds nothing but merges of earlier cuts (scripts/release-cut.mjs).
+#
+# Whose code runs (#944; Shyden's rulings of 2026-10-23 on
+# repo-template#86, its docs/release-cut.md): pull_request_target runs the
+# default branch's own copy of this workflow and checks out the default
+# branch, never the pull request. The script fetches the pull request's merge
+# ref as git data and runs none of its code, then posts its verdict as the
+# release-cut commit status on the head, which main requires. This job's own
+# check run is named judge-release-cut, so it is never taken for the status.
+# The head's name and commit arrive as env vars, never spliced into a script.
+name: release-cut
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  judge-release-cut:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    # The status is all it writes.
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      # The default branch, with every branch's history: the check asks git
+      # about origin/develop and origin/main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Judge the release cut and post its status
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-cut.mjs

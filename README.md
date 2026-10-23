@@ -104,8 +104,8 @@ feature/xxx ──PR──▶ develop ──push──▶ deploy-dev ──▶ d
 develop ──cut──▶ release/<date>-<what>   frozen at the commit the operator chose
                          │
                      release PR          requires: build-and-test + visual
-                   (merge commit)        + dev-verified; release-cut and logs
-                         │               run on this pull request alone
+                   (merge commit)        + dev-verified; release-cut posts its
+                         │               status and logs runs on it alone
                          ▼
                        main
                          │
@@ -129,9 +129,11 @@ commit carries the status with no copying step.
 
 A release reaches `main` only as a merge commit from a frozen `release/*` cut
 (#941). `main` does not require a branch to be up to date, since each release
-merge is a commit `develop` never holds; the `release-cut` job checks instead
+merge is a commit `develop` never holds; the `release-cut` status checks instead
 that the merge lands exactly the cut's tree and that `main` holds nothing but
-earlier cuts (`scripts/release-cut.mjs`).
+earlier cuts (`scripts/release-cut.mjs`). It is posted by `release-cut.yml`,
+which runs the default branch's own copy on `pull_request_target` and reads the
+pull request only as git data (#944).
 
 `develop` must not require `dev-verified` — that status is produced _by_ pushing
 to develop, so requiring it would deadlock.

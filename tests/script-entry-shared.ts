@@ -243,13 +243,13 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/record-ios-ceilings.mjs (takes no arguments)',
   },
-  // With no head named it has no cut to read, so it refuses before asking git
-  // anything (#941).
+  // With no head commit it has nothing to judge or post a status on, so it
+  // refuses before asking git anything (#941, #944).
   'release-cut.mjs': {
     args: [],
     env: { HEAD_REF: undefined, HEAD_SHA: undefined },
     status: 1,
-    says: "::error::the head is '', not a release/ cut",
+    says: '::error::release-cut: HEAD_SHA is not set',
   },
   // With no range and no --tests it has nothing to read, so it refuses (#362).
   'release-inventory.mjs': {
