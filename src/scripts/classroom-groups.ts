@@ -86,6 +86,7 @@ import { todayISO } from '../lib/csv';
 import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
 import { avatarSymbolId } from '../lib/avatars';
+import { liftFor } from '../lib/keyboard-dock';
 import { landAssetIndex, SFX_ASSET_GAIN } from '../lib/sfxAssets';
 // Six real, mastered CC0 samples (src/assets/sfx/CREDITS.md has provenance
 // and licence) -- imported through Vite so a missing file fails the BUILD,
@@ -388,6 +389,28 @@ if (form) {
   const soundText = $<HTMLSpanElement>('cg-sound-text')!;
   const speedSelect = $<HTMLSelectElement>('cg-speed')!;
   const goButton = $<HTMLButtonElement>('cg-go')!;
+
+  // Issue 853: Safari's on-screen keyboard shrinks only the visual viewport,
+  // so the Make Groups row, docked to the layout viewport's bottom, sat
+  // behind the keys while a teacher typed. The row's `bottom` reads
+  // `--keyboard-overlap` (ClassroomGroupsPage.astro), kept here at what the
+  // keyboard hides while a field that takes typing has focus; where the
+  // keyboard resizes the page instead (Android, issue 807) that is 0. A
+  // pinch zoom never moves it (Shyden, 2026-10-23), hence the focus.
+  const dockedRow = goButton.parentElement!;
+  const view = window.visualViewport;
+  if (view) {
+    const keepAboveKeyboard = () =>
+      dockedRow.style.setProperty(
+        '--keyboard-overlap',
+        `${liftFor(window.innerHeight, view, document.activeElement as HTMLElement | null)}px`,
+      );
+    view.addEventListener('resize', keepAboveKeyboard);
+    view.addEventListener('scroll', keepAboveKeyboard);
+    document.addEventListener('focusin', keepAboveKeyboard);
+    document.addEventListener('focusout', keepAboveKeyboard);
+    keepAboveKeyboard();
+  }
 
   // A localStorage KEY, not a DOM id -- deliberately left as the literal
   // 'cg-sound' rather than renamed alongside the checkbox above: a teacher
