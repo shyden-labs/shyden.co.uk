@@ -17,7 +17,8 @@
  * compiled converts through the cached copy and map, and an entry found
  * neither as its own text nor there is refused. `--recorded-root` is the
  * checkout the processes ran in, when that is another path than this one (a
- * CI container's); files are read from here.
+ * CI container's): it places each entry, whose URL is left as it ran, and
+ * files are read and reported from here.
  *
  * writes `coverage/<suite>/coverage-final.json`. A directory with no measured
  * entry is refused, never written as an empty report that reads as "nothing
@@ -34,7 +35,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { convert } from 'ast-v8-to-istanbul';
 import { parse } from 'vite';
@@ -289,26 +290,6 @@ export const indexCompileCache = (entries) => {
 };
 
 /**
- * Each entry recorded under `from` moved onto `to` (#913): a CI container
- * runs the checkout at another path than the job that converts it, and every
- * later step reads this checkout. Only a URL inside `from` itself moves.
- *
- * @param {readonly V8Script[]} scripts
- * @param {string} from the checkout the processes ran in
- * @param {string} to this checkout
- * @returns {V8Script[]}
- */
-export const rebaseUrls = (scripts, from, to) => {
-  const prefix = `${pathToFileURL(from).href}/`;
-  const onto = `${pathToFileURL(to).href}/`;
-  return scripts.map((script) =>
-    script.url.startsWith(prefix)
-      ? { ...script, url: onto + script.url.slice(prefix.length) }
-      : script,
-  );
-};
-
-/**
  * The compile cache's files as code-and-map pairs (#913): `<name>.js` beside
  * `<name>.map`, in whatever folders Playwright files them, other files left.
  * Half a pair is a cache cut short, and refused by name.
@@ -358,17 +339,19 @@ const addCounts = (into, from) => {
  * @param {readonly V8Script[]} scripts every process's entries
  * @param {(file: string) => string} read a file's text, by its relative path
  * @param {string} root the repository, absolute
- * @param {{ compiled?: ReadonlyMap<string, readonly Compiled[]>, measure?: import('../tests/coverage-options.ts').Measure }} [tool] a tool's compiled copies, by source text, and the set its run measures (#913); given copies, every entry that is not the file's own text must be found in them
+ * @param {{ compiled?: ReadonlyMap<string, readonly Compiled[]>, measure?: import('../tests/coverage-options.ts').Measure, recordedRoot?: string }} [tool] a tool's compiled copies, by source text, the checkout its processes ran in when that is not `root` (#913), and the set its run measures (#913); given copies, every entry that is not the file's own text must be found in them
  * @returns {Promise<{ report: Record<string, FileCoverage>, skipped: Skipped[] } | { refusal: string }>}
  */
 export const convertScripts = async (scripts, read, root, tool = {}) => {
-  const { compiled, measure } = tool;
+  const { compiled, measure, recordedRoot = root } = tool;
   /** @type {Record<string, FileCoverage>} */
   const report = {};
   /** @type {Skipped[]} */
   const skipped = [];
   for (const script of scripts) {
-    const file = fileOf(script.url, root, measure);
+    // Placed by the checkout it ran in; its URL stays as it ran, since the
+    // sourceURL Node appended carries it (#913).
+    const file = fileOf(script.url, recordedRoot, measure);
     if (file === null) continue;
     const text = read(file);
     const lengths = ownLengths(file, text, script.url);
@@ -652,11 +635,16 @@ const main = async () => {
     return read.result;
   });
   const result = await convertScripts(
-    recorded === undefined ? scripts : rebaseUrls(scripts, recorded, root),
+    scripts,
     (file) => readFileSync(path.join(root, file), 'utf8'),
     root,
-    // A compile cache is a Playwright run's, which measures its own set.
-    compiled === undefined ? {} : { compiled, measure: PLAYWRIGHT_MEASURE },
+    {
+      // A compile cache is a Playwright run's, which measures its own set.
+      ...(compiled === undefined
+        ? {}
+        : { compiled, measure: PLAYWRIGHT_MEASURE }),
+      ...(recorded === undefined ? {} : { recordedRoot: recorded }),
+    },
   );
   if ('refusal' in result) die(`${result.refusal} (read ${dir})`);
   mkdirSync(path.join('coverage', suite), { recursive: true });

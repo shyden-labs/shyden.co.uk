@@ -9,7 +9,6 @@ import {
   ledgerNote,
   pairCacheFiles,
   readRaw,
-  rebaseUrls,
   writerPid,
   type V8Script,
 } from '../../scripts/coverage-processes.mjs';
@@ -678,32 +677,43 @@ describe('the compile cache is read as pairs of code and map (#913)', () => {
 
 /**
  * A CI container runs the checkout at another path than the job that converts
- * it (#913): V8's URLs are moved onto this checkout, and nothing else is.
+ * it (#913). Each entry is placed in its checkout by the root it was recorded
+ * under, and reported under this one; its URL is left as it ran, because Node
+ * appended `//# sourceURL=` with that URL (PR #949's first run refused
+ * `src/lib/is-record.ts` when the URL was moved first: 660 against 673).
  */
-describe('recorded URLs move onto this checkout (#913)', () => {
-  const ran = (url: string): V8Script => ({ url, functions: [] });
+describe('an entry recorded in another checkout (#913)', () => {
+  const RECORDED = 'file:///__w/site/scripts/branch.ts';
+  // 164 characters of TypeScript, then the suffix with the URL it ran under.
+  const recorded = script(
+    RECORDED,
+    164 + `\n\n//# sourceURL=${RECORDED}`.length,
+    [106, 163],
+  );
 
-  it('moves a file under the recorded root, keeping its query', () => {
+  it('converts against the URL it ran under, reported under this checkout', async () => {
+    const result = await convertScripts([recorded], read, ROOT, {
+      recordedRoot: '/__w/site',
+    });
     expect(
-      rebaseUrls(
-        [ran('file:///__w/site/site/tests/helper.ts?fresh=1')],
-        '/__w/site/site',
-        '/home/runner/work/site/site',
-      ),
-    ).toEqual([
-      ran('file:///home/runner/work/site/site/tests/helper.ts?fresh=1'),
-    ]);
+      'report' in result && statements(result.report, 'scripts/branch.ts'),
+    ).toEqual(['1:21-1:44=1', '2:0-6:null=1', '3:2-3:null=1', '5:2-5:null=0']);
   });
 
-  it('leaves a file outside it, a sibling sharing its prefix, and a built-in', () => {
-    const others = [
-      ran('file:///__w/site/site-other/tests/helper.ts'),
-      ran('file:///usr/lib/node_modules/x.js'),
-      ran('node:fs'),
-    ];
-    expect(
-      rebaseUrls(others, '/__w/site/site', '/home/runner/work/site/site'),
-    ).toEqual(others);
+  it('leaves out a file outside the recorded root, and a sibling sharing its prefix', async () => {
+    const result = await convertScripts(
+      [
+        { ...recorded, url: 'file:///__w/site-other/scripts/branch.ts' },
+        { ...recorded, url: TS_URL },
+      ],
+      read,
+      ROOT,
+      { recordedRoot: '/__w/site' },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: no process ran a measured file, so there is nothing to report',
+    });
   });
 });
 
