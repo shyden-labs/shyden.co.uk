@@ -24,6 +24,31 @@ export const MEASURED = [
 ];
 export const NOT_MEASURED = ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'];
 
+/**
+ * Every Playwright web server's command, prefixed (#913): the server builds
+ * the site, which loads `src/` through Vite, code no Playwright run can
+ * convert (the build is #914's). So nothing it starts writes raw coverage,
+ * while the runner and workers that started it do.
+ */
+export const unmeasured = (command: string): string =>
+  `unset NODE_V8_COVERAGE; ${command}`;
+
+/** A measured set: the globs a file must match, then the globs it must not. */
+export type Measure = {
+  readonly include: readonly string[];
+  readonly exclude: readonly string[];
+};
+
+/**
+ * What a Playwright run measures (#913): the shared set, the Playwright
+ * configs, and every file under `tests/` its runner and workers load, specs
+ * and e2e helpers included. Only type declarations are left out.
+ */
+export const PLAYWRIGHT_MEASURE: Measure = {
+  include: [...MEASURED, 'playwright*.config.ts', `tests/**/*.${CODE}`],
+  exclude: ['**/*.d.ts'],
+};
+
 export const coverageFor = (suite: CoveredSuite) => ({
   provider: 'v8' as const,
   reporter: ['json', 'lcovonly'],

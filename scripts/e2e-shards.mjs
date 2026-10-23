@@ -266,6 +266,14 @@ const SCOPED_JOBS = {
     unguarded:
       'a release whose logs and audit trails were never checked would pass',
   },
+  // Runs wherever the pull request is NOT docs-only (#913): it joins what
+  // the e2e shards and the sanity run measured, which a docs-only pull
+  // request skips.
+  'coverage-playwright': {
+    verdict: 'docs_only',
+    runsWhen: 'false',
+    unguarded: 'what Playwright ran would never be measured',
+  },
 };
 
 /**
@@ -281,7 +289,9 @@ const SCOPED_JOBS = {
  */
 export function scopedJobFindings(needs, name) {
   if (!isRecord(needs)) return { findings: [], rest: needs };
-  const { verdict, unguarded } = SCOPED_JOBS[name];
+  /** @type {{ verdict: string, unguarded: string, runsWhen?: string }} */
+  const job = SCOPED_JOBS[name];
+  const { verdict, unguarded, runsWhen = 'true' } = job;
   const { [name]: state, ...rest } = needs;
   if (state === undefined)
     return {
@@ -302,7 +312,7 @@ export function scopedJobFindings(needs, name) {
       rest,
     };
   const [wanted, where] =
-    said === 'true' ? ['success', 'runs'] : ['skipped', 'does not run'];
+    said === runsWhen ? ['success', 'runs'] : ['skipped', 'does not run'];
   return {
     findings:
       result === wanted
@@ -679,7 +689,8 @@ function main() {
   // whether the pull request is docs-only, and the rest never see them.
   const capture = scopedJobFindings(needs, 'capture');
   const logs = scopedJobFindings(capture.rest, 'logs');
-  const docsOnly = isDocsOnlyRun(logs.rest);
+  const measured = scopedJobFindings(logs.rest, 'coverage-playwright');
+  const docsOnly = isDocsOnlyRun(measured.rest);
   // The capture's accounts, wherever scope gave a verdict it could read;
   // any other verdict is already refused there.
   const said =
@@ -713,13 +724,14 @@ function main() {
   const findings = [
     ...capture.findings,
     ...logs.findings,
+    ...measured.findings,
     ...captureAccounts,
     ...(docsOnly
       ? // No shard runs, and the download is skipped, so the glob arrives
         // unmatched; any account that does exist is refused by name.
-        docsOnlyFindings(logs.rest, present)
+        docsOnlyFindings(measured.rest, present)
       : [
-          ...needsFindings(logs.rest),
+          ...needsFindings(measured.rest),
           ...files
             .filter((file) => !existsSync(file))
             .map(

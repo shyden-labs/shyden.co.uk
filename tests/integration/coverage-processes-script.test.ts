@@ -1,9 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -11,6 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { nonEmpty } from '../../scripts/errors.mjs';
 
 /**
  * `scripts/coverage-processes.mjs` on a real child process (#899 AC3): a
@@ -66,11 +71,11 @@ const measure = (answer: 'yes' | 'no') => {
   return { child, convert };
 };
 
-/** Each statement of the planted file as `line=count`. */
-const lines = () => {
+/** Each statement of the planted file as `line=count`, in the checkout `at`. */
+const lines = (at = repo) => {
   const report = JSON.parse(
     readFileSync(
-      path.join(repo, 'coverage/processes/coverage-final.json'),
+      path.join(at, 'coverage/processes/coverage-final.json'),
       'utf8',
     ),
   ) as Record<
@@ -80,7 +85,7 @@ const lines = () => {
       s: Record<string, number>;
     }
   >;
-  const planted = report[path.join(repo, 'scripts/planted.mjs')];
+  const planted = report[path.join(at, 'scripts/planted.mjs')];
   if (!planted) throw new Error('the planted script is not in the report');
   return Object.entries(planted.statementMap).map(
     ([id, { start }]) => `${start.line}=${planted.s[id]}`,
@@ -240,6 +245,140 @@ describe('coverage-processes.mjs on a real child process', () => {
       writer.kill();
       await exited;
     }
+  });
+
+  /**
+   * Issue 913: a run recorded on another machine names its writers by that
+   * machine's pids. One may match a process running here (PR #949's second
+   * run waited 30 s on pid 408 and refused), so with --recorded-root no
+   * writer is looked for: the run finished before its files were handed on.
+   */
+  it('a run recorded elsewhere waits for no writer here, whatever its file names', () => {
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    expect(child.status).toBe(0);
+    // Renamed to the pid of a process that is running here: this one.
+    const [written] = nonEmpty(
+      readdirSync(raw).filter((name) => name.endsWith('.json')),
+      'raw coverage files the planted script wrote',
+    );
+    renameSync(
+      path.join(raw, String(written)),
+      path.join(raw, `coverage-${process.pid}-1-0.json`),
+    );
+    const started = Date.now();
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, raw, 'processes', '--recorded-root', repo],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stderr]).toEqual([0, '']);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(lines()).toEqual(['1=1', '2=1', '3=1', '5=0']);
+  });
+
+  /**
+   * Issue 913: a CI container runs the checkout at another path than the job
+   * that converts it. The run is measured in one checkout and converted in a
+   * copy at another path, which is where the report places it.
+   */
+  it('a run recorded in another checkout reads in this one', () => {
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    expect(child.status).toBe(0);
+    const here = realpathSync(
+      mkdtempSync(path.join(tmpdir(), 'coverage-here-')),
+    );
+    try {
+      cpSync(repo, here, { recursive: true });
+      const run = spawnSync(
+        process.execPath,
+        [SCRIPT, path.join(here, 'raw'), 'processes', '--recorded-root', repo],
+        {
+          cwd: here,
+          encoding: 'utf8',
+          env: { ...process.env, NODE_V8_COVERAGE: '' },
+        },
+      );
+      expect([run.status, run.stderr]).toEqual([0, '']);
+      expect(lines(here)).toEqual(['1=1', '2=1', '3=1', '5=0']);
+    } finally {
+      rmSync(here, { recursive: true, force: true });
+    }
+  });
+
+  /** Issue 913: a cache whose entries are read, beside a file run as its own text. */
+  it('a compile cache is read, and a file run as its own text still converts', () => {
+    const raw = path.join(repo, 'raw');
+    spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    const code = 'export const other = 1;\n';
+    const sha = createHash('sha1').update(code).digest('hex');
+    mkdirSync(path.join(repo, 'cache', 'ab'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'cache', 'ab', 'other_ab.js'),
+      `// ${sha}\n${code}`,
+    );
+    writeFileSync(
+      path.join(repo, 'cache', 'ab', 'other_ab.map'),
+      JSON.stringify({
+        version: 3,
+        mappings: 'AAAA',
+        names: [],
+        sources: ['other.ts'],
+        sourcesContent: ['export const other: number = 1;\n'],
+      }),
+    );
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, raw, 'processes', '--cache', path.join(repo, 'cache')],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stderr]).toEqual([0, '']);
+    expect(lines()).toEqual(['1=1', '2=1', '3=1', '5=0']);
+  });
+
+  it('a compile cache holding code with no map is refused, naming both', () => {
+    const raw = path.join(repo, 'raw');
+    spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    const cache = path.join(repo, 'cache');
+    mkdirSync(path.join(cache, 'ab'), { recursive: true });
+    writeFileSync(path.join(cache, 'ab', 'lone_ab.js'), '');
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, raw, 'processes', '--cache', cache],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      `✗ coverage-processes: the compile cache holds ${path.join('ab', 'lone_ab.js')} with no map beside it (read ${cache})\n`,
+    ]);
   });
 
   /** Issue 936: the ledger every started process writes as it starts. */

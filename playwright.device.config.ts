@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { VISUAL_PROJECT } from './playwright.config';
+import { unmeasured } from './tests/coverage-options';
 import { CLOCK_TAG } from './tests/device/clock-declaration';
 
 // Set here rather than only in the runner so that a bare `npx playwright test
@@ -78,7 +79,7 @@ export default defineConfig<Record<never, never>, { installsAClock: boolean }>({
   fullyParallel: false,
   workers: 1,
   webServer: {
-    command: 'npm run build && npm run preview -- --host 0.0.0.0',
+    command: unmeasured('npm run build && npm run preview -- --host 0.0.0.0'),
     url: 'http://localhost:4321',
     reuseExistingServer: !!process.env.PW_REUSE_SERVER,
   },
