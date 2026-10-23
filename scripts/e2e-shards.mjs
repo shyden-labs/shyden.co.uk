@@ -252,8 +252,9 @@ export function needsFindings(needs) {
  * would let through. The capture shards run where a pull request can move a
  * release picture; the logs suite runs on a pull request into `main`, the
  * release, and nowhere else (Shyden, 2026-10-16: "a release cannot be cut
- * until all checks are complete, including this one"), and so does the check
- * that its head is a frozen cut of `develop` (#941).
+ * until all checks are complete, including this one"). The check that a
+ * release's head is a frozen cut of `develop` is a commit status of its own
+ * (`release-cut.yml`, #944), required by `main`, not a job of this run.
  */
 const SCOPED_JOBS = {
   capture: {
@@ -264,11 +265,6 @@ const SCOPED_JOBS = {
     verdict: 'release',
     unguarded:
       'a release whose logs and audit trails were never checked would pass',
-  },
-  'release-cut': {
-    verdict: 'release',
-    unguarded:
-      'a release from a head that is not a frozen cut of develop would pass',
   },
 };
 
@@ -683,8 +679,7 @@ function main() {
   // whether the pull request is docs-only, and the rest never see them.
   const capture = scopedJobFindings(needs, 'capture');
   const logs = scopedJobFindings(capture.rest, 'logs');
-  const cut = scopedJobFindings(logs.rest, 'release-cut');
-  const docsOnly = isDocsOnlyRun(cut.rest);
+  const docsOnly = isDocsOnlyRun(logs.rest);
   // The capture's accounts, wherever scope gave a verdict it could read;
   // any other verdict is already refused there.
   const said =
@@ -718,14 +713,13 @@ function main() {
   const findings = [
     ...capture.findings,
     ...logs.findings,
-    ...cut.findings,
     ...captureAccounts,
     ...(docsOnly
       ? // No shard runs, and the download is skipped, so the glob arrives
         // unmatched; any account that does exist is refused by name.
-        docsOnlyFindings(cut.rest, present)
+        docsOnlyFindings(logs.rest, present)
       : [
-          ...needsFindings(cut.rest),
+          ...needsFindings(logs.rest),
           ...files
             .filter((file) => !existsSync(file))
             .map(

@@ -2009,23 +2009,48 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
   });
 
   // A release comes from a frozen release/* cut of develop (#941). main no
-  // longer demands a branch be up to date (Shyden, 2026-10-23), so this job
-  // is what keeps the landed tree the tested one, on the release alone.
-  it('checks the head is a frozen cut only where scope says the run is a release (#941)', () => {
-    const cut = jobNamed('ci.yml', 'release-cut');
+  // longer demands a branch be up to date (Shyden, 2026-10-23), so this check
+  // keeps the landed tree the tested one. It runs the default branch's own
+  // copy on pull_request_target, reads the pull request only as git data, and
+  // answers as the release-cut commit status (#944, repo-template#86).
+  it('judges a release cut from the default branch, posting the status alone (#944)', () => {
+    const parsed = parseCleanYaml(
+      workflow('release-cut.yml'),
+      'release-cut.yml',
+    ) as {
+      on?: unknown;
+      jobs?: Record<
+        string,
+        {
+          permissions?: unknown;
+          steps?: { uses?: string; with?: Record<string, unknown> }[];
+        }
+      >;
+    };
+    const judge = jobNamed('release-cut.yml', 'judge-release-cut');
+    const checkouts = (parsed.jobs?.['judge-release-cut']?.steps ?? []).filter(
+      (step) => step.uses?.startsWith('actions/checkout@'),
+    );
     expect({
-      condition: cut.condition,
-      needs: cut.needs,
-      runs: cut.runs,
-      stood: jobNamed('ci.yml', 'build-and-test').needs.includes('release-cut'),
+      on: parsed.on,
+      jobs: Object.keys(parsed.jobs ?? {}),
+      permissions: parsed.jobs?.['judge-release-cut']?.permissions,
+      runs: judge.runs,
+      checkouts: checkouts.map((step) => step.with),
+      inCi: workflowJobs(workflow('ci.yml'), 'ci.yml')
+        .filter(
+          ({ id, needs }) =>
+            id === 'release-cut' || needs.includes('release-cut'),
+        )
+        .map(({ id }) => id),
     }).toEqual({
-      condition: "needs.scope.outputs.release == 'true'",
-      needs: ['scope'],
-      runs: [
-        'git fetch --no-tags origin develop:refs/remotes/origin/develop main:refs/remotes/origin/main',
-        'node scripts/release-cut.mjs',
-      ],
-      stood: true,
+      on: { pull_request_target: { branches: ['main'] } },
+      jobs: ['judge-release-cut'],
+      permissions: { contents: 'read', statuses: 'write' },
+      runs: ['node scripts/release-cut.mjs'],
+      // No ref: the default branch, never the pull request's code.
+      checkouts: [{ 'persist-credentials': false, 'fetch-depth': 0 }],
+      inCi: [],
     });
   });
 
@@ -2797,13 +2822,20 @@ describe('no job inherits the repository default permissions (#301)', () => {
   // asks it of the workflows a PULL REQUEST can start, derived from the
   // parsed `on:` rather than named -- those are the ones whose run can be
   // provoked by a branch nobody here has reviewed, which is the case the
-  // repository default was never chosen for.
+  // repository default was never chosen for. `pull_request_target` counts
+  // too (#944): a pull request starts it, with the default branch's token.
   it('no workflow a pull request can start grants a write scope to a silent job', () => {
+    const PULL_REQUEST = ['pull_request', 'pull_request_target'];
     const startedByPullRequest = ({ file }: DeclaredPermissions): boolean => {
       const on = (parseCleanYaml(workflow(file), file) as { on?: unknown }).on;
-      if (typeof on === 'string') return on === 'pull_request';
-      if (Array.isArray(on)) return on.includes('pull_request');
-      return typeof on === 'object' && on !== null && 'pull_request' in on;
+      if (typeof on === 'string') return PULL_REQUEST.includes(on);
+      if (Array.isArray(on))
+        return on.some((event) => PULL_REQUEST.includes(String(event)));
+      return (
+        typeof on === 'object' &&
+        on !== null &&
+        PULL_REQUEST.some((event) => event in on)
+      );
     };
     const onPullRequest = declaredPermissions().filter(startedByPullRequest);
     const writes = onPullRequest.flatMap(({ file, permissions }) =>

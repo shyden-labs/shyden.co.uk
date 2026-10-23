@@ -1,15 +1,16 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scratchGit, withoutLocalGit } from '../git-env';
+import { scratchGit } from '../git-env';
+import { runScript, standIn, type StandIn } from '../json-stand-in';
 
 /**
- * `scripts/release-cut.mjs` as ci.yml's release-cut job runs it (#941): in a
- * real repository holding `origin/develop`, `origin/main` and the pull
- * request's merge checked out as HEAD, so every ancestry, tree and parent it
- * reads is git's own answer. `tests/unit/release-cut.test.ts` holds every
+ * `scripts/release-cut.mjs` as `release-cut.yml` runs it (#941, #944): in a
+ * checkout of the default branch whose origin holds develop, main and the
+ * pull request's merge ref, so every fetch, ancestry, tree and parent it reads
+ * is git's own answer, and its verdict goes to a stand-in of GitHub's status
+ * endpoint on this machine. `tests/unit/release-cut.test.ts` holds every
  * finding's wording.
  */
 
@@ -18,111 +19,205 @@ const SCRIPT = path.resolve(
   '../../scripts/release-cut.mjs',
 );
 
-let repo: string;
-let git: (args: readonly string[]) => string;
+/** The pull request the stand-in origin holds a merge ref for. */
+const PULL = 7;
 
-/** Commits `file` with `text`, and returns the new commit. */
+let root: string;
+let work: (args: readonly string[]) => string;
+let workDir: string;
+let checkout: string;
+// One per test: a stand-in's record runs on across the tests it serves.
+let github: StandIn;
+let answer: number;
+
+/** Commits `file` with `text` in the working repository, and returns it. */
 const commit = (file: string, text: string) => {
-  writeFileSync(path.join(repo, file), text);
-  git(['add', file]);
-  git(['commit', '-q', '-m', file]);
-  return git(['rev-parse', 'HEAD']).trim();
+  writeFileSync(path.join(workDir, file), text);
+  work(['add', file]);
+  work(['commit', '-q', '-m', file]);
+  return work(['rev-parse', 'HEAD']).trim();
 };
 
-/** The release pull request's merge of `cut` into `main`, checked out as HEAD. */
-const mergeInto = (main: string, cut: string) => {
-  git(['checkout', '-q', '--detach', main]);
-  git(['merge', '-q', '--no-ff', '--no-edit', cut]);
+/** Publishes develop and main to origin, then clones the job's checkout. */
+const publish = (develop: string, main: string) => {
+  work(['push', '-q', 'origin', `${develop}:refs/heads/develop`]);
+  work(['push', '-q', 'origin', `${main}:refs/heads/main`]);
+  scratchGit(root)(['clone', '-q', 'origin.git', 'checkout']);
 };
 
+/** GitHub's merge of `cut` into `main`, published as the pull request's merge ref. */
+const mergeRef = (main: string, cut: string) => {
+  work(['checkout', '-q', '--detach', main]);
+  work(['merge', '-q', '--no-ff', '--no-edit', cut]);
+  const merge = work(['rev-parse', 'HEAD']).trim();
+  work(['push', '-q', 'origin', `${merge}:refs/pull/${PULL}/merge`]);
+  work(['checkout', '-q', 'develop']);
+  return merge;
+};
+
+/** Runs the script in the checkout, with what release-cut.yml gives it. */
 const run = (headRef: string, headSha: string) =>
-  spawnSync(process.execPath, [SCRIPT], {
-    cwd: repo,
-    encoding: 'utf8',
-    env: {
-      ...withoutLocalGit(process.env),
+  runScript(
+    SCRIPT,
+    [],
+    {
+      HOME: root,
       HEAD_REF: headRef,
       HEAD_SHA: headSha,
+      PR_NUMBER: String(PULL),
+      GITHUB_TOKEN: 'job-token',
+      GITHUB_API_URL: github.url,
+      GITHUB_REPOSITORY: 'shyden-labs/shyden.co.uk',
+      GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_RUN_ID: '1',
     },
-  });
+    checkout,
+  );
+
+/** The statuses that reached the stand-in, each as GitHub would read it. */
+const posts = async () =>
+  (await github.record()).map(({ method, url, auth, body }) => ({
+    url: `${method} ${url}`,
+    authorization: auth,
+    body: JSON.parse(body) as unknown,
+  }));
 
 let base: string;
 let cut: string;
 
-beforeEach(() => {
-  repo = mkdtempSync(path.join(tmpdir(), 'release-cut-'));
-  git = scratchGit(repo);
-  git(['init', '-q', '-b', 'develop']);
-  git(['config', 'user.email', 'cut@example.invalid']);
-  git(['config', 'user.name', 'Cut']);
+beforeEach(async () => {
+  root = mkdtempSync(path.join(tmpdir(), 'release-cut-'));
+  scratchGit(root)(['init', '-q', '--bare', 'origin.git']);
+  workDir = path.join(root, 'work');
+  mkdirSync(workDir);
+  checkout = path.join(root, 'checkout');
+  work = scratchGit(workDir);
+  work(['init', '-q', '-b', 'develop']);
+  work(['config', 'user.email', 'cut@example.invalid']);
+  work(['config', 'user.name', 'Cut']);
+  work(['remote', 'add', 'origin', path.join(root, 'origin.git')]);
   base = commit('page.txt', 'live\n');
   cut = commit('page.txt', 'the release\n');
-  git(['update-ref', 'refs/remotes/origin/develop', cut]);
+  answer = 201;
+  github = standIn();
+  github.answer(() => ({
+    status: answer,
+    body: answer === 201 ? {} : 'refused',
+  }));
+  await github.start();
 });
 
-afterEach(() => {
-  rmSync(repo, { recursive: true, force: true });
+afterEach(async () => {
+  await github.stop();
+  rmSync(root, { recursive: true, force: true });
 });
+
+/** The one status a run posts, on `sha`. */
+const posted = (sha: string, state: string, description: string) => [
+  {
+    url: `POST /repos/shyden-labs/shyden.co.uk/statuses/${sha}`,
+    authorization: 'Bearer job-token',
+    body: {
+      state,
+      context: 'release-cut',
+      description,
+      target_url: 'https://github.com/shyden-labs/shyden.co.uk/actions/runs/1',
+    },
+  },
+];
 
 describe('release-cut.mjs', () => {
-  it('passes a release/ cut of develop merged into a main develop holds', () => {
-    git(['update-ref', 'refs/remotes/origin/main', base]);
-    mergeInto(base, cut);
-    const result = run('release/2026-10-23-cut', cut);
-    expect(result.stderr).toBe('');
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe(
+  it('passes a release/ cut of develop merged into a main develop holds', async () => {
+    mergeRef(base, cut);
+    publish(cut, base);
+    const result = await run('release/2026-10-23-cut', cut);
+    expect([result.code, result.out]).toEqual([
+      0,
       `release-cut: release/2026-10-23-cut at ${cut} is a cut of develop, and its merge lands exactly its tree\n`,
+    ]);
+    expect(await posts()).toEqual(
+      posted(
+        cut,
+        'success',
+        'a frozen release/ cut of develop, whose merge lands exactly its tree',
+      ),
     );
   });
 
-  it('passes the second cut, onto a main holding the first cut as a merge', () => {
-    git(['checkout', '-q', '--detach', base]);
-    git(['checkout', '-q', '-b', 'main']);
-    git(['merge', '-q', '--no-ff', '--no-edit', cut]);
-    const firstRelease = git(['rev-parse', 'HEAD']).trim();
-    git(['checkout', '-q', 'develop']);
+  it('passes the second cut, onto a main holding the first cut as a merge', async () => {
+    const firstRelease = mergeRef(base, cut);
     const second = commit('page.txt', 'the next release\n');
-    git(['update-ref', 'refs/remotes/origin/develop', second]);
-    git(['update-ref', 'refs/remotes/origin/main', firstRelease]);
-    mergeInto(firstRelease, second);
-    const result = run('release/2026-10-30-next', second);
-    expect(result.stderr).toBe('');
-    expect(result.status).toBe(0);
+    mergeRef(firstRelease, second);
+    publish(second, firstRelease);
+    const result = await run('release/2026-10-30-next', second);
+    expect([result.code, result.out]).toEqual([
+      0,
+      `release-cut: release/2026-10-30-next at ${second} is a cut of develop, and its merge lands exactly its tree\n`,
+    ]);
+    expect((await posts()).map(({ body }) => body)).toEqual(
+      posted(
+        second,
+        'success',
+        'a frozen release/ cut of develop, whose merge lands exactly its tree',
+      ).map(({ body }) => body),
+    );
   });
 
-  it('fails a main holding a hotfix, naming it and the tree it changes', () => {
-    git(['checkout', '-q', '--detach', base]);
+  it('fails a main holding a hotfix, naming it and the tree it changes', async () => {
+    work(['checkout', '-q', '--detach', base]);
     const hotfix = commit('hotfix.txt', 'straight onto main\n');
-    git(['update-ref', 'refs/remotes/origin/main', hotfix]);
-    mergeInto(hotfix, cut);
-    const landed = git(['rev-parse', 'HEAD^{tree}']).trim();
-    const cutTree = git(['rev-parse', `${cut}^{tree}`]).trim();
-    const result = run('release/2026-10-23-cut', cut);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toBe(
+    work(['checkout', '-q', 'develop']);
+    const merge = mergeRef(hotfix, cut);
+    publish(cut, hotfix);
+    const landed = work(['rev-parse', `${merge}^{tree}`]).trim();
+    const cutTree = work(['rev-parse', `${cut}^{tree}`]).trim();
+    const result = await run('release/2026-10-23-cut', cut);
+    const first = `the merge lands tree ${landed}, not the cut's tree ${cutTree}: main holds something the cut does not, so the release would ship a tree no run tested`;
+    expect([result.code, result.out]).toEqual([
+      1,
       [
-        `::error::the merge lands tree ${landed}, not the cut's tree ${cutTree}: main holds something the cut does not, so the release would ship a tree no run tested`,
+        `::error::${first}`,
         `::error::main holds ${hotfix}, which is not the merge of a cut of develop: main takes release cuts and nothing else`,
         '',
       ].join('\n'),
+    ]);
+    expect(await posts()).toEqual(
+      posted(cut, 'failure', `${first.slice(0, 139)}…`),
     );
   });
 
-  it('fails a head that is not a release/ branch, naming it', () => {
-    git(['update-ref', 'refs/remotes/origin/main', base]);
-    mergeInto(base, cut);
-    const result = run('develop', cut);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toBe(
-      "::error::the head is 'develop', not a release/ cut: a release comes from a release/<date>-<what> branch cut at the commit Shyden chose, frozen there\n",
-    );
+  it('fails a head that is not a release/ branch, naming it', async () => {
+    mergeRef(base, cut);
+    publish(cut, base);
+    const result = await run('develop', cut);
+    const finding =
+      "the head is 'develop', not a release/ cut: a release comes from a release/<date>-<what> branch cut at the commit Shyden chose, frozen there";
+    expect([result.code, result.out]).toEqual([1, `::error::${finding}\n`]);
+    // 139 characters: under GitHub's 140, so it is posted whole.
+    expect(await posts()).toEqual(posted(cut, 'failure', finding));
   });
 
-  it('fails, naming git, when a ref it reads does not exist', () => {
-    mergeInto(base, cut);
-    const result = run('release/2026-10-23-cut', cut);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/^::error::release-cut: .*origin\/main/);
+  // GitHub builds no merge ref for a pull request that conflicts with main.
+  it('posts an error, naming git, when the merge ref does not exist', async () => {
+    publish(cut, base);
+    const result = await run('release/2026-10-23-cut', cut);
+    expect(result.code).toBe(1);
+    expect(result.out).toMatch(
+      new RegExp(`^::error::release-cut: .*refs/pull/${PULL}/merge`),
+    );
+    expect(
+      (await posts()).map(({ body }) => (body as { state: string }).state),
+    ).toEqual(['error']);
+  });
+
+  it('fails, naming GitHub’s answer, when the status is refused', async () => {
+    mergeRef(base, cut);
+    publish(cut, base);
+    answer = 403;
+    const result = await run('release/2026-10-23-cut', cut);
+    expect(result.code).not.toBe(0);
+    expect(result.out).toContain(
+      `release-cut: GitHub answered 403 to the status on ${cut}: refused`,
+    );
   });
 });

@@ -99,17 +99,21 @@ export type StandIn = ReturnType<typeof standIn>;
 
 /**
  * Run a script as a real process with exactly `env` (and `PATH`), its stdout
- * and stderr in one string. Async `spawn`, never `spawnSync`: the stand-ins
- * answer from this process's event loop, which `spawnSync` would block.
+ * and stderr in one string, in `cwd` when one is named (a script that runs
+ * git in its working directory needs a scratch one). Async `spawn`, never
+ * `spawnSync`: the stand-ins answer from this process's event loop, which
+ * `spawnSync` would block.
  */
 export const runScript = (
   script: string,
   args: string[],
   env: Record<string, string>,
+  cwd?: string,
 ): Promise<{ code: number | null; out: string }> =>
   new Promise((resolve) => {
     const child = spawn(process.execPath, [script, ...args], {
       env: { PATH: process.env.PATH, ...env },
+      ...(cwd === undefined ? {} : { cwd }),
     });
     let out = '';
     child.stdout.on('data', (chunk) => (out += chunk));
