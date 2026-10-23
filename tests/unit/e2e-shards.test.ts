@@ -865,85 +865,246 @@ describe('a CI shard ends itself before its job limit (#938)', () => {
 });
 
 /**
- * Issue 938 AC2: a shard that ends itself names what it was running. On a
- * global timeout Playwright records the run error `Timed out waiting <n>s for
- * the test suite to run` and ends each test still running like any failure
- * (measured on run 39878264792: `page.waitForTimeout: Test ended.`), so the
- * tests running then are the last each worker started.
+ * Issue 938 AC2: a shard that ends itself names the tests in progress then.
+ * Playwright sets its global deadline in the tick it records the run's start,
+ * so the timeout fired `<n>` seconds (from `Timed out waiting <n>s for the
+ * test suite to run`) after `stats.startTime`. A test running at that moment
+ * either never reported an end (Playwright 1.64.1 leaves such a result at its
+ * defaults: `skipped`, duration 0; run 39909889234's planted hangs) or ended
+ * at or after it (`page.waitForTimeout: Test ended.`, run 39878264792). Each
+ * worker's last test is not the question: a new worker starts for each project
+ * and after each failure, and run 39909889234 printed 15 retired workers' last
+ * tests, every one passed long before, as still running.
  */
 describe('the tests a timed-out shard was running (#938)', () => {
+  // The run starts at second 0; its 60 s timeout fires at second 60.
   const at = (s: number) =>
-    `2026-10-23T00:00:${String(s).padStart(2, '0')}.000Z`;
+    new Date(Date.UTC(2026, 9, 23, 0, 0, s)).toISOString();
+  const result = (
+    worker: number,
+    start: number,
+    seconds: number,
+    status: string,
+  ) => ({
+    status,
+    workerIndex: worker,
+    startTime: at(start),
+    duration: seconds * 1000,
+  });
   const spec = (
     title: string,
     line: number,
-    worker: number,
-    start: number,
-    status: string,
+    results: ReturnType<typeof result>[],
+    expectedStatus = 'passed',
   ) => ({
     title,
     file: 'a.spec.ts',
     line,
-    tests: [
-      {
-        projectName: 'webkit',
-        results: [{ status, workerIndex: worker, startTime: at(start) }],
-      },
-    ],
-  });
-  const report = (errors: { message: string }[]) => ({
-    errors,
-    suites: [
-      {
-        title: 'a.spec.ts',
-        specs: [spec('first on worker 0', 3, 0, 1, 'passed')],
-        suites: [
-          {
-            title: 'a group',
-            specs: [
-              spec('last on worker 0', 9, 0, 30, 'failed'),
-              spec('only on worker 1', 12, 1, 20, 'failed'),
-            ],
-          },
-        ],
-      },
-    ],
+    tests: [{ projectName: 'webkit', expectedStatus, results }],
   });
   const timedOut = [
-    { message: 'Timed out waiting 965s for the test suite to run' },
+    { message: 'Timed out waiting 60s for the test suite to run' },
   ];
+  const report = (
+    specs: ReturnType<typeof spec>[],
+    errors: { message: string }[] = timedOut,
+  ) => ({
+    errors,
+    stats: { startTime: at(0) },
+    suites: [{ title: 'a.spec.ts', suites: [{ title: 'a group', specs }] }],
+  });
 
-  it('names the last test each worker started when the run timed out', () => {
-    expect(runningAtTimeout(report(timedOut))).toEqual([
-      '[webkit] a.spec.ts:9 › a group › last on worker 0 (worker 0, failed)',
-      '[webkit] a.spec.ts:12 › a group › only on worker 1 (worker 1, failed)',
+  it('names a test the timeout cut off before it reported an end', () => {
+    expect(
+      runningAtTimeout(
+        report([spec('hangs', 9, [result(11, 50, 0, 'skipped')])]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 11, cut off before it ended)',
     ]);
   });
 
-  it('names a test the worker had finished before its last in no line', () => {
-    expect(runningAtTimeout(report(timedOut))?.join('\n')).not.toContain(
-      'first on worker 0',
-    );
+  it('names a test that ended after the timeout fired', () => {
+    expect(
+      runningAtTimeout(
+        report([spec('stopped', 9, [result(3, 50, 12, 'failed')])]),
+      ),
+    ).toEqual(['[webkit] a.spec.ts:9 › a group › stopped (worker 3, failed)']);
+  });
+
+  it('names a test that ended at the very moment the timeout fired', () => {
+    expect(
+      runningAtTimeout(
+        report([spec('stopped', 9, [result(3, 50, 10, 'failed')])]),
+      ),
+    ).toEqual(['[webkit] a.spec.ts:9 › a group › stopped (worker 3, failed)']);
+  });
+
+  it('names a test the run marked interrupted', () => {
+    expect(
+      runningAtTimeout(
+        report([spec('stopped', 9, [result(3, 50, 0, 'interrupted')])]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › stopped (worker 3, interrupted)',
+    ]);
+  });
+
+  it("leaves out a retired worker's last test, which passed before the timeout", () => {
+    expect(
+      runningAtTimeout(
+        report([
+          spec('passed long before', 3, [result(0, 10, 5, 'passed')]),
+          spec('hangs', 9, [result(1, 50, 0, 'skipped')]),
+        ]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 1, cut off before it ended)',
+    ]);
+  });
+
+  it('leaves out a test that failed before the timeout', () => {
+    expect(
+      runningAtTimeout(
+        report([
+          spec('failed before', 3, [result(0, 10, 49, 'failed')]),
+          spec('hangs', 9, [result(1, 50, 0, 'skipped')]),
+        ]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 1, cut off before it ended)',
+    ]);
+  });
+
+  it('leaves out a test that skipped itself before the timeout', () => {
+    expect(
+      runningAtTimeout(
+        report([
+          spec('skips itself', 3, [result(0, 59, 0, 'skipped')], 'skipped'),
+          spec('hangs', 9, [result(1, 50, 0, 'skipped')]),
+        ]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 1, cut off before it ended)',
+    ]);
+  });
+
+  it('leaves out a result begun at or after the timeout', () => {
+    expect(
+      runningAtTimeout(
+        report([
+          spec('never started', 3, [result(0, 60, 0, 'skipped')]),
+          spec('hangs', 9, [result(1, 50, 0, 'skipped')]),
+        ]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 1, cut off before it ended)',
+    ]);
+  });
+
+  it('names every test in progress, in worker order, each attempt on its own', () => {
+    expect(
+      runningAtTimeout(
+        report([
+          spec('second', 9, [result(7, 55, 0, 'skipped')]),
+          spec('first', 3, [
+            result(2, 1, 5, 'failed'),
+            result(4, 40, 30, 'failed'),
+          ]),
+        ]),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:3 › a group › first (worker 4, failed)',
+      '[webkit] a.spec.ts:9 › a group › second (worker 7, cut off before it ended)',
+    ]);
+  });
+
+  it('says so when no test was in progress as the timeout fired', () => {
+    expect(
+      runningAtTimeout(
+        report([spec('passed', 3, [result(0, 10, 5, 'passed')])]),
+      ),
+    ).toEqual([
+      'no test was in progress when the 60 s timeout fired during the test suite',
+    ]);
+  });
+
+  it('names the step the timeout fired in when the tests had not begun', () => {
+    expect(
+      runningAtTimeout(
+        report(
+          [spec('passed', 3, [result(0, 10, 5, 'passed')])],
+          [
+            {
+              message: 'Timed out waiting 60s for the start web server to run',
+            },
+          ],
+        ),
+      ),
+    ).toEqual([
+      'no test was in progress when the 60 s timeout fired during the start web server',
+    ]);
   });
 
   it('reads the timeout error through the colour codes Playwright adds', () => {
-    const coloured = [
-      {
-        message: `${String.fromCharCode(27)}[31mTimed out waiting 965s for the test suite to run${String.fromCharCode(27)}[39m`,
-      },
-    ];
-    expect(runningAtTimeout(report(coloured))).toHaveLength(2);
+    const esc = String.fromCharCode(27);
+    expect(
+      runningAtTimeout(
+        report(
+          [spec('hangs', 9, [result(1, 50, 0, 'skipped')])],
+          [
+            {
+              message: `${esc}[31mTimed out waiting 60s for the test suite to run${esc}[39m`,
+            },
+          ],
+        ),
+      ),
+    ).toEqual([
+      '[webkit] a.spec.ts:9 › a group › hangs (worker 1, cut off before it ended)',
+    ]);
   });
 
   it('asks nothing of a run that did not time out', () => {
     expect(
-      runningAtTimeout(report([{ message: 'some other error' }])),
+      runningAtTimeout(
+        report(
+          [spec('hangs', 9, [result(1, 50, 0, 'skipped')])],
+          [{ message: 'some other error' }],
+        ),
+      ),
     ).toBeNull();
   });
 
   it('refuses a report with no suites to read', () => {
-    expect(() => runningAtTimeout({ errors: timedOut })).toThrow(
-      'the Playwright report holds no suites to read (#938)',
+    expect(() =>
+      runningAtTimeout({ errors: timedOut, stats: { startTime: at(0) } }),
+    ).toThrow('the Playwright report holds no suites to read (#938)');
+  });
+
+  it('refuses a timed-out report with no start time to place the timeout', () => {
+    expect(() => runningAtTimeout({ ...report([]), stats: {} })).toThrow(
+      'the Playwright report holds no run start time to place its timeout at (#938)',
+    );
+  });
+
+  it('refuses a timeout it cannot read as seconds', () => {
+    expect(() =>
+      runningAtTimeout(
+        report(
+          [spec('hangs', 9, [result(1, 50, 0, 'skipped')])],
+          [{ message: 'Timed out waiting 1.2.3s for the test suite to run' }],
+        ),
+      ),
+    ).toThrow(
+      'the Playwright timeout "1.2.3" is not a number of seconds (#938)',
+    );
+  });
+
+  it('refuses a result with no start time', () => {
+    const undated = spec('undated', 9, [result(1, 50, 0, 'skipped')]);
+    delete (undated.tests[0].results[0] as { startTime?: string }).startTime;
+    expect(() => runningAtTimeout(report([undated]))).toThrow(
+      'a.spec.ts:9 › a group › undated holds a result with no start time (#938)',
     );
   });
 });

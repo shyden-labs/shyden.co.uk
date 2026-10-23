@@ -1850,6 +1850,7 @@ const CAPTURE_SHARD_SCRIPT =
 
 /** Where each shard writes its account, and where build-and-test reads them. */
 const E2E_ACCOUNTS = 'e2e-accounts';
+const E2E_REPORTS = 'e2e-report';
 
 /** The same, for the capture shards, added up to the selection (#774). */
 const CAPTURE_ACCOUNTS = 'capture-accounts';
@@ -2130,6 +2131,29 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     );
     expect(upload?.if).toBe('always()');
     expect(upload?.with?.['if-no-files-found']).toBe('error');
+  });
+
+  // A shard that ended itself (#938) is read from its report: what each test
+  // did and when. The runner writes it to a throwaway directory unless told
+  // otherwise, so a red shard kept only its traces.
+  it('each e2e shard writes its report where the failing-shard upload reads it (#938)', () => {
+    const steps = ciParsed().jobs.e2e?.steps ?? [];
+    const run = steps.find((step) => step.run?.includes('npm run test:e2e'));
+    expect(run?.env?.E2E_REPORT_DIR).toBe(E2E_REPORTS);
+  });
+
+  it('a failing e2e shard keeps its report, and says so when there is none (#938)', () => {
+    const steps = ciParsed().jobs.e2e?.steps ?? [];
+    const upload = steps.find(
+      (step) =>
+        step.uses?.startsWith('actions/upload-artifact@') &&
+        step.with?.path === E2E_REPORTS,
+    );
+    expect(upload?.if).toBe('failure()');
+    expect(upload?.with?.name).toBe(
+      'e2e-report-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}',
+    );
+    expect(upload?.with?.['if-no-files-found']).toBe('warn');
   });
 
   it('each e2e shard runs the split planned from the committed timings (#607)', () => {

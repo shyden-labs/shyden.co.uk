@@ -496,9 +496,11 @@ export function reconcile({
  * running Playwright: the caller creates the directory.
  */
 export function reportLocation(env = process.env) {
-  const evidence = env.EVIDENCE_DIR;
-  const dir = evidence || join(tmpdir(), `e2e-reconcile-${process.pid}`);
-  return { dir, path: join(dir, EVIDENCE_REPORT), ephemeral: !evidence };
+  // A CI shard names a directory too, so a shard that fails or ends itself
+  // keeps the report its failing-shard step uploads (#938).
+  const kept = env.EVIDENCE_DIR || env.E2E_REPORT_DIR;
+  const dir = kept || join(tmpdir(), `e2e-reconcile-${process.pid}`);
+  return { dir, path: join(dir, EVIDENCE_REPORT), ephemeral: !kept };
 }
 
 function main() {

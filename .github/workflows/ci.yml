@@ -314,6 +314,7 @@ jobs:
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           E2E_ACCOUNT_DIR: e2e-accounts
+          E2E_REPORT_DIR: e2e-report
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
@@ -343,6 +344,17 @@ jobs:
           # `warn`, never `ignore`: `ignore` is the one value that lets this
           # step go GREEN having preserved nothing, and this step IS the
           # evidence path for a red run (#131).
+          if-no-files-found: warn
+      # The report says what each test did and when: how a shard that ended
+      # itself names what it was running, read again after the job (#938).
+      - name: Keep the failing shard's Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
+          path: e2e-report
+          retention-days: 14
+          # `warn`, as above: a red shard whose run wrote no report says so.
           if-no-files-found: warn
 
   # Every case the release page cites takes its picture (#774; operator ruling
