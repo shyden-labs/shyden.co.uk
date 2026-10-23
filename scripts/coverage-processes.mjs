@@ -7,8 +7,8 @@
  * ran the file's own text: plain JavaScript, or TypeScript Node stripped of
  * its types (the types become spaces, so every offset is the file's own, and
  * Node appends `\n\n//# sourceURL=<url>`). Anything else under the same URL is
- * code a tool transformed first (Vitest's workers inherit the variable), which
- * this text cannot describe, so it is skipped and named. A file Vitest's own
+ * code a tool transformed first (a process that loads TypeScript through
+ * Vite, say), which this text cannot describe, so it is skipped and named. A file Vitest's own
  * report measures still reaches the merge from there.
  *
  *   node scripts/coverage-processes.mjs <raw-dir> <suite>
@@ -452,8 +452,7 @@ const main = async () => {
     path.join('coverage', suite, 'coverage-final.json'),
     `${JSON.stringify(result.report)}\n`,
   );
-  // Vitest's workers inherit the variable, so most skipped entries are their
-  // transformed code: listed in a file beside the report, counted here.
+  // Transformed code is listed in a file beside the report, counted here.
   writeFileSync(
     path.join('coverage', suite, 'skipped.txt'),
     result.skipped.map(({ file, reason }) => `${file}: ${reason}\n`).join(''),

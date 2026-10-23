@@ -54,10 +54,11 @@ describe('the setup files of each suite', () => {
     ]);
   });
 
-  it('give the integration suite the shared pair, then the load measurement, and nothing that refuses (#696)', () => {
+  it('give the integration suite the shared pair, its child-process coverage, then the load measurement, and nothing that refuses (#696, #936)', () => {
     expect(integration.test?.setupFiles).toEqual([
       'tests/git-env-setup.ts',
       'tests/temporary-files-setup.ts',
+      'tests/child-coverage-setup.ts',
       'tests/load-setup.ts',
     ]);
   });
