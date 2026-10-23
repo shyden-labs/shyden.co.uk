@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 /**
@@ -21,6 +22,11 @@ const SCRIPT = path.resolve(
   import.meta.dirname,
   '../../scripts/coverage-processes.mjs',
 );
+
+/** The preload every process a test starts loads (#936). */
+const LEDGER = pathToFileURL(
+  path.resolve(import.meta.dirname, '../coverage-ledger.mjs'),
+).href;
 
 const PLANTED = [
   "const take = process.argv[2] === 'yes';",
@@ -176,7 +182,7 @@ describe('coverage-processes.mjs on a real child process', () => {
     );
     expect([run.status, run.stderr]).toEqual([
       1,
-      `✗ coverage-processes: ${name} (5 bytes, written by process ${exited.pid}, which has exited) is not whole JSON: Unterminated string in JSON at position 5 (line 1 column 6)\n`,
+      `✗ coverage-processes: ${name} (5 bytes, written by process ${exited.pid}, which has exited) is not whole JSON: Unterminated string in JSON at position 5 (line 1 column 6); no ledger line names process ${exited.pid}\n`,
     ]);
   });
 
@@ -234,5 +240,61 @@ describe('coverage-processes.mjs on a real child process', () => {
       writer.kill();
       await exited;
     }
+  });
+
+  /** Issue 936: the ledger every started process writes as it starts. */
+  it('a process started with the ledger preloaded writes its pid and command', () => {
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_V8_COVERAGE: raw,
+        NODE_OPTIONS: `--import=${LEDGER}`,
+      },
+    });
+    expect([child.status, child.stdout, child.stderr]).toEqual([
+      0,
+      'taken',
+      '',
+    ]);
+    expect(
+      JSON.parse(
+        readFileSync(path.join(raw, 'ledger', `${child.pid}.json`), 'utf8'),
+      ),
+    ).toEqual({
+      pid: child.pid,
+      argv: [process.execPath, path.join(repo, 'scripts/planted.mjs'), 'yes'],
+    });
+  });
+
+  it('a cut-off raw file names the command its writer was started as', () => {
+    mkdirSync(path.join(repo, 'cut', 'ledger'), { recursive: true });
+    const exited = spawnSync(process.execPath, ['-e', ''], {
+      encoding: 'utf8',
+    });
+    const name = `coverage-${exited.pid}-1-0.json`;
+    writeFileSync(path.join(repo, 'cut', name), '');
+    writeFileSync(
+      path.join(repo, 'cut', 'ledger', `${exited.pid}.json`),
+      JSON.stringify({
+        pid: exited.pid,
+        argv: ['node', 'playwright', 'test', '--list'],
+      }),
+    );
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'cut'), 'processes'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stderr]).toEqual([
+      1,
+      `✗ coverage-processes: ${name} (0 bytes, written by process ${exited.pid}, which has exited) is not whole JSON: Unexpected end of JSON input; process ${exited.pid} was started as: node playwright test --list\n`,
+    ]);
   });
 });

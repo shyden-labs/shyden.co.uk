@@ -71,23 +71,28 @@ const SUITES = [
     suite: 'guards',
     config: guards,
     command: 'vitest run --config vitest.guards.config.ts --testTimeout=25000',
+    own: [],
   },
   {
     suite: 'simulation',
     config: simulation,
     command:
       'vitest run --config vitest.simulation.config.ts --testTimeout=700',
+    own: [],
   },
   {
     suite: 'integration',
     config: integration,
     command:
       'vitest run --config vitest.integration.config.ts --testTimeout=30000',
+    // Its started processes write raw V8 coverage, its forks do not (#936).
+    own: ['tests/child-coverage-setup.ts'],
   },
   {
     suite: 'logs',
     config: logs,
     command: 'vitest run --config vitest.logs.config.ts --testTimeout=1000',
+    own: [],
   },
 ] as const;
 
@@ -100,7 +105,7 @@ const scripts = (): Record<string, string> =>
 
 describe.each(SUITES)(
   'the $suite suite budget',
-  ({ suite, config, command }) => {
+  ({ suite, config, command, own }) => {
     it('gives every test one limit, set on the command that runs the suite', () => {
       expect(scripts()[`test:${suite}`]).toBe(command);
     });
@@ -116,7 +121,7 @@ describe.each(SUITES)(
       expect(config.test?.include).toEqual([`tests/${suite}/**/*.test.ts`]);
     });
 
-    it("has the shared setup files and the unit suite's global setup, so a run is as isolated, then measures loading (#696)", () => {
+    it("has the shared setup files, its own, and the unit suite's global setup, so a run is as isolated, then measures loading (#696)", () => {
       expect({
         setup: config.test?.setupFiles,
         global: config.test?.globalSetup,
@@ -124,6 +129,7 @@ describe.each(SUITES)(
         setup: [
           'tests/git-env-setup.ts',
           'tests/temporary-files-setup.ts',
+          ...own,
           'tests/load-setup.ts',
         ],
         global: unit.test?.globalSetup,

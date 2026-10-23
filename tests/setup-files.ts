@@ -15,6 +15,14 @@ export const SHARED_SETUP: readonly string[] = [
   'tests/temporary-files-setup.ts',
 ];
 
+/**
+ * The integration suite's own (#936): the processes a test starts write raw V8
+ * coverage, the fork running the test does not (`tests/child-coverage.ts`).
+ */
+export const INTEGRATION_ONLY_SETUP: readonly string[] = [
+  'tests/child-coverage-setup.ts',
+];
+
 /** The unit suite's own-CPU judge (#632). */
 const UNIT_CPU_SETUP = 'tests/unit-cpu-setup.ts';
 
