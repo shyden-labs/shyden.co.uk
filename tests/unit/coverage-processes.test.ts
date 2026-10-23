@@ -1,20 +1,25 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   awaitWriters,
   convertScripts,
   fileOf,
+  indexCompileCache,
   ledgerNote,
+  pairCacheFiles,
   readRaw,
+  rebaseUrls,
   writerPid,
   type V8Script,
 } from '../../scripts/coverage-processes.mjs';
+import { PLAYWRIGHT_MEASURE } from '../coverage-options';
 
 /**
  * Raw V8 coverage from a process Node ran outside Vitest's workers, converted
  * to the Istanbul shape `scripts/coverage-merge.mjs` joins (#899). The ranges
  * below were recorded from real runs of these two files under
- * `NODE_V8_COVERAGE` (Node 26.12, 2026-10-22): the `else` arm never ran.
+ * `NODE_V8_COVERAGE` (Node 26.12, 2026-10-21 UTC): the `else` arm never ran.
  */
 const ROOT = '/repo';
 
@@ -276,6 +281,36 @@ describe('which file an entry is (#899)', () => {
       'tests/device-pixels.ts',
     );
   });
+
+  it('a spec is left out of the shared set', () => {
+    expect(fileOf('file:///repo/tests/e2e/board.spec.ts', ROOT)).toBeNull();
+  });
+});
+
+/**
+ * A Playwright run measures what its runner and workers load (#913): the
+ * shared set, the Playwright configs, and every file under tests/, specs
+ * and e2e helpers included. Only type declarations are left out.
+ */
+describe('which file a Playwright run’s entry is (#913)', () => {
+  it.each([
+    ['a spec', 'tests/e2e/board.spec.ts'],
+    ['an e2e helper', 'tests/e2e/published-paths.ts'],
+    ['a Playwright config', 'playwright.config.ts'],
+    ['a sanity config', 'playwright.dev.config.ts'],
+    ['a helper directly under tests/', 'tests/device-pixels.ts'],
+    ['a script', 'scripts/test-e2e.mjs'],
+  ])('keeps %s', (_, file) => {
+    expect(fileOf(`file:///repo/${file}`, ROOT, PLAYWRIGHT_MEASURE)).toBe(file);
+  });
+
+  it.each([
+    ['a type declaration', 'tests/e2e/globals.d.ts'],
+    ['a config of another tool', 'vitest.config.ts'],
+    ['a dependency', 'node_modules/@playwright/test/index.mjs'],
+  ])('leaves out %s', (_, file) => {
+    expect(fileOf(`file:///repo/${file}`, ROOT, PLAYWRIGHT_MEASURE)).toBeNull();
+  });
 });
 
 /**
@@ -305,6 +340,177 @@ describe('the converter’s packages are pinned to the versions installed (#899)
       ]);
     },
   );
+});
+
+/**
+ * Code a tool compiled before Node ran it: Playwright compiles TypeScript with
+ * Babel and keeps each file's code and map in its compile cache (#913,
+ * measured: 37 of 37 files found there, each code exactly the length V8 ran).
+ * The fixture is a small compiled file and a real map back to its source.
+ */
+const HELPER_TS = [
+  'const n: number = process.argv.length;',
+  'if (n > 0) {',
+  '  globalThis.x = 1;',
+  '} else {',
+  '  globalThis.x = 2;',
+  '}',
+  '',
+].join('\n');
+const HELPER_JS = HELPER_TS.replace(': number', '');
+const HELPER_MAP = {
+  version: 3,
+  sources: ['helper.ts'],
+  sourcesContent: [HELPER_TS],
+  names: [],
+  mappings: 'AAAA,MAAM,CAAS,GAAG;AAClB;AACA;AACA;AACA;AACA;',
+};
+const HELPER_URL = 'file:///repo/tests/helper.ts';
+const compiledRead = (file: string) => {
+  if (file !== 'tests/helper.ts')
+    throw new Error(`no fixture text for ${file}`);
+  return HELPER_TS;
+};
+const hashed = (code: string) =>
+  `// ${createHash('sha1').update(code).digest('hex')}\n${code}`;
+const cache = indexCompileCache([
+  { js: hashed(HELPER_JS), map: JSON.stringify(HELPER_MAP) },
+]);
+
+describe('code a tool compiled converts through its cached map (#913)', () => {
+  it('a compiled entry gives each source statement its count', async () => {
+    const result = await convertScripts(
+      [script(HELPER_URL, 95, [71, 94])],
+      compiledRead,
+      ROOT,
+      { compiled: cache },
+    );
+    expect(
+      'report' in result && statements(result.report, 'tests/helper.ts'),
+    ).toEqual([
+      '1:18-1:null=1',
+      '2:0-6:null=1',
+      '3:0-3:null=1',
+      '5:0-5:null=0',
+    ]);
+  });
+
+  it('a compiled copy that rebinds an import is refused, quoting the copy’s own text', async () => {
+    // The types make the copy shorter than its source, so a refusal that
+    // sliced the source at the copy's offsets would quote the wrong text.
+    const source = [
+      "import { env } from 'node:process';",
+      'function read(env: { HOME: string }) {',
+      '  const home = env.HOME;',
+      '  return home;',
+      '}',
+      "globalThis.out = read({ HOME: '/' });",
+      '',
+    ].join('\n');
+    const compiled = source.replace(': { HOME: string }', '');
+    const url = 'file:///repo/tests/shadow-helper.ts';
+    const result = await convertScripts(
+      [script(url, compiled.length, [compiled.length, compiled.length])],
+      (file) => {
+        if (file !== 'tests/shadow-helper.ts')
+          throw new Error(`no fixture text for ${file}`);
+        return source;
+      },
+      ROOT,
+      {
+        compiled: indexCompileCache([
+          {
+            js: hashed(compiled),
+            map: JSON.stringify({
+              version: 3,
+              sources: ['shadow-helper.ts'],
+              sourcesContent: [source],
+              names: [],
+              mappings: 'AAAA;AACA;AACA;AACA;AACA;AACA',
+            }),
+          },
+        ]),
+      },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: tests/shadow-helper.ts binds env again, and a declarator on line 3 reads env.HOME, so whether it reads the import (which Vitest skips) cannot be told',
+    });
+  });
+
+  it('the cache entry is found by its source text, never by its file name', () => {
+    expect([...cache.keys()]).toEqual([HELPER_TS]);
+  });
+
+  // With a cache, every entry the tool compiled must be found in it: one that
+  // is not is a cache that lost an entry, never code to leave out quietly.
+  it('a compiled entry of another length is refused, naming why', async () => {
+    const result = await convertScripts(
+      [jsEntry, script(HELPER_URL, 96, [71, 94])],
+      (file) => (file === 'tests/helper.ts' ? HELPER_TS : read(file)),
+      ROOT,
+      { compiled: cache },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: tests/helper.ts ran code 96 characters long, not its own text (103, or 147 with the sourceURL Node appends) nor any compiled copy cached (95)',
+    });
+  });
+
+  it('an entry with no compiled copy cached at all is refused, naming it', async () => {
+    const result = await convertScripts(
+      [jsEntry, script(HELPER_URL, 96, [71, 94])],
+      (file) => (file === 'tests/helper.ts' ? HELPER_TS : read(file)),
+      ROOT,
+      {
+        compiled: new Map([
+          ['another source', [{ code: 'x', map: HELPER_MAP }]],
+        ]),
+      },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: tests/helper.ts ran code 96 characters long, not its own text (103, or 147 with the sourceURL Node appends) and no compiled copy of it is cached',
+    });
+  });
+
+  it('a cache file with no hash line is refused', () => {
+    expect(() =>
+      indexCompileCache([
+        { js: 'no hash line', map: JSON.stringify(HELPER_MAP) },
+      ]),
+    ).toThrow('coverage-processes: a compile-cache entry has no hash line');
+  });
+
+  it('a cache file whose code does not match its hash is refused', () => {
+    expect(() =>
+      indexCompileCache([
+        {
+          js: hashed(HELPER_JS).replace('x = 2', 'x = 3'),
+          map: JSON.stringify(HELPER_MAP),
+        },
+      ]),
+    ).toThrow(
+      'coverage-processes: a compile-cache entry does not match its hash',
+    );
+  });
+
+  it('a compiled copy that does not parse is refused, naming it', async () => {
+    const broken = 'if (process.argv.length > 0 {';
+    const result = await convertScripts(
+      [script(HELPER_URL, broken.length, [0, broken.length])],
+      compiledRead,
+      ROOT,
+      {
+        compiled: indexCompileCache([
+          { js: hashed(broken), map: JSON.stringify(HELPER_MAP) },
+        ]),
+      },
+    );
+    expect('refusal' in result && result.refusal).toMatch(
+      /^coverage-processes: tests\/helper\.ts's compiled copy does not parse \(.+\), so its counts have nowhere to go$/,
+    );
+  });
 });
 
 /**
@@ -416,6 +622,88 @@ describe('a raw file that is not whole JSON is refused, naming it (#936)', () =>
       refusal:
         'coverage-processes: stray.json (0 bytes, written by an unnamed process) is not whole JSON: Unexpected end of JSON input',
     });
+  });
+});
+
+/**
+ * Playwright's compile cache is a tree of `<name>_<hash>.js` beside its
+ * `.map` (and a `.data` the converter does not read), under two-character
+ * folders (#913, probe run 39668240107). Half a pair is a cache cut short.
+ */
+describe('the compile cache is read as pairs of code and map (#913)', () => {
+  it('pairs each code file with its map, in any folder, and leaves the rest', () => {
+    expect(
+      pairCacheFiles([
+        'ab/helper_ab12.js',
+        'ab/helper_ab12.map',
+        'ab/helper_ab12.data',
+        'cd/spec_cd34.map',
+        'cd/spec_cd34.js',
+      ]),
+    ).toEqual({
+      pairs: [
+        { js: 'ab/helper_ab12.js', map: 'ab/helper_ab12.map' },
+        { js: 'cd/spec_cd34.js', map: 'cd/spec_cd34.map' },
+      ],
+    });
+  });
+
+  it('refuses code with no map, naming it', () => {
+    expect(
+      pairCacheFiles([
+        'ab/helper_ab12.js',
+        'cd/spec_cd34.js',
+        'cd/spec_cd34.map',
+      ]),
+    ).toEqual({
+      refusal:
+        'coverage-processes: the compile cache holds ab/helper_ab12.js with no map beside it',
+    });
+  });
+
+  it('refuses a map with no code, naming it', () => {
+    expect(pairCacheFiles(['ab/helper_ab12.map'])).toEqual({
+      refusal:
+        'coverage-processes: the compile cache holds ab/helper_ab12.map with no code beside it',
+    });
+  });
+
+  it('refuses a cache with no pair at all', () => {
+    expect(pairCacheFiles(['ab/helper_ab12.data'])).toEqual({
+      refusal:
+        'coverage-processes: the compile cache holds no code with its map',
+    });
+  });
+});
+
+/**
+ * A CI container runs the checkout at another path than the job that converts
+ * it (#913): V8's URLs are moved onto this checkout, and nothing else is.
+ */
+describe('recorded URLs move onto this checkout (#913)', () => {
+  const ran = (url: string): V8Script => ({ url, functions: [] });
+
+  it('moves a file under the recorded root, keeping its query', () => {
+    expect(
+      rebaseUrls(
+        [ran('file:///__w/site/site/tests/helper.ts?fresh=1')],
+        '/__w/site/site',
+        '/home/runner/work/site/site',
+      ),
+    ).toEqual([
+      ran('file:///home/runner/work/site/site/tests/helper.ts?fresh=1'),
+    ]);
+  });
+
+  it('leaves a file outside it, a sibling sharing its prefix, and a built-in', () => {
+    const others = [
+      ran('file:///__w/site/site-other/tests/helper.ts'),
+      ran('file:///usr/lib/node_modules/x.js'),
+      ran('node:fs'),
+    ];
+    expect(
+      rebaseUrls(others, '/__w/site/site', '/home/runner/work/site/site'),
+    ).toEqual(others);
   });
 });
 

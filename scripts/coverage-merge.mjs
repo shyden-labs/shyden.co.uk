@@ -19,9 +19,15 @@
  * repository.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
-import { die } from './errors.mjs';
+import { die, messageOf, nonEmpty } from './errors.mjs';
 
 /**
  * A place in a file, and a span between two; `FileCoverage` is one file as
@@ -200,12 +206,56 @@ export const mergeMaps = (maps, root, read = () => undefined) => {
   return refusals.length > 0 ? { refusal: refusals.join('\n') } : { merged };
 };
 
-const main = () => {
-  if (process.argv.length > 2) die('usage: coverage-merge.mjs');
-  const root = process.cwd();
-  const reports = SUITES.map((suite) =>
-    path.join('coverage', suite, 'coverage-final.json'),
+/**
+ * Every report the merge reads: the Vitest suites', then each Playwright
+ * run's under `coverage/playwright/<run>/` (#913), when the run names them.
+ * A run that names them and holds none is refused, never merged as if
+ * Playwright ran nothing.
+ *
+ * @param {readonly string[] | undefined} playwrightRuns the folders under coverage/playwright, or undefined when the run has none
+ * @returns {{ reports: string[] } | { refusal: string }}
+ */
+export const reportPaths = (playwrightRuns) => {
+  const suites = SUITES.map((suite) =>
+    path.posix.join('coverage', suite, 'coverage-final.json'),
   );
+  if (playwrightRuns === undefined) return { reports: suites };
+  if (playwrightRuns.length === 0)
+    return {
+      refusal:
+        'coverage-merge: --playwright names no run under coverage/playwright, so what Playwright ran would read as unmeasured',
+    };
+  return {
+    reports: [
+      ...suites,
+      ...[...playwrightRuns]
+        .sort()
+        .map((run) =>
+          path.posix.join('coverage', 'playwright', run, 'coverage-final.json'),
+        ),
+    ],
+  };
+};
+
+const main = () => {
+  const args = process.argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== '--playwright'))
+    die('usage: coverage-merge.mjs [--playwright]');
+  const root = process.cwd();
+  /** @type {string[] | undefined} */
+  let runs;
+  if (args[0] === '--playwright')
+    try {
+      runs = nonEmpty(
+        readdirSync(path.join('coverage', 'playwright')),
+        'Playwright runs under coverage/playwright',
+      );
+    } catch (error) {
+      die(`coverage-merge: --playwright: ${messageOf(error)}`);
+    }
+  const paths = reportPaths(runs);
+  if ('refusal' in paths) die(paths.refusal);
+  const { reports } = paths;
   const missing = reports.filter((report) => !existsSync(report));
   if (missing.length > 0)
     die(

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { BASE_URL, PASSWORD } from './tests/functions/local.mjs';
+import { unmeasured } from './tests/coverage-options';
 import { ENGINES, engineUse } from './tests/engines';
 
 /**
@@ -14,7 +15,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   webServer: {
-    command: 'node tests/functions/serve.mjs',
+    command: unmeasured('node tests/functions/serve.mjs'),
     // webServer takes no credentials, and the dev gate answers 401 without
     // them, which Playwright counts as up. So readiness only means "serving";
     // the health test, first in the file with one worker, is what proves the

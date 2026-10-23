@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mergeMaps, type FileCoverage } from '../../scripts/coverage-merge.mjs';
+import {
+  mergeMaps,
+  reportPaths,
+  type FileCoverage,
+} from '../../scripts/coverage-merge.mjs';
 
 /**
  * Joining the suites' V8 reports into one (#896). Each suite transforms a file
@@ -482,6 +486,45 @@ describe('reports whose places differ join by order (#899)', () => {
     ).toEqual({
       refusal:
         'coverage-merge: src/lib/a.ts holds a different number of branch arms in two reports (1 and 2), so their counts cannot be joined',
+    });
+  });
+});
+
+/**
+ * The reports the merge reads (#913): each Vitest suite's, then, when the
+ * run says Playwright ran, one per Playwright run, of which there must be one.
+ */
+describe('the reports the merge reads', () => {
+  it('reads the four suites alone when no Playwright run is named', () => {
+    expect(reportPaths(undefined)).toEqual({
+      reports: [
+        'coverage/unit/coverage-final.json',
+        'coverage/simulation/coverage-final.json',
+        'coverage/integration/coverage-final.json',
+        'coverage/processes/coverage-final.json',
+      ],
+    });
+  });
+
+  it('adds each Playwright run after them, in name order', () => {
+    expect(
+      reportPaths(['coverage-playwright-sanity', 'coverage-playwright-1']),
+    ).toEqual({
+      reports: [
+        'coverage/unit/coverage-final.json',
+        'coverage/simulation/coverage-final.json',
+        'coverage/integration/coverage-final.json',
+        'coverage/processes/coverage-final.json',
+        'coverage/playwright/coverage-playwright-1/coverage-final.json',
+        'coverage/playwright/coverage-playwright-sanity/coverage-final.json',
+      ],
+    });
+  });
+
+  it('refuses a run that says Playwright ran and holds no Playwright report', () => {
+    expect(reportPaths([])).toEqual({
+      refusal:
+        'coverage-merge: --playwright names no run under coverage/playwright, so what Playwright ran would read as unmeasured',
     });
   });
 });
