@@ -5,7 +5,9 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -13,6 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { nonEmpty } from '../../scripts/errors.mjs';
 
 /**
  * `scripts/coverage-processes.mjs` on a real child process (#899 AC3): a
@@ -242,6 +245,44 @@ describe('coverage-processes.mjs on a real child process', () => {
       writer.kill();
       await exited;
     }
+  });
+
+  /**
+   * Issue 913: a run recorded on another machine names its writers by that
+   * machine's pids. One may match a process running here (PR #949's second
+   * run waited 30 s on pid 408 and refused), so with --recorded-root no
+   * writer is looked for: the run finished before its files were handed on.
+   */
+  it('a run recorded elsewhere waits for no writer here, whatever its file names', () => {
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/planted.mjs', 'yes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    expect(child.status).toBe(0);
+    // Renamed to the pid of a process that is running here: this one.
+    const [written] = nonEmpty(
+      readdirSync(raw).filter((name) => name.endsWith('.json')),
+      'raw coverage files the planted script wrote',
+    );
+    renameSync(
+      path.join(raw, String(written)),
+      path.join(raw, `coverage-${process.pid}-1-0.json`),
+    );
+    const started = Date.now();
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, raw, 'processes', '--recorded-root', repo],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stderr]).toEqual([0, '']);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(lines()).toEqual(['1=1', '2=1', '3=1', '5=0']);
   });
 
   /**

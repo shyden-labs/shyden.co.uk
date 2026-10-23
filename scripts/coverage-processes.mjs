@@ -607,8 +607,13 @@ const main = async () => {
     die(messageOf(error));
   }
   const raw = names.filter((name) => name.endsWith('.json'));
+  // A run recorded elsewhere names its writers by that machine's pids, which
+  // say nothing here (a process of this machine can share one), and it was
+  // handed on after it finished: no writer of it runs here (#913).
+  /** @type {(pid: number) => boolean} */
+  const running = recorded === undefined ? processRuns : () => false;
   const waited = await awaitWriters(raw, {
-    isRunning: processRuns,
+    isRunning: running,
     pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now: () => Date.now(),
     ceilingMs: WRITER_CEILING_MS,
@@ -624,7 +629,7 @@ const main = async () => {
     const read = readRaw(
       name,
       readFileSync(path.join(dir, name), 'utf8'),
-      pid !== undefined && processRuns(pid),
+      pid !== undefined && running(pid),
     );
     if ('refusal' in read) {
       const line = path.join(dir, 'ledger', `${pid}.json`);
