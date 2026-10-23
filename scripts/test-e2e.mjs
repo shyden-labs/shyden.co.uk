@@ -46,6 +46,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EVIDENCE_REPORT } from './evidence-files.mjs';
 import {
+  interruptedTests,
   shardAccount,
   shardDeadlineMs,
   shardNotice,
@@ -627,6 +628,13 @@ function main() {
       process.exitCode = 1;
       return;
     }
+
+    // A shard that ended itself names what it was still running (#938 AC2).
+    const interrupted = interruptedTests(parsed);
+    if (interrupted.length > 0)
+      console.error(
+        `\n${RULE}\n  STILL RUNNING WHEN THE SHARD ENDED ITSELF (#938)\n${RULE}\n  ${interrupted.join('\n  ')}\n`,
+      );
 
     // #44 wants the distribution before anyone changes a timeout. Emitted
     // whether the run passed or failed — a failed run is when the numbers

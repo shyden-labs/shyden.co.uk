@@ -5,6 +5,7 @@ import {
   accountFindings,
   captureAccountFindings,
   docsOnlyFindings,
+  interruptedTests,
   isDocsOnlyRun,
   needsFindings,
   scopedJobFindings,
@@ -859,6 +860,68 @@ describe('a CI shard ends itself before its job limit (#938)', () => {
   it('refuses a shard whose 17 minutes ran out before its tests began', () => {
     expect(() => shardDeadlineMs(shard, ci, 1984)).toThrow(
       "the shard's 17 minutes ran out before its tests began: 984 s since its first step (#938)",
+    );
+  });
+});
+
+/**
+ * Issue 938 AC2: a shard that ends itself names what it was running. On a
+ * global timeout Playwright marks each test still running `interrupted` in
+ * its JSON report, inside nested suites.
+ */
+describe('the tests a timed-out shard was running (#938)', () => {
+  const report = {
+    suites: [
+      {
+        title: 'a.spec.ts',
+        specs: [
+          {
+            title: 'finished',
+            file: 'a.spec.ts',
+            line: 3,
+            tests: [
+              {
+                projectName: 'webkit',
+                results: [{ status: 'passed', workerIndex: 0 }],
+              },
+            ],
+          },
+        ],
+        suites: [
+          {
+            title: 'a group',
+            specs: [
+              {
+                title: 'still running',
+                file: 'a.spec.ts',
+                line: 9,
+                tests: [
+                  {
+                    projectName: 'webkit',
+                    results: [{ status: 'interrupted', workerIndex: 1 }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  it('names each interrupted test with its project, place and worker', () => {
+    expect(interruptedTests(report)).toEqual([
+      '[webkit] a.spec.ts:9 › a group › still running (worker 1)',
+    ]);
+  });
+
+  it('names a test that is not interrupted in no line', () => {
+    expect(interruptedTests(report).join('\n')).not.toContain('finished');
+  });
+
+  it('refuses a report with no suites to read', () => {
+    expect(() => interruptedTests({})).toThrow(
+      'the Playwright report holds no suites to read (#938)',
     );
   });
 });
