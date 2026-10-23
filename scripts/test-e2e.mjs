@@ -45,7 +45,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EVIDENCE_REPORT } from './evidence-files.mjs';
-import { shardAccount, shardNotice, shardOf } from './e2e-shards.mjs';
+import {
+  runningAtTimeout,
+  shardAccount,
+  shardDeadlineMs,
+  shardNotice,
+  shardOf,
+} from './e2e-shards.mjs';
 import { plannedRun, unitsOfListing } from './e2e-shard-plan.mjs';
 
 /** `playwright test --list` closes with e.g. `Total: 2094 tests in 18 files`. */
@@ -490,9 +496,11 @@ export function reconcile({
  * running Playwright: the caller creates the directory.
  */
 export function reportLocation(env = process.env) {
-  const evidence = env.EVIDENCE_DIR;
-  const dir = evidence || join(tmpdir(), `e2e-reconcile-${process.pid}`);
-  return { dir, path: join(dir, EVIDENCE_REPORT), ephemeral: !evidence };
+  // A CI shard names a directory too, so a shard that fails or ends itself
+  // keeps the report its failing-shard step uploads (#938).
+  const kept = env.EVIDENCE_DIR || env.E2E_REPORT_DIR;
+  const dir = kept || join(tmpdir(), `e2e-reconcile-${process.pid}`);
+  return { dir, path: join(dir, EVIDENCE_REPORT), ephemeral: !kept };
 }
 
 function main() {
@@ -546,6 +554,13 @@ function main() {
       );
     }
 
+    // A CI shard ends itself before its job's limit, which would throw its
+    // log away (#938): Playwright's global timeout, from the job's clock.
+    const deadlineMs = shardDeadlineMs(
+      argv,
+      process.env,
+      Math.floor(Date.now() / 1000),
+    );
     const started = performance.now();
     const run = spawnSync(
       'npx',
@@ -553,6 +568,7 @@ function main() {
         'playwright',
         'test',
         `--reporter=${reporter}`,
+        ...(deadlineMs === null ? [] : [`--global-timeout=${deadlineMs}`]),
         ...(planned ? planned.args : passthrough),
       ],
       {
@@ -614,6 +630,13 @@ function main() {
       process.exitCode = 1;
       return;
     }
+
+    // A shard that ended itself names what it was still running (#938 AC2).
+    const interrupted = runningAtTimeout(parsed);
+    if (interrupted !== null)
+      console.error(
+        `\n${RULE}\n  STILL RUNNING WHEN THE SHARD ENDED ITSELF (#938)\n${RULE}\n  ${interrupted.join('\n  ')}\n`,
+      );
 
     // #44 wants the distribution before anyone changes a timeout. Emitted
     // whether the run passed or failed — a failed run is when the numbers
