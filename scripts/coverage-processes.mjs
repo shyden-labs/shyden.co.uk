@@ -7,8 +7,8 @@
  * ran the file's own text: plain JavaScript, or TypeScript Node stripped of
  * its types (the types become spaces, so every offset is the file's own, and
  * Node appends `\n\n//# sourceURL=<url>`). Anything else under the same URL is
- * code a tool transformed first (Vitest's workers inherit the variable), which
- * this text cannot describe, so it is skipped and named. A file Vitest's own
+ * code a tool transformed first (a process that loads TypeScript through
+ * Vite, say), which this text cannot describe, so it is skipped and named. A file Vitest's own
  * report measures still reaches the merge from there.
  *
  *   node scripts/coverage-processes.mjs <raw-dir> <suite>
@@ -19,7 +19,13 @@
  * `tests/integration/coverage-processes-script.test.ts` runs it on a real
  * child process.
  */
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convert } from 'ast-v8-to-istanbul';
@@ -402,6 +408,26 @@ export const readRaw = (name, text, running) => {
  */
 const WRITER_CEILING_MS = 30_000;
 
+/**
+ * What the ledger says about a raw file's writer (#936): every process a test
+ * starts writes `ledger/<pid>.json` as it starts (`tests/coverage-ledger.mjs`),
+ * so a file its writer left unfinished names the command that wrote it.
+ *
+ * @param {number | undefined} pid the writer, from the file's name
+ * @param {string | undefined} text its ledger line, or undefined when none
+ * @returns {string} a note to follow the refusal, empty when no pid is named
+ */
+export const ledgerNote = (pid, text) => {
+  if (pid === undefined) return '';
+  if (text === undefined) return `; no ledger line names process ${pid}`;
+  try {
+    const { argv } = /** @type {{ argv: string[] }} */ (JSON.parse(text));
+    return `; process ${pid} was started as: ${argv.join(' ')}`;
+  } catch {
+    return `; the ledger line for process ${pid} is not whole JSON`;
+  }
+};
+
 const main = async () => {
   const [dir, suite, ...rest] = process.argv.slice(2);
   if (!dir || !suite || rest.length > 0)
@@ -438,7 +464,12 @@ const main = async () => {
       readFileSync(path.join(dir, name), 'utf8'),
       pid !== undefined && processRuns(pid),
     );
-    if ('refusal' in read) die(read.refusal);
+    if ('refusal' in read) {
+      const line = path.join(dir, 'ledger', `${pid}.json`);
+      die(
+        `${read.refusal}${ledgerNote(pid, pid !== undefined && existsSync(line) ? readFileSync(line, 'utf8') : undefined)}`,
+      );
+    }
     return read.result;
   });
   const result = await convertScripts(
@@ -452,8 +483,7 @@ const main = async () => {
     path.join('coverage', suite, 'coverage-final.json'),
     `${JSON.stringify(result.report)}\n`,
   );
-  // Vitest's workers inherit the variable, so most skipped entries are their
-  // transformed code: listed in a file beside the report, counted here.
+  // Transformed code is listed in a file beside the report, counted here.
   writeFileSync(
     path.join('coverage', suite, 'skipped.txt'),
     result.skipped.map(({ file, reason }) => `${file}: ${reason}\n`).join(''),

@@ -4,6 +4,7 @@ import {
   awaitWriters,
   convertScripts,
   fileOf,
+  ledgerNote,
   readRaw,
   writerPid,
   type V8Script,
@@ -415,5 +416,42 @@ describe('a raw file that is not whole JSON is refused, naming it (#936)', () =>
       refusal:
         'coverage-processes: stray.json (0 bytes, written by an unnamed process) is not whole JSON: Unexpected end of JSON input',
     });
+  });
+});
+
+/**
+ * Issue 936: an empty raw file names only its writer's pid, and the writer is
+ * gone by then. Every process a test starts writes a ledger line as it starts
+ * (`tests/coverage-ledger.mjs`), so a refusal names the command too.
+ */
+describe('a refused raw file names the command that wrote it (#936)', () => {
+  it('names the command the ledger holds for its pid', () => {
+    expect(
+      ledgerNote(
+        10539,
+        JSON.stringify({
+          pid: 10539,
+          argv: ['/usr/bin/node', 'playwright', 'test', '--list'],
+        }),
+      ),
+    ).toBe(
+      '; process 10539 was started as: /usr/bin/node playwright test --list',
+    );
+  });
+
+  it('says so when no ledger line names it', () => {
+    expect(ledgerNote(10539, undefined)).toBe(
+      '; no ledger line names process 10539',
+    );
+  });
+
+  it('says so when the ledger line cannot be read', () => {
+    expect(ledgerNote(10539, '{"pid')).toBe(
+      '; the ledger line for process 10539 is not whole JSON',
+    );
+  });
+
+  it('names nothing for a file Node did not name by a pid', () => {
+    expect(ledgerNote(undefined, undefined)).toBe('');
   });
 });

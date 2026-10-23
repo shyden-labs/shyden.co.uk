@@ -220,8 +220,9 @@ jobs:
       - run: npm run test:coverage
       - run: npm run test:coverage:simulation
       - run: npm run test:coverage:integration
-      # What the integration suite's child processes ran (#899): the suite
-      # runs under NODE_V8_COVERAGE, and each process it starts writes there.
+      # What the integration suite's child processes ran (#899): each process
+      # a test starts writes there, and the forks running the tests do not
+      # (#936, tests/child-coverage.ts).
       - run: node scripts/coverage-processes.mjs coverage/raw/integration processes
       - run: node scripts/coverage-merge.mjs
       - name: The changed lines, against the coverage of every suite
