@@ -101,12 +101,18 @@ feature/xxx ──PR──▶ develop ──push──▶ deploy-dev ──▶ d
             + closing-keywords        post dev-verified ◀───┘
              (required)                   on that SHA
                                                │
-develop ──promotion PR──▶ main   requires: build-and-test + visual + dev-verified
-                           │
-                         push ──▶ deploy-prod  approval gate → deploy →
-                           │                    smoke → browser check →
-                           │                    post prod-verified
-                           └──▶ release-tag     tag + GitHub release
+develop ──cut──▶ release/<date>-<what>   frozen at the commit the operator chose
+                         │
+                     release PR          requires: build-and-test + visual
+                   (merge commit)        + dev-verified; release-cut and logs
+                         │               run on this pull request alone
+                         ▼
+                       main
+                         │
+                       push ──▶ deploy-prod  approval gate → deploy →
+                         │                    smoke → browser check →
+                         │                    post prod-verified
+                         └──▶ release-tag     tag + GitHub release
 ```
 
 | Branch              | Required checks                                  | Direct push |
@@ -118,8 +124,14 @@ The deploy gate (`scripts/deploy-gate.mjs`) reads the same pull-request checks,
 `build-and-test` and `visual`, off the merged head before it deploys to dev.
 
 `dev-verified` is a **commit status**, so it is bound to a SHA rather than a
-branch. A promotion PR's head _is_ develop's head, which is why the status
-carries across with no copying step.
+branch. A release cut is a `develop` commit, so a cut taken at a dev-verified
+commit carries the status with no copying step.
+
+A release reaches `main` only as a merge commit from a frozen `release/*` cut
+(#941). `main` does not require a branch to be up to date, since each release
+merge is a commit `develop` never holds; the `release-cut` job checks instead
+that the merge lands exactly the cut's tree and that `main` holds nothing but
+earlier cuts (`scripts/release-cut.mjs`).
 
 `develop` must not require `dev-verified` — that status is produced _by_ pushing
 to develop, so requiring it would deadlock.
