@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -155,5 +155,84 @@ describe('coverage-processes.mjs on a real child process', () => {
       1,
       `✗ coverage-processes: no process ran a measured file, so there is nothing to report (read ${path.join(repo, 'unmeasured')})\n`,
     ]);
+  });
+
+  /** Issue 936: a cut-off raw file from a writer that has exited. */
+  it('a cut-off raw file is refused, naming it, its size and its writer', () => {
+    mkdirSync(path.join(repo, 'cut'));
+    const exited = spawnSync(process.execPath, ['-e', ''], {
+      encoding: 'utf8',
+    });
+    const name = `coverage-${exited.pid}-1-0.json`;
+    writeFileSync(path.join(repo, 'cut', name), '{"res');
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'cut'), 'processes'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      },
+    );
+    expect([run.status, run.stderr]).toEqual([
+      1,
+      `✗ coverage-processes: ${name} (5 bytes, written by process ${exited.pid}, which has exited) is not whole JSON: Unterminated string in JSON at position 5 (line 1 column 6)\n`,
+    ]);
+  });
+
+  /**
+   * Issue 936: a writer still finishing its file when the reader starts. The
+   * child holds the file half-written for a second, then completes it with
+   * the planted script's real coverage and exits.
+   */
+  it('a writer still running is waited for, then its whole file is read', async () => {
+    const raw = path.join(repo, 'raw');
+    const measured = spawnSync(
+      process.execPath,
+      ['scripts/planted.mjs', 'yes'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { ...process.env, NODE_V8_COVERAGE: raw },
+      },
+    );
+    expect(measured.status).toBe(0);
+    // The child names its file by its own pid, as Node does, and completes
+    // it a second after the test has planted the unfinished version.
+    const writer = spawn(
+      process.execPath,
+      [
+        '-e',
+        "const fs = require('node:fs'); const path = require('node:path'); setTimeout(() => fs.writeFileSync(path.join(process.argv[1], `coverage-${process.pid}-1-0.json`), JSON.stringify({ result: [] })), 1000);",
+        raw,
+      ],
+      { stdio: 'ignore' },
+    );
+    const exited = new Promise((resolve) => writer.once('exit', resolve));
+    try {
+      const target = path.join(raw, `coverage-${writer.pid}-1-0.json`);
+      writeFileSync(target, '{"res');
+      // Run without blocking this process: the writer is its child, and
+      // until this event loop reaps it the exited writer is a zombie, which
+      // still answers signal 0 as running.
+      const reader = spawn(process.execPath, [SCRIPT, raw, 'processes'], {
+        cwd: repo,
+        env: { ...process.env, NODE_V8_COVERAGE: '' },
+      });
+      const run = { status: -1, stdout: '', stderr: '' };
+      reader.stdout.on('data', (chunk: Buffer) => (run.stdout += chunk));
+      reader.stderr.on('data', (chunk: Buffer) => (run.stderr += chunk));
+      run.status = await new Promise<number>((resolve) =>
+        reader.once('close', (code) => resolve(code ?? -1)),
+      );
+      expect([run.status, run.stderr]).toEqual([0, '']);
+      expect(run.stdout).toContain(
+        `coverage-processes: waited for process ${writer.pid} to finish writing\n`,
+      );
+      expect(readFileSync(target, 'utf8')).toBe('{"result":[]}');
+    } finally {
+      writer.kill();
+      await exited;
+    }
   });
 });
