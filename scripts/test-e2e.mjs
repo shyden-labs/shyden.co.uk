@@ -46,7 +46,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EVIDENCE_REPORT } from './evidence-files.mjs';
 import {
-  interruptedTests,
+  runningAtTimeout,
   shardAccount,
   shardDeadlineMs,
   shardNotice,
@@ -630,8 +630,8 @@ function main() {
     }
 
     // A shard that ended itself names what it was still running (#938 AC2).
-    const interrupted = interruptedTests(parsed);
-    if (interrupted.length > 0)
+    const interrupted = runningAtTimeout(parsed);
+    if (interrupted !== null)
       console.error(
         `\n${RULE}\n  STILL RUNNING WHEN THE SHARD ENDED ITSELF (#938)\n${RULE}\n  ${interrupted.join('\n  ')}\n`,
       );

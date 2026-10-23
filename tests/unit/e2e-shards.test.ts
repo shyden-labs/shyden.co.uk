@@ -5,7 +5,7 @@ import {
   accountFindings,
   captureAccountFindings,
   docsOnlyFindings,
-  interruptedTests,
+  runningAtTimeout,
   isDocsOnlyRun,
   needsFindings,
   scopedJobFindings,
@@ -866,61 +866,83 @@ describe('a CI shard ends itself before its job limit (#938)', () => {
 
 /**
  * Issue 938 AC2: a shard that ends itself names what it was running. On a
- * global timeout Playwright marks each test still running `interrupted` in
- * its JSON report, inside nested suites.
+ * global timeout Playwright records the run error `Timed out waiting <n>s for
+ * the test suite to run` and ends each test still running like any failure
+ * (measured on run 39878264792: `page.waitForTimeout: Test ended.`), so the
+ * tests running then are the last each worker started.
  */
 describe('the tests a timed-out shard was running (#938)', () => {
-  const report = {
+  const at = (s: number) =>
+    `2026-10-23T00:00:${String(s).padStart(2, '0')}.000Z`;
+  const spec = (
+    title: string,
+    line: number,
+    worker: number,
+    start: number,
+    status: string,
+  ) => ({
+    title,
+    file: 'a.spec.ts',
+    line,
+    tests: [
+      {
+        projectName: 'webkit',
+        results: [{ status, workerIndex: worker, startTime: at(start) }],
+      },
+    ],
+  });
+  const report = (errors: { message: string }[]) => ({
+    errors,
     suites: [
       {
         title: 'a.spec.ts',
-        specs: [
-          {
-            title: 'finished',
-            file: 'a.spec.ts',
-            line: 3,
-            tests: [
-              {
-                projectName: 'webkit',
-                results: [{ status: 'passed', workerIndex: 0 }],
-              },
-            ],
-          },
-        ],
+        specs: [spec('first on worker 0', 3, 0, 1, 'passed')],
         suites: [
           {
             title: 'a group',
             specs: [
-              {
-                title: 'still running',
-                file: 'a.spec.ts',
-                line: 9,
-                tests: [
-                  {
-                    projectName: 'webkit',
-                    results: [{ status: 'interrupted', workerIndex: 1 }],
-                  },
-                ],
-              },
+              spec('last on worker 0', 9, 0, 30, 'failed'),
+              spec('only on worker 1', 12, 1, 20, 'failed'),
             ],
           },
         ],
       },
     ],
-  };
+  });
+  const timedOut = [
+    { message: 'Timed out waiting 965s for the test suite to run' },
+  ];
 
-  it('names each interrupted test with its project, place and worker', () => {
-    expect(interruptedTests(report)).toEqual([
-      '[webkit] a.spec.ts:9 › a group › still running (worker 1)',
+  it('names the last test each worker started when the run timed out', () => {
+    expect(runningAtTimeout(report(timedOut))).toEqual([
+      '[webkit] a.spec.ts:9 › a group › last on worker 0 (worker 0, failed)',
+      '[webkit] a.spec.ts:12 › a group › only on worker 1 (worker 1, failed)',
     ]);
   });
 
-  it('names a test that is not interrupted in no line', () => {
-    expect(interruptedTests(report).join('\n')).not.toContain('finished');
+  it('names a test the worker had finished before its last in no line', () => {
+    expect(runningAtTimeout(report(timedOut))?.join('\n')).not.toContain(
+      'first on worker 0',
+    );
+  });
+
+  it('reads the timeout error through the colour codes Playwright adds', () => {
+    const coloured = [
+      {
+        message: `${String.fromCharCode(27)}[31mTimed out waiting 965s for the test suite to run${String.fromCharCode(27)}[39m`,
+      },
+    ];
+    expect(runningAtTimeout(report(coloured))).toHaveLength(2);
+  });
+
+  it('asks nothing of a run that did not time out', () => {
+    expect(
+      runningAtTimeout(report([{ message: 'some other error' }])),
+    ).toBeNull();
   });
 
   it('refuses a report with no suites to read', () => {
-    expect(() => interruptedTests({})).toThrow(
+    expect(() => runningAtTimeout({ errors: timedOut })).toThrow(
       'the Playwright report holds no suites to read (#938)',
     );
   });

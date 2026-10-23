@@ -774,39 +774,55 @@ function main() {
 if (import.meta.main) main();
 
 /**
- * @typedef {{ status?: string, workerIndex?: number }} ReportResult
+ * @typedef {{ status?: string, workerIndex?: number, startTime?: string }} ReportResult
  * @typedef {{ projectName?: string, results?: ReportResult[] }} ReportTest
  * @typedef {{ title?: string, file?: string, line?: number, tests?: ReportTest[] }} ReportSpec
  * @typedef {{ title?: string, specs?: ReportSpec[], suites?: ReportSuite[] }} ReportSuite
  */
 
+/** The run error Playwright records when its global timeout ends a run. */
+const GLOBAL_TIMEOUT = /^Timed out waiting [\d.]+s for the test suite to run$/;
+
 /**
- * The tests a shard was still running when it ended itself (#938 AC2): on a
- * global timeout Playwright marks each one `interrupted` in its JSON report.
- * One line each, with its project, place, the suites it sits in and its
- * worker, so a hang names itself in the step's log.
+ * The tests a shard was still running when it ended itself (#938 AC2), one
+ * line each with its project, place, suites, worker and status. Playwright
+ * ends a test cut off by its global timeout like any failure (measured on
+ * run 39878264792: `page.waitForTimeout: Test ended.`, status not
+ * `interrupted`), so the tests running then are the last each worker
+ * started. A run that did not time out gets null: the question is not asked.
  *
- * @param {{ suites?: ReportSuite[] }} report
- * @returns {string[]}
+ * @param {{ errors?: { message?: string }[], suites?: ReportSuite[] }} report
+ * @returns {string[] | null}
  */
-export function interruptedTests(report) {
+export function runningAtTimeout(report) {
   if (!Array.isArray(report.suites))
     throw new Error('the Playwright report holds no suites to read (#938)');
-  /** @type {string[]} */
-  const found = [];
+  const timedOut = (report.errors ?? []).some((error) =>
+    GLOBAL_TIMEOUT.test((error.message ?? '').replace(/\u001b\[[0-9;]*m/g, '')),
+  );
+  if (!timedOut) return null;
+  /** @type {Map<number, { start: number, line: string }>} */
+  const lastByWorker = new Map();
   /** @param {ReportSuite} suite @param {string[]} path */
   const walk = (suite, path) => {
     for (const spec of suite.specs ?? [])
       for (const test of spec.tests ?? [])
-        for (const result of test.results ?? [])
-          if (result.status === 'interrupted')
-            found.push(
-              `[${test.projectName}] ${spec.file}:${spec.line} › ${[...path, spec.title].join(' › ')} (worker ${result.workerIndex})`,
-            );
+        for (const result of test.results ?? []) {
+          const worker = result.workerIndex ?? -1;
+          const start = Date.parse(result.startTime ?? '');
+          const seen = lastByWorker.get(worker);
+          if (seen === undefined || start > seen.start)
+            lastByWorker.set(worker, {
+              start,
+              line: `[${test.projectName}] ${spec.file}:${spec.line} › ${[...path, spec.title].join(' › ')} (worker ${worker}, ${result.status})`,
+            });
+        }
     for (const child of suite.suites ?? [])
       walk(child, [...path, child.title ?? '']);
   };
   // A top-level suite is a file, which the line already names.
   for (const file of report.suites) walk(file, []);
-  return found;
+  return [...lastByWorker.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, { line }]) => line);
 }
