@@ -248,7 +248,11 @@ jobs:
   # budget, and every pull request waited all of it.
   #
   # EIGHT, measured rather than guessed. At four (run 35830220134) the
-  # slowest shard took 13.2 minutes.
+  # slowest shard took 13.2 minutes. TEN since #938 (Shyden, 2026-10-22):
+  # each shard now ends itself 17 minutes after its job starts, so a hang
+  # keeps its log and report instead of running into the 20-minute limit,
+  # and at eight the slowest green shards already used 1,108 of the 1,200 s
+  # (241 shard jobs measured). Ten cut each to about 80% of that.
   #
   # Split by TIME, not count (#607). Playwright's own --shard hands each shard
   # an equal COUNT of tests in project order, and a WebKit test costs about
@@ -286,8 +290,11 @@ jobs:
       # way: build-and-test refuses a cancelled shard as surely as a failed one.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
+      # The job's clock for scripts/test-e2e.mjs, which ends the shard 17
+      # minutes after the job started (#938).
+      - run: echo "E2E_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -307,6 +314,7 @@ jobs:
       - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           E2E_ACCOUNT_DIR: e2e-accounts
+          E2E_REPORT_DIR: e2e-report
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
@@ -337,6 +345,17 @@ jobs:
           # step go GREEN having preserved nothing, and this step IS the
           # evidence path for a red run (#131).
           if-no-files-found: warn
+      # The report says what each test did and when: how a shard that ended
+      # itself names what it was running, read again after the job (#938).
+      - name: Keep the failing shard's Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
+          path: e2e-report
+          retention-days: 14
+          # `warn`, as above: a red shard whose run wrote no report says so.
+          if-no-files-found: warn
 
   # Every case the release page cites takes its picture (#774; operator ruling
   # 2026-10-14). The release capture runs once, on the laptop, as the release's
@@ -363,8 +382,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        # Five since #938: at four the slowest green capture shard used 1,190
+        # of its 1,200 s (100 jobs measured), with no room to end itself.
+        shard: [1, 2, 3, 4, 5]
     steps:
+      # The job's clock for scripts/test-e2e.mjs, which ends the shard 17
+      # minutes after the job started (#938).
+      - run: echo "E2E_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

@@ -88,6 +88,56 @@ export function shardOf(argv = []) {
 }
 
 /**
+ * How long a CI shard may run, from its job's start, before it ends itself
+ * (#938; Shyden, 2026-10-22: 17 minutes, inside the job's 20). A shard that
+ * hung ran into the job limit instead, and GitHub threw the job's log away,
+ * so nothing said what hung; ending three minutes early leaves the reporter
+ * and the failing-shard steps time to keep the report and traces.
+ */
+const SHARD_LIMIT_SECONDS = 17 * 60;
+
+/**
+ * The most a job spent before its first step ran, measured over 241 e2e and
+ * 100 capture shard jobs on 2026-10-22 (36 s and 34 s): the first step's
+ * clock starts that much after the job's.
+ */
+const JOB_START_TO_FIRST_STEP_SECONDS = 36;
+
+/**
+ * Playwright's global timeout for a CI shard, in ms: what is left of its 17
+ * minutes. `E2E_JOB_STARTED` is the epoch second the job's first step ran.
+ * A run that is not a shard, or not on CI, gets none (null).
+ *
+ * @param {readonly string[]} argv
+ * @param {Record<string, string | undefined>} env
+ * @param {number} nowSeconds
+ * @returns {number | null}
+ */
+export function shardDeadlineMs(argv, env, nowSeconds) {
+  if (shardOf(argv) === null) return null;
+  const started = env.E2E_JOB_STARTED;
+  if (started === undefined || started === '') {
+    if (env.CI)
+      throw new Error(
+        "a CI shard needs E2E_JOB_STARTED, the epoch second its job's first step ran (#938)",
+      );
+    return null;
+  }
+  if (!/^\d+$/.test(started))
+    throw new Error(
+      `E2E_JOB_STARTED must be whole epoch seconds, not ${JSON.stringify(started)} (#938)`,
+    );
+  const end =
+    Number(started) + SHARD_LIMIT_SECONDS - JOB_START_TO_FIRST_STEP_SECONDS;
+  const left = end - nowSeconds;
+  if (left <= 0)
+    throw new Error(
+      `the shard's 17 minutes ran out before its tests began: ${nowSeconds - Number(started)} s since its first step (#938)`,
+    );
+  return left * 1000;
+}
+
+/**
  * The file one shard's account is written to.
  *
  * Unique per shard, because the aggregating job downloads every shard's
@@ -722,3 +772,92 @@ function main() {
 
 // Only when run, never when imported: the unit suite imports the verdict.
 if (import.meta.main) main();
+
+/**
+ * @typedef {{ status?: string, workerIndex?: number, startTime?: string, duration?: number }} ReportResult
+ * @typedef {{ projectName?: string, expectedStatus?: string, results?: ReportResult[] }} ReportTest
+ * @typedef {{ title?: string, file?: string, line?: number, tests?: ReportTest[] }} ReportSpec
+ * @typedef {{ title?: string, specs?: ReportSpec[], suites?: ReportSuite[] }} ReportSuite
+ */
+
+/** The run error Playwright records when its global timeout ends a run. */
+const GLOBAL_TIMEOUT = /^Timed out waiting ([\d.]+)s for the (.+) to run$/;
+
+/**
+ * The tests in progress when a shard ended itself (#938 AC2), one line each
+ * with its project, place, suites, worker and status. Playwright sets its
+ * global deadline in the tick it records the run's start, so the timeout fired
+ * the error's `<n>` seconds after `stats.startTime`. A test running then
+ * either never reported an end, which leaves its result at Playwright's
+ * defaults (`skipped`, duration 0: run 39909889234), or ended at or after that
+ * moment (`page.waitForTimeout: Test ended.`: run 39878264792). A test that
+ * skipped itself expects `skipped` and is not one. A worker's last test is
+ * not the question: a worker is replaced on every project change and every
+ * failure, and its last test passed long before. A run that did not time out
+ * gets null: the question is not asked.
+ *
+ * @param {{ errors?: { message?: string }[], stats?: { startTime?: string }, suites?: ReportSuite[] }} report
+ * @returns {string[] | null}
+ */
+export function runningAtTimeout(report) {
+  if (!Array.isArray(report.suites))
+    throw new Error('the Playwright report holds no suites to read (#938)');
+  const timeout = (report.errors ?? [])
+    .map((error) =>
+      GLOBAL_TIMEOUT.exec(
+        (error.message ?? '').replace(/\u001b\[[0-9;]*m/g, ''),
+      ),
+    )
+    .find((match) => match !== null);
+  if (timeout === undefined) return null;
+  const runStart = Date.parse(report.stats?.startTime ?? '');
+  if (Number.isNaN(runStart))
+    throw new Error(
+      'the Playwright report holds no run start time to place its timeout at (#938)',
+    );
+  const seconds = Number(timeout[1]);
+  if (!Number.isFinite(seconds))
+    throw new Error(
+      `the Playwright timeout "${timeout[1]}" is not a number of seconds (#938)`,
+    );
+  const fired = runStart + seconds * 1000;
+  /** @type {{ worker: number, start: number, line: string }[]} */
+  const running = [];
+  /** @param {ReportSuite} suite @param {string[]} path */
+  const walk = (suite, path) => {
+    for (const spec of suite.specs ?? [])
+      for (const test of spec.tests ?? [])
+        for (const result of test.results ?? []) {
+          const place = `${spec.file}:${spec.line} › ${[...path, spec.title].join(' › ')}`;
+          const start = Date.parse(result.startTime ?? '');
+          if (Number.isNaN(start))
+            throw new Error(
+              `${place} holds a result with no start time (#938)`,
+            );
+          if (start >= fired) continue;
+          const neverEnded =
+            result.status === 'skipped' && test.expectedStatus !== 'skipped';
+          const endedAfter = start + (result.duration ?? 0) >= fired;
+          if (!neverEnded && !endedAfter && result.status !== 'interrupted')
+            continue;
+          const worker = result.workerIndex ?? -1;
+          const state = neverEnded ? 'cut off before it ended' : result.status;
+          running.push({
+            worker,
+            start,
+            line: `[${test.projectName}] ${place} (worker ${worker}, ${state})`,
+          });
+        }
+    for (const child of suite.suites ?? [])
+      walk(child, [...path, child.title ?? '']);
+  };
+  // A top-level suite is a file, which the line already names.
+  for (const file of report.suites) walk(file, []);
+  if (running.length === 0)
+    return [
+      `no test was in progress when the ${seconds} s timeout fired during the ${timeout[2]}`,
+    ];
+  return running
+    .sort((a, b) => a.worker - b.worker || a.start - b.start)
+    .map(({ line }) => line);
+}
