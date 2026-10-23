@@ -70,13 +70,21 @@ import { floorBreach } from '../floors';
 
 const tsFiles = filesUnder('tests', (path) => path.endsWith('.ts'));
 
+// The call graph, its closures and the binding over those files, each run
+// ONCE, by the first test that asks for it (#707, as #700 did for the
+// duplication scan). At module scope they ran while the file loaded, where no
+// limit sees them: 2,359 / 2,276 ms of CPU on the runner (#696). In a test
+// they run under the guards' 25 s per-test limit. Listing the files stays
+// above: a walk, with no parse.
+let closed: ReturnType<typeof presenceClosures> | undefined;
+let scanned: ReturnType<typeof scanPresence> | undefined;
+
 /**
  * Both properties are inherited by CALLERS, so both are closed transitively
  * over the whole of `tests/**` -- see `./ast`, which #118 extracted from here
  * so a second meta-guard could reason the same way without a second copy.
  */
-const closures = presenceClosures(callGraph(tsFiles));
-const { readers } = closures;
+const presence = () => (closed ??= presenceClosures(callGraph(tsFiles)));
 
 /**
  * Every file bound into one program, so a local name resolves to the
@@ -84,9 +92,7 @@ const { readers } = closures;
  * `supply-chain.test.ts:206` reached another test's `parseCleanYaml(...)`, and
  * a stripped assertion read as raw (#184).
  */
-const bound = bindFiles(tsFiles);
-
-const result = scanPresence(bound, closures);
+const scan = () => (scanned ??= scanPresence(bindFiles(tsFiles), presence()));
 
 const FIXTURE_CLOSURES: PresenceClosures = {
   readers: seededClosure('readFileSync'),
@@ -304,6 +310,7 @@ describe('presence assertions over source text are stripped or anchored', () => 
   // stopped matching would report zero findings and zero scanned, and only
   // one of those is good news. `event-collectors.test.ts` settled this shape.
   it('scans the presence assertions that actually read source text', () => {
+    const result = scan();
     // The figure is recorded exactly (#468), because slack here has cost
     // before: the floor sat at 20 while the truth was 27, so a control with that much slack in it is most of the way
     // back to no control at all. #118 moved the number twice -- UP as the
@@ -342,6 +349,7 @@ describe('presence assertions over source text are stripped or anchored', () => 
   });
 
   it('scans, in each file, the presence its text writes over raw file text', () => {
+    const result = scan();
     // Independent of the dataflow reader (#477): per file, the reader judged
     // exactly what a text reading counts. Fewer is a reader blind to a form;
     // more is a reader counting a read that is not one, which is how two
@@ -370,6 +378,7 @@ describe('presence assertions over source text are stripped or anchored', () => 
   });
 
   it('counts a read JSON.parse stands on as data, as its own definition does (#570)', () => {
+    const { readers } = presence();
     // floorBreach reads floors.json through JSON.parse. Counted as a reader,
     // any helper checking a floor made what it returned read as raw source.
     expect(readers.reaches('tests/floors.ts', 'floorBreach')).toBe(false);
@@ -383,6 +392,7 @@ describe('presence assertions over source text are stripped or anchored', () => 
   });
 
   it('finds none reading raw source with an unanchored matcher', () => {
+    const result = scan();
     expect(
       searched(result.findings, {
         of: result.scanned,
