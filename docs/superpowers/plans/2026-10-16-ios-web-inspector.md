@@ -14,6 +14,8 @@
 
 **Tasks 1-3 are built** (2026-10-19, 95 unit tests; the code below is the reviewed code, folded back after review pass 1 ran it and again in pass 2, when the XML reader stopped reading comment syntax). `tests/guards/one-home.test.ts` exempts the two plist encoders from the one-catalogue-walk rule by Shyden's ruling (AskUserQuestion, 2026-10-19). **On hold after Task 3** until the zero-code probe in the spec's section 8 (Safari's own Web Inspector on the phone's page, while WebDriverAgent runs: Shyden's ruling of 2026-10-18 retired `safaridriver`). Its attaching step (a) answered yes by hand on 2026-10-18 (#838 comment 6246973024); steps (b)-(e) remain. Tasks 4-9 (link, usbmux, lockdown, Web Inspector RPC, JSON protocol, the certificate pin and the TLS wiring) are written after it, from what the phone shows; Tasks 1-3 are the codecs any route needs.
 
+**2026-10-24:** the phone probe is done (spec section 8; #811 comments of 2026-10-20 and 2026-10-24: the route, every page command, and AC3's settings measured; forced colours exempted by Shyden). Tasks 4-10 below were written from those recordings.
+
 ## Scope
 
 **Part A (this plan, no phone):** Tasks 1-9. **Part B (phone-gated):** step 1's probe records real exchanges; Part B's own plan (page surface, session wiring, canaries, ported tests, exemption list, forced-colours measurement) is written from those recordings, because its tests are pinned to bytes only the phone can supply.
@@ -1486,3 +1488,162 @@ git commit -m "The iPhone inspector reads frames as they arrive in pieces, and n
 ```
 
 ---
+
+## Part A, Tasks 4-10: the link to the phone (written 2026-10-24 from the phone's own exchanges)
+
+**Measured before writing** (#811 comments of 2026-10-24): the whole route answers on the iPhone Air, iOS 27.0.1, through `com.apple.webinspector` over lockdown (not CoreDevice). Lockdown's session TLS and the service's TLS both run TLS 1.2 with Node-default ciphers (`ECDHE-RSA-AES256-GCM-SHA384`), and the phone's certificate equals the pair record's `DeviceCertificate`. Every page command in the design answers. Two facts shape the client: media emulation takes effect only after `Page.enable`; and the phone's first replies to `_rpc_reportIdentifier:` come in the order `_rpc_reportCurrentState:`, `_rpc_reportConnectedApplicationList:`, `_rpc_reportConnectedDriverList:`, with no `" "` follow-up plist needed.
+
+**Ceilings** (one constant each, in the file that waits): a usbmuxd or lockdown answer, 10 s (`REPLY_CEILING_MS`); Safari in the application list, 15 s; a page whose URL matches, 15 s (`LISTING_CEILING_MS`); `Target.targetCreated` after socket setup, 10 s; a protocol command's answer, 15 s (`COMMAND_CEILING_MS`). Each failure names what it waited for and what came instead.
+
+**Execution:** Native (one agent at a time; review agents are refused). Each task ends with `npm run test:unit` and `npm run typecheck` green on the laptop. Guards run in CI on the pull request.
+
+### Task 4: Recorded exchanges as fixtures, and the guard that refuses the phone's secrets
+
+**Files:**
+- Create: `tests/unit/fixtures/ios-inspector/exchanges-2026-10-24.json`, `tests/unit/fixtures/ios-inspector/throwaway-pair.ts`, `tests/unit/ios-inspector-fixtures.ts`
+- Create: `tests/guards/ios-inspector-fixtures.test.ts`
+- Recorder (git-ignored): `.superpowers/sdd/811/record-fixtures.py`, built from `wi-route-probe.py` and `wi-pages-probe.py`
+
+**Interfaces:**
+- Produces: `recordedFrames(channel: 'usbmux' | 'lockdown' | 'wir', dir: 'out' | 'in'): readonly Buffer[]` (payload bytes, without frame headers, in recorded order); `THROWAWAY_PAIR: { hostCertificatePem: Buffer; hostKeyPem: Buffer; deviceCertificatePem: Buffer; deviceCertificateDer: Buffer; hostId: string; systemBuid: string; udid: string }`.
+
+- [ ] **Step 1: Record.** The recorder repeats today's route, logging every frame's payload as `{ channel, dir, base64, redacted? }`. Before writing, it replaces the pair record's `HostCertificate`, `HostPrivateKey`, `RootCertificate`, `RootPrivateKey` and `DeviceCertificate` with a throwaway pair made by `openssl req -x509 -newkey rsa:2048 -nodes -days 1` at record time (never the phone's), and replaces `EscrowBag`, `WiFiMACAddress`, `HostID`, `SystemBUID` and the UDID with fixed fakes. A re-encoded payload is marked `redacted: true`. The throwaway PEMs go into `throwaway-pair.ts` with a header saying what they are. Expected: the fixture holds usbmuxd `ListDevices`/`ReadPairRecord`/`Connect`, lockdown `QueryType`/`StartSession`/`StartService`, and the WIR attach plus one round of each page command.
+- [ ] **Step 2: Write the failing guard.** `tests/guards/ios-inspector-fixtures.test.ts`: it reads every file under `tests/unit/fixtures/ios-inspector/` (derived from the filesystem), decodes every base64 payload and every nested `PairRecordData`, and collects every PEM block and every value at the keys `HostID`, `SystemBUID`, `SerialNumber`, `UniqueDeviceID`, `EscrowBag`, `WiFiMACAddress`. Verdict: every PEM block's sha256 is one of the throwaway pair's, and every identifier equals its fake. `expect(searched(foreign, { of: blocks, what: 'PEM blocks and pairing identifiers' })).toEqual([])`, then `floorBreach('ios-inspector-fixtures/secrets-read', blocks.length)`. The cross-check counts `-----BEGIN` in the raw decoded text per file and must equal the reader's per-file count.
+- [ ] **Step 3: Watch it go RED, both ways.** (a) Paste a fresh `openssl`-made key into a copy of the fixture: RED, naming the file and key. (b) Empty the directory: the floor fails. Restore both: GREEN.
+- [ ] **Step 4:** `tests/unit/ios-inspector-fixtures.ts` loads the JSON once (module scope stays under the 0.1 s load limit: one small JSON file) and serves `recordedFrames`.
+- [ ] **Step 5:** `git add -N` the new files, then commit. Floors are recorded by the dispatched recorder at the end of the branch (repo rule).
+
+### Task 5: The link: frames over any byte transport, each wait with a ceiling
+
+**Files:** Create `tests/device/ios/inspector/link.ts`, `tests/unit/ios-inspector-link.test.ts`
+
+**Interfaces:**
+- Consumes: `FrameReader`, `encodeUsbmuxFrame`, `encodeLengthFrame` (Task 3).
+- Produces:
+  - `interface ByteTransport { write(bytes: Buffer): void; onData(listener: (chunk: Buffer) => void): void; onEnd(listener: (error: Error | undefined) => void): void; close(): void }`
+  - `socketTransport(socket: Pick<import('node:net').Socket, 'write' | 'on' | 'destroy'>): ByteTransport`
+  - `class FrameLink { constructor(transport: ByteTransport, kind: 'usbmux' | 'length'); send(payload: Buffer, tag?: number): void; next(what: string, ceilingMs: number): Promise<Frame>; handOver(): { transport: ByteTransport; firstBytes: Buffer }; close(): void }`
+  - `class LinkError extends Error`
+
+- [ ] **Step 1: Failing tests** (fake transport: an object recording writes and holding the listeners; `vi.useFakeTimers()` for ceilings):
+  - `send` writes `encodeLengthFrame(payload)` for a length link, and `encodeUsbmuxFrame(tag, payload)` for a usbmux link.
+  - one test per split point: the SHORTEST recorded length frame (header included) pushed in two pieces at byte `k`, for each `k` from 1 to its length minus 1, generated at `describe` level; `next` resolves to the whole payload.
+  - two frames in one chunk: two `next` calls resolve in order.
+  - a frame arriving before `next` is asked for is queued, not lost.
+  - `next('ListDevices answer', 10_000)` with nothing arriving rejects at 10 000 ms with `LinkError` whose message contains `ListDevices answer` and `10 s`.
+  - the transport ending while `next` waits rejects with `LinkError` naming the awaited message, and carries the transport's error as `cause`.
+  - a `FrameError` from a bad header rejects the pending `next` with it, and every later `next` too (Review Focus 3: never an uncaught exception).
+  - `handOver()` after a usbmux frame returns bytes that arrived in the same chunk after that frame as `firstBytes` (Review Focus 5), and the link stops reading.
+  - `socketTransport` over an `EventEmitter` stand-in: `data` reaches `onData`; `error` then `close` call `onEnd` once, with the error; `close()` calls `destroy()`.
+- [ ] **Step 2:** Run the file and see each fail (module missing, then a throwing stub).
+- [ ] **Step 3:** Implement. One pending-reader queue; a timer per `next`, cleared on settle.
+- [ ] **Step 4:** `npx vitest run tests/unit/ios-inspector-link.test.ts`: PASS, each test under the CPU limit.
+- [ ] **Step 5:** Commit.
+
+### Task 6: usbmuxd: find the phone, read its pair record, open a port
+
+**Files:** Create `tests/device/ios/inspector/usbmux.ts`, `tests/unit/ios-inspector-usbmux.test.ts`
+
+**Interfaces:**
+- Consumes: `FrameLink` (Task 5), `encodeXmlPlist`, `decodeAnyPlist` (Task 2), the field readers (Task 3).
+- Produces:
+  - `interface UsbDevice { deviceId: number; udid: string; connectionType: string }`
+  - `interface PairRecord { hostCertificatePem: Buffer; hostKeyPem: Buffer; deviceCertificatePem: Buffer; hostId: string; systemBuid: string }`
+  - `listDevices(link: FrameLink): Promise<UsbDevice[]>`
+  - `onlyIphone(devices: UsbDevice[], expectedUdid?: string): UsbDevice`: the one device on USB (usbmuxd lists only Apple devices; the Android is never in it), or the one equal to `expectedUdid` when given
+  - `readPairRecord(link: FrameLink, udid: string): Promise<PairRecord>`
+  - `connectPort(link: FrameLink, deviceId: number, port: number): Promise<void>`
+  - `class UsbmuxError extends Error`; `REPLY_CEILING_MS = 10_000`
+- Request bodies (literal in tests): `{ MessageType, ClientVersionString: 'shyden-inspector', ProgName: 'shyden-inspector', ...}`; `Connect` sends `PortNumber` byte-swapped (62078 is sent as 32498); tags count up from 1 per link.
+
+- [ ] **Step 1: Failing tests** against the recorded frames:
+  - the recorded `ListDevices` answer gives `[{ deviceId: 1, udid: THROWAWAY_PAIR.udid, connectionType: 'USB' }]`.
+  - `onlyIphone`: no device gives `UsbmuxError` "no iPhone on USB: is it plugged in and trusted?"; two give an error listing both UDIDs; a network-only device does not count; `expectedUdid` mismatched names both.
+  - `readPairRecord` on the recorded (redacted) answer equals `THROWAWAY_PAIR`'s fields; an answer without `PairRecordData` names the keys it had.
+  - the bytes `connectPort` writes for port 62078 decode to `PortNumber: 32498` (pinned literal); `Number: 3` gives "usbmuxd refused port 62078 on device 1: connection refused (3)", one test per code 1, 2, 3, 6 with its name.
+  - a reply whose tag differs from the request's is refused by name.
+- [ ] **Steps 2-5:** RED, implement, GREEN, commit.
+
+### Task 7: Lockdown, and TLS pinned to the pair record
+
+**Files:** Create `tests/device/ios/inspector/lockdown.ts`, `tests/device/ios/inspector/pin.ts`, `tests/unit/ios-inspector-lockdown.test.ts`, `tests/unit/ios-inspector-pin.test.ts`
+
+**Interfaces:**
+- Consumes: `FrameLink`, `PairRecord`, `encodeXmlPlist`, `decodeAnyPlist`.
+- Produces:
+  - `queryType(link: FrameLink): Promise<string>`: refuses anything but `com.apple.mobile.lockdown`
+  - `startSession(link: FrameLink, pair: PairRecord): Promise<{ sessionId: string; ssl: boolean }>`
+  - `startService(link: FrameLink, service: string): Promise<{ port: number; ssl: boolean }>`
+  - `class LockdownError extends Error`
+  - `pemToDer(pem: Buffer): Buffer`
+  - `pinnedTlsOptions(pair: PairRecord): import('node:tls').ConnectionOptions`: `{ cert, key, minVersion: 'TLSv1.2', rejectUnauthorized: false, checkServerIdentity: () => undefined }`. Certificate checking is off ONLY because the next function replaces it; the comment says so.
+  - `verifyPinnedPeer(peerDer: Buffer | undefined, pair: PairRecord): void`: throws `LockdownError` "the phone's certificate is not the one in its pair record" unless it is byte-equal to `pemToDer(pair.deviceCertificatePem)`.
+- Label sent is `'shyden-inspector'`.
+
+- [ ] **Step 1: Failing tests:**
+  - recorded `QueryType`, `StartSession` and `StartService` answers give `'com.apple.mobile.lockdown'`, `{ ssl: true }` with the session id, and `{ port: 49242, ssl: true }`.
+  - the request `startSession` writes holds exactly `HostID` and `SystemBUID` from the pair (literal fakes).
+  - an `Error` key gives `LockdownError` naming it, one test each: `PasswordProtected` (adds "unlock the phone"), `InvalidHostID` (adds "re-pair: trust this Mac again"), `InvalidService` (names the service).
+  - `pemToDer(THROWAWAY_PAIR.deviceCertificatePem)` equals `THROWAWAY_PAIR.deviceCertificateDer` (made by `openssl x509 -outform der` at record time, so it is not computed by the code under test).
+  - `verifyPinnedPeer`: equal DER passes; one byte changed throws; `undefined` (no peer certificate) throws.
+  - `pinnedTlsOptions` holds the throwaway cert and key, `minVersion: 'TLSv1.2'`, `rejectUnauthorized: false`.
+- [ ] **Steps 2-5:** RED, implement, GREEN, commit.
+
+### Task 8: The Web Inspector RPC: Safari, its pages, and a page's socket
+
+**Files:** Create `tests/device/ios/inspector/wir.ts`, `tests/unit/ios-inspector-wir.test.ts`
+
+**Interfaces:**
+- Consumes: `FrameLink` (length kind), `encodeBinaryPlist`, `decodeAnyPlist`, field readers.
+- Produces:
+  - `interface WirPage { pageId: number; url: string; type: string }`
+  - `class WirSession { constructor(link: FrameLink, ids: { connection: string; sender: string }); identify(): Promise<void>; safari(ceilingMs: number): Promise<string>` (the application id, from the list or a later `_rpc_applicationConnected:`); `pages(appId: string, ceilingMs: number): Promise<WirPage[]>` (web pages only); `attach(appId: string, pageId: number): Promise<void>`; `sendData(json: string): void`; `onData(listener: (json: string) => void): void`; `until<T>(what: string, ceilingMs: number, pick: (message: PlistDictionary) => T | undefined, onTimeout?: () => string): Promise<T>`; `detach(): void }`. **Pull mode (decided while building, from the recording):** `until` reads frames, hands every `_rpc_applicationSentData:` to the data listeners first, then asks `pick`. Frames nobody reads wait in the link.
+  - `SAFARI_BUNDLE = 'com.apple.mobilesafari'`, `LISTING_CEILING_MS = 15_000`
+- Ids are passed in, so tests pin them as literals.
+
+- [ ] **Step 1: Failing tests** against the recorded WIR frames:
+  - `identify()` writes `_rpc_reportIdentifier:` with `WIRConnectionIdentifierKey` (literal id); the three recorded replies are consumed in order.
+  - `safari()` returns the recorded `PID:85317`, from the list, and from a later `_rpc_applicationConnected:` when the list lacked Safari; past the ceiling it fails naming the apps it saw and the Settings switch (Web Inspector).
+  - `pages()` returns `[{ pageId: 1, url: 'https://shyden.co.uk/classroom-groups/', type: 'WIRTypeWebPage' }]`, drops non-web entries, and past the ceiling lists what it saw.
+  - `attach()` writes `_rpc_forwardSocketSetup:` with app, page, sender and `WIRAutomaticallyPause: false` (literal plist compared after decode).
+  - `sendData` wraps the JSON as `WIRSocketDataKey` data; an `_rpc_applicationSentData:` reaches `onData` as text; an unknown selector is kept, not thrown.
+  - a reply whose `WIRMessageDataKey` is not data is refused by name (`ProtocolShapeError`).
+- [ ] **Steps 2-5:** RED, implement, GREEN, commit.
+
+### Task 9: The JSON protocol: commands to the page's target, answers, events, target swaps
+
+**Files:** Create `tests/device/ios/inspector/protocol.ts`, `tests/unit/ios-inspector-protocol.test.ts`
+
+**Interfaces:**
+- Consumes: `WirSession`'s `sendData`, `onData` and `until` (Task 8), passed in as `Pick<WirSession, 'sendData' | 'onData' | 'until'>`. The recording shows each outer `Target.sendMessageToTarget` answered with its own `{ result: {}, id }` before the inner answer: the outer success is ignored, and an outer error rejects the command naming the target.
+- Produces:
+  - `class InspectorError extends Error { readonly method: string; readonly params: unknown }`
+  - `class PageProtocol { constructor(channel); targetCreated(ceilingMs: number): Promise<string>; command<T = unknown>(method: string, params?: object, ceilingMs?: number): Promise<T>; on(method: string, listener: (params: unknown) => void): () => void; get targetId(): string }`
+  - `COMMAND_CEILING_MS = 15_000`
+- Wrapping: an inner `{ id, method, params }` is sent as `{ id: outerId, method: 'Target.sendMessageToTarget', params: { targetId, message: JSON.stringify(inner) } }`. Ids count up from 1 across inner and outer alike, matching the recording.
+
+- [ ] **Step 1: Failing tests** with the recorded JSON:
+  - `targetCreated()` resolves `'page-39'` from the recorded `Target.targetCreated`.
+  - `command('Runtime.evaluate', { expression: '1+1', returnByValue: true })` writes the literal outer message (pinned JSON) and resolves the recorded inner result.
+  - an inner `{ error: { message } }` rejects with `InspectorError` carrying method, params and WebKit's message; an outer error (target gone) the same, naming the target.
+  - an event (`Console.messageAdded`) inside `Target.dispatchMessageFromTarget` reaches an `on` listener and not a pending command; the unsubscribe stops it.
+  - `Target.didCommitProvisionalTarget { oldTargetId, newTargetId }` moves later commands to the new target (Review Focus 4), proved by the next written message's `targetId`.
+  - a command with no answer rejects at the ceiling, naming the method.
+  - a listener that throws fails that dispatch with the listener's error reported by name, and later messages still dispatch.
+  - malformed JSON from the phone rejects every pending command with a `ProtocolShapeError` naming the first 80 characters.
+- [ ] **Steps 2-5:** RED, implement, GREEN, commit.
+
+### Task 10: The wiring, and AC2 through this client on the phone
+
+**Files:** Create `tests/device/ios/inspector/connect.ts`, `tests/unit/ios-inspector-connect.test.ts`; device check (git-ignored): `.superpowers/sdd/811/client-check.ts`
+
+**Interfaces:**
+- Consumes: everything above.
+- Produces: `openInspector(options: { url: (url: string) => boolean; expectedUdid?: string; dial: Dialer }): Promise<{ page: PageProtocol; close(): void }>`, with `interface Dialer { usbmux(): Promise<ByteTransport>; tls(transport: ByteTransport, options: import('node:tls').ConnectionOptions): Promise<{ transport: ByteTransport; peerDer: Buffer | undefined }> }` and `nodeDialer: Dialer` (the only code that opens a socket: `net.createConnection('/var/run/usbmuxd')` and `tls.connect({ socket })`).
+- Order (from the recording): list devices, then read the pair record, then connect 62078; `QueryType`, `StartSession`, TLS with `verifyPinnedPeer`; `StartService com.apple.webinspector`; a new usbmuxd connection to its port with TLS and the pin; `identify`, `safari`, `pages`, pick the first page `url(...)` accepts (none: the error lists the URLs), `attach`, `targetCreated`; `Page.enable` (media emulation needs it, measured).
+
+- [ ] **Step 1: Failing unit tests** with an in-memory `Dialer` replaying the recorded frames per connection: the order above, as the list of requests written (literal selectors and messages); a pin mismatch stops before `StartService`; no matching page lists the URLs; `close()` sends `_rpc_forwardDidClose:` and closes every transport.
+- [ ] **Steps 2-4:** RED, implement, GREEN.
+- [ ] **Step 5: Device check (AC2).** On the phone, with Safari on `https://shyden.co.uk/classroom-groups` (opened by `xcrun devicectl device process launch --payload-url`), run `.superpowers/sdd/811/client-check.ts` under Node 26. It is the `wi-pages-probe.py` sequence written against `openInspector` and `nodeDialer`. Expected: the same readings as the 2026-10-24 Python probe for print, reduced motion, colour scheme (override away from the phone's own), contrast, console, bootstrap script and interception, each override cleared and read back. Post the transcript on #811.
+- [ ] **Step 6: The page held by another inspector (spec section 6).** Open the Mac's Safari Web Inspector on the same page, then run the check again. Record what `attach` or `targetCreated` does (a refusal, silence, or a second session). Then write the test that pins it, and the wait-then-fail naming the holder at `LISTING_CEILING_MS`. If the phone allows two inspectors at once, say so on #811 and keep no wait.
+- [ ] **Step 7:** Commit. Then floors (`git add -N`, scratch ref, `record-floors.yml -f mode=unit`, fold), push, open the PR, and CI runs the guards.
