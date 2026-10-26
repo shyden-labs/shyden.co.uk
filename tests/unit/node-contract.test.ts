@@ -272,11 +272,44 @@ describe('the Node running this suite reads the plural rules CI reads (#953)', (
   // number, and Vietnamese gained a `one` plural on the Mac alone. The plural
   // tests, message-parity and the translation tool all read Intl, so they are
   // written for one CLDR: the official build's, which CI installs.
+  //
+  // The pin is an alarm, and stays one (Shyden 2026-10-26: "if it's failing
+  // then it needs to be addressed, not hidden"). CI takes each new Node 26
+  // release, so the one that brings CLDR 49 fails every pull request here;
+  // the failure names the fix prepared for that day (#955).
+  const cldrAlarm = (
+    versions: Readonly<Record<string, string | undefined>>,
+  ): string | undefined => {
+    const { cldr, icu } = versions;
+    if (cldr === '48.0' && icu?.split('.')[0] === '78') return undefined;
+    return (
+      `this Node reads CLDR ${cldr} on ICU ${icu}, and the plural tests are written for CLDR 48 on ICU 78. ` +
+      `If CI reads it too, a Node release moved its language data: the fix is prepared in #955, on branch 955-cldr-49. ` +
+      `If only this Mac does, run the official nodejs.org build (~/.local/share/node/current/bin), as CI does.`
+    );
+  };
+
   it('is CLDR 48 on ICU 78, the official Node build', () => {
-    const icuMajor = process.versions.icu?.split('.')[0];
-    expect(
-      `CLDR ${process.versions.cldr}, ICU major ${icuMajor}`,
-      `this Node reads ICU ${process.versions.icu}: run the official nodejs.org build (~/.local/share/node/current/bin), as CI does`,
-    ).toBe('CLDR 48.0, ICU major 78');
+    expect(cldrAlarm(process.versions)).toBeUndefined();
+  });
+
+  it('accepts a later ICU 78 patch, which keeps CLDR 48', () => {
+    expect(cldrAlarm({ cldr: '48.0', icu: '78.9' })).toBeUndefined();
+  });
+
+  it('a Node on other plural rules is told where the prepared fix is', () => {
+    const alarm = cldrAlarm({ cldr: '49.0', icu: '79.1' });
+    expect(alarm).toContain('CLDR 49.0 on ICU 79.1');
+    expect(alarm).toContain('#955');
+    expect(alarm).toContain('branch 955-cldr-49');
+    expect(alarm).toContain('~/.local/share/node/current/bin');
+  });
+
+  it('a CLDR change inside ICU 78 still sounds the alarm', () => {
+    expect(cldrAlarm({ cldr: '48.1', icu: '78.3' })).toContain('#955');
+  });
+
+  it('a new ICU major sounds the alarm even before its CLDR moves', () => {
+    expect(cldrAlarm({ cldr: '48.0', icu: '79.1' })).toContain('#955');
   });
 });
