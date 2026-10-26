@@ -9,13 +9,25 @@
  * and attaches; `Page.enable` runs first, because media emulation takes
  * effect only once the page agent is on (measured).
  *
+ * Another inspector on the page holds this one off in silence (measured
+ * 2026-10-26, #811 step 6): no target, or a target that answers nothing, and
+ * nothing tells a held page from a hung one sooner than the ceiling. So a
+ * silent page fails at its ceiling naming the likely holder, and any failure
+ * after attaching detaches before it closes, so a failed run never leaves the
+ * page held for the next.
+ *
  * The sockets come from a Dialer, so the whole route is unit-tested on the
  * recorded frames; `nodeDialer` is the only code here that opens one.
  */
 import { randomUUID } from 'node:crypto';
 import { createConnection, type Socket } from 'node:net';
 import { connect as tlsConnect, type ConnectionOptions } from 'node:tls';
-import { type ByteTransport, FrameLink, socketTransport } from './link';
+import {
+  type ByteTransport,
+  CeilingError,
+  FrameLink,
+  socketTransport,
+} from './link';
 import { queryType, startService, startSession } from './lockdown';
 import { pinnedTlsOptions, verifyPinnedPeer } from './pin';
 import { PageProtocol } from './protocol';
@@ -32,6 +44,19 @@ const LOCKDOWN_PORT = 62078;
 const WEB_INSPECTOR = 'com.apple.webinspector';
 const TARGET_CEILING_MS = 10_000;
 const USBMUXD = '/var/run/usbmuxd';
+const HOLDER =
+  "another Web Inspector, such as Safari's on the Mac, may hold this page: close it and run again";
+
+/** A page that stayed silent past its ceiling fails naming the likely holder. */
+async function namingTheHolder<T>(waiting: Promise<T>): Promise<T> {
+  try {
+    return await waiting;
+  } catch (error) {
+    if (error instanceof CeilingError)
+      throw new CeilingError(`${error.message}: ${HOLDER}`, { cause: error });
+    throw error;
+  }
+}
 
 export interface Dialer {
   usbmux(): Promise<ByteTransport>;
@@ -83,7 +108,10 @@ export async function openInspector(options: {
 }): Promise<Inspector> {
   const { dial } = options;
   const opened: ByteTransport[] = [];
+  let attached: WirSession | undefined;
   const closeAll = (): void => {
+    attached?.detach();
+    attached = undefined;
     for (const transport of opened) transport.close();
   };
   try {
@@ -132,23 +160,13 @@ export async function openInspector(options: {
     });
     wir.identify();
     const safari = await wir.safari(LISTING_CEILING_MS);
-    const pages = await wir.pages(safari, LISTING_CEILING_MS);
-    const page = pages.find((candidate) => options.url(candidate.url));
-    if (!page)
-      throw new Error(
-        `Safari has no page this run opened (it has ${pages.map((candidate) => candidate.url).join(', ')})`,
-      );
+    const [page] = await wir.pages(safari, options.url, LISTING_CEILING_MS);
     wir.attach(safari, page.pageId);
+    attached = wir;
     const protocol = new PageProtocol(wir);
-    await protocol.targetCreated(TARGET_CEILING_MS);
-    await protocol.command('Page.enable');
-    return {
-      page: protocol,
-      close: () => {
-        wir.detach();
-        closeAll();
-      },
-    };
+    await namingTheHolder(protocol.targetCreated(TARGET_CEILING_MS));
+    await namingTheHolder(protocol.command('Page.enable'));
+    return { page: protocol, close: closeAll };
   } catch (error) {
     closeAll();
     throw error;

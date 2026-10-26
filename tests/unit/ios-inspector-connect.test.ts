@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeBinaryPlist } from '../device/ios/inspector/bplist';
 import { type Dialer, openInspector } from '../device/ios/inspector/connect';
 import {
@@ -6,6 +6,7 @@ import {
   encodeUsbmuxFrame,
 } from '../device/ios/inspector/framing';
 import type { ByteTransport } from '../device/ios/inspector/link';
+import { InspectorError } from '../device/ios/inspector/protocol';
 import { THROWAWAY_PAIR } from './fixtures/ios-inspector/throwaway-pair';
 import { recordedFrames } from './ios-inspector-fixtures';
 import { decodeWritten, fromTarget, pageData } from './ios-inspector-transport';
@@ -27,6 +28,7 @@ class ScriptedTransport implements ByteTransport {
   private data: ((chunk: Buffer) => void) | undefined;
   constructor(private readonly replies: readonly (readonly Buffer[])[]) {}
   write(bytes: Buffer): void {
+    if (this.closed) throw new Error('written after its connection closed');
     const reply = this.replies[this.written.length] ?? [];
     this.written.push(bytes);
     queueMicrotask(() => {
@@ -45,7 +47,36 @@ class ScriptedTransport implements ByteTransport {
 const mux = (payload: Buffer): Buffer => encodeUsbmuxFrame(1, payload);
 const len = (payload: Buffer): Buffer => encodeLengthFrame(payload);
 
-function dialer(options: { peerDer?: Buffer; noPage?: boolean } = {}): {
+/** Safari's listing of one web page at `url`. */
+const listingOf = (url: string): Buffer =>
+  encodeBinaryPlist({
+    __selector: '_rpc_applicationSentListing:',
+    __argument: {
+      WIRApplicationIdentifierKey: 'PID:86196',
+      WIRListingKey: {
+        '1': {
+          WIRPageIdentifierKey: 1,
+          WIRTypeKey: 'WIRTypeWebPage',
+          WIRURLKey: url,
+        },
+      },
+    },
+  });
+
+/**
+ * `listings`: what Safari lists, in order (the recorded listing by default).
+ * `held`: another inspector holds the page, as measured on 2026-10-26 (#811
+ * step 6): no target at all (row 5), or a target that answers nothing (row 1).
+ * `enableRefused`: the page answers `Page.enable` with an error.
+ */
+function dialer(
+  options: {
+    peerDer?: Buffer;
+    listings?: readonly Buffer[];
+    held?: 'no target' | 'silent target';
+    enableRefused?: string;
+  } = {},
+): {
   dial: Dialer;
   transports: ScriptedTransport[];
 } {
@@ -57,30 +88,20 @@ function dialer(options: { peerDer?: Buffer; noPage?: boolean } = {}): {
     [
       [mux(MUX[3])],
       WIR.slice(0, SAFARI_AT + 1).map(len),
-      options.noPage
-        ? [
+      (options.listings ?? [LISTING]).map(len),
+      options.held === 'no target' ? [] : [len(TARGET)],
+      options.held
+        ? []
+        : [
+            len(pageData('{"result":{},"id":2}')),
             len(
-              encodeBinaryPlist({
-                __selector: '_rpc_applicationSentListing:',
-                __argument: {
-                  WIRApplicationIdentifierKey: 'PID:86196',
-                  WIRListingKey: {
-                    '1': {
-                      WIRPageIdentifierKey: 1,
-                      WIRTypeKey: 'WIRTypeWebPage',
-                      WIRURLKey: 'https://elsewhere.example/',
-                    },
-                  },
-                },
-              }),
+              fromTarget(
+                options.enableRefused === undefined
+                  ? { result: {}, id: 1 }
+                  : { error: { message: options.enableRefused }, id: 1 },
+              ),
             ),
-          ]
-        : [len(LISTING)],
-      [len(TARGET)],
-      [
-        len(pageData('{"result":{},"id":2}')),
-        len(fromTarget({ result: {}, id: 1 })),
-      ],
+          ],
     ],
   ];
   const dial: Dialer = {
@@ -115,6 +136,17 @@ function asked(transports: readonly ScriptedTransport[]): string[] {
 
 const onPage = (url: string): boolean => url.includes('/classroom-groups');
 
+/** The words that name the likely holder of a page that answers nothing. */
+const HOLDER =
+  "another Web Inspector, such as Safari's on the Mac, may hold this page: close it and run again";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('opening the inspector on the phone', () => {
   it('walks the recorded route in order, ending with Page.enable', async () => {
     const { dial, transports } = dialer();
@@ -145,11 +177,71 @@ describe('opening the inspector on the phone', () => {
     expect(asked(transports)).not.toContain('2: StartService');
   });
 
-  it('no page at the URL lists the URLs Safari has', async () => {
-    const { dial } = dialer({ noPage: true });
-    await expect(openInspector({ url: onPage, dial })).rejects.toThrow(
-      'Safari has no page this run opened (it has https://elsewhere.example/)',
+  it('no page at the URL, past the listing ceiling, lists the pages Safari has and never detaches', async () => {
+    const { dial, transports } = dialer({
+      listings: [listingOf('https://elsewhere.example/')],
+    });
+    const opening = openInspector({ url: onPage, dial });
+    const verdict = expect(opening).rejects.toThrow(
+      'Safari showed no page this run opened within 15 s (its listings held: WIRTypeWebPage https://elsewhere.example/)',
     );
+    await vi.advanceTimersByTimeAsync(15_000);
+    await verdict;
+    expect(asked(transports).at(-1)).toBe('3: _rpc_forwardGetListing:');
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('a page still loading at the first listing is attached once Safari lists it', async () => {
+    const { dial } = dialer({ listings: [listingOf('about:blank'), LISTING] });
+    const inspector = await openInspector({ url: onPage, dial });
+    expect(inspector.page.targetId).toBe('page-39');
+  });
+
+  it('a page that gives no target names the inspector that may hold it, and detaches before closing', async () => {
+    const { dial, transports } = dialer({ held: 'no target' });
+    const opening = openInspector({ url: onPage, dial });
+    const verdict = expect(opening).rejects.toThrow(
+      `no Target.targetCreated within 10 s: ${HOLDER}`,
+    );
+    await vi.advanceTimersByTimeAsync(10_000);
+    await verdict;
+    expect(asked(transports).slice(-2)).toEqual([
+      '3: _rpc_forwardSocketSetup:',
+      '3: _rpc_forwardDidClose:',
+    ]);
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('a target that answers nothing names the inspector that may hold it, and detaches before closing', async () => {
+    const { dial, transports } = dialer({ held: 'silent target' });
+    const opening = openInspector({ url: onPage, dial });
+    const verdict = expect(opening).rejects.toThrow(
+      `no answer to Page.enable within 15 s: ${HOLDER}`,
+    );
+    await vi.advanceTimersByTimeAsync(15_000);
+    await verdict;
+    expect(asked(transports).slice(-2)).toEqual([
+      '3: _rpc_forwardSocketData:',
+      '3: _rpc_forwardDidClose:',
+    ]);
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('a failure that is not a silence keeps its own words, and still detaches before closing', async () => {
+    const { dial, transports } = dialer({ enableRefused: 'Page is busy' });
+    const error = await openInspector({ url: onPage, dial }).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeInstanceOf(InspectorError);
+    expect((error as Error).message).toBe(
+      'Page.enable failed on the page: Page is busy',
+    );
+    expect(asked(transports).slice(-2)).toEqual([
+      '3: _rpc_forwardSocketData:',
+      '3: _rpc_forwardDidClose:',
+    ]);
+    expect(transports.every((transport) => transport.closed)).toBe(true);
   });
 
   it('closing detaches from the page and closes every connection', async () => {

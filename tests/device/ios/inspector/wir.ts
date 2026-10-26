@@ -24,7 +24,7 @@ import {
   stringField,
   stringOr,
 } from './fields';
-import { type FrameLink, LinkError } from './link';
+import { CeilingError, type FrameLink, LinkError } from './link';
 import { decodeAnyPlist } from './plist-xml';
 
 export const SAFARI_BUNDLE = 'com.apple.mobilesafari';
@@ -74,13 +74,23 @@ export class WirSession {
     );
   }
 
-  async pages(appId: string, ceilingMs: number): Promise<WirPage[]> {
+  /**
+   * The web pages Safari lists whose URL `accept` takes. A listing without
+   * one is passed over and the next awaited, until the ceiling: straight after
+   * a relaunch Safari listed only about:blank, and the page loaded a moment
+   * later (measured 2026-10-26, #811 step 6).
+   */
+  async pages(
+    appId: string,
+    accept: (url: string) => boolean,
+    ceilingMs: number,
+  ): Promise<WirPage[]> {
     this.send('_rpc_forwardGetListing:', {
       WIRApplicationIdentifierKey: appId,
     });
     const seen: string[] = [];
     return this.until(
-      'a web page in the listing',
+      'a page this run opened in the listing',
       ceilingMs,
       (message) => {
         if (message.__selector !== '_rpc_applicationSentListing:')
@@ -101,11 +111,13 @@ export class WirSession {
           };
         });
         seen.push(...pages.map((page) => `${page.type} ${page.url}`));
-        const web = pages.filter((page) => page.type === WEB_PAGE);
-        return web.length > 0 ? web : undefined;
+        const opened = pages.filter(
+          (page) => page.type === WEB_PAGE && accept(page.url),
+        );
+        return opened.length > 0 ? opened : undefined;
       },
       () =>
-        `no web page in Safari within ${ceilingMs / 1000} s (its listings held: ${seen.join(', ') || 'nothing'})`,
+        `Safari showed no page this run opened within ${ceilingMs / 1000} s (its listings held: ${seen.join(', ') || 'nothing'})`,
     );
   }
 
@@ -149,11 +161,11 @@ export class WirSession {
       const remaining = deadline - Date.now();
       let frame;
       try {
-        if (remaining <= 0) throw new LinkError(`no ${what}`);
+        if (remaining <= 0) throw new CeilingError(`no ${what}`);
         frame = await this.link.next(what, remaining);
       } catch (error) {
-        if (error instanceof LinkError && Date.now() >= deadline)
-          throw new LinkError(
+        if (error instanceof CeilingError && Date.now() >= deadline)
+          throw new CeilingError(
             onTimeout?.() ?? `no ${what} within ${ceilingMs / 1000} s`,
             { cause: error },
           );

@@ -34,6 +34,14 @@ export class LinkError extends Error {
   }
 }
 
+/** A wait whose ceiling passed with the link still open: the phone said nothing, rather than hanging up. */
+export class CeilingError extends LinkError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'CeilingError';
+  }
+}
+
 /** The part of a Node socket (`net.Socket`, `tls.TLSSocket`) the transport uses. */
 export interface SocketLike {
   write(bytes: Buffer): unknown;
@@ -133,7 +141,9 @@ export class FrameLink {
         timer: setTimeout(() => {
           this.waiting.splice(this.waiting.indexOf(waiter), 1);
           reject(
-            new LinkError(`no ${what} within ${ceilingMs / 1000} s of asking`),
+            new CeilingError(
+              `no ${what} within ${ceilingMs / 1000} s of asking`,
+            ),
           );
         }, ceilingMs),
       };
