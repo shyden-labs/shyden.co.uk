@@ -226,9 +226,10 @@ export function main() {
     );
 
   /**
-   * The plural forms the target language has, from CLDR through Intl. Every
-   * language drafted so far has "other" alone, and `assembleMessage` refuses a
-   * message with a plural for one that has more.
+   * The plural forms the target language has, from CLDR through Intl.
+   * Indonesian, Chinese and Thai have "other" alone; Vietnamese gained "one"
+   * in CLDR 49, and `assembleMessage` refuses a message with a plural for a
+   * language that has more, so one is written by hand (#955).
    */
   const PLURAL_FORMS = new Intl.PluralRules(target).resolvedOptions()
     .pluralCategories;

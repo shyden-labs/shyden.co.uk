@@ -113,12 +113,23 @@ describe('formatMessage: plurals', () => {
     },
   );
 
-  it.each(['id', 'zh-Hans', 'vi', 'th'])(
+  it.each(['id', 'zh-Hans', 'th'])(
     '%s: has only `other`, so a count of 1 takes it too',
     (locale) => {
       expect(formatMessage(students, { count: 1 }, locale)).toBe('1 students');
     },
   );
+
+  // CLDR 49 gave Vietnamese a cardinal `one`: i = 0 or n = 1 (#955).
+  it.each([
+    [0, '0 student'],
+    [1, '1 student'],
+    [0.5, '0.5 student'],
+    [2, '2 students'],
+    [1.5, '1.5 students'],
+  ])('vi: %d picks its CLDR 49 category', (count, expected) => {
+    expect(formatMessage(students, { count }, 'vi')).toBe(expected);
+  });
 
   it('an exact =N branch wins over the category', () => {
     expect(

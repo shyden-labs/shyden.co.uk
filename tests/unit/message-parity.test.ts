@@ -234,8 +234,8 @@ describe('every language builds each message the way English does (#136)', () =>
 
   it('every plural offers exactly the forms its language has', () => {
     // CLDR decides, through the same Intl.PluralRules a page renders with:
-    // English has "one" and "other"; Indonesian, Chinese, Vietnamese and Thai
-    // have "other" alone. A form the language lacks is copy no count reaches,
+    // English and, since CLDR 49, Vietnamese have "one" and "other";
+    // Indonesian, Chinese and Thai have "other" alone. A form the language lacks is copy no count reaches,
     // and a form it has that the message lacks is the "1 groups" bug.
     const plurals = LOCALES.flatMap((locale) => {
       const forms = [

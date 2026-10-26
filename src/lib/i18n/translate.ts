@@ -345,8 +345,9 @@ export function translatableSentences(): ReadonlySet<string> {
  * rebuilt around the translations that come back.
  *
  * - A plural is sent as its "other" sentence, with `#` written as the slot it
- *   counts. Every language drafted so far has "other" alone, and
- *   `assembleMessage` refuses one that has more.
+ *   counts. `assembleMessage` refuses a language with more forms than
+ *   "other", Vietnamese among them since CLDR 49, so its plurals are written
+ *   by hand (#955).
  * - A choice (`select`) is sent as one whole sentence per branch, so each
  *   reaches the translator with its context rather than as a fragment.
  *

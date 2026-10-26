@@ -85,7 +85,7 @@ describe('main', () => {
 
   it("renders with the target language's own plural forms", () => {
     // Russian has four, so the first plural message is refused rather than
-    // drafted from "other"; every language drafted so far has "other" alone.
+    // drafted from "other", as a Vietnamese one is under CLDR 49 (#955).
     const cwd = workspace({ ru: everyDraft() });
     const run = scaffold(cwd, 'ru');
     expect(run.stderr).toMatch(
