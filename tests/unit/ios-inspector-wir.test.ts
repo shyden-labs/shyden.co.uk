@@ -4,6 +4,7 @@ import {
   type PlistDictionary,
 } from '../device/ios/inspector/bplist';
 import { ProtocolShapeError } from '../device/ios/inspector/fields';
+import { CeilingError } from '../device/ios/inspector/link';
 import { recordedFrames } from './ios-inspector-fixtures';
 import {
   deliverFrames,
@@ -25,6 +26,9 @@ const LISTING = IN.find((frame) =>
 const TARGET_CREATED = IN.find((frame) =>
   frame.includes('Target.targetCreated'),
 );
+/** Every web page, and only the page the recorded run opened. */
+const ANY = (): boolean => true;
+const OPENED = (url: string): boolean => url.includes('/classroom-groups');
 
 const setUp = wirOver;
 const written = (transport: FakeTransport): PlistDictionary[] =>
@@ -91,13 +95,14 @@ describe('finding Safari', () => {
     await expect(safari).rejects.toThrow(
       'is Settings > Apps > Safari > Advanced > Web Inspector on, and Safari open?',
     );
+    await expect(safari).rejects.toBeInstanceOf(CeilingError);
   });
 });
 
 describe("listing Safari's pages", () => {
   it('asks Safari for its listing', () => {
     const { transport, wir } = setUp();
-    void wir.pages(SAFARI, 15_000).catch(() => undefined);
+    void wir.pages(SAFARI, ANY, 15_000).catch(() => undefined);
     expect(written(transport)).toEqual([
       {
         __selector: '_rpc_forwardGetListing:',
@@ -111,7 +116,7 @@ describe("listing Safari's pages", () => {
 
   it('reads the recorded listing as the one web page', async () => {
     const { transport, wir } = setUp();
-    const pages = wir.pages(SAFARI, 15_000);
+    const pages = wir.pages(SAFARI, OPENED, 15_000);
     deliver(transport, [LISTING as Buffer]);
     expect(await pages).toEqual([
       {
@@ -124,7 +129,7 @@ describe("listing Safari's pages", () => {
 
   it('leaves out what is not a web page, and listings of other applications', async () => {
     const { transport, wir } = setUp();
-    const pages = wir.pages(SAFARI, 15_000);
+    const pages = wir.pages(SAFARI, ANY, 15_000);
     deliver(transport, [
       message('_rpc_applicationSentListing:', {
         WIRApplicationIdentifierKey: 'PID:1',
@@ -159,9 +164,9 @@ describe("listing Safari's pages", () => {
 
   it('a listing with no web page waits on, and past the ceiling says what it saw', async () => {
     const { transport, wir } = setUp();
-    const pages = wir.pages(SAFARI, 15_000);
+    const pages = wir.pages(SAFARI, ANY, 15_000);
     const verdict = expect(pages).rejects.toThrow(
-      'no web page in Safari within 15 s (its listings held: WIRTypeJavaScript about:blank)',
+      'Safari showed no page this run opened within 15 s (its listings held: WIRTypeJavaScript about:blank)',
     );
     deliver(transport, [
       message('_rpc_applicationSentListing:', {
@@ -177,6 +182,50 @@ describe("listing Safari's pages", () => {
     ]);
     await vi.advanceTimersByTimeAsync(15_000);
     await verdict;
+  });
+
+  // Measured 2026-10-26 (#811 step 6, row 3): straight after a relaunch the
+  // first listing held only about:blank, and the page loaded a moment later.
+  const blank = message('_rpc_applicationSentListing:', {
+    WIRApplicationIdentifierKey: SAFARI,
+    WIRListingKey: {
+      '1': {
+        WIRPageIdentifierKey: 1,
+        WIRTypeKey: 'WIRTypeWebPage',
+        WIRURLKey: 'about:blank',
+      },
+    },
+  });
+
+  it('a listing without the page this run opened waits for the next listing', async () => {
+    const { transport, wir } = setUp();
+    let settled = false;
+    const pages = wir.pages(SAFARI, OPENED, 15_000).finally(() => {
+      settled = true;
+    });
+    deliver(transport, [blank]);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(settled).toBe(false);
+    deliver(transport, [LISTING as Buffer]);
+    expect(await pages).toEqual([
+      {
+        pageId: 1,
+        url: 'https://shyden.co.uk/classroom-groups/',
+        type: 'WIRTypeWebPage',
+      },
+    ]);
+  });
+
+  it('past the ceiling, names the pages the listings held that this run did not open', async () => {
+    const { transport, wir } = setUp();
+    const pages = wir.pages(SAFARI, OPENED, 15_000);
+    const verdict = expect(pages).rejects.toThrow(
+      'Safari showed no page this run opened within 15 s (its listings held: WIRTypeWebPage about:blank)',
+    );
+    deliver(transport, [blank]);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await verdict;
+    await expect(pages).rejects.toBeInstanceOf(CeilingError);
   });
 });
 

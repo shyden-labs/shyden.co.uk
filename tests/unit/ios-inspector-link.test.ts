@@ -6,6 +6,7 @@ import {
   FrameError,
 } from '../device/ios/inspector/framing';
 import {
+  CeilingError,
   FrameLink,
   LinkError,
   socketTransport,
@@ -91,7 +92,7 @@ describe('frames and the waits for them', () => {
     const verdict = expect(next).rejects.toThrow(/ListDevices answer.*10 s/);
     await vi.advanceTimersByTimeAsync(10_000);
     await verdict;
-    await expect(next).rejects.toBeInstanceOf(LinkError);
+    await expect(next).rejects.toBeInstanceOf(CeilingError);
   });
 
   it('a wait is still pending one millisecond before its ceiling', async () => {
@@ -114,6 +115,7 @@ describe('frames and the waits for them', () => {
       (reason: unknown) => reason,
     );
     expect(error).toBeInstanceOf(LinkError);
+    expect(error).not.toBeInstanceOf(CeilingError);
     expect((error as LinkError).message).toMatch(/StartService answer/);
     expect((error as LinkError).cause).toBe(cause);
   });
