@@ -112,7 +112,8 @@ export async function openInspector(options: {
   const closeAll = (): void => {
     attached?.detach();
     attached = undefined;
-    for (const transport of opened) transport.close();
+    // Newest first, so each TLS layer closes before the tunnel beneath it.
+    for (const transport of [...opened].reverse()) transport.close();
   };
   try {
     const listing = await dial.usbmux();

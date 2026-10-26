@@ -42,12 +42,16 @@ export class CeilingError extends LinkError {
   }
 }
 
+/** How long a closing socket may take to send what was written before it is destroyed anyway. */
+export const CLOSE_CEILING_MS = 2_000;
+
 /** The part of a Node socket (`net.Socket`, `tls.TLSSocket`) the transport uses. */
 export interface SocketLike {
   write(bytes: Buffer): unknown;
   on(event: 'data', listener: (chunk: Buffer) => void): unknown;
   on(event: 'error', listener: (error: Error) => void): unknown;
   on(event: 'close', listener: () => void): unknown;
+  end(callback: () => void): unknown;
   destroy(): unknown;
 }
 
@@ -73,8 +77,15 @@ export function socketTransport(socket: SocketLike): ByteTransport {
     onEnd: (listener) => {
       endListener = listener;
     },
+    // `destroy` straight after a write can drop it, and the last write is
+    // the one that lets the page go: end first, so every write goes out,
+    // then destroy; a socket that cannot send is destroyed at the ceiling.
     close: () => {
-      socket.destroy();
+      const ceiling = setTimeout(() => socket.destroy(), CLOSE_CEILING_MS);
+      socket.end(() => {
+        clearTimeout(ceiling);
+        socket.destroy();
+      });
     },
   };
 }
