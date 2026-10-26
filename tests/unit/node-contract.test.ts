@@ -265,3 +265,18 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
     }
   });
 });
+
+describe('the Node running this suite reads the plural rules CI reads (#953)', () => {
+  // A version number does not fix Intl's data. Homebrew rebuilt Node 26.12.1
+  // against the Mac's own ICU, CLDR moved from 48 to 49 under the same
+  // number, and Vietnamese gained a `one` plural on the Mac alone. The plural
+  // tests, message-parity and the translation tool all read Intl, so they are
+  // written for one CLDR: the official build's, which CI installs.
+  it('is CLDR 48 on ICU 78, the official Node build', () => {
+    const icuMajor = process.versions.icu?.split('.')[0];
+    expect(
+      `CLDR ${process.versions.cldr}, ICU major ${icuMajor}`,
+      `this Node reads ICU ${process.versions.icu}: run the official nodejs.org build (~/.local/share/node/current/bin), as CI does`,
+    ).toBe('CLDR 48.0, ICU major 78');
+  });
+});
