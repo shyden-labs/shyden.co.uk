@@ -7,6 +7,7 @@ import {
 } from '../device/ios/inspector/framing';
 import {
   CeilingError,
+  CLOSE_CEILING_MS,
   FrameLink,
   LinkError,
   socketTransport,
@@ -165,18 +166,38 @@ describe('a link that starts where another left off', () => {
 });
 
 describe('a Node socket as a byte transport', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** `finish()` stands in for Node calling `end`'s callback once every write has gone out. */
   function standIn(): EventEmitter & {
     written: Buffer[];
+    ended: number;
     destroyed: number;
+    finish(): void;
     write(bytes: Buffer): boolean;
+    end(callback: () => void): void;
     destroy(): void;
   } {
+    let finished: (() => void) | undefined;
     const socket = Object.assign(new EventEmitter(), {
       written: [] as Buffer[],
+      ended: 0,
       destroyed: 0,
+      finish(): void {
+        finished?.();
+      },
       write(bytes: Buffer): boolean {
         socket.written.push(bytes);
         return true;
+      },
+      end(callback: () => void): void {
+        socket.ended += 1;
+        finished = callback;
       },
       destroy(): void {
         socket.destroyed += 1;
@@ -220,9 +241,32 @@ describe('a Node socket as a byte transport', () => {
     expect(ends).toEqual([undefined]);
   });
 
-  it('closing the transport destroys the socket', () => {
+  // A socket destroyed straight after a write can drop that write, and the
+  // last write before closing is the inspector's _rpc_forwardDidClose:,
+  // which lets the page go (#811 step 6).
+  it('closing ends the socket, and destroys it only once what was written has gone out', () => {
     const socket = standIn();
     socketTransport(socket).close();
+    expect(socket.ended).toBe(1);
+    expect(socket.destroyed).toBe(0);
+    socket.finish();
+    expect(socket.destroyed).toBe(1);
+  });
+
+  it('a socket whose writes never go out is destroyed at the close ceiling', async () => {
+    const socket = standIn();
+    socketTransport(socket).close();
+    await vi.advanceTimersByTimeAsync(CLOSE_CEILING_MS - 1);
+    expect(socket.destroyed).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.destroyed).toBe(1);
+  });
+
+  it('a socket that finished is not destroyed again at the ceiling', async () => {
+    const socket = standIn();
+    socketTransport(socket).close();
+    socket.finish();
+    await vi.advanceTimersByTimeAsync(CLOSE_CEILING_MS);
     expect(socket.destroyed).toBe(1);
   });
 });

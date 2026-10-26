@@ -26,7 +26,10 @@ class ScriptedTransport implements ByteTransport {
   readonly written: Buffer[] = [];
   closed = false;
   private data: ((chunk: Buffer) => void) | undefined;
-  constructor(private readonly replies: readonly (readonly Buffer[])[]) {}
+  constructor(
+    private readonly replies: readonly (readonly Buffer[])[],
+    private readonly closings: ByteTransport[],
+  ) {}
   write(bytes: Buffer): void {
     if (this.closed) throw new Error('written after its connection closed');
     const reply = this.replies[this.written.length] ?? [];
@@ -41,6 +44,27 @@ class ScriptedTransport implements ByteTransport {
   onEnd(): void {}
   close(): void {
     this.closed = true;
+    this.closings.push(this);
+  }
+}
+
+/** TLS over a tunnel: its own transport, passing bytes through to the one beneath, as a TLS socket does. */
+class TlsLayer implements ByteTransport {
+  constructor(
+    readonly under: ScriptedTransport,
+    private readonly closings: ByteTransport[],
+  ) {}
+  write(bytes: Buffer): void {
+    if (this.closings.includes(this))
+      throw new Error('written after its TLS layer closed');
+    this.under.write(bytes);
+  }
+  onData(listener: (chunk: Buffer) => void): void {
+    this.under.onData(listener);
+  }
+  onEnd(): void {}
+  close(): void {
+    this.closings.push(this);
   }
 }
 
@@ -79,8 +103,12 @@ function dialer(
 ): {
   dial: Dialer;
   transports: ScriptedTransport[];
+  layers: TlsLayer[];
+  closings: ByteTransport[];
 } {
   const transports: ScriptedTransport[] = [];
+  const layers: TlsLayer[] = [];
+  const closings: ByteTransport[] = [];
   const scripts: Buffer[][][] = [
     [[mux(MUX[0])]],
     [[mux(MUX[1])]],
@@ -106,17 +134,23 @@ function dialer(
   ];
   const dial: Dialer = {
     usbmux: () => {
-      const transport = new ScriptedTransport(scripts[transports.length] ?? []);
+      const transport = new ScriptedTransport(
+        scripts[transports.length] ?? [],
+        closings,
+      );
       transports.push(transport);
       return Promise.resolve(transport);
     },
-    tls: (transport) =>
-      Promise.resolve({
-        transport,
+    tls: (transport) => {
+      const layer = new TlsLayer(transport as ScriptedTransport, closings);
+      layers.push(layer);
+      return Promise.resolve({
+        transport: layer,
         peerDer: options.peerDer ?? THROWAWAY_PAIR.deviceCertificateDer,
-      }),
+      });
+    },
   };
-  return { dial, transports };
+  return { dial, transports, layers, closings };
 }
 
 /** What each write asked for, across every connection, in order. */
@@ -242,6 +276,22 @@ describe('opening the inspector on the phone', () => {
       '3: _rpc_forwardDidClose:',
     ]);
     expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('closing closes each TLS layer before the tunnel beneath it, the newest connection first', async () => {
+    const { dial, transports, layers, closings } = dialer();
+    const inspector = await openInspector({ url: onPage, dial });
+    inspector.close();
+    expect(layers.length).toBeGreaterThan(0);
+    for (const layer of layers)
+      expect(closings.indexOf(layer)).toBeLessThan(
+        closings.indexOf(layer.under),
+      );
+    const tunnels = closings.filter(
+      (closed): closed is ScriptedTransport =>
+        closed instanceof ScriptedTransport,
+    );
+    expect(tunnels).toEqual([...transports].reverse());
   });
 
   it('closing detaches from the page and closes every connection', async () => {
