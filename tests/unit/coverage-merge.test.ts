@@ -102,7 +102,7 @@ describe('the suites’ reports join into one (#896)', () => {
     });
   });
 
-  it('keys an arm with no place of its own by its branch, and its index', () => {
+  it('keys an arm with no place of its own by its branch, its index, and that it has none', () => {
     const implicitElse = file({
       branchMap: {
         '0': { loc: at(5, 0, 6, 1), locations: [at(5, 4, 5, 8), {}] },
@@ -114,9 +114,64 @@ describe('the suites’ reports join into one (#896)', () => {
     ).toMatchObject({
       merged: {
         'src/lib/a.ts': {
-          branches: { '5:0-6:1#1': { start: 5, end: 6, count: 0 } },
+          branches: { '5:0-6:1#1:implicit': { start: 5, end: 6, count: 0 } },
         },
       },
+    });
+  });
+
+  // `if (a) { … } else if (b) { … }`: the outer `else` is placed on the inner
+  // `if`, whose own implicit `else` takes the inner `if`'s place at the same
+  // index (#960, measured in 11 files of the unit report).
+  it('keeps an else-if’s placed else and its implicit else apart', () => {
+    const elseIf = file({
+      branchMap: {
+        '0': {
+          loc: at(1, 0, 5, 1),
+          locations: [at(1, 7, 2, 1), at(2, 7, 5, 1)],
+        },
+        '1': { loc: at(2, 7, 5, 1), locations: [at(2, 14, 3, 1), {}] },
+      },
+      b: { '0': [3, 2], '1': [2, 0] },
+    });
+    expect(
+      mergeMaps([{ [`${ROOT}/src/lib/a.ts`]: elseIf }], ROOT),
+    ).toMatchObject({
+      merged: {
+        'src/lib/a.ts': {
+          branches: {
+            '1:7-2:1#0': { start: 1, end: 2, count: 3 },
+            '2:7-5:1#1': { start: 2, end: 5, count: 2 },
+            '2:14-3:1#0': { start: 2, end: 3, count: 2 },
+            '2:7-5:1#1:implicit': { start: 2, end: 5, count: 0 },
+          },
+        },
+      },
+    });
+  });
+
+  it('refuses two branch arms one report places alike, naming the file and the place', () => {
+    const twins = file({
+      branchMap: {
+        '0': { loc: at(5, 0, 6, 1), locations: [at(5, 4, 5, 8), {}] },
+        '1': { loc: at(5, 0, 6, 1), locations: [at(5, 9, 5, 12), {}] },
+      },
+      b: { '0': [1, 0], '1': [1, 1] },
+    });
+    expect(mergeMaps([{ [`${ROOT}/src/lib/a.ts`]: twins }], ROOT)).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts places two branch arms at 5:0-6:1#1:implicit in one report, so their counts cannot be told apart',
+    });
+  });
+
+  it('refuses two statements one report places alike, naming the file and the place', () => {
+    const twins = file({
+      statementMap: { '0': at(1, 0, 1, 10), '1': at(1, 0, 1, 10) },
+      s: { '0': 1, '1': 0 },
+    });
+    expect(mergeMaps([{ [`${ROOT}/src/lib/a.ts`]: twins }], ROOT)).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts places two statements at 1:0-1:10 in one report, so their counts cannot be told apart',
     });
   });
 
