@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mergeMaps, type FileCoverage } from '../../scripts/coverage-merge.mjs';
+import {
+  mergeMaps,
+  reportPaths,
+  type FileCoverage,
+} from '../../scripts/coverage-merge.mjs';
 
 /**
  * Joining the suites' V8 reports into one (#896). Each suite transforms a file
@@ -214,329 +218,144 @@ describe('the suites’ reports join into one (#896)', () => {
 });
 
 /**
- * A process's report and Vitest's describe the same statements at shifted
- * columns (#899, measured: Vitest's transform moves `export const`'s start and
- * drops end columns), in the same order and on the same lines. They join by
- * order, and only when every pair agrees on its lines.
+ * Every report of a file lists the same places, since each is Vitest's own
+ * conversion of Vitest's own transform, the process reports' too (#913). A
+ * place one lists and another does not is refused, never paired by order:
+ * before #913 the process reports were converted on the file's own text and
+ * joined by order, with allowances where Vitest moved a parenthesis.
  */
-describe('reports whose places differ join by order (#899)', () => {
-  const vitestLike = file({
+describe('every report of a file lists the same places (#913)', () => {
+  const two = file({
     statementMap: { '0': at(1, 13, 1, 30), '1': at(2, 2, 2, 20) },
     s: { '0': 0, '1': 0 },
   });
-  const processLike = (over: Partial<FileCoverage> = {}) =>
-    file({
-      statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 2, 40) },
-      s: { '0': 1, '1': 0 },
-      ...over,
-    });
+  const one = file({ statementMap: { '0': at(1, 13, 1, 30) }, s: { '0': 1 } });
 
-  it('sums each statement onto the first report’s place, pairing them by order', () => {
+  it('refuses a statement only the later report lists, naming it', () => {
     expect(
       mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          { [`${ROOT}/src/lib/a.ts`]: processLike() },
-        ],
+        [{ [`${ROOT}/src/lib/a.ts`]: one }, { [`${ROOT}/src/lib/a.ts`]: two }],
         ROOT,
       ),
     ).toEqual({
-      merged: {
-        'src/lib/a.ts': {
-          statements: {
-            '1:13-1:30': { start: 1, end: 1, count: 1 },
-            '2:2-2:20': { start: 2, end: 2, count: 0 },
+      refusal:
+        'coverage-merge: src/lib/a.ts lists the statement at 2:2-2:20 in one report and not in another, so their counts cannot be joined',
+    });
+  });
+
+  it('refuses a statement only the earlier report lists, naming it', () => {
+    expect(
+      mergeMaps(
+        [{ [`${ROOT}/src/lib/a.ts`]: two }, { [`${ROOT}/src/lib/a.ts`]: one }],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts lists the statement at 2:2-2:20 in one report and not in another, so their counts cannot be joined',
+    });
+  });
+
+  // PR #926's allowance: Vitest ended `return (` … `);` a line early.
+  it('refuses a statement whose end moved a line, as the order join once allowed', () => {
+    const own = file({
+      statementMap: { '0': at(1, 13, 1, 30), '1': at(2, 2, 4, 3) },
+      s: { '0': 1, '1': 1 },
+    });
+    expect(
+      mergeMaps(
+        [{ [`${ROOT}/src/lib/a.ts`]: two }, { [`${ROOT}/src/lib/a.ts`]: own }],
+        ROOT,
+      ),
+    ).toEqual({
+      refusal:
+        'coverage-merge: src/lib/a.ts lists the statement at 2:2-4:3 in one report and not in another, so their counts cannot be joined',
+    });
+  });
+
+  it('refuses a branch arm one report lists and another does not, naming it', () => {
+    const arms = (second: number) =>
+      file({
+        branchMap: {
+          '0': {
+            loc: at(2, 0, 4, 1),
+            locations: [at(2, 4, 2, 9), at(3, second, 4, 1)],
           },
-          branches: {},
         },
-      },
-    });
-  });
-
-  it('refuses reports holding different numbers of statements, naming the file', () => {
+        b: { '0': [0, 0] },
+      });
     expect(
       mergeMaps(
         [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30) },
-              s: { '0': 1 },
-            }),
-          },
+          { [`${ROOT}/src/lib/a.ts`]: arms(4) },
+          { [`${ROOT}/src/lib/a.ts`]: arms(7) },
         ],
         ROOT,
       ),
     ).toEqual({
       refusal:
-        'coverage-merge: src/lib/a.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
-    });
-  });
-
-  it('refuses a pair that disagrees on its lines, naming both places', () => {
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(3, 2, 3, 40) },
-            }),
-          },
-        ],
-        ROOT,
-      ),
-    ).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 3:2-3:40 in another, on other lines, so their counts cannot be joined',
-    });
-  });
-
-  // Measured on PR #926 (runs 39715493288, 39729419429): Vitest re-prints a
-  // module with its parentheses dropped and printed back unmapped, so its
-  // remap puts a node that opens with `(` on the token before it and ends one
-  // closed by a `)` line early: back-translate.ts's `return (` … `);` (284-287
-  // in its own text, 284-286 in Vitest's), its arm `(sorted[…] + …) / 2`
-  // (525:6, Vitest 524:13), and message.ts's `(kind === …) ?? …` (171:8,
-  // Vitest 170:12). A pair that differs only that way is one node.
-  const SOURCE = [
-    'const a = 1;',
-    '  return (',
-    '    total',
-    '  );',
-    '  const b = 2;',
-  ];
-  const reading = (lines: readonly string[]) => (file: string) =>
-    file === 'src/lib/a.ts' ? lines.join('\n') : undefined;
-  const pair = (process: ReturnType<typeof at>) =>
-    mergeMaps(
-      [
-        { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-        {
-          [`${ROOT}/src/lib/a.ts`]: processLike({
-            statementMap: { '0': at(1, 32, 1, 30), '1': process },
-            s: { '0': 1, '1': 4 },
-          }),
-        },
-      ],
-      ROOT,
-      reading(SOURCE),
-    );
-  const joined = {
-    merged: {
-      'src/lib/a.ts': {
-        statements: {
-          '1:13-1:30': { start: 1, end: 1, count: 1 },
-          '2:2-2:20': { start: 2, end: 2, count: 4 },
-        },
-        branches: {},
-      },
-    },
-  };
-
-  it('joins a pair whose end Vitest placed a line early, where its own last line opens with )', () => {
-    expect(pair(at(2, 2, 4, 3))).toEqual(joined);
-  });
-
-  it('joins a pair whose end Vitest placed a line early, where its own last line closes a template', () => {
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 4, 3) },
-              s: { '0': 1, '1': 4 },
-            }),
-          },
-        ],
-        ROOT,
-        reading(['const a = 1;', '  return `${', '    total', '  }`;']),
-      ),
-    ).toEqual(joined);
-  });
-
-  it('refuses a pair whose end differs where its own last line closes a block', () => {
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 4, 3) },
-            }),
-          },
-        ],
-        ROOT,
-        reading(['const a = 1;', '  if (total) {', '    run();', '  }']),
-      ),
-    ).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 2:2-4:3 in another, on other lines, so their counts cannot be joined',
-    });
-  });
-
-  it('refuses a pair whose end differs where its own last line does not open with )', () => {
-    expect(pair(at(2, 2, 3, 9))).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 2:2-3:9 in another, on other lines, so their counts cannot be joined',
-    });
-  });
-
-  it('joins a pair whose start Vitest placed a line early only where its own text opens with (', () => {
-    const startMoved = (column: number) =>
-      mergeMaps(
-        [
-          {
-            [`${ROOT}/src/lib/a.ts`]: file({
-              statementMap: { '0': at(1, 13, 1, 30), '1': at(1, 30, 3, 9) },
-              s: { '0': 0, '1': 0 },
-            }),
-          },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, column, 3, 9) },
-              s: { '0': 1, '1': 4 },
-            }),
-          },
-        ],
-        ROOT,
-        reading(['const a = 1;', '  return (total', ' + 1);']),
-      );
-    // Column 9 is the `(`; column 3 is the `e` of `return`, with the same end.
-    expect(startMoved(9)).toMatchObject({
-      merged: { 'src/lib/a.ts': { statements: { '1:30-3:9': { count: 4 } } } },
-    });
-    expect(startMoved(3)).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 1:30-3:9 in one report is 2:3-3:9 in another, on other lines, so their counts cannot be joined',
-    });
-  });
-
-  it('refuses a pair whose start Vitest placed LATER than the process did, even at a (', () => {
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(1, 10, 2, 20) },
-            }),
-          },
-        ],
-        ROOT,
-        reading(['const a = (1);', '  const b = 2;']),
-      ),
-    ).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 1:10-2:20 in another, on other lines, so their counts cannot be joined',
-    });
-  });
-
-  it('allows no moved line when the source cannot be read', () => {
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: vitestLike },
-          {
-            [`${ROOT}/src/lib/a.ts`]: processLike({
-              statementMap: { '0': at(1, 32, 1, 30), '1': at(2, 2, 4, 3) },
-            }),
-          },
-        ],
-        ROOT,
-      ),
-    ).toEqual({
-      refusal:
-        'coverage-merge: src/lib/a.ts statement 2:2-2:20 in one report is 2:2-4:3 in another, on other lines, so their counts cannot be joined',
+        'coverage-merge: src/lib/a.ts lists the branch arm at 3:7-4:1#1 in one report and not in another, so their counts cannot be joined',
     });
   });
 
   it('names every file it cannot join, not only the first', () => {
-    const twoPlaces = (path: string) => ({ [`${ROOT}/${path}`]: vitestLike });
-    const onePlace = (path: string) => ({
-      [`${ROOT}/${path}`]: processLike({
-        statementMap: { '0': at(1, 32, 1, 30) },
-        s: { '0': 1 },
-      }),
-    });
     expect(
       mergeMaps(
         [
-          { ...twoPlaces('src/lib/a.ts'), ...twoPlaces('src/lib/b.ts') },
-          { ...onePlace('src/lib/a.ts'), ...onePlace('src/lib/b.ts') },
+          {
+            [`${ROOT}/src/lib/a.ts`]: two,
+            [`${ROOT}/src/lib/b.ts`]: two,
+          },
+          {
+            [`${ROOT}/src/lib/a.ts`]: one,
+            [`${ROOT}/src/lib/b.ts`]: one,
+          },
         ],
         ROOT,
       ),
     ).toEqual({
       refusal: [
-        'coverage-merge: src/lib/a.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
-        'coverage-merge: src/lib/b.ts holds a different number of statements in two reports (2 and 1), so their counts cannot be joined',
+        'coverage-merge: src/lib/a.ts lists the statement at 2:2-2:20 in one report and not in another, so their counts cannot be joined',
+        'coverage-merge: src/lib/b.ts lists the statement at 2:2-2:20 in one report and not in another, so their counts cannot be joined',
       ].join('\n'),
     });
   });
+});
 
-  it('pairs branch arms by order too', () => {
-    const arms = (first: number, second: number, counts: [number, number]) =>
-      file({
-        branchMap: {
-          '0': {
-            loc: at(2, 0, 4, 1),
-            locations: [at(2, first, 2, 9), at(3, second, 4, 1)],
-          },
-        },
-        b: { '0': counts },
-      });
-    expect(
-      mergeMaps(
-        [
-          { [`${ROOT}/src/lib/a.ts`]: arms(4, 4, [0, 0]) },
-          { [`${ROOT}/src/lib/a.ts`]: arms(6, 7, [2, 0]) },
-        ],
-        ROOT,
-      ),
-    ).toMatchObject({
-      merged: {
-        'src/lib/a.ts': {
-          branches: {
-            '2:4-2:9#0': { start: 2, end: 2, count: 2 },
-            '3:4-4:1#1': { start: 3, end: 4, count: 0 },
-          },
-        },
-      },
+/**
+ * The reports the merge reads (#913): each Vitest suite's, then, when the
+ * run says Playwright ran, one per Playwright run, of which there must be one.
+ */
+describe('the reports the merge reads', () => {
+  it('reads the four suites alone when no Playwright run is named', () => {
+    expect(reportPaths(undefined)).toEqual({
+      reports: [
+        'coverage/unit/coverage-final.json',
+        'coverage/simulation/coverage-final.json',
+        'coverage/integration/coverage-final.json',
+        'coverage/processes/coverage-final.json',
+      ],
     });
   });
 
-  it('refuses reports holding different numbers of branch arms, naming the file', () => {
+  it('adds each Playwright run after them, in name order', () => {
     expect(
-      mergeMaps(
-        [
-          {
-            [`${ROOT}/src/lib/a.ts`]: file({
-              branchMap: {
-                '0': { loc: at(2, 0, 4, 1), locations: [at(2, 4, 2, 9)] },
-              },
-              b: { '0': [0] },
-            }),
-          },
-          {
-            [`${ROOT}/src/lib/a.ts`]: file({
-              statementMap: { '0': at(1, 2, 1, 10) },
-              branchMap: {
-                '0': {
-                  loc: at(2, 0, 4, 1),
-                  locations: [at(2, 6, 2, 9), at(3, 4, 4, 1)],
-                },
-              },
-              b: { '0': [1, 0] },
-            }),
-          },
-        ],
-        ROOT,
-      ),
+      reportPaths(['coverage-playwright-sanity', 'coverage-playwright-1']),
     ).toEqual({
+      reports: [
+        'coverage/unit/coverage-final.json',
+        'coverage/simulation/coverage-final.json',
+        'coverage/integration/coverage-final.json',
+        'coverage/processes/coverage-final.json',
+        'coverage/playwright/coverage-playwright-1/coverage-final.json',
+        'coverage/playwright/coverage-playwright-sanity/coverage-final.json',
+      ],
+    });
+  });
+
+  it('refuses a run that says Playwright ran and holds no Playwright report', () => {
+    expect(reportPaths([])).toEqual({
       refusal:
-        'coverage-merge: src/lib/a.ts holds a different number of branch arms in two reports (1 and 2), so their counts cannot be joined',
+        'coverage-merge: --playwright names no run under coverage/playwright, so what Playwright ran would read as unmeasured',
     });
   });
 });
