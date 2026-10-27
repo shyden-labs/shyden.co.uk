@@ -224,7 +224,63 @@ jobs:
       # a test starts writes there, and the forks running the tests do not
       # (#936, tests/child-coverage.ts).
       - run: node scripts/coverage-processes.mjs coverage/raw/integration processes
-      - run: node scripts/coverage-merge.mjs
+      # Every suite's report, for coverage-playwright to join with what
+      # Playwright ran (#913).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-suites
+          path: |
+            coverage/*/coverage-final.json
+            coverage/*/lcov.info
+            coverage/processes/skipped.txt
+          retention-days: 3
+          if-no-files-found: error
+
+  # What Playwright's runner and workers ran, in every e2e shard and the
+  # sanity run (#913), joined with the coverage job's suites. It needs the
+  # shards, which a docs-only pull request skips, so its condition asks for
+  # each need's success itself, and build-and-test holds it to scope's
+  # docs-only verdict: run on every other pull request, skipped on that one.
+  coverage-playwright:
+    needs: [coverage, e2e, sanity-on-build]
+    if: always() && needs.coverage.result == 'success' && needs.e2e.result == 'success' && needs.sanity-on-build.result == 'success'
+    runs-on: ubuntu-26.04
+    # Measured on the first run of this job, then cut (#913).
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The verdict diffs against the merge base with develop.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: git fetch --no-tags origin develop:refs/remotes/origin/develop
+      - run: npm ci
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-suites
+          path: coverage
+      # Each run converted through its own compile cache, and moved from the
+      # container's checkout onto this one. A glob that
+      # matches nothing reaches tar as itself, and fails.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-playwright-*
+          path: coverage/raw/playwright
+      - name: Convert what each Playwright run measured
+        run: |
+          set -euo pipefail
+          for tgz in coverage/raw/playwright/*/coverage-playwright.tgz; do
+            run="$(dirname "$tgz")"
+            tar -C "$run" -xzf "$tgz"
+            node scripts/coverage-processes.mjs "$run/v8" "playwright/$(basename "$run")" --cache "$run/pwcache" --recorded-root "$(cat "$run/root.txt")"
+          done
+      - run: node scripts/coverage-merge.mjs --playwright
       - name: The changed lines, against the coverage of every suite
         run: node scripts/coverage-changed.mjs --report-only >> "$GITHUB_STEP_SUMMARY"
       # For SonarCloud's coverage on new code (#851).
@@ -317,6 +373,22 @@ jobs:
           E2E_ACCOUNT_DIR: e2e-accounts
           E2E_REPORT_DIR: e2e-report
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
+          # Measured for coverage (#913); the web server unsets it.
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
+      # What this run's Playwright runner and workers ran (#913): the raw V8
+      # files, the compile cache their TypeScript ran from, and the checkout
+      # they were recorded in, which is the container's. One tar, since an
+      # upload of the two directories came back empty (probe 39668240107).
+      - name: Keep this run's coverage for the coverage job
+        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-playwright-${{ matrix.shard }}
+          path: ${{ runner.temp }}/coverage-playwright.tgz
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
       # `overwrite` because re-running a failed shard uploads its account
@@ -475,6 +547,23 @@ jobs:
       - run: npm ci
       # Both sanity configs declare one project, chromium.
       - run: npm run test:sanity
+        env:
+          # Measured for coverage (#913); the web server unsets it.
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
+      # What this run's Playwright runner and workers ran (#913): the raw V8
+      # files, the compile cache their TypeScript ran from, and the checkout
+      # they were recorded in, which is the container's. One tar, since an
+      # upload of the two directories came back empty (probe 39668240107).
+      - name: Keep this run's coverage for the coverage job
+        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-playwright-sanity
+          path: ${{ runner.temp }}/coverage-playwright.tgz
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
       - name: Keep the failing run's Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -554,6 +643,7 @@ jobs:
         sanity-on-build,
         functions,
         logs,
+        coverage-playwright,
       ]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read

@@ -936,3 +936,46 @@ describe('no test run retries (#445)', () => {
     ).toBeUndefined();
   });
 });
+
+describe('no Playwright web server writes raw coverage (#913)', () => {
+  // A web server builds the site, loading src/ through Vite: code neither its
+  // own text nor in Playwright's compile cache, which the coverage of a
+  // Playwright run refuses. The build's coverage is #914's. Every config is
+  // read with the sanity switch on, so the sanity configs declare theirs.
+  const servers: { id: string; command: string }[] = [];
+
+  beforeAll(async () => {
+    for (const file of rootConfigs()) {
+      const loaded = await importConfig(file, { SANITY_ON_BUILD: '1' });
+      const declared = loaded.webServer;
+      const list =
+        declared === undefined
+          ? []
+          : Array.isArray(declared)
+            ? declared
+            : [declared];
+      list.forEach((server, i) =>
+        servers.push({
+          id: `${file} › web server ${i + 1}`,
+          command: server.command,
+        }),
+      );
+    }
+  });
+
+  it('starts every web server with NODE_V8_COVERAGE unset', () => {
+    expect(
+      searched(
+        servers
+          .filter(
+            ({ command }) => !command.startsWith('unset NODE_V8_COVERAGE; '),
+          )
+          .map(({ id, command }) => `${id}: ${command}`),
+        { of: servers, what: 'Playwright web servers' },
+      ),
+    ).toEqual([]);
+    expect(
+      floorBreach('browser-matrix/web-servers', servers.length),
+    ).toBeUndefined();
+  });
+});

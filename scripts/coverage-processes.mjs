@@ -11,7 +11,21 @@
  * Vite, say), which this text cannot describe, so it is skipped and named. A file Vitest's own
  * report measures still reaches the merge from there.
  *
- *   node scripts/coverage-processes.mjs <raw-dir> <suite>
+ * Each entry converts where Vitest's own report is placed (#913): its counts,
+ * carried onto the file's own text where a tool compiled it, are laid on
+ * Vitest's own transform of the file (`placeOnTransform` in
+ * `carry-counts.mjs`) and read by Vitest's own converter, from one Vitest
+ * instance on the checkout's `vitest.config.ts` that runs no test. Its places
+ * are therefore Vitest's, and `coverage-merge.mjs` joins them by place.
+ *
+ *   node scripts/coverage-processes.mjs <raw-dir> <suite> [--cache <dir>] [--recorded-root <path>]
+ *
+ * `--cache` is Playwright's compile cache (`PWTEST_CACHE_DIR`, #913): code it
+ * compiled converts through the cached copy and map, and an entry found
+ * neither as its own text nor there is refused. `--recorded-root` is the
+ * checkout the processes ran in, when that is another path than this one (a
+ * CI container's): it places each entry, whose URL is left as it ran, and
+ * files are read and reported from here.
  *
  * writes `coverage/<suite>/coverage-final.json`. A directory with no measured
  * entry is refused, never written as an empty report that reads as "nothing
@@ -19,6 +33,7 @@
  * `tests/integration/coverage-processes-script.test.ts` runs it on a real
  * child process.
  */
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -27,10 +42,14 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { convert } from 'ast-v8-to-istanbul';
-import { parse } from 'vite';
-import { MEASURED, NOT_MEASURED } from '../tests/coverage-options.ts';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+import { carryCounts, placeOnTransform } from './carry-counts.mjs';
+import {
+  MEASURED,
+  NOT_MEASURED,
+  PLAYWRIGHT_MEASURE,
+} from '../tests/coverage-options.ts';
 import { die, messageOf, nonEmpty } from './errors.mjs';
 import { processRuns } from './process-runs.mjs';
 
@@ -43,6 +62,12 @@ import { processRuns } from './process-runs.mjs';
  * @typedef {{ url: string, functions: V8Function[] }} V8Script
  * @typedef {import('./coverage-merge.mjs').FileCoverage} FileCoverage
  * @typedef {{ file: string, url: string, reason: string }} Skipped
+ * @typedef {{ version: number, sources: string[], sourcesContent?: (string | null)[], names: string[], mappings: string }} SourceMap
+ * @typedef {{ code: string, map: SourceMap }} Compiled one file a tool compiled, as its cache keeps it
+ * @typedef {{
+ *   transform(absolute: string, text: string): Promise<Compiled>,
+ *   remap(url: string, transformed: Compiled, functions: V8Function[]): Promise<Record<string, FileCoverage>>,
+ * }} VitestTool Vitest's own transform of a file (given the own text the counts are on, which Vitest reads for itself), and its own converter of counts on that transform (#913)
  */
 
 const TYPESCRIPT = /\.[mc]?tsx?$/;
@@ -53,9 +78,14 @@ const TYPESCRIPT = /\.[mc]?tsx?$/;
  *
  * @param {string} url
  * @param {string} root the repository, absolute
+ * @param {import('../tests/coverage-options.ts').Measure} [measure] the measured set, the shared one unless a run names its own
  * @returns {string | null}
  */
-export const fileOf = (url, root) => {
+export const fileOf = (
+  url,
+  root,
+  measure = { include: MEASURED, exclude: NOT_MEASURED },
+) => {
   if (!url.startsWith('file://')) return null;
   const relative = path.posix.relative(
     root,
@@ -63,8 +93,8 @@ export const fileOf = (url, root) => {
   );
   if (relative.startsWith('..') || path.posix.isAbsolute(relative)) return null;
   const measured =
-    MEASURED.some((glob) => path.posix.matchesGlob(relative, glob)) &&
-    !NOT_MEASURED.some((glob) => path.posix.matchesGlob(relative, glob));
+    measure.include.some((glob) => path.posix.matchesGlob(relative, glob)) &&
+    !measure.exclude.some((glob) => path.posix.matchesGlob(relative, glob));
   return measured ? relative : null;
 };
 
@@ -89,147 +119,73 @@ const ownLengths = (file, text, url) =>
     : [text.length];
 
 /**
- * The names a binding pattern binds: `a`, `{ a, b: c, ...d }`, `[a, , b = 1]`.
+ * Playwright's compile cache, indexed by each entry's SOURCE text (#913):
+ * its map names the source by a bare file name, so the text itself is the
+ * key. An entry is `<hash>.js` (a first line `// <sha1 of the code>`, then
+ * the code) beside `<hash>.map`; one whose code fails its own hash is
+ * refused, as Playwright refuses it.
  *
- * @param {any} node
- * @returns {string[]}
+ * @param {readonly { js: string, map: string }[]} entries
+ * @returns {Map<string, Compiled[]>}
  */
-const patternNames = (node) => {
-  switch (node?.type) {
-    case 'Identifier':
-      return [node.name];
-    case 'ObjectPattern':
-      return node.properties.flatMap((/** @type {any} */ property) =>
-        patternNames(
-          property.type === 'RestElement' ? property.argument : property.value,
-        ),
+export const indexCompileCache = (entries) => {
+  /** @type {Map<string, Compiled[]>} */
+  const index = new Map();
+  for (const entry of entries) {
+    // The first line is `// ` and the code's sha1, the rest the code.
+    const newline = entry.js.indexOf('\n');
+    const hash = entry.js.slice('// '.length, newline);
+    if (!entry.js.startsWith('// ') || !/^[0-9a-f]{40}$/.test(hash))
+      throw new Error(
+        'coverage-processes: a compile-cache entry has no hash line',
       );
-    case 'ArrayPattern':
-      return node.elements.flatMap((/** @type {any} */ element) =>
-        patternNames(element),
+    const code = entry.js.slice(newline + 1);
+    if (createHash('sha1').update(code).digest('hex') !== hash)
+      throw new Error(
+        'coverage-processes: a compile-cache entry does not match its hash',
       );
-    case 'AssignmentPattern':
-      return patternNames(node.left);
-    case 'RestElement':
-      return patternNames(node.argument);
-    case 'TSParameterProperty':
-      return patternNames(node.parameter);
-    default:
-      return [];
+    /** @type {SourceMap} */
+    const map = JSON.parse(entry.map);
+    const source = map.sourcesContent?.[0];
+    if (typeof source !== 'string') continue;
+    const list = index.get(source) ?? [];
+    list.push({ code, map });
+    index.set(source, list);
   }
+  return index;
 };
 
 /**
- * Every name the program binds, once per binding: declarations, function and
- * class names, parameters, catch parameters and imports.
+ * The compile cache's files as code-and-map pairs (#913): `<name>.js` beside
+ * `<name>.map`, in whatever folders Playwright files them, other files left.
+ * Half a pair is a cache cut short, and refused by name.
  *
- * @param {any} program
- * @returns {Map<string, number>}
+ * @param {readonly string[]} files paths inside the cache
+ * @returns {{ pairs: { js: string, map: string }[] } | { refusal: string }}
  */
-const bindingCounts = (program) => {
-  /** @type {Map<string, number>} */
-  const counts = new Map();
-  /** @param {readonly string[]} names */
-  const bind = (names) => {
-    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
-  };
-  /** @param {any} node */
-  const visit = (node) => {
-    switch (node.type) {
-      case 'VariableDeclarator':
-        bind(patternNames(node.id));
-        break;
-      case 'FunctionDeclaration':
-      case 'FunctionExpression':
-      case 'ArrowFunctionExpression':
-        bind([...patternNames(node.id), ...node.params.flatMap(patternNames)]);
-        break;
-      case 'ClassDeclaration':
-      case 'ClassExpression':
-        bind(patternNames(node.id));
-        break;
-      case 'CatchClause':
-        bind(patternNames(node.param));
-        break;
-      case 'ImportSpecifier':
-      case 'ImportDefaultSpecifier':
-      case 'ImportNamespaceSpecifier':
-        bind([node.local.name]);
-        break;
-    }
-    for (const value of Object.values(node))
-      for (const child of Array.isArray(value) ? value : [value])
-        if (
-          child &&
-          typeof child === 'object' &&
-          typeof child.type === 'string'
-        )
-          visit(child);
-  };
-  visit(program);
-  return counts;
-};
-
-/**
- * The declarators Vitest's coverage never counts (#928): vite's SSR transform
- * rewrites an imported `X.prop` as `__vite_ssr_import_N__.X.prop`, and
- * coverage-v8 5.0.5 ignores every declarator initialised that way
- * (`provider.js`, "SSR transformed import binding"). A namespace import is
- * the `__vite_ssr_import_N__` object itself, so its `ns.prop` keeps its count.
- * Measured on Vitest's own route (`tests/unit/coverage-processes.test.ts`).
- * The transform follows scope, which this does not: where the import's name
- * is bound again, such a read is refused rather than guessed.
- *
- * @param {any} program
- * @param {string} text
- * @param {string} file
- * @returns {{ skip: Set<number> } | { refusal: string }} the declarators to skip, by start offset
- */
-const importReads = (program, text, file) => {
-  const imported = new Set(
-    program.body
-      .filter((/** @type {any} */ node) => node.type === 'ImportDeclaration')
-      .flatMap((/** @type {any} */ declaration) => declaration.specifiers)
-      .filter(
-        (/** @type {any} */ specifier) =>
-          specifier.type !== 'ImportNamespaceSpecifier',
-      )
-      .map((/** @type {any} */ specifier) => specifier.local.name),
-  );
-  /** @type {Set<number>} */
-  const skip = new Set();
-  if (imported.size === 0) return { skip };
-  const counts = bindingCounts(program);
-  /** @type {string | undefined} */
-  let refusal;
-  /** @param {any} node */
-  const visit = (node) => {
-    if (refusal !== undefined) return;
-    if (
-      node.type === 'VariableDeclarator' &&
-      node.init?.type === 'MemberExpression' &&
-      node.init.object.type === 'Identifier' &&
-      imported.has(node.init.object.name)
-    ) {
-      const name = node.init.object.name;
-      if ((counts.get(name) ?? 0) > 1) {
-        const line = text.slice(0, node.start).split('\n').length;
-        refusal = `coverage-processes: ${file} binds ${name} again, and a declarator on line ${line} reads ${text.slice(node.init.start, node.init.end)}, so whether it reads the import (which Vitest skips) cannot be told`;
-        return;
-      }
-      skip.add(node.start);
-    }
-    for (const value of Object.values(node))
-      for (const child of Array.isArray(value) ? value : [value])
-        if (
-          child &&
-          typeof child === 'object' &&
-          typeof child.type === 'string'
-        )
-          visit(child);
-  };
-  visit(program);
-  return refusal === undefined ? { skip } : { refusal };
+export const pairCacheFiles = (files) => {
+  const present = new Set(files);
+  /** @type {{ js: string, map: string }[]} */
+  const pairs = [];
+  for (const file of files) {
+    const js = file.replace(/\.map$/, '.js');
+    const map = file.replace(/\.js$/, '.map');
+    if (file.endsWith('.js') && !present.has(map))
+      return {
+        refusal: `coverage-processes: the compile cache holds ${file} with no map beside it`,
+      };
+    if (file.endsWith('.map') && !present.has(js))
+      return {
+        refusal: `coverage-processes: the compile cache holds ${file} with no code beside it`,
+      };
+    if (file.endsWith('.js')) pairs.push({ js: file, map });
+  }
+  return pairs.length > 0
+    ? { pairs }
+    : {
+        refusal:
+          'coverage-processes: the compile cache holds no code with its map',
+      };
 };
 
 /**
@@ -249,66 +205,92 @@ const addCounts = (into, from) => {
  * @param {readonly V8Script[]} scripts every process's entries
  * @param {(file: string) => string} read a file's text, by its relative path
  * @param {string} root the repository, absolute
+ * @param {VitestTool} vitest the transform every count is placed on and the converter that reads it, so each file's places are Vitest's own (#913)
+ * @param {{ compiled?: ReadonlyMap<string, readonly Compiled[]>, measure?: import('../tests/coverage-options.ts').Measure, recordedRoot?: string }} [tool] a tool's compiled copies, by source text, the checkout its processes ran in when that is not `root` (#913), and the set its run measures (#913); given copies, every entry that is not the file's own text must be found in them
  * @returns {Promise<{ report: Record<string, FileCoverage>, skipped: Skipped[] } | { refusal: string }>}
  */
-export const convertScripts = async (scripts, read, root) => {
+export const convertScripts = async (
+  scripts,
+  read,
+  root,
+  vitest,
+  tool = {},
+) => {
+  if (!vitest)
+    return {
+      refusal:
+        'coverage-processes: no Vitest transform was given, so no count can be placed where Vitest’s report places it',
+    };
+  const { compiled, measure, recordedRoot = root } = tool;
   /** @type {Record<string, FileCoverage>} */
   const report = {};
   /** @type {Skipped[]} */
   const skipped = [];
   for (const script of scripts) {
-    const file = fileOf(script.url, root);
+    // Placed by the checkout it ran in; its URL stays as it ran, since the
+    // sourceURL Node appended carries it (#913).
+    const file = fileOf(script.url, recordedRoot, measure);
     if (file === null) continue;
     const text = read(file);
     const lengths = ownLengths(file, text, script.url);
     const ran = ranLength(script);
-    if (!lengths.includes(ran)) {
-      skipped.push({
-        file,
-        url: script.url,
-        reason: `ran code ${ran} characters long, not its own text (${lengths.join(', or ')}${lengths.length > 1 ? ' with the sourceURL Node appends' : ''})`,
-      });
+    const copies = compiled?.get(text) ?? [];
+    const copy = copies.find(({ code }) => code.length === ran);
+    if (!lengths.includes(ran) && !copy) {
+      const ownText = `${lengths.join(', or ')}${lengths.length > 1 ? ' with the sourceURL Node appends' : ''}`;
+      const cached =
+        copies.length > 0
+          ? ` nor any compiled copy cached (${copies.map(({ code }) => code.length).join(', ')})`
+          : compiled
+            ? ' and no compiled copy of it is cached'
+            : '';
+      const reason = `ran code ${ran} characters long, not its own text (${ownText})${cached}`;
+      // A cache that holds no copy of what ran lost an entry, so its counts
+      // are refused, never left out; with no cache, the entry is another
+      // tool's transformed code (Vitest's workers), listed as skipped.
+      if (compiled) return { refusal: `coverage-processes: ${file} ${reason}` };
+      skipped.push({ file, url: script.url, reason });
       continue;
     }
     const absolute = path.posix.join(root, file);
-    // The options Vitest's own (deprecated) parseAstAsync passes, so the tree
-    // is the one its report places statements on. `parse` reports a syntax
-    // error beside an empty program instead of throwing, so it is refused
-    // here, never converted as a file with no statements.
-    const parsed = await parse(file, text, {
-      lang: TYPESCRIPT.test(file) ? 'ts' : 'js',
-      preserveParens: false,
-    });
-    if (parsed.errors.length > 0)
+    // What a compiled copy counted is carried onto the file's own text
+    // through the copy's map, then everything is placed on Vitest's own
+    // transform of the file and converted by Vitest's own converter, so the
+    // places are the ones Vitest's report lists (#913).
+    let { functions } = script;
+    if (!lengths.includes(ran)) {
+      const carried = carryCounts(
+        functions,
+        /** @type {Compiled} */ (copy),
+        text,
+      );
+      if ('refusal' in carried)
+        return { refusal: `coverage-processes: ${file}: ${carried.refusal}` };
+      ({ functions } = carried);
+    }
+    /** @type {Compiled} */
+    let transformed;
+    try {
+      transformed = await vitest.transform(absolute, text);
+    } catch (error) {
       return {
-        refusal: `coverage-processes: ${file} does not parse (${parsed.errors[0]?.message}), so its counts have nowhere to go`,
+        refusal: `coverage-processes: ${file} cannot be transformed as Vitest transforms it (${messageOf(error)}), so its counts have nowhere to go`,
       };
-    const reads = importReads(parsed.program, text, file);
-    if ('refusal' in reads) return reads;
+    }
+    const placed = placeOnTransform(functions, transformed, text);
+    if ('refusal' in placed)
+      return { refusal: `coverage-processes: ${file}: ${placed.refusal}` };
     /** @type {Record<string, FileCoverage>} */
     const converted = JSON.parse(
       JSON.stringify(
-        await convert({
-          ast: parsed.program,
-          code: text,
-          wrapperLength: 0,
-          coverage: { functions: script.functions, url: script.url },
-          ignoreNode: (node, type) =>
-            type === 'statement' &&
-            node.type === 'VariableDeclarator' &&
-            // The tree is vite's (oxc), whose nodes carry offsets the ESTree
-            // type ast-v8-to-istanbul declares does not.
-            reads.skip.has(
-              /** @type {{ start: number }} */ (/** @type {unknown} */ (node))
-                .start,
-            )
-              ? true
-              : undefined,
-        }),
+        await vitest.remap(script.url, transformed, placed.functions),
       ),
     );
     const coverage = Object.values(converted)[0];
-    if (coverage === undefined) continue;
+    if (coverage === undefined)
+      return {
+        refusal: `coverage-processes: ${file} gave Vitest’s converter nothing to report, so its counts have nowhere to go`,
+      };
     coverage.path = absolute;
     const seen = report[absolute];
     if (seen) addCounts(seen, coverage);
@@ -428,11 +410,108 @@ export const ledgerNote = (pid, text) => {
   }
 };
 
+/** @param {string} dir Playwright's compile cache */
+const readCompileCache = (dir) => {
+  /** @type {string[]} */
+  let files;
+  try {
+    // Every entry under it, folders too: pairCacheFiles reads only the
+    // `.js` and `.map` names, wherever Playwright files them.
+    files = nonEmpty(
+      readdirSync(dir, { recursive: true, encoding: 'utf8' }),
+      `entries in the compile cache ${dir}`,
+    );
+  } catch (error) {
+    die(messageOf(error));
+  }
+  const paired = pairCacheFiles(files);
+  if ('refusal' in paired) die(`${paired.refusal} (read ${dir})`);
+  try {
+    return indexCompileCache(
+      paired.pairs.map(({ js, map }) => ({
+        js: readFileSync(path.join(dir, js), 'utf8'),
+        map: readFileSync(path.join(dir, map), 'utf8'),
+      })),
+    );
+  } catch (error) {
+    die(`${messageOf(error)} (read ${dir})`);
+  }
+};
+
+/**
+ * Vitest's own transform and converter, as its coverage runs them for the
+ * unit config (`@vitest/coverage-v8`'s `getSources` over `transformFile` in
+ * the `ssr` environment, then `remapCoverage`), from one Vitest instance that
+ * runs no test (#913). Measured 2026-10-27: on the root project of
+ * `vitest.config.ts`, the places this gives equal the unit report's on 204 of
+ * 204 files. Imported here, not at the top, so loading this module for its
+ * unit tests does not load Vitest's node API.
+ *
+ * @param {string} root
+ * @returns {Promise<{ tool: VitestTool, close: () => Promise<void> }>}
+ */
+const openVitest = async (root) => {
+  const config = path.join(root, 'vitest.config.ts');
+  if (!existsSync(config))
+    throw new Error(
+      `coverage-processes: ${config} is not there, so there is no Vitest transform to place counts on`,
+    );
+  const { createVitest } = await import('vitest/node');
+  const vitest = await createVitest('test', {
+    watch: false,
+    config,
+    coverage: { enabled: true, provider: 'v8' },
+  });
+  // Undeclared, and pinned with the packages (`coverage-processes.test.ts`):
+  // the provider's own methods, and the one call that makes the provider
+  // without `clean()`, which the declared `createCoverageProvider` runs and
+  // which deletes the coverage reports' folder.
+  const provider = await /** @type {any} */ (vitest).initCoverageProvider();
+  const project = vitest.getRootProject();
+  return {
+    tool: {
+      transform: async (absolute) => {
+        /** @type {{ code: string, map: SourceMap | null | undefined }} */
+        const sources = await provider.getSources(
+          pathToFileURL(absolute).href,
+          (/** @type {string} */ file) =>
+            provider.transformFile(file, project, 'ssr'),
+        );
+        if (!sources.map) throw new Error('Vitest’s transform gave no map');
+        return { code: sources.code, map: sources.map };
+      },
+      remap: (url, transformed, functions) =>
+        provider.remapCoverage(url, 0, transformed, functions),
+    },
+    close: () => vitest.close(),
+  };
+};
+
 const main = async () => {
-  const [dir, suite, ...rest] = process.argv.slice(2);
-  if (!dir || !suite || rest.length > 0)
-    die('usage: coverage-processes.mjs <raw-dir> <suite>');
+  const usage =
+    'usage: coverage-processes.mjs <raw-dir> <suite> [--cache <dir>] [--recorded-root <path>]';
+  const args = (() => {
+    try {
+      return parseArgs({
+        args: process.argv.slice(2),
+        options: {
+          cache: { type: 'string' },
+          'recorded-root': { type: 'string' },
+        },
+        allowPositionals: true,
+      });
+    } catch (error) {
+      return die(`${messageOf(error)}\n${usage}`);
+    }
+  })();
+  const [dir, suite, ...rest] = args.positionals;
+  if (!dir || !suite || rest.length > 0) die(usage);
   const root = process.cwd();
+  const recorded = args.values['recorded-root'];
+  const compiled =
+    args.values.cache === undefined
+      ? undefined
+      : readCompileCache(args.values.cache);
   // An empty directory means no process was measured at all; one holding
   // only processes that ran no measured file is refused by convertScripts.
   // Either refusal, and a directory that is not there, ends in one line, not
@@ -445,8 +524,13 @@ const main = async () => {
     die(messageOf(error));
   }
   const raw = names.filter((name) => name.endsWith('.json'));
+  // A run recorded elsewhere names its writers by that machine's pids, which
+  // say nothing here (a process of this machine can share one), and it was
+  // handed on after it finished: no writer of it runs here (#913).
+  /** @type {(pid: number) => boolean} */
+  const running = recorded === undefined ? processRuns : () => false;
   const waited = await awaitWriters(raw, {
-    isRunning: processRuns,
+    isRunning: running,
     pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now: () => Date.now(),
     ceilingMs: WRITER_CEILING_MS,
@@ -462,7 +546,7 @@ const main = async () => {
     const read = readRaw(
       name,
       readFileSync(path.join(dir, name), 'utf8'),
-      pid !== undefined && processRuns(pid),
+      pid !== undefined && running(pid),
     );
     if ('refusal' in read) {
       const line = path.join(dir, 'ledger', `${pid}.json`);
@@ -472,11 +556,32 @@ const main = async () => {
     }
     return read.result;
   });
-  const result = await convertScripts(
-    scripts,
-    (file) => readFileSync(path.join(root, file), 'utf8'),
-    root,
-  );
+  /** @type {Awaited<ReturnType<typeof openVitest>>} */
+  let vitest;
+  try {
+    vitest = await openVitest(root);
+  } catch (error) {
+    die(messageOf(error));
+  }
+  /** @type {Awaited<ReturnType<typeof convertScripts>>} */
+  let result;
+  try {
+    result = await convertScripts(
+      scripts,
+      (file) => readFileSync(path.join(root, file), 'utf8'),
+      root,
+      vitest.tool,
+      {
+        // A compile cache is a Playwright run's, which measures its own set.
+        ...(compiled === undefined
+          ? {}
+          : { compiled, measure: PLAYWRIGHT_MEASURE }),
+        ...(recorded === undefined ? {} : { recordedRoot: recorded }),
+      },
+    );
+  } finally {
+    await vitest.close();
+  }
   if ('refusal' in result) die(`${result.refusal} (read ${dir})`);
   mkdirSync(path.join('coverage', suite), { recursive: true });
   writeFileSync(

@@ -8,6 +8,9 @@
  * never by id. Branch arms are keyed the same way, plus their index; an arm
  * with no place of its own (an implicit `else`) takes its branch's, marked
  * `:implicit`. Two places one report keys alike are refused, never summed.
+ * Every report of a file lists the same places, the process reports too,
+ * which are converted on Vitest's own transform (#913): a place one report
+ * lists and another does not is refused, naming it.
  *
  *   node scripts/coverage-merge.mjs
  *
@@ -20,9 +23,15 @@
  * repository.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
-import { die } from './errors.mjs';
+import { die, messageOf, nonEmpty } from './errors.mjs';
 
 /**
  * A place in a file, and a span between two; `FileCoverage` is one file as
@@ -118,76 +127,40 @@ const placedTwice = (from) => {
 };
 
 /**
- * Whether one report's place and another's, paired by order, are one node.
- * Lines that agree are; lines that differ are only where Vitest's remap moved
- * a parenthesis. Vitest re-prints a module with its parentheses dropped and
- * printed back with no mapping, so a node that opens with `(` is placed on
- * the token before it, and one whose last line opens with `)`, or with a
- * template's closing `}` and backtick, ends a line early (PR #926, runs 39715493288 and 39729419429: back-translate.ts's
- * `return (` … `);` 284-287 against Vitest's 284-286, its arm
- * `(sorted[…] + …) / 2` at 525:6 against 524:13, message.ts's
- * `(kind === …) ?? …` at 171:8 against 170:12; report-review.ts's
- * ``return `… ${`` … ``}`;`` 216-220 against 216-219, run 39731806003; a bare
- * `}` closing a block does not qualify). The process report, joined
- * last, holds the file's own places; with no text read, no line may move.
- *
- * @param {Counted} seen the place joined so far (Vitest's)
- * @param {Location} loc the place being joined (the process report's)
- * @param {readonly string[] | undefined} lines
- */
-const sameNode = (seen, loc, lines) => {
-  const start = loc.start?.line ?? 0;
-  const end = loc.end?.line ?? 0;
-  const opensWithParen = lines?.[start - 1]?.[loc.start?.column ?? -1] === '(';
-  const closesWithParen = /^\s*(?:\)|\}`)/.test(lines?.[end - 1] ?? '');
-  return (
-    (seen.start === start || (seen.start < start && opensWithParen)) &&
-    (seen.end === end || (seen.end < end && closesWithParen))
-  );
-};
-
-/**
- * Adds one report's places to a file's join: by place when the join already
- * holds every one of them, otherwise by order (#899), which a report converted
- * outside Vitest needs, since Vitest's transform shifts columns. By order only
- * when both hold as many and every pair shares its lines, or differs only
- * where Vitest's remap moves a parenthesis (`movedByParens`).
+ * Adds one report's places to a file's join. Every report of a file lists the
+ * same places, since each suite's is Vitest's own conversion of Vitest's own
+ * transform (the process reports too, #913), so a place one report lists and
+ * another does not is refused, never paired by order.
  *
  * @param {Record<string, Counted>} into
  * @param {readonly Place[]} from
  * @param {string} file
  * @param {'statement' | 'branch arm'} what
- * @param {readonly string[] | undefined} lines the file's own text, if it was read
  * @returns {string | undefined} the refusal, if they cannot be joined
  */
-const join = (into, from, file, what, lines) => {
+const join = (into, from, file, what) => {
   const twice = placedTwice(from);
   if (twice !== undefined)
     return `coverage-merge: ${file} places two ${what}s at ${twice} in one report, so their counts cannot be told apart`;
   const keys = Object.keys(into);
-  if (keys.length === 0 || from.every(({ key }) => key in into)) {
-    for (const { key, loc, count } of from) add(into, key, loc, count);
-    return undefined;
+  if (keys.length > 0) {
+    const listed = new Set(from.map(({ key }) => key));
+    const alone =
+      from.find(({ key }) => !(key in into))?.key ??
+      keys.find((key) => !listed.has(key));
+    if (alone !== undefined)
+      return `coverage-merge: ${file} lists the ${what} at ${alone} in one report and not in another, so their counts cannot be joined`;
   }
-  if (keys.length !== from.length)
-    return `coverage-merge: ${file} holds a different number of ${what}s in two reports (${keys.length} and ${from.length}), so their counts cannot be joined`;
-  for (const [index, { key, loc, count }] of from.entries()) {
-    const ours = keys[index] ?? '';
-    const seen = /** @type {Counted} */ (into[ours]);
-    if (!sameNode(seen, loc, lines))
-      return `coverage-merge: ${file} ${what} ${ours} in one report is ${key} in another, on other lines, so their counts cannot be joined`;
-    seen.count += count;
-  }
+  for (const { key, loc, count } of from) add(into, key, loc, count);
   return undefined;
 };
 
 /**
  * @param {readonly Record<string, FileCoverage>[]} maps
  * @param {string} root the repository, absolute
- * @param {(file: string) => string | undefined} [read] a file's own text, by its relative path; none read by default
  * @returns {{ merged: Record<string, LocatedCoverage> } | { refusal: string }}
  */
-export const mergeMaps = (maps, root, read = () => undefined) => {
+export const mergeMaps = (maps, root) => {
   if (maps.length === 0)
     return { refusal: 'coverage-merge: no report to merge' };
   /** @type {Record<string, LocatedCoverage>} */
@@ -204,27 +177,64 @@ export const mergeMaps = (maps, root, read = () => undefined) => {
         };
       const into = (merged[relative] ??= { statements: {}, branches: {} });
       const places = placesOf(coverage);
-      const lines = read(relative)?.split('\n');
       const refusal =
-        join(
-          into.statements,
-          places.statements,
-          relative,
-          'statement',
-          lines,
-        ) ??
-        join(into.branches, places.branches, relative, 'branch arm', lines);
+        join(into.statements, places.statements, relative, 'statement') ??
+        join(into.branches, places.branches, relative, 'branch arm');
       if (refusal) refusals.push(refusal);
     }
   return refusals.length > 0 ? { refusal: refusals.join('\n') } : { merged };
 };
 
-const main = () => {
-  if (process.argv.length > 2) die('usage: coverage-merge.mjs');
-  const root = process.cwd();
-  const reports = SUITES.map((suite) =>
-    path.join('coverage', suite, 'coverage-final.json'),
+/**
+ * Every report the merge reads: the Vitest suites', then each Playwright
+ * run's under `coverage/playwright/<run>/` (#913), when the run names them.
+ * A run that names them and holds none is refused, never merged as if
+ * Playwright ran nothing.
+ *
+ * @param {readonly string[] | undefined} playwrightRuns the folders under coverage/playwright, or undefined when the run has none
+ * @returns {{ reports: string[] } | { refusal: string }}
+ */
+export const reportPaths = (playwrightRuns) => {
+  const suites = SUITES.map((suite) =>
+    path.posix.join('coverage', suite, 'coverage-final.json'),
   );
+  if (playwrightRuns === undefined) return { reports: suites };
+  if (playwrightRuns.length === 0)
+    return {
+      refusal:
+        'coverage-merge: --playwright names no run under coverage/playwright, so what Playwright ran would read as unmeasured',
+    };
+  return {
+    reports: [
+      ...suites,
+      ...[...playwrightRuns]
+        .sort()
+        .map((run) =>
+          path.posix.join('coverage', 'playwright', run, 'coverage-final.json'),
+        ),
+    ],
+  };
+};
+
+const main = () => {
+  const args = process.argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== '--playwright'))
+    die('usage: coverage-merge.mjs [--playwright]');
+  const root = process.cwd();
+  /** @type {string[] | undefined} */
+  let runs;
+  if (args[0] === '--playwright')
+    try {
+      runs = nonEmpty(
+        readdirSync(path.join('coverage', 'playwright')),
+        'Playwright runs under coverage/playwright',
+      );
+    } catch (error) {
+      die(`coverage-merge: --playwright: ${messageOf(error)}`);
+    }
+  const paths = reportPaths(runs);
+  if ('refusal' in paths) die(paths.refusal);
+  const { reports } = paths;
   const missing = reports.filter((report) => !existsSync(report));
   if (missing.length > 0)
     die(
@@ -238,12 +248,6 @@ const main = () => {
         ),
     ),
     root,
-    // The file's own text, for the parenthesis Vitest's remap moves; a file
-    // not in this checkout gets no such allowance.
-    (file) => {
-      const own = path.join(root, file);
-      return existsSync(own) ? readFileSync(own, 'utf8') : undefined;
-    },
   );
   if ('refusal' in result) die(result.refusal);
   mkdirSync(path.join('coverage', 'merged'), { recursive: true });

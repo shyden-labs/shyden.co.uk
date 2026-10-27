@@ -559,55 +559,71 @@ describe('accountFindings: the shards add up to the suite', () => {
   });
 });
 
-// The two jobs scope decides (#774, #822): each runs exactly where scope's
-// own verdict says, so its skip is a pass there and a refusal elsewhere. One
-// rule, two rows; every message is written out per job, never built from the
+// The three jobs scope decides (#774, #822, #913): each runs exactly where
+// scope's own verdict says, so its skip is a pass there and a refusal
+// elsewhere. coverage-playwright runs where docs_only is 'false'. One rule,
+// three rows; every message is written out per job, never built from the
 // row it is checked against.
 describe.each([
   {
     job: 'capture',
     verdict: 'capture',
+    runs: 'true',
+    stops: 'false',
     absent:
       'capture is not among the jobs build-and-test stands for, so a case with no picture would pass',
   },
   {
     job: 'logs',
     verdict: 'release',
+    runs: 'true',
+    stops: 'false',
     absent:
       'logs is not among the jobs build-and-test stands for, so a release whose logs and audit trails were never checked would pass',
   },
+  {
+    job: 'coverage-playwright',
+    verdict: 'docs_only',
+    runs: 'false',
+    stops: 'true',
+    absent:
+      'coverage-playwright is not among the jobs build-and-test stands for, so what Playwright ran would never be measured',
+  },
 ] as const)(
   'scopedJobFindings: $job ran exactly where scope said ($verdict, #774, #822)',
-  ({ job: name, verdict, absent }) => {
+  ({ job: name, verdict, runs, stops, absent }) => {
     const checks = { result: 'success', outputs: {} };
     const scopeSaid = (said: unknown) => ({
       result: 'success',
       outputs: { docs_only: 'false', [verdict]: said },
     });
+    // Scope's other outputs, with this row's verdict left out.
+    const silent =
+      verdict === 'docs_only' ? { capture: 'false' } : { docs_only: 'false' };
     const job = (result: string) => ({ result, outputs: {} });
 
     it('takes a run where scope said it runs, and hands on the rest', () => {
       expect(
         scopedJobFindings(
-          { scope: scopeSaid('true'), checks, [name]: job('success') },
+          { scope: scopeSaid(runs), checks, [name]: job('success') },
           name,
         ),
-      ).toEqual({ findings: [], rest: { scope: scopeSaid('true'), checks } });
+      ).toEqual({ findings: [], rest: { scope: scopeSaid(runs), checks } });
     });
 
     it('takes a skip where scope said it does not run', () => {
       expect(
         scopedJobFindings(
-          { scope: scopeSaid('false'), checks, [name]: job('skipped') },
+          { scope: scopeSaid(stops), checks, [name]: job('skipped') },
           name,
         ),
-      ).toEqual({ findings: [], rest: { scope: scopeSaid('false'), checks } });
+      ).toEqual({ findings: [], rest: { scope: scopeSaid(stops), checks } });
     });
 
     it('refuses a skip where scope said it runs', () => {
       expect(
         scopedJobFindings(
-          { scope: scopeSaid('true'), [name]: job('skipped') },
+          { scope: scopeSaid(runs), [name]: job('skipped') },
           name,
         ).findings,
       ).toEqual([
@@ -615,6 +631,8 @@ describe.each([
           capture:
             'capture finished `skipped` where scope said it runs, not `success`',
           logs: 'logs finished `skipped` where scope said it runs, not `success`',
+          'coverage-playwright':
+            'coverage-playwright finished `skipped` where scope said it runs, not `success`',
         }[name],
       ]);
     });
@@ -622,7 +640,7 @@ describe.each([
     it('refuses a failure where scope said it runs', () => {
       expect(
         scopedJobFindings(
-          { scope: scopeSaid('true'), [name]: job('failure') },
+          { scope: scopeSaid(runs), [name]: job('failure') },
           name,
         ).findings,
       ).toEqual([
@@ -630,6 +648,8 @@ describe.each([
           capture:
             'capture finished `failure` where scope said it runs, not `success`',
           logs: 'logs finished `failure` where scope said it runs, not `success`',
+          'coverage-playwright':
+            'coverage-playwright finished `failure` where scope said it runs, not `success`',
         }[name],
       ]);
     });
@@ -637,7 +657,7 @@ describe.each([
     it('refuses a run where scope said it does not', () => {
       expect(
         scopedJobFindings(
-          { scope: scopeSaid('false'), [name]: job('success') },
+          { scope: scopeSaid(stops), [name]: job('success') },
           name,
         ).findings,
       ).toEqual([
@@ -645,6 +665,8 @@ describe.each([
           capture:
             'capture finished `success` where scope said it does not run, not `skipped`',
           logs: 'logs finished `success` where scope said it does not run, not `skipped`',
+          'coverage-playwright':
+            'coverage-playwright finished `success` where scope said it does not run, not `skipped`',
         }[name],
       ]);
     });
@@ -653,7 +675,7 @@ describe.each([
       expect(
         scopedJobFindings(
           {
-            scope: { result: 'success', outputs: { docs_only: 'false' } },
+            scope: { result: 'success', outputs: silent },
             [name]: job('skipped'),
           },
           name,
@@ -663,6 +685,8 @@ describe.each([
           capture:
             'scope handed on no capture verdict (undefined), so capture finishing `skipped` cannot be judged',
           logs: 'scope handed on no release verdict (undefined), so logs finishing `skipped` cannot be judged',
+          'coverage-playwright':
+            'scope handed on no docs_only verdict (undefined), so coverage-playwright finishing `skipped` cannot be judged',
         }[name],
       ]);
     });
@@ -678,16 +702,18 @@ describe.each([
           capture:
             'scope handed on no capture verdict ("TRUE"), so capture finishing `success` cannot be judged',
           logs: 'scope handed on no release verdict ("TRUE"), so logs finishing `success` cannot be judged',
+          'coverage-playwright':
+            'scope handed on no docs_only verdict ("TRUE"), so coverage-playwright finishing `success` cannot be judged',
         }[name],
       ]);
     });
 
     it('refuses needs that do not include the job', () => {
       expect(
-        scopedJobFindings({ scope: scopeSaid('false'), checks }, name),
+        scopedJobFindings({ scope: scopeSaid(stops), checks }, name),
       ).toEqual({
         findings: [absent],
-        rest: { scope: scopeSaid('false'), checks },
+        rest: { scope: scopeSaid(stops), checks },
       });
     });
 
