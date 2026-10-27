@@ -6,7 +6,8 @@
  * transforms each file on its own, so one statement can carry a different id
  * in two reports: counts are joined by WHERE the code is (`line:col-line:col`),
  * never by id. Branch arms are keyed the same way, plus their index; an arm
- * with no place of its own (an implicit `else`) takes its branch's.
+ * with no place of its own (an implicit `else`) takes its branch's, marked
+ * `:implicit`. Two places one report keys alike are refused, never summed.
  *
  *   node scripts/coverage-merge.mjs
  *
@@ -89,17 +90,32 @@ const placesOf = (coverage) => ({
     loc,
     count: coverage.s[id] ?? 0,
   })),
+  // An implicit arm's key says it has no place of its own: in an `else if`,
+  // the outer `else` is placed on the inner `if`, whose implicit `else` takes
+  // that same place at the same index (#960).
   branches: Object.entries(coverage.branchMap).flatMap(([id, branch]) =>
     branch.locations.map((arm, index) => {
-      const loc = placed(arm) ? arm : branch.loc;
+      const own = placed(arm);
+      const loc = own ? arm : branch.loc;
       return {
-        key: `${keyOf(loc)}#${index}`,
+        key: `${keyOf(loc)}#${index}${own ? '' : ':implicit'}`,
         loc,
         count: coverage.b[id]?.[index] ?? 0,
       };
     }),
   ),
 });
+
+/**
+ * The first key one report gives two of its places, if any: their counts
+ * would be summed into one, so an arm no test ran could read as run (#960).
+ *
+ * @param {readonly Place[]} from
+ */
+const placedTwice = (from) => {
+  const seen = new Set();
+  return from.find(({ key }) => seen.size === seen.add(key).size)?.key;
+};
 
 /**
  * Whether one report's place and another's, paired by order, are one node.
@@ -145,6 +161,9 @@ const sameNode = (seen, loc, lines) => {
  * @returns {string | undefined} the refusal, if they cannot be joined
  */
 const join = (into, from, file, what, lines) => {
+  const twice = placedTwice(from);
+  if (twice !== undefined)
+    return `coverage-merge: ${file} places two ${what}s at ${twice} in one report, so their counts cannot be told apart`;
   const keys = Object.keys(into);
   if (keys.length === 0 || from.every(({ key }) => key in into)) {
     for (const { key, loc, count } of from) add(into, key, loc, count);
