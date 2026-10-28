@@ -10,6 +10,13 @@ import { spawn, spawnSync } from 'node:child_process';
 import { nonEmpty } from '../../scripts/errors.mjs';
 import { DATABASE_ID, PASSWORD, PERSIST, PORT, SECRET, d1 } from './local.mjs';
 
+// This script is measured for coverage, and nothing it starts is (#913): the
+// build loads src/ through Vite (#914's), and wrangler is not our code. Node
+// fixed this process's coverage folder at startup, so only the children,
+// which inherit this environment, lose it. First, before any process starts
+// (`web-server-coverage.ts` holds it there).
+delete process.env.NODE_V8_COVERAGE;
+
 /**
  * @param {string} command
  * @param {string[]} args

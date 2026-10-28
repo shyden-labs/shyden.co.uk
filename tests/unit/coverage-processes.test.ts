@@ -16,6 +16,7 @@ import {
   type VitestTool,
 } from '../../scripts/coverage-processes.mjs';
 import { PLAYWRIGHT_MEASURE } from '../coverage-options';
+import { fixtureReader } from '../fixture-texts';
 
 /**
  * Raw V8 coverage from a process Node ran outside Vitest's workers, converted
@@ -74,11 +75,7 @@ const texts: Record<string, string> = {
   'scripts/branch.mjs': JS,
   'scripts/branch.ts': TS,
 };
-const read = (file: string) => {
-  const text = texts[file];
-  if (text === undefined) throw new Error(`no fixture text for ${file}`);
-  return text;
-};
+const read = fixtureReader(texts);
 
 /** A map placing every character of `text` on itself, as base64 VLQ. */
 const identityMap = (text: string, source: string) => {
@@ -188,6 +185,22 @@ describe('raw V8 coverage from a process converts to the joined shape (#899)', (
         url: TS_URL,
         reason:
           'ran code 300 characters long, not its own text (164, or 210 with the sourceURL Node appends)',
+      },
+    ]);
+  });
+
+  it('a JavaScript entry not its own text names the one length its text has', async () => {
+    const result = await convertScripts(
+      [jsEntry, script(JS_URL, 300, [70, 106])],
+      read,
+      ROOT,
+      OWN_TEXT,
+    );
+    expect('report' in result && result.skipped).toEqual([
+      {
+        file: 'scripts/branch.mjs',
+        url: JS_URL,
+        reason: 'ran code 300 characters long, not its own text (107)',
       },
     ]);
   });
@@ -404,11 +417,7 @@ const HELPER_MAP = {
   mappings: 'AAAA,MAAM,CAAS,GAAG;AAClB;AACA;AACA;AACA;AACA;',
 };
 const HELPER_URL = 'file:///repo/tests/helper.ts';
-const compiledRead = (file: string) => {
-  if (file !== 'tests/helper.ts')
-    throw new Error(`no fixture text for ${file}`);
-  return HELPER_TS;
-};
+const compiledRead = fixtureReader({ 'tests/helper.ts': HELPER_TS });
 const hashed = (code: string) =>
   `// ${createHash('sha1').update(code).digest('hex')}\n${code}`;
 const cache = indexCompileCache([
@@ -502,11 +511,7 @@ describe('code a tool compiled converts onto the file’s own text (#913)', () =
           ],
         },
       ],
-      (file) => {
-        if (file !== 'tests/bare.ts')
-          throw new Error(`no fixture text for ${file}`);
-        return BARE_TS;
-      },
+      fixtureReader({ 'tests/bare.ts': BARE_TS }),
       ROOT,
       OWN_TEXT,
       {
@@ -565,6 +570,40 @@ describe('code a tool compiled converts onto the file’s own text (#913)', () =
     expect(result).toEqual({
       refusal:
         'coverage-processes: tests/helper.ts ran code 96 characters long, not its own text (103, or 147 with the sourceURL Node appends) and no compiled copy of it is cached',
+    });
+  });
+
+  it('a cached map with no source text is left out, so the code it compiled is refused', async () => {
+    const sourceless = [
+      {
+        js: hashed(HELPER_JS),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: undefined }),
+      },
+      {
+        js: hashed(HELPER_JS),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: [null] }),
+      },
+    ];
+    const other = 'export const other = 1;\n';
+    const beside = indexCompileCache([
+      ...sourceless,
+      {
+        js: hashed(other),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: [other] }),
+      },
+    ]);
+    expect([...beside.keys()]).toEqual([other]);
+    const withoutSource = indexCompileCache(sourceless);
+    const result = await convertScripts(
+      [jsEntry, script(HELPER_URL, 95, [71, 94])],
+      (file) => (file === 'tests/helper.ts' ? HELPER_TS : read(file)),
+      ROOT,
+      OWN_TEXT,
+      { compiled: withoutSource },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: tests/helper.ts ran code 95 characters long, not its own text (103, or 147 with the sourceURL Node appends) and no compiled copy of it is cached',
     });
   });
 

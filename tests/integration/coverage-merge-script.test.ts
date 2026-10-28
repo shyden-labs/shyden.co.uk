@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,7 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scratchGit, withoutLocalGit } from '../git-env';
+import { runScriptIn, scratchGit } from '../git-env';
 
 /**
  * `scripts/coverage-merge.mjs` as CI runs it after the three suites (#896): in
@@ -65,12 +64,7 @@ afterEach(() => {
   rmSync(repo, { recursive: true, force: true });
 });
 
-const merge = () =>
-  spawnSync(process.execPath, [SCRIPT], {
-    cwd: repo,
-    encoding: 'utf8',
-    env: withoutLocalGit(process.env),
-  });
+const merge = (...args: readonly string[]) => runScriptIn(repo, SCRIPT, args);
 
 describe('coverage-merge.mjs in a real repository', () => {
   it('joins the four reports and records the tree they measured', () => {
@@ -101,5 +95,42 @@ describe('coverage-merge.mjs in a real repository', () => {
     expect(run.stderr).toBe(
       '✗ coverage-merge: no report at coverage/simulation/coverage-final.json. A suite that failed writes none; run it with --coverage first.\n',
     );
+  });
+
+  it('--playwright joins each run under coverage/playwright with the four suites', () => {
+    SUITES.forEach((suite, index) => report(suite, index));
+    report('playwright/shard-1', 4);
+    report('playwright/sanity', 5);
+    const run = merge('--playwright');
+    expect([run.status, run.stderr]).toEqual([0, '']);
+    expect(
+      JSON.parse(
+        readFileSync(path.join(repo, 'coverage/merged/coverage.json'), 'utf8'),
+      ),
+    ).toEqual({
+      'src/a.ts': {
+        statements: { '1:0-1:9': { start: 1, end: 1, count: 15 } },
+        branches: {},
+      },
+    });
+  });
+
+  it('--playwright refuses an empty coverage/playwright, naming it', () => {
+    SUITES.forEach((suite) => report(suite, 1));
+    mkdirSync(path.join(repo, 'coverage/playwright'));
+    const run = merge('--playwright');
+    expect([run.status, run.stderr]).toEqual([
+      1,
+      '✗ coverage-merge: --playwright: found no Playwright runs under coverage/playwright — the walk is broken, not the subject clean. A guard handed an empty list asserts nothing at all (#84).\n',
+    ]);
+  });
+
+  it('--playwright refuses a checkout with no coverage/playwright, naming it', () => {
+    SUITES.forEach((suite) => report(suite, 1));
+    const run = merge('--playwright');
+    expect([run.status, run.stderr]).toEqual([
+      1,
+      "✗ coverage-merge: --playwright: ENOENT: no such file or directory, scandir 'coverage/playwright'\n",
+    ]);
   });
 });

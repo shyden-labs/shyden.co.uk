@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -9,7 +8,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scratchGit, withoutLocalGit } from '../git-env';
+import { runScriptIn, scratchGit } from '../git-env';
 
 /**
  * `scripts/coverage-changed.mjs` as CI runs it (#896): in a real repository
@@ -65,12 +64,7 @@ const report = (tree: string) => {
   writeFileSync(path.join(repo, 'coverage/merged/tree.txt'), `${tree}\n`);
 };
 
-const verdict = (...flags: string[]) =>
-  spawnSync(process.execPath, [SCRIPT, ...flags], {
-    cwd: repo,
-    encoding: 'utf8',
-    env: withoutLocalGit(process.env),
-  });
+const verdict = (...flags: string[]) => runScriptIn(repo, SCRIPT, flags);
 
 const PRINTED =
   '### Coverage of the changed lines (#896)\n\n2 changed lines judged: 1 unrun, 0 unmeasured.\n\n**Unrun** (no test ran these):\n- `src/a.ts:3` (line)\n';
