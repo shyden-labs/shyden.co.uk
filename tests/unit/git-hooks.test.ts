@@ -194,6 +194,14 @@ describe('the pre-push hook', () => {
     );
   });
 
+  it('type-checks so that a hint fails, as an error does (#966)', () => {
+    // astro check exits 0 on a hint, and a deprecated signature is a hint
+    // (ts(6387)): `createVitest('test', …)` passed CI that way in PR #962.
+    expect(packageJson().scripts.typecheck).toBe(
+      'astro check --minimumFailingSeverity hint',
+    );
+  });
+
   it('clears the repository git hands it before any check runs (#377)', () => {
     // From a linked worktree git runs this hook with an absolute GIT_DIR, and
     // the unit suite's scratch-repository tests acted on the real repository
