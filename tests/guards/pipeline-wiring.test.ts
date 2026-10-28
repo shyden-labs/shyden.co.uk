@@ -3914,14 +3914,13 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
   });
 
   it('holds record to a budget measured on its own full runs (#663)', () => {
-    // MEASURED 2026-10-12: the `record` job of all ten full records that had
-    // succeeded took 31.2 to 46.9 minutes (longest: run 38088077407); the
-    // unit and functions modes took 1.5 to 3.4. The 120 it replaced was the
-    // e2e policy's ceiling, set before any record had run.
-    expect(job('record')['timeout-minutes']).toBe(60);
-    // Provisional until #608's AC5 measures a sharded record: the e2e
-    // shards' 17-minute deadline and a quarter more.
-    expect(job('browser')['timeout-minutes']).toBe(25);
+    // MEASURED on #608's AC5 run 40773130895 (the browser stage sharded):
+    // the join took 3.95 minutes in one pass, each Vitest pass 2.0 of it, so
+    // three passes take 7.95 and a quarter more is 10; the ten shards took
+    // 4.7 to 7.7, and a quarter more on the slowest is 10. Before sharding
+    // (#663) the whole record took 31.2 to 46.9 minutes under a limit of 60.
+    expect(job('record')['timeout-minutes']).toBe(10);
+    expect(job('browser')['timeout-minutes']).toBe(10);
   });
 });
 

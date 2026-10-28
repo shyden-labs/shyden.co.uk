@@ -115,9 +115,9 @@ jobs:
     needs: image
     if: inputs.mode == 'full'
     runs-on: ubuntu-26.04
-    # Until #608's AC5 measures a sharded record: the e2e shards' 17-minute
-    # deadline and a quarter more.
-    timeout-minutes: 25
+    # Measured on #608's AC5 run 40773130895: the ten shards took 4.7 to 7.7
+    # minutes (slowest: shard 5). 10 is the slowest and a quarter more.
+    timeout-minutes: 10
     permissions:
       contents: read
     container:
@@ -158,14 +158,15 @@ jobs:
     # skip the shards and never read them (#608, #157).
     if: ${{ !cancelled() && needs.image.result == 'success' && (inputs.mode != 'full' || needs.browser.result == 'success') }}
     runs-on: ubuntu-26.04
-    # The recorder runs the unit, guards and integration suites, the Playwright
-    # specs on every project, and the Functions suite. Measured 2026-10-12
-    # (#663): this job took 31.2 to 46.9 minutes on all ten full records that
-    # had succeeded (longest: run 38088077407), and 1.5 to 3.4 in the unit and
-    # functions modes. 60 is the longest full record and a quarter more; a
-    # record that needs longer has grown, which is a finding, not a reason to
-    # raise this.
-    timeout-minutes: 60
+    # The recorder runs the unit, guards, integration and logs suites and the
+    # Functions suite, and in a full record joins the browser shards (#608).
+    # Measured: the full record's join took 3.95 minutes in one pass (run
+    # 40773130895), each Vitest pass 2.0 of it, and the unit-mode records 2.7
+    # to 4.15 (2026-10-28, runs 40664541086 to 40771054950). A record that
+    # adds ids takes up to two more Vitest passes: 3.95 + 2 x 2.0 = 7.95, and
+    # a quarter more is 10. A record that needs longer has grown, which is a
+    # finding, not a reason to raise this.
+    timeout-minutes: 10
     permissions:
       contents: read
     # The same pinned image and options as ci.yml's e2e shards, so a figure
