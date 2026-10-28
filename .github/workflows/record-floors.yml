@@ -79,6 +79,7 @@ jobs:
       contents: read
     outputs:
       ref: ${{ steps.pick.outputs.ref }}
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
       - name: Refuse anything but a scratch ref
         env:
@@ -98,20 +99,74 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      # The one commit every job measures (#608): a scratch ref pushed again
+      # mid-run would otherwise put the shards and the join on different trees.
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - id: pick
         run: node scripts/playwright-image.mjs
 
-  record:
+  # The browser stage of a full record, as time-planned shards (#608; Shyden
+  # 2026-10-28: "Shard it like e2e", "Keep 1 worker", "Engine+file, like
+  # e2e"). Each runs the `[project] › file` pieces scripts/e2e-shard-plan.mjs
+  # hands it, at one worker, and uploads its observations and a manifest even
+  # when it fails, so the join can name it. N is this matrix's own size.
+  browser:
     needs: image
+    if: inputs.mode == 'full'
     runs-on: ubuntu-26.04
-    # The recorder runs the unit, guards and integration suites, the Playwright
-    # specs on every project, and the Functions suite. Measured 2026-10-12
-    # (#663): this job took 31.2 to 46.9 minutes on all ten full records that
-    # had succeeded (longest: run 38088077407), and 1.5 to 3.4 in the unit and
-    # functions modes. 60 is the longest full record and a quarter more; a
-    # record that needs longer has grown, which is a finding, not a reason to
-    # raise this.
-    timeout-minutes: 60
+    # Measured on #608's AC5 run 40773130895: the ten shards took 4.7 to 7.7
+    # minutes (slowest: shard 5). 10 is the slowest and a quarter more.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.image.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Record this shard's browser floors
+        env:
+          FLOORS_RECORD_IN_IMAGE: '1'
+          SHARD: ${{ matrix.shard }}
+          TOTAL: ${{ strategy.job-total }}
+        run: npm run floors:record -- --browser-shard "$SHARD/$TOTAL" --out "$RUNNER_TEMP/floors-browser"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: floors-browser-${{ matrix.shard }}
+          path: ${{ runner.temp }}/floors-browser
+          retention-days: 7
+          if-no-files-found: error
+
+  record:
+    needs: [image, browser]
+    # A full record joins only shards that all succeeded (a failed shard's own
+    # job is red, and its manifest names it); the unit and functions modes
+    # skip the shards and never read them (#608, #157).
+    if: ${{ !cancelled() && needs.image.result == 'success' && (inputs.mode != 'full' || needs.browser.result == 'success') }}
+    runs-on: ubuntu-26.04
+    # The recorder runs the unit, guards, integration and logs suites and the
+    # Functions suite, and in a full record joins the browser shards (#608).
+    # Measured: the full record's join took 3.95 minutes in one pass (run
+    # 40773130895), each Vitest pass 2.0 of it, and the unit-mode records 2.7
+    # to 4.15 (2026-10-28, runs 40664541086 to 40771054950). A record that
+    # adds ids takes up to two more Vitest passes: 3.95 + 2 x 2.0 = 7.95, and
+    # a quarter more is 10. A record that needs longer has grown, which is a
+    # finding, not a reason to raise this.
+    timeout-minutes: 10
     permissions:
       contents: read
     # The same pinned image and options as ci.yml's e2e shards, so a figure
@@ -122,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.image.outputs.sha }}
           persist-credentials: false
       # The commit the record is made on, handed back with the figures, so
       # `scripts/fold-record.mjs` folds them into that commit and no other.
@@ -133,19 +188,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: cp tests/floors.json "$RUNNER_TEMP/floors-before.json"
+      # Outside the workspace: the recorder refuses a tree holding an
+      # untracked file (#547).
+      - if: inputs.mode == 'full'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: floors-browser-*
+          path: ${{ runner.temp }}/floors-browser
       - name: Record the floors
         shell: bash
         env:
           FLOORS_RECORD_IN_IMAGE: '1'
           MODE: ${{ inputs.mode }}
+          BROWSER: ${{ needs.browser.result }}
         run: |
           case "$MODE" in
-            full) flag='' ;;
-            unit) flag='--unit' ;;
-            functions) flag='--functions' ;;
+            full) flags=(--browser-from "$RUNNER_TEMP/floors-browser" --browser-result "$BROWSER") ;;
+            unit) flags=(--unit) ;;
+            functions) flags=(--functions) ;;
             *) echo "::error::unknown mode $MODE"; exit 1 ;;
           esac
-          npm run floors:record -- $flag 2>&1 | tee "$RUNNER_TEMP/record.log"
+          npm run floors:record -- "${flags[@]}" 2>&1 | tee "$RUNNER_TEMP/record.log"
       - name: Put the recorder's refusal in the summary
         if: failure()
         run: |

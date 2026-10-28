@@ -10,17 +10,7 @@ import {
 } from '../../scripts/e2e-shard-plan.mjs';
 import { timingsFileText } from '../../scripts/e2e-shard-timings.mjs';
 import { listedByUnit, ranByUnit } from '../../scripts/test-e2e.mjs';
-
-/** A `playwright test --list` print, in the list-mode reporter's own shape. */
-function listing(lines: string[], footer = lines.length): string {
-  const files = new Set(lines.map((l) => l.split(' › ')[1].split(':')[0]));
-  return [
-    'Listing tests:',
-    ...lines.map((l) => `  ${l}`),
-    `Total: ${footer} tests in ${files.size} files`,
-    '',
-  ].join('\n');
-}
+import { listing } from '../playwright-listing';
 
 const SUITE = listing([
   '[chromium] › home.spec.ts:5:3 › home › renders',
