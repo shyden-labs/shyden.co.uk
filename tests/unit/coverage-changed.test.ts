@@ -3,6 +3,7 @@ import {
   changedLines,
   isJudged,
   judge,
+  missingMerged,
   render,
 } from '../../scripts/coverage-changed.mjs';
 import type { LocatedCoverage } from '../../scripts/coverage-merge.mjs';
@@ -313,6 +314,39 @@ describe('the verdict as the job summary prints it (#896)', () => {
         '- `src/b.astro:1`',
         '',
       ].join('\n'),
+    );
+  });
+});
+
+describe('a missing merged file is named (#969)', () => {
+  const present =
+    (...files: string[]) =>
+    (file: string) =>
+      files.includes(file);
+
+  it('names nothing when the report and its tree are both there', () => {
+    expect(
+      missingMerged(
+        present('coverage/merged/coverage.json', 'coverage/merged/tree.txt'),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('names the tree file when only it is missing', () => {
+    expect(missingMerged(present('coverage/merged/coverage.json'))).toBe(
+      'coverage-changed: no coverage/merged/tree.txt beside the merged report, so the tree it measured is unknown; run node scripts/coverage-merge.mjs, which writes both',
+    );
+  });
+
+  it('names the report when only it is missing', () => {
+    expect(missingMerged(present('coverage/merged/tree.txt'))).toBe(
+      'coverage-changed: no merged report at coverage/merged/coverage.json; run the suites with coverage, then node scripts/coverage-merge.mjs',
+    );
+  });
+
+  it('names both when both are missing', () => {
+    expect(missingMerged(present())).toBe(
+      'coverage-changed: no merged report at coverage/merged/coverage.json, nor coverage/merged/tree.txt; run the suites with coverage, then node scripts/coverage-merge.mjs',
     );
   });
 });

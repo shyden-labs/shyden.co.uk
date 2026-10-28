@@ -151,6 +151,27 @@ export const render = ({ unrun, unmeasured, judged }) => {
   return `${out.join('\n')}\n`;
 };
 
+const TREE_FILE = 'coverage/merged/tree.txt';
+const REPORT_FILE = 'coverage/merged/coverage.json';
+
+/**
+ * Which of the merged report and the tree it measured is missing, named, or
+ * undefined when both are there (#969: a missing tree was reported as a
+ * missing report).
+ *
+ * @param {(file: string) => boolean} exists
+ * @returns {string | undefined}
+ */
+export const missingMerged = (exists) => {
+  const tree = exists(TREE_FILE);
+  const report = exists(REPORT_FILE);
+  if (tree && report) return undefined;
+  if (report)
+    return `coverage-changed: no ${TREE_FILE} beside the merged report, so the tree it measured is unknown; run node scripts/coverage-merge.mjs, which writes both`;
+  const also = tree ? '' : `, nor ${TREE_FILE}`;
+  return `coverage-changed: no merged report at ${REPORT_FILE}${also}; run the suites with coverage, then node scripts/coverage-merge.mjs`;
+};
+
 /** @param {readonly string[]} args */
 const git = (args) =>
   execFileSync('git', ['-c', 'core.quotePath=false', ...args], {
@@ -162,13 +183,9 @@ const main = () => {
   const flags = argv.slice(2);
   if (flags.some((flag) => flag !== '--report-only'))
     die('usage: coverage-changed.mjs [--report-only]');
-  const treeFile = 'coverage/merged/tree.txt';
-  const reportFile = 'coverage/merged/coverage.json';
-  if (!existsSync(treeFile) || !existsSync(reportFile))
-    die(
-      `coverage-changed: no merged report at ${reportFile}; run the suites with coverage, then node scripts/coverage-merge.mjs`,
-    );
-  const measured = readFileSync(treeFile, 'utf8').trim();
+  const missing = missingMerged(existsSync);
+  if (missing !== undefined) die(missing);
+  const measured = readFileSync(TREE_FILE, 'utf8').trim();
   const tree = git(['rev-parse', 'HEAD^{tree}']).trim();
   if (measured !== tree)
     die(
@@ -187,7 +204,7 @@ const main = () => {
       ]),
     ),
     /** @type {Record<string, LocatedCoverage>} */ (
-      JSON.parse(readFileSync(reportFile, 'utf8'))
+      JSON.parse(readFileSync(REPORT_FILE, 'utf8'))
     ),
   );
   process.stdout.write(render(verdict));

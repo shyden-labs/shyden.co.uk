@@ -95,7 +95,7 @@ describe('coverage-changed.mjs in a real repository', () => {
     const run = verdict('--report-only');
     expect(run.status).toBe(1);
     expect(run.stderr).toBe(
-      '✗ coverage-changed: no merged report at coverage/merged/coverage.json; run the suites with coverage, then node scripts/coverage-merge.mjs\n',
+      '✗ coverage-changed: no merged report at coverage/merged/coverage.json, nor coverage/merged/tree.txt; run the suites with coverage, then node scripts/coverage-merge.mjs\n',
     );
   });
 });
