@@ -59,7 +59,7 @@ const WIDTHS = [
 
 /**
  * Wait until `page` has stopped changing on its own: script, then fonts,
- * then images, then video.
+ * then images.
  */
 async function settle(page: Page): Promise<void> {
   // The heading is the last thing to settle on the two tool pages, whose
@@ -88,28 +88,6 @@ async function settle(page: Page): Promise<void> {
     for (const image of images) image.loading = 'eager';
     await Promise.all(images.map((image) => image.decode()));
   });
-  // Every video settled before any capture (#968). The homepage's promo is
-  // `preload="none"`, so it settles idle with only its poster, which is what
-  // every baseline shows. Until it does, Chromium's controls draw a loading
-  // spinner over the poster: run 40634186625, slowed by coverage, captured
-  // that spinner on 7 homepage baselines and never saw it stop within the
-  // capture's 5 s.
-  const videos = page.locator('video');
-  const idle = await videos.evaluateAll((elements) =>
-    elements.map(() => HTMLMediaElement.NETWORK_IDLE),
-  );
-  await expect
-    .poll(
-      () =>
-        videos.evaluateAll((elements) =>
-          elements.map((video) => (video as HTMLVideoElement).networkState),
-        ),
-      {
-        message: 'every video settles idle, as preload="none" leaves it',
-        timeout: 15_000,
-      },
-    )
-    .toEqual(idle);
 }
 
 /**

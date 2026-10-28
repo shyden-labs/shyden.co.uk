@@ -760,23 +760,13 @@ jobs:
             echo "| \`uname -m\` | \`${arch}\` |"
             echo "| image | \`${IMAGE}\` |"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # Not measured for coverage: the measure step below runs the same spec
+      # under it. Measured here, the gate ran slower and pictured the promo
+      # video's loading spinner on the homepage baselines (run 40634186625,
+      # and again with a networkState wait in run 40636512082; #968).
       - run: npx playwright test --project=visual
         env:
           VISUAL: '1'
-          # Measured for coverage (#913); the web server unsets it.
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
-      # Into the workspace, not the runner's temp folder: every path this
-      # job uploads is read literally by pipeline-wiring's #311 guard.
-      - name: Keep this run's coverage for the coverage job
-        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$PWD/coverage-playwright.tgz" v8 pwcache root.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-playwright-visual
-          path: coverage-playwright.tgz
-          retention-days: 3
-          overwrite: true
-          if-no-files-found: error
       # The MEASUREMENT, never a gate (#224). The step above decides the
       # build; this one only reports how much of `threshold`'s allowance is
       # already spent by differences nobody is looking at -- a baseline
@@ -798,6 +788,10 @@ jobs:
         continue-on-error: true
         env:
           VISUAL_MEASURE: '1'
+          # Measured for coverage (#913) here, where timing decides nothing;
+          # the web server unsets it.
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
         run: |
           npx playwright test --project=visual-measure --reporter=list \
             > measure.log 2>&1 || true
@@ -826,6 +820,17 @@ jobs:
             fi
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # Into the workspace, not the runner's temp folder: every path this
+      # job uploads is read literally by pipeline-wiring's #311 guard.
+      - name: Keep this run's coverage for the coverage job
+        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$PWD/coverage-playwright.tgz" v8 pwcache root.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-playwright-visual
+          path: coverage-playwright.tgz
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
       # expected / actual / diff PNGs, which is the whole point: a visual
       # failure that can only be reproduced locally gets ignored. The gate's
       # images and the measurement's are in separate folders under
