@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { releaseTests } from '../../scripts/release-inventory.mjs';
+import { fixtureReader } from '../fixture-texts';
 
 describe('the capture selection (#362)', () => {
   const sources: Record<string, string> = {
@@ -32,11 +33,7 @@ import { evidencePageOf } from '../evidence-fixture';
 test('the evidence page itself', async ({ page }) => { await shoot(page, 'x'); });
 `,
   };
-  const read = (file: string) => {
-    const source = sources[file];
-    if (source === undefined) throw new Error(`no fixture ${file}`);
-    return source;
-  };
+  const read = fixtureReader(sources);
 
   it('selects each capturing test by file:line, through helpers to a fixed point', () => {
     expect(releaseTests(Object.keys(sources), read)).toEqual([

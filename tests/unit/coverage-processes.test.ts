@@ -16,6 +16,7 @@ import {
   type VitestTool,
 } from '../../scripts/coverage-processes.mjs';
 import { PLAYWRIGHT_MEASURE } from '../coverage-options';
+import { fixtureReader } from '../fixture-texts';
 
 /**
  * Raw V8 coverage from a process Node ran outside Vitest's workers, converted
@@ -74,11 +75,7 @@ const texts: Record<string, string> = {
   'scripts/branch.mjs': JS,
   'scripts/branch.ts': TS,
 };
-const read = (file: string) => {
-  const text = texts[file];
-  if (text === undefined) throw new Error(`no fixture text for ${file}`);
-  return text;
-};
+const read = fixtureReader(texts);
 
 /** A map placing every character of `text` on itself, as base64 VLQ. */
 const identityMap = (text: string, source: string) => {
@@ -420,11 +417,7 @@ const HELPER_MAP = {
   mappings: 'AAAA,MAAM,CAAS,GAAG;AAClB;AACA;AACA;AACA;AACA;',
 };
 const HELPER_URL = 'file:///repo/tests/helper.ts';
-const compiledRead = (file: string) => {
-  if (file !== 'tests/helper.ts')
-    throw new Error(`no fixture text for ${file}`);
-  return HELPER_TS;
-};
+const compiledRead = fixtureReader({ 'tests/helper.ts': HELPER_TS });
 const hashed = (code: string) =>
   `// ${createHash('sha1').update(code).digest('hex')}\n${code}`;
 const cache = indexCompileCache([
@@ -518,11 +511,7 @@ describe('code a tool compiled converts onto the file’s own text (#913)', () =
           ],
         },
       ],
-      (file) => {
-        if (file !== 'tests/bare.ts')
-          throw new Error(`no fixture text for ${file}`);
-        return BARE_TS;
-      },
+      fixtureReader({ 'tests/bare.ts': BARE_TS }),
       ROOT,
       OWN_TEXT,
       {

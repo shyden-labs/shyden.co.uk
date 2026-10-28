@@ -822,7 +822,9 @@ jobs:
       # put 10 more drifted pictures in its report (4 -> 14, run 40638559057),
       # so neither is measured. Its own output folder, so it touches neither's
       # pictures; its pass or fail is never read, as the drift step's is not.
-      # The web server unsets the measurement.
+      # The web server unsets the measurement. Its account, and every test the
+      # reporter names in it, are printed: a test that ended early measured
+      # less, and the last three lines named 2 of the 4 (run 40646068459).
       - name: Measure the visual spec for coverage
         continue-on-error: true
         env:
@@ -832,7 +834,8 @@ jobs:
         run: |
           npx playwright test --project=visual --reporter=dot \
             --output=test-results/visual-coverage > visual-coverage.log 2>&1 || true
-          tail -n 3 visual-coverage.log
+          grep -E '^ +([0-9]+ (passed|failed|flaky|skipped|did not run|interrupted)|\[visual\] › )' visual-coverage.log \
+            || echo 'visual-coverage.log holds no account'
       # Into the workspace, not the runner's temp folder: every path this
       # job uploads is read literally by pipeline-wiring's #311 guard.
       - name: Keep this run's coverage for the coverage job

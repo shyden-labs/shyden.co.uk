@@ -850,4 +850,35 @@ describe('every job that uploads Playwright coverage is joined, waited for and m
       playwrightCoverageFindings('jobs:\n  e2e:\n    runs-on: x\n', 'ci.yml'),
     ).toThrow("ci.yml job 'e2e' has no steps list");
   });
+
+  it('a job with an empty body is refused', () => {
+    expect(() =>
+      playwrightCoverageFindings('jobs:\n  e2e:\n', 'ci.yml'),
+    ).toThrow("ci.yml job 'e2e' has no steps list");
+  });
+
+  it('a workflow whose jobs are not a mapping is refused', () => {
+    expect(() => playwrightCoverageFindings('jobs: 3\n', 'ci.yml')).toThrow(
+      'ci.yml has no jobs mapping',
+    );
+  });
+
+  it('an empty workflow is refused', () => {
+    expect(() => playwrightCoverageFindings('', 'ci.yml')).toThrow(
+      'ci.yml has no jobs mapping',
+    );
+  });
+
+  it('a joining job with no condition runs whatever every producer concluded', () => {
+    const wired = coverageWiring();
+    const text = wired.replace(/^ {4}if: .*\n/m, '');
+    expect([wired.length > text.length, text.includes('    if:')]).toEqual([
+      true,
+      false,
+    ]);
+    expect(playwrightCoverageFindings(text, 'ci.yml').findings).toEqual([
+      'coverage-playwright runs whatever e2e concluded',
+      'coverage-playwright runs whatever visual concluded',
+    ]);
+  });
 });

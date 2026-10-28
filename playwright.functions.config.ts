@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 import { BASE_URL, PASSWORD } from './tests/functions/local.mjs';
-import { unmeasured } from './tests/coverage-options';
 import { ENGINES, engineUse } from './tests/engines';
 
 /**
@@ -15,7 +14,9 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   webServer: {
-    command: unmeasured('node tests/functions/serve.mjs'),
+    // Measured, unlike every other web server: the script clears the
+    // measurement for everything it starts (#913).
+    command: 'node tests/functions/serve.mjs',
     // webServer takes no credentials, and the dev gate answers 401 without
     // them, which Playwright counts as up. So readiness only means "serving";
     // the health test, first in the file with one worker, is what proves the
@@ -25,6 +26,10 @@ export default defineConfig({
     // mutation would then be tested against code it never reached.
     reuseExistingServer: false,
     timeout: 240_000,
+    // Without this Playwright SIGKILLs the server, and a killed process never
+    // writes its coverage (#913). serve.mjs passes SIGTERM on to wrangler and
+    // exits when it does; past 10 s Playwright still kills it.
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
   },
   use: {
     baseURL: BASE_URL,

@@ -13,6 +13,7 @@ import {
 import { floorBreach } from '../floors';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
+import { serverCoverageFindings, type WebServer } from '../web-server-coverage';
 import { workflowJobs } from '../workflow-jobs';
 
 type PlaywrightConfigModule = typeof import('../../playwright.config');
@@ -937,12 +938,14 @@ describe('no test run retries (#445)', () => {
   });
 });
 
-describe('no Playwright web server writes raw coverage (#913)', () => {
+describe('no Playwright web server measures what it starts (#913)', () => {
   // A web server builds the site, loading src/ through Vite: code neither its
   // own text nor in Playwright's compile cache, which the coverage of a
   // Playwright run refuses. The build's coverage is #914's. Every config is
-  // read with the sanity switch on, so the sanity configs declare theirs.
-  const servers: { id: string; command: string }[] = [];
+  // read with the sanity switch on, so the sanity configs declare theirs. A
+  // `node <script>` server is measured when its script clears the variable
+  // before it starts anything, so its own code is judged and nothing else.
+  const servers: WebServer[] = [];
 
   beforeAll(async () => {
     for (const file of rootConfigs()) {
@@ -958,19 +961,16 @@ describe('no Playwright web server writes raw coverage (#913)', () => {
         servers.push({
           id: `${file} › web server ${i + 1}`,
           command: server.command,
+          signal: server.gracefulShutdown?.signal,
         }),
       );
     }
   });
 
-  it('starts every web server with NODE_V8_COVERAGE unset', () => {
+  it('starts every web server with NODE_V8_COVERAGE unset, or cleared by its script', () => {
     expect(
       searched(
-        servers
-          .filter(
-            ({ command }) => !command.startsWith('unset NODE_V8_COVERAGE; '),
-          )
-          .map(({ id, command }) => `${id}: ${command}`),
+        serverCoverageFindings(servers, (file) => readFileSync(file, 'utf8')),
         { of: servers, what: 'Playwright web servers' },
       ),
     ).toEqual([]);
