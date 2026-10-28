@@ -154,6 +154,28 @@ describe('fold folds a record into the unpushed commit it measured', () => {
       `git commit --amend -F ${DIR}/visual-capture/message.txt`,
     ]);
   });
+
+  it('folds a full record beside the artifacts its browser shards left (#608)', () => {
+    const { io, calls } = world({
+      artifacts: {
+        ...floorsArtifact(),
+        'floors-browser-1': {},
+        'floors-browser-10': {},
+      },
+    });
+    expect(fold('8', io)).toEqual({
+      folded: [
+        `Folded 1 file from run 8 (floors-record) into ${FOLDED}.`,
+        'Push it once, normally: git push origin 889-bots-push-nothing',
+        'Then delete the scratch ref: git push origin --delete refs/floors/889-bots-push-nothing',
+      ],
+    });
+    expect(changedNothing(calls)).toEqual([
+      `copy ${DIR}/floors-record/floors.json tests/floors.json`,
+      'git add -- tests/floors.json',
+      `git commit --amend -F ${DIR}/floors-record/message.txt`,
+    ]);
+  });
 });
 
 describe('fold refuses, by name, before it changes anything', () => {
@@ -190,6 +212,37 @@ describe('fold refuses, by name, before it changes anything', () => {
     expect(fold('7', io)).toEqual({
       refusal:
         'fold-record: run 7 holds e2e-accounts-1; expected exactly one of floors-record, visual-capture',
+    });
+    expect(calls).toEqual([`gh run download 7 -D ${DIR}`]);
+  });
+
+  it('refuses a browser shard’s artifact beside a visual capture (#608)', () => {
+    const { io, calls } = world({
+      artifacts: { ...visualArtifact(), 'floors-browser-1': {} },
+    });
+    expect(fold('7', io)).toEqual({
+      refusal:
+        'fold-record: run 7 holds floors-browser-1, visual-capture; expected exactly one of floors-record, visual-capture',
+    });
+    expect(calls).toEqual([`gh run download 7 -D ${DIR}`]);
+  });
+
+  it('refuses a browser shard’s artifact with no record beside it (#608)', () => {
+    const { io, calls } = world({ artifacts: { 'floors-browser-1': {} } });
+    expect(fold('7', io)).toEqual({
+      refusal:
+        'fold-record: run 7 holds floors-browser-1; expected exactly one of floors-record, visual-capture',
+    });
+    expect(calls).toEqual([`gh run download 7 -D ${DIR}`]);
+  });
+
+  it('refuses a name only shaped like a shard’s, beside a record (#608)', () => {
+    const { io, calls } = world({
+      artifacts: { ...floorsArtifact(), 'floors-browser-x': {} },
+    });
+    expect(fold('7', io)).toEqual({
+      refusal:
+        'fold-record: run 7 holds floors-browser-x, floors-record; expected exactly one of floors-record, visual-capture',
     });
     expect(calls).toEqual([`gh run download 7 -D ${DIR}`]);
   });

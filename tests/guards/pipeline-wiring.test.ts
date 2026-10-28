@@ -3678,6 +3678,9 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
   };
   type Job = {
     needs?: unknown;
+    if?: string;
+    outputs?: Record<string, string>;
+    strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: unknown } };
     permissions?: Record<string, string>;
     container?: { image?: string; options?: string };
     'timeout-minutes'?: unknown;
@@ -3711,8 +3714,12 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
     expect(inputs.ref?.required).toBe(true);
   });
 
-  it('is one job set of image and record', () => {
-    expect(Object.keys(recorder().jobs)).toEqual(['image', 'record']);
+  it('is one job set of image, the browser shards and record (#608)', () => {
+    expect(Object.keys(recorder().jobs)).toEqual([
+      'image',
+      'browser',
+      'record',
+    ]);
   });
 
   it('is not referenced by ci.yml, and no job of ci.yml needs it', () => {
@@ -3747,17 +3754,28 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
   });
 
   it('checks out the ref it refused nothing for, and keeps no credential', () => {
-    const checkouts = ['image', 'record'].flatMap((id) =>
+    const checkouts = ['image', 'browser', 'record'].flatMap((id) =>
       steps(id).filter(({ uses }) => uses?.startsWith('actions/checkout@')),
     );
+    // The image job checks out the ref it refused nothing for; every other job
+    // checks out the one commit it read there, so a scratch ref pushed again
+    // mid-run cannot put the shards and the join on different trees (#608).
     expect(checkouts.map((step) => step.with)).toEqual([
       { ref: '${{ inputs.ref }}', 'persist-credentials': false },
-      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
+      { ref: '${{ needs.image.outputs.sha }}', 'persist-credentials': false },
+      { ref: '${{ needs.image.outputs.sha }}', 'persist-credentials': false },
     ]);
+    expect(job('image').outputs).toEqual({
+      ref: '${{ steps.pick.outputs.ref }}',
+      sha: '${{ steps.sha.outputs.sha }}',
+    });
+    expect(steps('image').find(({ id }) => id === 'sha')?.run).toBe(
+      'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"',
+    );
   });
 
   it('never interpolates an input into a script', () => {
-    const scripts = ['image', 'record'].flatMap(runsOf);
+    const scripts = ['image', 'browser', 'record'].flatMap(runsOf);
     expect(
       searched(
         scripts.filter((run) => run.includes('${{')),
@@ -3822,6 +3840,71 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
       run?.includes('floors:record'),
     );
     expect(record?.env?.FLOORS_RECORD_IN_IMAGE).toBe('1');
+    expect(job('browser').container).toEqual(job('record').container);
+    const shard = steps('browser').find(({ run }) =>
+      run?.includes('floors:record'),
+    );
+    expect(shard?.env?.FLOORS_RECORD_IN_IMAGE).toBe('1');
+  });
+
+  it('runs the browser stage as a full record’s shards, each reporting even when it fails (#608)', () => {
+    const browser = job('browser');
+    expect(browser.needs).toBe('image');
+    expect(browser.if).toBe("inputs.mode == 'full'");
+    expect(browser.strategy?.['fail-fast']).toBe(false);
+    expect(browser.strategy?.matrix?.shard).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    ]);
+    const shard = steps('browser').find(({ run }) =>
+      run?.includes('floors:record'),
+    );
+    expect(shard?.env).toEqual({
+      FLOORS_RECORD_IN_IMAGE: '1',
+      SHARD: '${{ matrix.shard }}',
+      TOTAL: '${{ strategy.job-total }}',
+    });
+    expect(shard?.run).toBe(
+      'npm run floors:record -- --browser-shard "$SHARD/$TOTAL" --out "$RUNNER_TEMP/floors-browser"',
+    );
+    const upload = steps('browser').find(({ uses }) =>
+      uses?.startsWith('actions/upload-artifact@'),
+    );
+    expect(upload?.if).toBe('always()');
+    expect(upload?.with).toEqual({
+      name: 'floors-browser-${{ matrix.shard }}',
+      path: '${{ runner.temp }}/floors-browser',
+      'retention-days': 7,
+      'if-no-files-found': 'error',
+    });
+  });
+
+  it('joins only shards that all succeeded, handing the recorder their result (#608)', () => {
+    const record = job('record');
+    expect(record.needs).toEqual(['image', 'browser']);
+    expect(record.if).toBe(
+      "${{ !cancelled() && needs.image.result == 'success' && (inputs.mode != 'full' || needs.browser.result == 'success') }}",
+    );
+    const download = steps('record').find(({ uses }) =>
+      uses?.startsWith('actions/download-artifact@'),
+    );
+    expect(download?.if).toBe("inputs.mode == 'full'");
+    expect(download?.with).toEqual({
+      pattern: 'floors-browser-*',
+      path: '${{ runner.temp }}/floors-browser',
+    });
+    const step = steps('record').find(({ run }) =>
+      run?.includes('floors:record'),
+    );
+    expect(step?.env?.BROWSER).toBe('${{ needs.browser.result }}');
+    expect(linesOf(step?.run)).toEqual([
+      'case "$MODE" in',
+      'full) flags=(--browser-from "$RUNNER_TEMP/floors-browser" --browser-result "$BROWSER") ;;',
+      'unit) flags=(--unit) ;;',
+      'functions) flags=(--functions) ;;',
+      '*) echo "::error::unknown mode $MODE"; exit 1 ;;',
+      'esac',
+      'npm run floors:record -- "${flags[@]}" 2>&1 | tee "$RUNNER_TEMP/record.log"',
+    ]);
   });
 
   it('lists the figures it moved from the JSON diff', () => {
@@ -3836,6 +3919,9 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
     // unit and functions modes took 1.5 to 3.4. The 120 it replaced was the
     // e2e policy's ceiling, set before any record had run.
     expect(job('record')['timeout-minutes']).toBe(60);
+    // Provisional until #608's AC5 measures a sharded record: the e2e
+    // shards' 17-minute deadline and a quarter more.
+    expect(job('browser')['timeout-minutes']).toBe(25);
   });
 });
 
@@ -4206,6 +4292,7 @@ describe('neither bot can push, commit or amend (#889)', () => {
       workflow: {},
       jobs: {
         image: { permissions: { contents: 'read' }, uses: undefined },
+        browser: { permissions: { contents: 'read' }, uses: undefined },
         record: { permissions: { contents: 'read' }, uses: undefined },
       },
     });
@@ -4221,16 +4308,24 @@ describe('neither bot can push, commit or amend (#889)', () => {
     });
   });
 
-  it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
-    '%s uses checkout, setup-node and upload-artifact, and no other action',
-    (file) => {
-      expect(actionsOf(file).sort()).toEqual([
-        'actions/checkout',
-        'actions/setup-node',
-        'actions/upload-artifact',
-      ]);
-    },
-  );
+  it('visual-capture.yml uses checkout, setup-node and upload-artifact, and no other action', () => {
+    expect(actionsOf(CAPTURE_WORKFLOW).sort()).toEqual([
+      'actions/checkout',
+      'actions/setup-node',
+      'actions/upload-artifact',
+    ]);
+  });
+
+  it('record-floors.yml adds only download-artifact, for the join to read its own shards (#608)', () => {
+    // Read-only: it fetches this run's floors-browser-<i> artifacts, and
+    // nothing in it can push, commit or call the API.
+    expect(actionsOf(RECORDER_WORKFLOW).sort()).toEqual([
+      'actions/checkout',
+      'actions/download-artifact',
+      'actions/setup-node',
+      'actions/upload-artifact',
+    ]);
+  });
 
   it('runs no recorder line that pushes, commits or amends, and calls no gh', () => {
     const lines = scriptLines(RECORDER_WORKFLOW);

@@ -55,6 +55,13 @@ const KINDS = {
 };
 
 /**
+ * A full record's browser shards each upload their observations (#608), and
+ * the join reads them; they are the record's inputs, never folded. Set aside
+ * only beside a `floors-record`, so a run of anything else still refuses them.
+ */
+const SHARD_INPUT = /^floors-browser-\d+$/;
+
+/**
  * The files an artifact folds in, `from` inside the artifact and `to` in the
  * tree, or why it may not be folded.
  *
@@ -98,9 +105,14 @@ export const fold = (runId, io) => {
   const dir = io.tempDir();
   io.download(runId, dir);
   const found = io.list(dir).sort();
+  const artifacts = found.includes('floors-record')
+    ? found.filter((name) => !SHARD_INPUT.test(name))
+    : found;
   const known = Object.keys(KINDS);
   const kind = /** @type {keyof typeof KINDS | undefined} */ (
-    found.length === 1 && known.includes(found[0] ?? '') ? found[0] : undefined
+    artifacts.length === 1 && known.includes(artifacts[0] ?? '')
+      ? artifacts[0]
+      : undefined
   );
   if (kind === undefined)
     return refuse(

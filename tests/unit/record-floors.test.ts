@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  browserArguments,
   describeMoves,
   recordArguments,
   retireRefusals,
@@ -146,6 +147,92 @@ describe('recordArguments reads the mode and the ids to retire', () => {
     expect(recordArguments(['--units'])).toBe(
       'usage: npm run floors:record [-- --unit | --functions | --unit-suite | ' +
         '--device] [--retire <id>]... (got --units)',
+    );
+  });
+});
+
+/**
+ * The browser stage's two CI forms (#608): a shard runs its planned pieces
+ * and writes a manifest; the join is a full record whose Playwright stage
+ * reads the shards. Both run in the image alone, apart from every laptop mode.
+ */
+describe('browserArguments reads the browser shard and join forms (#608)', () => {
+  const USAGE =
+    'usage (CI only): npm run floors:record -- --browser-shard <i>/<n> --out <dir> | ' +
+    '--browser-from <dir> --browser-result <result>';
+
+  it('leaves a record with neither form to recordArguments', () => {
+    expect(browserArguments(['--unit', '--retire', 'x/one'], true)).toBe(
+      undefined,
+    );
+  });
+
+  it('reads a shard with its output folder, in either order', () => {
+    expect(
+      browserArguments(['--out', 'shard-2', '--browser-shard', '2/10'], true),
+    ).toEqual({ shard: { index: 2, total: 10 }, out: 'shard-2' });
+  });
+
+  it('reads the join with the shards’ folder and their result', () => {
+    expect(
+      browserArguments(
+        ['--browser-from', 'shards', '--browser-result', 'success'],
+        true,
+      ),
+    ).toEqual({ browserFrom: 'shards', browserResult: 'success' });
+  });
+
+  it.each([
+    ['a shard', ['--browser-shard', '1/2', '--out', 'd']],
+    ['the join', ['--browser-from', 'd', '--browser-result', 'success']],
+  ])('refuses %s outside the image', (_, args) => {
+    expect(browserArguments(args, false)).toBe(
+      'the browser shards and their join run in CI’s image alone: the laptop records unsharded',
+    );
+  });
+
+  it.each([
+    ['a shard written with a dash', ['--browser-shard', '2-10', '--out', 'd']],
+    ['a shard with no count', ['--browser-shard', '2/', '--out', 'd']],
+    ['a shard with no output folder', ['--browser-shard', '2/10']],
+    ['an output folder with no shard', ['--out', 'd']],
+    ['a value that is a flag', ['--browser-shard', '2/10', '--out', '--unit']],
+    [
+      'a laptop mode beside a shard',
+      ['--browser-shard', '2/10', '--out', 'd', '--unit'],
+    ],
+    [
+      'a retire beside the join',
+      [
+        '--browser-from',
+        'd',
+        '--browser-result',
+        'success',
+        '--retire',
+        'x/one',
+      ],
+    ],
+    ['the join with no result', ['--browser-from', 'd']],
+    [
+      'a flag given twice',
+      ['--browser-shard', '2/10', '--out', 'd', '--out', 'e'],
+    ],
+    [
+      'both forms at once',
+      [
+        '--browser-shard',
+        '1/2',
+        '--out',
+        'd',
+        '--browser-from',
+        'e',
+        '--browser-result',
+        'success',
+      ],
+    ],
+  ])('refuses %s', (_, args) => {
+    expect(browserArguments(args, true)).toBe(
+      `${USAGE} (got ${args.join(' ')})`,
     );
   });
 });

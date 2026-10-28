@@ -72,18 +72,26 @@
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { isAbsolute, join, posix, relative, sep } from 'node:path';
+import { isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { argv, env } from 'node:process';
 
 import { listDevices, pickIphone } from './devicectl.mjs';
+import { unitsOfListing } from './e2e-shard-plan.mjs';
 import { die, messageOf, nonEmpty } from './errors.mjs';
 import { containerArgs, localImage } from './playwright-image.mjs';
+import {
+  joinRefusals,
+  readManifest,
+  shardManifest,
+  shardRecordRun,
+} from './record-shards.mjs';
 
 const UNIT = 'unit suite';
 const GUARDS = 'guards suite';
@@ -699,6 +707,68 @@ export const recordArguments = (args) => {
   return modes.length > 1 ? usage : { mode: modes[0], retired };
 };
 
+const BROWSER_SHARD = '--browser-shard';
+const BROWSER_OUT = '--out';
+const BROWSER_FROM = '--browser-from';
+const BROWSER_RESULT = '--browser-result';
+const BROWSER_FLAGS = [
+  BROWSER_SHARD,
+  BROWSER_OUT,
+  BROWSER_FROM,
+  BROWSER_RESULT,
+];
+
+/**
+ * The browser stage's two CI forms (#608), or undefined when `args` name
+ * neither, which leaves them to `recordArguments`. A shard
+ * (`--browser-shard i/n --out <dir>`) runs its planned pieces and writes a
+ * manifest; the join (`--browser-from <dir> --browser-result <result>`) is a
+ * full record whose Playwright stage reads the shards. Each form stands
+ * alone, with no laptop mode and no retire beside it, and both are refused
+ * outside the image, since the laptop records unsharded.
+ *
+ * @param {readonly string[]} args
+ * @param {boolean} inImage
+ * @returns {undefined | string | { shard: { index: number, total: number }, out: string } | { browserFrom: string, browserResult: string }}
+ */
+export const browserArguments = (args, inImage) => {
+  if (!args.some((arg) => BROWSER_FLAGS.includes(arg))) return undefined;
+  if (!inImage)
+    return 'the browser shards and their join run in CI’s image alone: the laptop records unsharded';
+  const usage =
+    `usage (CI only): npm run floors:record -- ${BROWSER_SHARD} <i>/<n> ${BROWSER_OUT} <dir> | ` +
+    `${BROWSER_FROM} <dir> ${BROWSER_RESULT} <result> (got ${args.join(' ')})`;
+  /** @type {Map<string, string>} */
+  const values = new Map();
+  for (let i = 0; i < args.length; i += 2) {
+    const flag = args[i];
+    const value = args[i + 1];
+    if (
+      flag === undefined ||
+      values.has(flag) ||
+      value === undefined ||
+      value.startsWith('-')
+    )
+      return usage;
+    values.set(flag, value);
+  }
+  const named = [...values.keys()].sort().join(' ');
+  if (named === [BROWSER_OUT, BROWSER_SHARD].sort().join(' ')) {
+    const shard = /^(\d+)\/(\d+)$/.exec(values.get(BROWSER_SHARD) ?? '');
+    if (!shard) return usage;
+    return {
+      shard: { index: Number(shard[1]), total: Number(shard[2]) },
+      out: values.get(BROWSER_OUT) ?? '',
+    };
+  }
+  if (named === [BROWSER_FROM, BROWSER_RESULT].sort().join(' '))
+    return {
+      browserFrom: values.get(BROWSER_FROM) ?? '',
+      browserResult: values.get(BROWSER_RESULT) ?? '',
+    };
+  return usage;
+};
+
 /** Passes a record may take before its ids are called unsettled. */
 export const MAX_PASSES = 3;
 
@@ -862,6 +932,155 @@ const spelledUnderTests = (id) =>
     )
     .sort();
 
+/** The timings the e2e shards and the record's shards both plan from (#607, #608). */
+const SHARD_TIMINGS = 'tests/e2e-shard-timings.json';
+
+/**
+ * The floor specs' pieces as `playwright test --list` prints them: the one
+ * listing every record shard plans from and the join judges against (#608).
+ * Throws rather than dies, so a join inside `measure` keeps its cleanup.
+ *
+ * @param {readonly string[]} specs
+ * @returns {string}
+ */
+const floorListing = (specs) => {
+  const [file, ...command] = PLAYWRIGHT_TEST;
+  const run = spawnSync(file, [...command, '--list', ...specs], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const refusal = runRefusal(`${PLAYWRIGHT} --list`, run);
+  if (refusal !== undefined) throw new Error(refusal);
+  return run.stdout;
+};
+
+/** @returns {string} HEAD's SHA, or '' when git cannot say (a manifest then fails its own check) */
+const headSha = () =>
+  (
+    spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout ?? ''
+  ).trim();
+
+/**
+ * One browser shard of a full record (#608): runs the pieces the time plan
+ * hands it at one worker, records into `<out>/observations.jsonl`, writes
+ * `<out>/manifest.json` with Playwright's own exit status, and exits with
+ * that status only after the manifest is written, so a failed shard still
+ * reports and the join names it. It never touches the floors file.
+ *
+ * @param {{ shard: { index: number, total: number }, out: string }} run
+ */
+const recordShard = ({ shard, out }) => {
+  const untracked = untrackedTreeRefusal((command, args) =>
+    spawnSync(command, args, { encoding: 'utf8' }),
+  );
+  if (untracked !== undefined) die(untracked);
+  const specs = floorSpecs();
+  if (specs.length === 0)
+    die('no Playwright spec calls floorBreach: nothing to record there');
+  /** @type {{ testList: string, units: string[], report: string }} */
+  let planned;
+  try {
+    planned = shardRecordRun({
+      listing: floorListing(specs),
+      timingsText: readFileSync(SHARD_TIMINGS, 'utf8'),
+      shard,
+    });
+  } catch (error) {
+    return die(
+      `record shard ${shard.index} of ${shard.total}: ${messageOf(error)}`,
+    );
+  }
+  console.log(planned.report);
+  mkdirSync(out, { recursive: true });
+  const listPath = join(out, 'test-list.txt');
+  writeFileSync(listPath, planned.testList);
+  const [file, ...command] = PLAYWRIGHT_TEST;
+  const result = spawnSync(file, [...command, '--test-list', listPath], {
+    stdio: 'inherit',
+    env: childEnv(env, resolve(out, 'observations.jsonl')),
+  });
+  const status = result.status ?? 1;
+  writeFileSync(
+    join(out, 'manifest.json'),
+    shardManifest({
+      index: shard.index,
+      total: shard.total,
+      sha: headSha(),
+      status,
+      units: planned.units,
+    }),
+  );
+  if (result.error !== undefined)
+    die(`record shard ${shard.index}: ${messageOf(result.error)}`);
+  process.exit(status);
+};
+
+/**
+ * The browser shards' observations, joined (#608), or why they cannot be:
+ * every shard folder under `dir` must hold a manifest, and `joinRefusals`
+ * judges them against the join's own listing and HEAD, with each shard's
+ * observations counted here from its own file.
+ *
+ * @param {string} dir
+ * @param {string} browserResult the browser matrix's own result
+ * @param {readonly string[]} specs
+ * @returns {Observation[] | string}
+ */
+const joinedShards = (dir, browserResult, specs) => {
+  /** @type {import('./record-shards.mjs').Manifest[]} */
+  const manifests = [];
+  /** @type {Record<number, number>} */
+  const observed = {};
+  /** @type {Observation[]} */
+  const seen = [];
+  /** @type {string[]} */
+  let folders;
+  try {
+    folders = nonEmpty(
+      readdirSync(dir),
+      `browser shard folders in ${dir}`,
+    ).sort();
+  } catch (error) {
+    return `the browser shards cannot be joined: ${messageOf(error)}`;
+  }
+  for (const folder of folders) {
+    const manifestFile = join(dir, folder, 'manifest.json');
+    if (!existsSync(manifestFile))
+      return `the browser shards cannot be joined: ${join(dir, folder)} holds no manifest.json`;
+    try {
+      manifests.push(readManifest(readFileSync(manifestFile, 'utf8')));
+    } catch (error) {
+      return `the browser shards cannot be joined: ${manifestFile}: ${messageOf(error)}`;
+    }
+    const shard = manifests[manifests.length - 1];
+    const read = observationsIn(join(dir, folder, 'observations.jsonl'));
+    if (shard !== undefined)
+      observed[shard.index] = (observed[shard.index] ?? 0) + read.length;
+    seen.push(...read);
+  }
+  const first = manifests[0];
+  if (first === undefined)
+    return `the browser shards cannot be joined: no shard reported in ${dir}`;
+  /** @type {string[]} */
+  let expected;
+  try {
+    expected = unitsOfListing(floorListing(specs)).map(({ key }) => key);
+  } catch (error) {
+    return `the browser shards cannot be joined: the join's own listing: ${messageOf(error)}`;
+  }
+  const refusals = joinRefusals({
+    expected,
+    total: first.total,
+    sha: headSha(),
+    manifests,
+    observed,
+    browserResult,
+  });
+  return refusals.length > 0
+    ? `the browser shards cannot be joined:\n  ${refusals.join('\n  ')}`
+    : seen;
+};
+
 /**
  * @returns {void}
  */
@@ -869,7 +1088,16 @@ const main = () => {
   const inImage = recordsInImage(env);
   if (env.CI && !inImage)
     die('CI never records floors: run npm run floors:record locally');
-  const parsed = recordArguments(argv.slice(2));
+  // The browser stage's CI forms (#608): a shard runs and exits on its own;
+  // the join is a full record whose Playwright stage reads the shards.
+  const browser = browserArguments(argv.slice(2), inImage);
+  if (typeof browser === 'string') die(browser);
+  if (browser !== undefined && 'shard' in browser) return recordShard(browser);
+  const shardsJoin = browser;
+  const parsed =
+    shardsJoin === undefined
+      ? recordArguments(argv.slice(2))
+      : { mode: undefined, retired: [] };
   if (typeof parsed === 'string') die(parsed);
   const { mode, retired } = parsed;
 
@@ -1025,7 +1253,18 @@ const main = () => {
           );
           if (logsRefusal !== undefined) return logsRefusal;
         }
-        if (suites.playwright) {
+        if (suites.playwright && shardsJoin !== undefined) {
+          console.log(
+            `Joining the Playwright floors from the browser shards in ${shardsJoin.browserFrom}`,
+          );
+          const joined = joinedShards(
+            shardsJoin.browserFrom,
+            shardsJoin.browserResult,
+            specs,
+          );
+          if (typeof joined === 'string') return joined;
+          e2eSeen = joined;
+        } else if (suites.playwright) {
           const image = inImage ? 'the running container' : localImage();
           const e2e = join(dir, 'e2e.jsonl');
           console.log(
