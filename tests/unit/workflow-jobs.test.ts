@@ -4,6 +4,7 @@ import {
   checkoutSteps,
   isAggregate,
   jobsDownstreamOfAConditionalJob,
+  playwrightCoverageFindings,
   skippedUpstreamFindings,
   unboundedJobFindings,
   workflowJobs,
@@ -688,5 +689,165 @@ describe('an aggregate judges its needs in a step, and only that shape is excuse
         workflowJobs(aggregateShape(shape), 'fixture.yml'),
       ),
     ).toContain(NEVER_REQUIRES);
+  });
+});
+
+/** A workflow with two Playwright jobs uploading coverage and the job that joins them. */
+const coverageWiring = ({
+  needs = '[e2e, visual]',
+  condition = "always() && needs.e2e.result == 'success' && needs.visual.result == 'success'",
+  visualEnv = 'NODE_V8_COVERAGE: v8\n          PWTEST_CACHE_DIR: pwcache',
+  jobEnv = '',
+  extra = '',
+}: {
+  needs?: string;
+  condition?: string;
+  visualEnv?: string;
+  jobEnv?: string;
+  extra?: string;
+} = {}) => `
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm run test:e2e
+        env:
+          NODE_V8_COVERAGE: v8
+          PWTEST_CACHE_DIR: pwcache
+      - uses: actions/upload-artifact@0000000000000000000000000000000000000000
+        with:
+          name: coverage-playwright-\${{ matrix.shard }}
+  visual:
+    runs-on: ubuntu-latest${jobEnv}
+    steps:
+      - run: npx playwright test --project=visual
+        env:
+          ${visualEnv}
+      - uses: actions/upload-artifact@0000000000000000000000000000000000000000
+        with:
+          name: coverage-playwright-visual
+${extra}  coverage-playwright:
+    needs: ${needs}
+    if: ${condition}
+    runs-on: ubuntu-latest
+    steps:
+      - run: node scripts/coverage-merge.mjs --playwright
+`;
+
+describe('every job that uploads Playwright coverage is joined, waited for and measured (#913)', () => {
+  it('a wired workflow reads its two producers twice over and finds nothing', () => {
+    const wiring = playwrightCoverageFindings(coverageWiring(), 'ci.yml');
+    const producers = [...wiring.producers];
+    expect([wiring.producers, wiring.measured]).toEqual([
+      ['e2e', 'visual'],
+      ['e2e', 'visual'],
+    ]);
+    expect(
+      searched([...wiring.findings], {
+        of: producers,
+        what: 'fixture jobs uploading Playwright coverage',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'workflow-jobs/playwright-coverage-producers',
+        producers.length,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('a producer the joining job does not need is named', () => {
+    expect(
+      playwrightCoverageFindings(coverageWiring({ needs: '[e2e]' }), 'ci.yml')
+        .findings,
+    ).toEqual([
+      'visual uploads Playwright coverage, and coverage-playwright does not need it',
+    ]);
+  });
+
+  it('a producer whose success the joining job does not require is named', () => {
+    expect(
+      playwrightCoverageFindings(
+        coverageWiring({
+          condition: "always() && needs.e2e.result == 'success'",
+        }),
+        'ci.yml',
+      ).findings,
+    ).toEqual(['coverage-playwright runs whatever visual concluded']);
+  });
+
+  it('a producer that sets NODE_V8_COVERAGE without the compile cache is named', () => {
+    expect(
+      playwrightCoverageFindings(
+        coverageWiring({ visualEnv: 'NODE_V8_COVERAGE: v8' }),
+        'ci.yml',
+      ).findings,
+    ).toEqual([
+      'visual uploads Playwright coverage, and no step of it sets both NODE_V8_COVERAGE and PWTEST_CACHE_DIR',
+    ]);
+  });
+
+  it('a job-level env counts for every step of the job', () => {
+    const wiring = playwrightCoverageFindings(
+      coverageWiring({
+        visualEnv: 'VISUAL: "1"',
+        jobEnv:
+          '\n    env:\n      NODE_V8_COVERAGE: v8\n      PWTEST_CACHE_DIR: pwcache',
+      }),
+      'ci.yml',
+    );
+    expect([wiring.measured, wiring.findings.length]).toEqual([
+      ['e2e', 'visual'],
+      0,
+    ]);
+  });
+
+  it('a job that measures and uploads nothing reads apart from the producers', () => {
+    const wiring = playwrightCoverageFindings(
+      coverageWiring({
+        extra:
+          '  functions:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm run test:functions\n        env:\n          NODE_V8_COVERAGE: v8\n',
+      }),
+      'ci.yml',
+    );
+    expect([wiring.producers, wiring.measured]).toEqual([
+      ['e2e', 'visual'],
+      ['e2e', 'visual', 'functions'],
+    ]);
+  });
+
+  it('a workflow with no joining job is named', () => {
+    const text = coverageWiring().split('  coverage-playwright:')[0] ?? '';
+    expect(playwrightCoverageFindings(text, 'ci.yml').findings).toEqual([
+      'ci.yml has no coverage-playwright job to join them',
+    ]);
+  });
+
+  it('a step that is not a mapping is refused', () => {
+    expect(() =>
+      playwrightCoverageFindings(
+        'jobs:\n  e2e:\n    runs-on: x\n    steps:\n      - just text\n',
+        'ci.yml',
+      ),
+    ).toThrow("ci.yml job 'e2e': step 1 is not a mapping");
+  });
+
+  it('a job that calls another workflow is read as no steps of its own', () => {
+    const wiring = playwrightCoverageFindings(
+      coverageWiring({
+        extra: '  logs:\n    uses: ./.github/workflows/logs.yml\n',
+      }),
+      'ci.yml',
+    );
+    expect([wiring.producers, wiring.findings.length]).toEqual([
+      ['e2e', 'visual'],
+      0,
+    ]);
+  });
+
+  it('a job with neither steps nor a called workflow is refused', () => {
+    expect(() =>
+      playwrightCoverageFindings('jobs:\n  e2e:\n    runs-on: x\n', 'ci.yml'),
+    ).toThrow("ci.yml job 'e2e' has no steps list");
   });
 });

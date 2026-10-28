@@ -242,8 +242,8 @@ jobs:
   # each need's success itself, and build-and-test holds it to scope's
   # docs-only verdict: run on every other pull request, skipped on that one.
   coverage-playwright:
-    needs: [coverage, e2e, sanity-on-build]
-    if: always() && needs.coverage.result == 'success' && needs.e2e.result == 'success' && needs.sanity-on-build.result == 'success'
+    needs: [coverage, e2e, sanity-on-build, functions, visual]
+    if: always() && needs.coverage.result == 'success' && needs.e2e.result == 'success' && needs.sanity-on-build.result == 'success' && needs.functions.result == 'success' && needs.visual.result == 'success'
     runs-on: ubuntu-26.04
     # Measured on the first run of this job, then cut (#913).
     timeout-minutes: 10
@@ -607,6 +607,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:functions
+        env:
+          # Measured for coverage (#913); the web server unsets it.
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
+      - name: Keep this run's coverage for the coverage job
+        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-playwright-functions
+          path: ${{ runner.temp }}/coverage-playwright.tgz
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
       - name: Keep the failing run's Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -750,6 +763,20 @@ jobs:
       - run: npx playwright test --project=visual
         env:
           VISUAL: '1'
+          # Measured for coverage (#913); the web server unsets it.
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
+      # Into the workspace, not the runner's temp folder: every path this
+      # job uploads is read literally by pipeline-wiring's #311 guard.
+      - name: Keep this run's coverage for the coverage job
+        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$PWD/coverage-playwright.tgz" v8 pwcache root.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-playwright-visual
+          path: coverage-playwright.tgz
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
       # The MEASUREMENT, never a gate (#224). The step above decides the
       # build; this one only reports how much of `threshold`'s allowance is
       # already spent by differences nobody is looking at -- a baseline

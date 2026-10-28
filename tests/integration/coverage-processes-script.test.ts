@@ -9,6 +9,8 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,6 +24,10 @@ import { nonEmpty } from '../../scripts/errors.mjs';
  * script run under `NODE_V8_COVERAGE` takes one arm of an `if`, and the
  * converted report says which line ran and which did not, both ways round.
  * `tests/unit/coverage-processes.test.ts` holds the conversion itself.
+ *
+ * Each run of the converter inherits this suite's own `NODE_V8_COVERAGE`, so
+ * a coverage run measures the converter too: blanking it there left its whole
+ * command line reading unrun (#913, measured on run 40484222505).
  */
 const SCRIPT = path.resolve(
   import.meta.dirname,
@@ -72,7 +78,7 @@ const measure = (answer: 'yes' | 'no') => {
   const convert = spawnSync(process.execPath, [SCRIPT, raw, 'processes'], {
     cwd: repo,
     encoding: 'utf8',
-    env: { ...process.env, NODE_V8_COVERAGE: '' },
+    env: process.env,
   });
   return { child, convert };
 };
@@ -172,7 +178,7 @@ describe('a declarator read from an import counts as Vitest counts it (#899, #91
       const convert = spawnSync(process.execPath, [SCRIPT, raw, 'processes'], {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       });
       expect([child.status, convert.status, convert.stderr]).toEqual([
         0,
@@ -215,7 +221,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stdout, run.stderr]).toEqual([
@@ -230,7 +236,7 @@ describe('coverage-processes.mjs on a real child process', () => {
     const run = spawnSync(process.execPath, [SCRIPT, missing, 'processes'], {
       cwd: repo,
       encoding: 'utf8',
-      env: { ...process.env, NODE_V8_COVERAGE: '' },
+      env: process.env,
     });
     expect([run.status, run.stdout, run.stderr]).toEqual([
       1,
@@ -261,7 +267,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stderr]).toEqual([
@@ -284,7 +290,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stderr]).toEqual([
@@ -330,7 +336,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       // still answers signal 0 as running.
       const reader = spawn(process.execPath, [SCRIPT, raw, 'processes'], {
         cwd: repo,
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       });
       const run = { status: -1, stdout: '', stderr: '' };
       reader.stdout.on('data', (chunk: Buffer) => (run.stdout += chunk));
@@ -379,7 +385,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stderr]).toEqual([0, '']);
@@ -411,7 +417,7 @@ describe('coverage-processes.mjs on a real child process', () => {
         {
           cwd: here,
           encoding: 'utf8',
-          env: { ...process.env, NODE_V8_COVERAGE: '' },
+          env: process.env,
         },
       );
       expect([run.status, run.stderr]).toEqual([0, '']);
@@ -451,7 +457,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stderr]).toEqual([0, '']);
@@ -473,7 +479,7 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stdout, run.stderr]).toEqual([
@@ -481,6 +487,73 @@ describe('coverage-processes.mjs on a real child process', () => {
       '',
       `✗ coverage-processes: the compile cache holds ${path.join('ab', 'lone_ab.js')} with no map beside it (read ${cache})\n`,
     ]);
+  });
+
+  it('a compile cache that is not there is refused in one line, naming it', () => {
+    const cache = path.join(repo, 'no-cache');
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'raw'), 'processes', '--cache', cache],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: process.env,
+      },
+    );
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      `✗ ENOENT: no such file or directory, scandir '${cache}'\n`,
+    ]);
+  });
+
+  it('a compile-cache entry that cannot be read is refused, naming the cache', () => {
+    const cache = path.join(repo, 'cache');
+    mkdirSync(path.join(cache, 'ab', 'dir_ab.js'), { recursive: true });
+    writeFileSync(path.join(cache, 'ab', 'dir_ab.map'), '{}');
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'raw'), 'processes', '--cache', cache],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: process.env,
+      },
+    );
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      `✗ EISDIR: illegal operation on a directory, read (read ${cache})\n`,
+    ]);
+  });
+
+  it('a command line missing its suite is refused with the usage', () => {
+    const run = spawnSync(process.execPath, [SCRIPT, path.join(repo, 'raw')], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect([run.status, run.stdout, run.stderr]).toEqual([
+      1,
+      '',
+      '✗ usage: coverage-processes.mjs <raw-dir> <suite> [--cache <dir>] [--recorded-root <path>]\n',
+    ]);
+  });
+
+  it('an option the converter does not take is refused, naming it, with the usage', () => {
+    const run = spawnSync(
+      process.execPath,
+      [SCRIPT, path.join(repo, 'raw'), 'processes', '--bogus'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: process.env,
+      },
+    );
+    expect([run.status, run.stdout]).toEqual([1, '']);
+    expect(run.stderr).toMatch(
+      /^✗ Unknown option '--bogus'\.[^\n]*\nusage: coverage-processes\.mjs <raw-dir> <suite> \[--cache <dir>\] \[--recorded-root <path>\]\n$/,
+    );
   });
 
   /** Issue 936: the ledger every started process writes as it starts. */
@@ -530,12 +603,114 @@ describe('coverage-processes.mjs on a real child process', () => {
       {
         cwd: repo,
         encoding: 'utf8',
-        env: { ...process.env, NODE_V8_COVERAGE: '' },
+        env: process.env,
       },
     );
     expect([run.status, run.stderr]).toEqual([
       1,
       `✗ coverage-processes: ${name} (0 bytes, written by process ${exited.pid}, which has exited) is not whole JSON: Unexpected end of JSON input; process ${exited.pid} was started as: node playwright test --list\n`,
     ]);
+  });
+});
+
+/**
+ * #913 AC3: a helper a Playwright spec runs, compiled by Playwright's own
+ * Babel transform and run from its compile cache, as every e2e helper is. One
+ * answer takes one arm of the helper's `if`; the converted report reads that
+ * arm's line run and the other unrun, and the other answer turns it round.
+ */
+const PLANTED_HELPER = [
+  'export const answer = (take: boolean): string => {',
+  '  if (take) {',
+  "    return 'taken';",
+  '  }',
+  "  return 'not taken';",
+  '};',
+  '',
+].join('\n');
+
+const PLANTED_SPEC = [
+  "import { expect, test } from '@playwright/test';",
+  "import { answer } from './planted-helper';",
+  '',
+  "const take = process.env.PLANTED === 'yes';",
+  "test('the helper answers', () => {",
+  "  expect(answer(take)).toBe(take ? 'taken' : 'not taken');",
+  '});',
+  '',
+].join('\n');
+
+const PACKAGES = path.resolve(import.meta.dirname, '../../node_modules');
+
+describe('a helper a Playwright spec runs, measured through the compile cache (#913)', () => {
+  beforeEach(() => {
+    mkdirSync(path.join(repo, 'tests'));
+    writeFileSync(path.join(repo, 'tests/planted-helper.ts'), PLANTED_HELPER);
+    writeFileSync(path.join(repo, 'tests/planted.spec.ts'), PLANTED_SPEC);
+    writeFileSync(
+      path.join(repo, 'playwright.config.ts'),
+      "const workers = Number('1');\nexport default { testDir: 'tests', reporter: 'line', workers };\n",
+    );
+    symlinkSync(PACKAGES, path.join(repo, 'node_modules'), 'dir');
+  });
+
+  // The link goes first, by name: the folder's removal then never reaches
+  // this checkout's packages, whatever rmSync does with a link.
+  afterEach(() => {
+    unlinkSync(path.join(repo, 'node_modules'));
+  });
+
+  /** Runs the planted spec under real Playwright, then converts what it ran. */
+  const playwright = (answer: 'yes' | 'no') => {
+    const raw = path.join(repo, 'raw');
+    const cache = path.join(repo, 'pwcache');
+    const run = spawnSync(
+      process.execPath,
+      [path.join(PACKAGES, '@playwright/test/cli.js'), 'test'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLANTED: answer,
+          NODE_V8_COVERAGE: raw,
+          PWTEST_CACHE_DIR: cache,
+        },
+      },
+    );
+    const convert = spawnSync(
+      process.execPath,
+      [SCRIPT, raw, 'processes', '--cache', cache],
+      { cwd: repo, encoding: 'utf8', env: process.env },
+    );
+    return { run, convert };
+  };
+
+  /** The count of the one statement on `line` of `file`, the helper by default. */
+  const helperLine = (line: number, file = 'tests/planted-helper.ts') => {
+    const counts = lines(repo, file)
+      .filter((entry) => entry.startsWith(`${line}=`))
+      .map((entry) => Number(entry.slice(`${line}=`.length)));
+    if (counts.length !== 1)
+      throw new Error(
+        `line ${line} holds ${counts.length} statements, not one`,
+      );
+    return counts[0];
+  };
+
+  it('the arm the spec takes reads run and the other unrun, beside the config and spec', () => {
+    const { run, convert } = playwright('yes');
+    expect([run.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
+    expect([helperLine(3), helperLine(5)]).toEqual([1, 0]);
+    // The config's and the spec's first statements ran, in the runner and
+    // its worker alike, so each reads run however often it was loaded.
+    expect(helperLine(1, 'playwright.config.ts')).toBeGreaterThan(0);
+    expect(helperLine(4, 'tests/planted.spec.ts')).toBeGreaterThan(0);
+  });
+
+  it('the other answer turns the verdict round', () => {
+    const { run, convert } = playwright('no');
+    expect([run.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
+    expect([helperLine(3), helperLine(5)]).toEqual([0, 1]);
   });
 });

@@ -15,6 +15,7 @@ import {
   isAggregate,
   jobsDownstreamOfAConditionalJob,
   parseCleanYaml,
+  playwrightCoverageFindings,
   skippedUpstreamFindings,
   producibleContexts,
   unboundedJobFindings,
@@ -3194,6 +3195,40 @@ describe('wrangler comes from the lockfile (#97)', () => {
     ).toBeUndefined();
   });
 
+  it('every job that uploads Playwright coverage is joined, waited for and measured (#913)', () => {
+    const wiring = playwrightCoverageFindings(workflow('ci.yml'), 'ci.yml');
+    const producers = [...wiring.producers];
+    expect(
+      searched([...wiring.findings], {
+        of: producers,
+        what: 'ci.yml jobs uploading Playwright coverage',
+      }),
+    ).toEqual([]);
+    expect(
+      floorBreach(
+        'pipeline-wiring/playwright-coverage-producers',
+        producers.length,
+      ),
+    ).toBeUndefined();
+    // The second reading: every job that sets NODE_V8_COVERAGE is one that
+    // uploads what it measured, and the other way round.
+    expect(wiring.measured).toEqual(wiring.producers);
+  });
+
+  it('no workflow but ci.yml uploads Playwright coverage, so a called one hides none (#913)', () => {
+    const others = workflowYamlNames().filter((name) => name !== 'ci.yml');
+    const uploading = others.filter(
+      (name) =>
+        playwrightCoverageFindings(workflow(name), name).producers.length > 0,
+    );
+    expect(
+      searched(uploading, { of: others, what: 'workflows besides ci.yml' }),
+    ).toEqual([]);
+    expect(
+      floorBreach('pipeline-wiring/workflows-besides-ci', others.length),
+    ).toBeUndefined();
+  });
+
   it('the functions job runs the functions-runtime suite', () => {
     // That build-and-test needs the job is already derived by "stands for
     // every other ci.yml job that is not required by name itself"; this pins
@@ -3203,6 +3238,8 @@ describe('wrangler comes from the lockfile (#97)', () => {
       // Every engine: the suite posts the 404's forms from all five (#350).
       // No browser install: the job runs in the pinned image (#431).
       'npm run test:functions',
+      // What that run measured, for coverage-playwright to join (#913).
+      'pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt',
     ]);
   });
 });

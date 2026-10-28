@@ -1,8 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { scratchGit, withoutLocalGit } from '../git-env';
+import { runScriptIn, scratchGit } from '../git-env';
 import { scratchDir } from '../scratch-dir';
 
 /**
@@ -29,12 +28,7 @@ const commit = (file: string, message: string) => {
   return git(['rev-parse', '--short=8', 'HEAD']).trim();
 };
 
-const range = () =>
-  spawnSync(process.execPath, [SCRIPT, '--range', 'base..HEAD'], {
-    cwd: repo,
-    encoding: 'utf8',
-    env: withoutLocalGit(process.env),
-  });
+const range = () => runScriptIn(repo, SCRIPT, ['--range', 'base..HEAD']);
 
 beforeEach(() => {
   repo = scratchDir('gaps-checked-');

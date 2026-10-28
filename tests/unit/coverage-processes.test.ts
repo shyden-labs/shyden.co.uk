@@ -192,6 +192,22 @@ describe('raw V8 coverage from a process converts to the joined shape (#899)', (
     ]);
   });
 
+  it('a JavaScript entry not its own text names the one length its text has', async () => {
+    const result = await convertScripts(
+      [jsEntry, script(JS_URL, 300, [70, 106])],
+      read,
+      ROOT,
+      OWN_TEXT,
+    );
+    expect('report' in result && result.skipped).toEqual([
+      {
+        file: 'scripts/branch.mjs',
+        url: JS_URL,
+        reason: 'ran code 300 characters long, not its own text (107)',
+      },
+    ]);
+  });
+
   it('two processes’ entries for one file are summed', async () => {
     const result = await convertScripts(
       [jsEntry, jsEntry],
@@ -565,6 +581,40 @@ describe('code a tool compiled converts onto the file’s own text (#913)', () =
     expect(result).toEqual({
       refusal:
         'coverage-processes: tests/helper.ts ran code 96 characters long, not its own text (103, or 147 with the sourceURL Node appends) and no compiled copy of it is cached',
+    });
+  });
+
+  it('a cached map with no source text is left out, so the code it compiled is refused', async () => {
+    const sourceless = [
+      {
+        js: hashed(HELPER_JS),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: undefined }),
+      },
+      {
+        js: hashed(HELPER_JS),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: [null] }),
+      },
+    ];
+    const other = 'export const other = 1;\n';
+    const beside = indexCompileCache([
+      ...sourceless,
+      {
+        js: hashed(other),
+        map: JSON.stringify({ ...HELPER_MAP, sourcesContent: [other] }),
+      },
+    ]);
+    expect([...beside.keys()]).toEqual([other]);
+    const withoutSource = indexCompileCache(sourceless);
+    const result = await convertScripts(
+      [jsEntry, script(HELPER_URL, 95, [71, 94])],
+      (file) => (file === 'tests/helper.ts' ? HELPER_TS : read(file)),
+      ROOT,
+      OWN_TEXT,
+      { compiled: withoutSource },
+    );
+    expect(result).toEqual({
+      refusal:
+        'coverage-processes: tests/helper.ts ran code 95 characters long, not its own text (103, or 147 with the sourceURL Node appends) and no compiled copy of it is cached',
     });
   });
 

@@ -457,7 +457,7 @@ const openVitest = async (root) => {
       `coverage-processes: ${config} is not there, so there is no Vitest transform to place counts on`,
     );
   const { createVitest } = await import('vitest/node');
-  const vitest = await createVitest('test', {
+  const vitest = await createVitest({
     watch: false,
     config,
     coverage: { enabled: true, provider: 'v8' },

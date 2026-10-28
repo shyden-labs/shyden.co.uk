@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
 /**
@@ -66,3 +66,15 @@ export const scratchGit =
       encoding: 'utf8',
       env: withoutLocalGit(process.env),
     });
+
+/** Runs a Node script in the scratch repository `dir`, as CI runs it, with git's local variables removed. */
+export const runScriptIn = (
+  dir: string,
+  script: string,
+  args: readonly string[] = [],
+) =>
+  spawnSync(process.execPath, [script, ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: withoutLocalGit(process.env),
+  });

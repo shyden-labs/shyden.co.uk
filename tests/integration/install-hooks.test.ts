@@ -1,9 +1,8 @@
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scratchGit, withoutLocalGit } from '../git-env';
+import { runScriptIn, scratchGit } from '../git-env';
 
 /**
  * `scripts/install-hooks.mjs`, run by `npm install` (`prepare`) in a clone,
@@ -26,11 +25,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const install = () => {
-  const result = spawnSync(process.execPath, [SCRIPT], {
-    cwd: dir,
-    encoding: 'utf8',
-    env: withoutLocalGit(process.env),
-  });
+  const result = runScriptIn(dir, SCRIPT);
   return { code: result.status, out: result.stdout, err: result.stderr };
 };
 
