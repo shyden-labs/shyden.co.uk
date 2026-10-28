@@ -760,10 +760,10 @@ jobs:
             echo "| \`uname -m\` | \`${arch}\` |"
             echo "| image | \`${IMAGE}\` |"
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      # Not measured for coverage: the measure step below runs the same spec
-      # under it. Measured here, the gate ran slower and pictured the promo
-      # video's loading spinner on the homepage baselines (run 40634186625,
-      # and again with a networkState wait in run 40636512082; #968).
+      # Not measured for coverage: a run of its own below is. Measured here,
+      # the gate ran slower and pictured the promo video's loading spinner on
+      # the homepage baselines (run 40634186625, and again with a networkState
+      # wait in run 40636512082; #968).
       - run: npx playwright test --project=visual
         env:
           VISUAL: '1'
@@ -788,10 +788,6 @@ jobs:
         continue-on-error: true
         env:
           VISUAL_MEASURE: '1'
-          # Measured for coverage (#913) here, where timing decides nothing;
-          # the web server unsets it.
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
         run: |
           npx playwright test --project=visual-measure --reporter=list \
             > measure.log 2>&1 || true
@@ -820,6 +816,23 @@ jobs:
             fi
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      # What the visual spec runs, measured for coverage (#913) in a run of
+      # its own (Shyden, 2026-10-28: "Own measuring run"). Measuring the gate
+      # slowed it into the spinner #968 is about, and measuring the drift step
+      # put 10 more drifted pictures in its report (4 -> 14, run 40638559057),
+      # so neither is measured. Its own output folder, so it touches neither's
+      # pictures; its pass or fail is never read, as the drift step's is not.
+      # The web server unsets the measurement.
+      - name: Measure the visual spec for coverage
+        continue-on-error: true
+        env:
+          VISUAL: '1'
+          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
+          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
+        run: |
+          npx playwright test --project=visual --reporter=dot \
+            --output=test-results/visual-coverage > visual-coverage.log 2>&1 || true
+          tail -n 3 visual-coverage.log
       # Into the workspace, not the runner's temp folder: every path this
       # job uploads is read literally by pipeline-wiring's #311 guard.
       - name: Keep this run's coverage for the coverage job
