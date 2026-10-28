@@ -1,7 +1,5 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { convert } from 'ast-v8-to-istanbul';
-import { parse } from 'vite';
 import { describe, expect, it } from 'vitest';
 import {
   awaitWriters,
@@ -17,6 +15,7 @@ import {
 } from '../../scripts/coverage-processes.mjs';
 import { PLAYWRIGHT_MEASURE } from '../coverage-options';
 import { fixtureReader } from '../fixture-texts';
+import { remap, vlq } from '../source-map-fixtures';
 
 /**
  * Raw V8 coverage from a process Node ran outside Vitest's workers, converted
@@ -79,16 +78,6 @@ const read = fixtureReader(texts);
 
 /** A map placing every character of `text` on itself, as base64 VLQ. */
 const identityMap = (text: string, source: string) => {
-  const vlq = (value: number) => {
-    let rest = value < 0 ? (-value << 1) | 1 : value << 1;
-    let out = '';
-    do {
-      const digit = rest & 31;
-      rest >>>= 5;
-      out += BASE64[rest > 0 ? digit | 32 : digit];
-    } while (rest > 0);
-    return out;
-  };
   // Source line and column run on across lines; an empty line has no segment.
   let line = 0;
   let column = 0;
@@ -109,9 +98,6 @@ const identityMap = (text: string, source: string) => {
     .join(';');
   return { version: 3, sources: [source], names: [], mappings };
 };
-const BASE64 =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
 /**
  * Vitest's transform and converter, stood in for (#913): the transform is the
  * file's own text, mapped character by character onto itself, and the
@@ -125,18 +111,7 @@ const OWN_TEXT: VitestTool = {
     code: text,
     map: identityMap(text, absolute.split('/').at(-1) ?? absolute),
   }),
-  remap: async (url, transformed, functions) => {
-    const parsed = await parse(url, transformed.code, {
-      lang: /\.[mc]?tsx?$/.test(url) ? 'ts' : 'js',
-      preserveParens: false,
-    });
-    return convert({
-      ast: parsed.program as never,
-      code: transformed.code,
-      wrapperLength: 0,
-      coverage: { functions, url },
-    });
-  },
+  remap,
 };
 
 /** Each statement as `place=count`, in the report's own order. */

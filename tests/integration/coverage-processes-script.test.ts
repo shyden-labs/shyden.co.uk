@@ -714,3 +714,68 @@ describe('a helper a Playwright spec runs, measured through the compile cache (#
     expect([helperLine(3), helperLine(5)]).toEqual([0, 1]);
   });
 });
+
+/**
+ * A function starting with TypeScript-only text reads its own count (#959).
+ * Node strips the types of a `.ts` file by blanking them, so V8's range for
+ * `private first()` starts at `first` and for `<T,>(x: T) =>` at `(`. The
+ * fixture mirrors the shapes found in `src/lib/api-docs.ts` (`askForJson`,
+ * never called) and `src/lib/i18n/message.ts` (private methods called many
+ * times) rather than running those files; the unit suite holds each form.
+ */
+const TYPED = [
+  'export class Parts {',
+  '  private first(): number {',
+  '    return 1;',
+  '  }',
+  '  private second(): number {',
+  '    return 2;',
+  '  }',
+  '  run(): number {',
+  '    return this.first() + this.first() + this.first();',
+  '  }',
+  '}',
+  'export const askForJson = <T,>(x: T): T => {',
+  '  return x;',
+  '};',
+  'globalThis.out = new Parts().run();',
+  '',
+].join('\n');
+
+describe('a function starting with TypeScript-only text, in a type-stripped run (#959)', () => {
+  it('a never-called one reads 0 and a called one its own count', () => {
+    writeFileSync(path.join(repo, 'scripts/typed.ts'), TYPED);
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/typed.ts'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    const convert = spawnSync(process.execPath, [SCRIPT, raw, 'processes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect([child.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
+    const report = JSON.parse(
+      readFileSync(
+        path.join(repo, 'coverage/processes/coverage-final.json'),
+        'utf8',
+      ),
+    ) as Record<
+      string,
+      {
+        fnMap: Record<string, { decl: { start: { line: number } } }>;
+        f: Record<string, number>;
+      }
+    >;
+    const typed = report[path.join(repo, 'scripts/typed.ts')];
+    if (!typed) throw new Error('scripts/typed.ts is not in the report');
+    // first (line 2) ran 3 times, second (5) never, run (8) once, askForJson (12) never.
+    expect(
+      Object.entries(typed.fnMap)
+        .map(([id, { decl }]) => `${decl.start.line}=${typed.f[id]}`)
+        .toSorted(),
+    ).toEqual(['12=0', '2=3', '5=0', '8=1']);
+  });
+});

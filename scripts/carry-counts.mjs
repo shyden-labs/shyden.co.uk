@@ -365,6 +365,13 @@ export const placeOnTransform = (functions, transformed, text) => {
   const { length } = transformed.code;
   // A map lists each line's segments in the order the code emits them.
   const { segments } = mapped;
+  // Where the next segment that names one is placed in the own text, after each.
+  /** @type {(number | undefined)[]} */
+  const nextOwn = [];
+  for (let index = segments.length - 1, after; index >= 0; index--) {
+    nextOwn[index] = after;
+    after = segments[index]?.own ?? after;
+  }
   let count = whole;
   /** @type {V8Range[]} */
   const spans = [];
@@ -386,8 +393,13 @@ export const placeOnTransform = (functions, transformed, text) => {
     // grouping.ts, whose arrow's range starts at its `(`): while the
     // transform copies the own text, each character takes its own count.
     // Whitespace either side re-wrote is stepped over (`filter(\n  (locale)`
-    // printed `filter((locale)`, back-translate.ts); from the first other
-    // change, the rest takes the last copied character's count.
+    // printed `filter((locale)`, back-translate.ts). Text the transform
+    // dropped is stepped over too, to the last place the printed character
+    // is written at or before the next segment's (#959: vite places `never` where
+    // `private` began and prints `(` for `<T,>(`, while V8 counts from
+    // `never` and from `(`). From any other change, the rest takes the last
+    // copied character's count.
+    const next = nextOwn[index];
     let at = emitted;
     let from = own;
     count = countAt(flat, own);
@@ -403,7 +415,14 @@ export const placeOnTransform = (functions, transformed, text) => {
       else if (WHITESPACE.test(transformed.code.charAt(at))) {
         span(at, at + 1);
         at++;
-      } else break;
+      } else {
+        const dropped =
+          next === undefined
+            ? -1
+            : text.lastIndexOf(transformed.code.charAt(at), next);
+        if (dropped <= from) break;
+        from = dropped;
+      }
     }
     span(at, end);
   }
