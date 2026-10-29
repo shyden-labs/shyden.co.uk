@@ -21,7 +21,13 @@ const SCRIPT = path.resolve(
   import.meta.dirname,
   '../../scripts/coverage-merge.mjs',
 );
-const SUITES = ['unit', 'simulation', 'integration', 'processes'];
+const SUITES = [
+  'unit',
+  'simulation',
+  'integration',
+  'processes',
+  'vitest-main',
+];
 
 let repo: string;
 let git: (args: readonly string[]) => string;
@@ -67,7 +73,7 @@ afterEach(() => {
 const merge = (...args: readonly string[]) => runScriptIn(repo, SCRIPT, args);
 
 describe('coverage-merge.mjs in a real repository', () => {
-  it('joins the four reports and records the tree they measured', () => {
+  it('joins the five reports and records the tree they measured', () => {
     SUITES.forEach((suite, index) => report(suite, index));
     const run = merge();
     expect([run.status, run.stderr]).toEqual([0, '']);
@@ -77,7 +83,7 @@ describe('coverage-merge.mjs in a real repository', () => {
       ),
     ).toEqual({
       'src/a.ts': {
-        statements: { '1:0-1:9': { start: 1, end: 1, count: 6 } },
+        statements: { '1:0-1:9': { start: 1, end: 1, count: 10 } },
         branches: {},
       },
     });
@@ -97,7 +103,7 @@ describe('coverage-merge.mjs in a real repository', () => {
     );
   });
 
-  it('--playwright joins each run under coverage/playwright with the four suites', () => {
+  it('--playwright joins each run under coverage/playwright with the five suites', () => {
     SUITES.forEach((suite, index) => report(suite, index));
     report('playwright/shard-1', 4);
     report('playwright/sanity', 5);
@@ -109,7 +115,7 @@ describe('coverage-merge.mjs in a real repository', () => {
       ),
     ).toEqual({
       'src/a.ts': {
-        statements: { '1:0-1:9': { start: 1, end: 1, count: 15 } },
+        statements: { '1:0-1:9': { start: 1, end: 1, count: 19 } },
         branches: {},
       },
     });

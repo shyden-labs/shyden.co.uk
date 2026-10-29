@@ -58,8 +58,16 @@ import { die, messageOf, nonEmpty } from './errors.mjs';
 // 25 s limit (the duplication guard took 64 s on PR #903's first run), and no
 // limit is raised. Code only a guard runs therefore reads as unrun.
 // `processes`: what the integration suite's child processes ran, converted by
-// scripts/coverage-processes.mjs (#899).
-export const SUITES = ['unit', 'simulation', 'integration', 'processes'];
+// scripts/coverage-processes.mjs (#899). `vitest-main`: what the coverage
+// commands' own Vitest main processes loaded natively, the configs and
+// reporters (#912, tests/main-coverage.ts), converted the same way.
+export const SUITES = [
+  'unit',
+  'simulation',
+  'integration',
+  'processes',
+  'vitest-main',
+];
 
 /** @param {Location} loc */
 const placed = (loc) =>

@@ -5,6 +5,7 @@ import guards from '../../vitest.guards.config';
 import integration from '../../vitest.integration.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
+import LoadReporter from '../load-reporter';
 import { unitProject } from '../vitest-suite-dirs';
 
 /**
@@ -73,9 +74,9 @@ describe('the coverage run is the unit suite minus its two judges (#896)', () =>
   );
 
   it('reports load without the CPU reporter, which reads the judge’s figures', () => {
-    expect(coverage.test?.reporters).toEqual([
+    expect(coverage.test?.reporters).toStrictEqual([
       'default',
-      ['./tests/load-reporter.ts', { suite: 'unit' }],
+      new LoadReporter({ suite: 'unit' }),
     ]);
   });
 
@@ -86,7 +87,7 @@ describe('the coverage run is the unit suite minus its two judges (#896)', () =>
       }
     ).scripts;
     expect([scripts['test:unit'], unit.test?.coverage]).toEqual([
-      'vitest run',
+      'vitest run --configLoader native',
       undefined,
     ]);
   });
@@ -149,8 +150,8 @@ describe('the simulation suite under coverage judges coverage only (#916)', () =
       scripts['test:coverage:simulation'],
       scripts['test:simulation'],
     ]).toEqual([
-      'vitest run --config vitest.simulation.config.ts --coverage --testTimeout=0',
-      'vitest run --config vitest.simulation.config.ts --testTimeout=700',
+      'NODE_V8_COVERAGE="$PWD/coverage/raw/vitest-main" vitest run --configLoader native --config vitest.simulation.config.ts --coverage --testTimeout=0',
+      'vitest run --configLoader native --config vitest.simulation.config.ts --testTimeout=700',
     ]);
   });
 });

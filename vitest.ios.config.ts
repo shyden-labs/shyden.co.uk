@@ -1,3 +1,4 @@
+import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({

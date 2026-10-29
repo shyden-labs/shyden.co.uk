@@ -1,4 +1,7 @@
+import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
+import LoadReporter from './tests/load-reporter.ts';
+import UnitCpuReporter from './tests/unit-cpu-reporter.ts';
 import { parserTestFiles } from './tests/parser-files.ts';
 import {
   SHARED_SETUP,
@@ -40,8 +43,8 @@ export default defineConfig({
     // the heaviest files (#688), from the reporter every suite shares (#696).
     reporters: [
       'default',
-      './tests/unit-cpu-reporter.ts',
-      ['./tests/load-reporter.ts', { suite: 'unit' }],
+      new UnitCpuReporter(),
+      new LoadReporter({ suite: 'unit' }),
     ],
     // The unit suite in two projects (#688; operator 2026-10-11, "500 ms,
     // share the parser first"). A project inherits everything above and adds
