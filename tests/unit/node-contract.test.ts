@@ -48,6 +48,21 @@ const nvmrcMajor = (): number => {
   return major;
 };
 
+/**
+ * `content`, a `.nvmrc`, as one exact `x.y.z` release, or a refusal naming
+ * what it holds (#982). A bare major lets setup-node fetch the newest release
+ * on every run, so CI's Node would change with no pull request.
+ */
+const exactNodeVersion = (content: string): string => {
+  const raw = content.trim().replace(/^v/, '');
+  if (!/^\d+\.\d+\.\d+$/.test(raw)) {
+    throw new Error(
+      `.nvmrc must name one exact release (x.y.z), not ${JSON.stringify(content.trim())}`,
+    );
+  }
+  return raw;
+};
+
 const packageJson = (): Record<string, unknown> =>
   JSON.parse(readFileSync('package.json', 'utf8'));
 
@@ -138,6 +153,25 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
   // was read from would move with it and pin nothing.
   it('runs on Node 26 (#646)', () => {
     expect(nvmrcMajor()).toBe(26);
+  });
+
+  // One exact release, so CI's Node changes only in the pull request that
+  // bumps it (#982, global rule 2026-10-29). The literal moves with each bump.
+  it('names the exact release every project runs (#982)', () => {
+    expect(exactNodeVersion(readFileSync('.nvmrc', 'utf8'))).toBe('26.12.1');
+  });
+
+  it.each(['26', '26.12', '26.x', 'lts/*', 'node', '', '26.12.1-rc.1'])(
+    'refuses an .nvmrc of %j, which names no one release (#982)',
+    (content) => {
+      expect(() => exactNodeVersion(`${content}\n`)).toThrow(
+        `.nvmrc must name one exact release (x.y.z), not ${JSON.stringify(content)}`,
+      );
+    },
+  );
+
+  it('reads an exact release whatever its v prefix or newline (#982)', () => {
+    expect(exactNodeVersion('v26.12.1\n')).toBe('26.12.1');
   });
 
   it('admits Node 26.3 or later, and the 24 line Dependabot installs on (#646)', () => {
