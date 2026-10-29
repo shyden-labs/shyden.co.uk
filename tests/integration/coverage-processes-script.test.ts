@@ -116,8 +116,9 @@ const lines = (at = repo, file = 'scripts/planted.mjs') => {
  * Vitest converts the module vite's SSR transform wrote, where an imported
  * `X.prop` reads `__vite_ssr_import_N__.X.prop`, and coverage-v8 5.0.5 ignores
  * every declarator initialised that way (`provider.js`, "SSR transformed
- * import binding"), while a parameter of the same name is not an import and
- * is counted. The conversion runs on that same transform (#913), so its lines
+ * import binding"); since #928 both the suites and this converter add those
+ * declarators back (`tests/coverage-declarators.mjs`), while a parameter of
+ * the same name is not an import and is counted as before. The conversion runs on that same transform (#913), so its lines
  * are the ones measured on Vitest's own route (2026-10-27,
  * `.superpowers/sdd/913/tools`): before #913 the own-text converter skipped
  * them by hand, and refused `shadow.mjs`, whose scope it could not read.
@@ -143,7 +144,20 @@ const IMPORT_READS = [
       'globalThis.out = [fromNamed, fromDefault, fromNamespace, whole, deeper, computed, inner()];',
       '',
     ],
-    lines: ['6=1', '7=1', '8=1', '13=1', '15=1'],
+    // coverage-v8's own statements first, then the five declarators it
+    // drops, which #928 adds: 4, 5, 9, 10 and 12.
+    lines: [
+      '6=1',
+      '7=1',
+      '8=1',
+      '13=1',
+      '15=1',
+      '4=1',
+      '5=1',
+      '9=1',
+      '10=1',
+      '12=1',
+    ],
   },
   {
     file: 'shadow.mjs',
@@ -172,7 +186,7 @@ const IMPORT_READS = [
   },
 ];
 
-describe('a declarator read from an import counts as Vitest counts it (#899, #913)', () => {
+describe('a declarator read from an import counts as the suites count it (#899, #913, #928)', () => {
   it.each(IMPORT_READS)(
     '$file lists the statements Vitest lists',
     ({ file, text, lines: expected }) => {
@@ -905,4 +919,47 @@ describe('the functions #959 names, in a type-stripped run of their own files', 
         'the driver must make it differ from the script',
       ).not.toBe(whole.get(file));
     });
+});
+
+/**
+ * A declarator read from an imported binding's property is counted (#928):
+ * coverage-v8 drops `const home = env.HOME` (with `env` imported) as one of
+ * Vite's own import bindings, and the converter now adds it back.
+ */
+const IMPORTED_READS = [
+  "import { env } from 'node:process';",
+  'function never() {',
+  '  const home = env.HOME;',
+  '  return home;',
+  '}',
+  'function called() {',
+  '  const path = env.PATH;',
+  '  return path;',
+  '}',
+  'called();',
+  'globalThis.never = never;',
+  '',
+].join('\n');
+
+describe('a declarator read from an imported binding (#928)', () => {
+  it('reads unrun where no call reached it and run where one did', () => {
+    writeFileSync(path.join(repo, 'scripts/imported.mjs'), IMPORTED_READS);
+    const raw = path.join(repo, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/imported.mjs'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    const convert = spawnSync(process.execPath, [SCRIPT, raw, 'processes'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect([child.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
+    const counted = lines(repo, 'scripts/imported.mjs');
+    expect([
+      counted.filter((line) => line.startsWith('3=')),
+      counted.filter((line) => line.startsWith('7=')),
+    ]).toEqual([['3=0'], ['7=1']]);
+  });
 });
