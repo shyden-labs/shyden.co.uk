@@ -94,16 +94,21 @@ describe('the coverage run is the unit suite minus its two judges (#896)', () =>
 
 /** What every suite measures, and where each writes it (#896). */
 describe('every Vitest suite measures the same code with V8', () => {
+  // Tests are code (Shyden 2026-10-22, every project): every file under
+  // tests/ is measured, and the V8 provider is wrapped so Vitest's own
+  // hard-coded excludes (test files, setup files) give way to these (#912).
   const MEASURED = {
-    provider: 'v8',
+    provider: 'custom',
+    customProviderModule: './tests/coverage-provider.mjs',
     reporter: ['json', 'lcovonly'],
     include: [
       'src/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
       'scripts/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
       'functions/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
-      'tests/*.{ts,tsx,mts,cts,js,mjs,cjs}',
+      'tests/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
+      'vitest*.config.ts',
     ],
-    exclude: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
+    exclude: ['**/*.d.ts'],
     reportOnFailure: false,
   };
 
