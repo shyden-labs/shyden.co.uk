@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { scratchGit } from '../git-env';
+import { scratchDir } from '../scratch-dir';
 import { filesUnder } from '../source-files';
 import { floorBreach } from '../floors';
 
@@ -153,5 +154,70 @@ describe('a repository named by a hostile GIT_DIR (#377)', () => {
     } finally {
       rmSync(sentinel, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * A scratch repository's commit or merge starts no git maintenance (#788):
+ * since git 2.47 each starts `git maintenance run --auto --detach`, a
+ * background process that outlives the test. GIT_TRACE writes every command
+ * git runs to a file; a commit allowed maintenance on its own command line
+ * shows the trace would see it.
+ */
+describe('git in a scratch repository (#788)', () => {
+  it('starts no maintenance after a commit or a merge', () => {
+    const dir = scratchDir('git-env-maintenance-');
+    const trace = join(scratchDir('git-env-trace-'), 'trace.txt');
+    const git = scratchGit(dir);
+    const handed = process.env.GIT_TRACE;
+    /** Runs git `args`, whose command is `command`, and counts that command and any maintenance in its trace. */
+    const traced = (command: string, args: readonly string[]) => {
+      writeFileSync(trace, '');
+      process.env.GIT_TRACE = trace;
+      try {
+        git(args);
+      } finally {
+        if (handed === undefined) delete process.env.GIT_TRACE;
+        else process.env.GIT_TRACE = handed;
+      }
+      const lines = readFileSync(trace, 'utf8').split('\n');
+      const count = (needle: string) =>
+        lines.filter((line) => line.includes(needle)).length;
+      return {
+        ran: count(`built-in: git ${command}`),
+        maintenance: count('built-in: git maintenance'),
+      };
+    };
+    git(['init', '-q', '-b', 'base']);
+    git(['config', 'user.email', 'fixture@example.test']);
+    git(['config', 'user.name', 'Fixture']);
+    git(['config', 'commit.gpgsign', 'false']);
+    writeFileSync(join(dir, 'a'), 'a\n');
+    git(['add', '-A']);
+    expect(
+      traced('commit', [
+        '-c',
+        'maintenance.auto=true',
+        'commit',
+        '-q',
+        '-m',
+        'allowed',
+      ]),
+      'a commit allowed maintenance starts it, and the trace sees it',
+    ).toEqual({ ran: 1, maintenance: 1 });
+    git(['switch', '-q', '-c', 'pull']);
+    expect(
+      traced('commit', ['commit', '-q', '--allow-empty', '-m', 'head']),
+    ).toEqual({
+      ran: 1,
+      maintenance: 0,
+    });
+    git(['switch', '-q', 'base']);
+    expect(
+      traced('merge', ['merge', '-q', '--no-ff', '--no-edit', 'pull']),
+    ).toEqual({
+      ran: 1,
+      maintenance: 0,
+    });
   });
 });
