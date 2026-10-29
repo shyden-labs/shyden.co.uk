@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { searched } from '../source-files';
 import { test, expect } from './fixtures';
 import { openRoster, openWaitingBoard } from './helpers';
+import { SPIN_CYCLE_MS, videosIdleFor } from './media-settle';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
 
@@ -59,7 +60,7 @@ const WIDTHS = [
 
 /**
  * Wait until `page` has stopped changing on its own: script, then fonts,
- * then images.
+ * then images, then videos.
  */
 async function settle(page: Page): Promise<void> {
   // The heading is the last thing to settle on the two tool pages, whose
@@ -88,7 +89,33 @@ async function settle(page: Page): Promise<void> {
     for (const image of images) image.loading = 'eager';
     await Promise.all(images.map((image) => image.decode()));
   });
+  // Every video idle for a whole spinner cycle (#968). A slow run caught the
+  // homepage video's loading spinner, which finishes its cycle after the
+  // video goes idle; the page cannot see the spinner itself.
+  try {
+    await page.waitForFunction(videosIdleFor, SPIN_CYCLE_MS, {
+      timeout: VIDEO_SETTLE_CEILING_MS,
+    });
+  } catch (error) {
+    const states = await page.evaluate(() =>
+      [...document.querySelectorAll('video')].map(
+        (video) =>
+          `networkState ${video.networkState}, readyState ${video.readyState}`,
+      ),
+    );
+    throw new Error(
+      `no video was idle for a whole spinner cycle (${SPIN_CYCLE_MS} ms) within ${VIDEO_SETTLE_CEILING_MS} ms: ${states.join('; ')}`,
+      { cause: error },
+    );
+  }
 }
+
+/**
+ * How long `settle` waits for the videos (#968): the homepage's one video,
+ * under `preload="none"`, reads idle within its first frame, so this is many
+ * cycles of room for a slow runner.
+ */
+const VIDEO_SETTLE_CEILING_MS = 10_000;
 
 /**
  * Put every sticky element back in normal flow, for a full-page capture
