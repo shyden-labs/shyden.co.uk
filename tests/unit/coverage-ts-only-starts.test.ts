@@ -218,6 +218,61 @@ const FORMS: readonly Form[] = [
     },
     starts: { never: 'async never', called: 'async called' },
   },
+  {
+    name: 'a private method whose name begins as private does',
+    lines: [
+      'export class K {',
+      '  private prune() {',
+      '    return 1;',
+      '  }',
+      '  private pick() {',
+      '    return 2;',
+      '  }',
+      '}',
+    ],
+    vite: {
+      code: '__vite_ssr_exportName__("K", () => { try { return K } catch {} });\nclass K {\n\tprune() {\n\t\treturn 1;\n\t}\n\tpick() {\n\t\treturn 2;\n\t}\n}\n',
+      mappings:
+        ';AAAO,MAAM,EAAE;CACb,KAAQ,GAAQ;EACd,OAAO;CACT;CACA,IAAQ,GAAO;EACb,OAAO;CACT;AACF',
+    },
+    starts: { never: 'prune', called: 'pick' },
+  },
+  {
+    name: 'a readonly property whose name begins as readonly does',
+    lines: [
+      'export class K {',
+      '  readonly run = () => {',
+      '    return 1;',
+      '  };',
+      '  readonly rest = () => {',
+      '    return 2;',
+      '  };',
+      '}',
+    ],
+    vite: {
+      code: '__vite_ssr_exportName__("K", () => { try { return K } catch {} });\nclass K {\n\trun = () => {\n\t\treturn 1;\n\t};\n\trest = () => {\n\t\treturn 2;\n\t};\n}\n',
+      mappings:
+        ';AAAO,MAAM,EAAE;CACb,GAAS,SAAY;EACnB,OAAO;CACT;CACA,IAAS,SAAa;EACpB,OAAO;CACT;AACF',
+    },
+    starts: { never: '() =>', called: '() =>' },
+  },
+  {
+    name: 'a generic arrow whose type parameter holds a parenthesis',
+    lines: [
+      'export const never = <T extends (a: number) => void,>(x: T) => {',
+      '  return x;',
+      '};',
+      'export const called = <T extends (a: number) => void,>(x: T) => {',
+      '  return x;',
+      '};',
+    ],
+    vite: {
+      code: '__vite_ssr_exportName__("never", () => { try { return never } catch {} });\n__vite_ssr_exportName__("called", () => { try { return called } catch {} });\nconst never = (x) => {\n\treturn x;\n};\nconst called = (x) => {\n\treturn x;\n};\n',
+      mappings:
+        ';;AAAO,MAAM,SAAyC,MAAS;CAC7D,OAAO;AACT;AACO,MAAM,UAA0C,MAAS;CAC9D,OAAO;AACT',
+    },
+    starts: { never: '(x', called: '(x' },
+  },
 ];
 
 /** The function V8 counted: from `start` to the `}` closing its body. */

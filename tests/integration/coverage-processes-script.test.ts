@@ -16,7 +16,15 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
 import { nonEmpty } from '../../scripts/errors.mjs';
 
 /**
@@ -715,6 +723,21 @@ describe('a helper a Playwright spec runs, measured through the compile cache (#
   });
 });
 
+/** Each file's functions in the converted report of the checkout `at`. */
+const functionReport = (at: string) =>
+  JSON.parse(
+    readFileSync(
+      path.join(at, 'coverage/processes/coverage-final.json'),
+      'utf8',
+    ),
+  ) as Record<
+    string,
+    {
+      fnMap: Record<string, { decl: { start: { line: number } } }>;
+      f: Record<string, number>;
+    }
+  >;
+
 /**
  * A function starting with TypeScript-only text reads its own count (#959).
  * Node strips the types of a `.ts` file by blanking them, so V8's range for
@@ -757,19 +780,7 @@ describe('a function starting with TypeScript-only text, in a type-stripped run 
       env: process.env,
     });
     expect([child.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
-    const report = JSON.parse(
-      readFileSync(
-        path.join(repo, 'coverage/processes/coverage-final.json'),
-        'utf8',
-      ),
-    ) as Record<
-      string,
-      {
-        fnMap: Record<string, { decl: { start: { line: number } } }>;
-        f: Record<string, number>;
-      }
-    >;
-    const typed = report[path.join(repo, 'scripts/typed.ts')];
+    const typed = functionReport(repo)[path.join(repo, 'scripts/typed.ts')];
     if (!typed) throw new Error('scripts/typed.ts is not in the report');
     // first (line 2) ran 3 times, second (5) never, run (8) once, askForJson (12) never.
     expect(
@@ -778,4 +789,120 @@ describe('a function starting with TypeScript-only text, in a type-stripped run 
         .toSorted(),
     ).toEqual(['12=0', '2=3', '5=0', '8=1']);
   });
+});
+
+/**
+ * #959 AC2: the functions the ticket names, in the files it named them in,
+ * run type-stripped for real. A driver parses one plural message, which runs
+ * message.ts's private methods, and imports api-docs.ts and read-back.ts
+ * without calling `askForJson` or `each`. Each function must read the count
+ * V8 took of its own range, which the raw file holds, so no figure here is
+ * typed in; and that count must differ from the script's, which is what the
+ * defect read. `src/lib` and `functions/_lib` are copied whole, so the
+ * imports they need are there however they change.
+ */
+const NAMED = [
+  { file: 'src/lib/api-docs.ts', needle: 'export const askForJson = <' },
+  { file: 'src/lib/i18n/message.ts', needle: '  private parts(' },
+  { file: 'src/lib/i18n/message.ts', needle: '  private slot(' },
+  { file: 'src/lib/i18n/message.ts', needle: '  private match(' },
+  { file: 'src/lib/i18n/message.ts', needle: '  private skipSpace(' },
+  { file: 'src/lib/i18n/read-back.ts', needle: 'const each = <' },
+] as const;
+
+const DRIVER = [
+  "import { parseMessage } from '../src/lib/i18n/message.ts';",
+  "import '../src/lib/api-docs.ts';",
+  "import '../src/lib/i18n/read-back.ts';",
+  'for (let n = 0; n < 50; n++)',
+  "  parseMessage('Hello {name}, you have {count, plural, one {# item} other {# items}}');",
+  '',
+].join('\n');
+
+describe('the functions #959 names, in a type-stripped run of their own files', () => {
+  const checkout = path.resolve(import.meta.dirname, '../..');
+  let real: string;
+  /** V8's own count of each function starting on a line, per file, read from the raw files. */
+  const own = new Map<string, Map<number, number>>();
+  /** Each script's own count, per file: what the defect read. */
+  const whole = new Map<string, number>();
+  let report: ReturnType<typeof functionReport>;
+
+  beforeAll(() => {
+    real = realpathSync(mkdtempSync(path.join(tmpdir(), 'coverage-959-')));
+    for (const dir of ['src/lib', 'functions/_lib'])
+      cpSync(path.join(checkout, dir), path.join(real, dir), {
+        recursive: true,
+      });
+    mkdirSync(path.join(real, 'scripts'));
+    writeFileSync(path.join(real, 'scripts/drive.ts'), DRIVER);
+    writeFileSync(path.join(real, 'package.json'), '{ "type": "module" }\n');
+    writeFileSync(path.join(real, 'vitest.config.ts'), 'export default {};\n');
+    const raw = path.join(real, 'raw');
+    const child = spawnSync(process.execPath, ['scripts/drive.ts'], {
+      cwd: real,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_V8_COVERAGE: raw },
+    });
+    const convert = spawnSync(process.execPath, [SCRIPT, raw, 'processes'], {
+      cwd: real,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect([child.status, convert.status, convert.stderr]).toEqual([0, 0, '']);
+    report = functionReport(real);
+    for (const name of nonEmpty(
+      readdirSync(raw).filter((n) => n.endsWith('.json')),
+      'raw coverage files the driver wrote',
+    ))
+      for (const script of (
+        JSON.parse(readFileSync(path.join(raw, name), 'utf8')) as {
+          result: {
+            url: string;
+            functions: { ranges: { startOffset: number; count: number }[] }[];
+          }[];
+        }
+      ).result) {
+        const file = NAMED.find(({ file }) =>
+          script.url.endsWith(`/${file}`),
+        )?.file;
+        if (file === undefined) continue;
+        const text = readFileSync(path.join(real, file), 'utf8');
+        const [script0, ...functions] = script.functions;
+        whole.set(file, script0?.ranges[0]?.count ?? Number.NaN);
+        const lines = own.get(file) ?? new Map<number, number>();
+        for (const { ranges } of functions) {
+          const [first] = ranges;
+          if (!first) continue;
+          const line = text.slice(0, first.startOffset).split('\n').length;
+          lines.set(line, (lines.get(line) ?? 0) + first.count);
+        }
+        own.set(file, lines);
+      }
+  });
+
+  afterAll(() => {
+    rmSync(real, { recursive: true, force: true });
+  });
+
+  for (const { file, needle } of NAMED)
+    it(`${file}: \`${needle.trim()}\` reads its own count, not the script's`, () => {
+      const text = readFileSync(path.join(real, file), 'utf8');
+      const at = text.indexOf(needle);
+      expect(at, `${needle} is not in ${file}`).toBeGreaterThanOrEqual(0);
+      const line = text.slice(0, at).split('\n').length;
+      const coverage = report[path.join(real, file)];
+      if (!coverage) throw new Error(`${file} is not in the report`);
+      const counted = Object.entries(coverage.fnMap)
+        .filter(([, { decl }]) => decl.start.line === line)
+        .map(([id]) => coverage.f[id]);
+      // V8 lists a function it never compiled under none of its own ranges:
+      // such a function never ran, so its own count is 0.
+      const expected = own.get(file)?.get(line) ?? 0;
+      expect(counted).toEqual([expected]);
+      expect(
+        expected,
+        'the driver must make it differ from the script',
+      ).not.toBe(whole.get(file));
+    });
 });

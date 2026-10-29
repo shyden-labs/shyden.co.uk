@@ -172,6 +172,22 @@ const lineStarts = (text) => {
 
 const WORD = /^[\w$]*/;
 const WHITESPACE = /^\s$/;
+const WORD_CHARACTER = /^[\w$]$/;
+const NAME = /[\w$]+/y;
+
+/**
+ * The name `code` begins at `at`, ending by `stop`, or '' where no name
+ * begins there (another character, or the middle of a name).
+ *
+ * @param {string} code
+ * @param {number} at
+ * @param {number} stop
+ */
+const nameAt = (code, at, stop) => {
+  if (WORD_CHARACTER.test(code.charAt(at - 1))) return '';
+  NAME.lastIndex = at;
+  return NAME.exec(code)?.[0].slice(0, stop - at) ?? '';
+};
 
 /** @type {Whose} */
 const COPY = {
@@ -394,19 +410,24 @@ export const placeOnTransform = (functions, transformed, text) => {
     // transform copies the own text, each character takes its own count.
     // Whitespace either side re-wrote is stepped over (`filter(\n  (locale)`
     // printed `filter((locale)`, back-translate.ts). Text the transform
-    // dropped is stepped over too, to the last place the printed character
-    // is written at or before the next segment's (#959: vite places `never` where
-    // `private` began and prints `(` for `<T,>(`, while V8 counts from
-    // `never` and from `(`). From any other change, the rest takes the last
-    // copied character's count.
+    // dropped is stepped over too, to the last place the printed name, or
+    // else character, is written at or before the next segment's
+    // (#959: vite places `never` where `private` began and prints `(` for
+    // `<T,>(`, while V8 counts from `never` and from `(`). A name is matched
+    // whole, since `parts` shares its `p` with the `private` it is placed on
+    // (message.ts). From any other change, the rest takes the last copied
+    // character's count.
     const next = nextOwn[index];
     let at = emitted;
     let from = own;
     count = countAt(flat, own);
     while (at < end) {
-      const printed = transformed.code.charCodeAt(at);
-      const written = text.charCodeAt(from);
-      if (printed === written) {
+      const name = nameAt(transformed.code, at, end);
+      if (
+        name === ''
+          ? transformed.code.charCodeAt(at) === text.charCodeAt(from)
+          : nameAt(text, from, text.length) === name
+      ) {
         count = countAt(flat, from);
         span(at, at + 1);
         at++;
@@ -419,7 +440,7 @@ export const placeOnTransform = (functions, transformed, text) => {
         const dropped =
           next === undefined
             ? -1
-            : text.lastIndexOf(transformed.code.charAt(at), next);
+            : text.lastIndexOf(name || transformed.code.charAt(at), next);
         if (dropped <= from) break;
         from = dropped;
       }
