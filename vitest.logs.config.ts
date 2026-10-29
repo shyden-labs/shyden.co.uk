@@ -1,4 +1,6 @@
+import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
+import LoadReporter from './tests/load-reporter.ts';
 import unit from './vitest.config.ts';
 import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
 
@@ -25,7 +27,7 @@ export default defineConfig({
     // The shared setup, then the measurement of loading each file (#696).
     setupFiles: [...SHARED_SETUP, LOAD_SETUP],
     // The verbose listing, then what loading each file cost.
-    reporters: ['verbose', ['./tests/load-reporter.ts', { suite: 'logs' }]],
+    reporters: ['verbose', new LoadReporter({ suite: 'logs' })],
     globalSetup: unit.test?.globalSetup,
   },
 });

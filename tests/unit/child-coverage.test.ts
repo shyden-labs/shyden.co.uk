@@ -58,7 +58,7 @@ describe('the processes a test starts are measured, the fork is not (#936)', () 
       }
     ).scripts;
     expect(scripts['test:coverage:integration']).toBe(
-      'COVERAGE_CHILD_PROCESSES="$PWD/coverage/raw/integration" npm run test:integration -- --coverage',
+      'NODE_V8_COVERAGE="$PWD/coverage/raw/vitest-main" COVERAGE_CHILD_PROCESSES="$PWD/coverage/raw/integration" npm run test:integration -- --coverage',
     );
   });
 });

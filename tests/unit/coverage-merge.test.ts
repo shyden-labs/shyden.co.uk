@@ -326,13 +326,14 @@ describe('every report of a file lists the same places (#913)', () => {
  * run says Playwright ran, one per Playwright run, of which there must be one.
  */
 describe('the reports the merge reads', () => {
-  it('reads the four suites alone when no Playwright run is named', () => {
+  it('reads the five suites alone when no Playwright run is named', () => {
     expect(reportPaths(undefined)).toEqual({
       reports: [
         'coverage/unit/coverage-final.json',
         'coverage/simulation/coverage-final.json',
         'coverage/integration/coverage-final.json',
         'coverage/processes/coverage-final.json',
+        'coverage/vitest-main/coverage-final.json',
       ],
     });
   });
@@ -346,6 +347,7 @@ describe('the reports the merge reads', () => {
         'coverage/simulation/coverage-final.json',
         'coverage/integration/coverage-final.json',
         'coverage/processes/coverage-final.json',
+        'coverage/vitest-main/coverage-final.json',
         'coverage/playwright/coverage-playwright-1/coverage-final.json',
         'coverage/playwright/coverage-playwright-sanity/coverage-final.json',
       ],

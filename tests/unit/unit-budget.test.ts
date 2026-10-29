@@ -46,6 +46,6 @@ describe('the unit suite budget', () => {
         scripts: Record<string, string>;
       }
     ).scripts;
-    expect(scripts['test:unit']).toBe('vitest run');
+    expect(scripts['test:unit']).toBe('vitest run --configLoader native');
   });
 });

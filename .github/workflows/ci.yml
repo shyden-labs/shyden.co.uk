@@ -224,6 +224,9 @@ jobs:
       # a test starts writes there, and the forks running the tests do not
       # (#936, tests/child-coverage.ts).
       - run: node scripts/coverage-processes.mjs coverage/raw/integration processes
+      # What the three commands' own Vitest main processes loaded natively:
+      # the configs and the reporters they import (#912, tests/main-coverage.ts).
+      - run: node scripts/coverage-processes.mjs coverage/raw/vitest-main vitest-main
       # Every suite's report, for coverage-playwright to join with what
       # Playwright ran (#913).
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

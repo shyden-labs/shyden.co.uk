@@ -1,5 +1,5 @@
 import type { Reporter, TestModule } from 'vitest/node';
-import { cpuReport, type CpuRow } from './unit-cpu-limit';
+import { cpuReport, type CpuRow } from './unit-cpu-limit.ts';
 
 /**
  * Prints, at the end of every unit run, the own CPU of its heaviest tests

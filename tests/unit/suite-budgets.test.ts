@@ -70,28 +70,30 @@ const SUITES = [
   {
     suite: 'guards',
     config: guards,
-    command: 'vitest run --config vitest.guards.config.ts --testTimeout=25000',
+    command:
+      'vitest run --configLoader native --config vitest.guards.config.ts --testTimeout=25000',
     own: [],
   },
   {
     suite: 'simulation',
     config: simulation,
     command:
-      'vitest run --config vitest.simulation.config.ts --testTimeout=700',
+      'vitest run --configLoader native --config vitest.simulation.config.ts --testTimeout=700',
     own: [],
   },
   {
     suite: 'integration',
     config: integration,
     command:
-      'vitest run --config vitest.integration.config.ts --testTimeout=30000',
+      'vitest run --configLoader native --config vitest.integration.config.ts --testTimeout=30000',
     // Its started processes write raw V8 coverage, its forks do not (#936).
     own: ['tests/child-coverage-setup.ts'],
   },
   {
     suite: 'logs',
     config: logs,
-    command: 'vitest run --config vitest.logs.config.ts --testTimeout=1000',
+    command:
+      'vitest run --configLoader native --config vitest.logs.config.ts --testTimeout=1000',
     own: [],
   },
 ] as const;

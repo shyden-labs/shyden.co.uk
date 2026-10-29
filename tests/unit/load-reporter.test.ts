@@ -6,6 +6,7 @@ import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import LoadReporter from '../load-reporter';
+import UnitCpuReporter from '../unit-cpu-reporter';
 
 /**
  * The report of what loading each test file cost (#688, #696): one reporter,
@@ -91,14 +92,15 @@ describe('the load report', () => {
 });
 
 // Each suite's own reporters, pinned as literals read from the configs' own
-// objects (#696). The other suites keep the verbose listing they had on their
+// objects (#696). Each is an instance the config imports, so Node loads it
+// with the config and its own process measures it (#912). The other suites keep the verbose listing they had on their
 // command line, which a command-line reporter would replace wholesale.
 describe('the reporters of each suite', () => {
   it('give the unit suite the default listing, test CPU, then loading', () => {
-    expect(unit.test?.reporters).toEqual([
+    expect(unit.test?.reporters).toStrictEqual([
       'default',
-      './tests/unit-cpu-reporter.ts',
-      ['./tests/load-reporter.ts', { suite: 'unit' }],
+      new UnitCpuReporter(),
+      new LoadReporter({ suite: 'unit' }),
     ]);
   });
 
@@ -110,9 +112,9 @@ describe('the reporters of each suite', () => {
   ] as const)(
     'give the %s suite the verbose listing, then its loading (#696)',
     (suite, config) => {
-      expect(config.test?.reporters).toEqual([
+      expect(config.test?.reporters).toStrictEqual([
         'verbose',
-        ['./tests/load-reporter.ts', { suite }],
+        new LoadReporter({ suite }),
       ]);
     },
   );
