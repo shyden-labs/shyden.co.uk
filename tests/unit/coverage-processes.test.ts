@@ -289,7 +289,7 @@ describe('which file an entry is (#899)', () => {
   });
 
   it('a file outside the measured set is left out', () => {
-    expect(fileOf('file:///repo/tests/unit/a.test.ts', ROOT)).toBeNull();
+    expect(fileOf('file:///repo/astro.config.mjs', ROOT)).toBeNull();
   });
 
   it('a node: built-in is left out', () => {
@@ -306,15 +306,25 @@ describe('which file an entry is (#899)', () => {
     );
   });
 
-  it('a spec is left out of the shared set', () => {
-    expect(fileOf('file:///repo/tests/e2e/board.spec.ts', ROOT)).toBeNull();
+  it('a spec and a unit test are kept, since tests are code (#912)', () => {
+    expect([
+      fileOf('file:///repo/tests/e2e/board.spec.ts', ROOT),
+      fileOf('file:///repo/tests/unit/ast.test.ts', ROOT),
+    ]).toEqual(['tests/e2e/board.spec.ts', 'tests/unit/ast.test.ts']);
+  });
+
+  it('a Vitest config is kept, and a type declaration is not (#912)', () => {
+    expect([
+      fileOf('file:///repo/vitest.integration.config.ts', ROOT),
+      fileOf('file:///repo/tests/e2e/globals.d.ts', ROOT),
+    ]).toEqual(['vitest.integration.config.ts', null]);
   });
 });
 
 /**
  * A Playwright run measures what its runner and workers load (#913): the
- * shared set, the Playwright configs, and every file under tests/, specs
- * and e2e helpers included. Only type declarations are left out.
+ * shared set, which holds every file under tests/ since #912, and the
+ * Playwright configs. Only type declarations are left out.
  */
 describe('which file a Playwright run’s entry is (#913)', () => {
   it.each([
@@ -330,7 +340,7 @@ describe('which file a Playwright run’s entry is (#913)', () => {
 
   it.each([
     ['a type declaration', 'tests/e2e/globals.d.ts'],
-    ['a config of another tool', 'vitest.config.ts'],
+    ['a config of another tool', 'astro.config.mjs'],
     ['a dependency', 'node_modules/@playwright/test/index.mjs'],
   ])('leaves out %s', (_, file) => {
     expect(fileOf(`file:///repo/${file}`, ROOT, PLAYWRIGHT_MEASURE)).toBeNull();
