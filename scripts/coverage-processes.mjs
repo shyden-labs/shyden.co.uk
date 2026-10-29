@@ -44,12 +44,17 @@ import {
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { convert } from 'ast-v8-to-istanbul';
 import { carryCounts, placeOnTransform } from './carry-counts.mjs';
 import {
   MEASURED,
   NOT_MEASURED,
   PLAYWRIGHT_MEASURE,
 } from '../tests/coverage-options.ts';
+import {
+  programOf,
+  withImportedDeclarators,
+} from '../tests/coverage-declarators.mjs';
 import { die, messageOf, nonEmpty } from './errors.mjs';
 import { processRuns } from './process-runs.mjs';
 
@@ -466,7 +471,12 @@ const openVitest = async (root) => {
   // the provider's own methods, and the one call that makes the provider
   // without `clean()`, which the declared `createCoverageProvider` runs and
   // which deletes the coverage reports' folder.
-  const provider = await /** @type {any} */ (vitest).initCoverageProvider();
+  // Counting the declarators coverage-v8 drops as Vite's own bindings, as the
+  // suites' own provider does (#928).
+  const provider = withImportedDeclarators(
+    await /** @type {any} */ (vitest).initCoverageProvider(),
+    { parse: programOf, convert },
+  );
   const project = vitest.getRootProject();
   return {
     tool: {
