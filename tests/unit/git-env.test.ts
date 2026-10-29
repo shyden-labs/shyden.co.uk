@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { LOCAL_GIT_VARS, localGitVars, withoutLocalGit } from '../git-env';
+import {
+  LOCAL_GIT_VARS,
+  localGitVars,
+  scratchGitEnv,
+  withoutLocalGit,
+} from '../git-env';
 import { searched } from '../source-files';
 import { floorBreach } from '../floors';
 
@@ -51,5 +56,45 @@ describe('the variables that point git at one repository (#377)', () => {
     const handed = JSON.parse(process.env[LOCAL_GIT_VARS] ?? '[]') as string[];
     expect(handed).toContain('GIT_DIR');
     expect(localGitVars()).toEqual(handed);
+  });
+});
+
+/**
+ * A scratch repository starts no git maintenance (#788). Since git 2.47 a
+ * commit or merge starts `git maintenance run --auto --detach`, a background
+ * process that outlives the test that made the repository; measured with
+ * GIT_TRACE on git 2.54. `tests/integration/git-env.test.ts` runs it.
+ */
+describe('the environment git runs with in a scratch repository (#788)', () => {
+  it('turns automatic maintenance off', () => {
+    expect(scratchGitEnv({ PATH: '/usr/bin' })).toEqual({
+      PATH: '/usr/bin',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'maintenance.auto',
+      GIT_CONFIG_VALUE_0: 'false',
+    });
+  });
+
+  it('removes the variables that point git at a repository first', () => {
+    expect(
+      scratchGitEnv({ GIT_DIR: '/elsewhere/.git', PATH: '/usr/bin' }).GIT_DIR,
+    ).toBeUndefined();
+  });
+
+  it('replaces settings a repository was handed, as git counts them local', () => {
+    // git lists GIT_CONFIG_COUNT among the variables that point it at one
+    // repository, so a handed count goes with the rest and only ours is read.
+    expect(localGitVars()).toContain('GIT_CONFIG_COUNT');
+    expect(
+      scratchGitEnv({
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'core.hooksPath',
+        GIT_CONFIG_VALUE_0: '/elsewhere/hooks',
+      }),
+    ).toEqual({
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'maintenance.auto',
+      GIT_CONFIG_VALUE_0: 'false',
+    });
   });
 });

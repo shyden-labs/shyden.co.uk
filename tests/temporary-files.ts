@@ -1,5 +1,6 @@
 import {
   existsSync,
+  lstatSync,
   mkdtempSync,
   readdirSync,
   rmSync,
@@ -7,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { nonEmpty } from './source-files';
+import { everythingUnder, nonEmpty } from './source-files';
 
 /**
  * The unit run's own temporary directory (#390 F56), as vitest's
@@ -64,16 +65,43 @@ export function setup(): void {
   process.env[RUN_TMPDIR] = runDir;
 }
 
+/** How many paths a refusal lists before it only counts the rest. */
+export const LEAK_LISTING_LIMIT = 40;
+
+/**
+ * The refusal for what a test left in `dir`, or undefined where it left
+ * nothing. It lists every path under each leaked entry with its size and when
+ * it was last written (#788): the directory goes with the run, so the refusal
+ * is the only evidence of whether a test never removed it or something wrote
+ * it back afterwards.
+ */
+export function leakRefusal(dir: string): string | undefined {
+  const leaked = leakedEntries(dir);
+  if (leaked.length === 0) return undefined;
+  const lines = leaked
+    .flatMap((name) => everythingUnder(join(dir, name)))
+    .map((path) => {
+      const { mtime, size } = lstatSync(path);
+      const at = mtime.toISOString();
+      const shown = path.slice(dir.length + 1);
+      return path.endsWith('/')
+        ? `  ${shown}  ${at}`
+        : `  ${shown}  ${size} B  ${at}`;
+    });
+  const left = lines.length - LEAK_LISTING_LIMIT;
+  return [
+    `the unit run left ${leaked.length} entr${leaked.length === 1 ? 'y' : 'ies'} in its ` +
+      `temporary directory: ${leaked.join(', ')}. Make a test's directory with ` +
+      "scratchDir() from 'tests/scratch-dir', which removes it when the test ends. It holds:",
+    ...lines.slice(0, LEAK_LISTING_LIMIT),
+    ...(left > 0 ? [`  … and ${left} more`] : []),
+  ].join('\n');
+}
+
 export function teardown(): void {
   try {
-    const leaked = leakedEntries(runDir);
-    if (leaked.length > 0) {
-      throw new Error(
-        `the unit run left ${leaked.length} entr${leaked.length === 1 ? 'y' : 'ies'} in its ` +
-          `temporary directory: ${leaked.join(', ')}. Make a test's directory with ` +
-          "scratchDir() from 'tests/scratch-dir', which removes it when the test ends.",
-      );
-    }
+    const refusal = leakRefusal(runDir);
+    if (refusal !== undefined) throw new Error(refusal);
   } finally {
     rmSync(runDir, { recursive: true, force: true });
   }

@@ -50,18 +50,36 @@ export function filesUnder(
  *
  * `tests/` holds directories with no `.spec.ts` in them, so a walk that
  * refused an empty sub-result could never complete. The refusal belongs to
- * the exported, top-level form and nowhere else.
+ * the exported, top-level form and nowhere else. With `everything`, nothing
+ * is skipped and each directory is listed too, ending in `/`.
  */
-function walk(dir: string, keep: (path: string) => boolean): string[] {
+function walk(
+  dir: string,
+  keep: (path: string) => boolean,
+  { everything = false } = {},
+): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (isSkipped(entry.name)) continue;
+    if (!everything && isSkipped(entry.name)) continue;
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walk(path, keep));
-    else if (keep(path)) out.push(path);
+    if (entry.isDirectory()) {
+      if (everything) out.push(`${path}/`);
+      out.push(...walk(path, keep, { everything }));
+    } else if (keep(path)) out.push(path);
   }
   return out;
 }
+
+/**
+ * `dir` and every path below it, hidden ones and directories included (each
+ * directory ending in `/`), sorted: what a leaked scratch directory holds, a
+ * git repository's `.git` above all (#788). Never empty, since it lists `dir`.
+ */
+export const everythingUnder = (dir: string): string[] =>
+  nonEmpty(
+    [`${dir}/`, ...walk(dir, () => true, { everything: true })].sort(),
+    `${dir} and what it holds`,
+  );
 
 /** One home in `scripts/errors.mjs`, where a script can reach it too (#475). */
 export { nonEmpty };
