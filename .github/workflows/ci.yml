@@ -181,25 +181,13 @@ jobs:
       # One limit, measured, on the command itself (tests/unit/suite-budgets.test.ts).
       - run: npm run test:integration
 
-  # Coverage of the changed lines (#896): three Vitest suites again, each
-  # under V8 coverage, joined, then the verdict on every line this pull request
-  # changes, printed in the job summary. It reports and gates nothing yet:
-  # #902 makes it a gate once #899-#901 measure child processes, workerd and
-  # the browser (Shyden 2026-10-21, "Measure all first"). A suite that fails
-  # writes no report, and a missing or stale report fails the job either way.
-  # The unit suite's own 1 s step stays in `checks`, without coverage.
-  # Not guards: under coverage the duplication guard's whole-tree scan took
-  # 64 s against the suite's 25 s limit (run 39612796552), and no limit is
-  # raised, so code only a guard runs reads as unrun.
+  # One overall coverage figure for the unit suite, its threshold in
+  # vitest.config.ts (global rule 2026-10-30: one percentage per repo).
   coverage:
     needs: [image, scope]
     # Skipped on a docs-only pull request (#582), like every job that builds.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # Run 39612796552: unit under coverage took 20 s; simulation and
-    # integration take 26-32 s together in `checks` (39586345113,
-    # 39574987257) and have not yet run under coverage, so this is room
-    # until they have, then cut to a measured figure (#896).
     timeout-minutes: 10
     permissions:
       contents: read
@@ -207,101 +195,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The verdict diffs against the merge base with develop.
-          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: git fetch --no-tags origin develop:refs/remotes/origin/develop
       - run: npm ci
-      # The integration suite serves the built site.
-      - run: npm run build
       - run: npm run test:coverage
-      - run: npm run test:coverage:simulation
-      - run: npm run test:coverage:integration
-      # What the integration suite's child processes ran (#899): each process
-      # a test starts writes there, and the forks running the tests do not
-      # (#936, tests/child-coverage.ts).
-      - run: node scripts/coverage-processes.mjs coverage/raw/integration processes
-      # What the three commands' own Vitest main processes loaded natively:
-      # the configs and the reporters they import (#912, tests/main-coverage.ts).
-      - run: node scripts/coverage-processes.mjs coverage/raw/vitest-main vitest-main
-      # Every suite's report, for coverage-playwright to join with what
-      # Playwright ran (#913).
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-suites
-          path: |
-            coverage/*/coverage-final.json
-            coverage/*/lcov.info
-            coverage/processes/skipped.txt
-          retention-days: 3
-          if-no-files-found: error
-
-  # What Playwright's runner and workers ran, in every e2e shard and the
-  # sanity run (#913), joined with the coverage job's suites. It needs the
-  # shards, which a docs-only pull request skips, so its condition asks for
-  # each need's success itself, and build-and-test holds it to scope's
-  # docs-only verdict: run on every other pull request, skipped on that one.
-  coverage-playwright:
-    needs: [coverage, e2e, sanity-on-build, functions, visual]
-    if: always() && needs.coverage.result == 'success' && needs.e2e.result == 'success' && needs.sanity-on-build.result == 'success' && needs.functions.result == 'success' && needs.visual.result == 'success'
-    runs-on: ubuntu-26.04
-    # Measured on the first run of this job, then cut (#913).
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          # The verdict diffs against the merge base with develop.
-          fetch-depth: 0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: git fetch --no-tags origin develop:refs/remotes/origin/develop
-      - run: npm ci
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: coverage-suites
-          path: coverage
-      # Each run converted through its own compile cache, and moved from the
-      # container's checkout onto this one. A glob that
-      # matches nothing reaches tar as itself, and fails.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: coverage-playwright-*
-          path: coverage/raw/playwright
-      - name: Convert what each Playwright run measured
-        run: |
-          set -euo pipefail
-          for tgz in coverage/raw/playwright/*/coverage-playwright.tgz; do
-            run="$(dirname "$tgz")"
-            tar -C "$run" -xzf "$tgz"
-            node scripts/coverage-processes.mjs "$run/v8" "playwright/$(basename "$run")" --cache "$run/pwcache" --recorded-root "$(cat "$run/root.txt")"
-          done
-      - run: node scripts/coverage-merge.mjs --playwright
-      - name: The changed lines, against the coverage of every suite
-        run: node scripts/coverage-changed.mjs --report-only >> "$GITHUB_STEP_SUMMARY"
-      # For SonarCloud's coverage on new code (#851).
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-lcov
-          path: coverage/*/lcov.info
-          if-no-files-found: error
-      # What the child processes measured, and what they ran that was not a
-      # file's own text (#899).
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-processes
-          path: |
-            coverage/processes/coverage-final.json
-            coverage/processes/skipped.txt
-            coverage/merged/coverage.json
-          if-no-files-found: error
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
@@ -376,22 +275,6 @@ jobs:
           E2E_ACCOUNT_DIR: e2e-accounts
           E2E_REPORT_DIR: e2e-report
           E2E_SHARD_PLAN: tests/e2e-shard-timings.json
-          # Measured for coverage (#913); the web server unsets it.
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
-      # What this run's Playwright runner and workers ran (#913): the raw V8
-      # files, the compile cache their TypeScript ran from, and the checkout
-      # they were recorded in, which is the container's. One tar, since an
-      # upload of the two directories came back empty (probe 39668240107).
-      - name: Keep this run's coverage for the coverage job
-        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-playwright-${{ matrix.shard }}
-          path: ${{ runner.temp }}/coverage-playwright.tgz
-          retention-days: 3
-          overwrite: true
-          if-no-files-found: error
       # Whatever the shard's outcome, and an empty upload is an ERROR: a shard
       # that wrote no account has nothing for build-and-test to add up.
       # `overwrite` because re-running a failed shard uploads its account
@@ -551,22 +434,6 @@ jobs:
       # Both sanity configs declare one project, chromium.
       - run: npm run test:sanity
         env:
-          # Measured for coverage (#913); the web server unsets it.
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
-      # What this run's Playwright runner and workers ran (#913): the raw V8
-      # files, the compile cache their TypeScript ran from, and the checkout
-      # they were recorded in, which is the container's. One tar, since an
-      # upload of the two directories came back empty (probe 39668240107).
-      - name: Keep this run's coverage for the coverage job
-        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-playwright-sanity
-          path: ${{ runner.temp }}/coverage-playwright.tgz
-          retention-days: 3
-          overwrite: true
-          if-no-files-found: error
       - name: Keep the failing run's Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -611,18 +478,6 @@ jobs:
       - run: npm ci
       - run: npm run test:functions
         env:
-          # Measured for coverage (#913); the web server unsets it.
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
-      - name: Keep this run's coverage for the coverage job
-        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-playwright-functions
-          path: ${{ runner.temp }}/coverage-playwright.tgz
-          retention-days: 3
-          overwrite: true
-          if-no-files-found: error
       - name: Keep the failing run's Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -659,7 +514,6 @@ jobs:
         sanity-on-build,
         functions,
         logs,
-        coverage-playwright,
       ]
     # NEVER skipped. A skipped required check is reported to branch protection
     # as passing, so an aggregate whose condition could turn false would read
@@ -819,37 +673,6 @@ jobs:
             fi
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      # What the visual spec runs, measured for coverage (#913) in a run of
-      # its own (Shyden, 2026-10-28: "Own measuring run"). Measuring the gate
-      # slowed it into the spinner #968 is about, and measuring the drift step
-      # put 10 more drifted pictures in its report (4 -> 14, run 40638559057),
-      # so neither is measured. Its own output folder, so it touches neither's
-      # pictures; its pass or fail is never read, as the drift step's is not.
-      # The web server unsets the measurement. Its account, and every test the
-      # reporter names in it, are printed: a test that ended early measured
-      # less, and the last three lines named 2 of the 4 (run 40646068459).
-      - name: Measure the visual spec for coverage
-        continue-on-error: true
-        env:
-          VISUAL: '1'
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8
-          PWTEST_CACHE_DIR: ${{ runner.temp }}/pwcache
-        run: |
-          npx playwright test --project=visual --reporter=dot \
-            --output=test-results/visual-coverage > visual-coverage.log 2>&1 || true
-          grep -E '^ +([0-9]+ (passed|failed|flaky|skipped|did not run|interrupted)|\[visual\] › )' visual-coverage.log \
-            || echo 'visual-coverage.log holds no account'
-      # Into the workspace, not the runner's temp folder: every path this
-      # job uploads is read literally by pipeline-wiring's #311 guard.
-      - name: Keep this run's coverage for the coverage job
-        run: pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$PWD/coverage-playwright.tgz" v8 pwcache root.txt
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-playwright-visual
-          path: coverage-playwright.tgz
-          retention-days: 3
-          overwrite: true
-          if-no-files-found: error
       # expected / actual / diff PNGs, which is the whole point: a visual
       # failure that can only be reproduced locally gets ignored. The gate's
       # images and the measurement's are in separate folders under
