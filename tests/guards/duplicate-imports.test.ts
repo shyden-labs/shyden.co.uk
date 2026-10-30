@@ -225,6 +225,5 @@ describe('no source imports one module twice (#390 F59)', () => {
       )
       .map(({ path }) => path);
     expect(searched(unread, { of: sources, what: 'source files' })).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 });

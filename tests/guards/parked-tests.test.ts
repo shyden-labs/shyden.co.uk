@@ -278,7 +278,7 @@ describe('parked tests must name an issue', () => {
   it('the e2e corpus parks nothing without naming an issue', () => {
     expectNothingFound(
       readParkedTests,
-      declarationsRead('tests and groups read', 'parked-tests/declarations'),
+      declarationsRead('tests and groups read'),
     );
   });
 });

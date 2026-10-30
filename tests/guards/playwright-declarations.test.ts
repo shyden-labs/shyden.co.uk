@@ -325,6 +325,7 @@ describe('testsWritten() counts the tests a file writes, as text (#477)', () => 
       [],
     );
     // A planted form deleted from the table would go unread with this green.
+    expect(counted.length).toBeGreaterThan(0);
   });
 
   it('counts nothing that is not a test', () => {

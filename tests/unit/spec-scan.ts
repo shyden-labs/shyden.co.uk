@@ -52,12 +52,6 @@ export type Liveness = {
   /** The unit `judged` lists, plural: `tests read`, `captures`. */
   readonly what: string;
   /**
-   * The id of the floor in `tests/floors.json` (#468): `judged` is checked
-   * against it for equality, so a reader that comes back one short fails, and
-   * so does a population that grew, until it is recorded.
-   */
-  readonly floor: string;
-  /**
    * An independent reading of the same file: true where its text plainly
    * holds the construct. A file it holds and `analyze` judged nothing in is
    * a form the reader is blind to.
@@ -77,9 +71,8 @@ export type Liveness = {
  * a file whose text declares a test, and in which the guard judged none, is
  * a form its reader is blind to. One home, since three guards read that way.
  */
-export const declarationsRead = (what: string, floor: string): Liveness => ({
+export const declarationsRead = (what: string): Liveness => ({
   what,
-  floor,
   carries: (_file, source) => declaresTests(source),
 });
 
@@ -154,5 +147,4 @@ export const expectNothingFound = (
         disagree.join('\n'),
     ).toEqual([]);
   }
-  // After every verdict, so a population that grew never hides a finding.
 };

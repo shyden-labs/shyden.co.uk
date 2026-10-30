@@ -52,12 +52,6 @@ const DRAFTS = JSON.parse(
   ),
 ) as Record<string, Record<string, string>>;
 const UNITS = unitsByLocale();
-const LINES_FLOOR: Readonly<Record<ReadLocale, string>> = {
-  zh: 'read-back/lines-zh',
-  th: 'read-back/lines-th',
-  id: 'read-back/lines-id',
-  vi: 'read-back/lines-vi',
-};
 const FIX = 'run npm run i18n:google-read-back';
 
 describe('every translated line is read back by Google, or pending', () => {
@@ -110,25 +104,12 @@ describe('every translated line is read back by Google, or pending', () => {
  * writers are judged as the DeepL cache says now, so a re-drafted line
  * cannot keep a reading its new writer took.
  */
-const GOOGLE_READINGS_FLOOR: Readonly<Record<ReadLocale, string>> = {
-  zh: 'read-back/google-readings-zh',
-  th: 'read-back/google-readings-th',
-  id: 'read-back/google-readings-id',
-  vi: 'read-back/google-readings-vi',
-};
-const SECOND_READINGS_FLOOR: Readonly<Record<ReadLocale, string>> = {
-  zh: 'read-back/second-readings-zh',
-  th: 'read-back/second-readings-th',
-  id: 'read-back/second-readings-id',
-  vi: 'read-back/second-readings-vi',
-};
 const REFRESH = 'run npm run i18n:second-read -- --refresh-writers';
 
 const noSelfReading = (
   locale: ReadLocale,
   entries: readonly ReaderEntry[],
   what: string,
-  floor: string,
 ) => {
   const found = readerProblems(locale, UNITS[locale], DRAFTS, entries);
   expect(
@@ -151,7 +132,6 @@ describe('no Google reading is filed under the wrong writer', () => {
       locale,
       googleEntries(STORE, locale),
       `${locale} Google readings`,
-      GOOGLE_READINGS_FLOOR[locale],
     );
   });
 });
@@ -162,7 +142,6 @@ describe('no second reading was taken by the engine that wrote the line', () => 
       locale,
       secondEntries(SECOND, locale),
       `${locale} second readings`,
-      SECOND_READINGS_FLOOR[locale],
     );
   });
 });

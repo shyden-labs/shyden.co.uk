@@ -136,7 +136,7 @@ const SEPARATE: ReadonlyMap<string, string> = new Map([
 describe('a function body has one home across files', () => {
   it('scans the whole tracked tree, not a list', () => {
     // Anti-vacuity: an empty scan satisfies every assertion below.
-    const { declarations } = scan();
+    expect(scan().declarations.length).toBeGreaterThan(0);
     expect(SCANNED).toContain('src/lib/grouping.ts');
     expect(SCANNED).toContain('scripts/test-devices.mjs');
   });
@@ -168,8 +168,7 @@ describe('a function body has one home across files', () => {
         { of: recorded, what: 'recorded verdicts' },
       ),
     ).toEqual([]);
-    // A verdict dropped from the table would leave its pair unexcused, but a
-    // reader dropping one silently would leave this test reading fewer (#524).
+    expect(recorded.length).toBeGreaterThan(0);
   });
 
   it('records each verdict against one pair, which no copy can inherit', () => {

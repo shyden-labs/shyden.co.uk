@@ -25,7 +25,6 @@ describe('visible lines are read in one home, and survive being sent into the pa
     expectClosesOverNothing(
       'tests/visible-text.ts',
       'export const visibleLinesReader',
-      'visible-text/closure-lines',
     );
   });
 

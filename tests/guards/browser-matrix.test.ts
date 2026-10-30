@@ -830,11 +830,11 @@ describe('no test run retries (#445)', () => {
   // process.env.CI ? 0 : 1` resolves to 0 under CI, and the device config
   // only ever runs on the laptop (#502, F168).
   it.each([
-    ['under CI', { CI: 'true' }, 'browser-matrix/retry-configs'],
-    ['without CI', { CI: undefined }, 'browser-matrix/retry-configs-local'],
+    ['under CI', { CI: 'true' }],
+    ['without CI', { CI: undefined }],
   ] as const)(
     'resolves retries to 0 in every Playwright config and project, %s',
-    async (_, env, floorId) => {
+    async (_, env) => {
       const configs = rootConfigs();
       const retrying: string[] = [];
       for (const file of configs) {

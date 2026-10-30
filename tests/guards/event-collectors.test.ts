@@ -74,7 +74,6 @@ describe('browser-event collectors have exactly one home', () => {
         what: 'files in spec directories',
       }),
     ).toEqual([]);
-    // The walk and git's list can narrow together, and agree over less (#524).
   });
 
   it('is subscribed to only in recorders.ts', () => {

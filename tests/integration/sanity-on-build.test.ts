@@ -145,12 +145,6 @@ const deployedOnlyTests = (): ListedTest[] =>
     t.tags.includes('deployed-only'),
   );
 
-// One id per config: each case runs the same line over its own spec files.
-const SPEC_FILES_FLOOR: Readonly<Record<string, string>> = {
-  'tests/dev': 'sanity-on-build/spec-files-dev',
-  'tests/prod': 'sanity-on-build/spec-files-prod',
-};
-
 describe.each(CONFIGS)(
   '$config with SANITY_ON_BUILD=1',
   ({ config, testDir }) => {

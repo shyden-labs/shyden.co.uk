@@ -227,17 +227,6 @@ describe('unitsBetween: what the reader is asked to read', () => {
   });
 });
 
-/**
- * Each locale's count of translated entries, ratcheted (#468). Keyed by the
- * catalogue, so a locale added without a floor fails to compile.
- */
-const TRANSLATED_FLOOR: Readonly<Record<keyof typeof CATALOGUES, string>> = {
-  id: 'back-translate/translated-id',
-  zh: 'back-translate/translated-zh',
-  vi: 'back-translate/translated-vi',
-  th: 'back-translate/translated-th',
-};
-
 /** The CSV vocabulary without its `sex` letters, which the roster rows read back. */
 const csvCopy = (locale: Locale) =>
   Object.fromEntries(
@@ -299,7 +288,6 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
         ),
       );
       expect([...read].sort(), locale).toEqual([...expected].sort());
-      // After the verdict, so a population that grew never hides a finding.
     }
   });
 

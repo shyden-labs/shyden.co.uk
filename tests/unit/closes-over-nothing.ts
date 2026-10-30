@@ -21,7 +21,6 @@ import { withoutTsComments } from './source-text';
 export function expectClosesOverNothing(
   path: string,
   declaration: string,
-  floorId: string,
 ): void {
   const source = withoutTsComments(readFileSync(path, 'utf8'));
   expect(source, `read the module that owns the measurement`).toContain(
@@ -35,6 +34,4 @@ export function expectClosesOverNothing(
     'an import here is a binding that exists while type-checking and is ' +
       'undefined at the far end, where the measurement runs',
   ).toEqual([]);
-  // Each caller names its own id: the two modules have different lengths,
-  // and one id reading two values is refused by the recorder.
 }

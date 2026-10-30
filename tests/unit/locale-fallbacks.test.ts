@@ -99,18 +99,6 @@ describe('what is still English in each catalogue', () => {
     );
   });
 
-  // One id per locale: each case runs the same line over its own catalogue.
-  const ENGLISH_MESSAGES_FLOOR: Readonly<Record<string, string>> = {
-    zh: 'locale-fallbacks/english-messages-zh',
-    vi: 'locale-fallbacks/english-messages-vi',
-    th: 'locale-fallbacks/english-messages-th',
-  };
-  // One id per locale, for the same reason.
-  const LEAF_PATHS_FLOOR: Readonly<Record<string, string>> = {
-    zh: 'locale-fallbacks/leaf-paths-zh',
-    vi: 'locale-fallbacks/leaf-paths-vi',
-    th: 'locale-fallbacks/leaf-paths-th',
-  };
   for (const [locale, table] of Object.entries(MACHINE_SEEDED)) {
     it(`${locale}: no message is still English`, () => {
       // Until #136 this pinned all 51 messages as the English function by

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * What the CI visual capture (#654) hands back to fold (#889): the baselines a
+ * What the CI visual capture (#654) hands back (#889): the baselines a
  * `--update-snapshots=all` run changed, and nothing else.
  *
  *   node scripts/visual-capture.mjs <status> <head-message> <message-out> <list-out>
@@ -12,8 +12,8 @@
  * judged by `capturedBaselines` against the committed picture at `HEAD`, and
  * only one past `CAPTURE_PIXEL_RULE` is handed back. Anything in the status
  * that is not a baseline is refused: a capture hands back baselines and
- * nothing else, so the fold (`scripts/fold-record.mjs`, #889) carries no
- * other side effect of the branch's code.
+ * nothing else, so committing it carries no other side effect of the
+ * branch's code.
  *
  * Writes the measured commit's message with the committed baselines added to
  * `<message-out>`, their paths one per line to `<list-out>`, the summary
@@ -24,8 +24,30 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { argv, env } from 'node:process';
 import { die } from './errors.mjs';
-import { withBlock } from './floors-diff.mjs';
 import { decodePng, differingPixels } from './png-pixels.mjs';
+
+/** A git trailer line: `Co-Authored-By: ...`. */
+const TRAILER = /^[A-Za-z][A-Za-z0-9-]*: \S/;
+
+/**
+ * A commit message with `block` added as its own paragraph ahead of the
+ * trailer paragraph, or last when there is none.
+ *
+ * @param {string} original
+ * @param {string} block
+ * @returns {string}
+ */
+const withBlock = (original, block) => {
+  const paragraphs = original.trimEnd().split(/\n{2,}/);
+  const last = paragraphs.at(-1) ?? '';
+  const trailers =
+    paragraphs.length > 1 &&
+    last.split('\n').every((entry) => TRAILER.test(entry));
+  const body = trailers
+    ? [...paragraphs.slice(0, -1), block, last]
+    : [...paragraphs, block];
+  return `${body.join('\n\n')}\n`;
+};
 
 /** Where `playwright.config.ts`'s `snapshotPathTemplate` keeps baselines. */
 export const BASELINE_DIR = 'tests/e2e/__screenshots__/';
@@ -41,15 +63,6 @@ const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
  */
 const BASELINE = new RegExp(
   `^( M|M |MM|\\?\\?) (${BASELINE_DIR_PATTERN}[^/\\s]+\\.png)$`,
-);
-
-/**
- * A path a capture may hand back: one PNG directly in the baseline directory,
- * no quote or space in its name. `scripts/fold-record.mjs` judges the
- * artifact's list by it again before it copies anything (#889).
- */
-export const BASELINE_PATH = new RegExp(
-  `^${BASELINE_DIR_PATTERN}[^/"\\s]+\\.png$`,
 );
 
 /**
@@ -73,7 +86,7 @@ export const baselineChanges = (porcelain) => {
 
 /**
  * The measured commit's message with the captured baselines named, ahead of
- * its trailers (the same fold as the floor recorder's, one home).
+ * its trailers.
  *
  * @param {string} original
  * @param {readonly string[]} files

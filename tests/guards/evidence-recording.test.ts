@@ -295,6 +295,7 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
 
   it('reads every spec, and as many declarations as there are', () => {
     const declaring = SPECS.filter((path) => declaresRecorded(sourceOf(path)));
+    expect(declaring.length).toBeGreaterThan(0);
     // Cross-checked against the parse tree: a spec the compiler reads as
     // passing `recorded` to `test.use` is one the text scan reads as
     // declaring it, and the other way round, so neither reading has a form
@@ -309,7 +310,6 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
         what: 'specs checked for a declaration',
       }),
     ).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([

@@ -144,14 +144,6 @@ const AWAITING_READ: Record<Locale, readonly string[]> = {
   th: [],
 };
 
-// One id per locale: the search below runs once per locale over its own labels.
-const WITNESSED_FLOOR: Readonly<Record<string, string>> = {
-  id: 'verified-labels/witnessed-labels-id',
-  zh: 'verified-labels/witnessed-labels-zh',
-  vi: 'verified-labels/witnessed-labels-vi',
-  th: 'verified-labels/witnessed-labels-th',
-};
-
 describe('short labels that disagree with their own locale', () => {
   // One test per locale (#714): the five in one test reached 71 ms of own CPU
   // on the runner, over the 70 ms cut line under the 0.1 s limit.
@@ -227,14 +219,6 @@ const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
     'site.calculators.title',
     'site.home.openCalculators',
   ],
-};
-
-// One id per locale: the search below runs once per locale over its own labels.
-const UNWITNESSED_FLOOR: Readonly<Record<keyof typeof UNWITNESSED, string>> = {
-  id: 'verified-labels/unwitnessed-labels-id',
-  zh: 'verified-labels/unwitnessed-labels-zh',
-  vi: 'verified-labels/unwitnessed-labels-vi',
-  th: 'verified-labels/unwitnessed-labels-th',
 };
 
 describe('short labels no check can judge', () => {

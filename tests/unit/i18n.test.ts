@@ -132,18 +132,15 @@ describe('locales are complete', () => {
   });
 
   it.each([
-    ['en', enCatalogue, 'i18n/en-catalogue-blank-strings'],
-    ['id', idCatalogue, 'i18n/id-catalogue-blank-strings'],
-  ] as const)(
-    '%s has no blank string anywhere',
-    (_name, catalogue, floorId) => {
-      const strings = deepStrings(catalogue);
-      const blank = strings.filter(([, v]) => v.trim() === '').map(([k]) => k);
-      expect(
-        searched(blank, { of: strings, what: 'catalogue strings' }),
-      ).toEqual([]);
-    },
-  );
+    ['en', enCatalogue],
+    ['id', idCatalogue],
+  ] as const)('%s has no blank string anywhere', (_name, catalogue) => {
+    const strings = deepStrings(catalogue);
+    const blank = strings.filter(([, v]) => v.trim() === '').map(([k]) => k);
+    expect(searched(blank, { of: strings, what: 'catalogue strings' })).toEqual(
+      [],
+    );
+  });
 
   it('Indonesian is actually translated, not copied English', () => {
     // Walks EVERY string rather than five hand-picked ones. A copy-paste
@@ -1635,12 +1632,6 @@ describe('site-wide copy is fully translated', () => {
   // #602: the same walk for the other machine-seeded site locales. One test
   // per locale, generated, never a loop of locales inside a body.
   const SITE_BY_LOCALE = { zh: siteZh, vi: siteVi, th: siteTh } as const;
-  // One literal id per locale, each spelled exactly once (literal-floors).
-  const SITE_FLOOR = {
-    zh: 'i18n/site-strings-zh',
-    vi: 'i18n/site-strings-vi',
-    th: 'i18n/site-strings-th',
-  } as const;
   for (const locale of ['zh', 'vi', 'th'] as const) {
     it(`${locale}: no site string is English left untranslated`, () => {
       const leaves = stringLeaves(SITE_BY_LOCALE[locale]);

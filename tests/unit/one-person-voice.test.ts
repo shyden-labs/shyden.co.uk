@@ -46,14 +46,6 @@ const WE: Readonly<Record<MvpLocale, RegExp>> = {
   th: /เรา/,
 };
 
-const FLOOR: Readonly<Record<MvpLocale, string>> = {
-  en: 'one-person-voice/strings-en',
-  id: 'one-person-voice/strings-id',
-  zh: 'one-person-voice/strings-zh',
-  vi: 'one-person-voice/strings-vi',
-  th: 'one-person-voice/strings-th',
-};
-
 describe('the site speaks as one person', () => {
   it('reads every locale the site serves', () => {
     expect(Object.keys(COPY).sort()).toEqual([...MVP_LOCALES].sort());

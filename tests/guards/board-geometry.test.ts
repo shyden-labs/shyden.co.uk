@@ -54,7 +54,6 @@ describe('the board is measured once, and survives being sent somewhere else', (
     expectClosesOverNothing(
       'tests/board-geometry.ts',
       'export const measureBoard',
-      'board-geometry/closure-lines',
     );
   });
 

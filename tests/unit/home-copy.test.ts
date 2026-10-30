@@ -61,14 +61,6 @@ const RETIRED_CLAIMS: Record<Locale, readonly string[]> = {
 };
 
 describe('no product is called first (#403 AC3)', () => {
-  // One id per locale: each case runs the same line over its own strings.
-  const HOME_STRINGS_FLOOR: Readonly<Record<Locale, string>> = {
-    en: 'home-copy/home-strings-en',
-    id: 'home-copy/home-strings-id',
-    zh: 'home-copy/home-strings-zh',
-    vi: 'home-copy/home-strings-vi',
-    th: 'home-copy/home-strings-th',
-  };
   for (const locale of LOCALES)
     it(`${locale}: no homepage string calls a product first or the flagship`, () => {
       const values = Object.values(getSiteStrings(locale).home);

@@ -256,30 +256,10 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: build-release-content.mjs',
   },
-  // Without its four paths it prints its usage and refuses (#651).
-  'floors-diff.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: floors-diff.mjs',
-  },
-  // Without a run id it prints its usage and refuses, before git or gh (#889).
-  'fold-record.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: fold-record.mjs <run-id>',
-  },
   // Without its four paths it prints its usage and refuses (#654).
   'visual-capture.mjs': {
     args: [],
     status: 1,
     says: 'usage: visual-capture.mjs',
-  },
-  // The gate never records the guards' floors, so under CI it refuses before
-  // it runs anything (#468), unless told it is the dispatched recorder (#651).
-  'record-floors.mjs': {
-    args: [],
-    env: { CI: 'true' },
-    status: 1,
-    says: 'CI never records floors',
   },
 };

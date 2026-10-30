@@ -97,5 +97,6 @@ describe('the gauntlet’s by-design count selects exactly what android-chrome e
               span.expression.text === CONSTANT,
           ),
       );
+    expect(built.length).toBeGreaterThan(0);
   });
 });

@@ -287,23 +287,6 @@ const DISABLED_FILL: Record<Theme, string> = {
 const pairName = (p: Pair) =>
   `${p.fg.join(' over ')} on ${p.bg.join(' over ')} (${p.where})`;
 
-/**
- * Each theme's floor, spelled once: a recorded id is a string under tests/,
- * never built at runtime (`literal-floors.test.ts`).
- */
-const PAIRS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/pairs',
-  dark: 'contrast/dark/pairs',
-};
-const GROUNDS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/grounds',
-  dark: 'contrast/dark/grounds',
-};
-const TOKENS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/colour-tokens',
-  dark: 'contrast/dark/colour-tokens',
-};
-
 describe('the palette meets WCAG AA by computation, not by comment', () => {
   it('reads the atmosphere from body::before, top-first, named by position', () => {
     expect(atmosphereLayers(tokensCss())).toEqual([

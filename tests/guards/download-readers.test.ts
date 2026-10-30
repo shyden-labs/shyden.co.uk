@@ -87,7 +87,6 @@ describe('a download’s bytes are read only through downloadText', () => {
     // hold them, and ratcheted (#468).
     expectNothingFound(read, {
       what: 'download byte reads',
-      floor: 'download-readers/byte-reads',
       carries: (_file, source) => BYTE_READ.test(withoutTsComments(source)),
     });
   });

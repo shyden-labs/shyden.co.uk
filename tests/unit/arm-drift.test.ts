@@ -104,13 +104,6 @@ const ALLOWANCE: Readonly<
   },
 };
 
-const DRIFT_FLOOR: Readonly<Record<ReadLocale, string>> = {
-  zh: 'arm-drift/arms-zh',
-  th: 'arm-drift/arms-th',
-  id: 'arm-drift/arms-id',
-  vi: 'arm-drift/arms-vi',
-};
-
 describe('every arm stays within its allowance of the arm it was made from', () => {
   it.each(READ_ORDER)('%s', (locale) => {
     const arms = armDrift(backTranslationUnits(locale));

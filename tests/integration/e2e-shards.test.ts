@@ -77,11 +77,6 @@ describe('the verdict, run as build-and-test runs it', () => {
       { outputs?: Record<string, string> } | undefined;
     return {
       logs: { result: 'skipped', outputs: {} },
-      // Runs wherever the pull request is not docs-only (#913).
-      'coverage-playwright': {
-        result: scope?.outputs?.docs_only === 'true' ? 'skipped' : 'success',
-        outputs: {},
-      },
       ...needs,
       scope: {
         result: 'success',
@@ -251,7 +246,6 @@ describe('the verdict, run as build-and-test runs it', () => {
       },
       capture: { result: 'skipped', outputs: {} },
       logs: { result: 'skipped', outputs: {} },
-      'coverage-playwright': { result: 'skipped', outputs: {} },
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toMatch(/e2e finished `skipped`, not `success`/);

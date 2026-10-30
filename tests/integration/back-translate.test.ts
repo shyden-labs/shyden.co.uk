@@ -320,6 +320,7 @@ describe('scripts/i18n-back-translate.mjs', () => {
       'a run with no engine sent something',
     ).toEqual([]);
     // `listening` and nothing else: not even the languages read (#522).
+    expect(engine.log).toHaveLength(1);
   });
 
   it('fails a locale that came back empty, and says so in the summary', async () => {

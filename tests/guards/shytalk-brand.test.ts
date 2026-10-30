@@ -165,7 +165,7 @@ describe("ShyTalk's brand mark has one home", () => {
   });
 
   it('reads every source file, and as many as there are', () => {
-    const files = scannedFiles();
+    expect(scannedFiles().length).toBeGreaterThan(0);
     // Cross-checked on the files that do spell the mark, by the same reading
     // the verdict makes: the home spells every hex, and the token home spells
     // its one token exactly once, so a reader gone blind to a script or to a
@@ -180,7 +180,6 @@ describe("ShyTalk's brand mark has one home", () => {
       }),
     ).toEqual([]);
     expect(readCode(TOKEN_HOME).split(TOKEN_FORM).length - 1).toBe(1);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([

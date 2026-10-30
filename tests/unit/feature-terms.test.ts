@@ -385,19 +385,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
 describe('on the live catalogues', () => {
   const naming = (units: readonly BackTranslationUnit[]) =>
     units.filter(({ english }) => featuresNamed(english).length > 0);
-  // One id per locale: each case runs the same line over its own catalogue.
-  const NAMING_FLOOR: Readonly<Record<string, string>> = {
-    id: 'feature-terms/naming-units-id',
-    zh: 'feature-terms/naming-units-zh',
-    vi: 'feature-terms/naming-units-vi',
-    th: 'feature-terms/naming-units-th',
-  };
-  const APPROVED_FLOOR: Readonly<Record<string, string>> = {
-    id: 'feature-terms/approved-words-id',
-    zh: 'feature-terms/approved-words-zh',
-    vi: 'feature-terms/approved-words-vi',
-    th: 'feature-terms/approved-words-th',
-  };
 
   it.each(TRANSLATED_LOCALES)(
     '%s: every piece of copy that names a feature carries an approved word for it',

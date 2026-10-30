@@ -133,8 +133,9 @@ describe('the two themes (#142)', () => {
     for (const block of blocks) {
       expect(customProperties(block).get('--wordmark-pad') ?? pad).toBe(pad);
     }
-    // Ratcheted after the loop it proves (#468): two today, and a third dark
-    // block must be recorded before its padding is trusted to this loop.
+    // Two today: a third dark block is checked here before its padding is
+    // trusted to this loop.
+    expect(blocks).toHaveLength(2);
   });
 });
 

@@ -269,10 +269,7 @@ const analyze = (file: string, text: string): readonly string[] =>
 
 describe('a real device has one browser context', () => {
   it('every test run without JavaScript, or calling newContext(), is tagged @requires-isolated-context, and no tag is stale', () => {
-    expectNothingFound(
-      read,
-      declarationsRead('tests read', 'isolated-context-tagging/tests'),
-    );
+    expectNothingFound(read, declarationsRead('tests read'));
   });
 
   it("allows the operator's one clock exception, and no other (#854)", () => {

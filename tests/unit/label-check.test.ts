@@ -482,20 +482,6 @@ describe('on the live catalogues', () => {
     });
   });
 
-  // #390. A teacher told to open a section, or press a button, looks for the
-  // words the sentence gives; the page shows the label's. Eighteen sentences
-  // named Student details one way beside a heading saying another, and four
-  // named Shuffle again in other words, in zh, vi and th.
-  //
-  // One floor per locale (#525), spelled as literals so the recorder can read
-  // each id. A locale with no entry reads an id nobody recorded, and its case
-  // goes red under its own name.
-  const NAMED_LABEL_FLOOR: Readonly<Record<string, string>> = {
-    id: 'label-check/named-labels-id',
-    zh: 'label-check/named-labels-zh',
-    vi: 'label-check/named-labels-vi',
-    th: 'label-check/named-labels-th',
-  };
   it.each(TRANSLATED_LOCALES)(
     '%s: every sentence that names a label carries that label',
     (locale) => {

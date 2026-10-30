@@ -489,13 +489,6 @@ describe('matching a quote (spec 5)', () => {
     expect(matchesForm('a1c2b', form, 'vi')).toBe(false);
   });
 
-  // One id per locale: each reads its own catalogue's strings.
-  const NONSENSE_QUOTE_FLOOR: Readonly<Record<string, string>> = {
-    id: 'report/nonsense-quote-strings-id',
-    zh: 'report/nonsense-quote-strings-zh',
-    vi: 'report/nonsense-quote-strings-vi',
-    th: 'report/nonsense-quote-strings-th',
-  };
   it.each(PREFIXED_LOCALES)(
     '%s: a nonsense quote matches nothing on any page',
     (locale) => {

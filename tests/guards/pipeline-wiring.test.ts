@@ -15,7 +15,6 @@ import {
   isAggregate,
   jobsDownstreamOfAConditionalJob,
   parseCleanYaml,
-  playwrightCoverageFindings,
   skippedUpstreamFindings,
   producibleContexts,
   unboundedJobFindings,
@@ -225,9 +224,6 @@ const jobBlockRunning = (yaml: string, needle: string): string => {
   expect(
     searched(owning, { of: blocks, what: 'job blocks in the workflow' }),
   ).toHaveLength(1);
-  // One caller today. A second, on another workflow, reads another count, and
-  // the recorder refuses an id that read two values, so this fails closed.
-
   return owning[0];
 };
 
@@ -1058,7 +1054,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         .map((ref) => `${file} → ${ref}`),
     );
     expect(searched(missed, { of: files, what: 'workflow files' })).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([
@@ -1301,7 +1296,6 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
     expect(searched(missed, { of: workflows, what: 'workflow files' })).toEqual(
       [],
     );
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([
@@ -2036,7 +2030,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(Array.isArray(shards)).toBe(true);
     const list = shards as unknown[];
     // More than one, or it is not a split at all.
-
+    expect(list.length).toBeGreaterThan(1);
     expect(list).toEqual(list.map((_, i) => i + 1));
     // A failing shard would otherwise CANCEL its siblings, and every test they
     // had not reached would go unreported: one red run would show one shard's
@@ -2430,7 +2424,6 @@ describe('the drift measurement reports, and never gates (#224)', () => {
       }),
       'a summary written with >> cannot be read back from the job log',
     ).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it('runs even when the gate went red, which is when it is worth having', () => {
@@ -2867,8 +2860,6 @@ describe('the back-translation review', () => {
       searched(unwatched, { of: inputs, what: 'files the review reads' }),
       'a change to one of these would not start the review',
     ).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
-    // The closure is followed, not listed, and its size is ratcheted (#468).
   });
 });
 
@@ -2973,7 +2964,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
         what: 'workflow texts',
       }),
     ).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([
@@ -3035,31 +3025,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
     ).toEqual([]);
   });
 
-  it('every job that uploads Playwright coverage is joined, waited for and measured (#913)', () => {
-    const wiring = playwrightCoverageFindings(workflow('ci.yml'), 'ci.yml');
-    const producers = [...wiring.producers];
-    expect(
-      searched([...wiring.findings], {
-        of: producers,
-        what: 'ci.yml jobs uploading Playwright coverage',
-      }),
-    ).toEqual([]);
-    // The second reading: every job that sets NODE_V8_COVERAGE is one that
-    // uploads what it measured, and the other way round.
-    expect(wiring.measured).toEqual(wiring.producers);
-  });
-
-  it('no workflow but ci.yml uploads Playwright coverage, so a called one hides none (#913)', () => {
-    const others = workflowYamlNames().filter((name) => name !== 'ci.yml');
-    const uploading = others.filter(
-      (name) =>
-        playwrightCoverageFindings(workflow(name), name).producers.length > 0,
-    );
-    expect(
-      searched(uploading, { of: others, what: 'workflows besides ci.yml' }),
-    ).toEqual([]);
-  });
-
   it('the functions job runs the functions-runtime suite', () => {
     // That build-and-test needs the job is already derived by "stands for
     // every other ci.yml job that is not required by name itself"; this pins
@@ -3069,8 +3034,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
       // Every engine: the suite posts the 404's forms from all five (#350).
       // No browser install: the job runs in the pinned image (#431).
       'npm run test:functions',
-      // What that run measured, for coverage-playwright to join (#913).
-      'pwd > "$RUNNER_TEMP/root.txt" && tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/coverage-playwright.tgz" v8 pwcache root.txt',
     ]);
   });
 });
@@ -3463,286 +3426,6 @@ describe('no scheduled dispatch to main fails silently (#882)', () => {
   });
 });
 
-describe('CI never records the guards’ floors (#468), bar the dispatched recorder (#651)', () => {
-  it('runs neither npm run floors:record nor its script, outside record-floors.yml', () => {
-    // A run that can raise the figure it checks against asserts nothing, for
-    // the reason CI never passes --update-snapshots. The recorder refuses
-    // under CI itself unless it is told it is in the image
-    // (script-entry.test.ts probes it); this keeps a workflow from asking.
-    // The one workflow that does is `workflow_dispatch` only (below).
-    const runs = workflowYamlNames()
-      .filter((file) => file !== RECORDER_WORKFLOW)
-      .flatMap((file) =>
-        workflowJobs(workflow(file), file).flatMap(({ runs }) =>
-          runs.map((run) => ({ file, run })),
-        ),
-      );
-    const recording = runs
-      .filter(({ run }) => /floors:record|record-floors/.test(run))
-      .map(({ file, run }) => `${file}: ${run.trim().split('\n')[0]}`);
-    expect(
-      searched(recording, { of: runs, what: 'run steps in the workflows' }),
-    ).toEqual([]);
-  });
-});
-
-const RECORDER_WORKFLOW = 'record-floors.yml';
-
-describe('the floor recorder measures a scratch ref and pushes nothing (#651, #889)', () => {
-  type Step = {
-    id?: string;
-    name?: string;
-    if?: string;
-    run?: string;
-    uses?: string;
-    env?: Record<string, string>;
-    with?: Record<string, unknown>;
-  };
-  type Job = {
-    needs?: unknown;
-    if?: string;
-    outputs?: Record<string, string>;
-    strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: unknown } };
-    permissions?: Record<string, string>;
-    container?: { image?: string; options?: string };
-    'timeout-minutes'?: unknown;
-    steps?: Step[];
-  };
-  type Parsed = {
-    on?: Record<string, { inputs?: Record<string, { required?: boolean }> }>;
-    permissions?: Record<string, string>;
-    jobs: Record<string, Job>;
-  };
-  const parsed = (file: string) =>
-    parseCleanYaml(workflow(file), file) as Parsed;
-  const recorder = () => parsed(RECORDER_WORKFLOW);
-  const job = (id: string) => {
-    const found = recorder().jobs[id];
-    expect(found, `${RECORDER_WORKFLOW} defines no job '${id}'`).toBeDefined();
-    return found!;
-  };
-  const steps = (id: string) => job(id).steps ?? [];
-  const runsOf = (id: string) => steps(id).flatMap(({ run }) => run ?? []);
-  const linesOf = (run: string | undefined) =>
-    (run ?? '')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line !== '');
-
-  it('starts on workflow_dispatch and on nothing else, naming the scratch ref and the mode', () => {
-    expect(Object.keys(recorder().on ?? {})).toEqual(['workflow_dispatch']);
-    const inputs = recorder().on?.workflow_dispatch?.inputs ?? {};
-    expect(Object.keys(inputs)).toEqual(['ref', 'mode']);
-    expect(inputs.ref?.required).toBe(true);
-  });
-
-  it('is one job set of image, the browser shards and record (#608)', () => {
-    expect(Object.keys(recorder().jobs)).toEqual([
-      'image',
-      'browser',
-      'record',
-    ]);
-  });
-
-  it('is not referenced by ci.yml, and no job of ci.yml needs it', () => {
-    // Comments stripped: ci.yml's prose may name the recorder, and only a
-    // `uses:` or a `gh workflow run` of it would wire the two together.
-    const ci = runnableText(workflow('ci.yml'));
-    expect(workflowRefs(ci)).not.toContain(RECORDER_WORKFLOW);
-    expect(workflowRefs(ci).length).toBeGreaterThan(0);
-    for (const { name, jobs } of workflowGraphs())
-      if (name !== RECORDER_WORKFLOW)
-        expect(
-          jobs.flatMap(({ uses }) => uses ?? []),
-          `${name} calls the recorder`,
-        ).not.toContain(`./.github/workflows/${RECORDER_WORKFLOW}`);
-    expect(REQUIRED_CHECKS).not.toContain('record');
-  });
-
-  it('refuses any ref outside refs/floors/, develop and main included, before it checks anything out', () => {
-    const [first, ...rest] = steps('image');
-    expect(first?.env).toEqual({ REF: '${{ inputs.ref }}' });
-    // Every line, so a widened pattern or a dropped exit is seen.
-    expect(linesOf(first?.run)).toEqual([
-      'case "$REF" in',
-      'refs/floors/?*) ;;',
-      '*)',
-      'echo "::error::floors are recorded on a scratch ref under refs/floors/, never on $REF: push the unpushed commit there first"',
-      'exit 1',
-      ';;',
-      'esac',
-    ]);
-    expect(rest[0]?.uses).toMatch(/^actions\/checkout@/);
-  });
-
-  it('checks out the ref it refused nothing for, and keeps no credential', () => {
-    const checkouts = ['image', 'browser', 'record'].flatMap((id) =>
-      steps(id).filter(({ uses }) => uses?.startsWith('actions/checkout@')),
-    );
-    // The image job checks out the ref it refused nothing for; every other job
-    // checks out the one commit it read there, so a scratch ref pushed again
-    // mid-run cannot put the shards and the join on different trees (#608).
-    expect(checkouts.map((step) => step.with)).toEqual([
-      { ref: '${{ inputs.ref }}', 'persist-credentials': false },
-      { ref: '${{ needs.image.outputs.sha }}', 'persist-credentials': false },
-      { ref: '${{ needs.image.outputs.sha }}', 'persist-credentials': false },
-    ]);
-    expect(job('image').outputs).toEqual({
-      ref: '${{ steps.pick.outputs.ref }}',
-      sha: '${{ steps.sha.outputs.sha }}',
-    });
-    expect(steps('image').find(({ id }) => id === 'sha')?.run).toBe(
-      'echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"',
-    );
-  });
-
-  it('never interpolates an input into a script', () => {
-    const scripts = ['image', 'browser', 'record'].flatMap(runsOf);
-    expect(
-      searched(
-        scripts.filter((run) => run.includes('${{')),
-        { of: scripts, what: 'run scripts in the recorder' },
-      ),
-    ).toEqual([]);
-  });
-
-  it('composes the amended message from the measured commit, for the fold to use unchanged', () => {
-    const record = runsOf('record').flatMap(linesOf);
-    expect(record.filter((line) => line.startsWith('git log '))).toEqual([
-      'git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"',
-    ]);
-  });
-
-  it('hands back the figures, the message, the measured SHA and the ref, only when a floor moved', () => {
-    expect(runsOf('record').join('\n')).toMatch(
-      /^git rev-parse HEAD > "\$RUNNER_TEMP\/sha\.txt"$/m,
-    );
-    const keep = steps('record').find(
-      ({ name }) => name === 'Keep the figures for the session to fold',
-    );
-    expect(keep?.if).toBe("steps.diff.outputs.changed == 'true'");
-    expect(keep?.env).toEqual({ REF: '${{ inputs.ref }}' });
-    expect(linesOf(keep?.run)).toEqual([
-      'mkdir floors-record',
-      'cp tests/floors.json floors-record/floors.json',
-      'cp "$RUNNER_TEMP/message.txt" floors-record/message.txt',
-      'cp "$RUNNER_TEMP/sha.txt" floors-record/sha.txt',
-      `printf '%s\\n' "$REF" > floors-record/ref.txt`,
-    ]);
-    const upload = steps('record').find(({ uses }) =>
-      uses?.startsWith('actions/upload-artifact@'),
-    );
-    expect(upload?.if).toBe("steps.diff.outputs.changed == 'true'");
-    expect(upload?.with).toEqual({
-      name: 'floors-record',
-      path: 'floors-record',
-      'retention-days': 7,
-      'if-no-files-found': 'error',
-    });
-  });
-
-  it('records in the image CI runs the e2e suite in, with the recorder told so', () => {
-    const ci = parsed('ci.yml') as Parsed & {
-      jobs: Record<string, Job & { steps?: Step[] }>;
-    };
-    expect(job('record').container).toEqual(ci.jobs.e2e?.container);
-    expect(job('record').container?.image).toBe(
-      '${{ needs.image.outputs.ref }}',
-    );
-    expect(
-      runsOf('image').filter((run) => run.includes('playwright-image')),
-    ).toEqual(['node scripts/playwright-image.mjs']);
-    expect(runsOf('image').at(-1)).toBe(
-      ci.jobs.image?.steps?.find(({ id }) => id === 'pick')?.run,
-    );
-    const record = steps('record').find(({ run }) =>
-      run?.includes('floors:record'),
-    );
-    expect(record?.env?.FLOORS_RECORD_IN_IMAGE).toBe('1');
-    expect(job('browser').container).toEqual(job('record').container);
-    const shard = steps('browser').find(({ run }) =>
-      run?.includes('floors:record'),
-    );
-    expect(shard?.env?.FLOORS_RECORD_IN_IMAGE).toBe('1');
-  });
-
-  it('runs the browser stage as a full record’s shards, each reporting even when it fails (#608)', () => {
-    const browser = job('browser');
-    expect(browser.needs).toBe('image');
-    expect(browser.if).toBe("inputs.mode == 'full'");
-    expect(browser.strategy?.['fail-fast']).toBe(false);
-    expect(browser.strategy?.matrix?.shard).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-    ]);
-    const shard = steps('browser').find(({ run }) =>
-      run?.includes('floors:record'),
-    );
-    expect(shard?.env).toEqual({
-      FLOORS_RECORD_IN_IMAGE: '1',
-      SHARD: '${{ matrix.shard }}',
-      TOTAL: '${{ strategy.job-total }}',
-    });
-    expect(shard?.run).toBe(
-      'npm run floors:record -- --browser-shard "$SHARD/$TOTAL" --out "$RUNNER_TEMP/floors-browser"',
-    );
-    const upload = steps('browser').find(({ uses }) =>
-      uses?.startsWith('actions/upload-artifact@'),
-    );
-    expect(upload?.if).toBe('always()');
-    expect(upload?.with).toEqual({
-      name: 'floors-browser-${{ matrix.shard }}',
-      path: '${{ runner.temp }}/floors-browser',
-      'retention-days': 7,
-      'if-no-files-found': 'error',
-    });
-  });
-
-  it('joins only shards that all succeeded, handing the recorder their result (#608)', () => {
-    const record = job('record');
-    expect(record.needs).toEqual(['image', 'browser']);
-    expect(record.if).toBe(
-      "${{ !cancelled() && needs.image.result == 'success' && (inputs.mode != 'full' || needs.browser.result == 'success') }}",
-    );
-    const download = steps('record').find(({ uses }) =>
-      uses?.startsWith('actions/download-artifact@'),
-    );
-    expect(download?.if).toBe("inputs.mode == 'full'");
-    expect(download?.with).toEqual({
-      pattern: 'floors-browser-*',
-      path: '${{ runner.temp }}/floors-browser',
-    });
-    const step = steps('record').find(({ run }) =>
-      run?.includes('floors:record'),
-    );
-    expect(step?.env?.BROWSER).toBe('${{ needs.browser.result }}');
-    expect(linesOf(step?.run)).toEqual([
-      'case "$MODE" in',
-      'full) flags=(--browser-from "$RUNNER_TEMP/floors-browser" --browser-result "$BROWSER") ;;',
-      'unit) flags=(--unit) ;;',
-      'functions) flags=(--functions) ;;',
-      '*) echo "::error::unknown mode $MODE"; exit 1 ;;',
-      'esac',
-      'npm run floors:record -- "${flags[@]}" 2>&1 | tee "$RUNNER_TEMP/record.log"',
-    ]);
-  });
-
-  it('lists the figures it moved from the JSON diff', () => {
-    expect(runsOf('record').join('\n')).toMatch(
-      /^node scripts\/floors-diff\.mjs /m,
-    );
-  });
-
-  it('holds record to a budget measured on its own full runs (#663)', () => {
-    // MEASURED on #608's AC5 run 40773130895 (the browser stage sharded):
-    // the join took 3.95 minutes in one pass, each Vitest pass 2.0 of it, so
-    // three passes take 7.95 and a quarter more is 10; the ten shards took
-    // 4.7 to 7.7, and a quarter more on the slowest is 10. Before sharding
-    // (#663) the whole record took 31.2 to 46.9 minutes under a limit of 60.
-    expect(job('record')['timeout-minutes']).toBe(10);
-    expect(job('browser')['timeout-minutes']).toBe(10);
-  });
-});
-
 /**
  * The dispatched paths the old bot push needed (#651), kept pinned until #891
  * removes them: since #889 nothing dispatches either workflow.
@@ -3904,7 +3587,7 @@ const CAPTURE_WORKFLOW = 'visual-capture.yml';
 describe('the visual capture measures a scratch ref and hands back only baselines (#654, #889)', () => {
   // Operator 2026-10-09 (global): visual runs are CI's, never the laptop's.
   // Baselines change ONE way: this workflow, dispatched by hand, on a scratch
-  // ref; `scripts/fold-record.mjs` folds what it hands back.
+  // ref; what it hands back is committed by hand.
   type Step = {
     id?: string;
     name?: string;
@@ -4096,17 +3779,6 @@ describe('neither bot can push, commit or amend (#889)', () => {
   const WRITES =
     /\bgit\b.*\s(?:push|commit|merge|rebase|cherry-pick|revert|am|tag|update-ref|reset|notes|stash)\b|--amend\b|\bgh\b/;
 
-  it('holds the recorder to no token, and each of its jobs to reading the repository', () => {
-    expect(permissionsOf(RECORDER_WORKFLOW)).toEqual({
-      workflow: {},
-      jobs: {
-        image: { permissions: { contents: 'read' }, uses: undefined },
-        browser: { permissions: { contents: 'read' }, uses: undefined },
-        record: { permissions: { contents: 'read' }, uses: undefined },
-      },
-    });
-  });
-
   it('holds the capture to no token, and each of its jobs to reading the repository', () => {
     expect(permissionsOf(CAPTURE_WORKFLOW)).toEqual({
       workflow: {},
@@ -4125,27 +3797,6 @@ describe('neither bot can push, commit or amend (#889)', () => {
     ]);
   });
 
-  it('record-floors.yml adds only download-artifact, for the join to read its own shards (#608)', () => {
-    // Read-only: it fetches this run's floors-browser-<i> artifacts, and
-    // nothing in it can push, commit or call the API.
-    expect(actionsOf(RECORDER_WORKFLOW).sort()).toEqual([
-      'actions/checkout',
-      'actions/download-artifact',
-      'actions/setup-node',
-      'actions/upload-artifact',
-    ]);
-  });
-
-  it('runs no recorder line that pushes, commits or amends, and calls no gh', () => {
-    const lines = scriptLines(RECORDER_WORKFLOW);
-    expect(
-      searched(
-        lines.filter((line) => WRITES.test(line)),
-        { of: lines, what: `script lines in ${RECORDER_WORKFLOW}` },
-      ),
-    ).toEqual([]);
-  });
-
   it('runs no capture line that pushes, commits or amends, and calls no gh', () => {
     const lines = scriptLines(CAPTURE_WORKFLOW);
     expect(
@@ -4160,7 +3811,7 @@ describe('neither bot can push, commit or amend (#889)', () => {
   // form it must refuse, the old bots' own push and amend among them.
   it.each([
     'git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push --force-with-lease="refs/heads/$BRANCH:$SHA" origin "HEAD:refs/heads/$BRANCH"',
-    'git commit --amend -F floors-record/message.txt',
+    'git commit --amend -F message.txt',
     'git push origin HEAD:refs/heads/x',
     'git -C "a dir" commit -m x',
     'git --git-dir=.git update-ref refs/heads/x HEAD',
@@ -4196,21 +3847,6 @@ const workflowHeader = (file: string) => {
  * old one's steps (the reset onto a bot's head, the held runs re-run).
  */
 describe('each bot documents the push-free round trip (#889)', () => {
-  it('documents pushing to refs/floors/, dispatching the recorder from develop, folding, pushing once and deleting the ref', () => {
-    const header = workflowHeader(RECORDER_WORKFLOW);
-    expect(header).toMatch(
-      /^#\s+git push origin HEAD:refs\/floors\/<branch>$/m,
-    );
-    expect(header).toMatch(
-      /^#\s+gh workflow run record-floors\.yml --ref develop -f ref=refs\/floors\/<branch>$/m,
-    );
-    expect(header).toMatch(/^#\s+node scripts\/fold-record\.mjs <run-id>$/m);
-    expect(header).toMatch(/^#\s+git push origin <branch>$/m);
-    expect(header).toMatch(
-      /^#\s+git push origin --delete refs\/floors\/<branch>$/m,
-    );
-  });
-
   it('documents pushing to refs/visual/, dispatching the capture from develop, folding, pushing once and deleting the ref', () => {
     const header = workflowHeader(CAPTURE_WORKFLOW);
     expect(header).toMatch(
@@ -4219,14 +3855,16 @@ describe('each bot documents the push-free round trip (#889)', () => {
     expect(header).toMatch(
       /^#\s+gh workflow run visual-capture\.yml --ref develop -f ref=refs\/visual\/<branch>$/m,
     );
-    expect(header).toMatch(/^#\s+node scripts\/fold-record\.mjs <run-id>$/m);
+    expect(header).toMatch(
+      /^#\s+gh run download <run-id> -n visual-capture -D <scratch-dir>$/m,
+    );
     expect(header).toMatch(/^#\s+git push origin <branch>$/m);
     expect(header).toMatch(
       /^#\s+git push origin --delete refs\/visual\/<branch>$/m,
     );
   });
 
-  it.each([RECORDER_WORKFLOW, CAPTURE_WORKFLOW])(
+  it.each([CAPTURE_WORKFLOW])(
     '%s no longer documents the reset onto a bot’s head or the held runs',
     (file) => {
       expect(workflowHeader(file)).not.toMatch(

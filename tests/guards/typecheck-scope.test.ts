@@ -116,7 +116,6 @@ describe('typecheck reads the scripts that deploy this site (#228)', () => {
       return silencedByCompiler(path, text) && !optsOut(text);
     });
     expect(searched(missed, { of: read, what: 'scripts read' })).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
   });
 
   it.each([

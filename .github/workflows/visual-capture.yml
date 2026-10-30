@@ -8,16 +8,16 @@ name: visual-capture
 #   git push origin HEAD:refs/visual/<branch>
 #   gh workflow run visual-capture.yml --ref develop -f ref=refs/visual/<branch>
 #   (wait for the run)
-#   node scripts/fold-record.mjs <run-id>
+#   gh run download <run-id> -n visual-capture -D <scratch-dir>
+#   cp -R <scratch-dir>/files/. .
+#   git commit --amend --no-edit
 #   git push origin <branch>
 #   git push origin --delete refs/visual/<branch>
 #
-# then look at every baseline the commit's message names: the gate compares
+# then look at every baseline the run's message.txt names: the gate compares
 # against them from then on. A CI bot never pushes to a branch (operator,
-# 2026-10-21), so `scripts/fold-record.mjs` folds the baselines into the local
-# commit the run measured, judges the artifact's list again (a baseline
-# directly in `tests/e2e/__screenshots__/`, nothing else), and refuses a
-# pushed HEAD, another commit and a dirty tree.
+# 2026-10-21), so the baselines come back as an artifact and are committed by
+# hand onto the commit the run measured (its sha.txt).
 #
 # `workflow_dispatch` ONLY: the gate (`ci.yml`'s `visual`) never passes
 # `--update-snapshots`, because a run that can rewrite the baseline it checks
@@ -121,7 +121,7 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
       # The commit the capture is made on, handed back with the baselines, so
-      # `scripts/fold-record.mjs` folds them into that commit and no other.
+      # they are committed onto that commit and no other.
       # The container runs as another user than the checkout's owner, which
       # git refuses to read without being told the directory is safe.
       - run: |

@@ -130,28 +130,6 @@ describe('every language builds each message the way English does (#136)', () =>
     );
   });
 
-  // One id per locale: each case runs the same line over its own catalogue.
-  const ENGLISH_IMPORTS_FLOOR: Readonly<Record<string, string>> = {
-    id: 'message-parity/english-imports-id',
-    zh: 'message-parity/english-imports-zh',
-    vi: 'message-parity/english-imports-vi',
-    th: 'message-parity/english-imports-th',
-  };
-  // One id per locale, for the same reason.
-  const SLOT_STRINGS_FLOOR: Readonly<Record<string, string>> = {
-    id: 'message-parity/slot-checked-strings-id',
-    zh: 'message-parity/slot-checked-strings-zh',
-    vi: 'message-parity/slot-checked-strings-vi',
-    th: 'message-parity/slot-checked-strings-th',
-  };
-  // One id per locale, for the same reason.
-  const CHOICE_MESSAGES_FLOOR: Readonly<Record<string, string>> = {
-    id: 'message-parity/choice-checked-messages-id',
-    zh: 'message-parity/choice-checked-messages-zh',
-    vi: 'message-parity/choice-checked-messages-vi',
-    th: 'message-parity/choice-checked-messages-th',
-  };
-
   it.each(TRANSLATIONS)(
     '%s takes nothing from English but its type',
     (locale) => {
