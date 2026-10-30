@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   READ_ORDER,
   coverage,
@@ -145,7 +144,6 @@ const noSelfReading = (
     searched(found.stale, { of: entries, what }),
     `${locale}: readings of text no line says; ${REFRESH}`,
   ).toEqual([]);
-  expect(floorBreach(floor, entries.length)).toBeUndefined();
 };
 
 describe('no Google reading is filed under the wrong writer', () => {

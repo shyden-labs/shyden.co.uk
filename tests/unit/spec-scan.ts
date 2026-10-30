@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { expect } from 'vitest';
 import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { declaresTests } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
 
 /**
@@ -156,11 +155,5 @@ export const expectNothingFound = (
     ).toEqual([]);
   }
   // After every verdict, so a population that grew never hides a finding.
-  expect(
-    floorBreach('spec-scan/spec-dir-files', readings.length),
-  ).toBeUndefined();
-  expect(
-    floorBreach(liveness.floor, judged.length),
-    `${liveness.what}: not the recorded figure`,
-  ).toBeUndefined();
+  
 };

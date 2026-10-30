@@ -9,7 +9,6 @@ import {
   parseNameStatus,
   verdictFromGit,
 } from '../../scripts/docs-only.mjs';
-import { floorBreach } from '../floors';
 import { trackedFiles } from '../source-files';
 import { treeReading } from '../tree-reading';
 import { withoutTsComments, withoutYamlComments } from '../unit/source-text';

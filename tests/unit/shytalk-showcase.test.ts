@@ -8,7 +8,6 @@ import {
   roomCapturePath,
 } from '../../src/lib/shytalk-showcase';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The ShyTalk showcase ships one REAL room capture per locale (#138).

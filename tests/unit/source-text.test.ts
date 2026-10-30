@@ -22,7 +22,6 @@ import {
   withoutTsComments,
   withoutMarkupComments,
 } from './source-text';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**

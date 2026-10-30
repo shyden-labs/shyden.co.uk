@@ -13,7 +13,6 @@ import {
   tokensCss,
 } from '../palette';
 import { SHYTALK_MARK } from '../../src/lib/shytalk-brand';
-import { floorBreach } from '../floors';
 
 /**
  * The structure of tokens.css (#142).

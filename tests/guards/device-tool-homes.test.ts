@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { withoutTsComments } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * Each command-line tool the device leg drives is spawned from one home, which

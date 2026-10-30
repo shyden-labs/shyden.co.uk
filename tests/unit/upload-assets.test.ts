@@ -6,7 +6,6 @@ import {
   planOf,
   UPLOAD_BATCH,
 } from '../../scripts/upload-evidence-assets.mjs';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

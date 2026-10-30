@@ -11,7 +11,6 @@ import {
 } from '../../scripts/release-inventory.mjs';
 import { scratchGit, withoutLocalGit } from '../git-env';
 import { writeUnder } from '../scratch-dir';
-import { floorBreach } from '../floors';
 
 /** A throwaway repository, driven by the real git. */
 const repository = () => {

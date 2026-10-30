@@ -5,7 +5,6 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder, tsFilesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { oneAttemptEach, reportLocation } from '../../scripts/test-e2e.mjs';
 import {
   CONTRACT_MODULE,

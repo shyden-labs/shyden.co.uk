@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layoutWidthsFrom } from '../layout-widths';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A breakpoint is measured on BOTH sides: the last width one layout holds and

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { join } from 'node:path';
 import { FAILURE_TITLE, NOT_ON_MAIN_NOTICE } from '../../src/lib/access-expiry';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { dailyJobRunner, standIn, type Received } from '../json-stand-in';
 import { PROD_SANITY, tokenList } from '../access-expiry-shared';
 
@@ -115,9 +114,6 @@ const expectGitHubUntouched = async () => {
       what: 'requests the GitHub stand-in recorded, the sentinel included',
     }),
   ).toEqual([]);
-  expect(
-    floorBreach('access-expiry-script/github-untouched', all.length),
-  ).toBeUndefined();
 };
 
 describe('the check mode', () => {

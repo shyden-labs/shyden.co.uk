@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { codeWithoutComments } from '../unit/source-text';
 import { filesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Modules for the CLI that nothing the site ships may import.

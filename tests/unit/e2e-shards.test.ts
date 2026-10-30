@@ -20,7 +20,6 @@ import {
   SKIPPED_WHEN_DOCS_ONLY,
 } from '../../scripts/docs-only.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   SUITE,
   WHOLE_UNITS,

@@ -11,7 +11,6 @@ import {
   type FunctionBody,
 } from '../unit/duplication';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 import { nodesIn, parseSource } from '../unit/ast';
 
 /**

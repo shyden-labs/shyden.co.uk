@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { withoutIniComments, withoutYamlComments } from './source-text';
 
 /**

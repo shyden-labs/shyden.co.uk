@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MVP_LOCALES } from '../../src/lib/i18n/metadata';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { messageOf } from '../../scripts/errors.mjs';
 import {
   DO_NOT_TRANSLATE,

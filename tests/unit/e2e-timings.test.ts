@@ -8,7 +8,6 @@ import {
 import { withoutTsComments } from './source-text';
 import { commentsIn, parseSource } from './ast';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Where the e2e suite's time actually goes, per project.

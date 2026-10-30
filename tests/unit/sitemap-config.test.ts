@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { withoutTsComments } from './source-text';
 import { LOCALES } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
-import { floorBreach } from '../floors';
 
 /**
  * The sitemap's locale map, which cannot import the table it must agree with.

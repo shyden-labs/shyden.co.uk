@@ -25,7 +25,6 @@ import { isMessageTemplate } from '../../src/lib/i18n/message';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { renderedOn } from '../../src/lib/i18n/label-check';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 const ELLIPSIS = String.fromCharCode(0x2026);
 const keysOn = (page: PageId, locale: Locale) =>

@@ -1,7 +1,6 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 import { parseFile, where } from '../unit/ast';
 
 /**

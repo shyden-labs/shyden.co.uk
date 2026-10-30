@@ -4,7 +4,6 @@ import { openWaitingBoard } from './helpers';
 import { onRealDevice } from '../device/device-downloads';
 import { recorded } from './evidence';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   measureBoard,
   measureBoardScript,

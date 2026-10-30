@@ -9,7 +9,6 @@ import {
 import type { Page } from '@playwright/test';
 
 import { join, relative, sep, basename } from 'node:path';
-import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import {
   DEFAULT_LOCALE,

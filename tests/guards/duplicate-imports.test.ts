@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { parseSource } from '../unit/ast';
 import { astroCodeViews, withoutTsComments } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * No module imports the same specifier twice (#390 F59).

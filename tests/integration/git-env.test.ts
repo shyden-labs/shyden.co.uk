@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 import { scratchGit } from '../git-env';
 import { scratchDir } from '../scratch-dir';
 import { filesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A unit run cannot act on the repository git hands it (#377).

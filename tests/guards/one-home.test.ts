@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { declaredName, parseSource } from '../unit/ast';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Comment stripping lives in one place. Seven private copies had accumulated

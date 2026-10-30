@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   declarationsRead,
   expectNothingFound,

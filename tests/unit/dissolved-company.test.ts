@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { renderedText } from '../html-text';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * What the site printed about the company before #370, copied from

@@ -6,7 +6,6 @@ import {
   NAMED_COLOURS,
   onPaper,
 } from './css-rules';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 describe('cssRules', () => {

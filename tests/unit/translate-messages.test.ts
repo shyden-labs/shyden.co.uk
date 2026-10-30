@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { blankCommentLines } from './source-text';
 import { en } from '../../src/lib/i18n/en';

@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures';
 import { shoot } from './evidence';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';

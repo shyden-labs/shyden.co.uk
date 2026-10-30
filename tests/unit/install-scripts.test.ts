@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Which dependencies are allowed to EXECUTE CODE when they install.

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { stylesheetCss } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * CSS Masking deprecates `clip` in favour of `clip-path`, and a deprecated

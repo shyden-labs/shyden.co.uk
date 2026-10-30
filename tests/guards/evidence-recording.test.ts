@@ -26,7 +26,6 @@ import {
   enclosingDeclaration,
   useCallsIn,
 } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 
 const E2E = 'tests/e2e';
 const HOME = 'tests/e2e/evidence.ts';

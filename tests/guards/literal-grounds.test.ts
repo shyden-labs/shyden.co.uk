@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { filesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { stylesheetCss } from '../unit/source-text';
 import {
   colourLiterals,

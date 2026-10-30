@@ -4,7 +4,6 @@ import { basename, dirname, join } from 'node:path';
 import { withoutYamlComments, withoutYamlQuotes } from '../unit/source-text';
 import { filesUnder, nonEmpty, searched } from '../source-files';
 import { parseCleanYaml } from '../workflow-jobs';
-import { floorBreach } from '../floors';
 
 /**
  * The CI supply chain is pinned, and something keeps it current.

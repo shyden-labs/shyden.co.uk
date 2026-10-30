@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LOCALES, type Locale, getSiteStrings } from '../../src/lib/i18n';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   MVP_LOCALES,
   LOCALE_METADATA,

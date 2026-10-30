@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { en, type Catalogue } from '../../src/lib/i18n/en';
 import { id } from '../../src/lib/i18n/id';
 import { zh } from '../../src/lib/i18n/zh';

@@ -6,7 +6,6 @@ import {
   type WebServer,
 } from '../web-server-coverage';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { fixtureReader } from '../fixture-texts';
 
 const CLEARS =

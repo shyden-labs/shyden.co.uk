@@ -6,7 +6,6 @@ import {
   withoutLocalGit,
 } from '../git-env';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 describe('the variables that point git at one repository (#377)', () => {
   it('are the ones git itself lists, the dangerous ones among them', () => {

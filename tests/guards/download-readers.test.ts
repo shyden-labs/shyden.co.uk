@@ -5,7 +5,6 @@ import { parseSource } from '../unit/ast';
 import { callsIn, lineOf } from '../playwright-declarations';
 import { withoutTsComments } from '../unit/source-text';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A download's bytes are read in ONE place: `downloadText` (tests/e2e/helpers.ts).

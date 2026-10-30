@@ -10,7 +10,6 @@ import {
   specFilesUnder,
   trackedFiles,
 } from '../source-files';
-import { floorBreach } from '../floors';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
 import { serverCoverageFindings, type WebServer } from '../web-server-coverage';

@@ -7,7 +7,6 @@ import {
   measureBoardScript,
   measureCover,
 } from '../board-geometry';
-import { floorBreach } from '../floors';
 import { searched, tsFilesUnder } from '../source-files';
 import { expectClosesOverNothing } from '../unit/closes-over-nothing';
 import { withoutTsComments } from '../unit/source-text';

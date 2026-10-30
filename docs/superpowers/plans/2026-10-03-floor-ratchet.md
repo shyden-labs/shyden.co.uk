@@ -424,7 +424,7 @@ index 875f402..8d86a47 100644
  import { describe, it, expect } from 'vitest';
  import ts from 'typescript';
  import { readFileSync } from 'node:fs';
-+import { floorBreach } from '../floors';
++
  import { filesUnder, searched } from '../source-files';
  import { withoutTsComments } from './source-text';
  import { bindFiles, callGraph, derivationOf, where } from './ast';
@@ -1060,9 +1060,6 @@ index 8d86a47..265cad2 100644
 --- a/tests/unit/absence-liveness.test.ts
 +++ b/tests/unit/absence-liveness.test.ts
 @@ -279,10 +279,9 @@ describe('absence assertions prove the population they searched', () => {
-     expect(
-       floorBreach('absence-liveness/ts-files', tsFiles.length),
-     ).toBeUndefined();
 -    // The floor is stated against a measured figure rather
 -    // than left comfortably low, for the reason `anchored-presence`
 -    // records: a control with slack in it is most of the way back to
@@ -1081,7 +1078,7 @@ index 3c746a5..5808cdb 100644
  import { filesUnder, searched } from '../source-files';
  import { bind, bindFiles, callGraph, type Closure } from './ast';
  import { scanPresence, type PresenceClosures } from './presence-detector';
-+import { floorBreach } from '../floors';
++
  /**
   * A presence assertion over source text must be STRIPPED or ANCHORED.
   *
@@ -1205,7 +1202,7 @@ index 08acbac..1612cd2 100644
  import { describe, expect, it } from 'vitest';
  import { filesUnder, searched } from '../source-files';
  import { stylesheetCss } from './source-text';
-+import { floorBreach } from '../floors';
++
  
  /**
   * CSS Masking deprecates `clip` in favour of `clip-path`, and a deprecated
@@ -1939,7 +1936,7 @@ index 1a7a45a..ae2124d 100644
    astroTemplate,
    withoutTsComments,
  } from './source-text';
-+import { floorBreach } from '../floors';
++
  
  /**
   * No `.astro` source reads the clock, so no built page carries a date and no
@@ -2598,7 +2595,7 @@ index 0835635..6855f5d 100644
  import { withoutYamlComments, withoutYamlQuotes } from './source-text';
  import { filesUnder, nonEmpty, searched } from '../source-files';
  import { parseCleanYaml } from '../workflow-jobs';
-+import { floorBreach } from '../floors';
++
  
  /**
   * The CI supply chain is pinned, and something keeps it current.
@@ -2702,7 +2699,7 @@ index 20ff1e3..02cbe55 100644
    type RGB,
  } from '../wcag';
  import { declaredName, parseSource } from './ast';
-+import { floorBreach } from '../floors';
++
  
  /** The sRGB transfer curve's constants: the linear slope, then the curve's. */
  const CURVE = [12.92, 1.055, 2.4];

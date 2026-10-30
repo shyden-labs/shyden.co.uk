@@ -7,7 +7,6 @@ import {
   isCapturePath,
 } from '../../scripts/capture-scope.mjs';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The scope job traces the capture's files on every pull request (#774), and

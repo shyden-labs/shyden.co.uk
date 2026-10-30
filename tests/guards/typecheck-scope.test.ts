@@ -21,7 +21,6 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder, searched, nonEmpty } from '../source-files';
-import { floorBreach } from '../floors';
 
 /** `tsconfig.json` is JSONC: it carries the reason for every option. */
 const tsconfig = (): Record<string, any> =>

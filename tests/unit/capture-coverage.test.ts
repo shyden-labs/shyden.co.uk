@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { uncaptured } from '../../scripts/capture-coverage.mjs';
 import { manifestRow } from '../../scripts/evidence-files.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * #774: every case the release page cites must take its picture. A capture

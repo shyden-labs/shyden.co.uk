@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { relative } from 'node:path';
 import { searched, specFilesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A pull request runs the deployed-site suites against its own build (#335).

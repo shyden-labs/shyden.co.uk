@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { specDirFilesGitHas, specDirs } from '../spec-dirs';
-import { floorBreach } from '../floors';
 
 describe('the directories guards scan are derived, not listed', () => {
   it('finds every directory under tests/ that holds specs', () => {

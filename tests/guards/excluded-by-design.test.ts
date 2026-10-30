@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The device gauntlet reports how many tests `android-chrome` excludes by design, by LISTING the

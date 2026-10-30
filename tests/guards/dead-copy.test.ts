@@ -6,7 +6,6 @@ import { en } from '../../src/lib/i18n/en';
 import { siteEn } from '../../src/lib/i18n/site';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { filesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A defined string that nothing renders.

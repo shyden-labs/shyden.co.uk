@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { MVP_LOCALES, type MvpLocale } from '../../src/lib/i18n/metadata';
 import { en } from '../../src/lib/i18n/en';

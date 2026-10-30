@@ -5,7 +5,6 @@ import ts from 'typescript';
 import { filesUnder, searched } from '../source-files';
 import { parseFile, parseSource, where } from '../unit/ast';
 import { withoutTsComments } from '../unit/source-text';
-import { floorBreach } from '../floors';
 import { PROBES } from '../script-entry-shared';
 
 /**

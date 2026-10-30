@@ -9,7 +9,6 @@ import {
 } from '../../scripts/dependabot-labels.mjs';
 import { workflowJobs } from '../workflow-jobs';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * `.github/dependabot.yml` names labels; the repository either has them or it

@@ -7,7 +7,6 @@ import {
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
 import { declarationsIn, type Declaration } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**

@@ -6,7 +6,6 @@ import { LOCALES, PREFIXED_LOCALES } from '../../src/lib/i18n';
 import { withoutTsComments, withoutMarkupComments } from './source-text';
 import { nonEmpty, searched } from '../source-files';
 import { parseFile, parseSource, stringTextsIn } from './ast';
-import { floorBreach } from '../floors';
 
 /**
  * #21 Stage 4. Adding a locale must not mean writing routes by hand.

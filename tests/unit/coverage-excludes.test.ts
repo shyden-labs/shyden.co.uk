@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CoverageProviderModule } from 'vitest/node';
 import { delegatingTo, withOnlyOurExcludes } from '../coverage-excludes.mjs';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**

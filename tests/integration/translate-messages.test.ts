@@ -4,7 +4,6 @@ import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { blankCommentLines } from '../unit/source-text';
 
 describe('the harness runs under plain Node', () => {

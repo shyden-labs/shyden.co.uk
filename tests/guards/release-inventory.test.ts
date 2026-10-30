@@ -5,7 +5,6 @@ import { searched, trackedFiles } from '../source-files';
 import { withoutTsComments } from '../unit/source-text';
 import { parseSource } from '../unit/ast';
 import { callsIn } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 import { inFixtureTestDir } from '../vitest-suite-dirs';
 
 describe('release-inventory.mjs as a command (#362)', () => {

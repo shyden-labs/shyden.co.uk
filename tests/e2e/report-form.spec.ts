@@ -7,7 +7,6 @@ import {
 } from './recorders';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { formTextsUnderAA, resolvedColour } from './helpers';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   PREFIXED_LOCALES,

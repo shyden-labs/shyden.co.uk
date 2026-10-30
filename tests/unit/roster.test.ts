@@ -15,7 +15,6 @@ import {
 import * as roster from '../../src/lib/roster';
 import { student } from './factories';
 import type { Student } from '../../src/lib/grouping';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { getStrings } from '../../src/lib/i18n';
 

@@ -7,7 +7,6 @@ import {
   REPORT_DIR,
 } from '../../scripts/test-devices.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { withoutTsComments } from './source-text';
 
 /**

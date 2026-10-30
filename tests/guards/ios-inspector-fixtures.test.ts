@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import type { PlistValue } from '../device/ios/inspector/bplist';
 import { decodeAnyPlist } from '../device/ios/inspector/plist-xml';
-import { floorBreach } from '../floors';
 import {
   committableFiles,
   filesUnder,

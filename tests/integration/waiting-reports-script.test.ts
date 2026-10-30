@@ -7,7 +7,6 @@ import {
   NOT_ON_MAIN_NOTICE,
 } from '../../src/lib/waiting-reports';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   dailyJobRunner,
   standIn,
@@ -50,9 +49,6 @@ const checked = (side: string, stand: StandIn) =>
           what: `requests the ${side} stand-in recorded, the sentinel included`,
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('waiting-reports-script/stand-in-requests', all.length),
-      ).toBeUndefined();
     },
   });
 

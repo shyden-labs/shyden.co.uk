@@ -1,7 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import { nonEmpty, searched } from '../source-files';
 import { nodesIn, parseSource, where } from './ast';
 

@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { docsPaths } from '../site-pages';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { contrastRatio } from './helpers';
 import { docsSpecFile, requiredTextFields } from '../api-docs-pages';

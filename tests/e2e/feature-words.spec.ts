@@ -1,7 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { floorBreach } from '../floors';
 import { getStrings, renderError, type Locale } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { CSV_LOCALES } from '../../src/lib/csv-locale';

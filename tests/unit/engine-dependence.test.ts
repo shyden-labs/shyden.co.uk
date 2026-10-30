@@ -1,7 +1,6 @@
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { nodesIn, parseSource } from './ast';
 import {
   EMULATED_VIEWPORT_TAG,

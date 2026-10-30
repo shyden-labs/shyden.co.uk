@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scratchDir } from '../scratch-dir';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   LEAK_LISTING_LIMIT,
   RUN_MARKER,

@@ -13,7 +13,6 @@ import {
   openWaitingBoard,
 } from './helpers';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { FLOOR_PX } from '../../src/scripts/projector';
 import { measureBoard, measureCover } from '../board-geometry';
 import { coverGaps } from '../device-pixels';

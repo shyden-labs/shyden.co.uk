@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LOCALES, type Locale, getSiteStrings } from '../../src/lib/i18n';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The homepage's English, as the operator approved it for #403 (2026-10-04,

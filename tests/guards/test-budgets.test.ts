@@ -5,7 +5,6 @@ import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
 import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 import { callsIn } from '../playwright-declarations';
 import { budgetsIn, budgetsSpelled } from '../playwright-budgets';
-import { floorBreach } from '../floors';
 
 /**
  * No test outside the unit suite sets its own budget (operator 2026-10-07;

@@ -8,7 +8,6 @@ import {
   trackedFiles,
   walkDisagreements,
 } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The shared directory walk (#80). Nine private copies had grown, in three

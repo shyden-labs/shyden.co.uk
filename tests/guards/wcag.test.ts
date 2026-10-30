@@ -11,7 +11,6 @@ import {
   type RGB,
 } from '../wcag';
 import { declaredName, parseSource } from '../unit/ast';
-import { floorBreach } from '../floors';
 
 /** The sRGB transfer curve's constants: the linear slope, then the curve's. */
 const CURVE = [12.92, 1.055, 2.4];

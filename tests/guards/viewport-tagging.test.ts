@@ -6,7 +6,6 @@ import {
 } from '../unit/spec-scan';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   callsIn,

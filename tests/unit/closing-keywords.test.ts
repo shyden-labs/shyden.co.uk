@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCRIPT, workflowsRunningTheRule } from '../closing-keywords-shared';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { closingKeywordOffences } from '../../scripts/closing-keywords.mjs';
 
 /**

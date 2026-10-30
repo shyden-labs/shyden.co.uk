@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { floorBreach } from '../floors';
 
 /**
  * `floorBreach` under Playwright, where the e2e floors call it (#475).

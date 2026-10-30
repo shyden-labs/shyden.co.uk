@@ -14,7 +14,6 @@ import {
   localisePath,
   type Locale,
 } from '../../src/lib/i18n';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { expectNoHorizontalScroll } from '../viewport';
 import { readsAsLineWidth } from '../device-pixels';

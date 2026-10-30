@@ -10,7 +10,6 @@ import {
   noticeBody,
   openNoticeOf,
 } from '../../src/lib/deploy-failure';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**

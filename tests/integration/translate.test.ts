@@ -12,7 +12,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { collectCatalogue } from '../translate-shared';
 
 /**

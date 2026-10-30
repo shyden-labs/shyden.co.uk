@@ -11,7 +11,6 @@ import {
   type WorkflowJob,
 } from '../workflow-jobs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The rule behind the pipeline guard, proved on fixtures before it is trusted

@@ -10,7 +10,6 @@ import {
   enumerationMode,
 } from '../../scripts/test-e2e.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A green e2e run must mean the whole suite ran, not that some of it did.

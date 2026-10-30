@@ -62,7 +62,6 @@ import {
 import { MAX_STUDENTS } from '../../../src/lib/grouping';
 import { FLOOR_PX } from '../../../src/scripts/projector';
 import { measureBoardScript, type BoardGeometry } from '../../board-geometry';
-import { floorBreach } from '../../floors';
 import { searched } from '../../source-files';
 import {
   IOS_ZOOM_FLOOR_PX,

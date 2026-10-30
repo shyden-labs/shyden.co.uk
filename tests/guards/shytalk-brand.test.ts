@@ -7,7 +7,6 @@ import {
   asComputedRgb,
   asRgba,
 } from '../../src/lib/shytalk-brand';
-import { floorBreach } from '../floors';
 
 /**
  * ShyTalk's brand mark has exactly one home (#17).

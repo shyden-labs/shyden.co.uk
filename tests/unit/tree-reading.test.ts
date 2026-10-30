@@ -4,7 +4,6 @@ import integration from '../../vitest.integration.config';
 import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import { isDocsOnlyPath } from '../../scripts/docs-only.mjs';
-import { floorBreach } from '../floors';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { scratchDir, writeUnder } from '../scratch-dir';
 import { searched } from '../source-files';

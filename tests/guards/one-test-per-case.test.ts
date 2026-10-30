@@ -15,7 +15,6 @@ import {
   type LoopedCase,
 } from '../one-test-per-case';
 import { declaresTests, testsWritten } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 import { inFixtureTestDir } from '../vitest-suite-dirs';
 
 /**

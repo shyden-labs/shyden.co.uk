@@ -9,7 +9,6 @@ import {
 import { refusedOn, scriptedDatabase, tableWith } from '../report-fakes';
 import { onRequest } from '../../functions/_middleware.js';
 import { LOCALES, isBetaLocale, getSiteStrings } from '../../src/lib/i18n';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   loadSpec,

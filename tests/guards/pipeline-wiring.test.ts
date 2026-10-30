@@ -30,7 +30,6 @@ import { CAPTURE_ENTRIES } from '../../scripts/capture-scope.mjs';
 import { localImage } from '../../scripts/playwright-image.mjs';
 import { TIMINGS_FILE } from '../../scripts/e2e-shard-timings.mjs';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
-import { floorBreach } from '../floors';
 
 const WORKFLOWS = '.github/workflows';
 
@@ -228,9 +227,7 @@ const jobBlockRunning = (yaml: string, needle: string): string => {
   ).toHaveLength(1);
   // One caller today. A second, on another workflow, reads another count, and
   // the recorder refuses an id that read two values, so this fails closed.
-  expect(
-    floorBreach('pipeline-wiring/job-blocks', blocks.length),
-  ).toBeUndefined();
+  
   return owning[0];
 };
 

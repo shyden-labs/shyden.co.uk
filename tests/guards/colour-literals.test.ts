@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import {
   astroCode,

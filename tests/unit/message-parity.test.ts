@@ -1,7 +1,6 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { parseFile } from './ast';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { DEFAULT_LOCALE, LOCALES, type Locale } from '../../src/lib/i18n';

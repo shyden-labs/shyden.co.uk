@@ -6,7 +6,6 @@ import {
   astroTemplate,
   withoutTsComments,
 } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * No `.astro` source reads the clock, so no built page carries a date and no
