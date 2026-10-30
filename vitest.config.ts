@@ -18,5 +18,14 @@ export default defineConfig({
     testTimeout: 1_000,
     hookTimeout: 1_000,
     pool: 'forks',
+    // One overall figure, enforced by CI's `npm run test:coverage` (global
+    // rule 2026-10-30: one percentage per repo, no per-file floors).
+    coverage: {
+      provider: 'v8',
+      // .astro pages are rendered by the e2e suite, not this one.
+      include: ['{src,functions,scripts}/**/*.{ts,js,mjs}'],
+      // Measured 55.4% of lines on 2026-10-30 (#992).
+      thresholds: { lines: 55 },
+    },
   },
 });

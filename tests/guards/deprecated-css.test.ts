@@ -136,7 +136,6 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([

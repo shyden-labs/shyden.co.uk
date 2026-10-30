@@ -13,7 +13,7 @@ import { scratchDir } from '../scratch-dir';
 describe('the site page list is derived from src/pages', () => {
   it('reads real pages off disk', () => {
     // Anti-vacuity: an empty derivation would satisfy every assertion below.
-    
+
     expect(pageNames()).toContain('index');
   });
 

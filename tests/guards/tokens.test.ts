@@ -135,7 +135,6 @@ describe('the two themes (#142)', () => {
     }
     // Ratcheted after the loop it proves (#468): two today, and a third dark
     // block must be recorded before its padding is trusted to this loop.
-    
   });
 });
 

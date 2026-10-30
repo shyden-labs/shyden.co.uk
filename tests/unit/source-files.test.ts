@@ -20,7 +20,7 @@ describe('filesUnder', () => {
     const specs = filesUnder('tests', (path) => path.endsWith('.spec.ts'));
     // Anti-vacuity: an empty walk would satisfy every "no offenders" guard in
     // the suite at once — the exact failure #79 found in the e2e collectors.
-    
+
     // Proof it went DOWN, not just listed the top level.
     expect(specs).toContain('tests/e2e/classroom-groups-print.spec.ts');
   });
@@ -90,7 +90,9 @@ describe('filesUnder refuses to answer blind', () => {
     // The refusal belongs to the TOP-LEVEL call only. `tests/` holds
     // directories with no `.spec.ts` in them, so a recursion that refused an
     // empty sub-result could never complete a walk at all.
-    expect(filesUnder('tests', (path) => path.endsWith('.spec.ts')).length).toBeGreaterThan(0);
+    expect(
+      filesUnder('tests', (path) => path.endsWith('.spec.ts')).length,
+    ).toBeGreaterThan(0);
   });
 });
 

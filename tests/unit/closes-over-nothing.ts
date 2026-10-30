@@ -37,5 +37,4 @@ export function expectClosesOverNothing(
   ).toEqual([]);
   // Each caller names its own id: the two modules have different lengths,
   // and one id reading two values is refused by the recorder.
-  
 }

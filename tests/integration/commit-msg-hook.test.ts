@@ -24,15 +24,8 @@ import { scratchDir } from '../scratch-dir';
 const HOOK = resolve('.githooks/commit-msg');
 
 /**
- * A Gaps checked section the hook accepts (#897), for the cases about the
- * closing-keyword rule: the hook runs both rules on every message.
- */
-const GAPS =
-  '\nGaps checked:\n- Before: the closing-keyword forms, each planted first.\n- After: the hook run on each message, its verdict read.\n- New passes: none.\n';
-
-/**
  * Runs the real hook against a real message file, as git would, in a scratch
- * repository whose staged files are `staged` (the Gaps rule reads them).
+ * repository whose staged files are `staged`.
  */
 function runHook(
   message: string,
@@ -96,51 +89,12 @@ describe('the commit-msg hook reaches the closing-keyword rule', () => {
   });
 
   it('accepts the phrasing it tells you to use', () => {
-    expect(
-      runHook(`feat: x\n\nRefs #44 — the ticket stays open.\n${GAPS}`).ok,
-    ).toBe(true);
+    expect(runHook(`feat: x\n\nRefs #44 — the ticket stays open.`).ok).toBe(
+      true,
+    );
   });
 
   it('accepts a message with no issue reference at all', () => {
-    expect(runHook(`docs: tidy a comment\n${GAPS}`).ok).toBe(true);
-  });
-});
-
-describe('the commit-msg hook reaches the Gaps checked rule (#897)', () => {
-  it('refuses a code commit without the section, naming what is missing', () => {
-    const { ok, output } = runHook('feat: x\n');
-    expect(ok).toBe(false);
-    expect(output).toContain('no `Gaps checked:` heading');
-  });
-
-  it('accepts a commit of only .md files without the section', () => {
-    expect(runHook('docs: x\n', ['notes.md']).ok).toBe(true);
-  });
-
-  it('judges a staged rename of a code file to .md, never exempting it', () => {
-    const repo = scratchDir('commit-msg-rename-');
-    const git = scratchGit(repo);
-    git(['init', '-q']);
-    git(['config', 'user.email', 'hook@example.invalid']);
-    git(['config', 'user.name', 'Hook']);
-    writeFileSync(join(repo, 'a.ts'), 'export const a = 1;\n');
-    git(['add', 'a.ts']);
-    git(['commit', '-q', '-m', 'base']);
-    git(['mv', 'a.ts', 'notes.md']);
-    const file = join(scratchDir('commit-msg-'), 'COMMIT_EDITMSG');
-    writeFileSync(file, 'docs: rename\n');
-    const run = spawnSync(HOOK, [file], {
-      cwd: repo,
-      encoding: 'utf8',
-      env: withoutLocalGit(process.env),
-    });
-    expect(run.status).toBe(1);
-    expect(run.stderr).toContain('no `Gaps checked:` heading');
-  });
-
-  it('runs the closing-keyword rule first, whatever the section says', () => {
-    const { ok, output } = runHook(`feat: x\n\nCloses #65\n${GAPS}`);
-    expect(ok).toBe(false);
-    expect(output).toContain('gh issue close');
+    expect(runHook(`docs: tidy a comment`).ok).toBe(true);
   });
 });

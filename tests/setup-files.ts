@@ -12,7 +12,6 @@ export const SHARED_SETUP: readonly string[] = [
   'tests/temporary-files-setup.ts',
 ];
 
-
 export const UNIT_ONLY_SETUP: readonly string[] = [
   'tests/unit-refusal-setup.ts',
 ];

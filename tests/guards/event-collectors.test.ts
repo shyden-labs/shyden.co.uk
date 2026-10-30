@@ -59,7 +59,7 @@ describe('browser-event collectors have exactly one home', () => {
   it('scans every spec directory', () => {
     // Anti-vacuity: an empty scan satisfies the assertion below, which is the
     // very failure mode this ticket is about.
-    
+
     expect(SCANNED).toContain('tests/e2e/classroom-groups.spec.ts');
     expect(SCANNED).toContain(RECORDERS);
   });
@@ -75,7 +75,6 @@ describe('browser-event collectors have exactly one home', () => {
       }),
     ).toEqual([]);
     // The walk and git's list can narrow together, and agree over less (#524).
-    
   });
 
   it('is subscribed to only in recorders.ts', () => {

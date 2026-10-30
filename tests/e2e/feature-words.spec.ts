@@ -359,7 +359,7 @@ test.describe('the sentences corrected on #319', () => {
         );
       // Recorded in tests/floors.json and checked for equality (#475): one
       // figure for every language and engine, measured on all five.
-      
+
       await shoot(
         tool,
         `${locale}: a faulty class list names every problem`,

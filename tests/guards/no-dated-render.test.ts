@@ -87,7 +87,6 @@ describe('no page is rendered from the clock (#370)', () => {
       searched(markupUnread, { of: sources, what: '.astro sources' }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([

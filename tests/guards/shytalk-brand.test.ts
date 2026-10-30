@@ -181,7 +181,6 @@ describe("ShyTalk's brand mark has one home", () => {
     ).toEqual([]);
     expect(readCode(TOKEN_HOME).split(TOKEN_FORM).length - 1).toBe(1);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([

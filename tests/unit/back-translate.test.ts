@@ -300,7 +300,6 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
       );
       expect([...read].sort(), locale).toEqual([...expected].sort());
       // After the verdict, so a population that grew never hides a finding.
-      
     }
   });
 

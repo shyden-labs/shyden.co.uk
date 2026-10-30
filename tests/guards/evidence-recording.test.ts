@@ -310,7 +310,6 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([

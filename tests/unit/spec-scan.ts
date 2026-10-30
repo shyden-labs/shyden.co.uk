@@ -155,5 +155,4 @@ export const expectNothingFound = (
     ).toEqual([]);
   }
   // After every verdict, so a population that grew never hides a finding.
-  
 };

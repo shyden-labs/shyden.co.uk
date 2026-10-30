@@ -170,7 +170,6 @@ describe('a function body has one home across files', () => {
     ).toEqual([]);
     // A verdict dropped from the table would leave its pair unexcused, but a
     // reader dropping one silently would leave this test reading fewer (#524).
-    
   });
 
   it('records each verdict against one pair, which no copy can inherit', () => {

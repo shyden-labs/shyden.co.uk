@@ -227,7 +227,7 @@ const jobBlockRunning = (yaml: string, needle: string): string => {
   ).toHaveLength(1);
   // One caller today. A second, on another workflow, reads another count, and
   // the recorder refuses an id that read two values, so this fails closed.
-  
+
   return owning[0];
 };
 
@@ -245,7 +245,9 @@ describe('the deploy pipeline runs what it claims to', () => {
   it('the dev sanity suite exists and is more than a stub', async () => {
     // A guard that only checked the workflow REFERENCES the config would pass
     // against an emptied suite.
-    expect((await plainTestsIn('tests/dev/dev-sanity.spec.ts')).length).toBeGreaterThan(0);
+    expect(
+      (await plainTestsIn('tests/dev/dev-sanity.spec.ts')).length,
+    ).toBeGreaterThan(0);
   });
 
   it('the dev deploy is gated on a gate that SUCCEEDED, never on one that skipped', () => {
@@ -1057,7 +1059,6 @@ describe('the deploy pipeline runs what it claims to', () => {
     );
     expect(searched(missed, { of: files, what: 'workflow files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([
@@ -1136,7 +1137,9 @@ describe('the deploy pipeline runs what it claims to', () => {
   });
 
   it('the prod sanity suite exists and is more than a stub', async () => {
-    expect((await plainTestsIn('tests/prod/prod-sanity.spec.ts')).length).toBeGreaterThan(0);
+    expect(
+      (await plainTestsIn('tests/prod/prod-sanity.spec.ts')).length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -1299,7 +1302,6 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
       [],
     );
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([
@@ -2034,7 +2036,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(Array.isArray(shards)).toBe(true);
     const list = shards as unknown[];
     // More than one, or it is not a split at all.
-    
+
     expect(list).toEqual(list.map((_, i) => i + 1));
     // A failing shard would otherwise CANCEL its siblings, and every test they
     // had not reached would go unreported: one red run would show one shard's
@@ -2429,7 +2431,6 @@ describe('the drift measurement reports, and never gates (#224)', () => {
       'a summary written with >> cannot be read back from the job log',
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it('runs even when the gate went red, which is when it is worth having', () => {
@@ -2868,7 +2869,6 @@ describe('the back-translation review', () => {
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     // The closure is followed, not listed, and its size is ratcheted (#468).
-    
   });
 });
 
@@ -2974,7 +2974,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([
@@ -3759,10 +3758,8 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
   const parsed = (file: string) =>
     parseCleanYaml(workflow(file), file) as Parsed;
 
-  // Each pr-body job judges one pull request (#897 adds gaps-checked).
   it.each([
     ['closing-keywords', 'node scripts/closing-keywords.mjs', 2],
-    ['gaps-checked', 'node scripts/gaps-checked.mjs', 1],
   ] as const)(
     'refuses a dispatched %s run whose pull request is not the one that owns the ref',
     (job, script, judging) => {
@@ -3805,10 +3802,7 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
     };
     expect(body.on?.workflow_dispatch?.inputs?.pr?.required).toBe(true);
     // The check keeps its context name, and judges with the same script.
-    expect(Object.keys(body.jobs)).toEqual([
-      'closing-keywords',
-      'gaps-checked',
-    ]);
+    expect(Object.keys(body.jobs)).toEqual(['closing-keywords']);
     const bodyRuns = (body.jobs['closing-keywords']?.steps ?? [])
       .flatMap(({ run }) => run ?? [])
       .join('\n');
@@ -3817,10 +3811,6 @@ describe('the dispatch paths #891 retires stay safe while they remain', () => {
     // Read-only, scoped to the job; the workflow's own token stays contents: read.
     expect(body.permissions).toEqual({ contents: 'read' });
     expect(body.jobs['closing-keywords']?.permissions).toEqual({
-      contents: 'read',
-      'pull-requests': 'read',
-    });
-    expect(body.jobs['gaps-checked']?.permissions).toEqual({
       contents: 'read',
       'pull-requests': 'read',
     });

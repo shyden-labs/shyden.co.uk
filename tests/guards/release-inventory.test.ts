@@ -62,7 +62,6 @@ describe('release-inventory.mjs as a command (#362)', () => {
       searched(missed, { of: modules, what: 'test helper modules' }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    
   });
 
   it.each([

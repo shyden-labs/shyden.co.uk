@@ -4,7 +4,7 @@ import { specDirFilesGitHas, specDirs } from '../spec-dirs';
 describe('the directories guards scan are derived, not listed', () => {
   it('finds every directory under tests/ that holds specs', () => {
     // Anti-vacuity: an empty derivation would make every guard a no-op.
-    
+
     expect(specDirs()).toContain('tests/e2e');
     expect(specDirs()).toContain('tests/device');
   });

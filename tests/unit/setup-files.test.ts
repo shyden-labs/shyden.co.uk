@@ -41,7 +41,10 @@ describe('the setup files of each suite', () => {
     ['integration', integration],
     ['simulation', simulation],
     ['logs', logs],
-  ] as const)('give the %s suite the unit suite global setup', (_name, config) => {
-    expect(config.test?.globalSetup).toEqual(unit.test?.globalSetup);
-  });
+  ] as const)(
+    'give the %s suite the unit suite global setup',
+    (_name, config) => {
+      expect(config.test?.globalSetup).toEqual(unit.test?.globalSetup);
+    },
+  );
 });
