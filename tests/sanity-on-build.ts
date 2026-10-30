@@ -1,5 +1,4 @@
 import type { PlaywrightTestConfig } from '@playwright/test';
-import { unmeasured } from './coverage-options';
 
 /**
  * The deployed-site suites, run against a pull request's own build (#335).
@@ -60,7 +59,7 @@ export function onBuild(
   const baseURL = `http://localhost:${port}`;
   return {
     webServer: {
-      command: unmeasured(`npm run build && npm run preview -- --port ${port}`),
+      command: `npm run build && npm run preview -- --port ${port}`,
       url: baseURL,
       env: buildEnv,
       reuseExistingServer: false,

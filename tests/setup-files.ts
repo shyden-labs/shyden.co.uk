@@ -12,10 +12,6 @@ export const SHARED_SETUP: readonly string[] = [
   'tests/temporary-files-setup.ts',
 ];
 
-/** The integration suite's own: coverage of the processes it starts. */
-export const INTEGRATION_ONLY_SETUP: readonly string[] = [
-  'tests/child-coverage-setup.ts',
-];
 
 export const UNIT_ONLY_SETUP: readonly string[] = [
   'tests/unit-refusal-setup.ts',

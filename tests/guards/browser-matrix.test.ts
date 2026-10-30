@@ -12,7 +12,6 @@ import {
 } from '../source-files';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
-import { serverCoverageFindings, type WebServer } from '../web-server-coverage';
 import { workflowJobs } from '../workflow-jobs';
 
 type PlaywrightConfigModule = typeof import('../../playwright.config');
@@ -881,45 +880,6 @@ describe('no test run retries (#445)', () => {
         of: commands,
         what: 'workflow steps and package scripts',
       }),
-    ).toEqual([]);
-  });
-});
-
-describe('no Playwright web server measures what it starts (#913)', () => {
-  // A web server builds the site, loading src/ through Vite: code neither its
-  // own text nor in Playwright's compile cache, which the coverage of a
-  // Playwright run refuses. The build's coverage is #914's. Every config is
-  // read with the sanity switch on, so the sanity configs declare theirs. A
-  // `node <script>` server is measured when its script clears the variable
-  // before it starts anything, so its own code is judged and nothing else.
-  const servers: WebServer[] = [];
-
-  beforeAll(async () => {
-    for (const file of rootConfigs()) {
-      const loaded = await importConfig(file, { SANITY_ON_BUILD: '1' });
-      const declared = loaded.webServer;
-      const list =
-        declared === undefined
-          ? []
-          : Array.isArray(declared)
-            ? declared
-            : [declared];
-      list.forEach((server, i) =>
-        servers.push({
-          id: `${file} › web server ${i + 1}`,
-          command: server.command,
-          signal: server.gracefulShutdown?.signal,
-        }),
-      );
-    }
-  });
-
-  it('starts every web server with NODE_V8_COVERAGE unset, or cleared by its script', () => {
-    expect(
-      searched(
-        serverCoverageFindings(servers, (file) => readFileSync(file, 'utf8')),
-        { of: servers, what: 'Playwright web servers' },
-      ),
     ).toEqual([]);
   });
 });

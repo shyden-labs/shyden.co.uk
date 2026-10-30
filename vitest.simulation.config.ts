@@ -1,8 +1,6 @@
-import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
 import unit from './vitest.config.ts';
 import { SHARED_SETUP } from './tests/setup-files.ts';
-import { coverageFor } from './tests/coverage-options.ts';
 
 /**
  * The simulation suite (#650): every test whose real case is a run of the
@@ -14,9 +12,7 @@ import { coverageFor } from './tests/coverage-options.ts';
  * two share the repo's setup files. There is NO time limit in this file: the
  * suite's one measured limit is on the command that runs it
  * (`npm run test:simulation`), pinned by
- * `tests/unit/suite-budgets.test.ts`. The coverage run of this suite
- * (`npm run test:coverage:simulation`) sets no limit: instrumentation took
- * sweep cases past 700 ms, so there the limit timed V8, not the engine (#916).
+ * `tests/unit/suite-budgets.test.ts`.
  */
 export default defineConfig({
   test: {
@@ -29,7 +25,5 @@ export default defineConfig({
     // line replaces this whole list), then what loading each file cost.
     reporters: ['verbose'],
     globalSetup: unit.test?.globalSetup,
-    // Inert until a command passes --coverage (#896).
-    coverage: coverageFor('simulation'),
   },
 });

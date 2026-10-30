@@ -1,11 +1,18 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { posix } from 'node:path';
 import ts from 'typescript';
-import { boundNames } from './literal-floors';
 import { isCallback } from './playwright-declarations';
 import { nodesIn } from './unit/ast';
 import { filesUnder } from './source-files';
 import { withoutTsComments } from './unit/source-text';
+
+/** The names a parameter binds, through destructuring. */
+function boundNames(name: ts.BindingName): string[] {
+  if (ts.isIdentifier(name)) return [name.text];
+  return name.elements.flatMap((element) =>
+    ts.isOmittedExpression(element) ? [] : boundNames(element.name),
+  );
+}
 
 /**
  * No check is ever added to an iPhone-only test file (#858). A phone check is

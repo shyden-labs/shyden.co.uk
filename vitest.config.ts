@@ -1,4 +1,3 @@
-import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
 import { SHARED_SETUP, UNIT_ONLY_SETUP } from './tests/setup-files.ts';
 
