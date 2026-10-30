@@ -41,7 +41,7 @@ import { withoutCommentLines } from './source-text';
  * of `test:e2e` here fails this suite.
  *
  * NOR IS ANY OTHER SUITE, unit included (#713, operator 2026-10-12): the hook
- * runs format, typecheck and the changed-test lint, and nothing else.
+ * runs format and typecheck, and nothing else.
  */
 
 const HOOK = '.githooks/pre-push';
@@ -101,15 +101,11 @@ describe('the pre-push hook', () => {
     // tests, formatters and type checks run on the laptop; every other suite
     // is CI's (operator, 2026-10-09, a global rule).
     //
-    // `lint:tests` joined in #662: the three test-code meta-guards' finders
-    // over the test files the branch changed. A static read, so a lint the
-    // laptop may run (operator ruling 2026-10-12); the guards stay CI's.
+    // `lint:tests` (#662) left with the meta-guards it ran (#992).
     //
     // And `test:unit` left (#713): no test suite runs at push, not even unit
-    // (operator, 2026-10-12, a global rule). A branch that adds a floor fails
-    // the unit suite until `record-floors.yml` records it on the pushed
-    // branch, so a unit run here refused the push the record needs.
-    expect(invokedNpmScripts()).toEqual(['format', 'lint:tests', 'typecheck']);
+    // (operator, 2026-10-12, a global rule).
+    expect(invokedNpmScripts()).toEqual(['format', 'typecheck']);
   });
 
   it('executes nothing but its checks, in order (#713)', () => {
@@ -142,7 +138,6 @@ describe('the pre-push hook', () => {
       '[',
       'npm run format',
       'npm run typecheck',
-      'npm run lint:tests',
     ]);
   });
 
@@ -177,21 +172,6 @@ describe('the pre-push hook', () => {
       "set -- 'a check could not start its tool (exit 127, command not found), so it checked nothing' 'npm ci'",
       'fi',
     ]);
-  });
-
-  it('lints the changed test files after the type check (#662)', () => {
-    // After typecheck, so a type error is named by the checker that reads
-    // types rather than by a finder parsing a file that does not compile.
-    const lines = withoutCommentLines(hookSource(), '#').split('\n');
-    const at = (script: string) =>
-      lines.findIndex((line) =>
-        new RegExp(`^\\s*npm run ${script}\\b`).test(line),
-      );
-    expect(at('typecheck'), 'the hook type-checks').toBeGreaterThanOrEqual(0);
-    expect(at('lint:tests')).toBeGreaterThan(at('typecheck'));
-    expect(packageJson().scripts['lint:tests']).toBe(
-      'node scripts/lint-changed-tests.mjs',
-    );
   });
 
   it('type-checks so that a hint fails, as an error does (#966)', () => {
