@@ -43,7 +43,6 @@
     "[chromium] › zoom-on-focus.spec.ts": 4.6,
     "[content] › baseurl-guard.spec.ts": 0.6,
     "[content] › copy-reaches-a-page.spec.ts": 0.1,
-    "[content] › floors-under-playwright.spec.ts": 0,
     "[content] › head-and-sitemap.spec.ts": 7.4,
     "[content] › locale-parity.spec.ts": 3.9,
     "[content] › seo.spec.ts": 0.4,

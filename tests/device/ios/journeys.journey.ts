@@ -80,9 +80,8 @@ let session: DeviceSession;
  * there must be none, and after a class the page can deal, where there must be
  * some. The second reading is the population the first is judged against, so
  * a reader gone blind (a selector that stopped matching, a card whose text
- * stopped reading) is a short count against its recorded floor rather than a
- * clean "nothing rendered". `npm run floors:record -- --device` records the
- * floors, on the phone, since nothing else can run this file.
+ * stopped reading) shows as an empty second reading rather than a clean
+ * "nothing rendered".
  */
 async function groupCardTexts(): Promise<string[]> {
   const cards = await session.driver.findElements('#cg-tables .group');

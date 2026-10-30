@@ -51,10 +51,9 @@ export function scriptCheckout(): ScriptCheckout {
   // the one directory they read today, because a fixture that holds less than
   // a checkout does drifts from it silently; it is 2 MB, once per run.
   cpSync('src', join(root, 'src'), { recursive: true });
-  // `tests` too, whole, for the same reason: `coverage-processes.mjs` imports
-  // `../tests/coverage-options.ts`, the one home of what coverage measures,
-  // and without it its probe met ERR_MODULE_NOT_FOUND before its usage line
-  // (#899, record run 39703940249). 16 MB, measured at 122 ms to copy.
+  // `tests` too, whole, for the same reason: a script that imports a module
+  // under `tests/` meets ERR_MODULE_NOT_FOUND before its usage line without
+  // it (#899). 16 MB, measured at 122 ms to copy.
   cpSync('tests', join(root, 'tests'), { recursive: true });
   symlinkSync(resolve('node_modules'), join(root, 'node_modules'), 'dir');
   const link = join(base, 'linked');

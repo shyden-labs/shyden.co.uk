@@ -86,7 +86,7 @@ export const die = (message) => {
  * Playwright specs, and a failed assertion belonging to neither runner is
  * still a loud, correctly-attributed failure in both. Here rather than in
  * `tests/source-files.ts`, which re-exports it, so a script that reads a
- * directory proves it too (`record-floors.mjs`, #475).
+ * directory proves it too.
  *
  * @template T
  * @param {T[]} items

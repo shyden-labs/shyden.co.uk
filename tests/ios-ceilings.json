@@ -5,6 +5,72 @@
     "indirectChecks": 0,
     "harnessCalls": 0
   },
+  "tests/device/ios/inspector/bplist.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/connect.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/fields.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/framing.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/link.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/lockdown.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/pin.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/plist-xml.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/protocol.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/usbmux.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/inspector/wir.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
   "tests/device/ios/interaction.ts": {
     "tests": 0,
     "assertions": 0,
@@ -13,9 +79,9 @@
   },
   "tests/device/ios/journeys.journey.ts": {
     "tests": 15,
-    "assertions": 59,
-    "indirectChecks": 29,
-    "harnessCalls": 266
+    "assertions": 55,
+    "indirectChecks": 25,
+    "harnessCalls": 261
   },
   "tests/device/ios/server-process.ts": {
     "tests": 0,

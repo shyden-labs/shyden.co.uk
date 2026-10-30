@@ -15,10 +15,8 @@ import config from '../../vitest.config';
  *
  * The limit is now 1 s, for a test and for a hook. Measured at 8eb3e10 with
  * coverage off (#632): 3 092 tests, the slowest under 1 s wall and none over
- * 0.1 s of its own CPU; `tests/unit-cpu-setup.ts` fails any test whose own CPU
- * passes 1 s, which load cannot move. The limit is declared once, in
- * `vitest.config.ts`, and `tests/guards/unit-limit.test.ts` refuses any raised
- * limit anywhere in the unit population. It is pinned here as a literal: a
+ * 0.1 s of its own CPU. The limit is declared once, in `vitest.config.ts`
+ * (operator 2026-10-30: the runner's 1 s timeout, never raised). It is pinned here as a literal: a
  * value asserted against the config it came from would move with it and pin
  * nothing.
  */

@@ -27,11 +27,8 @@ name: CI
 # deploy-dev.yml's dispatch path runs THIS suite on a branch that has no pull
 # request, rather than a copy of it that could drift (#163).
 #
-# `workflow_dispatch` is the other, and nothing dispatches it any more: it
-# existed so the floor recorder (`record-floors.yml`, #651) could start this
-# workflow on the commit it pushed with its own token, which starts no run.
-# Since #889 neither bot pushes, so the branch's own push starts its pull
-# request's run; #891 removes this trigger with pr-body.yml's twin.
+# `workflow_dispatch` is the other, and nothing dispatches it any more; #891
+# removes it with pr-body.yml's twin.
 on:
   pull_request:
   workflow_call:
