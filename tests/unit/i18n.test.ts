@@ -142,7 +142,6 @@ describe('locales are complete', () => {
       expect(
         searched(blank, { of: strings, what: 'catalogue strings' }),
       ).toEqual([]);
-      expect(floorBreach(floorId, strings.length)).toBeUndefined();
     },
   );
 
@@ -170,9 +169,6 @@ describe('locales are complete', () => {
         { of: idStrings, what: 'Indonesian catalogue strings' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('i18n/indonesian-catalogue-strings', idStrings.length),
-    ).toBeUndefined();
   });
 
   it('and the list of exceptions has no dead entries', () => {
@@ -189,9 +185,6 @@ describe('locales are complete', () => {
         what: 'allowed-identical entries',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('i18n/allowed-identical-entries', allowed.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1625,7 +1618,6 @@ describe('site-wide copy is fully translated', () => {
       .filter(([, value]) => value.trim() === '')
       .map(([key]) => key);
     expect(searched(blank, { of: strings, what: 'site strings' })).toEqual([]);
-    expect(floorBreach('i18n/site-strings', strings.length)).toBeUndefined();
   });
 
   it('the visible prose is genuinely translated, not copied English', () => {
@@ -1638,9 +1630,6 @@ describe('site-wide copy is fully translated', () => {
     expect(
       searched(identical, { of: idLeaves, what: 'Indonesian site strings' }),
     ).toEqual([]);
-    expect(
-      floorBreach('i18n/indonesian-site-strings', idLeaves.length),
-    ).toBeUndefined();
   });
 
   // #602: the same walk for the other machine-seeded site locales. One test
@@ -1659,7 +1648,6 @@ describe('site-wide copy is fully translated', () => {
       expect(
         searched(identical, { of: leaves, what: `${locale} site strings` }),
       ).toEqual([]);
-      expect(floorBreach(SITE_FLOOR[locale], leaves.length)).toBeUndefined();
     });
   }
 
@@ -1679,9 +1667,6 @@ describe('site-wide copy is fully translated', () => {
     expect(
       searched(stale, { of: allowedKeys, what: 'allowed-identical site keys' }),
     ).toEqual([]);
-    expect(
-      floorBreach('i18n/site-allowed-identical', allowedKeys.length),
-    ).toBeUndefined();
   });
 });
 

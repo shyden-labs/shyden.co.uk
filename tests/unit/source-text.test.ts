@@ -330,9 +330,6 @@ describe('astroCodeViews reads only the code an .astro file holds', () => {
         { of: cases, what: 'files handed to astroCodeViews' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('source-text/files-without-code', cases.length),
-    ).toBeUndefined();
   });
 });
 
@@ -400,9 +397,6 @@ describe('astroStyleViews reads only the CSS an .astro file holds', () => {
         { of: cases, what: 'files handed to astroStyleViews' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('source-text/files-without-a-style', cases.length),
-    ).toBeUndefined();
   });
 });
 
@@ -576,9 +570,6 @@ describe('cssComments', () => {
         { of: cases, what: 'stylesheets handed to cssComments' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('source-text/quoted-comment-syntax', cases.length),
-    ).toBeUndefined();
   });
 
   it('and the code it keeps is the code the stripper keeps', () => {

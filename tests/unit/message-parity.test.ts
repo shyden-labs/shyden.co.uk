@@ -178,9 +178,6 @@ describe('every language builds each message the way English does (#136)', () =>
           { of: imports, what: `imports from en.ts in ${file}` },
         ),
       ).toEqual([]);
-      expect(
-        floorBreach(ENGLISH_IMPORTS_FLOOR[locale], imports.length),
-      ).toBeUndefined();
     },
   );
 
@@ -198,9 +195,6 @@ describe('every language builds each message the way English does (#136)', () =>
       expect(
         searched(differing, { of: paths, what: 'English catalogue strings' }),
       ).toEqual([]);
-      expect(
-        floorBreach(SLOT_STRINGS_FLOOR[locale], paths.length),
-      ).toBeUndefined();
     },
   );
 
@@ -225,9 +219,6 @@ describe('every language builds each message the way English does (#136)', () =>
           what: 'English messages that choose a sentence',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach(CHOICE_MESSAGES_FLOOR[locale], choosers.length),
-      ).toBeUndefined();
     },
   );
 
@@ -267,8 +258,5 @@ describe('every language builds each message the way English does (#136)', () =>
     expect(
       searched(wrong, { of: judged, what: 'plurals across every catalogue' }),
     ).toEqual([]);
-    expect(
-      floorBreach('message-parity/plurals', judged.length),
-    ).toBeUndefined();
   });
 });

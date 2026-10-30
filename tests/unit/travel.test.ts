@@ -52,9 +52,6 @@ describe('travelOrder', () => {
         { of: cases, what: 'deals where everyone is pinned' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('travel/everyone-pinned-cases', cases.length),
-    ).toBeUndefined();
   });
 
   const dealt = (seed: number) => {

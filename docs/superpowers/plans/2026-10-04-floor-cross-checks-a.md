@@ -97,6 +97,7 @@ index f663098..013d264 100644
  import { describe, it, expect } from 'vitest';
  import ts from 'typescript';
 -import { readFileSync } from 'node:fs';
+ import { floorBreach } from '../floors';
  import { filesUnder, searched } from '../source-files';
 -import { withoutTsComments } from './source-text';
 -import { bindFiles, callGraph, derivationOf, where } from './ast';
@@ -221,7 +222,13 @@ index f663098..013d264 100644
 +      );
 +    expect(searched(disagree, { of: tsFiles, what: 'files' })).toEqual([]);
      // Ratcheted after the verdict (#468), so growth never hides a finding.
-     
+     expect(
+-      floorBreach('absence-liveness/plain-files', plain.length),
++      floorBreach(
++        'absence-liveness/plain-files',
++        tsFiles.filter((file) => (written.get(file) ?? 0) > 0).length,
++      ),
+     ).toBeUndefined();
    });
  
 diff --git a/tests/unit/ast.test.ts b/tests/unit/ast.test.ts
@@ -457,6 +464,7 @@ index 013d264..f4f277d 100644
 @@ -1,7 +1,13 @@
  import { describe, it, expect } from 'vitest';
  import ts from 'typescript';
+ import { floorBreach } from '../floors';
 -import { filesUnder, searched } from '../source-files';
 +import {
 +  committableFiles,
@@ -502,6 +510,7 @@ index 9e88e66..c5bb198 100644
 +} from '../source-files';
  import { bind, bindFiles, callGraph, type Closure } from './ast';
  import { scanPresence, type PresenceClosures } from './presence-detector';
+ import { floorBreach } from '../floors';
 @@ -304,6 +310,17 @@ describe('presence assertions over source text are stripped or anchored', () =>
      ).toBeUndefined();
    });
@@ -568,6 +577,7 @@ index 23ac411..ffe527d 100644
 +} from '../source-files';
  import { parseSource } from './ast';
  import { withoutTsComments } from './source-text';
+ import { floorBreach } from '../floors';
 @@ -67,6 +73,27 @@ describe('browser-event collectors have exactly one home', () => {
      expect(SCANNED).toContain(RECORDERS);
    });
@@ -612,6 +622,7 @@ index 5897b7f..08a940d 100644
 +  trackedFiles,
 +  walkDisagreements,
 +} from '../source-files';
+ import { floorBreach } from '../floors';
  
  /**
 @@ -158,3 +166,48 @@ describe('searched -- the population a finding list was drawn from', () => {
@@ -880,6 +891,7 @@ index 05a8140..59506fc 100644
  } from '../one-test-per-case';
 -import { declaresTests } from '../playwright-declarations';
 +import { declaresTests, testsWritten } from '../playwright-declarations';
+ import { floorBreach } from '../floors';
  
  /**
 @@ -244,6 +244,7 @@ const scan = (): {
@@ -1530,6 +1542,7 @@ index ffe527d..1443328 100644
 +import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
  import { parseSource } from './ast';
  import { withoutTsComments } from './source-text';
+ import { floorBreach } from '../floors';
 @@ -77,17 +71,8 @@ describe('browser-event collectors have exactly one home', () => {
      // Independent of the walk (#477): spec directories and their files both
      // derived from git's list, so a walk that drops a directory or a suffix
@@ -1631,6 +1644,7 @@ index e335c2a..3ede659 100644
  import { describe, expect, it } from 'vitest';
 -import { specDirs } from '../spec-dirs';
 +import { specDirFilesGitHas, specDirs } from '../spec-dirs';
+ import { floorBreach } from '../floors';
  
  describe('the directories guards scan are derived, not listed', () => {
 @@ -23,3 +23,15 @@ describe('the directories guards scan are derived, not listed', () => {
@@ -1659,6 +1673,7 @@ index 9224a69..068a248 100644
 -import { specDirs } from '../spec-dirs';
 +import { specDirFilesGitHas, specDirs } from '../spec-dirs';
  import { declaresTests } from '../playwright-declarations';
+ import { floorBreach } from '../floors';
 -import { searched, tsFilesUnder } from '../source-files';
 +import { searched, tsFilesUnder, walkDisagreements } from '../source-files';
  

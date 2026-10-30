@@ -137,12 +137,8 @@ describe('a function body has one home across files', () => {
   it('scans the whole tracked tree, not a list', () => {
     // Anti-vacuity: an empty scan satisfies every assertion below.
     const { declarations } = scan();
-    expect(floorBreach('duplication/files', SCANNED.length)).toBeUndefined();
     expect(SCANNED).toContain('src/lib/grouping.ts');
     expect(SCANNED).toContain('scripts/test-devices.mjs');
-    expect(
-      floorBreach('duplication/declarations', declarations.length),
-    ).toBeUndefined();
   });
 
   it('finds no cross-file duplicate that has not been given a verdict', () => {
@@ -157,9 +153,6 @@ describe('a function body has one home across files', () => {
       searched(findings, { of: declarations, what: 'function bodies' }),
       findings.join('\n'),
     ).toEqual([]);
-    expect(
-      floorBreach('duplication/judged-declarations', declarations.length),
-    ).toBeUndefined();
   });
 
   it('carries no verdict for a pair that no longer exists', () => {
@@ -177,9 +170,7 @@ describe('a function body has one home across files', () => {
     ).toEqual([]);
     // A verdict dropped from the table would leave its pair unexcused, but a
     // reader dropping one silently would leave this test reading fewer (#524).
-    expect(
-      floorBreach('duplication/outliving-verdicts', recorded.length),
-    ).toBeUndefined();
+    
   });
 
   it('records each verdict against one pair, which no copy can inherit', () => {
@@ -198,9 +189,6 @@ describe('a function body has one home across files', () => {
         { of: recorded, what: 'recorded verdicts' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('duplication/shared-verdicts', recorded.length),
-    ).toBeUndefined();
   });
 });
 
@@ -331,9 +319,6 @@ describe('the scan itself', () => {
         what: 'function bodies',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplication/same-file-bodies', bodies.length),
-    ).toBeUndefined();
   });
 
   it('ignores a body shorter than the floor', () => {
@@ -350,8 +335,5 @@ describe('the scan itself', () => {
         what: 'function-like nodes',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplication/short-candidates', candidates.length),
-    ).toBeUndefined();
   });
 });

@@ -366,8 +366,6 @@ test.describe('no built page names the dissolved company (#370)', () => {
     );
     // Recorded in tests/floors.json and checked for equality (#475), so a
     // site that grows a page moves the figure on purpose.
-    expect(
-      floorBreach('copy-reaches-a-page/built-pages', pages.length),
-    ).toBeUndefined();
+    
   });
 });

@@ -100,6 +100,5 @@ describe('a CLI-only module stays out of everything the site ships', () => {
       searched(offenders, { of: files, what: 'shipped source files' }),
       'this would put a CLI module in the browser bundle',
     ).toEqual([]);
-    expect(floorBreach('cli-only/shipped-files', files.length)).toBeUndefined();
   });
 });

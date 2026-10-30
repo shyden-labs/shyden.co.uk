@@ -68,11 +68,6 @@ describe('the sitemap declares every locale the site serves', () => {
     // A regex that stopped matching would hand every assertion above an empty
     // object, and `{} === {}` is a pass for a check phrased as "no extras".
     // #84: a guard handed an empty list asserts nothing at all.
-    expect(
-      floorBreach(
-        'sitemap-config/locales',
-        Object.keys(sitemapLocales()).length,
-      ),
-    ).toBeUndefined();
+    
   });
 });

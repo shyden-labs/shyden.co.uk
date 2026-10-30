@@ -133,7 +133,6 @@ describe('the WCAG formula has one home', () => {
       (path) =>
         /^(src|tests|scripts)\//.test(path) && /\.(ts|mjs|js)$/.test(path),
     );
-    expect(floorBreach('wcag/files', scanned.length)).toBeUndefined();
     // The home is in the result, so an empty scan cannot pass this.
     expect(
       scanned.flatMap((file) => curvesIn(readFileSync(file, 'utf8'), file)),

@@ -99,9 +99,6 @@ describe('the ShyTalk showcase ships a real room capture per locale', () => {
     expect(searched(missing, { of: locales, what: 'site locales' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('shytalk-showcase/locales-with-a-capture', locales.length),
-    ).toBeUndefined();
   });
 
   it('gives every locale its OWN capture, not one file under five names', () => {
@@ -116,9 +113,6 @@ describe('the ShyTalk showcase ships a real room capture per locale', () => {
     expect(
       searched(shared, { of: captures, what: 'room captures on disk' }),
     ).toEqual([]);
-    expect(
-      floorBreach('shytalk-showcase/digested-captures', captures.length),
-    ).toBeUndefined();
   });
 
   it('authors every capture at exactly the 2x frame size, and no larger', () => {
@@ -133,9 +127,6 @@ describe('the ShyTalk showcase ships a real room capture per locale', () => {
     expect(
       searched(wrongSize, { of: captures, what: 'room captures on disk' }),
     ).toEqual([]);
-    expect(
-      floorBreach('shytalk-showcase/sized-captures', captures.length),
-    ).toBeUndefined();
   });
 
   it('stores every capture as a PNG, so the size read above is meaningful', () => {
@@ -145,9 +136,6 @@ describe('the ShyTalk showcase ships a real room capture per locale', () => {
     expect(
       searched(notPng, { of: captures, what: 'room captures on disk' }),
     ).toEqual([]);
-    expect(
-      floorBreach('shytalk-showcase/format-checked-captures', captures.length),
-    ).toBeUndefined();
   });
 
   it('keeps every capture inside the per-visit weight budget', () => {
@@ -158,8 +146,5 @@ describe('the ShyTalk showcase ships a real room capture per locale', () => {
     expect(
       searched(tooHeavy, { of: captures, what: 'room captures on disk' }),
     ).toEqual([]);
-    expect(
-      floorBreach('shytalk-showcase/weighed-captures', captures.length),
-    ).toBeUndefined();
   });
 });

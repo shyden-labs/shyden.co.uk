@@ -272,9 +272,6 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
     ),
     'AC11: a request left the site',
   ).toEqual([]);
-  expect(
-    floorBreach('report-form/report-send-requests', heard.length),
-  ).toBeUndefined();
 });
 
 // #872: a daily limit's 429 shows its own message in place, and no other.

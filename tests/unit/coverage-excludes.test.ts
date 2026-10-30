@@ -50,9 +50,6 @@ describe('the V8 provider with only our excludes (#912)', () => {
         what: 'include verdicts cached before the swap',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('coverage-excludes/cached-verdicts', cachedBefore),
-    ).toBeUndefined();
   });
 
   it('refuses a provider with no exclude list, naming the field', () => {

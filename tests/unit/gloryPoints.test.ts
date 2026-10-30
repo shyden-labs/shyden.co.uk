@@ -186,8 +186,5 @@ describe('the result line reads in the page’s own language (#390)', () => {
     expect(
       searched(reused, { of: translated, what: 'translated functions' }),
     ).toEqual([]);
-    expect(
-      floorBreach('glory-points/translated-functions', translated.length),
-    ).toBeUndefined();
   });
 });

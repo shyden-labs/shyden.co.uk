@@ -48,9 +48,6 @@ describe('the board is measured once, and survives being sent somewhere else', (
       searched(missing, { of: needles, what: 'serialised selectors' }),
       `the serialised measurement lost: ${missing.join(', ')}`,
     ).toEqual([]);
-    expect(
-      floorBreach('board-geometry/serialised-needles', needles.length),
-    ).toBeUndefined();
   });
 
   it('closes over nothing, because anything it closed over would be undefined at the far end', () => {
@@ -95,9 +92,6 @@ describe('the board is measured once, and survives being sent somewhere else', (
       'the board stage is measured in one home; a second measurement is the ' +
         'one place the two legs could quietly disagree',
     ).toEqual(['tests/board-geometry.ts']);
-    expect(
-      floorBreach('board-geometry/ts-files', files.length),
-    ).toBeUndefined();
   });
 });
 
@@ -123,8 +117,5 @@ describe('the cover measurement survives being sent somewhere else', () => {
       searched(missing, { of: needles, what: 'serialised cover reads' }),
       `the serialised cover measurement lost: ${missing.join(', ')}`,
     ).toEqual([]);
-    expect(
-      floorBreach('board-geometry/cover-needles', needles.length),
-    ).toBeUndefined();
   });
 });

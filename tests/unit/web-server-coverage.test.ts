@@ -124,9 +124,6 @@ describe('every web server either unsets the measurement or its script clears it
         what: 'fixture web servers',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('web-server-coverage/unset-servers', servers.length),
-    ).toBeUndefined();
   });
 
   it('accepts a node script that clears it first and is stopped by SIGTERM', () => {
@@ -139,9 +136,6 @@ describe('every web server either unsets the measurement or its script clears it
         what: 'fixture web servers',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('web-server-coverage/sigterm-servers', servers.length),
-    ).toBeUndefined();
   });
 
   it('accepts a node script that clears it first and is stopped by SIGINT', () => {
@@ -154,9 +148,6 @@ describe('every web server either unsets the measurement or its script clears it
         what: 'fixture web servers',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('web-server-coverage/sigint-servers', servers.length),
-    ).toBeUndefined();
   });
 
   it('names a node script Playwright would SIGKILL, which writes no coverage', () => {

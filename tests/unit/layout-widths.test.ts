@@ -78,9 +78,6 @@ describe('the widths a stylesheet can lay out', () => {
     expect(
       searched(edgesOf(...others), { of: others, what: 'media conditions' }),
     ).toEqual([]);
-    expect(
-      floorBreach('layout-widths/non-width-conditions', others.length),
-    ).toBeUndefined();
     // The same list with one width condition added finds exactly that one,
     // so the empty answer above is the filter working, not the reader dead.
     expect(edgesOf(...others, '(min-width: 720px)')).toEqual([719, 720]);

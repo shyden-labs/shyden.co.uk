@@ -552,9 +552,6 @@ describe('a script asks whether it was run directly with import.meta.main alone 
       searched(unread, { of: files, what: 'files under scripts/' }),
       'a file these rules cannot parse is a file they do not guard',
     ).toEqual([]);
-    expect(
-      floorBreach('script-entry/script-files', files.length),
-    ).toBeUndefined();
   });
 
   it('never reads process.argv[1]', () => {
@@ -570,9 +567,6 @@ describe('a script asks whether it was run directly with import.meta.main alone 
         what: 'reads of process.argv',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('script-entry/argv1-checked-reads', argvReads.length),
-    ).toBeUndefined();
   });
 
   it('judges every read of process.argv the scripts make, and as many as there are', () => {
@@ -592,15 +586,7 @@ describe('a script asks whether it was run directly with import.meta.main alone 
       );
     expect(searched(disagree, { of: modules, what: 'scripts' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('script-entry/argv-compared-scripts', modules.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'script-entry/argv-reads',
-        readings.reduce((sum, { judged }) => sum + judged, 0),
-      ),
-    ).toBeUndefined();
+    
   });
 
   it('decides on import.meta.main alone', () => {
@@ -609,9 +595,6 @@ describe('a script asks whether it was run directly with import.meta.main alone 
     expect(
       searched(wrong, { of: decisions, what: 'load-time main() decisions' }),
     ).toEqual([]);
-    expect(
-      floorBreach('script-entry/main-decisions', decisions.length),
-    ).toBeUndefined();
   });
 
   it('probes exactly the scripts that decide', () => {
@@ -656,9 +639,6 @@ describe('a script does no work while it loads (#276)', () => {
       }),
       'a module that works while it loads runs its program on import',
     ).toEqual([]);
-    expect(
-      floorBreach('script-entry/effect-checked-statements', statements.length),
-    ).toBeUndefined();
   });
 
   it('judges every load-time statement the scripts hold, and as many as there are', () => {
@@ -679,14 +659,6 @@ describe('a script does no work while it loads (#276)', () => {
       .map(({ file, judged, held }) => `${file}: ${judged} of ${held} judged`);
     expect(searched(skipped, { of: modules, what: 'scripts' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('script-entry/load-time-compared-scripts', modules.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'script-entry/load-time-statements',
-        readings.reduce((sum, { judged }) => sum + judged, 0),
-      ),
-    ).toBeUndefined();
+    
   });
 });

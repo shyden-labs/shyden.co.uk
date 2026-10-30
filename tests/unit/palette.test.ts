@@ -134,7 +134,6 @@ describe('subsets', () => {
         { of: all, what: 'subsets' },
       ),
     ).toEqual([]);
-    expect(floorBreach('palette/subsets-of-three', all.length)).toBeUndefined();
   });
 });
 

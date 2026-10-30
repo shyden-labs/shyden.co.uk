@@ -43,9 +43,6 @@ describe('leakedEntries: what a test left in the run directory', () => {
     expect(
       searched(leakedEntries(dir), { of: kept, what: 'cache entries' }),
     ).toEqual([]);
-    expect(
-      floorBreach('temporary-files/kept-cache-entries', kept.length),
-    ).toBeUndefined();
   });
 
   it('reports what only looks like a module cache', () => {

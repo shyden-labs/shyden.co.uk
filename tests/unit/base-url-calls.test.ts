@@ -389,9 +389,6 @@ describe('what the guard reports', () => {
     expect(
       searched(rest, { of: calls, what: 'examined base-URL calls' }),
     ).toHaveLength(0);
-    expect(
-      floorBreach('base-url-calls/relative-url-examined', calls.length),
-    ).toBeUndefined();
     expect(finding).toBe(
       'tests/e2e/a.spec.ts:1 calls `page.route(...)` with a relative URL, ' +
         "'/framed', which resolves to /framed; page.route is not patched to " +
@@ -411,9 +408,6 @@ describe('what the guard reports', () => {
     expect(
       searched(rest, { of: calls, what: 'examined base-URL calls' }),
     ).toHaveLength(0);
-    expect(
-      floorBreach('base-url-calls/unresolved-url-examined', calls.length),
-    ).toBeUndefined();
     expect(finding).toBe(
       'tests/e2e/a.spec.ts:1 calls `page.route(...)` with url, and could not ' +
         'resolve `url` (a parameter). That is a limit of this guard, not a ' +

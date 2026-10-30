@@ -525,12 +525,6 @@ test.describe('classroom groups — mobile-first layout', () => {
             what: 'visible controls measured in both modes',
           }),
         ).toEqual([]);
-        expect(
-          floorBreach(
-            'classroom-groups-controls/measured-controls',
-            measured.length,
-          ),
-        ).toBeUndefined();
       },
     );
 

@@ -146,9 +146,6 @@ describe('a repository named by a hostile GIT_DIR (#377)', () => {
         join(sentinel, 'child-run.json'),
       );
       expect(report.numFailedTests, stderr).toBe(0);
-      expect(
-        floorBreach('git-env/child-tests-passed', report.numPassedTests),
-      ).toBeUndefined();
       expect(fingerprint(sentinel)).toEqual(before);
     } finally {
       rmSync(sentinel, { recursive: true, force: true });

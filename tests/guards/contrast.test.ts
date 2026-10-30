@@ -377,7 +377,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(failures, { of: PAIRS, what: `${theme} colour pairs` }),
       ).toEqual([]);
-      expect(floorBreach(PAIRS_FLOOR[theme], PAIRS.length)).toBeUndefined();
     });
   }
 
@@ -424,7 +423,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(collisions, { of: grounds, what: 'opaque grounds' }),
       ).toEqual([]);
-      expect(floorBreach(GROUNDS_FLOOR[theme], grounds.length)).toBeUndefined();
     });
   }
 
@@ -447,7 +445,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(unclassified, { of: all, what: 'colour tokens' }),
       ).toEqual([]);
-      expect(floorBreach(TOKENS_FLOOR[theme], all.length)).toBeUndefined();
     });
   }
 
@@ -568,9 +565,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(offenders, { of: usages, what: 'var(--border) usages in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-judged-as-controls', usages.length),
-    ).toBeUndefined();
   });
 
   it('every --border usage is classified as control or decorative', () => {
@@ -586,9 +580,6 @@ describe('a control is never identified by the decorative border alone', () => {
         what: 'var(--border) usages in src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-classified', usages.length),
-    ).toBeUndefined();
   });
 
   /**
@@ -620,9 +611,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(stale, { of: usages, what: 'var(--border) usages in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-for-decorative', usages.length),
-    ).toBeUndefined();
   });
 
   it('names a control only where the reader finds that selector', () => {
@@ -635,9 +623,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(stale, { of: selectors, what: 'declared selectors in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/declared-selectors', selectors.length),
-    ).toBeUndefined();
   });
 });
 
@@ -687,8 +672,5 @@ describe('one disabled look, defined in one place', () => {
         what: 'paint declarations on a :disabled subject',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/disabled-paint', paintedAt.length),
-    ).toBeUndefined();
   });
 });

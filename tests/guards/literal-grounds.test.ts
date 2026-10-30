@@ -200,9 +200,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         what: 'literal grounds under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/ink-checked-grounds', judged.length),
-    ).toBeUndefined();
   });
 
   it('no rule under src/ puts token ink on text inside a literal ground', () => {
@@ -217,9 +214,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         what: 'literal grounds under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/inside-checked-grounds', judged.length),
-    ).toBeUndefined();
   });
 
   it('judges the text inside a ground by the rule that colours it', () => {
@@ -269,9 +263,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         what: 'the paragraph rule with token ink',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/left-alone-controls', control.length),
-    ).toBeUndefined();
   });
 
   it('exempts only grounds the reader finds', () => {
@@ -286,9 +277,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         what: 'literal grounds under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/exemption-checked-grounds', judged.length),
-    ).toBeUndefined();
   });
 
   it('joins a selector split over several rules, keeping the last of each property', () => {
@@ -302,9 +290,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
     expect(
       searched(offending(split), { of: split, what: 'grounds in the fixture' }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/joined-grounds', split.length),
-    ).toBeUndefined();
 
     const overridden = literalGrounds(
       'x.css',
@@ -327,9 +312,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         what: 'the ground before the override',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/overridden-grounds', literal.length),
-    ).toBeUndefined();
   });
 
   it('reads a token with a literal fallback as a token, on the ground and on the ink', () => {
@@ -340,9 +322,6 @@ describe('a ground written as a literal carries its own ink (#332)', () => {
         { of: literal, what: 'the same colour written as a literal' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('literal-grounds/fallback-grounds', literal.length),
-    ).toBeUndefined();
     expect(
       offending(
         literalGrounds(

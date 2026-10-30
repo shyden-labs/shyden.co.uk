@@ -80,8 +80,5 @@ describe('no product is called first (#403 AC3)', () => {
       expect(
         searched(claims, { of: values, what: `${locale} homepage strings` }),
       ).toEqual([]);
-      expect(
-        floorBreach(HOME_STRINGS_FLOOR[locale], values.length),
-      ).toBeUndefined();
     });
 });

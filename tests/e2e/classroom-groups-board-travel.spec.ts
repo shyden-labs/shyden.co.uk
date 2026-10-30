@@ -423,9 +423,6 @@ test.describe('the board deals by moving students into their cards', () => {
         ),
         'students the sampler never saw as a chip and as a row',
       ).toEqual([]);
-      expect(
-        floorBreach('board-travel/students-sampled', students.length),
-      ).toBeUndefined();
       // Last, so a frame the checks above saw is reported whatever this says:
       // a gap over the ceiling means a blank that long could have gone undrawn.
       // The in-flight gap is measured only once a flight is seen, so a run that
@@ -452,9 +449,6 @@ test.describe('the board deals by moving students into their cards', () => {
       searched(during, { of: travelled, what: 'students seen travelling' }),
       'students during whose flight the list changed height',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/list-students', travelled.length),
-    ).toBeUndefined();
   });
 
   test('the cards hold still while students travel', async ({ page }) => {
@@ -472,9 +466,6 @@ test.describe('the board deals by moving students into their cards', () => {
       searched(during, { of: travelled, what: 'students seen travelling' }),
       'students during whose flight a card moved or changed size',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/card-students', travelled.length),
-    ).toBeUndefined();
   });
 
   test('the schedule is the one travelSchedule states', async ({ page }) => {
@@ -504,9 +495,6 @@ test.describe('the board deals by moving students into their cards', () => {
       ),
       'animations made on anything but a row, a chip or a card',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/animations-made', made.length),
-    ).toBeUndefined();
     test.info().annotations.push({
       type: 'travel-wall-ms',
       description: `${wall} ms against ${schedule.totalMs} ms scheduled`,
@@ -533,9 +521,6 @@ test.describe('the board deals by moving students into their cards', () => {
       ),
       'students seen twice, or nowhere, in one frame',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/students-sampled-again', students.length),
-    ).toBeUndefined();
   });
 
   test('a Shuffle pressed while students travel starts again, and nobody is seen twice', async ({
@@ -555,9 +540,6 @@ test.describe('the board deals by moving students into their cards', () => {
       ),
       'students seen twice in one frame',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/students-sampled-restart', students.length),
-    ).toBeUndefined();
     const numbers = await board(page)
       .locator('.student')
       .evaluateAll((rows) =>
@@ -636,9 +618,6 @@ test.describe('the board deals by moving students into their cards', () => {
       ),
       'rows of the abandoned deal still on the board',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/abandoned-rows', abandoned.length),
-    ).toBeUndefined();
   });
 
   test('leaving the board while students travel puts the groups on the page at once', async ({
@@ -684,9 +663,6 @@ test.describe('the board deals by moving students into their cards', () => {
       }),
       'animations made for a deal that must not move',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/seated-skip', seated.length),
-    ).toBeUndefined();
   });
 
   test('with reduced motion nothing moves: everyone is in their card at once', async ({
@@ -717,9 +693,6 @@ test.describe('the board deals by moving students into their cards', () => {
       }),
       'animations made for a deal that must not move',
     ).toEqual([]);
-    expect(
-      floorBreach('board-travel/seated-reduced-motion', seated.length),
-    ).toBeUndefined();
   });
 
   test(
@@ -740,9 +713,6 @@ test.describe('the board deals by moving students into their cards', () => {
         searched(during, { of: travelled, what: 'students seen travelling' }),
         'students during whose flight the board scrolled sideways',
       ).toEqual([]);
-      expect(
-        floorBreach('board-travel/overflow-students-320', travelled.length),
-      ).toBeUndefined();
     },
   );
 

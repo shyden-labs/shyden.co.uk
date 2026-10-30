@@ -50,8 +50,5 @@ describe('the harness runs under plain Node', () => {
         what: 'src modules the scripts import',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('translate-messages/imported-src-modules', modules.length),
-    ).toBeUndefined();
   });
 });

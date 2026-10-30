@@ -67,9 +67,6 @@ describe('a stored row is checked before it is printed (AC2)', () => {
         what: 'statements in the answer',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('report-review/empty-table-statements', statements.length),
-    ).toBeUndefined();
   });
 
   it.each([

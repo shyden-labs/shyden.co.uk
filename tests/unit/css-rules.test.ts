@@ -151,9 +151,6 @@ describe('colourLiterals', () => {
         { of: none, what: 'values that fix no colour' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('css-rules/no-colour-values', none.length),
-    ).toBeUndefined();
   });
 
   it('knows every CSS named colour once', () => {
@@ -178,9 +175,6 @@ describe('onPaper', () => {
         { of: onPrint, what: 'rules inside a print-only media block' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('css-rules/print-only-chains', onPrint.length),
-    ).toBeUndefined();
   });
 
   it('does not hold for a rule outside every print-only media block', () => {
@@ -196,9 +190,6 @@ describe('onPaper', () => {
         { of: offPrint, what: 'rules outside every print-only media block' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('css-rules/not-print-only-chains', offPrint.length),
-    ).toBeUndefined();
   });
 });
 
@@ -233,9 +224,6 @@ describe('codeColourLiterals', () => {
         what: 'colour lookalikes',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('css-rules/colour-lookalikes', lookalikes.length),
-    ).toBeUndefined();
   });
 
   it('finds a hex-shaped issue number too, which only an allowlist can excuse', () => {

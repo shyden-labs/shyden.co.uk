@@ -116,9 +116,6 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       'a dry run made a request',
     ).toEqual([]);
-    expect(
-      floorBreach('translate/dry-run-trap-log', run.log.length),
-    ).toBeUndefined();
   });
 
   it('drops the stale drafts with --prune, with no key and no request', () => {
@@ -135,9 +132,6 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       '--prune made a request',
     ).toEqual([]);
-    expect(
-      floorBreach('translate/prune-trap-log', run.log.length),
-    ).toBeUndefined();
     expect(run.output).toMatch(
       /^✓ dropped 2 stale drafts — nothing sent, no key read\.$/m,
     );
@@ -154,9 +148,6 @@ describe('the harness prunes the cache it writes', () => {
       searched(run.requests, { of: run.log, what: 'fetch trap log lines' }),
       'nothing was pending, yet it sent',
     ).toEqual([]);
-    expect(
-      floorBreach('translate/send-trap-log', run.log.length),
-    ).toBeUndefined();
   });
 
   it('writes nothing when --prune has nothing to drop', () => {

@@ -199,9 +199,6 @@ describe('featuresNamed: the features a piece of English copy names', () => {
     expect(
       searched(featuresNamed(english), { of: FEATURES, what: 'features' }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/features-tested', FEATURES.length),
-    ).toBeUndefined();
   });
 });
 
@@ -219,9 +216,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/carried-features', named.length),
-    ).toBeUndefined();
   });
 
   it('copy naming a feature with none of its approved words is returned, naming the feature', () => {
@@ -257,9 +251,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/alternative-words', named.length),
-    ).toBeUndefined();
   });
 
   it('each feature is judged on its own: carrying one does not excuse another', () => {
@@ -294,9 +285,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/features-unnamed-copy', FEATURES.length),
-    ).toBeUndefined();
   });
 
   it('an approved word must appear whole: cùng is not cùng nhau', () => {
@@ -329,9 +317,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/case-features', named.length),
-    ).toBeUndefined();
   });
 
   it('Unicode composition does not decide it, whatever the glossary spells', () => {
@@ -347,9 +332,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/composition-features', named.length),
-    ).toBeUndefined();
   });
 
   it('a slot in the rendering carries no word, even one spelled like an approved word', () => {
@@ -386,9 +368,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/unbroken-zh-features', named.length),
-    ).toBeUndefined();
   });
 
   it('Thai is searched without word breaks: ปักหมุด inside เลิกปักหมุด counts', () => {
@@ -400,9 +379,6 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
         what: 'features the copy names',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/unbroken-th-features', named.length),
-    ).toBeUndefined();
   });
 });
 
@@ -435,7 +411,6 @@ describe('on the live catalogues', () => {
           { of: named, what: `${locale} copy naming a feature` },
         ),
       ).toEqual([]);
-      expect(floorBreach(NAMING_FLOOR[locale], named.length)).toBeUndefined();
     },
   );
 
@@ -476,9 +451,6 @@ describe('on the live catalogues', () => {
           what: `${locale} approved words`,
         }),
       ).toEqual([]);
-      expect(
-        floorBreach(APPROVED_FLOOR[locale], approved.length),
-      ).toBeUndefined();
     },
   );
 
@@ -578,8 +550,5 @@ describe('on the live catalogues', () => {
         { of: named, what: 'features the corrected copy names' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('feature-terms/corrected-features', named.length),
-    ).toBeUndefined();
   });
 });

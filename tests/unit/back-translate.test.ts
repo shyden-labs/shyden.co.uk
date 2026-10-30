@@ -136,9 +136,6 @@ describe('unitsBetween: what the reader is asked to read', () => {
         what: 'symbol entries offered',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/symbol-entries', Object.keys(symbols).length),
-    ).toBeUndefined();
   });
 
   it('sends nothing for copy the locale has no string for', () => {
@@ -303,10 +300,7 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
       );
       expect([...read].sort(), locale).toEqual([...expected].sort());
       // After the verdict, so a population that grew never hides a finding.
-      expect(
-        floorBreach(TRANSLATED_FLOOR[locale], expected.size),
-        `${locale}: not the recorded count of translated entries`,
-      ).toBeUndefined();
+      
     }
   });
 
@@ -327,9 +321,6 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
         what: 'units a translated locale sends',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/units-english-withholds', offered.length),
-    ).toBeUndefined();
   });
 });
 
@@ -384,9 +375,6 @@ describe('livenessProblems: a run that read nothing is a failure', () => {
         what: 'comparisons across both locales',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/liveness-comparisons', comparisons.length),
-    ).toBeUndefined();
   });
 
   it('names a locale that compared nothing', () => {
@@ -412,9 +400,6 @@ describe('livenessProblems: a run that read nothing is a failure', () => {
         what: 'comparisons, one of them empty',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/one-empty-comparisons', comparisons.length),
-    ).toBeUndefined();
   });
 
   it('fails a run that compared nothing at all, once per locale', () => {

@@ -126,9 +126,6 @@ describe('what is still English in each catalogue', () => {
           what: 'English messages',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach(ENGLISH_MESSAGES_FLOOR[locale], messages.length),
-      ).toBeUndefined();
     });
 
     it(`${locale}: carries exactly the documented English strings`, () => {
@@ -151,9 +148,6 @@ describe('what is still English in each catalogue', () => {
         searched(blank, { of: paths, what: 'catalogue leaf paths' }),
         'a blank string renders as nothing at all',
       ).toEqual([]);
-      expect(
-        floorBreach(LEAF_PATHS_FLOOR[locale], paths.length),
-      ).toBeUndefined();
     });
   }
 });

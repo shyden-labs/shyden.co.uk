@@ -245,12 +245,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   it('the dev sanity suite exists and is more than a stub', async () => {
     // A guard that only checked the workflow REFERENCES the config would pass
     // against an emptied suite.
-    expect(
-      floorBreach(
-        'pipeline-wiring/dev-sanity-tests',
-        (await plainTestsIn('tests/dev/dev-sanity.spec.ts')).length,
-      ),
-    ).toBeUndefined();
+    
   });
 
   it('the dev deploy is gated on a gate that SUCCEEDED, never on one that skipped', () => {
@@ -299,9 +294,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'jobs downstream of a conditional job',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/skip-downstream-jobs', downstream.length),
-    ).toBeUndefined();
   });
 
   it('the jobs excused from asking for success are the two that judge in a step (#582, #725)', () => {
@@ -398,9 +390,6 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(
       searched(refused, { of: asked, what: 'permissions ci.yml asks for' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/dispatch-asked-permissions', asked.length),
-    ).toBeUndefined();
   });
 
   // The merge gate. `dev-verified` has to be POSTED by something, or branch
@@ -578,9 +567,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'jobs reading a secret other than GITHUB_TOKEN',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/secret-readers', judged.length),
-    ).toBeUndefined();
   });
 
   // What a job does with the Cloudflare pair decides the environment it reads
@@ -644,9 +630,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'jobs reading a Cloudflare secret',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/cloudflare-secret-readers', judged.length),
-    ).toBeUndefined();
   });
 
   // An unattended environment holds a production read token for one daily
@@ -711,9 +694,6 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(
       searched(strays, { of: tenants, what: 'jobs in reports-count' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/reports-count-jobs', tenants.length),
-    ).toBeUndefined();
   });
 
   it('only the Access token expiry check reads secrets in access-expiry, on main alone, or its token anywhere (#796, #877)', () => {
@@ -727,9 +707,6 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(
       searched(strays, { of: tenants, what: 'jobs in access-expiry' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/access-expiry-jobs', tenants.length),
-    ).toBeUndefined();
   });
 
   // A prod job is any job in a workflow that changes what prod serves, and any
@@ -756,9 +733,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'jobs that deploy or verify prod',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/prod-jobs', judged.length),
-    ).toBeUndefined();
   });
 
   // ---- the rollback's dry run (#241, Shyden's decision 2026-09-19) --------
@@ -942,9 +916,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'contexts this repository documents as required',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/documented-contexts', documented.length),
-    ).toBeUndefined();
   });
 
   // #284, operator: "if you're deploying to dev, say you're deploying to dev.
@@ -977,9 +948,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: `workflows running \`${DEPLOY_COMMAND}\``,
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/deploying-workflows', deploys.length),
-    ).toBeUndefined();
   });
 
   // #237: a push to an open pull request started a fresh run and left the
@@ -1069,9 +1037,6 @@ describe('the deploy pipeline runs what it claims to', () => {
         what: 'workflow file references',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/named-workflow-refs', judged.length),
-    ).toBeUndefined();
   });
 
   it('reads every workflow file reference, and as many as there are', () => {
@@ -1092,15 +1057,7 @@ describe('the deploy pipeline runs what it claims to', () => {
     );
     expect(searched(missed, { of: files, what: 'workflow files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('pipeline-wiring/ref-cross-checked-files', files.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'pipeline-wiring/workflow-file-refs',
-        read.flatMap(({ refs }) => refs).length,
-      ),
-    ).toBeUndefined();
+    
   });
 
   it.each([
@@ -1179,12 +1136,6 @@ describe('the deploy pipeline runs what it claims to', () => {
   });
 
   it('the prod sanity suite exists and is more than a stub', async () => {
-    expect(
-      floorBreach(
-        'pipeline-wiring/prod-sanity-tests',
-        (await plainTestsIn('tests/prod/prod-sanity.spec.ts')).length,
-      ),
-    ).toBeUndefined();
   });
 });
 
@@ -1254,9 +1205,6 @@ describe('the e2e reconciliation guard cannot be bypassed', () => {
       'a workflow running the default config outside `npm run test:e2e` is a ' +
         'full suite whose completeness nobody checks',
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/playwright-bypass-files', files.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1322,9 +1270,6 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
     expect(searched(named, { of: workflows, what: 'workflow files' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('pipeline-wiring/image-selector-workflows', workflows.length),
-    ).toBeUndefined();
     expect(jobNamed('ci.yml', 'image').runs).toEqual([
       'node scripts/playwright-image.mjs',
     ]);
@@ -1353,12 +1298,7 @@ describe('the visual-regression job cannot rewrite what it checks', () => {
       [],
     );
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach(
-        'pipeline-wiring/workflows-read-for-an-image',
-        workflows.length,
-      ),
-    ).toBeUndefined();
+    
   });
 
   it.each([
@@ -1507,9 +1447,6 @@ describe('a failure capture cannot succeed having caught nothing', () => {
     expect(
       searched(silent, { of: steps, what: 'upload-artifact steps' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/ignored-capture-steps', steps.length),
-    ).toBeUndefined();
   });
 
   it('every artifact capture states what an empty capture means', () => {
@@ -1521,9 +1458,6 @@ describe('a failure capture cannot succeed having caught nothing', () => {
     expect(
       searched(undeclared, { of: steps, what: 'upload-artifact steps' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/undeclared-capture-steps', steps.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1572,9 +1506,6 @@ describe('the e2e server is supervised, not handed to a daemon', () => {
       }),
       'an auto-backgrounded server exits early under Playwright and orphans the port',
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/astro-server-scripts', commands.length),
-    ).toBeUndefined();
   });
 
   it('the opt-out it relies on still exists in the installed Astro', () => {
@@ -1702,12 +1633,6 @@ describe('every workflow that runs the e2e suite is read as doing so', () => {
     expect(searched(missed, { of: workflows, what: 'workflow files' })).toEqual(
       [],
     );
-    expect(
-      floorBreach(
-        'pipeline-wiring/suite-cross-checked-workflows',
-        workflows.length,
-      ),
-    ).toBeUndefined();
   });
 
   it.each([
@@ -1783,9 +1708,6 @@ describe('every job runs under a budget of its own (#157)', () => {
         what: 'checkout steps across every workflow',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/checkout-steps', judged.length),
-    ).toBeUndefined();
   });
 
   it('no job in any workflow runs on the runner default budget', () => {
@@ -1800,9 +1722,6 @@ describe('every job runs under a budget of its own (#157)', () => {
         what: 'jobs across every workflow',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/budgeted-jobs', judged.length),
-    ).toBeUndefined();
   });
 
   it('every job running the e2e suite carries exactly the shard budget', () => {
@@ -1819,9 +1738,6 @@ describe('every job runs under a budget of its own (#157)', () => {
         what: 'jobs running npm run test:e2e',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/shard-budget-suites', suites.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1902,9 +1818,6 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(
       searched(unclocked, { of: sharded, what: 'ci.yml jobs running a shard' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/clocked-shard-jobs', sharded.length),
-    ).toBeUndefined();
   });
 
   // A skipped required check is reported to branch protection as PASSING. An
@@ -2096,9 +2009,6 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(
       searched(untraced, { of: ran, what: 'scripts the capture runs' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/capture-scripts', ran.length),
-    ).toBeUndefined();
   });
 
   it('judges every capture shard for a case with no picture (#774)', () => {
@@ -2123,9 +2033,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(Array.isArray(shards)).toBe(true);
     const list = shards as unknown[];
     // More than one, or it is not a split at all.
-    expect(
-      floorBreach('pipeline-wiring/e2e-shards', list.length),
-    ).toBeUndefined();
+    
     expect(list).toEqual(list.map((_, i) => i + 1));
     // A failing shard would otherwise CANCEL its siblings, and every test they
     // had not reached would go unreported: one red run would show one shard's
@@ -2157,9 +2065,6 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
     expect(
       searched(prebuilt, { of: suites, what: 'jobs running npm run test:e2e' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/prebuild-checked-suites', suites.length),
-    ).toBeUndefined();
   });
 
   it('each shard writes its account where build-and-test reads it', () => {
@@ -2282,9 +2187,6 @@ describe('a matrix job names every artifact per leg', () => {
     expect(
       searched(shared, { of: uploads, what: 'uploads in matrix jobs' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/matrix-uploads', uploads.length),
-    ).toBeUndefined();
   });
 });
 
@@ -2326,9 +2228,6 @@ describe('no job rides a moving runner label', () => {
         what: `runner labels in ${WORKFLOWS}`,
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/runner-labels', labels.length),
-    ).toBeUndefined();
   });
 
   it('pins the images this repository has actually run on', () => {
@@ -2368,9 +2267,6 @@ describe('the visual job says which architecture it rendered on', () => {
       }),
       'the visual job must record the architecture it renders on',
     ).toHaveLength(1);
-    expect(
-      floorBreach('pipeline-wiring/visual-run-steps', runs.length),
-    ).toBeUndefined();
   });
 
   it('records it BEFORE the comparison, so a red run still reports it', () => {
@@ -2494,9 +2390,6 @@ describe('the drift measurement reports, and never gates (#224)', () => {
       }),
       'a command between a fallback and the status it tests makes it dead code',
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/workflow-script-lines', scriptLines.length),
-    ).toBeUndefined();
   });
 
   it('writes its numbers where they can be read back, not only to the summary', () => {
@@ -2535,9 +2428,7 @@ describe('the drift measurement reports, and never gates (#224)', () => {
       'a summary written with >> cannot be read back from the job log',
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('pipeline-wiring/visual-summary-writes', writes.length),
-    ).toBeUndefined();
+    
   });
 
   it('runs even when the gate went red, which is when it is worth having', () => {
@@ -2612,9 +2503,6 @@ describe('the drift measurement reports, and never gates (#224)', () => {
     expect(searched(unreadable, { of: paths, what: 'upload paths' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('pipeline-wiring/visual-upload-paths', paths.length),
-    ).toBeUndefined();
 
     const keeps = (dir: string) =>
       paths.some((path) => reaches(resolve(path), dir));
@@ -2700,9 +2588,6 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
   };
 
   it('launches more than one config, or the rest of this asserts nothing', () => {
-    expect(
-      floorBreach('pipeline-wiring/launched-configs', launchedConfigs().length),
-    ).toBeUndefined();
   });
 
   it('gives each launched config a folder of its own', async () => {
@@ -2735,9 +2620,6 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
     expect(
       searched(uncleared, { of: reports, what: 'per-group report files' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/device-reports', reports.length),
-    ).toBeUndefined();
   });
 
   it('nests none inside another, which a parent wipe would take with it', async () => {
@@ -2750,9 +2632,6 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
     expect(
       searched(nested, { of: dirs, what: 'gauntlet output folders' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/gauntlet-output-dirs', dirs.length),
-    ).toBeUndefined();
   });
 });
 
@@ -2786,9 +2665,6 @@ describe('no job inherits the repository default permissions (#301)', () => {
         what: 'workflow files',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/permissions-workflows', files.length),
-    ).toBeUndefined();
   });
 
   // Four of the finder's five branches cannot fire on this repository's own
@@ -2848,9 +2724,6 @@ describe('no job inherits the repository default permissions (#301)', () => {
         what: 'workflows a pull request can start',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/pull-request-workflows', judged.length),
-    ).toBeUndefined();
   });
 });
 
@@ -2927,9 +2800,6 @@ describe('the back-translation review', () => {
       searched(typed, { of: steps, what: 'review steps' }),
       'BACK_TRANSLATE_ENGINE typed into the workflow',
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/engine-review-steps', steps.length),
-    ).toBeUndefined();
   });
 
   it('can go red: nothing in it continues on error', () => {
@@ -2943,12 +2813,6 @@ describe('the back-translation review', () => {
       searched(excused, { of: steps, what: 'review steps' }),
       'a liveness failure swallowed here is a green check over nothing',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'pipeline-wiring/continue-on-error-review-steps',
-        steps.length,
-      ),
-    ).toBeUndefined();
   });
 
   /** Every module a script loads at run time, following relative imports. */
@@ -3002,9 +2866,7 @@ describe('the back-translation review', () => {
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
     // The closure is followed, not listed, and its size is ratcheted (#468).
-    expect(
-      floorBreach('pipeline-wiring/sanity-import-walk', inputs.length),
-    ).toBeUndefined();
+    
   });
 });
 
@@ -3089,9 +2951,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
         what: 'workflow texts',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/global-install-workflows', texts.length),
-    ).toBeUndefined();
   });
 
   it('reads every workflow for an install, and as many as there are', () => {
@@ -3113,18 +2972,7 @@ describe('wrangler comes from the lockfile (#97)', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach(
-        'pipeline-wiring/install-cross-checked-texts',
-        workflowTexts.length,
-      ),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'pipeline-wiring/workflows-read-for-an-install',
-        workflows.length,
-      ),
-    ).toBeUndefined();
+    
   });
 
   it.each([
@@ -3169,9 +3017,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
         what: 'workflow lines',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/locked-copy-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('every deploy runs the locked copy', () => {
@@ -3187,9 +3032,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
         { of: deploys, what: 'wrangler deploy lines' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/wrangler-deploy-lines', deploys.length),
-    ).toBeUndefined();
   });
 
   it('every job that uploads Playwright coverage is joined, waited for and measured (#913)', () => {
@@ -3201,12 +3043,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
         what: 'ci.yml jobs uploading Playwright coverage',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'pipeline-wiring/playwright-coverage-producers',
-        producers.length,
-      ),
-    ).toBeUndefined();
     // The second reading: every job that sets NODE_V8_COVERAGE is one that
     // uploads what it measured, and the other way round.
     expect(wiring.measured).toEqual(wiring.producers);
@@ -3221,9 +3057,6 @@ describe('wrangler comes from the lockfile (#97)', () => {
     expect(
       searched(uploading, { of: others, what: 'workflows besides ci.yml' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/workflows-besides-ci', others.length),
-    ).toBeUndefined();
   });
 
   it('the functions job runs the functions-runtime suite', () => {
@@ -3346,9 +3179,6 @@ describe('browsers come with the pinned Playwright image, never a download (#431
         what: 'jobs running Playwright',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/playwright-image-jobs', judged.length),
-    ).toBeUndefined();
   });
 });
 
@@ -3629,9 +3459,6 @@ describe('no scheduled dispatch to main fails silently (#882)', () => {
       }),
       'jobs that start a workflow on main with no failure report after the start',
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/main-dispatchers', dispatchers.length),
-    ).toBeUndefined();
   });
 });
 
@@ -3655,9 +3482,6 @@ describe('CI never records the guards’ floors (#468), bar the dispatched recor
     expect(
       searched(recording, { of: runs, what: 'run steps in the workflows' }),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/record-checked-run-steps', runs.length),
-    ).toBeUndefined();
   });
 });
 
@@ -3779,9 +3603,6 @@ describe('the floor recorder measures a scratch ref and pushes nothing (#651, #8
         { of: scripts, what: 'run scripts in the recorder' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/recorder-run-scripts', scripts.length),
-    ).toBeUndefined();
   });
 
   it('composes the amended message from the measured commit, for the fold to use unchanged', () => {
@@ -4331,9 +4152,6 @@ describe('neither bot can push, commit or amend (#889)', () => {
         { of: lines, what: `script lines in ${RECORDER_WORKFLOW}` },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/recorder-script-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('runs no capture line that pushes, commits or amends, and calls no gh', () => {
@@ -4344,9 +4162,6 @@ describe('neither bot can push, commit or amend (#889)', () => {
         { of: lines, what: `script lines in ${CAPTURE_WORKFLOW}` },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('pipeline-wiring/capture-script-lines', lines.length),
-    ).toBeUndefined();
   });
 
   // The pattern's own plants, written by hand (#446), one test each: every

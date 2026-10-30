@@ -69,9 +69,6 @@ test.describe('every locale, every page', () => {
         { of: LOCALES, what: 'shipped locales' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('locale-parity/shipped-locales', LOCALES.length),
-    ).toBeUndefined();
   });
 
   // 'localisePath agrees with the route layout for every locale' is retired

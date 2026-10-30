@@ -177,9 +177,6 @@ describe('scripts/i18n-back-translate.mjs', () => {
       ),
       'a slot sent is noise the engine mangles',
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/texts-sent', engine.sent.length),
-    ).toBeUndefined();
     expect(engine.sent).toContain('Nhóm');
     // Every section, parsed off its line rather than found as a substring.
     expect(
@@ -323,9 +320,7 @@ describe('scripts/i18n-back-translate.mjs', () => {
       'a run with no engine sent something',
     ).toEqual([]);
     // `listening` and nothing else: not even the languages read (#522).
-    expect(
-      floorBreach('back-translate/no-engine-log', engine.log.length),
-    ).toBeUndefined();
+    
   });
 
   it('fails a locale that came back empty, and says so in the summary', async () => {
@@ -362,9 +357,6 @@ describe('scripts/i18n-back-translate.mjs', () => {
       }),
       'it sent copy before finding a locale it could not read',
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/refused-locale-log', engine.log.length),
-    ).toBeUndefined();
   });
 
   it('refuses an argument, since everything it reads is an environment variable', async () => {

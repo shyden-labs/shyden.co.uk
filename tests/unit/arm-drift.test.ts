@@ -122,7 +122,6 @@ describe('every arm stays within its allowance of the arm it was made from', () 
       searched(over, { of: arms, what: `${locale} message arms` }),
       `${locale}: arms further from their other arm than allowed; read the arm, then correct it or record its allowance with a reason`,
     ).toEqual([]);
-    expect(floorBreach(DRIFT_FLOOR[locale], arms.length)).toBeUndefined();
   });
 
   it.each(READ_ORDER)(

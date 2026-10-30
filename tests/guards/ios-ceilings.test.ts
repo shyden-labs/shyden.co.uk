@@ -38,7 +38,6 @@ describe('no check is ever added to an iPhone-only file (#858)', () => {
       searched(findings, { of: files, what: 'files under tests/device/ios' }),
       findings.join('\n'),
     ).toEqual([]);
-    expect(floorBreach('ios-ceilings/files', files.length)).toBeUndefined();
   });
 
   it('reads every file git would commit there, the journeys among them', () => {
@@ -91,8 +90,5 @@ describe('no check is ever added to an iPhone-only file (#858)', () => {
     expect(
       searched(disagree, { of: files, what: 'files under tests/device/ios' }),
     ).toEqual([]);
-    expect(
-      floorBreach('ios-ceilings/cross-checked-files', files.length),
-    ).toBeUndefined();
   });
 });

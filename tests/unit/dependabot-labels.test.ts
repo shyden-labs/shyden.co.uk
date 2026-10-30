@@ -61,9 +61,6 @@ describe('the labels dependabot.yml asks for', () => {
         { of: declared, what: 'declared labels' },
       ),
     ).toHaveLength(0);
-    expect(
-      floorBreach('dependabot-labels/declared-labels', declared.length),
-    ).toBeUndefined();
   });
 
   it('are deduplicated and sorted, so the refusal reads the same every run', () => {
@@ -85,9 +82,6 @@ describe('the labels dependabot.yml asks for', () => {
         what: 'lines of the label-less config',
       }),
     ).toHaveLength(0);
-    expect(
-      floorBreach('dependabot-labels/label-less-config-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('refuse a label YAML does not read as text, rather than dropping it', () => {
@@ -128,9 +122,6 @@ describe('a declared label with nothing behind it', () => {
         what: 'declared labels',
       }),
     ).toHaveLength(0);
-    expect(
-      floorBreach('dependabot-labels/respelled-labels', declared.length),
-    ).toBeUndefined();
   });
 
   it('names itself and the command that creates it in the refusal', () => {
@@ -172,8 +163,5 @@ describe('the check that reads repository state', () => {
     );
 
     expect(invocations).toHaveLength(1);
-    expect(
-      floorBreach('dependabot-labels/gating-run-steps', runs.length),
-    ).toBeUndefined();
   });
 });

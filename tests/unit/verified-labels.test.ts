@@ -102,9 +102,6 @@ describe('the copy the operator read and approved', () => {
     expect(
       searched(unpinned, { of: rosterColumnKeys, what: 'roster columns' }),
     ).toEqual([]);
-    expect(
-      floorBreach('verified-labels/roster-columns', rosterColumnKeys.length),
-    ).toBeUndefined();
 
     const values = LOCALES.flatMap((locale) => Object.values(VERIFIED[locale]));
     expect(
@@ -113,9 +110,6 @@ describe('the copy the operator read and approved', () => {
         { of: values, what: 'pinned values' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('verified-labels/pinned-values', values.length),
-    ).toBeUndefined();
   });
 });
 
@@ -188,9 +182,6 @@ describe('short labels that disagree with their own locale', () => {
           }),
         ].sort(),
       ).toEqual([...AWAITING_READ[locale]].sort());
-      expect(
-        floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
-      ).toBeUndefined();
     });
 });
 
@@ -261,9 +252,6 @@ describe('short labels no check can judge', () => {
         ),
       ].sort();
       expect(unread).toEqual([...UNWITNESSED[locale]].sort());
-      expect(
-        floorBreach(UNWITNESSED_FLOOR[locale], unwitnessed.length),
-      ).toBeUndefined();
     });
   }
 });

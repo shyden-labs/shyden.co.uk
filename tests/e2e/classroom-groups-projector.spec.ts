@@ -133,9 +133,6 @@ test.describe('the projector view', () => {
       }),
       JSON.stringify(cover),
     ).toEqual([]);
-    expect(
-      floorBreach('projector/cover-checks', checked.length),
-    ).toBeUndefined();
     // …and the groups are actually ON it, which is the point of falling
     // back rather than merely showing an empty layer.
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
@@ -1329,9 +1326,6 @@ test.describe('the projector board never hides a name', () => {
       searched(seen.unreachable, { of: seen.cards, what: 'group cards' }),
       where,
     ).toEqual([]);
-    expect(
-      floorBreach('projector/settled-grant-cards', seen.cards.length),
-    ).toBeUndefined();
     expect(
       seen.scrollable,
       `${where} -- the stage scrolls exactly when its sheet overflows`,

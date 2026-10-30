@@ -104,7 +104,6 @@ describe('writersOf: every writer of every line saying a text', () => {
         what: 'th fixture lines',
       }),
     ).toEqual([]);
-    expect(floorBreach('readers/fixture-lines', units.length)).toBeUndefined();
   });
 });
 

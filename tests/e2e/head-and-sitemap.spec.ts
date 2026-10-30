@@ -87,9 +87,6 @@ test.describe('the sitemap', () => {
       searched(wrong, { of: blocks, what: 'sitemap <url> blocks' }),
       `expected every page to declare ${EXPECTED_ALTERNATES.join(',')}`,
     ).toEqual([]);
-    expect(
-      floorBreach('head-and-sitemap/sitemap-url-blocks', blocks.length),
-    ).toBeUndefined();
 
     // Each entry pairs with its own translation, not with the homepage.
     const groups = xml.split('<url>').slice(1);

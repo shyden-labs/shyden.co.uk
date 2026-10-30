@@ -503,9 +503,6 @@ describe('a page-shipped default cannot stand in for an implementation', () => {
         { of: all, what: 'expectations against a shipped default' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('shipped-defaults/judged-collisions', all.length),
-    ).toBeUndefined();
   });
 
   it('keeps the deliberate pin, which asserts the default on an untouched page', () => {

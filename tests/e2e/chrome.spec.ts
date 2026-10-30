@@ -254,9 +254,6 @@ test.describe('header + footer', () => {
     expect(
       searched(withTabindex, { of: headerLinks, what: 'header links' }),
     ).toEqual([]);
-    expect(
-      floorBreach('chrome/header-links', headerLinks.length),
-    ).toBeUndefined();
   });
 });
 

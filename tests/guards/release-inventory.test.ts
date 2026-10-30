@@ -46,9 +46,6 @@ describe('release-inventory.mjs as a command (#362)', () => {
     expect(
       searched(capturing, { of: modules, what: 'test helper modules' }),
     ).toEqual([]);
-    expect(
-      floorBreach('release-inventory/capture-scanned-modules', modules.length),
-    ).toBeUndefined();
   });
 
   it('reads every helper module, and as many as there are', () => {
@@ -65,9 +62,7 @@ describe('release-inventory.mjs as a command (#362)', () => {
       searched(missed, { of: modules, what: 'test helper modules' }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('release-inventory/helper-modules', modules.length),
-    ).toBeUndefined();
+    
   });
 
   it.each([

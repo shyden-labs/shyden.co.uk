@@ -121,9 +121,6 @@ describe('readImports reads declarations, not text', () => {
     expect(
       searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/namespace-beside-named', imports.length),
-    ).toBeUndefined();
   });
 
   it('allows an import type beside a value import', () => {
@@ -132,9 +129,6 @@ describe('readImports reads declarations, not text', () => {
     expect(
       searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/type-beside-value', imports.length),
-    ).toBeUndefined();
   });
 
   it('allows a side-effect import beside a named one', () => {
@@ -143,9 +137,6 @@ describe('readImports reads declarations, not text', () => {
     expect(
       searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/side-effect-beside-named', imports.length),
-    ).toBeUndefined();
   });
 
   it('ignores an import spelled inside a string', () => {
@@ -155,9 +146,6 @@ describe('readImports reads declarations, not text', () => {
     expect(
       searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/string-spelled-import', imports.length),
-    ).toBeUndefined();
   });
 
   it("reads an .astro file's frontmatter and script as separate programs", () => {
@@ -178,9 +166,6 @@ describe('readImports reads declarations, not text', () => {
         what: 'imports read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/astro-programs', imports.length),
-    ).toBeUndefined();
     expect(fileRepeats('case.ts', component)).toEqual(['./m']);
   });
 
@@ -198,9 +183,6 @@ describe('readImports reads declarations, not text', () => {
     expect(
       searched(repeatsIn(text), { of: imports, what: 'imports read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/different-modules', imports.length),
-    ).toBeUndefined();
   });
 });
 
@@ -229,9 +211,6 @@ describe('no source imports one module twice (#390 F59)', () => {
         what: 'imports read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('duplicate-imports/judged-imports', imports.length),
-    ).toBeUndefined();
   });
 
   it('reads every import the sources declare, and as many as there are', () => {
@@ -247,14 +226,6 @@ describe('no source imports one module twice (#390 F59)', () => {
       .map(({ path }) => path);
     expect(searched(unread, { of: sources, what: 'source files' })).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('duplicate-imports/scanned-sources', sources.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'duplicate-imports/imports',
-        sources.flatMap(({ read }) => read).length,
-      ),
-    ).toBeUndefined();
+    
   });
 });

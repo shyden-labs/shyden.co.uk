@@ -69,9 +69,6 @@ describe('reading what the asset store already holds', () => {
         { of: cases, what: 'listings parsed' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('upload-assets/empty-store-listings', cases.length),
-    ).toBeUndefined();
   });
 
   it('refuses a listing that lists fewer assets than its own header declares', () => {

@@ -305,9 +305,6 @@ describe('the report-failure mode', () => {
         what: 'requests the Cloudflare stand-in recorded, the sentinel included',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('access-expiry-script/cloudflare-untouched', asked.length),
-    ).toBeUndefined();
   });
 
   it('comments the run on the failure issue already open, opening none', async () => {

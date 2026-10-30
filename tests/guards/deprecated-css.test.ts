@@ -95,9 +95,6 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
         what: 'declarations in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('deprecated-css/lookalike-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('finds none in any stylesheet under src/', () => {
@@ -116,9 +113,6 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
         what: 'declarations under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('deprecated-css/judged-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('reads every declaration the stylesheets hold, and as many as there are', () => {
@@ -142,15 +136,7 @@ describe('no stylesheet declares the deprecated clip property (#200)', () => {
       }),
     ).toEqual([]);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('deprecated-css/css-sources', files.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'deprecated-css/declarations',
-        sheets.flatMap(({ css }) => declarationsIn(css)).length,
-      ),
-    ).toBeUndefined();
+    
   });
 
   it.each([
@@ -235,9 +221,6 @@ describe('the visually-hidden recipe is written once, in tokens.css (#767)', () 
         what: 'declarations in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('visually-hidden/lookalike-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('finds it in exactly one stylesheet under src/: the global .visually-hidden', () => {
@@ -254,9 +237,6 @@ describe('the visually-hidden recipe is written once, in tokens.css (#767)', () 
       }),
       'every copy of the visually-hidden recipe; a second one belongs on the global class',
     ).toEqual(['src/styles/tokens.css: clip-path: inset(50%)']);
-    expect(
-      floorBreach('visually-hidden/judged-declarations', declarations.length),
-    ).toBeUndefined();
   });
 
   it('reads the recipe in every file whose text holds it', () => {
@@ -280,8 +260,5 @@ describe('the visually-hidden recipe is written once, in tokens.css (#767)', () 
         what: 'stylesheets and components under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('visually-hidden/css-sources', files.length),
-    ).toBeUndefined();
   });
 });

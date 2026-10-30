@@ -91,9 +91,6 @@ describe('every vitest config names the files it imports (#680)', () => {
       }),
       bare.join('\n'),
     ).toEqual([]);
-    expect(
-      floorBreach('config-imports/relative-imports', imports.length),
-    ).toBeUndefined();
   });
 
   // Hiding the warning is not the fix: the variable that silences it is set
@@ -115,8 +112,5 @@ describe('every vitest config names the files it imports (#680)', () => {
         what: 'files a run takes its environment from',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('config-imports/environment-homes', homes.length),
-    ).toBeUndefined();
   });
 });

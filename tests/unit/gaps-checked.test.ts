@@ -38,9 +38,6 @@ describe('a commit message’s Gaps checked section (#897)', () => {
         what: 'lines of the good message',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('gaps-checked/good-message-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('a message with no heading is refused, naming it', () => {
@@ -94,9 +91,6 @@ describe('a commit message’s Gaps checked section (#897)', () => {
         what: 'lines of the message with trailers',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('gaps-checked/trailer-message-lines', lines.length),
-    ).toBeUndefined();
   });
 });
 
@@ -109,9 +103,6 @@ describe('which commits the rule judges (#897)', () => {
         what: 'files of the .md-only commit',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('gaps-checked/md-only-files', files.length),
-    ).toBeUndefined();
   });
 
   it('a commit changing a .md file and any other file is judged', () => {

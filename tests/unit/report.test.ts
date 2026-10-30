@@ -120,9 +120,6 @@ describe('a page offers its own sections plus the chrome', () => {
           { of: offered, what: 'keys offered on yeetalk-calculators' },
         ),
       ).toEqual([]);
-      expect(
-        floorBreach('report/yeetalk-calculators-keys', offered.length),
-      ).toBeUndefined();
     },
   );
 
@@ -150,9 +147,6 @@ describe('a page offers its own sections plus the chrome', () => {
         { of: offered, what: 'keys offered on the footer pages' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('report/footer-page-keys-vi', offered.length),
-    ).toBeUndefined();
   });
 
   it.each(LOCALES.filter(isBetaLocale))(
@@ -356,9 +350,6 @@ describe('matching a quote (spec 5)', () => {
         what: 'strings reportable on home',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('report/home-strings-one-character', strings.length),
-    ).toBeUndefined();
     expect(matchingKeys(text.slice(0, 2), 'home', 'vi').length).toBeGreaterThan(
       0,
     );
@@ -385,9 +376,6 @@ describe('matching a quote (spec 5)', () => {
         what: 'strings reportable on home in Thai',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('report/home-strings-thai-graphemes', strings.length),
-    ).toBeUndefined();
     expect(
       matchingKeys(clusters[at] + clusters[at + 1], 'home', 'th'),
     ).toContain('site.report.open');
@@ -442,9 +430,6 @@ describe('matching a quote (spec 5)', () => {
         what: 'strings reportable on classroom-groups',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('report/classroom-groups-spanning-fragment', strings.length),
-    ).toBeUndefined();
   });
 
   it('stores every key a quote matches', () => {
@@ -476,9 +461,6 @@ describe('matching a quote (spec 5)', () => {
         what: 'strings reportable on home',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('report/home-strings-absent-text', strings.length),
-    ).toBeUndefined();
   });
 
   it('rule 3 needs two characters of fixed wording (clarification 6)', () => {
@@ -535,9 +517,6 @@ describe('matching a quote (spec 5)', () => {
           },
         ),
       ).toEqual([]);
-      expect(
-        floorBreach(NONSENSE_QUOTE_FLOOR[locale], strings.length),
-      ).toBeUndefined();
     },
   );
 
@@ -557,12 +536,6 @@ describe('matching a quote (spec 5)', () => {
         what: 'strings reportable on yeetalk-calculators',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'report/yeetalk-calculators-strings-home-only-quote',
-        strings.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('answers a 1000-unit quote against every classroom-groups form promptly', () => {

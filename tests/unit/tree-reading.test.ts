@@ -30,9 +30,6 @@ describe('the tree reading every guard shares (#631)', () => {
     const { tracked } = treeReading();
     const blank = tracked.filter((path) => path === '');
     expect(searched(blank, { of: tracked, what: 'tracked files' })).toEqual([]);
-    expect(
-      floorBreach('tree-reading/blank-paths', tracked.length),
-    ).toBeUndefined();
     expect(new Set(tracked).size).toBe(tracked.length);
   });
 
@@ -43,7 +40,6 @@ describe('the tree reading every guard shares (#631)', () => {
     expect(searched(missing, { of: tracked, what: 'tracked files' })).toEqual(
       [],
     );
-    expect(floorBreach('tree-reading/tracked', tracked.length)).toBeUndefined();
   });
 
   it('answers the two ignore questions git settles from its rules', () => {
@@ -58,9 +54,6 @@ describe('the tree reading every guard shares (#631)', () => {
     expect(
       searched(stray, { of: docsPathspecSelected, what: 'docs-only files' }),
     ).toEqual([]);
-    expect(
-      floorBreach('tree-reading/docs-selected', docsPathspecSelected.length),
-    ).toBeUndefined();
     expect(docsNaming).toContain('scripts/docs-only.mjs');
   });
 

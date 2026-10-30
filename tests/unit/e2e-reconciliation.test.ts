@@ -352,12 +352,6 @@ describe('what the enumeration is allowed to inherit', () => {
       }),
       'the total must describe the whole suite, not the slice being run',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'e2e-reconciliation/filter-flags',
-        argv.filter((arg) => arg.startsWith('-')).length,
-      ),
-    ).toBeUndefined();
   });
 
   it('ignores flags that change neither the suite nor its size', () => {
@@ -368,12 +362,6 @@ describe('what the enumeration is allowed to inherit', () => {
         what: 'flags offered to the enumeration',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'e2e-reconciliation/neutral-flags',
-        argv.filter((arg) => arg.startsWith('-')).length,
-      ),
-    ).toBeUndefined();
   });
 });
 
@@ -418,9 +406,6 @@ describe('a sharded selection may enumerate itself, by opt-in only (#774)', () =
     expect(
       searched(enumerationArgs(argv), { of: ids, what: 'test ids offered' }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-reconciliation/unasked-test-ids', ids.length),
-    ).toBeUndefined();
   });
 
   it('enumerates the whole suite when nothing asks otherwise', () => {

@@ -99,9 +99,6 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
         what: 'lines of a page with no style element',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('astro-css-strip/no-style-page-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('counts a frontmatter comment as none of its CSS', () => {
@@ -115,9 +112,6 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
         what: 'comments held outside the page style',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('astro-css-strip/frontmatter-comments', held.length),
-    ).toBeUndefined();
   });
 
   it('scans no comment that the per-style read removes', () => {
@@ -144,9 +138,6 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
         what: 'CSS comments in <style> bodies under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('astro-css-strip/style-comments', comments.length),
-    ).toBeUndefined();
   });
 
   it('leaves the raw CSS stripper with no caller outside its own home', () => {

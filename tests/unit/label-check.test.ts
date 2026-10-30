@@ -351,9 +351,6 @@ describe('checkNamedLabels: a sentence that names a label, held to it', () => {
     expect(
       searched(checkNamedLabels(units, 'zh'), { of: units, what: 'units' }),
     ).toEqual([]);
-    expect(
-      floorBreach('label-check/common-words-units', units.length),
-    ).toBeUndefined();
   });
 
   // #403. English capitalises a language's name wherever it stands, so the
@@ -514,9 +511,6 @@ describe('on the live catalogues', () => {
           { of: verdicts, what: `${locale} sentences naming a label` },
         ),
       ).toEqual([]);
-      expect(
-        floorBreach(NAMED_LABEL_FLOOR[locale], verdicts.length),
-      ).toBeUndefined();
     },
   );
 });

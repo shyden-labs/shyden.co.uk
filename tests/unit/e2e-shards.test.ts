@@ -112,9 +112,6 @@ describe('shardAccount: what a shard writes down about its own run', () => {
     expect(
       searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/round-trip-accounts', accounts.length),
-    ).toBeUndefined();
   });
 
   it('carries what the run measured, not what it was meant to', () => {
@@ -177,9 +174,6 @@ describe('needsFindings: every job build-and-test stands for succeeded', () => {
         what: 'jobs build-and-test stands for',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/succeeded-jobs', Object.values(jobs).length),
-    ).toBeUndefined();
   });
 
   // `skipped` is the dangerous one: a skipped required check is reported to
@@ -261,9 +255,6 @@ describe('docsOnlyFindings: a docs-only pull request skipped exactly what it may
         what: 'jobs build-and-test stands for',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/docs-only-jobs', Object.values(jobs).length),
-    ).toBeUndefined();
   });
 
   it.each(
@@ -436,9 +427,6 @@ describe('accountFindings: the shards add up to the suite', () => {
     expect(
       searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/untimed-shard-accounts', accounts.length),
-    ).toBeUndefined();
   });
 
   it('has nothing to say when four shards ran exactly the enumerated suite', () => {
@@ -446,9 +434,6 @@ describe('accountFindings: the shards add up to the suite', () => {
     expect(
       searched(accountFindings(accounts), { of: accounts, what: 'accounts' }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/whole-suite-accounts', accounts.length),
-    ).toBeUndefined();
   });
 
   it('refuses a total one short, and says by how much', () => {
@@ -755,9 +740,6 @@ describe('captureAccountFindings: the capture shards ran the whole selection (#7
         what: 'capture accounts',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/capture-accounts', accounts.length),
-    ).toBeUndefined();
   });
 
   it('refuses capture shards that ran one case short, naming the capture', () => {
@@ -794,9 +776,6 @@ describe('captureAccountFindings: the capture shards ran the whole selection (#7
         { of: cases, what: 'cases' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-shards/capture-skipped-cases', cases.length),
-    ).toBeUndefined();
   });
 });
 

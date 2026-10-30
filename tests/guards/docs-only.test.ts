@@ -61,9 +61,6 @@ describe('which paths are documentation alone', () => {
     const selected = [...treeReading().docsPathspecSelected].sort();
     const accepted = trackedFiles(isDocsOnlyPath);
     expect(accepted).toEqual(selected);
-    expect(
-      floorBreach('docs-only/tracked-docs-files', accepted.length),
-    ).toBeUndefined();
   });
 });
 
@@ -118,9 +115,6 @@ describe('the parts of docs/ that code reads are never documentation alone', () 
         if (text.includes(handover)) named.add(handover);
     }
     expect([...named].sort()).toEqual([...DOCS_READ_BY_CODE]);
-    expect(
-      floorBreach('docs-only/code-files-read', files.length),
-    ).toBeUndefined();
   });
 
   it('the walk reads every file whose raw text names a docs/ path', () => {
@@ -131,9 +125,6 @@ describe('the parts of docs/ that code reads are never documentation alone', () 
     const naming = [...treeReading().docsNaming].sort();
     const walked = new Set(codeFiles());
     expect(naming.filter((path) => walked.has(path))).toEqual(naming);
-    expect(
-      floorBreach('docs-only/files-naming-docs', naming.length),
-    ).toBeUndefined();
   });
 });
 
@@ -267,9 +258,6 @@ describe('the verdict on a diff', () => {
     );
     expect(passing).toEqual(tracked.filter(isDocsOnlyPath));
     expect(passing.length).toBeLessThan(tracked.length);
-    expect(
-      floorBreach('docs-only/tracked-files', tracked.length),
-    ).toBeUndefined();
   });
 });
 

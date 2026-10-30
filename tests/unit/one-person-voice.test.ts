@@ -68,7 +68,6 @@ describe('the site speaks as one person', () => {
       expect(
         searched(plural, { of: strings, what: `${locale} copy strings` }),
       ).toEqual([]);
-      expect(floorBreach(FLOOR[locale], strings.length)).toBeUndefined();
     });
   }
 });

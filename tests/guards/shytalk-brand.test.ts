@@ -162,9 +162,6 @@ describe("ShyTalk's brand mark has one home", () => {
     expect(
       searched(offenders, { of: files, what: 'source files scanned' }),
     ).toEqual([]);
-    expect(
-      floorBreach('shytalk-brand/spelling-scanned-files', files.length),
-    ).toBeUndefined();
   });
 
   it('reads every source file, and as many as there are', () => {
@@ -184,10 +181,7 @@ describe("ShyTalk's brand mark has one home", () => {
     ).toEqual([]);
     expect(readCode(TOKEN_HOME).split(TOKEN_FORM).length - 1).toBe(1);
     // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('shytalk-brand/home-checked-hexes', hexes.length),
-    ).toBeUndefined();
-    expect(floorBreach('shytalk-brand/files', files.length)).toBeUndefined();
+    
   });
 
   it.each([

@@ -89,12 +89,6 @@ describe('dissolvedIn: every form the dissolved company was printed in', () => {
       }),
     ).toEqual([]);
     expect(dissolvedIn('Shyden Ltd.')).toEqual(['Ltd']);
-    expect(
-      floorBreach(
-        'dissolved-company/forms-read-as-words',
-        DISSOLVED_COMPANY.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('passes the copy the site prints today', () => {
@@ -106,11 +100,5 @@ describe('dissolvedIn: every form the dissolved company was printed in', () => {
         { of: DISSOLVED_COMPANY, what: 'dissolved-company forms' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'dissolved-company/forms-read-against-current-copy',
-        DISSOLVED_COMPANY.length,
-      ),
-    ).toBeUndefined();
   });
 });

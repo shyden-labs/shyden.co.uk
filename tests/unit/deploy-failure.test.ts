@@ -81,12 +81,6 @@ describe('failedNeeds', () => {
         what: 'needs of a run in which nothing failed',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'deploy-failure/needs-none-failed',
-        Object.keys(needs).length,
-      ),
-    ).toBeUndefined();
   });
 
   it('a cancelled need is not a failure to report', () => {
@@ -97,9 +91,6 @@ describe('failedNeeds', () => {
         what: 'needs of a run someone cancelled',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('deploy-failure/needs-cancelled', Object.keys(needs).length),
-    ).toBeUndefined();
   });
 
   it('needs that are not an object throw, rather than read as nothing failed', () => {

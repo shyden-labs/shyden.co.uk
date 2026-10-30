@@ -564,9 +564,6 @@ test.describe('the language band sits under the header (#599)', () => {
         ),
         'the band, its clip or its strip is pinned',
       ).toEqual([]);
-      expect(
-        floorBreach('homepage/band-positions', facts.positions.length),
-      ).toBeUndefined();
       expect(facts.positions).toHaveLength(3);
       await shoot(
         page,
@@ -663,9 +660,6 @@ test.describe('the language band sits under the header (#599)', () => {
           ),
           'the band paints over the header',
         ).toEqual([]);
-        expect(
-          floorBreach('homepage/overlap-samples', hit.samples.length),
-        ).toBeUndefined();
         expect(hit.samples).toHaveLength(3);
         await shoot(
           page,
@@ -946,9 +940,6 @@ test.describe('pause motion', () => {
             'span.band-pause-name visually-hidden',
           ]),
         );
-        expect(
-          floorBreach('homepage/pause-control-boxes', inside.length),
-        ).toBeUndefined();
         await expectNoHorizontalScroll(page);
       },
     );
@@ -998,9 +989,6 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
         }),
         'words a visitor can see in the control',
       ).toEqual([]);
-      expect(
-        floorBreach('homepage/pause-control-text', words.all.length),
-      ).toBeUndefined();
       const control = page.getByRole('checkbox', { name, exact: true });
       await expect(control).toHaveCount(1);
       await expect(control).toHaveAccessibleName(name);
@@ -1299,9 +1287,6 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
         }),
         'ancestors that clip the ring',
       ).toEqual([]);
-      expect(
-        floorBreach('homepage/pause-ring-ancestors', ring.walked.length),
-      ).toBeUndefined();
       await shoot(page, `${theme}: keyboard focus rings the pause disc`);
     });
 
@@ -1451,9 +1436,6 @@ test.describe('the Yawelo Idle preview video', () => {
       }),
       'preload="none": no rendition is fetched until the visitor plays it',
     ).toEqual([]);
-    expect(
-      floorBreach('homepage/promo-requests', heard.length),
-    ).toBeUndefined();
   });
 
   test('every request the homepage makes is ours or the media host', async ({

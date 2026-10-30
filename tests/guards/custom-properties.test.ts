@@ -88,9 +88,6 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
         what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('custom-properties/other-file-reads', reads.length),
-    ).toBeUndefined();
   });
 
   it('accepts a define:vars key as a definition', () => {
@@ -105,9 +102,6 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
         what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('custom-properties/define-vars-reads', reads.length),
-    ).toBeUndefined();
   });
 
   it('accepts setProperty and a quoted style key as definitions', () => {
@@ -123,9 +117,6 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
         what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('custom-properties/set-property-reads', reads.length),
-    ).toBeUndefined();
   });
 
   it('lets no comment define a property', () => {
@@ -145,9 +136,6 @@ describe('propertiesOf reads definitions and reads, not comments', () => {
         what: 'var() reads in the fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('custom-properties/comment-reads', reads.length),
-    ).toBeUndefined();
   });
 });
 
@@ -166,8 +154,5 @@ describe('no custom property is read without a definition (#390 F62)', () => {
         what: 'custom properties read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('custom-properties/read-properties', read.length),
-    ).toBeUndefined();
   });
 });

@@ -1,8 +1,7 @@
 import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
-import LoadReporter from './tests/load-reporter.ts';
 import unit from './vitest.config.ts';
-import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
+import { SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The guards suite (#638): every test whose cost is reading or parsing the
@@ -21,10 +20,10 @@ export default defineConfig({
     // The shared setup, then the measurement of loading each file (#696):
     // reported by the reporter below, not limited, since a limit for this
     // suite's loading is the operator's to set from those figures.
-    setupFiles: [...SHARED_SETUP, LOAD_SETUP],
+    setupFiles: [...SHARED_SETUP],
     // The verbose listing its command once named (a reporter on the command
     // line replaces this whole list), then what loading each file cost.
-    reporters: ['verbose', new LoadReporter({ suite: 'guards' })],
+    reporters: ['verbose'],
     globalSetup: unit.test?.globalSetup,
   },
 });

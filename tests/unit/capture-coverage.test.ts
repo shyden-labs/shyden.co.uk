@@ -58,9 +58,6 @@ describe('uncaptured: the cited cases that took no picture', () => {
       manifest: [row('shows', 'chromium')],
     });
     expect(searched(missing, { of: judged, what: 'passed cases' })).toEqual([]);
-    expect(
-      floorBreach('capture-coverage/one-case', judged.length),
-    ).toBeUndefined();
   });
 
   it('names a passed case with no picture, by engine and title', () => {
@@ -110,9 +107,6 @@ describe('uncaptured: the cited cases that took no picture', () => {
       'a page > shows',
     ]);
     expect(searched(missing, { of: judged, what: 'passed cases' })).toEqual([]);
-    expect(
-      floorBreach('capture-coverage/passed-of-three', judged.length),
-    ).toBeUndefined();
   });
 
   it("does not count an earlier run's picture", () => {

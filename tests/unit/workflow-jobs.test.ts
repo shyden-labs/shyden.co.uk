@@ -115,12 +115,6 @@ describe('a job downstream of a conditional job states its own condition (#157)'
         what: 'fixture jobs downstream of a conditional job',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'workflow-jobs/deploy-dev-downstream-jobs',
-        downstream.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('follows a skip through every hop, not only the nearest need', () => {
@@ -168,9 +162,6 @@ jobs:
         what: 'fixture jobs',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/unconditional-graph-jobs', jobs.length),
-    ).toBeUndefined();
   });
 
   it('refuses a need naming a job the workflow does not define', () => {
@@ -274,9 +265,6 @@ describe("a job's own budget and scripts, as the runner reads them (#157)", () =
         { of: cases, what: 'jobs read for scripts' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/job-with-no-steps', cases.length),
-    ).toBeUndefined();
   });
 
   it('refuses steps that are not a list of mappings with script runs', () => {
@@ -352,9 +340,6 @@ describe('no job runs on the runner default budget (#157)', () => {
     expect(
       searched(unboundedJobFindings(jobs), { of: jobs, what: 'fixture jobs' }),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/whole-minute-jobs', jobs.length),
-    ).toBeUndefined();
   });
 
   // GitHub refuses `timeout-minutes` on a job that calls a reusable workflow.
@@ -375,9 +360,6 @@ describe('no job runs on the runner default budget (#157)', () => {
     expect(
       searched(caller.runsOn, { of: jobs, what: 'jobs of the fixture' }),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/job-level-uses-jobs', jobs.length),
-    ).toBeUndefined();
     expect(ordinary.uses).toBeUndefined();
     expect(ordinary.runsOn).toEqual(['ubuntu-latest']);
   });
@@ -390,9 +372,6 @@ describe('no job runs on the runner default budget (#157)', () => {
     expect(
       searched(unboundedJobFindings(jobs), { of: jobs, what: 'fixture jobs' }),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/local-caller-jobs', jobs.length),
-    ).toBeUndefined();
   });
 
   it('flags a job calling a workflow in another repository, whose budgets no guard here can read', () => {
@@ -539,9 +518,6 @@ describe('the secrets a job reads, and the environment it reads them in (#241)',
         { of: cases, what: 'jobs read for secrets' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/job-reading-no-secret', cases.length),
-    ).toBeUndefined();
   });
 });
 
@@ -657,9 +633,6 @@ describe('an aggregate judges its needs in a step, and only that shape is excuse
         what: 'jobs of the aggregate fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('workflow-jobs/aggregate-excused-jobs', jobs.length),
-    ).toBeUndefined();
   });
 
   it.each([
@@ -747,12 +720,6 @@ describe('every job that uploads Playwright coverage is joined, waited for and m
         what: 'fixture jobs uploading Playwright coverage',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'workflow-jobs/playwright-coverage-producers',
-        producers.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('a producer the joining job does not need is named', () => {

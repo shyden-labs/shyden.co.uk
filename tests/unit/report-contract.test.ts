@@ -184,7 +184,6 @@ describe('POST /api/report answers as openapi/report.yaml says', () => {
     expect(
       searched(findings, { of: checked, what: `${name}: points checked` }),
     ).toEqual([]);
-    expect(floorBreach(floorOf(name), checked.length)).toBeUndefined();
   });
 });
 
@@ -266,7 +265,6 @@ describe('GET /api/report/health answers as openapi/report-health.yaml says', ()
     expect(
       searched(findings, { of: checked, what: `${name}: points checked` }),
     ).toEqual([]);
-    expect(floorBreach(floorOf(name), checked.length)).toBeUndefined();
   });
 
   it('lists every status the cases produce, and no other', () => {

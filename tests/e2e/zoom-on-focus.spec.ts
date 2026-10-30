@@ -67,9 +67,6 @@ test.describe('no field makes iOS zoom the page (#352)', () => {
           }),
           'the English homepage has no typed field',
         ).toEqual([]);
-        expect(
-          floorBreach('zoom-on-focus/homepage-elements', examined),
-        ).toBeUndefined();
         return;
       }
       expect(

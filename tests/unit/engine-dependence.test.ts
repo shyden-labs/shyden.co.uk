@@ -89,12 +89,6 @@ describe('engineDependence reads code, never prose', () => {
         { of: identifiersIn(src), what: 'identifiers in the code' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/comment-fixture-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 
   it('ignores the name in a test title and in any other plain string', () => {
@@ -110,12 +104,6 @@ describe('engineDependence reads code, never prose', () => {
         what: 'identifiers in the code',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/string-fixture-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 });
 
@@ -148,12 +136,6 @@ describe('engineDependence reads code a page function receives as a string', () 
         what: 'identifiers in the code',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/selector-fixture-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 
   it('and still ignores a comment inside that code', () => {
@@ -165,12 +147,6 @@ describe('engineDependence reads code a page function receives as a string', () 
         what: 'identifiers in the code',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/commented-page-code-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 });
 
@@ -192,12 +168,6 @@ describe('engineDependence finds the emulated-viewport tag', () => {
         what: 'identifiers in the code',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/commented-tag-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 });
 
@@ -227,12 +197,6 @@ describe('engineDependence reports what it found', () => {
         what: 'identifiers in the code',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'engine-dependence/content-only-identifiers',
-        identifiersIn(src).length,
-      ),
-    ).toBeUndefined();
   });
 });
 

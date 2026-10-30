@@ -131,9 +131,6 @@ describe('a message is sent as the sentences it can say', () => {
         { of: symbols, what: 'symbols handed to translationUnits' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('translate-messages/symbol-inputs', symbols.length),
-    ).toBeUndefined();
   });
 
   it('sends no syntax for any real English message', () => {
@@ -153,9 +150,6 @@ describe('a message is sent as the sentences it can say', () => {
         what: 'sentences sent for English messages',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('translate-messages/sent-units', units.length),
-    ).toBeUndefined();
   });
 });
 

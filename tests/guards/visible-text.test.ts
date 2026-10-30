@@ -52,8 +52,5 @@ describe('visible lines are read in one home, and survive being sent into the pa
       'visible lines are read in one home; two readers are how an invisible ' +
         'name came to be scored as text on the ribbon',
     ).toEqual(['tests/visible-text.ts']);
-    expect(
-      floorBreach('visible-text/test-ts-files', files.length),
-    ).toBeUndefined();
   });
 });

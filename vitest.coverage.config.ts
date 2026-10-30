@@ -1,6 +1,5 @@
 import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
-import LoadReporter from './tests/load-reporter.ts';
 import unit from './vitest.config.ts';
 import { coverageFor } from './tests/coverage-options.ts';
 import { UNIT_JUDGES } from './tests/setup-files.ts';
@@ -30,7 +29,7 @@ export default defineConfig({
   test: {
     ...unit.test,
     setupFiles: withoutJudges(unit.test?.setupFiles),
-    reporters: ['default', new LoadReporter({ suite: 'unit' })],
+    reporters: ['default'],
     projects,
     coverage: coverageFor('unit'),
   },

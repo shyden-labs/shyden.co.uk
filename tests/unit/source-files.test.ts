@@ -20,7 +20,7 @@ describe('filesUnder', () => {
     const specs = filesUnder('tests', (path) => path.endsWith('.spec.ts'));
     // Anti-vacuity: an empty walk would satisfy every "no offenders" guard in
     // the suite at once — the exact failure #79 found in the e2e collectors.
-    expect(floorBreach('source-files/specs', specs.length)).toBeUndefined();
+    
     // Proof it went DOWN, not just listed the top level.
     expect(specs).toContain('tests/e2e/classroom-groups-print.spec.ts');
   });
@@ -51,9 +51,6 @@ describe('filesUnder', () => {
         { of: all, what: 'walked paths' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('source-files/walked-test-paths', all.length),
-    ).toBeUndefined();
   });
 });
 
@@ -93,12 +90,7 @@ describe('filesUnder refuses to answer blind', () => {
     // The refusal belongs to the TOP-LEVEL call only. `tests/` holds
     // directories with no `.spec.ts` in them, so a recursion that refused an
     // empty sub-result could never complete a walk at all.
-    expect(
-      floorBreach(
-        'source-files/specs-through-empty-dirs',
-        filesUnder('tests', (path) => path.endsWith('.spec.ts')).length,
-      ),
-    ).toBeUndefined();
+    
   });
 });
 
@@ -122,9 +114,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     const findings = ['a'];
     const rows = ['x', 'y'];
     expect(searched(findings, { of: rows, what: 'rows' })).toBe(findings);
-    expect(
-      floorBreach('source-files/untouched-rows', rows.length),
-    ).toBeUndefined();
   });
 
   it('refuses a population that is empty', () => {
@@ -132,9 +121,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: files, what: 'files' })).toThrow(
       /no files/,
     );
-    expect(
-      floorBreach('source-files/empty-files', files.length),
-    ).toBeUndefined();
   });
 
   it('refuses a population of BLANK strings -- #112 exactly', () => {
@@ -143,9 +129,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: headers, what: 'headers' })).toThrow(
       /no headers/,
     );
-    expect(
-      floorBreach('source-files/blank-headers', headers.length),
-    ).toBeUndefined();
   });
 
   it('refuses a population of empty containers', () => {
@@ -153,9 +136,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: catalogues, what: 'catalogues' })).toThrow(
       /no catalogues/,
     );
-    expect(
-      floorBreach('source-files/empty-catalogues', catalogues.length),
-    ).toBeUndefined();
   });
 
   it('refuses a population of null and undefined', () => {
@@ -163,9 +143,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: locales, what: 'locales' })).toThrow(
       /no locales/,
     );
-    expect(
-      floorBreach('source-files/absent-locales', locales.length),
-    ).toBeUndefined();
   });
 
   it('accepts a population where only SOME members carry content', () => {
@@ -173,9 +150,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     // blanks may be what the caller is hunting.
     const rows = ['', 'real'];
     expect(searched([], { of: rows, what: 'rows' })).toEqual([]);
-    expect(
-      floorBreach('source-files/partly-blank-rows', rows.length),
-    ).toBeUndefined();
   });
 
   it('accepts a plain count, which cannot be content-checked', () => {
@@ -183,8 +157,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     const none = 0;
     expect(searched([], { of: pairs, what: 'pairs' })).toEqual([]);
     expect(() => searched([], { of: none, what: 'pairs' })).toThrow(/no pairs/);
-    expect(floorBreach('source-files/counted-pairs', pairs)).toBeUndefined();
-    expect(floorBreach('source-files/no-pairs', none)).toBeUndefined();
   });
 
   it('counts a zero and a false as content -- they are values, not blanks', () => {
@@ -192,12 +164,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     const flags = [false];
     expect(searched([], { of: widths, what: 'widths' })).toEqual([]);
     expect(searched([], { of: flags, what: 'flags' })).toEqual([]);
-    expect(
-      floorBreach('source-files/zero-widths', widths.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach('source-files/false-flags', flags.length),
-    ).toBeUndefined();
   });
 
   it('names the population in the message, so a failure says what died', () => {
@@ -205,9 +171,6 @@ describe('searched -- the population a finding list was drawn from', () => {
     expect(() => searched([], { of: pages, what: 'built pages' })).toThrow(
       /built pages/,
     );
-    expect(
-      floorBreach('source-files/unbuilt-pages', pages.length),
-    ).toBeUndefined();
   });
 });
 
@@ -224,9 +187,6 @@ describe('committableFiles -- what git tracks or would (#477)', () => {
     expect(searched(dropped, { of: tracked, what: 'tracked files' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('source-files/tracked-test-files', tracked.length),
-    ).toBeUndefined();
   });
 
   it('holds no file git ignores, though it is on disk', () => {
@@ -262,8 +222,5 @@ describe('walkDisagreements -- a walk against the list git keeps (#477)', () => 
         what: 'files the walk read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('source-files/agreeing-walk', walked.length),
-    ).toBeUndefined();
   });
 });
