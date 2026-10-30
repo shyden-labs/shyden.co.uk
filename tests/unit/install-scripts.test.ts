@@ -106,7 +106,7 @@ describe('the install-script allowlist', () => {
     // If a dependency change genuinely leaves NO package running install
     // scripts, this failure is the prompt to confirm that and delete the
     // suite deliberately — not to weaken the assertion.
-    
+    expect(packagesWithInstallScripts().length).toBeGreaterThan(0);
   });
 
   it('approves exactly the packages that run install scripts, and no others', () => {

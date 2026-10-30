@@ -90,7 +90,7 @@ describe('filesUnder refuses to answer blind', () => {
     // The refusal belongs to the TOP-LEVEL call only. `tests/` holds
     // directories with no `.spec.ts` in them, so a recursion that refused an
     // empty sub-result could never complete a walk at all.
-    
+    expect(filesUnder('tests', (path) => path.endsWith('.spec.ts')).length).toBeGreaterThan(0);
   });
 });
 

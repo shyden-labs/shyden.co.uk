@@ -245,7 +245,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   it('the dev sanity suite exists and is more than a stub', async () => {
     // A guard that only checked the workflow REFERENCES the config would pass
     // against an emptied suite.
-    
+    expect((await plainTestsIn('tests/dev/dev-sanity.spec.ts')).length).toBeGreaterThan(0);
   });
 
   it('the dev deploy is gated on a gate that SUCCEEDED, never on one that skipped', () => {
@@ -1136,6 +1136,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   });
 
   it('the prod sanity suite exists and is more than a stub', async () => {
+    expect((await plainTestsIn('tests/prod/prod-sanity.spec.ts')).length).toBeGreaterThan(0);
   });
 });
 
@@ -2588,6 +2589,7 @@ describe('no two concurrently launched groups share an output folder (#230)', ()
   };
 
   it('launches more than one config, or the rest of this asserts nothing', () => {
+    expect(launchedConfigs().length).toBeGreaterThan(0);
   });
 
   it('gives each launched config a folder of its own', async () => {

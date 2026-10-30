@@ -102,6 +102,7 @@ const subPathRepos = (): [string, Set<string>][] => {
 
 describe('the CI supply chain is pinned', () => {
   it('there is something to check', () => {
+    expect(externalUses().length).toBeGreaterThan(0);
   });
 
   it('every third-party action is pinned to a full commit SHA', () => {
