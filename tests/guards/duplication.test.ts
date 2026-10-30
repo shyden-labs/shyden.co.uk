@@ -78,14 +78,6 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
   'outside `specDirs()`, where `viewport-tagging.test.ts` cannot read them ' +
   '-- measured: four untagged viewport tests, whole unit suite green.';
 
-const CROSS_CHECK_STAYS_IN_ITS_GUARD =
-  'Each guard checks its own walk against git beside the floor it ratchets ' +
-  '(#477), and these two guards walk one population. A helper that returns ' +
-  'the verdict hides `searched` from absence-liveness, which reads it only ' +
-  'at the call site -- measured: three findings "derives from the ' +
-  'filesystem". One shared walk would leave each guard checking a list it ' +
-  'no longer owns.';
-
 /**
  * Pairs read and deliberately left separate, each with the reason a reader
  * needs before deciding to collapse it after all.
@@ -95,10 +87,6 @@ const CROSS_CHECK_STAYS_IN_ITS_GUARD =
  * code it excuses and quietly start excusing something else.
  */
 const SEPARATE: ReadonlyMap<string, string> = new Map([
-  [
-    "tests/guards/absence-liveness.test.ts:it('walks every .ts file git has under tests/')  <->  tests/guards/anchored-presence.test.ts:it('walks every .ts file git has under tests/')",
-    CROSS_CHECK_STAYS_IN_ITS_GUARD,
-  ],
   [
     'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,

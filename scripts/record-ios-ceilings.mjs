@@ -12,7 +12,7 @@
  * laptop like `npm run format`. The guard that judges the result is
  * `tests/guards/ios-ceilings.test.ts`, which is CI's. The readers are
  * TypeScript with extensionless imports, so they load through the Vite
- * server `vitest/node` exports, as `lint-changed-tests.mjs` loads its own.
+ * server `vitest/node` exports.
  *
  *   node scripts/record-ios-ceilings.mjs     (npm run ceilings:record)
  */
