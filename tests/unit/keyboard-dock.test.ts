@@ -123,4 +123,24 @@ describe('liftFor', () => {
       ),
     ).toBe(0);
   });
+
+  // #853's own defect (measured 2026-10-31 on the iPhone, #838): the field
+  // blurs on the tap's touchend, and dropping the lift then let the bar fall
+  // 323 px before Safari's click, so Make Groups did nothing on the first
+  // tap. A lift already up stays while the keyboard is still on screen.
+  it('keeps a lift already up while the keyboard is still closing after the field blurred', () => {
+    expect(liftFor(746, { offsetTop: 0, height: 423 }, null, 323)).toBe(323);
+  });
+
+  it('follows the closing keyboard down rather than holding the old height', () => {
+    expect(liftFor(746, { offsetTop: 0, height: 600 }, null, 323)).toBe(146);
+  });
+
+  it('drops to zero once the keyboard has gone', () => {
+    expect(liftFor(746, { offsetTop: 0, height: 746 }, null, 323)).toBe(0);
+  });
+
+  it('still does not lift for a pinch zoom when nothing was lifted', () => {
+    expect(liftFor(720, { offsetTop: 180, height: 288 }, null, 0)).toBe(0);
+  });
 });
