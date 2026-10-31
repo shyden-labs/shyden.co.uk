@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICECTL_TIMEOUT_MS, pickIphone } from '../../scripts/devicectl.mjs';
+import {
+  DEVICECTL_TIMEOUT_MS,
+  pickIphone,
+  safariLaunchArgs,
+} from '../../scripts/devicectl.mjs';
 
 /**
  * Every `xcrun devicectl` read the iOS leg makes, and the one reading of what
@@ -97,5 +101,22 @@ describe('pickIphone: one physical iPhone, or a reason', () => {
     expect(pickIphone(listing(bare), undefined)).toEqual({
       absence: `expected the iPhone A to report deviceProperties.name and .osVersionNumber -- got ${JSON.stringify(bare)}`,
     });
+  });
+});
+
+describe('safariLaunchArgs: Safari opened on a page of the one chosen iPhone (#859)', () => {
+  it('launches Safari on that device, closing any Safari already running, at the URL', () => {
+    expect(safariLaunchArgs('UDID-1', 'about:blank')).toEqual([
+      'devicectl',
+      'device',
+      'process',
+      'launch',
+      '--device',
+      'UDID-1',
+      '--terminate-existing',
+      '--payload-url',
+      'about:blank',
+      'com.apple.mobilesafari',
+    ]);
   });
 });
