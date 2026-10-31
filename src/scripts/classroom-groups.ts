@@ -400,11 +400,16 @@ if (form) {
   const dockedRow = goButton.parentElement!;
   const view = window.visualViewport;
   if (view) {
-    const keepAboveKeyboard = () =>
-      dockedRow.style.setProperty(
-        '--keyboard-overlap',
-        `${liftFor(window.innerHeight, view, document.activeElement as HTMLElement | null)}px`,
+    let lift = 0;
+    const keepAboveKeyboard = () => {
+      lift = liftFor(
+        window.innerHeight,
+        view,
+        document.activeElement as HTMLElement | null,
+        lift,
       );
+      dockedRow.style.setProperty('--keyboard-overlap', `${lift}px`);
+    };
     view.addEventListener('resize', keepAboveKeyboard);
     view.addEventListener('scroll', keepAboveKeyboard);
     document.addEventListener('focusin', keepAboveKeyboard);
