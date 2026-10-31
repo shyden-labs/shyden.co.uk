@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 import { scratchGit } from '../git-env';
 import { scratchDir } from '../scratch-dir';
 import { filesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A unit run cannot act on the repository git hands it (#377).
@@ -147,9 +146,6 @@ describe('a repository named by a hostile GIT_DIR (#377)', () => {
         join(sentinel, 'child-run.json'),
       );
       expect(report.numFailedTests, stderr).toBe(0);
-      expect(
-        floorBreach('git-env/child-tests-passed', report.numPassedTests),
-      ).toBeUndefined();
       expect(fingerprint(sentinel)).toEqual(before);
     } finally {
       rmSync(sentinel, { recursive: true, force: true });

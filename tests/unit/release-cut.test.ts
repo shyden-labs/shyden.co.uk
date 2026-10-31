@@ -6,7 +6,6 @@ import {
   releaseCutFindings,
   statusFor,
 } from '../../scripts/release-cut.mjs';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**
@@ -74,9 +73,6 @@ describe('releaseCutFindings', () => {
         { of: asked, what: 'questions git answered about the sound cut' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('release-cut/sound-cut-questions', asked.length),
-    ).toBeUndefined();
     expect(asked).toEqual(Object.keys(sound));
   });
 
@@ -96,9 +92,6 @@ describe('releaseCutFindings', () => {
         { of: asked, what: 'questions git answered about the first cut' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('release-cut/first-cut-questions', asked.length),
-    ).toBeUndefined();
     expect(asked).toEqual(
       Object.keys(answers).filter((key) => !key.includes(PREVIOUS_CUT)),
     );

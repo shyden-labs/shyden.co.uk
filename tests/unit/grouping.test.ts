@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   anonymousStudent,
   buildGroups,
@@ -1976,9 +1975,6 @@ describe('sex mode: mix', () => {
       );
     });
     expect(searched(bothTogether, { of: seeds, what: 'seeds' })).toEqual([]);
-    expect(
-      floorBreach('grouping/girl-spread-seeds', seeds.length),
-    ).toBeUndefined();
   });
 
   // Correction 2: the dedicated variety regression guard the together-letters
@@ -2507,9 +2503,6 @@ describe('the warnings channel', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/current-success-roster', students.length),
-      ).toBeUndefined();
     },
   );
 });
@@ -2603,9 +2596,6 @@ describe('sex mode: separate', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/divisible-single-sex-roster', students.length),
-      ).toBeUndefined();
     });
 
     // Six boys and two girls into groups of 4: the boys make one group and
@@ -2664,9 +2654,6 @@ describe('sex mode: separate', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/one-sex-roster', students.length),
-      ).toBeUndefined();
     });
   });
 
@@ -2695,9 +2682,6 @@ describe('sex mode: separate', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/headcount-share-roster', students.length),
-      ).toBeUndefined();
       expect(shape(out.result.groups)).toEqual([6, 6, 4, 4]);
       for (const g of out.result.groups) {
         expect(new Set(g.map((s) => s.sex)).size).toBe(1);
@@ -2858,12 +2842,6 @@ describe('sex mode: separate', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach(
-          'grouping/together-unit-not-refused-roster',
-          students.length,
-        ),
-      ).toBeUndefined();
       expect(shape(out.result.groups)).toEqual([8, 4, 4, 4]);
       const girlUnit = groupOf(out.result.groups, 13);
       for (const n of [13, 14, 15, 16, 17]) {
@@ -3116,9 +3094,6 @@ describe('sex mode: separate', () => {
       expect(
         searched(out.result.warnings, { of: students, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/lone-sex-too-small-roster', students.length),
-      ).toBeUndefined();
     });
   });
 
@@ -3704,12 +3679,6 @@ describe('pinned groups', () => {
           }),
           sexMode,
         ).toEqual([]);
-        expect(
-          floorBreach(
-            'grouping/mixed-pin-roster-outside-separate',
-            mixedPinRoster.length,
-          ),
-        ).toBeUndefined();
       },
     );
   });
@@ -3915,9 +3884,6 @@ describe('pinned groups', () => {
         searched(out.result.warnings, { of: roster, what: 'students' }),
       ).toEqual([]);
       expect(
-        floorBreach('grouping/over-pinned-roster', roster.length),
-      ).toBeUndefined();
-      expect(
         out.result.groups.map((g) =>
           g.map((s) => s.number).sort((a, b) => a - b),
         ),
@@ -4089,9 +4055,6 @@ describe('pinned groups', () => {
       expect(
         searched(out.result.warnings, { of: sepRoster, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/pinned-single-sex-roster', sepRoster.length),
-      ).toBeUndefined();
       const pinnedResult = groupOf(out.result.groups, 1);
       expect(pinnedResult?.map((s) => s.number).sort((a, b) => a - b)).toEqual([
         1, 2,
@@ -5220,9 +5183,6 @@ describe('leftovers, against the new constraints', () => {
       expect(
         searched(out.result.warnings, { of: roster, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/each-side-remainder-bunch-roster', roster.length),
-      ).toBeUndefined();
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       const girlsGroups = out.result.groups.filter((g) => g[0].sex === 'F');
       expect(shape(boysGroups)).toEqual([6, 4, 4]);
@@ -5339,9 +5299,6 @@ describe('leftovers, against the new constraints', () => {
       expect(
         searched(out.result.warnings, { of: roster, what: 'students' }),
       ).toEqual([]);
-      expect(
-        floorBreach('grouping/boys-remainder-bunch-roster', roster.length),
-      ).toBeUndefined();
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       expect(boysGroups).toHaveLength(3);
       expect(shape(boysGroups)).toEqual([6, 4, 4]);

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   collectNavigations,
@@ -101,9 +100,6 @@ describe('collecting navigation steps out of a result tree', () => {
         what: 'steps in the result tree',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('nav-timings/human-titled-navigate-steps', tree.length),
-    ).toBeUndefined();
   });
 
   it('ignores the other pw:api steps that surround every navigation', () => {
@@ -118,9 +114,6 @@ describe('collecting navigation steps out of a result tree', () => {
         what: 'steps in the result tree',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('nav-timings/surrounding-pw-api-steps', tree.length),
-    ).toBeUndefined();
   });
 
   it('flags a navigation that errored — the #44 shape', () => {
@@ -234,9 +227,6 @@ describe('summarising navigations per project', () => {
         { of: runs, what: 'runs handed to navTimings' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('nav-timings/runs-that-recorded-nothing', runs.length),
-    ).toBeUndefined();
   });
 });
 
@@ -325,9 +315,6 @@ describe('which projects must navigate — read back out of the report', () => {
         { of: reports, what: 'reports handed to excusedFromNavigating' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('nav-timings/reports-without-config', reports.length),
-    ).toBeUndefined();
   });
 
   it('excuses nothing when no project in the report carries the mark', () => {
@@ -338,9 +325,6 @@ describe('which projects must navigate — read back out of the report', () => {
         what: 'projects in the report',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('nav-timings/unmarked-report-projects', projects.length),
-    ).toBeUndefined();
   });
 
   it('counts each project’s results, however deep the describe blocks, and never a skip', () => {

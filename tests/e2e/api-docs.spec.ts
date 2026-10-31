@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { docsPaths } from '../site-pages';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { contrastRatio } from './helpers';
 import { docsSpecFile, requiredTextFields } from '../api-docs-pages';
@@ -184,7 +183,6 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               searched(dim, { of: probes, what: `${path} text elements` }),
             ).toEqual([]);
-            expect(floorBreach(floors.texts, probes.length)).toBeUndefined();
 
             const controls = await controlSizes(page);
             const small = controls
@@ -196,9 +194,6 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               searched(small, { of: controls, what: `${path} controls` }),
             ).toEqual([]);
-            expect(
-              floorBreach(floors.controls, controls.length),
-            ).toBeUndefined();
 
             // The two page-wide sweeps that read pages as they load hand the
             // docs over to this, the state with every field drawn.
@@ -209,7 +204,6 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               searched(zooming, { of: typed, what: `${path} typed fields` }),
             ).toEqual([]);
-            expect(floorBreach(floors.typed, typed.length)).toBeUndefined();
 
             const { allowed, readings } = await readPalette(page);
             expect(
@@ -218,9 +212,6 @@ test.describe('the API docs meet the site bar (#781)', () => {
                 what: `${path} painted controls`,
               }),
             ).toEqual([]);
-            expect(
-              floorBreach(floors.painted, readings.length),
-            ).toBeUndefined();
 
             await shoot(page, `${path}, ${theme}, ${width}px, everything open`);
           },

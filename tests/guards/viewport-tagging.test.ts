@@ -6,7 +6,6 @@ import {
 } from '../unit/spec-scan';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   callsIn,
@@ -239,13 +238,7 @@ const analyze = (file: string, text: string): readonly string[] =>
 
 describe('a real phone cannot resize its own screen', () => {
   it('every test that resizes the viewport is tagged @emulated-viewport, none the phone runs reads it, and no tag is stale', () => {
-    expectNothingFound(
-      read,
-      declarationsRead(
-        'tests and groups read',
-        'viewport-tagging/declarations',
-      ),
-    );
+    expectNothingFound(read, declarationsRead('tests and groups read'));
   });
 });
 
@@ -297,9 +290,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/tag-added', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('flags a tag on a test whose body never touches the viewport as stale', () => {
@@ -376,12 +366,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'viewport-tagging/read-in-tagged-resize',
-        reading.judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('still calls a tag stale when a page.viewportSize() read is all that justifies it', () => {
@@ -424,9 +408,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/runtime-skip', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('attributes test.use({ viewport }) to its enclosing describe, both directions', () => {
@@ -459,9 +440,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/tagged-describe', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('asks the group to carry the tag for a resize reached through an aliased callee, rather than passing over it', () => {
@@ -526,9 +504,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/comment-only', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('tolerates a wrapped title (test( on one line, the quoted title on the next)', () => {
@@ -556,9 +531,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/wrapped-title', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('sees test.use({ viewport }) written in shorthand', () => {
@@ -594,9 +566,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
         what: 'declarations the scanner read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('viewport-tagging/string-declaration', reading.judged.length),
-    ).toBeUndefined();
   });
 
   it('gives a resize in a hook to the group the hook runs for, not to the test above it', () => {

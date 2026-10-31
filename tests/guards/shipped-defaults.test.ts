@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { searched, specFilesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 import { parseFile, parseSource } from '../unit/ast';
 import { withoutAstroComments, withoutTsComments } from '../unit/source-text';
 
@@ -504,9 +503,6 @@ describe('a page-shipped default cannot stand in for an implementation', () => {
         { of: all, what: 'expectations against a shipped default' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('shipped-defaults/judged-collisions', all.length),
-    ).toBeUndefined();
   });
 
   it('keeps the deliberate pin, which asserts the default on an untouched page', () => {

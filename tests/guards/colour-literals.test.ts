@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import {
   astroCode,
@@ -207,9 +206,6 @@ describe('no colour a theme cannot see (#142)', () => {
         what: 'colour literals under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('colour-literals/judged-literals', literals.length),
-    ).toBeUndefined();
   });
 
   it('allows nothing the reader cannot find', () => {
@@ -234,9 +230,6 @@ describe('no colour a theme cannot see (#142)', () => {
         what: 'colour literals under src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('colour-literals/allowance-literals', literals.length),
-    ).toBeUndefined();
   });
 
   it('reads CSS by rule and skips paper, and reads code whole', () => {
@@ -248,9 +241,6 @@ describe('no colour a theme cannot see (#142)', () => {
         what: 'the same rule on screen',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('colour-literals/screen-control', control.length),
-    ).toBeUndefined();
     expect(
       literalsIn(
         'x.astro',

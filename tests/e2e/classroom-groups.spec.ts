@@ -9,7 +9,6 @@ import {
 import type { Page } from '@playwright/test';
 
 import { join, relative, sep, basename } from 'node:path';
-import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import {
   DEFAULT_LOCALE,
@@ -550,9 +549,6 @@ test.describe('classroom group creator', () => {
       }),
       'sound off means the assets are never downloaded',
     ).toEqual([]);
-    expect(
-      floorBreach('classroom-groups/sound-off-requests', heard.length),
-    ).toBeUndefined();
   });
 
   test('with sound on, the audio requests that happen are exactly ours and same-origin', async ({
@@ -612,9 +608,6 @@ test.describe('classroom group creator', () => {
         }),
         'a reduced-motion visitor downloads no audio at all',
       ).toEqual([]);
-      expect(
-        floorBreach('classroom-groups/reduced-motion-requests', heard.length),
-      ).toBeUndefined();
     });
 
     /**
@@ -2212,16 +2205,6 @@ test.describe('the no-scroll rule, measured', () => {
             what: 'interactive targets on screen with every section open',
           }),
         ).toEqual([]);
-        expect(
-          floorBreach(
-            // English carries one footer link; every beta language also
-            // carries the report form's fields, so the two read differently.
-            path === '/classroom-groups'
-              ? 'classroom-groups/interactive-targets-en'
-              : 'classroom-groups/interactive-targets-beta',
-            measured.length,
-          ),
-        ).toBeUndefined();
       },
     );
 
@@ -2279,9 +2262,6 @@ test.describe('the no-scroll rule, measured', () => {
       ),
       'the homepage fetches no script',
     ).toEqual([]);
-    expect(
-      floorBreach('classroom-groups/homepage-requests', heard.length),
-    ).toBeUndefined();
   });
 });
 

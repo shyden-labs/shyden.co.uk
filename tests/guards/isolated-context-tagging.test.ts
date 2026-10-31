@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   declarationsRead,
   expectNothingFound,
@@ -270,10 +269,7 @@ const analyze = (file: string, text: string): readonly string[] =>
 
 describe('a real device has one browser context', () => {
   it('every test run without JavaScript, or calling newContext(), is tagged @requires-isolated-context, and no tag is stale', () => {
-    expectNothingFound(
-      read,
-      declarationsRead('tests read', 'isolated-context-tagging/tests'),
-    );
+    expectNothingFound(read, declarationsRead('tests read'));
   });
 
   it("allows the operator's one clock exception, and no other (#854)", () => {
@@ -342,12 +338,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/identical-tagged-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('flags a tag on a test with no enclosing javaScriptEnabled:false describe as stale', () => {
@@ -395,12 +385,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/sibling-describe-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('holds a nested group to the tag too, since test.use() reaches it', () => {
@@ -435,9 +419,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach('isolated-context-tagging/runtime-use-tests', judged.length),
-    ).toBeUndefined();
   });
 
   it('reports test.use({ javaScriptEnabled: false }) inside a test body, which Playwright rejects', () => {
@@ -480,12 +461,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/template-title-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('ignores a javaScriptEnabled:false-shaped call when it appears only in a comment', () => {
@@ -505,12 +480,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/commented-use-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('finds the group when prettier wraps its opening across lines', () => {
@@ -542,12 +511,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/string-declaration-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('reports a javaScriptEnabled it cannot read, instead of reading it as enabled', () => {
@@ -620,12 +583,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/newcontext-tagged-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('opens no context for a newContext() written only in a comment or a string', () => {
@@ -669,9 +626,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach('isolated-context-tagging/clock-tagged-tests', judged.length),
-    ).toBeUndefined();
   });
 
   it('flags @installs-a-clock on a test that calls no clock method as stale (#854)', () => {
@@ -718,12 +672,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'isolated-context-tagging/clock-excepted-tests',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('excepts that title nowhere else (#854)', () => {

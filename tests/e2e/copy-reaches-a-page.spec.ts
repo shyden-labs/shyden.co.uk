@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { floorBreach } from '../floors';
 import { deployedRoutes, docsPaths } from '../site-pages';
 import {
   LOCALES,
@@ -365,10 +364,5 @@ test.describe('no built page names the dissolved company (#370)', () => {
         join('dist', '404.html'),
       ].sort(),
     );
-    // Recorded in tests/floors.json and checked for equality (#475), so a
-    // site that grows a page moves the figure on purpose.
-    expect(
-      floorBreach('copy-reaches-a-page/built-pages', pages.length),
-    ).toBeUndefined();
   });
 });

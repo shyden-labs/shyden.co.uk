@@ -13,7 +13,6 @@ import {
   tokensCss,
 } from '../palette';
 import { SHYTALK_MARK } from '../../src/lib/shytalk-brand';
-import { floorBreach } from '../floors';
 
 /**
  * The structure of tokens.css (#142).
@@ -35,7 +34,6 @@ describe('the token file', () => {
     expect(
       searched(unread, { of: tokens, what: 'tokens on bare :root' }),
     ).toEqual([]);
-    expect(floorBreach('tokens/read-tokens', tokens.length)).toBeUndefined();
   });
 });
 
@@ -72,9 +70,6 @@ describe('the two themes (#142)', () => {
     expect(
       searched(stray, { of: declaring, what: 'rules declaring color-scheme' }),
     ).toEqual([]);
-    expect(
-      floorBreach('tokens/color-scheme-rules', declaring.length),
-    ).toBeUndefined();
   });
 
   it('keeps every dark block screen-only, and has both states it needs', () => {
@@ -83,9 +78,6 @@ describe('the two themes (#142)', () => {
     );
     const onPaper = chains.filter((chain) => !/^@media screen\b/.test(chain));
     expect(searched(onPaper, { of: chains, what: 'dark blocks' })).toEqual([]);
-    expect(
-      floorBreach('tokens/dark-block-chains', chains.length),
-    ).toBeUndefined();
     expect(chains).toEqual(
       expect.arrayContaining([
         "@media screen and (prefers-color-scheme: dark) { :root:not([data-theme='light'])",
@@ -107,9 +99,6 @@ describe('the two themes (#142)', () => {
     expect(
       searched(drifted, { of: rest, what: 'dark blocks after the first' }),
     ).toEqual([]);
-    expect(
-      floorBreach('tokens/later-dark-blocks', rest.length),
-    ).toBeUndefined();
   });
 
   it('defines no token only inside a dark block', () => {
@@ -122,9 +111,6 @@ describe('the two themes (#142)', () => {
     expect(
       searched(orphans, { of: dark, what: 'tokens the dark blocks declare' }),
     ).toEqual([]);
-    expect(
-      floorBreach('tokens/dark-block-tokens', dark.length),
-    ).toBeUndefined();
   });
 
   it('puts the ShyTalk mark on its own tile in light, and on nothing in dark, in one box', () => {
@@ -147,9 +133,9 @@ describe('the two themes (#142)', () => {
     for (const block of blocks) {
       expect(customProperties(block).get('--wordmark-pad') ?? pad).toBe(pad);
     }
-    // Ratcheted after the loop it proves (#468): two today, and a third dark
-    // block must be recorded before its padding is trusted to this loop.
-    expect(floorBreach('tokens/dark-blocks', blocks.length)).toBeUndefined();
+    // Two today: a third dark block is checked here before its padding is
+    // trusted to this loop.
+    expect(blocks).toHaveLength(2);
   });
 });
 

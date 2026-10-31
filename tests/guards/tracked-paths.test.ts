@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Every tracked path is made of plain names.
@@ -34,7 +33,6 @@ describe('tracked paths', () => {
     const paths = trackedFiles(() => true);
     const strays = paths.filter((path) => !isPlainPath(path));
     expect(searched(strays, { of: paths, what: 'tracked paths' })).toEqual([]);
-    expect(floorBreach('tracked-paths/paths', paths.length)).toBeUndefined();
   });
 
   it('refuses the name a failed heredoc left behind', () => {

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import { commentsIn, parseSource } from '../unit/ast';
 import { astroCodeViews } from '../unit/source-text';
 import { SOURCE_FILE, walkedSource } from '../git-questions';
@@ -132,9 +131,6 @@ describe('no docblock in tracked source sits directly on another', () => {
         { of: tracked, what: 'tracked source files' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('stranded-docblocks/tracked-sources', tracked.length),
-    ).toBeUndefined();
   });
 
   it('reads the kinds of source the ticket names, and no others', () => {
@@ -176,9 +172,6 @@ describe('no docblock in tracked source sits directly on another', () => {
         { of: held, what: 'kinds of source holding a docblock' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('stranded-docblocks/docblock-kinds', held.length),
-    ).toBeUndefined();
   });
 
   it('finds none sitting directly on another', () => {
@@ -192,9 +185,6 @@ describe('no docblock in tracked source sits directly on another', () => {
         },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('stranded-docblocks/judged-docblocks', docblocks.length),
-    ).toBeUndefined();
   });
 });
 

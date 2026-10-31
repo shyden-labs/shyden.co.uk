@@ -266,14 +266,6 @@ const SCOPED_JOBS = {
     unguarded:
       'a release whose logs and audit trails were never checked would pass',
   },
-  // Runs wherever the pull request is NOT docs-only (#913): it joins what
-  // the e2e shards and the sanity run measured, which a docs-only pull
-  // request skips.
-  'coverage-playwright': {
-    verdict: 'docs_only',
-    runsWhen: 'false',
-    unguarded: 'what Playwright ran would never be measured',
-  },
 };
 
 /**
@@ -289,9 +281,9 @@ const SCOPED_JOBS = {
  */
 export function scopedJobFindings(needs, name) {
   if (!isRecord(needs)) return { findings: [], rest: needs };
-  /** @type {{ verdict: string, unguarded: string, runsWhen?: string }} */
+  /** @type {{ verdict: string, unguarded: string }} */
   const job = SCOPED_JOBS[name];
-  const { verdict, unguarded, runsWhen = 'true' } = job;
+  const { verdict, unguarded } = job;
   const { [name]: state, ...rest } = needs;
   if (state === undefined)
     return {
@@ -312,7 +304,7 @@ export function scopedJobFindings(needs, name) {
       rest,
     };
   const [wanted, where] =
-    said === runsWhen ? ['success', 'runs'] : ['skipped', 'does not run'];
+    said === 'true' ? ['success', 'runs'] : ['skipped', 'does not run'];
   return {
     findings:
       result === wanted
@@ -689,8 +681,7 @@ function main() {
   // whether the pull request is docs-only, and the rest never see them.
   const capture = scopedJobFindings(needs, 'capture');
   const logs = scopedJobFindings(capture.rest, 'logs');
-  const measured = scopedJobFindings(logs.rest, 'coverage-playwright');
-  const docsOnly = isDocsOnlyRun(measured.rest);
+  const docsOnly = isDocsOnlyRun(logs.rest);
   // The capture's accounts, wherever scope gave a verdict it could read;
   // any other verdict is already refused there.
   const said =
@@ -724,14 +715,13 @@ function main() {
   const findings = [
     ...capture.findings,
     ...logs.findings,
-    ...measured.findings,
     ...captureAccounts,
     ...(docsOnly
       ? // No shard runs, and the download is skipped, so the glob arrives
         // unmatched; any account that does exist is refused by name.
-        docsOnlyFindings(measured.rest, present)
+        docsOnlyFindings(logs.rest, present)
       : [
-          ...needsFindings(measured.rest),
+          ...needsFindings(logs.rest),
           ...files
             .filter((file) => !existsSync(file))
             .map(

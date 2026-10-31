@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { blankCommentLines } from './source-text';
 import { en } from '../../src/lib/i18n/en';
@@ -132,9 +131,6 @@ describe('a message is sent as the sentences it can say', () => {
         { of: symbols, what: 'symbols handed to translationUnits' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('translate-messages/symbol-inputs', symbols.length),
-    ).toBeUndefined();
   });
 
   it('sends no syntax for any real English message', () => {
@@ -154,9 +150,6 @@ describe('a message is sent as the sentences it can say', () => {
         what: 'sentences sent for English messages',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('translate-messages/sent-units', units.length),
-    ).toBeUndefined();
   });
 });
 

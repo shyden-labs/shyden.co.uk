@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import {
   calculateGlory,
@@ -187,8 +186,5 @@ describe('the result line reads in the page’s own language (#390)', () => {
     expect(
       searched(reused, { of: translated, what: 'translated functions' }),
     ).toEqual([]);
-    expect(
-      floorBreach('glory-points/translated-functions', translated.length),
-    ).toBeUndefined();
   });
 });

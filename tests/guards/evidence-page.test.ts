@@ -5,7 +5,6 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder, tsFilesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { oneAttemptEach, reportLocation } from '../../scripts/test-e2e.mjs';
 import {
   CONTRACT_MODULE,
@@ -252,9 +251,6 @@ describe('a run that recorded nothing still publishes (#214 AC7)', () => {
     expect(
       searched(candidates, { of: results, what: 'report results' }),
     ).toEqual([]);
-    expect(
-      floorBreach('evidence-page/report-results-no-recording', results.length),
-    ).toBeUndefined();
     expect(assetUploads(candidates)).toEqual({});
     expect(reconcileFiles({ desired: {}, published: [] })).toEqual({});
     // A page that USED to carry recordings as supporting files must retract
@@ -376,9 +372,6 @@ describe('a captured journey the report never ran says which kind of missing it 
       }),
       'nothing here read a policy',
     ).toHaveLength(0);
-    expect(
-      floorBreach('evidence-page/no-recording-notes', notes.length),
-    ).toBeUndefined();
   });
 });
 
@@ -468,9 +461,6 @@ describe('a recording the report names is on disk, or the build refuses', () => 
         what: 'report results',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('evidence-page/results-without-recording', results.length),
-    ).toBeUndefined();
   });
 });
 
@@ -718,9 +708,6 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
       searched(deletions, { of: deletions.length, what: 'report cleanups' }),
       'the runner stopped deleting its temp report directory at all',
     ).toHaveLength(1);
-    expect(
-      floorBreach('evidence-page/report-cleanups', deletions.length),
-    ).toBeUndefined();
     expect(runner, 'the report directory is deleted unconditionally').toMatch(
       /if \(ephemeral\)\s*rmSync\(reportDir/,
     );
@@ -904,9 +891,6 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
       searched(respellings, { of: consumers, what: 'evidence consumers' }),
       'a filename spelled twice is two filenames the day one of them moves',
     ).toEqual([]);
-    expect(
-      floorBreach('evidence-page/consumers', consumers.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1245,9 +1229,6 @@ describe('the page references its recordings by a path the artifact serves', () 
     expect(
       searched(unservable, { of: srcs, what: 'media references' }),
     ).toEqual([]);
-    expect(
-      floorBreach('evidence-page/media-references', srcs.length),
-    ).toBeUndefined();
     // A positive control on the POPULATION, not merely on its size: the shots
     // are data URIs and would satisfy `searched` on their own, leaving the
     // recording -- the only blob path here -- entirely unexamined.
@@ -1302,9 +1283,6 @@ describe('a journey that captured nothing is still on the page', () => {
     expect(searched(naming, { of: MANIFEST, what: 'manifest rows' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('evidence-page/manifest-rows', MANIFEST.length),
-    ).toBeUndefined();
 
     const html = build({ report: reportNamingAnUncapturedJourney });
 
@@ -1334,9 +1312,6 @@ describe('a journey that captured nothing is still on the page', () => {
         what: 'recordings handed to the page',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('evidence-page/handed-recordings', keys.length),
-    ).toBeUndefined();
   });
 });
 

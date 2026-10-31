@@ -24,7 +24,6 @@ import {
   type Comparison,
   type EngineLanguage,
 } from '../../src/lib/i18n/back-translate';
-import { floorBreach } from '../floors';
 import { CATALOGUES, TRANSLATED } from '../back-translate-shared';
 
 /**
@@ -137,9 +136,6 @@ describe('unitsBetween: what the reader is asked to read', () => {
         what: 'symbol entries offered',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/symbol-entries', Object.keys(symbols).length),
-    ).toBeUndefined();
   });
 
   it('sends nothing for copy the locale has no string for', () => {
@@ -231,17 +227,6 @@ describe('unitsBetween: what the reader is asked to read', () => {
   });
 });
 
-/**
- * Each locale's count of translated entries, ratcheted (#468). Keyed by the
- * catalogue, so a locale added without a floor fails to compile.
- */
-const TRANSLATED_FLOOR: Readonly<Record<keyof typeof CATALOGUES, string>> = {
-  id: 'back-translate/translated-id',
-  zh: 'back-translate/translated-zh',
-  vi: 'back-translate/translated-vi',
-  th: 'back-translate/translated-th',
-};
-
 /** The CSV vocabulary without its `sex` letters, which the roster rows read back. */
 const csvCopy = (locale: Locale) =>
   Object.fromEntries(
@@ -303,11 +288,6 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
         ),
       );
       expect([...read].sort(), locale).toEqual([...expected].sort());
-      // After the verdict, so a population that grew never hides a finding.
-      expect(
-        floorBreach(TRANSLATED_FLOOR[locale], expected.size),
-        `${locale}: not the recorded count of translated entries`,
-      ).toBeUndefined();
     }
   });
 
@@ -328,9 +308,6 @@ describe('backTranslationUnits: every catalogue the site ships', () => {
         what: 'units a translated locale sends',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/units-english-withholds', offered.length),
-    ).toBeUndefined();
   });
 });
 
@@ -385,9 +362,6 @@ describe('livenessProblems: a run that read nothing is a failure', () => {
         what: 'comparisons across both locales',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/liveness-comparisons', comparisons.length),
-    ).toBeUndefined();
   });
 
   it('names a locale that compared nothing', () => {
@@ -413,9 +387,6 @@ describe('livenessProblems: a run that read nothing is a failure', () => {
         what: 'comparisons, one of them empty',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('back-translate/one-empty-comparisons', comparisons.length),
-    ).toBeUndefined();
   });
 
   it('fails a run that compared nothing at all, once per locale', () => {

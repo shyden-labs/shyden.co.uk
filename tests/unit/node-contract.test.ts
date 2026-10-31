@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { withoutIniComments, withoutYamlComments } from './source-text';
 
 /**
@@ -227,9 +226,6 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
         what: 'workflow files and package scripts',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('node-contract/fetch-setting-sources', sources.length),
-    ).toBeUndefined();
   });
 
   it('keeps the highest engines.node floor and .nvmrc on the same major, in both directions', () => {
@@ -253,9 +249,6 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
     expect(
       searched(below, { of: floors, what: 'engines.node alternatives' }),
     ).toEqual([]);
-    expect(
-      floorBreach('node-contract/engine-alternatives', floors.length),
-    ).toBeUndefined();
   });
 
   // The types describe the Node CI runs, not the newest one, nor the older

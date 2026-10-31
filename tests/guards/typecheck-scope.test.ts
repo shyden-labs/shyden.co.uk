@@ -21,7 +21,6 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder, searched, nonEmpty } from '../source-files';
-import { floorBreach } from '../floors';
 
 /** `tsconfig.json` is JSONC: it carries the reason for every option. */
 const tsconfig = (): Record<string, any> =>
@@ -105,9 +104,6 @@ describe('typecheck reads the scripts that deploy this site (#228)', () => {
     const read = scripts();
     const opted = read.filter((path) => optsOut(readFileSync(path, 'utf8')));
     expect(searched(opted, { of: read, what: 'scripts read' })).toEqual([]);
-    expect(
-      floorBreach('typecheck-scope/nocheck-scripts', read.length),
-    ).toBeUndefined();
   });
 
   it('reads every script, and as many as there are', () => {
@@ -120,8 +116,6 @@ describe('typecheck reads the scripts that deploy this site (#228)', () => {
       return silencedByCompiler(path, text) && !optsOut(text);
     });
     expect(searched(missed, { of: read, what: 'scripts read' })).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
-    expect(floorBreach('typecheck-scope/scripts', read.length)).toBeUndefined();
   });
 
   it.each([

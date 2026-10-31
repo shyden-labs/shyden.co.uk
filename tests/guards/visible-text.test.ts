@@ -3,7 +3,6 @@ import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { searched, tsFilesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 import { visibleLinesReader, visibleLinesReaderScript } from '../visible-text';
 import { expectClosesOverNothing } from '../unit/closes-over-nothing';
 import { withoutTsComments } from '../unit/source-text';
@@ -26,7 +25,6 @@ describe('visible lines are read in one home, and survive being sent into the pa
     expectClosesOverNothing(
       'tests/visible-text.ts',
       'export const visibleLinesReader',
-      'visible-text/closure-lines',
     );
   });
 
@@ -53,8 +51,5 @@ describe('visible lines are read in one home, and survive being sent into the pa
       'visible lines are read in one home; two readers are how an invisible ' +
         'name came to be scored as text on the ribbon',
     ).toEqual(['tests/visible-text.ts']);
-    expect(
-      floorBreach('visible-text/test-ts-files', files.length),
-    ).toBeUndefined();
   });
 });

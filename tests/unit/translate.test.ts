@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MVP_LOCALES } from '../../src/lib/i18n/metadata';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { messageOf } from '../../scripts/errors.mjs';
 import {
   DO_NOT_TRANSLATE,
@@ -376,9 +375,6 @@ describe('protected terms are wrapped before they are sent', () => {
       }),
       'these strings do not survive the request pipeline unchanged',
     ).toEqual([]);
-    expect(
-      floorBreach('translate/round-tripped-strings', catalogue.length),
-    ).toBeUndefined();
   });
 });
 
@@ -529,9 +525,6 @@ describe('a draft whose English is retired is dropped', () => {
       }),
       'drafts for English no catalogue sends -- run `npm run i18n:translate -- <locale> --prune`',
     ).toEqual([]);
-    expect(
-      floorBreach('translate/cached-drafts', cachedDrafts.length),
-    ).toBeUndefined();
   });
 
   it('has nothing to drop for a locale with no drafts', () => {

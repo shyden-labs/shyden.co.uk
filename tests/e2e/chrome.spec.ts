@@ -3,7 +3,6 @@ import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 test.use(recorded);
@@ -255,9 +254,6 @@ test.describe('header + footer', () => {
     expect(
       searched(withTabindex, { of: headerLinks, what: 'header links' }),
     ).toEqual([]);
-    expect(
-      floorBreach('chrome/header-links', headerLinks.length),
-    ).toBeUndefined();
   });
 });
 

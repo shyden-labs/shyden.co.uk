@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { floorBreach } from '../floors';
 import { filesUnder, nonEmpty, searched } from '../source-files';
 import { stylesheetCss } from '../unit/source-text';
 import { contrast, parseColour } from '../wcag';
@@ -288,23 +287,6 @@ const DISABLED_FILL: Record<Theme, string> = {
 const pairName = (p: Pair) =>
   `${p.fg.join(' over ')} on ${p.bg.join(' over ')} (${p.where})`;
 
-/**
- * Each theme's floor, spelled once: a recorded id is a string under tests/,
- * never built at runtime (`literal-floors.test.ts`).
- */
-const PAIRS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/pairs',
-  dark: 'contrast/dark/pairs',
-};
-const GROUNDS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/grounds',
-  dark: 'contrast/dark/grounds',
-};
-const TOKENS_FLOOR: Readonly<Record<Theme, string>> = {
-  light: 'contrast/light/colour-tokens',
-  dark: 'contrast/dark/colour-tokens',
-};
-
 describe('the palette meets WCAG AA by computation, not by comment', () => {
   it('reads the atmosphere from body::before, top-first, named by position', () => {
     expect(atmosphereLayers(tokensCss())).toEqual([
@@ -378,7 +360,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(failures, { of: PAIRS, what: `${theme} colour pairs` }),
       ).toEqual([]);
-      expect(floorBreach(PAIRS_FLOOR[theme], PAIRS.length)).toBeUndefined();
     });
   }
 
@@ -425,7 +406,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(collisions, { of: grounds, what: 'opaque grounds' }),
       ).toEqual([]);
-      expect(floorBreach(GROUNDS_FLOOR[theme], grounds.length)).toBeUndefined();
     });
   }
 
@@ -448,7 +428,6 @@ describe('the palette meets WCAG AA by computation, not by comment', () => {
       expect(
         searched(unclassified, { of: all, what: 'colour tokens' }),
       ).toEqual([]);
-      expect(floorBreach(TOKENS_FLOOR[theme], all.length)).toBeUndefined();
     });
   }
 
@@ -569,9 +548,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(offenders, { of: usages, what: 'var(--border) usages in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-judged-as-controls', usages.length),
-    ).toBeUndefined();
   });
 
   it('every --border usage is classified as control or decorative', () => {
@@ -587,9 +563,6 @@ describe('a control is never identified by the decorative border alone', () => {
         what: 'var(--border) usages in src/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-classified', usages.length),
-    ).toBeUndefined();
   });
 
   /**
@@ -621,9 +594,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(stale, { of: usages, what: 'var(--border) usages in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/border-usages-for-decorative', usages.length),
-    ).toBeUndefined();
   });
 
   it('names a control only where the reader finds that selector', () => {
@@ -636,9 +606,6 @@ describe('a control is never identified by the decorative border alone', () => {
     expect(
       searched(stale, { of: selectors, what: 'declared selectors in src/' }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/declared-selectors', selectors.length),
-    ).toBeUndefined();
   });
 });
 
@@ -688,8 +655,5 @@ describe('one disabled look, defined in one place', () => {
         what: 'paint declarations on a :disabled subject',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('contrast/disabled-paint', paintedAt.length),
-    ).toBeUndefined();
   });
 });

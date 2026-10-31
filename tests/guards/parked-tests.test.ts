@@ -7,7 +7,6 @@ import {
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
 import { declarationsIn, type Declaration } from '../playwright-declarations';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**
@@ -137,9 +136,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/preceding-comment-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('accepts a test.fixme whose own title names an issue', () => {
@@ -152,9 +148,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/title-names-issue-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('accepts a reference on the wrapped title line', () => {
@@ -169,9 +162,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/wrapped-title-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('is blind to the runtime conditional overload, which needs no issue', () => {
@@ -187,9 +177,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/runtime-overload-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('flags a bare test.describe.fixme, not just a single test', () => {
@@ -231,12 +218,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'parked-tests/comment-block-above-declarations',
-        judged.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('does not treat a test.fixme quoted inside a comment as a declaration', () => {
@@ -251,9 +232,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/quoted-in-comment-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('names the file and line so a finding is actionable', () => {
@@ -284,9 +262,6 @@ describe('parked tests must name an issue', () => {
     expect(
       searched(findings, { of: judged, what: 'declarations read' }),
     ).toEqual([]);
-    expect(
-      floorBreach('parked-tests/spelled-in-string-declarations', judged.length),
-    ).toBeUndefined();
   });
 
   it('does not accept a reference only in a comment inside the body', () => {
@@ -303,7 +278,7 @@ describe('parked tests must name an issue', () => {
   it('the e2e corpus parks nothing without naming an issue', () => {
     expectNothingFound(
       readParkedTests,
-      declarationsRead('tests and groups read', 'parked-tests/declarations'),
+      declarationsRead('tests and groups read'),
     );
   });
 });

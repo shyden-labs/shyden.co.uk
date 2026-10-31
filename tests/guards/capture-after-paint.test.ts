@@ -80,7 +80,6 @@ const captureText = (_file: string, source: string): number =>
 
 const captures: Liveness = {
   what: 'Playwright captures',
-  floor: 'capture-after-paint/captures',
   carries: (file, source) => captureText(file, source) > 0,
   count: captureText,
 };

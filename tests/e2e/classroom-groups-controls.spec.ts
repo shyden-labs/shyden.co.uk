@@ -5,7 +5,6 @@ import { MAX_STUDENTS } from '../../src/lib/grouping';
 import { recordErrors } from './recorders';
 import { localePaths, sampledPaths } from './locale-sampling';
 import { getStrings, localeFromPath } from '../../src/lib/i18n';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   addSeveral,
@@ -526,12 +525,6 @@ test.describe('classroom groups — mobile-first layout', () => {
             what: 'visible controls measured in both modes',
           }),
         ).toEqual([]);
-        expect(
-          floorBreach(
-            'classroom-groups-controls/measured-controls',
-            measured.length,
-          ),
-        ).toBeUndefined();
       },
     );
 

@@ -13,7 +13,6 @@ import {
 } from '../../src/lib/i18n';
 import { pagePath } from '../../src/lib/report';
 import { expectReportsBound } from '../report-health';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   BASE_URL,
@@ -95,9 +94,6 @@ test.describe('with JavaScript disabled', () => {
           what: 'reports stored under this test',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('report/not-found-stored-rows', stored.length),
-      ).toBeUndefined();
     },
   );
 
@@ -155,9 +151,6 @@ test.describe('with JavaScript disabled', () => {
           what: 'reports stored under this test',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('report/cross-block-stored-rows', stored.length),
-      ).toBeUndefined();
     },
   );
 });
@@ -190,9 +183,6 @@ test('a cross-origin POST is refused and stores nothing', async ({
       what: 'reports stored under this test',
     }),
   ).toEqual([]);
-  expect(
-    floorBreach('report/cross-origin-stored-rows', stored.length),
-  ).toBeUndefined();
 });
 
 test.describe('on a tool page', () => {

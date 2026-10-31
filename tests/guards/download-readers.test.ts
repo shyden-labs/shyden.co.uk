@@ -5,7 +5,6 @@ import { parseSource } from '../unit/ast';
 import { callsIn, lineOf } from '../playwright-declarations';
 import { withoutTsComments } from '../unit/source-text';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * A download's bytes are read in ONE place: `downloadText` (tests/e2e/helpers.ts).
@@ -88,7 +87,6 @@ describe('a download’s bytes are read only through downloadText', () => {
     // hold them, and ratcheted (#468).
     expectNothingFound(read, {
       what: 'download byte reads',
-      floor: 'download-readers/byte-reads',
       carries: (_file, source) => BYTE_READ.test(withoutTsComments(source)),
     });
   });
@@ -125,9 +123,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(scanned(src), { of: reads, what: 'download byte reads' }),
     ).toEqual([]);
-    expect(
-      floorBreach('download-readers/accepted-reads', reads.length),
-    ).toBeUndefined();
   });
 
   it('allows the read inside the home, and only there', () => {
@@ -140,9 +135,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(scanned(home), { of: reads, what: 'download byte reads' }),
     ).toEqual([]);
-    expect(
-      floorBreach('download-readers/reads-inside-home', reads.length),
-    ).toBeUndefined();
     const elsewhere = home.map((line) =>
       line.replace('downloadText', 'readItMyself'),
     );
@@ -159,8 +151,5 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(
       searched(scanned(lines), { of: lines, what: 'lines naming a reader' }),
     ).toEqual([]);
-    expect(
-      floorBreach('download-readers/commented-lines', lines.length),
-    ).toBeUndefined();
   });
 });

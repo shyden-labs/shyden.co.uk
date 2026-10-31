@@ -9,7 +9,6 @@ import {
   openRoster,
 } from './helpers';
 import { todayISO } from '../../src/lib/csv';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { recorded, shoot } from './evidence';
 
@@ -685,12 +684,6 @@ test.describe('the printed sheet', () => {
       }),
       `printed controls: ${controls.join(' | ')}`,
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'classroom-groups-print/buttons-and-links',
-        candidates.length,
-      ),
-    ).toBeUndefined();
   });
 
   test('carries the class name and the date however it was printed', async ({

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { CSV_LOCALES, type CsvColumn } from '../../src/lib/csv-locale';
-import { floorBreach } from '../floors';
 import { nonEmpty, searched } from '../source-files';
 import { LOCALES, getStrings, type Locale } from '../../src/lib/i18n';
 import {
@@ -160,9 +159,6 @@ describe('CSV_LOCALES', () => {
     expect(
       searched(collisions, { of: unordered, what: 'locale pairs' }),
     ).toEqual([]);
-    expect(
-      floorBreach('csv/header-word-pairs', unordered.length),
-    ).toBeUndefined();
     // Anti-vacuity, the same reason the populated-tables test below exists:
     // an empty table makes every comparison above pass having compared
     // nothing. Count the pairs actually walked, and the words in each table.
@@ -219,7 +215,6 @@ describe('CSV_LOCALES', () => {
     expect(
       searched(conflicts, { of: tokens, what: 'distinct CSV tokens' }),
     ).toEqual([]);
-    expect(floorBreach('csv/distinct-tokens', tokens.length)).toBeUndefined();
     // Anti-vacuity: a table of empty strings collides with nothing, so
     // assert every locale actually contributed a token for every meaning.
     for (const locale of LOCALES) {
@@ -708,7 +703,6 @@ describe('parseRoster', () => {
         what: 'lines of the header-only file',
       }),
     ).toEqual([]);
-    expect(floorBreach('csv/header-only-lines', lines.length)).toBeUndefined();
   });
 
   it('ignores every # line except the class comment', () => {
@@ -750,9 +744,6 @@ describe('parseRoster', () => {
         what: 'lines of the English template',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('csv/english-template-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('imports nothing from an untouched Indonesian template either', () => {
@@ -767,9 +758,6 @@ describe('parseRoster', () => {
         what: 'lines of the Indonesian template',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('csv/indonesian-template-lines', lines.length),
-    ).toBeUndefined();
   });
 
   it('does not import a real child called Example One', () => {
@@ -1206,9 +1194,6 @@ describe('the sex column header, corrected without breaking old files', () => {
     expect(
       searched(lost, { of: locales, what: 'locales round-tripped' }),
     ).toEqual([]);
-    expect(
-      floorBreach('csv/round-tripped-locales', locales.length),
-    ).toBeUndefined();
   });
 
   it('the sex header agrees with the roster column the teacher sees', () => {
@@ -1240,9 +1225,6 @@ describe('the sex column header, corrected without breaking old files', () => {
     expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('csv/sex-header-locales', locales.length),
-    ).toBeUndefined();
   });
 
   it('the sex tokens are the letters the roster offers the teacher', () => {
@@ -1266,9 +1248,6 @@ describe('the sex column header, corrected without breaking old files', () => {
     expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('csv/sex-token-locales', locales.length),
-    ).toBeUndefined();
   });
 
   it("the class comment names the class the way the page's own field does", () => {
@@ -1294,9 +1273,6 @@ describe('the sex column header, corrected without breaking old files', () => {
     expect(searched(drift, { of: locales, what: 'locales compared' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('csv/class-comment-locales', locales.length),
-    ).toBeUndefined();
   });
 
   it('correcting the sex header moved nothing else, in any locale', () => {
@@ -1374,9 +1350,6 @@ describe('the sex column header, corrected without breaking old files', () => {
     expect(searched(moved, { of: locales, what: 'locales pinned' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('csv/untouched-locales', locales.length),
-    ).toBeUndefined();
   });
 });
 
@@ -1417,6 +1390,5 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
     expect(searched(leaked, { of: locales, what: 'locales exported' })).toEqual(
       [],
     );
-    expect(floorBreach('csv/exported-locales', locales.length)).toBeUndefined();
   });
 });

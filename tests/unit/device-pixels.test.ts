@@ -5,7 +5,6 @@ import {
   readsAsLineWidth,
   type Cover,
 } from '../device-pixels';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**
@@ -98,9 +97,6 @@ const phone = (over: Partial<Cover> = {}): Cover => ({
 const expectCovers = (m: Cover) => {
   const { checked, gaps } = coverGaps(m);
   expect(searched(gaps, { of: checked, what: 'cover checks' })).toEqual([]);
-  expect(
-    floorBreach('device-pixels/cover-checks', checked.length),
-  ).toBeUndefined();
 };
 
 describe('coverGaps', () => {

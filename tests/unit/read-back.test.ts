@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import {
   GOOGLE_ENGINE,
   approvedFirst,
@@ -409,9 +408,6 @@ describe('coverage: every line has a reading of its exact current text', () => {
         { of: units, what: 'fixture lines, every one read' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('read-back/fixture-read-lines', units.length),
-    ).toBeUndefined();
   });
 
   it('names a line changed since its reading', () => {
@@ -438,9 +434,6 @@ describe('coverage: every line has a reading of its exact current text', () => {
         { of: units, what: 'fixture lines, one pending' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('read-back/fixture-pending-lines', units.length),
-    ).toBeUndefined();
   });
 
   it('names a pending key whose line is now read, so the list only shrinks', () => {
@@ -836,9 +829,6 @@ describe('batches under an allowance', () => {
         what: 'texts planned on a spent day',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('read-back/spent-day-plan', plan.length),
-    ).toBeUndefined();
   });
 });
 

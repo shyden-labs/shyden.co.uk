@@ -26,7 +26,6 @@ import {
 import { call, readBack } from '../../scripts/back-translate-client.mjs';
 import { backTranslations } from '../../scripts/reports-review.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { codeWithoutComments } from './source-text';
 import {
   BELL,
@@ -421,9 +420,6 @@ describe('the engine client has one home (AC4)', () => {
           what: 'requests the engine stand-in recorded, the sentinel included',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('report-review/no-engine-requests', recorded.all.length),
-      ).toBeUndefined();
     });
 
     it('reports an engine it cannot reach in every report that needed it', async () => {
@@ -456,9 +452,6 @@ describe('the engine client has one home (AC4)', () => {
           what: 'requests the engine stand-in recorded, the sentinel included',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('report-review/not-needed-requests', recorded.all.length),
-      ).toBeUndefined();
     });
   });
 

@@ -7,7 +7,6 @@ import {
   REPORT_DIR,
 } from '../../scripts/test-devices.mjs';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { withoutTsComments } from './source-text';
 
 /**
@@ -55,9 +54,6 @@ describe('the dashboard reads the paths the device harness writes', () => {
         what: 'shared path literals',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('dashboard-paths/shared-paths', needles.length),
-    ).toBeUndefined();
   });
 
   it('exports every file the dashboard reads, under the repository root', () => {

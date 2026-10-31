@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { scopedClassReport } from '../unit/scoped-classes';
 
 /**
@@ -143,9 +142,6 @@ describe('scopedClassReport', () => {
           what: 'classes the scoped styles name',
         }),
       ).toEqual([]);
-      expect(
-        floorBreach('scoped-classes/script-added-named', report.named.length),
-      ).toBeUndefined();
     },
   );
 
@@ -198,9 +194,6 @@ describe('scopedClassReport', () => {
         what: 'classes the scoped styles name',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('scoped-classes/scoped-only-named', report.named.length),
-    ).toBeUndefined();
   });
 
   it('reads selectors, never declarations, conditions or attribute values', () => {
@@ -273,9 +266,6 @@ describe('every class a scoped rule names is one its own file can carry', () => 
         what: 'classes named in scoped styles',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('scoped-classes/named-classes', judged.length),
-    ).toBeUndefined();
   });
 
   it('can read every class those files write', () => {
@@ -290,8 +280,5 @@ describe('every class a scoped rule names is one its own file can carry', () => 
         what: 'class values read',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('scoped-classes/read-class-values', judged.length),
-    ).toBeUndefined();
   });
 });

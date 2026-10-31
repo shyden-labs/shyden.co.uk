@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import {
   dependentsOf,
   maxStaleBranch,
@@ -115,12 +114,6 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
     expect(
       searched(findings, { of: properties, what: 'config properties' }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'remote-images/no-remote-image-properties',
-        properties.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('is not satisfied, nor refused, by a comment naming a domain', () => {
@@ -131,9 +124,6 @@ describe('remoteImageAllowances reads what lets the build fetch a remote image',
     expect(
       searched(findings, { of: properties, what: 'config properties' }),
     ).toEqual([]);
-    expect(
-      floorBreach('remote-images/comment-only-properties', properties.length),
-    ).toBeUndefined();
   });
 
   it('refuses a config with no defineConfig object to read', () => {
@@ -157,9 +147,6 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
       `${CACHE} still serves max-stale ungated (GHSA-ch52-4w7c-c8xp, #457): ` +
         'a remote image would put it in the build',
     ).toEqual([]);
-    expect(
-      floorBreach('remote-images/config-properties', properties.length),
-    ).toBeUndefined();
   });
 
   it('keeps http-cache-semantics pinned to 4.2.0, so a refresh cannot read as a fix', () => {

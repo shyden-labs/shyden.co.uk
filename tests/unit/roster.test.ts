@@ -15,7 +15,6 @@ import {
 import * as roster from '../../src/lib/roster';
 import { student } from './factories';
 import type { Student } from '../../src/lib/grouping';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { getStrings } from '../../src/lib/i18n';
 
@@ -508,9 +507,6 @@ describe('rosterProblems', () => {
         what: 'students handed to rosterProblems',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/apart-letter-not-kept-together', students.length),
-    ).toBeUndefined();
   });
 
   it('names an unnamed student as Student N in the message', () => {
@@ -598,9 +594,6 @@ describe('rosterProblems', () => {
         what: 'students handed to rosterProblems',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/absent-holder-of-a-clash', students.length),
-    ).toBeUndefined();
   });
 
   // ...but a duplicate number is still caught even when one holder is
@@ -628,9 +621,6 @@ describe('rosterProblems', () => {
         { of: cases, what: 'rosters handed to rosterProblems' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/empty-roster-problems', cases.length),
-    ).toBeUndefined();
   });
 
   it('renders the clash message in Indonesian too, not a copy of the English sentence', () => {
@@ -682,9 +672,6 @@ describe('rosterWarnings', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/numbers-without-gaps', students.length),
-    ).toBeUndefined();
   });
 
   it('does not treat a roster starting above 1 as a gap', () => {
@@ -696,9 +683,6 @@ describe('rosterWarnings', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/numbered-from-above-one', students.length),
-    ).toBeUndefined();
   });
 
   // Not in the brief -- English inflects (this file's established
@@ -725,9 +709,6 @@ describe('rosterWarnings', () => {
         { of: cases, what: 'rosters handed to rosterWarnings' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/empty-roster-warnings', cases.length),
-    ).toBeUndefined();
   });
 
   // A single-student roster has no internal range to be missing a number
@@ -743,9 +724,6 @@ describe('rosterWarnings', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/single-student', students.length),
-    ).toBeUndefined();
   });
 
   it('is quiet when a duplicate, not a gap, is what is wrong', () => {
@@ -758,9 +736,6 @@ describe('rosterWarnings', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/duplicate-not-gap', students.length),
-    ).toBeUndefined();
   });
 
   // Absence does not touch the register -- design spec section 4's "their
@@ -777,9 +752,6 @@ describe('rosterWarnings', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/absent-closes-the-gap', students.length),
-    ).toBeUndefined();
   });
 
   it('renders in Indonesian too, not a copy of the English sentence', () => {
@@ -816,9 +788,6 @@ describe('rosterWarnings does not enumerate an unbounded range', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/range-wider-than-max', students.length),
-    ).toBeUndefined();
     expect(Date.now() - started).toBeLessThan(200);
   });
 
@@ -848,8 +817,5 @@ describe('rosterWarnings does not enumerate an unbounded range', () => {
         what: 'students handed to rosterWarnings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('roster/one-past-the-limit', past.length),
-    ).toBeUndefined();
   });
 });

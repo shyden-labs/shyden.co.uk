@@ -1,8 +1,6 @@
-import './tests/main-coverage.ts';
 import { defineConfig } from 'vitest/config';
-import LoadReporter from './tests/load-reporter.ts';
 import unit from './vitest.config.ts';
-import { LOAD_SETUP, SHARED_SETUP } from './tests/setup-files.ts';
+import { SHARED_SETUP } from './tests/setup-files.ts';
 
 /**
  * The logs suite (#822): every check of a log line or an audit trail the code
@@ -25,9 +23,9 @@ export default defineConfig({
   test: {
     include: ['tests/logs/**/*.test.ts'],
     // The shared setup, then the measurement of loading each file (#696).
-    setupFiles: [...SHARED_SETUP, LOAD_SETUP],
+    setupFiles: [...SHARED_SETUP],
     // The verbose listing, then what loading each file cost.
-    reporters: ['verbose', new LoadReporter({ suite: 'logs' })],
+    reporters: ['verbose'],
     globalSetup: unit.test?.globalSetup,
   },
 });

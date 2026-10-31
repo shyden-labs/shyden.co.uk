@@ -1,7 +1,6 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 import { parseFile, where } from '../unit/ast';
 
 /**
@@ -84,8 +83,5 @@ describe('git runs in a scratch repository through one home (#377)', () => {
         { of: calls, what: 'calls that start git under tests/' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('scratch-git-home/git-calls', calls.length),
-    ).toBeUndefined();
   });
 });

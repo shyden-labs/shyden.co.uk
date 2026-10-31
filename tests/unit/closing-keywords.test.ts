@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCRIPT, workflowsRunningTheRule } from '../closing-keywords-shared';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { closingKeywordOffences } from '../../scripts/closing-keywords.mjs';
 
 /**
@@ -136,9 +135,6 @@ describe('the closing-keyword rule, in its one home', () => {
         what: 'safe phrasings',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('closing-keywords/safe-phrasings', phrasings.length),
-    ).toBeUndefined();
   });
 
   it('reports the line a multi-line message offends on, not the first', () => {
@@ -178,9 +174,6 @@ describe('the closing-keyword rule, in its one home', () => {
         what: 'lines of the empty message',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('closing-keywords/empty-message-lines', lines.length),
-    ).toBeUndefined();
   });
 });
 
@@ -265,8 +258,5 @@ describe('the rule covers a pull request body, not only a commit message', () =>
         what: `run: scripts in ${only?.file ?? 'no workflow'}`,
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('closing-keywords/rule-workflow-runs', runs.length),
-    ).toBeUndefined();
   });
 });

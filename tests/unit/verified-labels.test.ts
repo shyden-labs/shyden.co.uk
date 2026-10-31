@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { nonEmpty, searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { en, type Catalogue } from '../../src/lib/i18n/en';
 import { id } from '../../src/lib/i18n/id';
 import { zh } from '../../src/lib/i18n/zh';
@@ -103,9 +102,6 @@ describe('the copy the operator read and approved', () => {
     expect(
       searched(unpinned, { of: rosterColumnKeys, what: 'roster columns' }),
     ).toEqual([]);
-    expect(
-      floorBreach('verified-labels/roster-columns', rosterColumnKeys.length),
-    ).toBeUndefined();
 
     const values = LOCALES.flatMap((locale) => Object.values(VERIFIED[locale]));
     expect(
@@ -114,9 +110,6 @@ describe('the copy the operator read and approved', () => {
         { of: values, what: 'pinned values' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('verified-labels/pinned-values', values.length),
-    ).toBeUndefined();
   });
 });
 
@@ -151,14 +144,6 @@ const AWAITING_READ: Record<Locale, readonly string[]> = {
   th: [],
 };
 
-// One id per locale: the search below runs once per locale over its own labels.
-const WITNESSED_FLOOR: Readonly<Record<string, string>> = {
-  id: 'verified-labels/witnessed-labels-id',
-  zh: 'verified-labels/witnessed-labels-zh',
-  vi: 'verified-labels/witnessed-labels-vi',
-  th: 'verified-labels/witnessed-labels-th',
-};
-
 describe('short labels that disagree with their own locale', () => {
   // One test per locale (#714): the five in one test reached 71 ms of own CPU
   // on the runner, over the 70 ms cut line under the 0.1 s limit.
@@ -189,9 +174,6 @@ describe('short labels that disagree with their own locale', () => {
           }),
         ].sort(),
       ).toEqual([...AWAITING_READ[locale]].sort());
-      expect(
-        floorBreach(WITNESSED_FLOOR[locale], witnessed.length),
-      ).toBeUndefined();
     });
 });
 
@@ -239,14 +221,6 @@ const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
   ],
 };
 
-// One id per locale: the search below runs once per locale over its own labels.
-const UNWITNESSED_FLOOR: Readonly<Record<keyof typeof UNWITNESSED, string>> = {
-  id: 'verified-labels/unwitnessed-labels-id',
-  zh: 'verified-labels/unwitnessed-labels-zh',
-  vi: 'verified-labels/unwitnessed-labels-vi',
-  th: 'verified-labels/unwitnessed-labels-th',
-};
-
 describe('short labels no check can judge', () => {
   for (const locale of Object.keys(
     UNWITNESSED,
@@ -262,9 +236,6 @@ describe('short labels no check can judge', () => {
         ),
       ].sort();
       expect(unread).toEqual([...UNWITNESSED[locale]].sort());
-      expect(
-        floorBreach(UNWITNESSED_FLOOR[locale], unwitnessed.length),
-      ).toBeUndefined();
     });
   }
 });

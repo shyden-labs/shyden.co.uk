@@ -6,7 +6,6 @@ import logs from '../../vitest.logs.config';
 import simulation from '../../vitest.simulation.config';
 import unit from '../../vitest.config';
 import { workflowJobs } from '../workflow-jobs';
-import { unitProject } from '../vitest-suite-dirs';
 
 /**
  * The per-test budget of each suite that is not the unit suite: one table, so
@@ -87,7 +86,7 @@ const SUITES = [
     command:
       'vitest run --configLoader native --config vitest.integration.config.ts --testTimeout=30000',
     // Its started processes write raw V8 coverage, its forks do not (#936).
-    own: ['tests/child-coverage-setup.ts'],
+    own: [],
   },
   {
     suite: 'logs',
@@ -123,7 +122,7 @@ describe.each(SUITES)(
       expect(config.test?.include).toEqual([`tests/${suite}/**/*.test.ts`]);
     });
 
-    it("has the shared setup files, its own, and the unit suite's global setup, so a run is as isolated, then measures loading (#696)", () => {
+    it("has the shared setup files, its own, and the unit suite's global setup, so a run is as isolated", () => {
       expect({
         setup: config.test?.setupFiles,
         global: config.test?.globalSetup,
@@ -132,7 +131,6 @@ describe.each(SUITES)(
           'tests/git-env-setup.ts',
           'tests/temporary-files-setup.ts',
           ...own,
-          'tests/load-setup.ts',
         ],
         global: unit.test?.globalSetup,
       });
@@ -142,12 +140,7 @@ describe.each(SUITES)(
 
 describe('the suites beside the unit suite', () => {
   it('are not read by the unit suite', () => {
-    expect({
-      unit: unitProject('unit').include,
-      parser: unitProject('unit-parser').include?.every((file) =>
-        file.startsWith('tests/unit/'),
-      ),
-    }).toEqual({ unit: ['tests/unit/**/*.test.ts'], parser: true });
+    expect(unit.test?.include).toEqual(['tests/unit/**/*.test.ts']);
   });
 
   // Only unit tests, formatters and type checks run on the laptop; every other

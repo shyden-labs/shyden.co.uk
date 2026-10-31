@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import { searched, trackedFiles } from '../source-files';
 
 /**
@@ -64,9 +63,6 @@ describe("no live file names the org's old GitHub handle (#413)", () => {
         { of: files, what: 'tracked files outside the dated docs' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('organisation-name/old-handle-files', files.length),
-    ).toBeUndefined();
   });
 });
 
@@ -93,8 +89,5 @@ describe('no live file names the game by its retired name (#552)', () => {
         what: 'tracked files outside the dated docs',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('organisation-name/retired-game-name-files', files.length),
-    ).toBeUndefined();
   });
 });

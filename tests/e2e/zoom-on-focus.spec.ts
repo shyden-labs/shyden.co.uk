@@ -1,6 +1,5 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../typed-fields';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
@@ -68,9 +67,6 @@ test.describe('no field makes iOS zoom the page (#352)', () => {
           }),
           'the English homepage has no typed field',
         ).toEqual([]);
-        expect(
-          floorBreach('zoom-on-focus/homepage-elements', examined),
-        ).toBeUndefined();
         return;
       }
       expect(

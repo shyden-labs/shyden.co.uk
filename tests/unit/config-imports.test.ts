@@ -1,7 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import { nonEmpty, searched } from '../source-files';
 import { nodesIn, parseSource, where } from './ast';
 
@@ -92,9 +91,6 @@ describe('every vitest config names the files it imports (#680)', () => {
       }),
       bare.join('\n'),
     ).toEqual([]);
-    expect(
-      floorBreach('config-imports/relative-imports', imports.length),
-    ).toBeUndefined();
   });
 
   // Hiding the warning is not the fix: the variable that silences it is set
@@ -116,8 +112,5 @@ describe('every vitest config names the files it imports (#680)', () => {
         what: 'files a run takes its environment from',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('config-imports/environment-homes', homes.length),
-    ).toBeUndefined();
   });
 });

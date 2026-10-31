@@ -8,7 +8,6 @@ import {
 import { withoutTsComments } from './source-text';
 import { commentsIn, parseSource } from './ast';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Where the e2e suite's time actually goes, per project.
@@ -129,9 +128,6 @@ describe('per-project e2e timings', () => {
         what: 'suites of the empty report',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('e2e-timings/empty-report-suites', empty.suites.length),
-    ).toBeUndefined();
   });
 
   it('formats a table naming the budget each project is measured against', () => {

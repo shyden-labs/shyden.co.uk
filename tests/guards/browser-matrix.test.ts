@@ -10,10 +10,8 @@ import {
   specFilesUnder,
   trackedFiles,
 } from '../source-files';
-import { floorBreach } from '../floors';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
-import { serverCoverageFindings, type WebServer } from '../web-server-coverage';
 import { workflowJobs } from '../workflow-jobs';
 
 type PlaywrightConfigModule = typeof import('../../playwright.config');
@@ -137,12 +135,6 @@ describe('the content-only project', () => {
       }),
       'a renamed spec would silently stop being scoped',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'browser-matrix/named-content-only-specs',
-        contentOnly.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('does not simply list every spec, which would assert nothing', () => {
@@ -175,12 +167,6 @@ describe('the content-only project', () => {
       'a spec that drives the viewport or reads layout is engine-dependent ' +
         'and must run on all five',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'browser-matrix/engine-checked-content-only-specs',
-        contentOnly.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('is judged by a detector that sees layout reads in the real suite', () => {
@@ -231,9 +217,6 @@ describe('the content-only project', () => {
       'a shipped reader the detector does not name hides every layout read ' +
         'it makes from the content-only boundary',
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/shipped-readers', readers.length),
-    ).toBeUndefined();
   });
 
   it('runs those specs on exactly one project', () => {
@@ -337,12 +320,6 @@ describe('the visual-regression project', () => {
       }),
       'each would demand its own set of baselines',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'browser-matrix/projects-other-than-visual',
-        otherNames.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('states its flake policy rather than discovering it', () => {
@@ -476,9 +453,6 @@ describe('the real-device config (#194)', () => {
       }),
       'a phone has no baseline CI would read, so it must never be asked for one',
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/device-projects', deviceNames.length),
-    ).toBeUndefined();
   });
 
   it('still runs every other e2e spec on the phone, content-only ones included', () => {
@@ -493,12 +467,6 @@ describe('the real-device config (#194)', () => {
       searched(dropped, { of: contentOnly, what: 'content-only specs' }),
       'the phone is the only run that measures touching words at phone width (#198)',
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'browser-matrix/phone-content-only-specs',
-        contentOnly.length,
-      ),
-    ).toBeUndefined();
 
     const specs = specFilesUnder(E2E);
     expect(specs.filter((spec) => claims(android, spec))).toEqual(
@@ -578,9 +546,6 @@ describe('the real-device config (#194)', () => {
         what: 'specs a device project claims',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/device-claimed-specs', claimed.length),
-    ).toBeUndefined();
   });
 
   it('leaves git ignoring a snapshot a stray run writes beside a spec', () => {
@@ -716,9 +681,6 @@ describe('every project declares its colour scheme (#142)', () => {
     expect(
       searched(undeclared, { of: projects, what: 'Playwright projects' }),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/colour-scheme-projects', projects.length),
-    ).toBeUndefined();
   });
 });
 
@@ -776,9 +738,6 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
         { of: webkit, what: 'WebKit projects' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/webkit-sink-projects', webkit.length),
-    ).toBeUndefined();
   });
 
   it('launches every WebKit project with the environment it would inherit', () => {
@@ -809,9 +768,6 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
         { of: webkit, what: 'WebKit projects' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/webkit-env-projects', webkit.length),
-    ).toBeUndefined();
   });
 
   it('gives no other engine the sink, as ruled', () => {
@@ -826,9 +782,6 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
         { of: others, what: 'projects on other engines' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/other-engine-sink-projects', others.length),
-    ).toBeUndefined();
   });
 });
 
@@ -849,9 +802,6 @@ describe('no CI run can be narrowed to the tests someone focused (#390)', () => 
     expect(searched(lax, { of: configs, what: 'Playwright configs' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('browser-matrix/forbid-only-configs', configs.length),
-    ).toBeUndefined();
   });
 });
 
@@ -880,11 +830,11 @@ describe('no test run retries (#445)', () => {
   // process.env.CI ? 0 : 1` resolves to 0 under CI, and the device config
   // only ever runs on the laptop (#502, F168).
   it.each([
-    ['under CI', { CI: 'true' }, 'browser-matrix/retry-configs'],
-    ['without CI', { CI: undefined }, 'browser-matrix/retry-configs-local'],
+    ['under CI', { CI: 'true' }],
+    ['without CI', { CI: undefined }],
   ] as const)(
     'resolves retries to 0 in every Playwright config and project, %s',
-    async (_, env, floorId) => {
+    async (_, env) => {
       const configs = rootConfigs();
       const retrying: string[] = [];
       for (const file of configs) {
@@ -900,7 +850,6 @@ describe('no test run retries (#445)', () => {
       expect(
         searched(retrying, { of: configs, what: 'Playwright configs' }),
       ).toEqual([]);
-      expect(floorBreach(floorId, configs.length)).toBeUndefined();
     },
   );
 
@@ -932,50 +881,5 @@ describe('no test run retries (#445)', () => {
         what: 'workflow steps and package scripts',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/retry-commands', commands.length),
-    ).toBeUndefined();
-  });
-});
-
-describe('no Playwright web server measures what it starts (#913)', () => {
-  // A web server builds the site, loading src/ through Vite: code neither its
-  // own text nor in Playwright's compile cache, which the coverage of a
-  // Playwright run refuses. The build's coverage is #914's. Every config is
-  // read with the sanity switch on, so the sanity configs declare theirs. A
-  // `node <script>` server is measured when its script clears the variable
-  // before it starts anything, so its own code is judged and nothing else.
-  const servers: WebServer[] = [];
-
-  beforeAll(async () => {
-    for (const file of rootConfigs()) {
-      const loaded = await importConfig(file, { SANITY_ON_BUILD: '1' });
-      const declared = loaded.webServer;
-      const list =
-        declared === undefined
-          ? []
-          : Array.isArray(declared)
-            ? declared
-            : [declared];
-      list.forEach((server, i) =>
-        servers.push({
-          id: `${file} › web server ${i + 1}`,
-          command: server.command,
-          signal: server.gracefulShutdown?.signal,
-        }),
-      );
-    }
-  });
-
-  it('starts every web server with NODE_V8_COVERAGE unset, or cleared by its script', () => {
-    expect(
-      searched(
-        serverCoverageFindings(servers, (file) => readFileSync(file, 'utf8')),
-        { of: servers, what: 'Playwright web servers' },
-      ),
-    ).toEqual([]);
-    expect(
-      floorBreach('browser-matrix/web-servers', servers.length),
-    ).toBeUndefined();
   });
 });

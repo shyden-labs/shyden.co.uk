@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures';
 import { shoot } from './evidence';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
@@ -95,9 +94,6 @@ for (const path of PAGES) {
           }),
           'the homepage paints no form controls',
         ).toHaveLength(0);
-        expect(
-          floorBreach('palette-controls/homepage-elements', examined),
-        ).toBeUndefined();
         // The release evidence cites this case too, so it takes a picture
         // (#774): with no control to clip to, the first screen that holds
         // none.

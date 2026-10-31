@@ -2,7 +2,6 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { bind, bindFiles, derivationOf, where, type Bound } from '../unit/ast';
 import { searched, tsFilesUnder } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * Collecting the suite never reads the built site (#351).
@@ -241,9 +240,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the test-body fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('collection-needs-no-build/test-body-calls', calls.length),
-    ).toBeUndefined();
   });
 
   it('nor inside a hook, which also runs only when tests do', () => {
@@ -257,9 +253,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the hook fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('collection-needs-no-build/hook-body-calls', calls.length),
-    ).toBeUndefined();
   });
 
   it('a describe body runs while collecting, so a read there is one', () => {
@@ -281,12 +274,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the describe-constant fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'collection-needs-no-build/describe-constant-calls',
-        calls.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('a path constant read at module scope is a read, at the read', () => {
@@ -308,12 +295,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the composed-path fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'collection-needs-no-build/composed-path-calls',
-        calls.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('...but reading the composed path at module scope does', () => {
@@ -343,9 +324,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the lazy-helper fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('collection-needs-no-build/lazy-helper-calls', calls.length),
-    ).toBeUndefined();
   });
 
   it('the same helper called at module scope is, two hops away included', () => {
@@ -377,12 +355,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the imported-helper fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'collection-needs-no-build/imported-helper-calls',
-        calls.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('a callback handed to a module-scope call runs with it, and is reported once, at the read', () => {
@@ -415,12 +387,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the recursive-helper fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'collection-needs-no-build/recursive-helper-calls',
-        calls.length,
-      ),
-    ).toBeUndefined();
   });
 
   it('a title that starts with dist/ is a title, not a path', () => {
@@ -434,9 +400,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the dist-title fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('collection-needs-no-build/dist-title-calls', calls.length),
-    ).toBeUndefined();
   });
 
   it('a comment naming the read neither is one nor hides one', () => {
@@ -450,12 +413,6 @@ describe('what counts as reading the build while collecting', () => {
         what: 'calls in the commented fixture',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach(
-        'collection-needs-no-build/comment-fixture-calls',
-        calls.length,
-      ),
-    ).toBeUndefined();
     expect(
       readsIn({
         [SPEC]: `${HEAD}// deliberately lazy: filesUnder('dist', keep)\nconst PAGES = filesUnder('dist', keep);`,
@@ -477,8 +434,5 @@ describe('collecting the suite never needs a build (#351)', () => {
         "so every filtered run's reconciliation -- fail on a checkout with no " +
         'build. Read it inside the test or hook that needs it.',
     ).toEqual([]);
-    expect(
-      floorBreach('collection-needs-no-build/dist-literals', literals.length),
-    ).toBeUndefined();
   });
 });

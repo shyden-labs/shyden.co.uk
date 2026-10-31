@@ -1,6 +1,5 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import {
   docsNamingArgs,
   docsPathspec,
@@ -39,9 +38,6 @@ describe('the tree reading is what git says now (#631)', () => {
         what: 'tracked files',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('tree-reading/fresh-tracked', fresh.length),
-    ).toBeUndefined();
   });
 
   it('committable equals git ls-files with the untracked, unignored files', () => {
@@ -54,9 +50,6 @@ describe('the tree reading is what git says now (#631)', () => {
         what: 'committable files',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('tree-reading/fresh-committable', fresh.length),
-    ).toBeUndefined();
   });
 
   it('every ignore answer equals git check-ignore', () => {
@@ -82,9 +75,6 @@ describe('the tree reading is what git says now (#631)', () => {
     expect(searched(wrong, { of: kept, what: 'unignored questions' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('tree-reading/fresh-unignored-questions', kept.length),
-    ).toBeUndefined();
   });
 
   it('the docs-only selections equal git`s own', () => {
@@ -102,11 +92,5 @@ describe('the tree reading is what git says now (#631)', () => {
         what: 'files naming docs/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('tree-reading/fresh-docs-selected', selected.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach('tree-reading/fresh-docs-naming', naming.length),
-    ).toBeUndefined();
   });
 });

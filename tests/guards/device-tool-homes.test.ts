@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { filesUnder, searched } from '../source-files';
 import { withoutTsComments } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * Each command-line tool the device leg drives is spawned from one home, which
@@ -63,9 +62,6 @@ describe.each(HOMES)('no file spawns $tool but $home', ({ tool, home }) => {
         what: 'files under tests/ and scripts/',
       }),
     ).toEqual([]);
-    expect(
-      floorBreach('device-tool-homes/call-site-files', files.length),
-    ).toBeUndefined();
 
     // The positive control: the home itself is caught by the same pattern, so
     // an empty list above is a fact about the other files and not a pattern
@@ -77,9 +73,6 @@ describe.each(HOMES)('no file spawns $tool but $home', ({ tool, home }) => {
   });
 
   it('reads every file under tests/ and scripts/, and as many as there are', () => {
-    expect(
-      floorBreach('device-tool-homes/files', files.length),
-    ).toBeUndefined();
     // The home is among them, so a walk that loses scripts/ fails too.
     expect(files).toContain(home);
   });
@@ -109,8 +102,5 @@ describe('`adb devices` is read in one place', () => {
     expect(
       searched(reading, { of: files, what: 'files under tests/ and scripts/' }),
     ).toEqual(['scripts/adb.mjs']);
-    expect(
-      floorBreach('device-tool-homes/adb-reader-files', files.length),
-    ).toBeUndefined();
   });
 });

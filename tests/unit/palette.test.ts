@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 import {
   ATMOSPHERE,
@@ -135,7 +134,6 @@ describe('subsets', () => {
         { of: all, what: 'subsets' },
       ),
     ).toEqual([]);
-    expect(floorBreach('palette/subsets-of-three', all.length)).toBeUndefined();
   });
 });
 

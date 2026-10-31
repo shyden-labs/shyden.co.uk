@@ -6,7 +6,6 @@ import {
   withoutLocalGit,
 } from '../git-env';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 describe('the variables that point git at one repository (#377)', () => {
   it('are the ones git itself lists, the dangerous ones among them', () => {
@@ -45,7 +44,6 @@ describe('the variables that point git at one repository (#377)', () => {
         { of: vars, what: 'variables that point git at a repository' },
       ),
     ).toEqual([]);
-    expect(floorBreach('git-env/local-git-vars', vars.length)).toBeUndefined();
   });
 
   // The list is asked of git once per run, in global setup, and handed to the

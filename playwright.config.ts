@@ -1,5 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import { unmeasured } from './tests/coverage-options';
 import { ENGINES, engineUse } from './tests/engines';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
@@ -42,7 +41,6 @@ export const CONTENT_ONLY_SPECS = [
   'locale-parity.spec.ts',
   'copy-reaches-a-page.spec.ts',
   'theme-script.spec.ts',
-  'floors-under-playwright.spec.ts',
 ];
 
 const contentOnly = new RegExp(
@@ -269,7 +267,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: unmeasured('npm run build && npm run preview'),
+    command: 'npm run build && npm run preview',
     url: 'http://localhost:4321',
     reuseExistingServer: !!process.env.PW_REUSE_SERVER,
   },

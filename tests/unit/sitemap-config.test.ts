@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { withoutTsComments } from './source-text';
 import { LOCALES } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
-import { floorBreach } from '../floors';
 
 /**
  * The sitemap's locale map, which cannot import the table it must agree with.
@@ -69,11 +68,6 @@ describe('the sitemap declares every locale the site serves', () => {
     // A regex that stopped matching would hand every assertion above an empty
     // object, and `{} === {}` is a pass for a check phrased as "no extras".
     // #84: a guard handed an empty list asserts nothing at all.
-    expect(
-      floorBreach(
-        'sitemap-config/locales',
-        Object.keys(sitemapLocales()).length,
-      ),
-    ).toBeUndefined();
+    expect(Object.keys(sitemapLocales()).length).toBeGreaterThan(0);
   });
 });

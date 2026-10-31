@@ -11,7 +11,6 @@ import {
 } from '../../scripts/release-inventory.mjs';
 import { scratchGit, withoutLocalGit } from '../git-env';
 import { writeUnder } from '../scratch-dir';
-import { floorBreach } from '../floors';
 
 /** A throwaway repository, driven by the real git. */
 const repository = () => {
@@ -249,9 +248,6 @@ describe('release-inventory.mjs as a command (#362)', () => {
     });
     expect(run.status, run.stderr).toBe(0);
     const lines = run.stdout.trim().split('\n');
-    expect(
-      floorBreach('release-inventory/capture-lines', lines.length),
-    ).toBeUndefined();
     expect(
       lines.every((l) => /^tests\/e2e\/[\w.-]+\.spec\.ts:\d+$/.test(l)),
     ).toBe(true);

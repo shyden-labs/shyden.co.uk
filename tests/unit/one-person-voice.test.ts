@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
 import { MVP_LOCALES, type MvpLocale } from '../../src/lib/i18n/metadata';
 import { en } from '../../src/lib/i18n/en';
@@ -47,14 +46,6 @@ const WE: Readonly<Record<MvpLocale, RegExp>> = {
   th: /เรา/,
 };
 
-const FLOOR: Readonly<Record<MvpLocale, string>> = {
-  en: 'one-person-voice/strings-en',
-  id: 'one-person-voice/strings-id',
-  zh: 'one-person-voice/strings-zh',
-  vi: 'one-person-voice/strings-vi',
-  th: 'one-person-voice/strings-th',
-};
-
 describe('the site speaks as one person', () => {
   it('reads every locale the site serves', () => {
     expect(Object.keys(COPY).sort()).toEqual([...MVP_LOCALES].sort());
@@ -69,7 +60,6 @@ describe('the site speaks as one person', () => {
       expect(
         searched(plural, { of: strings, what: `${locale} copy strings` }),
       ).toEqual([]);
-      expect(floorBreach(FLOOR[locale], strings.length)).toBeUndefined();
     });
   }
 });

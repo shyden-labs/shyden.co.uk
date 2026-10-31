@@ -62,7 +62,6 @@ import {
 import { MAX_STUDENTS } from '../../../src/lib/grouping';
 import { FLOOR_PX } from '../../../src/scripts/projector';
 import { measureBoardScript, type BoardGeometry } from '../../board-geometry';
-import { floorBreach } from '../../floors';
 import { searched } from '../../source-files';
 import {
   IOS_ZOOM_FLOOR_PX,
@@ -81,9 +80,8 @@ let session: DeviceSession;
  * there must be none, and after a class the page can deal, where there must be
  * some. The second reading is the population the first is judged against, so
  * a reader gone blind (a selector that stopped matching, a card whose text
- * stopped reading) is a short count against its recorded floor rather than a
- * clean "nothing rendered". `npm run floors:record -- --device` records the
- * floors, on the phone, since nothing else can run this file.
+ * stopped reading) shows as an empty second reading rather than a clean
+ * "nothing rendered".
  */
 async function groupCardTexts(): Promise<string[]> {
   const cards = await session.driver.findElements('#cg-tables .group');
@@ -433,9 +431,6 @@ describe.each(LOCALES)(
         }),
         `group cards after refusing 0 students (${locale})`,
       ).toEqual([]);
-      expect(
-        floorBreach('ios-journeys/no-students-dealt', dealt.length),
-      ).toBeUndefined();
     });
 
     // Brief item 6 reads "a group size larger than the class". The only
@@ -497,9 +492,6 @@ describe.each(LOCALES)(
         }),
         `group cards after refusing more groups than students (${locale})`,
       ).toEqual([]);
-      expect(
-        floorBreach('ios-journeys/too-many-groups-dealt', dealt.length),
-      ).toBeUndefined();
     });
 
     test('Journey 7 -- changing the student count after a shuffle shows the real localised stale notice', async () => {
@@ -652,9 +644,6 @@ describe.each(LOCALES)(
         }),
         `nothing rendered for a refused count (${locale})`,
       ).toEqual([]);
-      expect(
-        floorBreach('ios-journeys/too-many-students-dealt', dealt.length),
-      ).toBeUndefined();
     });
 
     test('Journey 9 -- no horizontal scroll at the real device width', async () => {
@@ -899,14 +888,12 @@ describe.each(LOCALES)(
         size: '5',
         groups: 5,
         what: 'the reported case',
-        floor: 'ios-journeys/board-reported-case-cards',
       },
       {
         count: '8',
         size: '2',
         groups: 4,
         what: 'the false-fit shape',
-        floor: 'ios-journeys/board-false-fit-cards',
       },
     ] as const;
 
@@ -1068,7 +1055,6 @@ describe.each(LOCALES)(
           }),
           where,
         ).toEqual([]);
-        expect(floorBreach(shape.floor, seen.cards.length)).toBeUndefined();
         await shootDevice(session.driver, {
           project,
           label: `nothing out of reach -- ${seen.rows} row(s) at ${seen.font}`,

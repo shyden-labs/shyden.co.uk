@@ -1359,10 +1359,8 @@ function cleanUpOnSignal() {
 }
 
 /**
- * The groups a run launches: all three, or the iOS group alone for `--ios`,
- * which is how `npm run floors:record -- --device` records the iPhone
- * journeys' floors (#623) without an emulated browser writing figures beside
- * them. Anything else is the usage line naming what was given -- and refusing
+ * The groups a run launches: all three, or the iOS group alone for `--ios`.
+ * Anything else is the usage line naming what was given -- and refusing
  * it is the cheapest proof that `main()` ran when the file is executed
  * directly (#227). A skipped entry point exits 0 in silence.
  *

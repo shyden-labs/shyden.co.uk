@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { LOCALES, localisePath } from '../../src/lib/i18n/index';
-import { floorBreach } from '../floors';
 import { filesUnder, searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
 import { docsPaths } from '../site-pages';
@@ -88,9 +87,6 @@ test.describe('the sitemap', () => {
       searched(wrong, { of: blocks, what: 'sitemap <url> blocks' }),
       `expected every page to declare ${EXPECTED_ALTERNATES.join(',')}`,
     ).toEqual([]);
-    expect(
-      floorBreach('head-and-sitemap/sitemap-url-blocks', blocks.length),
-    ).toBeUndefined();
 
     // Each entry pairs with its own translation, not with the homepage.
     const groups = xml.split('<url>').slice(1);

@@ -97,7 +97,6 @@ const shootCalls = (file: string, source: string): number =>
 
 const captures: Liveness = {
   what: 'evidence captures',
-  floor: 'capture-after-assertion/captures',
   carries: (file, source) => shootCalls(file, source) > 0,
   count: shootCalls,
 };

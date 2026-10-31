@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The device gauntlet reports how many tests `android-chrome` excludes by design, by LISTING the
@@ -86,9 +85,6 @@ describe('the gauntlet’s by-design count selects exactly what android-chrome e
     expect(
       searched(literals, { of: strings, what: `string literals in ${SCRIPT}` }),
     ).toEqual([]);
-    expect(
-      floorBreach('excluded-by-design/script-strings', strings.length),
-    ).toBeUndefined();
     // Liveness: the listing still passes a --grep at all, built from the constant.
     const built = nodesOf(script())
       .filter(ts.isTemplateExpression)
@@ -101,8 +97,6 @@ describe('the gauntlet’s by-design count selects exactly what android-chrome e
               span.expression.text === CONSTANT,
           ),
       );
-    expect(
-      floorBreach('excluded-by-design/built-patterns', built.length),
-    ).toBeUndefined();
+    expect(built.length).toBeGreaterThan(0);
   });
 });

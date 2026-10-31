@@ -7,7 +7,6 @@ import {
   isCapturePath,
 } from '../../scripts/capture-scope.mjs';
 import { searched, trackedFiles } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The scope job traces the capture's files on every pull request (#774), and
@@ -31,9 +30,6 @@ describe('the capture scope traces the real tree (#774)', () => {
     // imports, and the evidence file names tests/e2e/evidence.ts imports.
     expect(closure.has('tests/engines.ts')).toBe(true);
     expect(closure.has('scripts/evidence-files.mjs')).toBe(true);
-    expect(
-      floorBreach('capture-scope/traced-files', closure.size),
-    ).toBeUndefined();
   });
 
   it('still leaves a unit test and a git hook out, so the filter can skip', () => {
@@ -49,8 +45,5 @@ describe('the capture scope traces the real tree (#774)', () => {
     expect(
       searched(missing, { of: OUTSIDE_TREES, what: 'trees the capture skips' }),
     ).toEqual([]);
-    expect(
-      floorBreach('capture-scope/outside-trees', OUTSIDE_TREES.length),
-    ).toBeUndefined();
   });
 });

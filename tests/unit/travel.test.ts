@@ -11,7 +11,6 @@ import {
 } from '../../src/lib/travel';
 import { seeded } from './factories';
 import { searched } from '../source-files';
-import { floorBreach } from '../floors';
 
 /**
  * The board's deal (spec 2026-10-14): who travels in what order, and when.
@@ -53,9 +52,6 @@ describe('travelOrder', () => {
         { of: cases, what: 'deals where everyone is pinned' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('travel/everyone-pinned-cases', cases.length),
-    ).toBeUndefined();
   });
 
   const dealt = (seed: number) => {

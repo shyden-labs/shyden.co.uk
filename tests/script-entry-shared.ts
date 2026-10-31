@@ -23,13 +23,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
-  // With no message file and no --range it has nothing to judge, so it
-  // refuses; a skipped `main()` would pass every commit in silence (#897).
-  'gaps-checked.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: node scripts/gaps-checked.mjs',
-  },
   // Without its three paths it prints its usage and refuses.
   'build-evidence-page.mjs': {
     args: [],
@@ -57,27 +50,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: [],
     status: 2,
     says: 'usage: node scripts/capture-coverage.mjs',
-  },
-  // It takes no argument, so one it was not asked for is refused before any
-  // report is read: a skipped main() would exit 0 and write nothing (#896).
-  'coverage-merge.mjs': {
-    args: ['--unknown'],
-    status: 1,
-    says: 'usage: coverage-merge.mjs',
-  },
-  // With no raw directory or suite there is nothing to convert, so it
-  // refuses; a skipped main() would exit 0 and write no report (#899).
-  'coverage-processes.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: coverage-processes.mjs <raw-dir> <suite>',
-  },
-  // A flag it does not know is refused before any git or report is read; a
-  // skipped main() would exit 0 and print no verdict at all (#896).
-  'coverage-changed.mjs': {
-    args: ['--unknown'],
-    status: 1,
-    says: 'usage: coverage-changed.mjs [--report-only]',
   },
   // With nowhere to hand its verdict on, it refuses rather than decide
   // nothing, which would leave the browser jobs to a missing output (#582).
@@ -229,13 +201,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'install-hooks.mjs takes no arguments',
   },
-  // It reads the branch's own diff and takes nothing else, so an argument is a
-  // mistake it refuses before reading anything (#662).
-  'lint-changed-tests.mjs': {
-    args: ['--no-such-flag'],
-    status: 1,
-    says: 'usage: node scripts/lint-changed-tests.mjs (takes no arguments)',
-  },
   // It measures the iPhone files and takes nothing else, so an argument is a
   // mistake it refuses before reading anything (#858).
   'record-ios-ceilings.mjs': {
@@ -263,30 +228,10 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: build-release-content.mjs',
   },
-  // Without its four paths it prints its usage and refuses (#651).
-  'floors-diff.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: floors-diff.mjs',
-  },
-  // Without a run id it prints its usage and refuses, before git or gh (#889).
-  'fold-record.mjs': {
-    args: [],
-    status: 1,
-    says: 'usage: fold-record.mjs <run-id>',
-  },
   // Without its four paths it prints its usage and refuses (#654).
   'visual-capture.mjs': {
     args: [],
     status: 1,
     says: 'usage: visual-capture.mjs',
-  },
-  // The gate never records the guards' floors, so under CI it refuses before
-  // it runs anything (#468), unless told it is the dispatched recorder (#651).
-  'record-floors.mjs': {
-    args: [],
-    env: { CI: 'true' },
-    status: 1,
-    says: 'CI never records floors',
   },
 };

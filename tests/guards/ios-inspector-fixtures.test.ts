@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import type { PlistValue } from '../device/ios/inspector/bplist';
 import { decodeAnyPlist } from '../device/ios/inspector/plist-xml';
-import { floorBreach } from '../floors';
 import {
   committableFiles,
   filesUnder,
@@ -156,9 +155,6 @@ describe("the iPhone inspector's fixtures hold none of the phone's secrets", () 
         { of: files, what: 'fixture files' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('ios-inspector-fixtures/files', files.length),
-    ).toBeUndefined();
   });
 
   it('every PEM block is one of the throwaway pair', () => {
@@ -168,9 +164,6 @@ describe("the iPhone inspector's fixtures hold none of the phone's secrets", () 
     expect(searched(foreign, { of: pemBlocks, what: 'PEM blocks' })).toEqual(
       [],
     );
-    expect(
-      floorBreach('ios-inspector-fixtures/pem-blocks', pemBlocks.length),
-    ).toBeUndefined();
   });
 
   it('every pairing identifier is a fake', () => {
@@ -180,9 +173,6 @@ describe("the iPhone inspector's fixtures hold none of the phone's secrets", () 
     expect(
       searched(real, { of: identifiers, what: 'pairing identifiers' }),
     ).toEqual([]);
-    expect(
-      floorBreach('ios-inspector-fixtures/identifiers', identifiers.length),
-    ).toBeUndefined();
   });
 
   describe.each(readings.map((reading) => [reading.file, reading] as const))(

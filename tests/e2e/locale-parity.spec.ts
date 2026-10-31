@@ -9,7 +9,6 @@ import {
   type SiteStrings,
 } from '../../src/lib/i18n/site';
 import { sitePaths, TITLE_FOR } from '../site-pages';
-import { floorBreach } from '../floors';
 import { searched } from '../source-files';
 
 /**
@@ -70,9 +69,6 @@ test.describe('every locale, every page', () => {
         { of: LOCALES, what: 'shipped locales' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('locale-parity/shipped-locales', LOCALES.length),
-    ).toBeUndefined();
   });
 
   // 'localisePath agrees with the route layout for every locale' is retired

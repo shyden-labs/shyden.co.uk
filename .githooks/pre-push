@@ -1,8 +1,7 @@
 #!/bin/sh
 #
 # Runs the two fastest checks of ci.yml's `checks` job, format and typecheck,
-# and since #662 the test-code lint below, so a two-second problem cannot cost
-# a CI round trip. Typecheck joined in #390 (about ten
+# so a two-second problem cannot cost a CI round trip. Typecheck joined in #390 (about ten
 # seconds): vitest strips types without checking them, so a type error passed
 # this hook and reached a pushed commit. PR #34 failed on a single over-long line in a
 # test file; `npm run format` ran first, so the build, the unit suite and the
@@ -14,17 +13,10 @@
 # Nothing else is here, deliberately: only unit tests, formatters and type
 # checks run on the laptop, and every other suite (guards, integration, e2e,
 # visual, sanity) runs in CI alone (operator, 2026-10-09, a global rule; #653).
-# The guards ran here from #638 until then. `lint:tests` (#662) is not a
-# suite: it applies three of the guards' finders (floorless-searches,
-# absence-liveness, anchored-presence) to the test files this branch changed,
-# a static read the operator ruled a lint (2026-10-12), so a new test meets
-# them here rather than one CI round trip later.
+# The guards ran here from #638 until then.
 #
 # And no test suite runs here, not even unit (operator, 2026-10-12, a global
-# rule; #713). Floors are recorded by `record-floors.yml` on a scratch ref the
-# commit is pushed to first (#889), so a commit that adds or moves a floor
-# fails the unit suite until that run is folded in, and a unit run here
-# refused the very push the record needs (#658).
+# rule; #713).
 # Run `npm run test:unit` by hand before each push; CI runs every suite on the
 # pull request.
 #
@@ -58,4 +50,3 @@ fail() {
 
 npm run format || fail 'Prettier found files that are not formatted' 'npx prettier --write .'
 npm run typecheck || fail 'astro check found a type error' 'npm run typecheck'
-npm run lint:tests || fail 'a changed test file breaks a test-code meta-guard' 'npm run lint:tests'

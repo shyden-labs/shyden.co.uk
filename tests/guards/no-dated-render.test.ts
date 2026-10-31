@@ -6,7 +6,6 @@ import {
   astroTemplate,
   withoutTsComments,
 } from '../unit/source-text';
-import { floorBreach } from '../floors';
 
 /**
  * No `.astro` source reads the clock, so no built page carries a date and no
@@ -71,9 +70,6 @@ describe('no page is rendered from the clock (#370)', () => {
     expect(
       searched(dated, { of: judged, what: '.astro code and markup views' }),
     ).toEqual([]);
-    expect(
-      floorBreach('no-dated-render/date-checked-views', judged.length),
-    ).toBeUndefined();
   });
 
   it('reads every view the sources hold, and as many as there are', () => {
@@ -90,16 +86,6 @@ describe('no page is rendered from the clock (#370)', () => {
     expect(
       searched(markupUnread, { of: sources, what: '.astro sources' }),
     ).toEqual([]);
-    // After the verdict, so a population that grew never hides a finding.
-    expect(
-      floorBreach('no-dated-render/read-sources', sources.length),
-    ).toBeUndefined();
-    expect(
-      floorBreach(
-        'no-dated-render/views',
-        sources.flatMap(({ views }) => views).length,
-      ),
-    ).toBeUndefined();
   });
 
   it.each([
@@ -129,8 +115,5 @@ describe('no page is rendered from the clock (#370)', () => {
         { of: views, what: 'views of the fixture' },
       ),
     ).toEqual([]);
-    expect(
-      floorBreach('no-dated-render/comment-fixture-views', views.length),
-    ).toBeUndefined();
   });
 });
