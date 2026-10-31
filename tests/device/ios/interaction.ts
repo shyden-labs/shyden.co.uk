@@ -416,20 +416,23 @@ export class RealTapInteraction implements Interaction {
    */
   private async bringIntoView(element: PageElement): Promise<Prepared> {
     let prepared = await this.prepare(element);
-    if (keyboardUp(prepared) && this.mustMove(prepared)) {
-      // A visitor whose keyboard hides the next control, or whose lifted
-      // Make Groups bar covers it, taps Done on the bar above the keyboard;
-      // with it up, Safari keeps the focused field in view and a drag does
-      // not stay where it is put (measured 2026-10-31).
-      await this.closeKeyboard(element);
-      prepared = await this.prepare(element);
-    }
     for (let swipes = 0; this.mustMove(prepared); swipes++) {
       if (swipes === MAX_SWIPES)
         throw new TapNotLandedError(
           element.selector,
           `${element.selector} did not come into view after ${MAX_SWIPES} real swipes (its box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall)`,
         );
+      if (keyboardUp(prepared)) {
+        // A visitor whose keyboard hides the next control, or whose lifted
+        // Make Groups bar covers it, taps Done on the bar above the
+        // keyboard; with it up, Safari keeps the focused field in view and
+        // a drag does not stay where it is put (measured 2026-10-31).
+        // Checked before EVERY swipe: run 9 found it up only after the
+        // first (Journey 14, id). A close counts toward the ceiling.
+        await this.closeKeyboard(element);
+        prepared = await this.prepare(element);
+        continue;
+      }
       const before = prepared.rect.y;
       await this.swipeToward(prepared);
       prepared = await this.prepare(element);

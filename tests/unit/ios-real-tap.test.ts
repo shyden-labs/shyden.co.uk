@@ -606,6 +606,35 @@ describe('RealTapInteraction.click: the keyboard is in the way', () => {
     expect(f.taps[0]).toEqual({ x: 375, y: 557 });
   });
 
+  // iPhone run 9, Journey 14 (id): the keyboard was found up only after the
+  // first swipe, and every later drag was undone by Safari keeping the
+  // focused field in view, 12 times over.
+  it('closes the keyboard when it is found up between swipes, not only before the first', async () => {
+    const f = fakes({
+      prepare: inTurn(
+        prepared({
+          rect: { x: 100, y: 900, width: 100, height: 40 },
+          inView: false,
+        }),
+        hidden,
+        prepared(),
+      ),
+    });
+    f.setMenu([{ x: 355, y: 538, width: 40, height: 38 }]);
+    await interaction(f).click(element('#cg-size'));
+    expect(f.log).toEqual([
+      'prepare',
+      'swipe',
+      'prepare',
+      'menu:Done',
+      'tap',
+      'keyboard-gone',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
+  });
+
   it('closes the keyboard too when the lifted bar covers the target', async () => {
     const f = fakes({
       prepare: inTurn(
