@@ -3,7 +3,7 @@
  *
  * `tests/e2e/evidence.ts` is Playwright-only: it reads `test.info()` for the
  * project name, so it cannot be called from the iOS journeys, which run under
- * Vitest and drive a real phone over WebDriver. AC11 of #189 wants the
+ * Vitest and drive a real phone through its Web Inspector. AC11 of #189 wants the
  * reported case confirmed on that phone, and an operator can only judge it if
  * the capture reaches the same page as every other shot.
  *
@@ -14,7 +14,7 @@
  */
 
 /**
- * A real 1x1 PNG, base64, exactly as WebDriver's `GET /screenshot` returns it.
+ * A real 1x1 PNG, base64, exactly as the page driver's `screenshot()` returns it.
  *
  * Real bytes rather than a placeholder string on purpose: the seam this file
  * protects is that the page builder can still recognise what the device leg

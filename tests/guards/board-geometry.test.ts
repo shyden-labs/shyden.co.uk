@@ -22,7 +22,7 @@ import { withoutTsComments } from '../unit/source-text';
  * one of it.
  *
  * Both callers ship the function as TEXT: Playwright serialises it into the
- * page, and the iOS leg sends `(${measureBoard})()` down a WebDriver wire. A
+ * page, and the iOS leg sends `(${measureBoard})()` down the Web Inspector wire. A
  * reference to a module-scope binding type-checks perfectly here and is
  * `undefined` over there -- a failure that appears only on a real phone, in
  * the one leg #189 AC11 exists to cover.

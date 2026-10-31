@@ -3,7 +3,7 @@
  * A real-device iOS run's Vitest JSON report, read as the Playwright report
  * the evidence page builder already understands (#354).
  *
- * The iOS leg drives a real iPhone over WebDriver under Vitest, so it writes
+ * The iOS leg drives a real iPhone through its Web Inspector under Vitest, so it writes
  * Vitest's report, not Playwright's, and the builder refused it. Rather than
  * teach every part of the builder a second format, the report is rebuilt in
  * the one shape it reads: a file suite holding its describes as nested

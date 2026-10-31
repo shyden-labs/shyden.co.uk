@@ -13,7 +13,7 @@ import {
  *
  * `tests/e2e/evidence.ts` reads `test.info()` for the project name and the
  * title, which only exists under Playwright. These journeys run under Vitest
- * and drive a real iPhone over WebDriver, so `shoot` is not merely
+ * and drive a real iPhone through our Web Inspector client, so `shoot` is not merely
  * inconvenient here -- it is uncallable.
  *
  * #189 AC11 is why this exists: the reported clipping case has to be confirmed
@@ -32,8 +32,8 @@ import {
  *    round trip to a physical device, so an ordinary gauntlet must not pay for
  *    captures nobody asked for.
  *
- * The format is PNG, not the JPEG every other leg writes: WebDriver returns
- * base64 PNG and re-encoding would mean a new dependency, which is an operator
+ * The format is PNG, not the JPEG every other leg writes: the page driver
+ * returns base64 PNG and re-encoding would mean a new dependency, which is an operator
  * decision. Nothing downstream cares -- `mediaType` in the page builder sniffs
  * MAGIC BYTES rather than the extension, and throws on anything it cannot
  * recognise instead of emitting a src the browser cannot paint. That seam is
@@ -44,12 +44,12 @@ import {
 /**
  * The only thing a capture needs from a driver.
  *
- * Structural, not `WebDriver`, so the unit test can prove the counter, the
+ * Structural, not `PageDriver`, so the unit test can prove the counter, the
  * paths and the manifest row without a phone in the room -- and so that "did
  * not capture" is provable by a driver that counts its own calls.
  */
 export interface Screenshotter {
-  /** Base64 PNG, as WebDriver's `GET /screenshot` returns it. */
+  /** Base64 PNG, as the page driver's `screenshot()` returns it. */
   screenshot(): Promise<string>;
 }
 
@@ -72,9 +72,10 @@ export interface DeviceCapture {
  * device pixels.
  *
  * `tests/e2e/evidence.ts` passes `scale: 'css'` for exactly this reason -- "a
- * device pixel ratio of 3 triples the bytes to say the same thing". WebDriver
- * offers no such option: `GET /screenshot` returns the full device-pixel
- * buffer, 1260x2736 on this phone at ~400KB a shot. Thirty of those is 12MB,
+ * device pixel ratio of 3 triples the bytes to say the same thing". The
+ * page driver offers no such option: `Page.snapshotRect` returns the full
+ * device-pixel buffer (1170x900 for a 390x300 rect, measured 2026-10-31); the
+ * whole-screen shots before #859 were 1260x2736 at ~400KB. Thirty of those is 12MB,
  * and the page builder REFUSED to write the evidence page at 23.48MB against
  * the 16MB one published document may carry.
  *
@@ -88,7 +89,7 @@ const CSS_MAX_PX = 912;
  * Resample a capture down to CSS scale, in place. Returns whether it ran.
  *
  * `sips` is a macOS built-in rather than a dependency, and this file is
- * already macOS-only by construction -- it needs `safaridriver` and a physical
+ * already macOS-only by construction -- it needs `xcrun devicectl` and a physical
  * iPhone on USB, neither of which exists anywhere else. Node has no image
  * resize of its own, and adding one would be an operator decision.
  *

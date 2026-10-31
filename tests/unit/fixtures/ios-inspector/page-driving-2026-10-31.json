@@ -1,0 +1,162 @@
+{
+  "source": "iPhone Air, iOS 27.0.1, 2026-10-31 (#859 probes)",
+  "answers": {
+    "sync value": {
+      "result": {
+        "type": "string",
+        "value": "{\"href\":\"https://shyden.co.uk/\",\"n\":14}"
+      },
+      "wasThrown": false
+    },
+    "async value": {
+      "result": {
+        "type": "object",
+        "value": {}
+      },
+      "wasThrown": false
+    },
+    "thrown error": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":1}",
+        "subtype": "error",
+        "className": "TypeError",
+        "description": "TypeError: probe boom"
+      },
+      "wasThrown": true
+    },
+    "rejected promise": {
+      "result": {
+        "type": "object",
+        "value": {}
+      },
+      "wasThrown": false
+    },
+    "element handle": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":2}",
+        "subtype": "node",
+        "className": "HTMLAnchorElement",
+        "description": "<a class=\"skip-link\">"
+      },
+      "wasThrown": false
+    },
+    "callFunctionOn handle": {
+      "result": {
+        "type": "string",
+        "value": "A!"
+      },
+      "wasThrown": false
+    },
+    "element list handle": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":3}",
+        "subtype": "array",
+        "className": "Array",
+        "description": "Array",
+        "size": 14
+      },
+      "wasThrown": false
+    },
+    "Page.reload": {},
+    "evaluate after reload": {
+      "result": {
+        "type": "string",
+        "value": "https://shyden.co.uk/"
+      },
+      "wasThrown": false
+    },
+    "stale handle after reload": "InspectorError: Runtime.callFunctionOn failed on the page: Missing injected script for given objectId",
+    "Page.navigate same origin": "InspectorError: Page.navigate failed on the page: 'Page.navigate' was not found",
+    "evaluate after navigate": {
+      "result": {
+        "type": "string",
+        "value": "https://shyden.co.uk/ complete"
+      },
+      "wasThrown": false
+    },
+    "promise handle": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":1}",
+        "className": "Promise",
+        "description": "Promise"
+      },
+      "wasThrown": false
+    },
+    "Runtime.awaitPromise resolve": {
+      "result": {
+        "type": "object",
+        "value": {
+          "waited": 50
+        }
+      },
+      "wasThrown": false
+    },
+    "rejecting handle": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":2}",
+        "className": "Promise",
+        "description": "Promise"
+      },
+      "wasThrown": false
+    },
+    "Runtime.awaitPromise reject": {
+      "result": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":3}",
+        "subtype": "error",
+        "className": "RangeError",
+        "description": "RangeError: probe reject"
+      },
+      "wasThrown": true
+    },
+    "location.assign": {
+      "result": {
+        "type": "undefined"
+      },
+      "wasThrown": false
+    },
+    "evaluate after assign": {
+      "result": {
+        "type": "string",
+        "value": "https://shyden.co.uk/classroom-groups/ complete"
+      },
+      "wasThrown": false
+    },
+    "cross-origin assign": {
+      "result": {
+        "type": "undefined"
+      },
+      "wasThrown": false
+    },
+    "evaluate after cross-origin": {
+      "result": {
+        "type": "string",
+        "value": "https://shyden.co.uk/classroom-groups/"
+      },
+      "wasThrown": false
+    },
+    "getProperties on list (first entry; the log cut the answer at 300 chars)": {
+      "value": {
+        "type": "object",
+        "objectId": "{\"injectedScriptId\":1,\"id\":4}",
+        "subtype": "node",
+        "className": "HTMLAnchorElement",
+        "description": "<a class=\"skip-link\">"
+      },
+      "writable": true,
+      "enumerable": true,
+      "configurable": true,
+      "name": "0",
+      "isOwn": true
+    },
+    "snapshotRect (dataURL cut to 86 chars)": {
+      "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABJIAAAOECAYAAAD6xRsXAAAAAXNSR0IArs4c6QAA"
+    }
+  },
+  "note": "Each answer is copied from the probe logs, which cut a line at 300 characters; the two marked entries are the parts the log holds."
+}

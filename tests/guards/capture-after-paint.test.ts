@@ -21,7 +21,7 @@ import {
  * Playwright file sits inside a `captureAfterPaint(` call.
  *
  * A Playwright file is one that imports `@playwright/test` or the e2e
- * `fixtures` module. `tests/device/ios` captures through WebDriver
+ * `fixtures` module. `tests/device/ios` captures through its page driver
  * (`driver.screenshot()`), which has no `Page.captureScreenshot` and no page
  * to wait on, so it is outside this rule rather than exempt from it.
  *
@@ -114,7 +114,7 @@ describe('capturesBeforePaint -- the scan proven on synthetic input', () => {
     ]);
   });
 
-  it('judges a WebDriver capture in a file that imports no Playwright as outside the rule', () => {
+  it('judges a device-driver capture in a file that imports no Playwright as outside the rule', () => {
     expect(
       scan(
         "import { execFileSync } from 'node:child_process';",

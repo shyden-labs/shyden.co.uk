@@ -1,3 +1,4 @@
+import { fixtureLayout } from '../ios-fixture-layout';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -119,10 +120,13 @@ function decodeInto(first: Buffer, into: Reading): void {
 function read(file: string): Reading {
   const text = readFileSync(file, 'utf8');
   const reading: Reading = { file, texts: [text], identifiers: [] };
+  // A capture holds `frames`, base64 to decode; recorded answers are plain
+  // text, which `texts` above already holds. Any other layout is refused
+  // (`fixtureLayout`, #859).
   if (file.endsWith('.json')) {
-    const { frames } = JSON.parse(text) as {
-      frames: { base64: string }[];
-    };
+    const parsed: unknown = JSON.parse(text);
+    if (fixtureLayout(file, parsed) === 'answers') return reading;
+    const { frames } = parsed as { frames: { base64: string }[] };
     for (const frame of frames)
       decodeInto(Buffer.from(frame.base64, 'base64'), reading);
   }

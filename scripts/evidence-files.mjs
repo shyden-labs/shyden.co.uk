@@ -90,7 +90,7 @@ export const EVIDENCE_JPEG_QUALITY = jpegQuality(
  * Here rather than beside `shoot` because there are now two capture legs and
  * only one naming scheme. `tests/e2e/evidence.ts` is Playwright-only -- it
  * reads `test.info()` -- while the iOS journeys run under Vitest and drive a
- * real phone over WebDriver, so they cannot import it at all. Two slug
+ * real phone through its Web Inspector, so they cannot import it at all. Two slug
  * implementations would be two schemes the day one of them changed, and the
  * page would show a picture nobody could trace back to a run.
  *

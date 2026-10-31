@@ -1,21 +1,20 @@
 /**
- * Real Safari, on the real iPhone, over the WebDriver session session.ts
- * builds. See docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
+ * Real Safari, on the real iPhone, driven through our own Web Inspector
+ * client by the session session.ts builds (#859). See
+ * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 5: Playwright cannot attach to iOS Safari at all, so this is a
- * real driver for the real W3C WebDriver protocol Safari speaks -- not a
- * mock of Playwright's API.
+ * real driver for the protocol Safari's page speaks -- not a mock of
+ * Playwright's API.
  *
- * DUAL-MODE INTERACTION (design doc s5a). Real synthetic click/keyboard
- * input does not currently work on this device -- see
- * tests/device/ios/interaction.ts's own module doc for the measurements.
- * A canary decides, once per run, whether real WebDriver input primitives
- * or DOM-dispatch (`execute/sync`) drives interaction; every journey below
- * calls only `session.interaction.click/type/clear`, never
- * `driver`-level click/sendKeys/clear directly, so it is written once and
- * does not know or care which mode is active. The mode is logged
- * prominently by session.ts the moment it is decided, and again at the
- * start of every test here (see `logMode` below) -- a DOM-dispatch run
- * must never read as though taps were taps.
+ * INTERACTION MODE (design doc s5a). Input is DOM dispatch today -- see
+ * tests/device/ios/interaction.ts's own module doc -- until #838 brings
+ * WebDriverAgent's real taps. Every journey below calls only
+ * `session.interaction.click/type/clear`, never element-level
+ * click/sendKeys/clear directly, so it is written once and does not know
+ * or care which mode is active. The mode is logged prominently by
+ * session.ts when the session starts, and again at the start of every
+ * test here (see `logMode` below) -- a DOM-dispatch run must never read as
+ * though taps were taps.
  *
  * TASK 3a + 3b SCOPE. The task brief lists 13 journeys, in three groups
  * (happy 1-4, unhappy 5-7, edge 8-10) plus three iOS-only proofs (11-13)
@@ -27,7 +26,7 @@
  * plumbing.
  *
  * Journeys 11 and 13 are bounded by the SAME dual-mode limitation this
- * whole file already carries (see DUAL-MODE INTERACTION, above):
+ * whole file already carries (see INTERACTION MODE, above):
  * dom-dispatch mode does not exercise the touch input path itself, so
  * neither can verify that a real tap actually lands on a control (Journey
  * 13) or that focusing a field via a real tap changes
@@ -45,7 +44,7 @@
  * error sentence here could all drift from their one real source the
  * moment it changes.
  *
- * One phone, one WebDriver session for the WHOLE FILE ("Exactly one session
+ * One phone, one attached page for the WHOLE FILE ("Exactly one session
  * per device" -- the task brief). `beforeAll`/`afterAll` are declared at
  * module scope, not nested inside `describe.each`, so both locale blocks
  * share the one session; vitest.ios.config.ts's `fileParallelism: false` is
@@ -70,7 +69,7 @@ import {
 } from '../../typed-fields';
 import { shootDevice } from './evidence';
 import { startIosSession, type DeviceSession } from './session';
-import { waitFor } from './webdriver';
+import { waitFor } from './page-driver';
 
 let session: DeviceSession;
 
@@ -140,7 +139,7 @@ function logMode(journeyName: string): void {
 
 // The describe name carries a static pointer to the console output rather
 // than the mode value itself: Vitest fixes suite/test NAMES at synchronous
-// collection time, before `beforeAll` has run the canary that determines
+// collection time, before `beforeAll` has started the session that reports
 // the mode -- so the mode cannot be interpolated into a name string
 // without either an unverified top-level-await restructure or a second
 // process run ahead of vitest to pre-compute it, neither of which this
@@ -244,10 +243,10 @@ describe.each(LOCALES)(
       // harness clears it (see session.ts's own module doc) -- so a bare
       // first click here cannot assume which direction it will toggle,
       // depending on whatever a PREVIOUS run of this exact suite left
-      // behind. `localStorage.setItem` is plain execute/sync, not a
-      // synthetic click/keyboard interaction, so -- like Journey 4's own
-      // arrangement read below -- it is unaffected by the interaction-mode
-      // canary and does not need to go through `session.interaction`.
+      // behind. `localStorage.setItem` is a plain script, not a
+      // click/keyboard interaction, so -- like Journey 4's own
+      // arrangement read below -- it is unaffected by the interaction
+      // mode and does not need to go through `session.interaction`.
       await session.driver.executeScript(
         `localStorage.setItem('cg-howto-collapsed', '1');`,
       );
@@ -340,7 +339,7 @@ describe.each(LOCALES)(
         `the button reads the real "again" copy after a successful shuffle (${locale})`,
       ).toBe(strings.again);
 
-      // One execute/sync round trip rather than one WebDriver call per
+      // One script round trip rather than one driver call per
       // student -- read-only DOM inspection, exactly like Journey 1's own
       // direct `session.driver.findElement(...).text()` calls, so it does
       // not go through `session.interaction` either.
@@ -567,7 +566,7 @@ describe.each(LOCALES)(
       // Set here purely so MAX_STUDENTS worth of per-card deal animation
       // (otherwise ~110ms EACH, on the phone's one shared main thread) does
       // not still be running when the very next journey issues its own
-      // WebDriver commands against the same session. Plain execute/sync, a
+      // commands against the same page. A plain script, a
       // direct value assignment exactly like the product's own
       // `reduceMotion` branch already performs -- not a synthetic
       // click/keyboard interaction, so this does not go through

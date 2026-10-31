@@ -1,0 +1,512 @@
+/**
+ * The iPhone run's page driver (#859): Safari's page, driven through our own
+ * Web Inspector client (`./inspector/`) rather than `safaridriver`, which held
+ * the phone in Guided Access and so could not share it with WebDriverAgent's
+ * taps (Shyden's ruling on #838, 2026-10-18).
+ *
+ * `PageDriver` and `PageElement` keep the method names and argument shapes the
+ * journeys already call, so the journey file barely changes. Each method is a
+ * few `Runtime`/`Page` commands, chosen from what the iPhone Air (iOS 27.0.1)
+ * answered on 2026-10-31 (design: docs/superpowers/specs/2026-10-31-ios-page-driving-design.md):
+ * `Runtime.evaluate`'s `awaitPromise` is ignored there, so a promise is awaited
+ * with `Runtime.awaitPromise`; `Page.navigate` is absent, so navigation is
+ * `location.assign` and a wait for `Page.loadEventFired`.
+ *
+ * Nothing here retries (global rule): a failure names what failed.
+ */
+import { messageOf } from '../../../scripts/errors.mjs';
+import { InspectorError, type PageProtocol } from './inspector/protocol';
+
+/** The one call the driver makes on the page's protocol. */
+export type PagePort = Pick<PageProtocol, 'command'>;
+
+/** What `Runtime.evaluate`, `callFunctionOn` and `awaitPromise` answer. */
+interface RemoteResult {
+  readonly result: {
+    readonly type?: string;
+    readonly value?: unknown;
+    readonly objectId?: string;
+    readonly className?: string;
+    readonly description?: string;
+  };
+  readonly wasThrown?: boolean;
+}
+
+/** An exception the page threw while running a script: which script, which error. */
+export class PageScriptError extends Error {
+  constructor(
+    message: string,
+    readonly scriptLine: string,
+    readonly errorClass: string,
+  ) {
+    super(message);
+    this.name = 'PageScriptError';
+  }
+}
+
+/** The first line of a script that says anything, to name it in an error. */
+const firstLine = (script: string): string =>
+  script
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line !== '') ?? '(empty script)';
+
+/** The answer's value, or the page's exception as a PageScriptError. */
+function valueOf(answer: RemoteResult, script: string): unknown {
+  if (answer.wasThrown) {
+    const line = firstLine(script);
+    const errorClass = answer.result.className ?? 'Error';
+    throw new PageScriptError(
+      `page script failed (${line}): ${answer.result.description ?? errorClass}`,
+      line,
+      errorClass,
+    );
+  }
+  return answer.result.value;
+}
+
+/** The handle an answer carries, refused when it carries none. */
+function handleOf(answer: RemoteResult, what: string): string {
+  const { objectId } = answer.result;
+  if (typeof objectId !== 'string')
+    throw new Error(
+      `expected ${what} to come back as a handle, got ${JSON.stringify(answer.result)}`,
+    );
+  return objectId;
+}
+
+/** A script argument as `Runtime.callFunctionOn` takes it: an element by its handle. */
+const callArgument = (
+  arg: unknown,
+): { value: unknown } | { objectId: string } =>
+  arg instanceof PageElement ? { objectId: arg.objectId } : { value: arg };
+
+/** WebKit's words for a handle from before a reload (measured 2026-10-31). */
+const STALE_HANDLE = 'Missing injected script for given objectId';
+
+/** An element a selector found, gone from the page since: it reloaded, or the node was replaced. */
+export class StaleElementError extends Error {
+  constructor(
+    readonly selector: string,
+    options?: { cause?: unknown },
+  ) {
+    super(
+      `the element ${selector} found is gone from the page (it reloaded or was replaced)`,
+      options,
+    );
+    this.name = 'StaleElementError';
+  }
+}
+
+const INPUT_THEN_CHANGE = [
+  "this.dispatchEvent(new Event('input', { bubbles: true }));",
+  "this.dispatchEvent(new Event('change', { bubbles: true }));",
+].join('\n');
+
+/**
+ * One element on the page, by the handle the page gave for it. Each call is
+ * one function run with the element as `this`.
+ */
+export class PageElement {
+  constructor(
+    private readonly page: PagePort,
+    readonly objectId: string,
+    /** The selector that found it, to name it in an error. */
+    readonly selector: string,
+  ) {}
+
+  async click(): Promise<void> {
+    await this.call('this.click();');
+  }
+
+  async clear(): Promise<void> {
+    await this.call(`this.value = '';\n${INPUT_THEN_CHANGE}`);
+  }
+
+  /**
+   * Appends `text` to the value and fires `input` then `change`.
+   * NOT YET THE SAME as Android (#838): no key events, no real typing.
+   */
+  async sendKeys(text: string): Promise<void> {
+    await this.call(
+      `this.value = this.value + arguments[0];\n${INPUT_THEN_CHANGE}`,
+      [text],
+    );
+  }
+
+  async text(): Promise<string> {
+    const value = await this.call('return this.innerText;');
+    if (typeof value !== 'string')
+      throw new Error(
+        `expected the text of ${this.selector} to be a string, got ${JSON.stringify(value)}`,
+      );
+    return value;
+  }
+
+  async attribute(name: string): Promise<string | null> {
+    const value = await this.call('return this.getAttribute(arguments[0]);', [
+      name,
+    ]);
+    if (value !== null && typeof value !== 'string')
+      throw new Error(
+        `expected the ${name} attribute of ${this.selector} to be a string or null, got ${JSON.stringify(value)}`,
+      );
+    return value;
+  }
+
+  async property(name: string): Promise<unknown> {
+    return this.call('return this[arguments[0]];', [name]);
+  }
+
+  async rect(): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> {
+    const value = await this.call(
+      'var r = this.getBoundingClientRect();\n' +
+        'return { x: r.x, y: r.y, width: r.width, height: r.height };',
+    );
+    const box = value as Record<string, unknown> | null;
+    if (
+      typeof box !== 'object' ||
+      box === null ||
+      !['x', 'y', 'width', 'height'].every(
+        (key) => typeof box[key] === 'number',
+      )
+    )
+      throw new Error(
+        `expected the rect of ${this.selector} to hold x, y, width and height, got ${JSON.stringify(value)}`,
+      );
+    return box as { x: number; y: number; width: number; height: number };
+  }
+
+  private async call(body: string, args: unknown[] = []): Promise<unknown> {
+    let answer: RemoteResult;
+    try {
+      answer = await this.page.command<RemoteResult>('Runtime.callFunctionOn', {
+        objectId: this.objectId,
+        functionDeclaration: `function () {${body}\n}`,
+        arguments: args.map(callArgument),
+        returnByValue: true,
+      });
+    } catch (error) {
+      if (
+        error instanceof InspectorError &&
+        error.message.includes(STALE_HANDLE)
+      )
+        throw new StaleElementError(this.selector, { cause: error });
+      throw error;
+    }
+    return valueOf(answer, body);
+  }
+}
+
+/** The handles a `getProperties` answer lists at array indices, in index order. */
+function indexedHandles(answer: {
+  properties: readonly { name: string; value?: { objectId?: string } }[];
+}): string[] {
+  return answer.properties
+    .filter((property) => /^\d+$/.test(property.name))
+    .sort((a, b) => Number(a.name) - Number(b.name))
+    .map((property) =>
+      handleOf({ result: property.value ?? {} }, `match ${property.name}`),
+    );
+}
+
+/** Runs `body` as an async function: its last argument is the callback that settles it. */
+const asyncDeclaration = (body: string): string =>
+  [
+    'function () {',
+    '  var args = Array.prototype.slice.call(arguments);',
+    '  var self = this;',
+    '  return new Promise(function (resolve) {',
+    '    args.push(resolve);',
+    `    (function () {${body}\n    }).apply(self, args);`,
+    '  });',
+    '}',
+  ].join('\n');
+
+/** How long a navigation may take to load (#859 design). */
+export const NAVIGATION_CEILING_MS = 15_000;
+
+/** How often a navigation asks whether its new document has loaded. */
+export const NAVIGATION_POLL_MS = 100;
+
+/** Set on the document a navigation leaves, so the one it arrives at is told apart. */
+export const DOCUMENT_MARK = '__pageDriverLeaving';
+
+/** The phone's answer to a command sent to a target that has just been swapped out. */
+const TARGET_SWAPPED = 'Missing target for given targetId';
+
+const PNG_PREFIX = 'data:image/png;base64,';
+
+export class PageDriver {
+  constructor(private readonly page: PagePort) {}
+
+  /**
+   * Loads `url` and waits until a NEW document there has finished loading.
+   *
+   * Not by `Page.loadEventFired`: measured on the iPhone Air 2026-10-31
+   * (`.superpowers/sdd/859/swap-probe*.log`), going from `about:blank` to the
+   * LAN page swaps the page's target, the new target sends no load event at
+   * all, and the swap itself reaches us only with the answer to the next
+   * command we send. So the current document is marked first, and the page
+   * is asked every `NAVIGATION_POLL_MS` whether the document it now holds is
+   * unmarked and complete; each ask is also what brings the swap in. A
+   * command that reached the old target as it went away is answered
+   * `Missing target for given targetId`, which means "not loaded yet"; any
+   * other refusal ends the wait. An assign to the URL the page is already at
+   * does not always load, so that case is a reload.
+   */
+  async navigate(url: string): Promise<void> {
+    const markExpression = `(window.${DOCUMENT_MARK} = true, location.href)`;
+    const here = valueOf(
+      await this.page.command<RemoteResult>('Runtime.evaluate', {
+        expression: markExpression,
+        returnByValue: true,
+      }),
+      markExpression,
+    );
+    if (here === url) await this.page.command('Page.reload', {});
+    else {
+      const expression = `location.assign(${JSON.stringify(url)})`;
+      valueOf(
+        await this.page.command<RemoteResult>('Runtime.evaluate', {
+          expression,
+        }),
+        expression,
+      );
+    }
+    const readyExpression = `window.${DOCUMENT_MARK} === undefined && document.readyState === 'complete'`;
+    await waitFor(
+      async () =>
+        valueOf(
+          await this.page.command<RemoteResult>('Runtime.evaluate', {
+            expression: readyExpression,
+            returnByValue: true,
+          }),
+          readyExpression,
+        ) === true,
+      {
+        timeout: NAVIGATION_CEILING_MS,
+        interval: NAVIGATION_POLL_MS,
+        describe: `a new document to finish loading ${url}`,
+        retryable: (error) =>
+          error instanceof InspectorError &&
+          error.message.includes(TARGET_SWAPPED),
+      },
+    );
+  }
+
+  /** The viewport as a base64 PNG, at device pixels, with no data-URL prefix. */
+  async screenshot(): Promise<string> {
+    const size = valueOf(
+      await this.page.command<RemoteResult>('Runtime.evaluate', {
+        expression: '[innerWidth, innerHeight]',
+        returnByValue: true,
+      }),
+      '[innerWidth, innerHeight]',
+    );
+    if (
+      !Array.isArray(size) ||
+      size.length !== 2 ||
+      !size.every((side) => typeof side === 'number' && side > 0)
+    )
+      throw new Error(
+        `expected the viewport to be two positive numbers, got ${JSON.stringify(size)}`,
+      );
+    const [width, height] = size as [number, number];
+    const { dataURL } = await this.page.command<{ dataURL?: unknown }>(
+      'Page.snapshotRect',
+      { x: 0, y: 0, width, height, coordinateSystem: 'Viewport' },
+    );
+    if (typeof dataURL !== 'string' || !dataURL.startsWith(PNG_PREFIX))
+      throw new Error(
+        `expected Page.snapshotRect to answer a PNG data URL, got ${String(dataURL).slice(0, 30)}…`,
+      );
+    return dataURL.slice(PNG_PREFIX.length);
+  }
+
+  /** Every element `cssSelector` matches, in document order. */
+  async findElements(cssSelector: string): Promise<PageElement[]> {
+    const list = await this.page.command<RemoteResult>('Runtime.evaluate', {
+      expression: `Array.from(document.querySelectorAll(${JSON.stringify(cssSelector)}))`,
+    });
+    valueOf(list, `querySelectorAll(${cssSelector})`);
+    const listed = await this.page.command<{
+      properties: { name: string; value?: { objectId?: string } }[];
+    }>('Runtime.getProperties', {
+      objectId: handleOf(list, `the matches of ${cssSelector}`),
+      ownProperties: true,
+    });
+    return indexedHandles(listed).map(
+      (objectId) => new PageElement(this.page, objectId, cssSelector),
+    );
+  }
+
+  /** The first element `cssSelector` matches; refused when none does. */
+  async findElement(cssSelector: string): Promise<PageElement> {
+    const [first] = await this.findElements(cssSelector);
+    if (!first) throw new Error(`no element matches ${cssSelector}`);
+    return first;
+  }
+
+  /**
+   * Runs `script` as a function body on the page, as WebDriver's `execute/sync`
+   * does, and returns its value. Each call takes a fresh handle to `window`
+   * (2 ms measured), so no handle a reload invalidated is ever reused.
+   */
+  async executeScript<T = unknown>(
+    script: string,
+    args: unknown[] = [],
+  ): Promise<T> {
+    const answer = await this.callOnWindow(
+      `function () {${script}\n}`,
+      args,
+      true,
+    );
+    return valueOf(answer, script) as T;
+  }
+
+  /**
+   * Runs `script` as WebDriver's `execute/async` does: its last argument is a
+   * callback, and the call returns what the script hands it.
+   */
+  async executeAsyncScript<T = unknown>(
+    script: string,
+    args: unknown[] = [],
+  ): Promise<T> {
+    const started = await this.callOnWindow(
+      asyncDeclaration(script),
+      args,
+      false,
+    );
+    valueOf(started, script);
+    const settled = await this.page.command<RemoteResult>(
+      'Runtime.awaitPromise',
+      {
+        promiseObjectId: handleOf(started, 'an async script'),
+        returnByValue: true,
+      },
+    );
+    return valueOf(settled, script) as T;
+  }
+
+  private async callOnWindow(
+    functionDeclaration: string,
+    args: unknown[],
+    returnByValue: boolean,
+  ): Promise<RemoteResult> {
+    const window = await this.page.command<RemoteResult>('Runtime.evaluate', {
+      expression: 'window',
+    });
+    return this.page.command<RemoteResult>('Runtime.callFunctionOn', {
+      objectId: handleOf(window, 'window'),
+      functionDeclaration,
+      arguments: args.map(callArgument),
+      ...(returnByValue ? { returnByValue } : {}),
+    });
+  }
+}
+
+// ── Waiting on a condition (moved unchanged from webdriver.ts) ──────────────
+
+export interface WaitForOptions {
+  readonly timeout?: number;
+  readonly interval?: number;
+  readonly describe: string;
+  /**
+   * Whether an error the predicate threw is worth another poll. Omitted,
+   * every thrown error is. An error this rejects ends the wait at once and
+   * is rethrown as-is: the caller already knows no later poll can succeed.
+   */
+  readonly retryable?: (error: unknown) => boolean;
+}
+
+const DEFAULT_WAIT_TIMEOUT_MS = 10_000;
+const DEFAULT_WAIT_INTERVAL_MS = 200;
+
+const UNSETTLED = Symbol('unsettled');
+
+/**
+ * `promise`'s value, or `UNSETTLED` if `deadline` passes first. A request
+ * nobody answers never settles, and awaiting it outright would carry the
+ * wait past any deadline.
+ */
+async function settledBy<T>(
+  promise: Promise<T>,
+  deadline: number,
+): Promise<T | typeof UNSETTLED> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<typeof UNSETTLED>((resolve) => {
+    // A poll can start after the deadline, since the pause between polls is
+    // not cut short at it. Node would clamp the negative delay to 1 ms anyway,
+    // and warn on every run (#327); clamping here keeps the same timing.
+    timer = setTimeout(
+      () => resolve(UNSETTLED),
+      Math.max(0, deadline - Date.now()),
+    );
+  });
+  try {
+    return await Promise.race([promise, expiry]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Polls `predicate` until it returns a truthy value, or throws naming what
+ * was awaited and the last observed value (or thrown error).
+ *
+ * This is NOT the bare `sleep(500)` this project's standards forbid: the
+ * pass/fail verdict is decided entirely by the observed condition, never by
+ * how much time has elapsed -- `timeout` is a safety net against a hung
+ * device or session, not the thing that decides success. A poll still
+ * pending at the deadline is abandoned, so a request that is never answered
+ * cannot hold the wait past it (#309). The delay between
+ * polls below is the cadence of a condition-based wait (the same shape
+ * `expect.poll` uses internally), not a substitute for checking one.
+ *
+ * A thrown predicate (e.g. a transient fetch failure) is caught and
+ * recorded rather than aborting the wait -- callers do not need their own
+ * try/catch just to poll for an element that has not appeared yet. A caller
+ * that knows a failure is terminal says so with `retryable`, and that
+ * failure ends the wait at once instead of being retried until the timeout:
+ * a `safaridriver` that has already exited will never answer (#309).
+ */
+export async function waitFor<T>(
+  predicate: () => Promise<T | undefined | null | false | 0 | ''>,
+  options: WaitForOptions,
+): Promise<T> {
+  const timeout = options.timeout ?? DEFAULT_WAIT_TIMEOUT_MS;
+  const interval = options.interval ?? DEFAULT_WAIT_INTERVAL_MS;
+  const retryable = options.retryable ?? (() => true);
+  const deadline = Date.now() + timeout;
+
+  for (;;) {
+    let observed: string;
+    try {
+      const result = await settledBy(predicate(), deadline);
+      if (result === UNSETTLED) {
+        observed = 'a poll that had not settled when the time ran out';
+      } else if (result) {
+        return result;
+      } else {
+        observed = `resolved to ${JSON.stringify(result)}`;
+      }
+    } catch (error) {
+      if (!retryable(error)) throw error;
+      observed = `threw ${messageOf(error)}`;
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out after ${timeout}ms waiting for: ${options.describe}. Last observed: ${observed}`,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}

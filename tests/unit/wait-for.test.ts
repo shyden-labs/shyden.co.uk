@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { waitFor } from '../device/ios/webdriver';
+import { waitFor } from '../device/ios/page-driver';
 
 /**
  * `waitFor` treats a thrown predicate as "not yet" and polls again (#309).
  *
  * That is right for a transient failure, such as a `fetch` refused because a
- * server is still starting, and wrong for a terminal one: a `safaridriver`
+ * server is still starting, and wrong for a terminal one: a server
  * that had already exited will never answer, yet its exit was re-thrown and
  * swallowed on every poll until the 15 s timeout, and only then reported.
  *
@@ -15,7 +15,7 @@ import { waitFor } from '../device/ios/webdriver';
 describe('waitFor', () => {
   it('ends the wait at once on an error the caller says is not worth retrying', async () => {
     const exited = new Error(
-      'safaridriver exited before answering GET /status (code=1, signal=null)',
+      'the server exited before answering GET /status (code=1, signal=null)',
     );
     let polls = 0;
     const started = performance.now();
@@ -41,7 +41,7 @@ describe('waitFor', () => {
   });
 
   it('polls again on an error the caller says is worth retrying, until the condition holds', async () => {
-    const exited = new Error('safaridriver exited');
+    const exited = new Error('the server exited');
     let polls = 0;
 
     const value = await waitFor(

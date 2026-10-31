@@ -126,7 +126,7 @@ export const spillPastCard = (
  *
  * Four of those sites hold a measured rect rather than a `Locator` -- two
  * measure the `<label>` wrapping a deliberately small checkbox through an
- * in-page `evaluate`, and two more are the iOS journey corpus's WebDriver
+ * in-page `evaluate`, and two more are the iOS journey corpus's element
  * rects. `rectAtLeast44` is the home they share, so the floor, the rounding
  * and the both-dimensions policy are decided in exactly one place whatever
  * did the measuring. The journey corpus still cannot import it -- that

@@ -45,13 +45,58 @@ export function listDevices({ timeoutMs = DEVICECTL_TIMEOUT_MS } = {}) {
 }
 
 /**
+ * The `xcrun` arguments that open Safari on `url` on the iPhone `udid`,
+ * closing any Safari already running there first, so the run starts on a
+ * page it chose (#859; measured 2026-10-31 with `about:blank` and `https://`
+ * URLs: the page is listed to the Web Inspector in 0.14-0.26 s).
+ *
+ * @param {string} udid
+ * @param {string} url
+ * @returns {string[]}
+ */
+export function safariLaunchArgs(udid, url) {
+  return [
+    'devicectl',
+    'device',
+    'process',
+    'launch',
+    '--device',
+    udid,
+    '--terminate-existing',
+    '--payload-url',
+    url,
+    'com.apple.mobilesafari',
+  ];
+}
+
+/**
+ * Opens Safari on `url` on the iPhone `udid`. Throws, naming the command,
+ * when it fails or gives no answer within `timeoutMs`.
+ *
+ * @param {string} udid
+ * @param {string} url
+ * @param {{ timeoutMs?: number }} [options]
+ * @returns {string}
+ */
+export function launchSafari(
+  udid,
+  url,
+  { timeoutMs = DEVICECTL_TIMEOUT_MS } = {},
+) {
+  return runWithDeadline('xcrun', safariLaunchArgs(udid, url), {
+    timeoutMs,
+    whenSilent: 'is the iPhone still connected, trusted and unlocked?',
+  });
+}
+
+/**
  * The one physical iPhone to drive, read from `listDevices()`, or why there is
  * none. `udid` is `IOS_UDID`, which chooses among several.
  *
- * The classic UDID `safari:deviceUDID` expects is `hardwareProperties.udid`.
- * devicectl's top-level `identifier` is a CoreDevice UUID, a different value
- * that would silently hand safaridriver the wrong phone (measured on a live
- * device).
+ * The phone's classic UDID is `hardwareProperties.udid`, the one the Web
+ * Inspector's `expectedUdid` is checked against. devicectl's top-level
+ * `identifier` is a CoreDevice UUID, a different value that would silently
+ * name the wrong phone (measured on a live device).
  *
  * @param {string} raw
  * @param {string | undefined} udid

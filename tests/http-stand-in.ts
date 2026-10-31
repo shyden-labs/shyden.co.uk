@@ -6,9 +6,9 @@ import type { Server } from 'node:http';
  * is closed after each test. Registers its own `afterEach`, so call it once at
  * the top of a test file, never inside a test.
  *
- * One home since #390: `device-runner.test.ts` was written with a copy of the
- * teardown `webdriver.test.ts` (then `webdriver-status.test.ts`) already had, and `duplication.test.ts`
- * refused the pair.
+ * One home since #390, when `device-runner.test.ts` and the WebDriver client's
+ * tests each carried a copy and `duplication.test.ts` refused the pair; the
+ * WebDriver client went in #859.
  */
 export function serversClosedAfterEach(): Server[] {
   const servers: Server[] = [];
