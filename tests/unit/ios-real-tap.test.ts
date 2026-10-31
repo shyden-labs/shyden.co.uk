@@ -444,6 +444,28 @@ describe('runTapCanary', () => {
     expect(f.taps).toEqual([{ x: 210, y: 456 }]);
   });
 
+  it("takes the visual viewport's scroll out of the origin, as a keyboard-open measurement needs", async () => {
+    const f = fakes({
+      canary: () => ({
+        touch: {
+          isTrusted: true,
+          pointerType: 'touch',
+          clientX: 210,
+          clientY: 510,
+        },
+        innerHeight: 746,
+        viewHeight: 423,
+        offsetLeft: 0,
+        offsetTop: 122,
+        scale: 1,
+      }),
+    });
+    expect((await runTapCanary(f.page, f.wda, SCREEN)).origin).toEqual({
+      x: 0,
+      y: 68,
+    });
+  });
+
   it('fails closed when the trusted event never arrives, and removes its layer', async () => {
     const f = fakes({
       canary: () => ({ touch: null, innerHeight: 746, viewHeight: 746 }),

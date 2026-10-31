@@ -240,7 +240,8 @@ var started = Date.now();
   var record = window.__realTap;
   var touch = record && record.token === 'canary' ? record.touch : null;
   if (touch || Date.now() - started >= ceiling)
-    return done({ touch: touch, innerHeight: window.innerHeight, viewHeight: window.visualViewport.height });
+    return done({ touch: touch, innerHeight: window.innerHeight, viewHeight: window.visualViewport.height,
+      offsetLeft: window.visualViewport.offsetLeft, offsetTop: window.visualViewport.offsetTop, scale: window.visualViewport.scale });
   requestAnimationFrame(look);
 })();`;
 
@@ -495,6 +496,9 @@ export async function runTapCanary(
     touch: Touch | null;
     innerHeight: number;
     viewHeight: number;
+    offsetLeft?: number;
+    offsetTop?: number;
+    scale?: number;
   };
   try {
     await page.executeScript(CANARY_INSTALL_SCRIPT);
@@ -516,7 +520,18 @@ export async function runTapCanary(
         'Is the iPhone unlocked, with Safari in front?',
     );
   return {
-    origin: { x: point.x - touch.clientX, y: point.y - touch.clientY },
+    // The touch's client point is in layout pixels; the screen shows the
+    // visual viewport, which a keyboard scrolls (offsetTop 122, measured
+    // 2026-10-31). toScreenPoint takes that scroll out, so the origin must
+    // too, or every tap after a keyboard-open measurement lands that far high.
+    origin: {
+      x:
+        point.x -
+        (touch.clientX - (landing.offsetLeft ?? 0)) * (landing.scale ?? 1),
+      y:
+        point.y -
+        (touch.clientY - (landing.offsetTop ?? 0)) * (landing.scale ?? 1),
+    },
     innerHeight: landing.innerHeight,
     viewHeight: landing.viewHeight,
   };
