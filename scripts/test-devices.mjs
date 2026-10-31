@@ -1328,7 +1328,7 @@ async function main() {
   // AFTER the build, the preview-server start and the
   // @emulated-viewport count -- tens of seconds after the dashboard is
   // already up and rendering. Watched happening on a real run: the iOS
-  // card showed dom-dispatch mode banner while its own badge still read
+  // card showed the old mode banner while its own badge still read
   // "pending", because the file on disk was still the PREVIOUS run's.
   // Harmless in substance on THIS device (the mode has been stable), but
   // exactly the shape of claim design doc s5a exists to forbid --

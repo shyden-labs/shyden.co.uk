@@ -6,15 +6,14 @@
  * real driver for the protocol Safari's page speaks -- not a mock of
  * Playwright's API.
  *
- * INTERACTION MODE (design doc s5a). Input is DOM dispatch today -- see
- * tests/device/ios/interaction.ts's own module doc -- until #838 brings
- * WebDriverAgent's real taps. Every journey below calls only
- * `session.interaction.click/type/clear`, never element-level
- * click/sendKeys/clear directly, so it is written once and does not know
- * or care which mode is active. The mode is logged prominently by
- * session.ts when the session starts, and again at the start of every
- * test here (see `logMode` below) -- a DOM-dispatch run must never read as
- * though taps were taps.
+ * INTERACTION MODE (design doc s5a; #838). Every tap is a real touch and
+ * every keystroke the iPhone's own keyboard, through WebDriverAgent -- see
+ * tests/device/ios/interaction.ts's own module doc. Each tap is checked to
+ * land on its element (nothing on top at its centre; a trusted touch
+ * inside its box), and a tap that does not land fails the test naming
+ * why. Every journey below calls only `session.interaction.click/type/clear`.
+ * The mode is logged by session.ts when the session starts, and again at
+ * the start of every test here (see `logMode` below).
  *
  * TASK 3a + 3b SCOPE. The task brief lists 13 journeys, in three groups
  * (happy 1-4, unhappy 5-7, edge 8-10) plus three iOS-only proofs (11-13)
@@ -25,15 +24,9 @@
  * that way in the first place: a later journey drops in with no new
  * plumbing.
  *
- * Journeys 11 and 13 are bounded by the SAME dual-mode limitation this
- * whole file already carries (see INTERACTION MODE, above):
- * dom-dispatch mode does not exercise the touch input path itself, so
- * neither can verify that a real tap actually lands on a control (Journey
- * 13) or that focusing a field via a real tap changes
- * `visualViewport.scale` (Journey 11) -- only the real, computed geometry
- * each one measures (an input's own computed font-size; a control's own
- * real `rect()`) is asserted, and each says so plainly in its own test
- * name. Journey 12 is a measurement, not a threshold -- see
+ * Journey 11 taps into a field for real and checks the page did not zoom;
+ * Journey 13 taps each primary control for real, so a control a finger
+ * cannot reach fails there. Journey 12 is a measurement, not a threshold -- see
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 5, for why real hardware, not an emulated profile, is the whole
  * point of this file.
@@ -727,14 +720,12 @@ describe.each(LOCALES)(
       ).toBe(true);
     });
 
-    // iOS-only proofs (11-13): the reason this whole runner exists. Bounded
-    // by the SAME dual-mode limitation as the rest of this file -- see this
-    // file's own module doc, and design doc s5a.
+    // iOS-only proofs (11-13): the reason this whole runner exists.
     // The fields are the ones `zoom-on-focus.spec.ts` checks in CI, from the
     // one definition in tests/typed-fields.ts. This journey used to check only
     // `input[type=text|number]`, so the one leg on real WebKit skipped every
     // select, textarea and email field (#390).
-    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px (tap-triggered focus and scale change are NOT verified in dom-dispatch mode)', async () => {
+    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px, and a real tap into the student count focuses it with the page left at scale 1', async () => {
       logMode(`Journey 11 (${locale})`);
       await session.navigateToPath(path);
 
@@ -755,6 +746,23 @@ describe.each(LOCALES)(
           `${field} computed font-size (${locale})`,
         ).toBeGreaterThanOrEqual(IOS_ZOOM_FLOOR_PX);
       }
+
+      // The zoom itself, as a visitor meets it: a real tap into the field
+      // the tool opens on, then what Safari did with the page.
+      await session.interaction.click(
+        await session.driver.findElement('#cg-count'),
+      );
+      const afterTap = await session.driver.executeScript<{
+        focused: string | null;
+        scale: number;
+      }>(
+        'return { focused: document.activeElement && document.activeElement.id, scale: window.visualViewport.scale };',
+      );
+      expect(
+        afterTap.focused,
+        `the tapped field has the focus (${locale})`,
+      ).toBe('cg-count');
+      expect(afterTap.scale, `the page did not zoom (${locale})`).toBe(1);
     });
 
     test('Journey 12 -- iOS-only geometry: viewport, device pixel ratio, and the fold position of #cg-go (a measurement, not a threshold)', async () => {
@@ -807,7 +815,7 @@ describe.each(LOCALES)(
       ).toBeLessThanOrEqual(geometry.innerWidth);
     });
 
-    test('Journey 13 -- iOS-only, 44px touch targets: primary controls meet the minimum at real pixel density (geometry only -- that a tap actually lands is NOT verified)', async () => {
+    test('Journey 13 -- iOS-only, 44px touch targets: primary controls meet the minimum at real pixel density, and a real tap lands on each', async () => {
       logMode(`Journey 13 (${locale})`);
       await session.navigateToPath(path);
 
@@ -841,6 +849,9 @@ describe.each(LOCALES)(
           Math.round(rect.height),
           `#${id} height, locale ${locale}`,
         ).toBeGreaterThanOrEqual(44);
+        // Fails, naming what is on top or where the touch went, unless a
+        // finger's tap reaches the control.
+        await session.interaction.click(el);
       }
     });
 
