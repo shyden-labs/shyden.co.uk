@@ -15,7 +15,7 @@
  * Nothing here retries (global rule): a failure names what failed.
  */
 import { messageOf } from '../../../scripts/errors.mjs';
-import type { PageProtocol } from './inspector/protocol';
+import { InspectorError, type PageProtocol } from './inspector/protocol';
 
 /** The two calls the driver makes on the page's protocol. */
 export type PagePort = Pick<PageProtocol, 'command' | 'on'>;
@@ -75,8 +75,145 @@ function handleOf(answer: RemoteResult, what: string): string {
   return objectId;
 }
 
-/** A script argument as `Runtime.callFunctionOn` takes it. */
-const callArgument = (arg: unknown): { value: unknown } => ({ value: arg });
+/** A script argument as `Runtime.callFunctionOn` takes it: an element by its handle. */
+const callArgument = (
+  arg: unknown,
+): { value: unknown } | { objectId: string } =>
+  arg instanceof PageElement ? { objectId: arg.objectId } : { value: arg };
+
+/** WebKit's words for a handle from before a reload (measured 2026-10-31). */
+const STALE_HANDLE = 'Missing injected script for given objectId';
+
+/** An element a selector found, gone from the page since: it reloaded, or the node was replaced. */
+export class StaleElementError extends Error {
+  constructor(
+    readonly selector: string,
+    options?: { cause?: unknown },
+  ) {
+    super(
+      `the element ${selector} found is gone from the page (it reloaded or was replaced)`,
+      options,
+    );
+    this.name = 'StaleElementError';
+  }
+}
+
+const INPUT_THEN_CHANGE = [
+  "this.dispatchEvent(new Event('input', { bubbles: true }));",
+  "this.dispatchEvent(new Event('change', { bubbles: true }));",
+].join('\n');
+
+/**
+ * One element on the page, by the handle the page gave for it. Each call is
+ * one function run with the element as `this`.
+ */
+export class PageElement {
+  constructor(
+    private readonly page: PagePort,
+    readonly objectId: string,
+    /** The selector that found it, to name it in an error. */
+    readonly selector: string,
+  ) {}
+
+  async click(): Promise<void> {
+    await this.call('this.click();');
+  }
+
+  async clear(): Promise<void> {
+    await this.call(`this.value = '';\n${INPUT_THEN_CHANGE}`);
+  }
+
+  /**
+   * Appends `text` to the value and fires `input` then `change`.
+   * NOT YET THE SAME as Android (#838): no key events, no real typing.
+   */
+  async sendKeys(text: string): Promise<void> {
+    await this.call(
+      `this.value = this.value + arguments[0];\n${INPUT_THEN_CHANGE}`,
+      [text],
+    );
+  }
+
+  async text(): Promise<string> {
+    const value = await this.call('return this.innerText;');
+    if (typeof value !== 'string')
+      throw new Error(
+        `expected the text of ${this.selector} to be a string, got ${JSON.stringify(value)}`,
+      );
+    return value;
+  }
+
+  async attribute(name: string): Promise<string | null> {
+    const value = await this.call('return this.getAttribute(arguments[0]);', [
+      name,
+    ]);
+    if (value !== null && typeof value !== 'string')
+      throw new Error(
+        `expected the ${name} attribute of ${this.selector} to be a string or null, got ${JSON.stringify(value)}`,
+      );
+    return value;
+  }
+
+  async property(name: string): Promise<unknown> {
+    return this.call('return this[arguments[0]];', [name]);
+  }
+
+  async rect(): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> {
+    const value = await this.call(
+      'var r = this.getBoundingClientRect();\n' +
+        'return { x: r.x, y: r.y, width: r.width, height: r.height };',
+    );
+    const box = value as Record<string, unknown> | null;
+    if (
+      typeof box !== 'object' ||
+      box === null ||
+      !['x', 'y', 'width', 'height'].every(
+        (key) => typeof box[key] === 'number',
+      )
+    )
+      throw new Error(
+        `expected the rect of ${this.selector} to hold x, y, width and height, got ${JSON.stringify(value)}`,
+      );
+    return box as { x: number; y: number; width: number; height: number };
+  }
+
+  private async call(body: string, args: unknown[] = []): Promise<unknown> {
+    let answer: RemoteResult;
+    try {
+      answer = await this.page.command<RemoteResult>('Runtime.callFunctionOn', {
+        objectId: this.objectId,
+        functionDeclaration: `function () {${body}\n}`,
+        arguments: args.map(callArgument),
+        returnByValue: true,
+      });
+    } catch (error) {
+      if (
+        error instanceof InspectorError &&
+        error.message.includes(STALE_HANDLE)
+      )
+        throw new StaleElementError(this.selector, { cause: error });
+      throw error;
+    }
+    return valueOf(answer, body);
+  }
+}
+
+/** The handles a `getProperties` answer lists at array indices, in index order. */
+function indexedHandles(answer: {
+  properties: readonly { name: string; value?: { objectId?: string } }[];
+}): string[] {
+  return answer.properties
+    .filter((property) => /^\d+$/.test(property.name))
+    .sort((a, b) => Number(a.name) - Number(b.name))
+    .map((property) =>
+      handleOf({ result: property.value ?? {} }, `match ${property.name}`),
+    );
+}
 
 /** Runs `body` as an async function: its last argument is the callback that settles it. */
 const asyncDeclaration = (body: string): string =>
@@ -93,6 +230,30 @@ const asyncDeclaration = (body: string): string =>
 
 export class PageDriver {
   constructor(private readonly page: PagePort) {}
+
+  /** Every element `cssSelector` matches, in document order. */
+  async findElements(cssSelector: string): Promise<PageElement[]> {
+    const list = await this.page.command<RemoteResult>('Runtime.evaluate', {
+      expression: `Array.from(document.querySelectorAll(${JSON.stringify(cssSelector)}))`,
+    });
+    valueOf(list, `querySelectorAll(${cssSelector})`);
+    const listed = await this.page.command<{
+      properties: { name: string; value?: { objectId?: string } }[];
+    }>('Runtime.getProperties', {
+      objectId: handleOf(list, `the matches of ${cssSelector}`),
+      ownProperties: true,
+    });
+    return indexedHandles(listed).map(
+      (objectId) => new PageElement(this.page, objectId, cssSelector),
+    );
+  }
+
+  /** The first element `cssSelector` matches; refused when none does. */
+  async findElement(cssSelector: string): Promise<PageElement> {
+    const [first] = await this.findElements(cssSelector);
+    if (!first) throw new Error(`no element matches ${cssSelector}`);
+    return first;
+  }
 
   /**
    * Runs `script` as a function body on the page, as WebDriver's `execute/sync`
