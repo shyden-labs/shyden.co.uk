@@ -533,10 +533,14 @@ export class RealTapInteraction implements Interaction {
       : `; on screen at ${at} Safari shows ${chain.join(' > ')}, outside the page`;
   }
 
-  /** Out of view, or covered away from the middle of the view (passing under a bar). */
-  private mustMove({ inView, hit, rect, vv, viewHeight }: Prepared): boolean {
+  /**
+   * Out of view, or away from the middle of the view. Uncovered is not
+   * enough: Safari's floating address capsule sits over the foot of the page
+   * and is no part of the DOM, so a control there with nothing in the page on
+   * top still took the tap (CapsuleViewController, iPhone run 11).
+   */
+  private mustMove({ inView, rect, vv, viewHeight }: Prepared): boolean {
     if (!inView) return true;
-    if (hit === null) return false;
     const centre = rect.y + rect.height / 2;
     const margin = (viewHeight * (1 - MIDDLE_SHARE)) / 2;
     return (

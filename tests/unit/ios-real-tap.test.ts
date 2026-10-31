@@ -324,6 +324,30 @@ describe('RealTapInteraction.click: real scrolling', () => {
     expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
   });
 
+  it('swipes an uncovered element at the foot of the view toward the middle before tapping it', async () => {
+    // Run 11 (2026-11-01) measured it: #cg-go at the foot of the view, with
+    // nothing in the page on top, took a tap on Safari's floating address
+    // capsule (CapsuleViewController), which no DOM read can see.
+    const f = fakes({
+      prepare: inTurn(
+        prepared({ rect: { x: 100, y: 690, width: 100, height: 40 } }),
+        prepared(),
+      ),
+    });
+    await interaction(f).click(element());
+    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+  });
+
+  it('taps an uncovered element at the foot of the view where it is when the page cannot scroll further', async () => {
+    const f = fakes({
+      prepare: () =>
+        prepared({ rect: { x: 100, y: 690, width: 100, height: 40 } }),
+      landing: () => landed({ clientY: 710 }),
+    });
+    await interaction(f).click(element());
+    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+  });
+
   it('fails as covered when the page cannot scroll the element out from under the bar', async () => {
     const f = fakes({
       prepare: () =>
