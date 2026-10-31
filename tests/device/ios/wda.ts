@@ -43,6 +43,10 @@ export const WDA_COMMAND_CEILING_MS = 10_000;
 
 /** How long the finger rests on the glass: a quick, ordinary tap. */
 const TAP_HOLD_MS = 50;
+/** A deliberate drag, not a flick: 0.4 s across the glass. */
+const SWIPE_MS = 400;
+/** Held still before lifting, so the page stops with the finger. */
+const SWIPE_HOLD_MS = 150;
 
 export class WdaError extends Error {
   constructor(method: string, path: string, status: number, detail: string) {
@@ -156,7 +160,11 @@ export class WdaSession {
     return (await this.http('GET', `/session/${this.id}/window/rect`)) as Rect;
   }
 
-  /** One real finger tap at `point` (screen points). */
+  /**
+   * One real finger tap at `point` (screen points). WDA lifts the finger
+   * itself when the sequence ends, and answers 404 to W3C's release call
+   * (measured 2026-10-31), so none is sent.
+   */
   async tap(point: Point): Promise<void> {
     await this.http('POST', `/session/${this.id}/actions`, {
       actions: [
@@ -178,12 +186,55 @@ export class WdaSession {
         },
       ],
     });
-    await this.http('DELETE', `/session/${this.id}/actions`);
+  }
+
+  /**
+   * One real finger drag from `from` to `to` (screen points), held still a
+   * moment before it lifts, so the page scrolls by the drag and does not
+   * fling on.
+   */
+  async swipe(from: Point, to: Point): Promise<void> {
+    await this.http('POST', `/session/${this.id}/actions`, {
+      actions: [
+        {
+          type: 'pointer',
+          id: 'finger1',
+          parameters: { pointerType: 'touch' },
+          actions: [
+            {
+              type: 'pointerMove',
+              duration: 0,
+              x: Math.round(from.x),
+              y: Math.round(from.y),
+            },
+            { type: 'pointerDown', button: 0 },
+            {
+              type: 'pointerMove',
+              duration: SWIPE_MS,
+              x: Math.round(to.x),
+              y: Math.round(to.y),
+            },
+            { type: 'pause', duration: SWIPE_HOLD_MS },
+            { type: 'pointerUp', button: 0 },
+          ],
+        },
+      ],
+    });
   }
 
   /** Types `text` on the iPhone's own keyboard into the focused field. */
   async keys(text: string): Promise<void> {
     await this.http('POST', `/session/${this.id}/wda/keys`, { value: [text] });
+  }
+
+  /**
+   * Closes the iPhone's keyboard as a visitor does: a real tap on the Done
+   * key of Safari's bar above it.
+   */
+  async dismissKeyboard(): Promise<void> {
+    await this.http('POST', `/session/${this.id}/wda/keyboard/dismiss`, {
+      keyNames: ['Done'],
+    });
   }
 
   async close(): Promise<void> {

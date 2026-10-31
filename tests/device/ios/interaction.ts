@@ -38,7 +38,10 @@ export type ScriptPort = Pick<
   PageDriver,
   'executeScript' | 'executeAsyncScript'
 >;
-export type TapPort = Pick<WdaSession, 'tap' | 'keys'>;
+export type TapPort = Pick<
+  WdaSession,
+  'tap' | 'keys' | 'dismissKeyboard' | 'swipe'
+>;
 
 /** A real tap's events arrive within a frame or two; 2 s is a tap that never came. */
 export const TAP_LANDING_CEILING_MS = 2_000;
@@ -49,6 +52,25 @@ interface Touch {
   pointerType: string;
   clientX: number;
   clientY: number;
+}
+
+/** Where a touch that missed its element went instead. */
+interface Stray {
+  target: string;
+  clientX: number;
+  clientY: number;
+}
+
+interface Prepared {
+  rect: Rect;
+  vv: VisualViewport;
+  hit: string | null;
+  /** The visual viewport's height: the page a finger can see above any keyboard. */
+  viewHeight: number;
+  /** Whether a field that raises the keyboard has the focus. */
+  keyboard: boolean;
+  /** Whether the element's whole box is inside the visual viewport. */
+  inView: boolean;
 }
 
 export class TapNotLandedError extends Error {
@@ -69,35 +91,95 @@ export class TapNotLandedError extends Error {
  */
 export const PREPARE_SCRIPT = `
 var el = arguments[0], token = arguments[1], done = arguments[arguments.length - 1];
-el.scrollIntoView({ block: 'center', inline: 'center' });
-requestAnimationFrame(function () { requestAnimationFrame(function () {
+var vv = window.visualViewport;
+// Nothing here scrolls: a finger does that (RealTapInteraction.click).
+// Wait until the box and the view have held still for three frames
+// (ceiling 1.5 s): a keyboard sliding in moves both.
+var shape = function () {
+  var b = el.getBoundingClientRect();
+  return [b.x, b.y, b.width, b.height, vv.offsetLeft, vv.offsetTop, vv.height, vv.scale].join(',');
+};
+var last = shape(), still = 0, settleStarted = Date.now();
+(function settle() {
+  var now = shape();
+  still = now === last ? still + 1 : 0;
+  last = now;
+  if (still < 3 && Date.now() - settleStarted < 1500) return requestAnimationFrame(settle);
   var r = el.getBoundingClientRect();
-  var vv = window.visualViewport;
-  var top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+  var inView = r.top >= vv.offsetTop && r.bottom <= vv.offsetTop + vv.height &&
+    r.left >= vv.offsetLeft && r.right <= vv.offsetLeft + vv.width;
+  var describe = function (node) {
+    return node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') +
+      (typeof node.className === 'string' && node.className.trim() ? '.' + node.className.trim().split(/\\s+/).join('.') : '');
+  };
   var hit = null;
-  if (top === null) hit = 'nothing (the centre is outside the page)';
-  else if (top !== el && !el.contains(top))
-    hit = top.tagName.toLowerCase() + (top.id ? '#' + top.id : '') +
-      (typeof top.className === 'string' && top.className.trim() ? '.' + top.className.trim().split(/\\s+/).join('.') : '');
-  if (hit === null) {
-    window.__realTap = { token: token, touch: null };
-    el.addEventListener('pointerdown', function (e) {
-      if (window.__realTap && window.__realTap.token === token)
-        window.__realTap.touch = { isTrusted: e.isTrusted, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY };
+  if (inView) {
+    var top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    if (top === null) hit = 'nothing (the centre is outside the page)';
+    else if (top !== el && !el.contains(top)) hit = describe(top);
+  }
+  var active = document.activeElement;
+  var keyboard = !!active && active !== document.body &&
+    (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable);
+  if (inView && hit === null) {
+    var record = { token: token, touch: null, stray: null };
+    window.__realTap = record;
+    document.addEventListener('pointerdown', function (e) {
+      if (window.__realTap !== record) return;
+      var point = { isTrusted: e.isTrusted, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY };
+      if (e.target === el || el.contains(e.target)) record.touch = point;
+      else record.stray = { target: describe(e.target), clientX: e.clientX, clientY: e.clientY };
     }, { capture: true, once: true });
   }
   done({ rect: { x: r.x, y: r.y, width: r.width, height: r.height },
-         vv: { offsetLeft: vv.offsetLeft, offsetTop: vv.offsetTop, scale: vv.scale }, hit: hit });
-}); });`;
+         vv: { offsetLeft: vv.offsetLeft, offsetTop: vv.offsetTop, scale: vv.scale },
+         hit: hit, viewHeight: vv.height, keyboard: keyboard, inView: inView });
+})();`;
 
-/** Async: waits up to arguments[1] ms for the touch armed under token arguments[0]; null if none came. */
+/**
+ * Async: waits up to arguments[1] ms for the touch armed under token
+ * arguments[0]. Answers `{ touch, stray }`: the touch on the element, or
+ * where a touch went instead, or neither.
+ */
 export const LANDING_SCRIPT = `
 var token = arguments[0], ceiling = arguments[1], done = arguments[arguments.length - 1];
 var started = Date.now();
 (function look() {
   var record = window.__realTap;
-  if (record && record.token === token && record.touch) return done(record.touch);
-  if (Date.now() - started >= ceiling) return done(null);
+  var mine = record && record.token === token;
+  if (mine && (record.touch || record.stray)) return done({ touch: record.touch, stray: record.stray });
+  if (Date.now() - started >= ceiling) return done({ touch: null, stray: null });
+  requestAnimationFrame(look);
+})();`;
+
+/** Real swipes allowed to bring an element into view: the page's full height is about six views. */
+export const MAX_SWIPES = 12;
+/** One swipe moves at most this share of the view, so the target is never flung past. */
+const SWIPE_SHARE = 0.6;
+/** Below this, iOS reads a drag as a tap: every swipe travels at least this far. */
+const MIN_SWIPE_POINTS = 60;
+
+/** The keyboard takes ~0.9 s to come back after WDA types (measured 2026-10-31). */
+export const KEYBOARD_SETTLE_CEILING_MS = 3_000;
+
+/**
+ * Async: waits up to arguments[0] ms for the keyboard to be up (the visual
+ * viewport at least 150 px shorter than the layout viewport) and the view
+ * to hold still for three frames. Answers true, or false at the ceiling.
+ * Each WDA keys call drops the keyboard for ~850 ms before it returns
+ * (measured 2026-10-31), which a visitor's keyboard never does; the next
+ * tap waits for the keyboard the visitor would be looking at.
+ */
+export const KEYBOARD_SCRIPT = `
+var ceiling = arguments[0], done = arguments[arguments.length - 1];
+var vv = window.visualViewport, started = Date.now(), last = '', still = 0;
+(function look() {
+  var up = vv.height < window.innerHeight - 150;
+  var now = [vv.height, vv.offsetTop].join(',');
+  still = up && now === last ? still + 1 : 0;
+  last = now;
+  if (still >= 3) return done(true);
+  if (Date.now() - started >= ceiling) return done(false);
   requestAnimationFrame(look);
 })();`;
 
@@ -118,11 +200,16 @@ layer.addEventListener('pointerdown', function (e) {
 document.body.appendChild(layer);
 return true;`;
 
-/** Async: the canary's touch, waited for as `LANDING_SCRIPT` waits. */
-export const CANARY_SCRIPT = LANDING_SCRIPT.replace(
-  'var token = arguments[0], ceiling = arguments[1]',
-  "var token = 'canary', ceiling = arguments[0]",
-);
+/** Async: the canary's touch, or null when none came within arguments[0] ms. */
+export const CANARY_SCRIPT = `
+var ceiling = arguments[0], done = arguments[arguments.length - 1];
+var started = Date.now();
+(function look() {
+  var record = window.__realTap;
+  if (record && record.token === 'canary' && record.touch) return done(record.touch);
+  if (Date.now() - started >= ceiling) return done(null);
+  requestAnimationFrame(look);
+})();`;
 
 export const CANARY_REMOVE_SCRIPT = `
 var layer = document.getElementById('__realTapCanary');
@@ -145,6 +232,7 @@ const AIM_TOLERANCE = 1;
 export class RealTapInteraction implements Interaction {
   readonly mode: InteractionMode = 'real-tap';
   private taps = 0;
+  private token = '';
 
   constructor(
     private readonly page: ScriptPort,
@@ -154,12 +242,28 @@ export class RealTapInteraction implements Interaction {
   ) {}
 
   async click(element: PageElement): Promise<void> {
-    const token = `tap-${++this.taps}`;
-    const prepared = await this.page.executeAsyncScript<{
-      rect: Rect;
-      vv: VisualViewport;
-      hit: string | null;
-    }>(PREPARE_SCRIPT, [element, token]);
+    let prepared = await this.prepare(element);
+    if (prepared.keyboard && this.behindKeyboard(prepared)) {
+      // A visitor whose keyboard hides the button taps Done first.
+      await this.wda.dismissKeyboard();
+      prepared = await this.prepare(element);
+      if (this.behindKeyboard(prepared)) {
+        const { rect } = prepared;
+        throw new TapNotLandedError(
+          element.selector,
+          `${element.selector} is behind the keyboard: its centre is at y ${rect.y + rect.height / 2} and the visible page ends at ${prepared.vv.offsetTop + prepared.viewHeight}, even after tapping Done`,
+        );
+      }
+    }
+    for (let swipes = 0; !prepared.inView; swipes++) {
+      if (swipes === MAX_SWIPES)
+        throw new TapNotLandedError(
+          element.selector,
+          `${element.selector} did not come into view after ${MAX_SWIPES} real swipes (its box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall)`,
+        );
+      await this.swipeToward(prepared);
+      prepared = await this.prepare(element);
+    }
     if (prepared.hit !== null)
       throw new TapNotLandedError(
         element.selector,
@@ -167,13 +271,15 @@ export class RealTapInteraction implements Interaction {
       );
     const { rect, vv } = prepared;
     await this.wda.tap(toScreenPoint(rect, vv, this.origin, this.screen));
-    const touch = await this.page.executeAsyncScript<Touch | null>(
-      LANDING_SCRIPT,
-      [token, TAP_LANDING_CEILING_MS],
-    );
+    const { touch, stray } = await this.page.executeAsyncScript<{
+      touch: Touch | null;
+      stray: Stray | null;
+    }>(LANDING_SCRIPT, [this.token, TAP_LANDING_CEILING_MS]);
     const why = whyNotLanded(
       touch,
-      `no touch reached it within ${TAP_LANDING_CEILING_MS / 1000} s`,
+      stray === null
+        ? `no touch reached it within ${TAP_LANDING_CEILING_MS / 1000} s`
+        : `the touch reached ${stray.target} at (${stray.clientX}, ${stray.clientY}) instead`,
     );
     if (why !== null || touch === null)
       throw new TapNotLandedError(
@@ -194,11 +300,45 @@ export class RealTapInteraction implements Interaction {
       );
   }
 
+  /** Scrolls, measures and arms the element under a fresh token. */
+  private prepare(element: PageElement): Promise<Prepared> {
+    this.token = `tap-${++this.taps}`;
+    return this.page.executeAsyncScript<Prepared>(PREPARE_SCRIPT, [
+      element,
+      this.token,
+    ]);
+  }
+
+  /**
+   * One real drag up or down the middle of the screen, moving the element's
+   * centre toward the middle of the view.
+   */
+  private async swipeToward({ rect, vv, viewHeight }: Prepared): Promise<void> {
+    const need =
+      (rect.y + rect.height / 2 - (vv.offsetTop + viewHeight / 2)) * vv.scale;
+    const reach = viewHeight * vv.scale * SWIPE_SHARE;
+    const distance =
+      Math.sign(need) *
+      Math.max(MIN_SWIPE_POINTS, Math.min(Math.abs(need), reach));
+    const x = this.screen.x + this.screen.width / 2;
+    const middle = this.origin.y + (viewHeight * vv.scale) / 2;
+    await this.wda.swipe(
+      { x, y: middle + distance / 2 },
+      { x, y: middle - distance / 2 },
+    );
+  }
+
+  /** Whether the element's centre is below the page a finger can see. */
+  private behindKeyboard({ rect, vv, viewHeight }: Prepared): boolean {
+    return rect.y + rect.height / 2 > vv.offsetTop + viewHeight;
+  }
+
   /** Taps into the field unless it already has the focus, then types on the iPhone's keyboard. */
   async type(element: PageElement, text: string): Promise<void> {
     const before = await this.field(element);
     if (!before.focused) await this.click(element);
     await this.wda.keys(text);
+    await this.keyboardBack(element);
     const after = await this.field(element);
     if (after.value !== before.value + text)
       throw new Error(
@@ -210,12 +350,24 @@ export class RealTapInteraction implements Interaction {
   async clear(element: PageElement): Promise<void> {
     const before = await this.field(element);
     if (!before.focused) await this.click(element);
-    if (before.value.length > 0)
+    if (before.value.length > 0) {
       await this.wda.keys('\b'.repeat(before.value.length));
+      await this.keyboardBack(element);
+    }
     const after = await this.field(element);
     if (after.value !== '')
       throw new Error(
         `cleared ${element.selector}, which still holds "${after.value}"`,
+      );
+  }
+
+  private async keyboardBack(element: PageElement): Promise<void> {
+    const back = await this.page.executeAsyncScript<boolean>(KEYBOARD_SCRIPT, [
+      KEYBOARD_SETTLE_CEILING_MS,
+    ]);
+    if (!back)
+      throw new Error(
+        `the keyboard did not come back and settle within ${KEYBOARD_SETTLE_CEILING_MS / 1000} s after typing into ${element.selector}`,
       );
   }
 

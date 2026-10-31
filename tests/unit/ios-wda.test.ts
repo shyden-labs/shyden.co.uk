@@ -82,7 +82,7 @@ describe('WdaSession', () => {
     ]);
   });
 
-  it('tap sends one touch pointer: move, down, 50 ms pause, up, then releases', async () => {
+  it('tap sends one touch pointer: move, down, 50 ms pause, up, and nothing else (WDA answers 404 to a release)', async () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.tap({ x: 60.4, y: 108.6 });
@@ -106,7 +106,32 @@ describe('WdaSession', () => {
           ],
         },
       ],
-      ['DELETE', '/session/S1/actions', undefined],
+    ]);
+  });
+
+  it('swipe drags one finger from start to end, holds, then lifts (no fling)', async () => {
+    const { calls, http } = recorder();
+    const wda = await WdaSession.open(http);
+    await wda.swipe({ x: 210, y: 600.4 }, { x: 210, y: 300.6 });
+    expect(calls[1]).toEqual([
+      'POST',
+      '/session/S1/actions',
+      {
+        actions: [
+          {
+            type: 'pointer',
+            id: 'finger1',
+            parameters: { pointerType: 'touch' },
+            actions: [
+              { type: 'pointerMove', duration: 0, x: 210, y: 600 },
+              { type: 'pointerDown', button: 0 },
+              { type: 'pointerMove', duration: 400, x: 210, y: 301 },
+              { type: 'pause', duration: 150 },
+              { type: 'pointerUp', button: 0 },
+            ],
+          },
+        ],
+      },
     ]);
   });
 
@@ -118,6 +143,17 @@ describe('WdaSession', () => {
       'POST',
       '/session/S1/wda/keys',
       { value: ['Ana'] },
+    ]);
+  });
+
+  it("dismissKeyboard taps the keyboard bar's Done key", async () => {
+    const { calls, http } = recorder();
+    const wda = await WdaSession.open(http);
+    await wda.dismissKeyboard();
+    expect(calls[1]).toEqual([
+      'POST',
+      '/session/S1/wda/keyboard/dismiss',
+      { keyNames: ['Done'] },
     ]);
   });
 

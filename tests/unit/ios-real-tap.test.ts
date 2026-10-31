@@ -5,6 +5,8 @@ import {
   CANARY_SCRIPT,
   CANARY_REMOVE_SCRIPT,
   FIELD_SCRIPT,
+  KEYBOARD_SCRIPT,
+  MAX_SWIPES,
   RealTapInteraction,
   runTapCanary,
   TapNotLandedError,
@@ -31,22 +33,40 @@ const element = (selector = '#cg-go') =>
 type Handler = (args: unknown[]) => unknown;
 
 function fakes({
-  prepare = (): unknown => ({ rect: RECT, vv: VV, hit: null }),
+  prepare = (): unknown => ({
+    rect: RECT,
+    vv: VV,
+    hit: null,
+    viewHeight: 746,
+    keyboard: false,
+    inView: true,
+  }),
   landing = (): unknown => ({
-    isTrusted: true,
-    pointerType: 'touch',
-    clientX: 150,
-    clientY: 320,
+    touch: {
+      isTrusted: true,
+      pointerType: 'touch',
+      clientX: 150,
+      clientY: 320,
+    },
+    stray: null,
   }),
   field = (): unknown => ({ value: '', focused: false }),
-}: { prepare?: Handler; landing?: Handler; field?: Handler } = {}) {
+  keyboard = (): unknown => true,
+}: {
+  prepare?: Handler;
+  landing?: Handler;
+  field?: Handler;
+  keyboard?: Handler;
+} = {}) {
   const log: string[] = [];
   const taps: Point[] = [];
   const keys: string[] = [];
+  const swipes: [Point, Point][] = [];
   const handlers = new Map<string, Handler>([
     [PREPARE_SCRIPT, prepare],
     [LANDING_SCRIPT, landing],
     [FIELD_SCRIPT, field],
+    [KEYBOARD_SCRIPT, keyboard],
   ]);
   const page: ScriptPort = {
     async executeScript<T>(script: string, args: unknown[] = []): Promise<T> {
@@ -64,7 +84,9 @@ function fakes({
           ? 'prepare'
           : script === LANDING_SCRIPT
             ? 'landing'
-            : 'field',
+            : script === KEYBOARD_SCRIPT
+              ? 'keyboard'
+              : 'field',
       );
       return handler(args) as T;
     },
@@ -78,8 +100,15 @@ function fakes({
       log.push('keys');
       keys.push(text);
     },
+    async dismissKeyboard() {
+      log.push('dismiss');
+    },
+    async swipe(from: Point, to: Point) {
+      log.push('swipe');
+      swipes.push([from, to]);
+    },
   };
-  return { page, wda, log, taps, keys, handlers };
+  return { page, wda, log, taps, keys, swipes, handlers };
 }
 
 const interaction = (f: ReturnType<typeof fakes>) =>
@@ -100,7 +129,14 @@ describe('RealTapInteraction.click', () => {
 
   it('refuses when another element is the hit target, naming it, and never taps', async () => {
     const f = fakes({
-      prepare: () => ({ rect: RECT, vv: VV, hit: 'div#overlay.cover' }),
+      prepare: () => ({
+        rect: RECT,
+        vv: VV,
+        hit: 'div#overlay.cover',
+        viewHeight: 746,
+        inView: true,
+        keyboard: false,
+      }),
     });
     const tapping = interaction(f).click(element());
     await expect(tapping).rejects.toBeInstanceOf(TapNotLandedError);
@@ -111,7 +147,7 @@ describe('RealTapInteraction.click', () => {
   });
 
   it('fails when no touch reaches the element', async () => {
-    const f = fakes({ landing: () => null });
+    const f = fakes({ landing: () => ({ touch: null, stray: null }) });
     await expect(interaction(f).click(element())).rejects.toThrow(
       /a real tap on #cg-go did not land: no touch reached it within 2 s/,
     );
@@ -120,10 +156,13 @@ describe('RealTapInteraction.click', () => {
   it('fails when the touch that arrived was not trusted', async () => {
     const f = fakes({
       landing: () => ({
-        isTrusted: false,
-        pointerType: 'touch',
-        clientX: 150,
-        clientY: 320,
+        touch: {
+          isTrusted: false,
+          pointerType: 'touch',
+          clientX: 150,
+          clientY: 320,
+        },
+        stray: null,
       }),
     });
     await expect(interaction(f).click(element())).rejects.toThrow(
@@ -134,10 +173,13 @@ describe('RealTapInteraction.click', () => {
   it('fails when the event was not a touch', async () => {
     const f = fakes({
       landing: () => ({
-        isTrusted: true,
-        pointerType: 'mouse',
-        clientX: 150,
-        clientY: 320,
+        touch: {
+          isTrusted: true,
+          pointerType: 'mouse',
+          clientX: 150,
+          clientY: 320,
+        },
+        stray: null,
       }),
     });
     await expect(interaction(f).click(element())).rejects.toThrow(
@@ -148,14 +190,157 @@ describe('RealTapInteraction.click', () => {
   it("fails naming the drift when the touch landed outside the element's box", async () => {
     const f = fakes({
       landing: () => ({
-        isTrusted: true,
-        pointerType: 'touch',
-        clientX: 150,
-        clientY: 400,
+        touch: {
+          isTrusted: true,
+          pointerType: 'touch',
+          clientX: 150,
+          clientY: 400,
+        },
+        stray: null,
       }),
     });
     await expect(interaction(f).click(element())).rejects.toThrow(
       /aimed at \(150, 320\) and landed at \(150, 400\)/,
+    );
+  });
+
+  it('closes the keyboard with Done when it hides the target, then prepares again and taps', async () => {
+    const f = fakes();
+    let calls = 0;
+    f.handlers.set(PREPARE_SCRIPT, () =>
+      ++calls === 1
+        ? {
+            rect: { x: 100, y: 700, width: 100, height: 40 },
+            vv: VV,
+            hit: null,
+            viewHeight: 400,
+            inView: false,
+            keyboard: true,
+          }
+        : {
+            rect: RECT,
+            vv: VV,
+            hit: null,
+            viewHeight: 746,
+            inView: true,
+            keyboard: false,
+          },
+    );
+    await interaction(f).click(element());
+    expect(f.log).toEqual(['prepare', 'dismiss', 'prepare', 'tap', 'landing']);
+  });
+
+  it('fails naming the keyboard when Done did not uncover the target', async () => {
+    const f = fakes({
+      prepare: () => ({
+        rect: { x: 100, y: 700, width: 100, height: 40 },
+        vv: VV,
+        hit: null,
+        viewHeight: 400,
+        inView: false,
+        keyboard: true,
+      }),
+    });
+    await expect(interaction(f).click(element())).rejects.toThrow(
+      /#cg-go is behind the keyboard: its centre is at y 720 and the visible page ends at 400, even after tapping Done/,
+    );
+  });
+
+  it('says where a missed touch went', async () => {
+    const f = fakes({
+      landing: () => ({
+        touch: null,
+        stray: { target: 'div.keyboard-shim', clientX: 150, clientY: 330 },
+      }),
+    });
+    await expect(interaction(f).click(element())).rejects.toThrow(
+      /did not land: the touch reached div\.keyboard-shim at \(150, 330\) instead/,
+    );
+  });
+
+  it('brings an element below the view up with a real swipe, never a script scroll', async () => {
+    const f = fakes();
+    let calls = 0;
+    f.handlers.set(PREPARE_SCRIPT, () =>
+      ++calls === 1
+        ? {
+            rect: { x: 100, y: 1200, width: 100, height: 40 },
+            vv: VV,
+            hit: null,
+            viewHeight: 746,
+            keyboard: false,
+            inView: false,
+          }
+        : {
+            rect: RECT,
+            vv: VV,
+            hit: null,
+            viewHeight: 746,
+            keyboard: false,
+            inView: true,
+          },
+    );
+    await interaction(f).click(element());
+    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+    const [[from, to]] = f.swipes;
+    expect(from.x).toBe(210);
+    expect(to.x).toBe(210);
+    expect(
+      from.y - to.y,
+      'the finger moves up, at most 60% of the view',
+    ).toBeCloseTo(746 * 0.6, 0);
+  });
+
+  it('swipes down for an element above the view', async () => {
+    const f = fakes();
+    let calls = 0;
+    f.handlers.set(PREPARE_SCRIPT, () =>
+      ++calls === 1
+        ? {
+            rect: { x: 100, y: -200, width: 100, height: 40 },
+            vv: VV,
+            hit: null,
+            viewHeight: 746,
+            keyboard: false,
+            inView: false,
+          }
+        : {
+            rect: RECT,
+            vv: VV,
+            hit: null,
+            viewHeight: 746,
+            keyboard: false,
+            inView: true,
+          },
+    );
+    await interaction(f).click(element());
+    const [[from, to]] = f.swipes;
+    expect(to.y).toBeGreaterThan(from.y);
+  });
+
+  it('fails naming the element when real swipes never bring it into view', async () => {
+    const f = fakes({
+      prepare: () => ({
+        rect: { x: 100, y: 5000, width: 100, height: 40 },
+        vv: VV,
+        hit: null,
+        viewHeight: 746,
+        keyboard: false,
+        inView: false,
+      }),
+    });
+    await expect(interaction(f).click(element())).rejects.toThrow(
+      new RegExp(
+        `#cg-go did not come into view after ${MAX_SWIPES} real swipes`,
+      ),
+    );
+    expect(f.swipes).toHaveLength(MAX_SWIPES);
+    expect(f.taps).toEqual([]);
+  });
+
+  it("no page script scrolls the page: scrolling is a finger's", () => {
+    expect(PREPARE_SCRIPT).not.toMatch(
+      /scrollIntoView|scrollTo|scrollBy|scrollTop\s*=/,
     );
   });
 
@@ -164,7 +349,14 @@ describe('RealTapInteraction.click', () => {
     const tokens: unknown[] = [];
     f.handlers.set(PREPARE_SCRIPT, (args) => {
       tokens.push(args[1]);
-      return { rect: RECT, vv: VV, hit: null };
+      return {
+        rect: RECT,
+        vv: VV,
+        hit: null,
+        viewHeight: 746,
+        inView: true,
+        keyboard: false,
+      };
     });
     const i = interaction(f);
     await i.click(element());
@@ -189,9 +381,22 @@ describe('RealTapInteraction.type and clear', () => {
       'tap',
       'landing',
       'keys',
+      'keyboard',
       'field',
     ]);
     expect(f.keys).toEqual(['12']);
+  });
+
+  it('fails when the keyboard does not come back after typing', async () => {
+    const f = fakes({
+      field: () => ({ value: '', focused: true }),
+      keyboard: () => false,
+    });
+    await expect(
+      interaction(f).type(element('#cg-count'), '12'),
+    ).rejects.toThrow(
+      /the keyboard did not come back and settle within 3 s after typing into #cg-count/,
+    );
   });
 
   it('does not tap a field it is already typing in', async () => {
@@ -261,6 +466,8 @@ describe('runTapCanary', () => {
     const wda = {
       tap: async (p: Point) => void taps.push(p),
       keys: async () => {},
+      dismissKeyboard: async () => {},
+      swipe: async () => {},
     };
     expect(await runTapCanary(page, wda, SCREEN)).toEqual({ x: 0, y: 68 });
     expect(taps).toEqual([{ x: 210, y: 456 }]);
@@ -268,7 +475,12 @@ describe('runTapCanary', () => {
 
   it('fails closed when the trusted event never arrives, and removes its layer', async () => {
     const { page, calls } = canaryPage(null);
-    const wda = { tap: async () => {}, keys: async () => {} };
+    const wda = {
+      tap: async () => {},
+      keys: async () => {},
+      dismissKeyboard: async () => {},
+      swipe: async () => {},
+    };
     await expect(runTapCanary(page, wda, SCREEN)).rejects.toThrow(
       /^iPhone real taps are not landing: no touch reached the page within 2 s\. The run stops here; it never falls back to el\.click\(\)\./,
     );
@@ -282,7 +494,12 @@ describe('runTapCanary', () => {
       clientX: 210,
       clientY: 388,
     });
-    const wda = { tap: async () => {}, keys: async () => {} };
+    const wda = {
+      tap: async () => {},
+      keys: async () => {},
+      dismissKeyboard: async () => {},
+      swipe: async () => {},
+    };
     await expect(runTapCanary(page, wda, SCREEN)).rejects.toThrow(
       /^iPhone real taps are not landing: the event was untrusted/,
     );
