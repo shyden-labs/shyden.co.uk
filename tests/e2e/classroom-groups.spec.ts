@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { chooseSpeed } from '../make-groups';
 import {
@@ -49,11 +50,13 @@ const fill = async (
     speed?: 'normal' | 'fast' | 'skip';
   },
 ) => {
-  if (opts.count !== undefined) await page.fill('#cg-count', opts.count);
-  if (opts.size !== undefined) await page.fill('#cg-size', opts.size);
+  if (opts.count !== undefined)
+    await typeInto(page.locator('#cg-count'), opts.count);
+  if (opts.size !== undefined)
+    await typeInto(page.locator('#cg-size'), opts.size);
   if (opts.groups !== undefined) {
     await page.check('input[name="mode"][value="groupCount"]');
-    await page.fill('#cg-groups', opts.groups);
+    await typeInto(page.locator('#cg-groups'), opts.groups);
   }
   // Default to skip so the tests assert the RESULT, not the show. The
   // animation gets its own test below. Idempotent, so `fill()` may run
@@ -129,7 +132,7 @@ test.describe('classroom group creator', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make groups' }).click();
     // 12 students at the default group size (4) => 3 groups.
@@ -173,7 +176,7 @@ test.describe('classroom group creator', () => {
   }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '25', groups: '5' });
-    await page.fill('#cg-numbers-absent', '7');
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
     await expect(page.locator('#cg-numbers-absent')).toHaveValue('7');
     await shoot(
       page,
@@ -242,8 +245,8 @@ test.describe('classroom group creator', () => {
     await expect(go).toBeEnabled();
     await shoot(page, 'Make groups enabled before anything is typed', go);
 
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '26');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
     await expect(page.locator('#cg-numbers-problem')).toBeVisible();
     await shoot(
       page,
@@ -255,7 +258,7 @@ test.describe('classroom group creator', () => {
 
     // And the recovery direction, which is the one that proves the gate is
     // not simply stuck shut once it has closed.
-    await page.fill('#cg-numbers-absent', '7');
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
     await expect(page.locator('#cg-numbers-problem')).toBeHidden();
     await shoot(
       page,
@@ -287,8 +290,8 @@ test.describe('classroom group creator', () => {
     // Clean FIRST, and by count as well as visibility: `toBeHidden` passes for
     // an element that does not exist, so a renamed id would satisfy this line
     // on its own and leave the refusal below as the only thing asserting.
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '20');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '20');
     await expect(problem).toHaveCount(1);
     await expect(problem).toBeHidden();
     await expect(go).toBeEnabled();
@@ -300,7 +303,7 @@ test.describe('classroom group creator', () => {
 
     // The class shrinks underneath it. No click: the refusal has to arrive on
     // the count's own keystroke, which is the whole of AC12.
-    await page.fill('#cg-count', '10');
+    await typeInto(page.locator('#cg-count'), '10');
     await expect(problem).toBeVisible();
     await expect(problem).toHaveText(
       'There is no number 20. You have 10 students.',
@@ -315,7 +318,7 @@ test.describe('classroom group creator', () => {
     // Raising it back clears the refusal, so the gate is not stuck shut once
     // it has closed -- the recovery direction the guard above proves for the
     // other path.
-    await page.fill('#cg-count', '25');
+    await typeInto(page.locator('#cg-count'), '25');
     await expect(problem).toBeHidden();
     await expect(go).toBeEnabled();
     await shoot(
@@ -597,7 +600,7 @@ test.describe('classroom group creator', () => {
       // a phone (see classroom-groups.ts's own "sound asset network
       // prefetch" section).
       await expect(page.locator('#cg-speed')).toHaveValue('skip');
-      await page.fill('#cg-count', '6');
+      await typeInto(page.locator('#cg-count'), '6');
       await page.click('#cg-go');
       await expect(page.locator('#cg-results .student')).toHaveCount(6);
       const heard = requestsEveryEngineMakes(seen.all);
@@ -634,7 +637,7 @@ test.describe('classroom group creator', () => {
       // the script builds every card and none carries the component's scope.
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('/classroom-groups');
-      await page.fill('#cg-count', '6');
+      await typeInto(page.locator('#cg-count'), '6');
       await page.click('#cg-go');
       const cards = page.locator('#cg-results .student');
       await expect(cards).toHaveCount(6);
@@ -667,7 +670,7 @@ test.describe('classroom group creator', () => {
             opacity,
           })),
         )
-        .toEqual(Array(6).fill(atRest));
+        .toEqual(Array.from({ length: 6 }, () => atRest));
       await shoot(
         page,
         'every dealt card at rest for a reduced-motion visitor',
@@ -797,7 +800,7 @@ test.describe('class name and results heading', () => {
   // already record and correct.
   test('the class name heads the results, once', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
@@ -841,7 +844,7 @@ test.describe('class name and results heading', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('   ');
+    await typeInto(page.getByLabel('Class (optional)'), '   ');
     await fill(page, { count: '9', size: '4' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
@@ -861,7 +864,7 @@ test.describe('class name and results heading', () => {
   // numbered DEFAULT.
   test('groups stay numbered when a class name is set', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .group h3').first()).toHaveText(
@@ -888,7 +891,7 @@ test.describe('class name and results heading', () => {
       void d.dismiss();
     });
     const raw = '<img src=x onerror=alert(1)>7B & "Sons"';
-    await page.getByLabel('Class (optional)').fill(raw);
+    await typeInto(page.getByLabel('Class (optional)'), raw);
     // This test keeps the default class size, so it chooses the speed
     // alone rather than going through fill().
     await chooseSpeed(page, 'skip');
@@ -911,7 +914,7 @@ test.describe('class name and results heading', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('Year 7 / Set B');
+    await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
     await chooseSpeed(page, 'skip');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText(
@@ -932,7 +935,7 @@ test.describe('class name and results heading', () => {
     async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 900 });
       await page.goto('/classroom-groups');
-      await page.getByLabel('Class (optional)').fill('x'.repeat(300));
+      await typeInto(page.getByLabel('Class (optional)'), 'x'.repeat(300));
       await chooseSpeed(page, 'skip');
       await page.click('#cg-go');
       await expect(page.locator('#cg-results-h')).toBeVisible();
@@ -952,12 +955,12 @@ test.describe('class name and results heading', () => {
   }) => {
     await page.goto('/classroom-groups');
     const classField = page.getByLabel('Class (optional)');
-    await classField.fill('7B');
+    await typeInto(classField, '7B');
     await fill(page, { count: '8', size: '4' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
 
-    await classField.fill('8C');
+    await typeInto(classField, '8C');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText('8C — your groups');
   });
@@ -1094,7 +1097,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   // was English-only).
   test('the class name heads the results, once', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Kelas (opsional)').fill('7B');
+    await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
     await fill(page, { count: '9', size: '4' });
     await page.click('#cg-go');
     await expect(page.locator('#cg-results-h')).toHaveText(
@@ -1136,7 +1139,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
 // match two elements.
 test.describe('out-of-date groups', () => {
   const shuffle = async (page: Page) => {
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   };
@@ -1146,7 +1149,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(
       page.getByText('These groups are out of date — the group size changed.'),
     ).toBeVisible();
@@ -1183,7 +1186,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Number of students').fill('30');
+    await typeInto(page.getByLabel('Number of students'), '30');
     await expect(
       page.getByText('These groups are out of date — the class list changed.'),
     ).toBeVisible();
@@ -1196,8 +1199,8 @@ test.describe('out-of-date groups', () => {
   test('undoing the count change clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Number of students').fill('30');
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '30');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
@@ -1214,21 +1217,21 @@ test.describe('out-of-date groups', () => {
   test('the class name does NOT mark them out of date', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
   test('the old groups stay visible while stale', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   });
 
   test('shuffling clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await page.click('#cg-go');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
@@ -1236,8 +1239,8 @@ test.describe('out-of-date groups', () => {
   test('undoing the change clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await page.getByLabel('Students in each group').fill('4');
+    await typeInto(page.getByLabel('Students in each group'), '3');
+    await typeInto(page.getByLabel('Students in each group'), '4');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
@@ -1398,7 +1401,10 @@ test.describe('out-of-date groups', () => {
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Anna');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Anna',
+    );
     await expect(page.getByText('out of date')).toHaveCount(0);
     // `#cg-results`, NOT `#cg-groups` -- that id belongs to the "number of
     // groups" number input. The same correction this suite has already had
@@ -1417,10 +1423,10 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await page.locator('#cg-grouping-toggle').click();
     await page.getByLabel('Put them all in one group').check();
-    await page.getByLabel('Students in each group').fill('4'); // undoes ONLY the size change
+    await typeInto(page.getByLabel('Students in each group'), '4'); // undoes ONLY the size change
     await expect(
       page.getByText(
         'These groups are out of date — the leftovers choice changed.',
@@ -1432,10 +1438,10 @@ test.describe('out-of-date groups', () => {
   test('when two things change, undoing both clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await page.locator('#cg-grouping-toggle').click();
     await page.getByLabel('Put them all in one group').check();
-    await page.getByLabel('Students in each group').fill('4');
+    await typeInto(page.getByLabel('Students in each group'), '4');
     await page.getByLabel('Share them out evenly').check();
     await expect(page.getByText('out of date')).toHaveCount(0);
     await expect(page.locator('#cg-results')).not.toHaveClass(/stale/);
@@ -1452,7 +1458,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'These groups are out of date — the group size changed.',
     );
@@ -1469,7 +1475,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-stale')).toBeVisible();
     await page.locator('#cg-stale button').click();
     await expect(page.locator('#cg-stale')).toBeHidden();
@@ -1491,7 +1497,7 @@ test.describe('out-of-date groups', () => {
       .locator('#cg-results .group')
       .first()
       .evaluate((el) => getComputedStyle(el).opacity);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-results')).toHaveClass(/stale/);
     const after = await page
       .locator('#cg-results .group')
@@ -1518,7 +1524,7 @@ test.describe('out-of-date groups', () => {
     }) => {
       await page.goto('/classroom-groups');
       await shuffle(page);
-      await page.getByLabel('Students in each group').fill('3');
+      await typeInto(page.getByLabel('Students in each group'), '3');
       await expect(page.locator('#cg-results')).toHaveClass(/stale/);
       await emulateTheme(page, theme);
       const contrast = await contrastRatio(
@@ -1537,7 +1543,7 @@ test.describe('out-of-date groups', () => {
     }) => {
       await page.goto('/classroom-groups');
       await shuffle(page);
-      await page.getByLabel('Students in each group').fill('3');
+      await typeInto(page.getByLabel('Students in each group'), '3');
       const sentence = page.locator('#cg-stale-text');
       await expect(sentence).toBeVisible();
       await expect(sentence).toHaveText(
@@ -1569,10 +1575,10 @@ test.describe('out-of-date groups', () => {
       async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 900 });
         await page.goto(path);
-        await page.locator('#cg-count').fill('12');
+        await typeInto(page.locator('#cg-count'), '12');
         await page.click('#cg-go');
         await expect(page.locator('#cg-results .group')).toHaveCount(3);
-        await page.locator('#cg-size').fill('3');
+        await typeInto(page.locator('#cg-size'), '3');
         await expect(page.locator('#cg-stale')).toBeVisible();
         await expectNoHorizontalScroll(page, `${path}: the stale notice`);
         await atLeast44(
@@ -1592,10 +1598,10 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.getByLabel('Siswa dalam setiap kelompok').fill('3');
+    await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '3');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — ukuran kelompok berubah.',
     );
@@ -1617,7 +1623,7 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
     await page.locator('#cg-grouping-toggle').click();
@@ -1636,10 +1642,10 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
     await page.click('#cg-go');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.getByLabel('Jumlah siswa').fill('30');
+    await typeInto(page.getByLabel('Jumlah siswa'), '30');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — daftar kelas berubah.',
     );

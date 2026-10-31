@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recordErrors } from './recorders';
 import { atLeast44 } from '../viewport';
@@ -239,7 +240,7 @@ test.describe('Import / export', () => {
 
   test('the filename carries the class and the date', async ({ page }) => {
     await rosterOf(page, 2);
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     const name = await downloadName(page, 'Export class list');
     expect(name).toMatch(/^7B-class-list-\d{4}-\d{2}-\d{2}\.csv$/);
@@ -249,7 +250,7 @@ test.describe('Import / export', () => {
     page,
   }) => {
     await rosterOf(page, 2);
-    await page.getByLabel('Class (optional)').fill('Year 7 / Set B');
+    await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
     await openIo(page);
     const name = await downloadName(page, 'Export class list');
     expect(name).toBe(`Year-7-Set-B-class-list-${todayISO()}.csv`);
@@ -265,7 +266,7 @@ test.describe('Import / export', () => {
     page,
   }) => {
     await rosterOf(page, 4);
-    await page.getByLabel('Class (optional)').fill('Year 7 / Set B');
+    await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await expect(page.locator('#cg-results-h')).toContainText('Year 7 / Set B');
@@ -303,7 +304,7 @@ test.describe('Import / export', () => {
 
   test('the exported groups file is one row per student', async ({ page }) => {
     await rosterOf(page, 4);
-    await page.getByLabel('Students in each group').fill('2');
+    await typeInto(page.getByLabel('Students in each group'), '2');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await openIo(page);
@@ -350,7 +351,10 @@ test.describe('Import / export', () => {
     // open it, and a hidden input cannot be typed into. Opening it is the
     // same thing a teacher does, not a workaround.
     await page.locator('#cg-students-toggle').click();
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Anna');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Anna',
+    );
     await expect(page.locator('#cg-io .state')).toHaveText(
       'unsaved changes — export to keep them',
     );
@@ -445,7 +449,7 @@ test.describe('Import / export — Indonesian', () => {
     await rosterOf(page, 2);
     await page.goto('/id/classroom-groups');
     await buildRoster(page, [['F', 'Ana']], '/id/classroom-groups');
-    await page.getByLabel('Kelas (opsional)').fill('7B');
+    await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
     await page.locator('#cg-io-toggle').click();
     const name = await downloadName(page, 'Ekspor daftar kelas');
     expect(name).toBe(`7B-daftar-kelas-${todayISO()}.csv`);
@@ -1050,7 +1054,7 @@ test.describe('review findings — import', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     await upload(page, 'unnamed.csv', 'number,name\n1,Gita\n2,Hani\n');
     await expect(page.locator('.cg-student')).toHaveCount(2);
@@ -1062,7 +1066,7 @@ test.describe('review findings — import', () => {
 
   test('and an import that HAS a name takes it', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     await upload(page, 'named.csv', '# Class: 8C\nnumber,name\n1,Gita\n');
     await expect(page.getByLabel('Class (optional)')).toHaveValue('8C');

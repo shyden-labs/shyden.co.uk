@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
 import { LOCALES, getStrings, localisePath } from '../../src/lib/i18n';
@@ -56,10 +57,10 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '7, 12');
-    await page.fill('#cg-numbers-together', '3,9');
-    await page.fill('#cg-numbers-apart', '2,5');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '7, 12');
+    await typeInto(page.locator('#cg-numbers-together'), '3,9');
+    await typeInto(page.locator('#cg-numbers-apart'), '2,5');
 
     // THE POSITIVE CONTROL, and the whole reason this test means anything.
     // Empty is the DEFAULT state of these fields, so "reload, then find them
@@ -91,8 +92,8 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
 
   test('and nothing about them is written to storage', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '7, 12');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '7, 12');
     await expect(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
 
     // The positive control has to CREATE something first. This page writes
@@ -271,8 +272,8 @@ test.describe('privacy — with JavaScript blocked', () => {
       // control cannot be serialised into a form GET at all. Filled here
       // anyway, with a value distinctive enough to be unmistakable, so the
       // proof is concrete rather than resting on that guarantee alone.
-      await page.fill('#cg-count', '24');
-      await page.fill('#cg-class', 'PrivacyProbeClassName7B');
+      await typeInto(page.locator('#cg-count'), '24');
+      await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B');
       await page.click('#cg-go');
       // WebKit schedules the form's GET after the click has returned, so the
       // click's own wait for navigations can end before it starts, and the URL
@@ -333,7 +334,7 @@ test.describe('privacy — when the script dies half-way', () => {
     // the tool would work, its own handler would keep the URL clean, and this
     // would pass without any failure having happened.
     await expect.poll(failures).toBe(2);
-    await page.fill('#cg-count', '8');
+    await typeInto(page.locator('#cg-count'), '8');
     // Whether the submit was CANCELLED, read from the event itself (#449). The
     // URL alone cannot say: WebKit starts a native submit's navigation after
     // the click returns, so an unchanged URL read straight away passed even
@@ -543,7 +544,7 @@ test.describe('privacy — the roster never leaves memory', () => {
       .getByLabel('Apart')
       .selectOption('A');
     await page.getByLabel('Number of groups').check();
-    await page.getByLabel('How many groups').fill('2');
+    await typeInto(page.getByLabel('How many groups'), '2');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await expect(page.locator('#cg-results .group').first()).toBeVisible();

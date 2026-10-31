@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
 import { adb, renderedScreen } from '../../scripts/adb.mjs';
 import { test, expect } from '../e2e/fixtures';
@@ -118,7 +119,7 @@ test.describe('per-test isolation actually isolates state across back-to-back te
         'the next test can meaningfully assert its absence',
     ).toBe(PROBE_VALUE);
 
-    await page.locator('#cg-class').fill('ISOLATION-PROBE-CLASS-NAME');
+    await typeInto(page.locator('#cg-class'), 'ISOLATION-PROBE-CLASS-NAME');
     await expect(page.locator('#cg-class')).toHaveValue(
       'ISOLATION-PROBE-CLASS-NAME',
     );

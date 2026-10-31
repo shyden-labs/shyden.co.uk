@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { expectVisibleText } from './helpers';
@@ -30,7 +31,7 @@ test.describe('the Gift Value result line reads in every language', () => {
       const group = (n: number) =>
         n.toLocaleString(LOCALE_METADATA[locale].numberLocale);
 
-      await page.locator('#gift-input').fill('1000000');
+      await typeInto(page.locator('#gift-input'), '1000000');
       await page.locator('#gift-submit').click();
 
       const result = page.locator('#gift-result');

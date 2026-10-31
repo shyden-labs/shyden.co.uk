@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import {
   expect,
   type BrowserContext,
@@ -75,8 +76,8 @@ export const openWaitingBoard = async (
   speed?: 'normal' | 'fast' | 'skip',
 ) => {
   await page.goto('/classroom-groups');
-  await page.fill('#cg-count', count);
-  await page.fill('#cg-size', size);
+  await typeInto(page.locator('#cg-count'), count);
+  await typeInto(page.locator('#cg-size'), size);
   // #744: a board Shuffle travels unless the speed is Skip, so a test that
   // presses it says which it means; left out, the page's default stands.
   if (speed) await chooseSpeed(page, speed);
@@ -150,7 +151,10 @@ export const addSeveral = async (page: Page, howMany: number) => {
   await page
     .getByRole('button', { name: t.rosterAddSeveral, exact: true })
     .click();
-  await page.getByLabel(t.rosterHowMany, { exact: true }).fill(String(howMany));
+  await typeInto(
+    page.getByLabel(t.rosterHowMany, { exact: true }),
+    String(howMany),
+  );
   await page
     .getByRole('button', { name: t.rosterAddConfirm, exact: true })
     .click();
@@ -226,9 +230,10 @@ export const buildRoster = async (
   for (const [i, [sex, name]] of students.entries()) {
     const row = page.locator('.cg-student').nth(i);
     if (name)
-      await row
-        .getByLabel(stringsOf(page).rosterColName, { exact: true })
-        .fill(name);
+      await typeInto(
+        row.getByLabel(stringsOf(page).rosterColName, { exact: true }),
+        name,
+      );
     if (sex)
       await row
         .getByLabel(stringsOf(page).rosterColSex, { exact: true })
@@ -391,7 +396,7 @@ export const rosterForSpillover = async (page: Page) => {
   ]);
   await page.locator('#cg-grouping-toggle').click();
   await page.getByLabel(/Keep boys and girls separate/).check();
-  await page.getByLabel(/Students in each group/).fill('4');
+  await typeInto(page.getByLabel(/Students in each group/), '4');
 };
 
 export const namesIn = (text: string): string[] =>

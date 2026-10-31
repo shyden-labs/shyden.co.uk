@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -191,7 +192,7 @@ test.describe('the sentences corrected on #319', () => {
           .nth(row)
           .getByLabel(t.rosterColTogether, { exact: true })
           .selectOption('A');
-      await tool.locator('#cg-size').fill('2');
+      await typeInto(tool.locator('#cg-size'), '2');
       await go.click();
       await expectVisibleText(
         error,

@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import {
@@ -326,10 +327,11 @@ test(
     const home = localisePath('/', 'vi');
     await page.goto(home);
     await page.locator('[data-report] summary').click();
-    await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
-    await page
-      .getByLabel(t.noteLabel, { exact: true })
-      .fill(`automated dev check ${process.env.GITHUB_SHA ?? 'local'}`);
+    await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
+    await typeInto(
+      page.getByLabel(t.noteLabel, { exact: true }),
+      `automated dev check ${process.env.GITHUB_SHA ?? 'local'}`,
+    );
     await page.getByRole('button', { name: t.send }).click();
     await expect(page).toHaveURL(
       (url) => url.pathname === home && url.hash === '#report-sent',
@@ -358,9 +360,9 @@ test(
     await page.goto('/api/docs/');
     await page.locator('#swagger .opblock-summary-control').first().click();
     await page.locator('#swagger .try-out__btn').click();
-    await page.getByPlaceholder('quote', { exact: true }).fill('x');
+    await typeInto(page.getByPlaceholder('quote', { exact: true }), 'x');
     // The honeypot: dev answers sent and stores nothing.
-    await page.getByPlaceholder('website', { exact: true }).fill('a bot');
+    await typeInto(page.getByPlaceholder('website', { exact: true }), 'a bot');
     await page.locator('#swagger .btn.execute').click();
     const live = page.locator('#swagger .live-responses-table .response');
     await expect(live).toHaveCount(1);

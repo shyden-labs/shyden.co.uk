@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import {
@@ -156,17 +157,16 @@ test('/vi/classroom-groups submits in place: failed shows, takes focus, and the 
   await page.goto(pagePath('classroom-groups', 'vi'));
   await page.locator('#cg-students-toggle').click();
   await page.getByRole('button', { name: tool.rosterAddStudent }).click();
-  await page
-    .locator('.cg-student')
-    .first()
-    .getByLabel(tool.rosterColName)
-    .fill('Lan');
+  await typeInto(
+    page.locator('.cg-student').first().getByLabel(tool.rosterColName),
+    'Lan',
+  );
   await page.evaluate(
     () => ((window as unknown as { unreloaded: boolean }).unreloaded = true),
   );
 
   await page.locator('[data-report] summary').click();
-  await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
+  await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
   await page.getByRole('button', { name: t.send }).click();
 
   const failed = page.locator('#report-failed');
@@ -218,7 +218,7 @@ test('/vi/classroom-groups: one report at a time, and Send comes back for the ne
   });
   await page.goto(pagePath('classroom-groups', 'vi'));
   await page.locator('[data-report] summary').click();
-  await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
+  await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
   const send = page.getByRole('button', { name: t.send });
 
   await page.locator('[data-report-form]').evaluate((form: HTMLFormElement) => {
@@ -254,7 +254,7 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
   const t = getSiteStrings('vi').report;
   await page.goto(pagePath('classroom-groups', 'vi'));
   await page.locator('[data-report] summary').click();
-  await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
+  await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
   await page.getByRole('button', { name: t.send }).click();
   await expect(page.locator('#report-failed')).toBeVisible();
   // Liveness by content: the report itself is among the requests seen.
@@ -293,7 +293,7 @@ for (const [outcome, key] of [
     );
     await page.goto(pagePath('classroom-groups', 'vi'));
     await page.locator('[data-report] summary').click();
-    await page.getByLabel(t.quoteLabel, { exact: true }).fill(t.open);
+    await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
     await page.getByRole('button', { name: t.send }).click();
     const shown = page.locator(`#report-${outcome}`);
     await expect(shown).toBeVisible();

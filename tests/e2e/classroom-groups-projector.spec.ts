@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { chooseSpeed, makeGroups } from '../make-groups';
 import {
@@ -99,12 +100,12 @@ test.describe('the projector view', () => {
     await page.goto('/classroom-groups');
     await expect(go).toBeEnabled();
     await expect(open).toBeVisible();
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '26');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
     await expect(go).toBeDisabled();
     await expect(openEvenHidden).toHaveCount(1);
     await expect(openEvenHidden).toBeHidden();
-    await page.fill('#cg-numbers-absent', '7');
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
     await expect(go).toBeEnabled();
     await expect(open).toBeVisible();
   });
@@ -512,7 +513,7 @@ test.describe('the board before a shuffle (#743)', () => {
       ['M', 'Eli'],
       ['F', 'Fay'],
     ]);
-    await page.fill('#cg-size', '3');
+    await typeInto(page.locator('#cg-size'), '3');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page)).toBeVisible();
     await expect(board(page).locator('#cg-results-h')).toHaveText(
@@ -554,8 +555,8 @@ test.describe('the board before a shuffle (#743)', () => {
 
   test('a bare count waits by number alone', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page).locator('.group h3')).toHaveText([
       'Group 1',
@@ -572,8 +573,8 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.getByRole('button', { name: 'Full screen' }).click();
     // Nothing has been shuffled yet, so the board's button says what the
@@ -596,7 +597,7 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
+    await typeInto(page.locator('#cg-count'), '10');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page)).toBeVisible();
     await page.keyboard.press('Escape');
@@ -614,8 +615,8 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '0');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '0');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await bar(page).getByRole('button', { name: 'Make Groups' }).click();

@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
@@ -38,7 +39,7 @@ test.describe('glory points calculator', () => {
       page,
     }) => {
       await page.goto('/yeetalk-calculators');
-      await page.fill(`#${calculator.id}-input`, '1000');
+      await typeInto(page.locator(`#${calculator.id}-input`), '1000');
       await page.click(`#${calculator.id}-submit`);
       // The whole line, so each amount sits in its own place: three
       // order-free substring checks passed with coins and beans swapped (#390
@@ -62,7 +63,7 @@ test.describe('glory points calculator', () => {
     // how this survived, along with t.errors.* and the English fallback in
     // yeetalk-calculators.ts.
     await page.goto('/id/yeetalk-calculators');
-    await page.fill('#glory-input', '1000');
+    await typeInto(page.locator('#glory-input'), '1000');
     await page.click('#glory-submit');
     await expectVisibleText(
       page.locator('#glory-result'),
@@ -72,7 +73,7 @@ test.describe('glory points calculator', () => {
 
   test('the Indonesian calculator refuses in Indonesian', async ({ page }) => {
     await page.goto('/id/yeetalk-calculators');
-    await page.fill('#glory-input', 'abc');
+    await typeInto(page.locator('#glory-input'), 'abc');
     await page.click('#glory-submit');
     // The English fallback at yeetalk-calculators.ts would render the raw English
     // message here; the map must actually cover this code. Named, not merely
@@ -84,7 +85,10 @@ test.describe('glory points calculator', () => {
   for (const calculator of CALCULATORS) {
     test(`${calculator.name}: Enter key submits`, async ({ page }) => {
       await page.goto('/yeetalk-calculators');
-      await page.fill(`#${calculator.id}-input`, calculator.enterInput);
+      await typeInto(
+        page.locator(`#${calculator.id}-input`),
+        calculator.enterInput,
+      );
       await page.press(`#${calculator.id}-input`, 'Enter');
       await expectVisibleText(
         page.locator(`#${calculator.id}-result`),
@@ -119,7 +123,8 @@ test.describe('glory points calculator', () => {
         page,
       }) => {
         await page.goto('/yeetalk-calculators');
-        if (input) await page.fill(`#${calculator.id}-input`, input);
+        if (input)
+          await typeInto(page.locator(`#${calculator.id}-input`), input);
         await page.click(`#${calculator.id}-submit`);
         await expectVisibleText(
           page.locator(`#${calculator.id}-error`),

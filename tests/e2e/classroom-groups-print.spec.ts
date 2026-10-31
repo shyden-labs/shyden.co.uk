@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import {
   withGroups,
@@ -139,7 +140,7 @@ test.describe('the print panel', () => {
 
   test('only preferences are stored — no class data', async ({ page }) => {
     await withGroups(page);
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openPrintPanel(page);
     await panel(page).getByLabel('Class list').check();
     const stored = await page.evaluate(() =>
@@ -468,7 +469,7 @@ test.describe('the printed class list', () => {
   });
 
   test('the sheet carries the class name and a date', async ({ page }) => {
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -552,7 +553,10 @@ test.describe('the printed class list', () => {
       'Ana',
     );
     await page.emulateMedia({ media: 'screen' });
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Annika');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Annika',
+    );
     await page.emulateMedia({ media: 'print' });
     await expect(page.locator('.print-list tbody tr').first()).toContainText(
       'Annika',
@@ -690,7 +694,7 @@ test.describe('the printed sheet', () => {
     page,
   }) => {
     await withGroups(page, 6);
-    await page.locator('#cg-class').fill('Year 9 — Set 2');
+    await typeInto(page.locator('#cg-class'), 'Year 9 — Set 2');
     // Ctrl/Cmd+P, not the in-page Print button. `writePrintHead` used to run
     // only from the print panel's apply, so printing the way people actually
     // print produced a sheet with no class name and no date.
@@ -720,7 +724,7 @@ test.describe('the printed sheet', () => {
 
 /** The text edit both register blocks below make: it never re-renders. */
 const typeAName = async (row: import('@playwright/test').Locator) => {
-  await row.getByLabel('Name').fill('Ana');
+  await typeInto(row.getByLabel('Name'), 'Ana');
 };
 
 /**
