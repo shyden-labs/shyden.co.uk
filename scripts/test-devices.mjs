@@ -55,6 +55,7 @@ import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
+import { startWda } from './wda.mjs';
 import {
   closeSync,
   copyFileSync,
@@ -614,15 +615,14 @@ function isAndroidPresent() {
  * syntax transform that Node's strip-only mode does not support. The session
  * can import a plain module, so the listing and its parsing live in one.
  */
-function isIosPresent() {
+function findIphone() {
   let raw;
   try {
     raw = listDevices();
   } catch (error) {
-    return messageOf(error);
+    return { absence: messageOf(error) };
   }
-  const picked = pickIphone(raw, process.env.IOS_UDID);
-  return 'absence' in picked ? picked.absence : null;
+  return pickIphone(raw, process.env.IOS_UDID);
 }
 
 // ── one-off discovery: how many tests does grepInvert exclude by design? ──
@@ -1011,8 +1011,9 @@ async function runAndroidGroup(excludedByDesign) {
 async function runIosGroup() {
   const name = 'ios';
   const startedAt = Date.now();
-  const absence = isIosPresent();
-  if (absence !== null) {
+  const found = findIphone();
+  if ('absence' in found) {
+    const { absence } = found;
     process.stdout.write(
       `[${name}] device absent -- not attempting this group: ${absence}\n`,
     );
@@ -1035,37 +1036,64 @@ async function runIosGroup() {
   // leftover mode from an earlier run.
   if (existsSync(IOS_MODE_FILE)) unlinkSync(IOS_MODE_FILE);
 
+  // Real taps and keys come from WebDriverAgent (#838), started here, in
+  // the runner's own process, and stopped whatever the group did. A WDA
+  // that cannot start fails the group, naming why: the iPhone run never
+  // falls back to taps that are not taps.
   const reportFile = REPORT_FILES.ios;
-  const { code } = await runTagged(
-    name,
-    'npx',
-    [
-      'vitest',
-      'run',
-      '--config=vitest.ios.config.ts',
-      '--reporter=verbose',
-      '--reporter=json',
-      `--outputFile.json=${reportFile}`,
-      // Additive, same as the two Playwright groups' jsonl reporter --
-      // verbose+json are unchanged. The leading "./" is load-bearing, not
-      // decorative: vitest's own CLI-to-config resolution
-      // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
-      // starting "// ./reporter.js || ../reporter.js, but not
-      // .reporters/reporter.js") only treats a --reporter value as a file
-      // path when it matches /^\.\.?\//; a bare path is treated as a
-      // reporter NAME and fails to resolve. Measured, not assumed -- see
-      // tests/reporters/jsonl-vitest.ts's own module doc. No change to
-      // vitest.ios.config.ts needed.
-      '--reporter=./tests/reporters/jsonl-vitest.ts',
-    ],
-    {
-      env: {
-        ...process.env,
-        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-        DASHBOARD_GROUP: name,
+  let wda;
+  try {
+    wda = await startWda({ udid: found.device.udid });
+  } catch (error) {
+    const reason = `WebDriverAgent did not start: ${messageOf(error)}`;
+    process.stdout.write(`[${name}] ${reason}\n`);
+    return {
+      name,
+      status: 'failed',
+      passed: null,
+      failed: null,
+      skippedByDesign: null,
+      durationMs: Date.now() - startedAt,
+      reason,
+    };
+  }
+  process.stdout.write(`[${name}] WebDriverAgent ready at ${wda.url}\n`);
+  let code;
+  try {
+    ({ code } = await runTagged(
+      name,
+      'npx',
+      [
+        'vitest',
+        'run',
+        '--config=vitest.ios.config.ts',
+        '--reporter=verbose',
+        '--reporter=json',
+        `--outputFile.json=${reportFile}`,
+        // Additive, same as the two Playwright groups' jsonl reporter --
+        // verbose+json are unchanged. The leading "./" is load-bearing, not
+        // decorative: vitest's own CLI-to-config resolution
+        // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
+        // starting "// ./reporter.js || ../reporter.js, but not
+        // .reporters/reporter.js") only treats a --reporter value as a file
+        // path when it matches /^\.\.?\//; a bare path is treated as a
+        // reporter NAME and fails to resolve. Measured, not assumed -- see
+        // tests/reporters/jsonl-vitest.ts's own module doc. No change to
+        // vitest.ios.config.ts needed.
+        '--reporter=./tests/reporters/jsonl-vitest.ts',
+      ],
+      {
+        env: {
+          ...process.env,
+          DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+          DASHBOARD_GROUP: name,
+          WDA_URL: wda.url,
+        },
       },
-    },
-  );
+    ));
+  } finally {
+    await wda.stop();
+  }
   const durationMs = Date.now() - startedAt;
   // An evidence run leaves the page builder this group's report beside its
   // captures (#354). A report never written is already a failed group below.
@@ -1081,7 +1109,7 @@ async function runIosGroup() {
   // `modeInfo.description` is the FULL sentence session.ts already rendered
   // via its own `describeInteractionMode` call -- read verbatim, not
   // recomputed here, because this script cannot import that function
-  // directly (see `isIosPresent`'s own comment for the measured
+  // directly (see `findIphone`'s own comment for the measured
   // reason) and a hand-copied paraphrase could drift from the source of
   // truth the moment either file is edited.
   const modeNote = modeInfo

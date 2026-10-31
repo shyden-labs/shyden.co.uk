@@ -162,3 +162,22 @@ export function pickIphone(raw, udid) {
   }
   return { device: { udid: chosen.hardwareProperties.udid, name, osVersion } };
 }
+
+/**
+ * The address the iPhone answers on over USB, from `xcrun devicectl device
+ * info details`' "Tunnel IP Address" line (#838: WebDriverAgent is reached
+ * here, not over Wi-Fi). It changes with every connection (measured
+ * 2026-10-31: fd71:47c:ca8f::1, then fd97:eff2:bed2::1), so it is read at
+ * run time, never kept.
+ *
+ * @param {string} details
+ * @returns {string}
+ */
+export function parseTunnelAddress(details) {
+  const match = /Tunnel IP Address:\s*(\S+)/.exec(details);
+  if (match === null)
+    throw new Error(
+      `devicectl's device details held no "Tunnel IP Address" line; is the iPhone connected over USB? Got: ${details.slice(0, 200)}`,
+    );
+  return match[1];
+}
