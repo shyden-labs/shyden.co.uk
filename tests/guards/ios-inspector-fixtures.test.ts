@@ -119,10 +119,13 @@ function decodeInto(first: Buffer, into: Reading): void {
 function read(file: string): Reading {
   const text = readFileSync(file, 'utf8');
   const reading: Reading = { file, texts: [text], identifiers: [] };
+  // A capture of the wire holds `frames`, base64 to decode. Any other JSON
+  // here, such as the page driver's recorded answers (#859), is plain text,
+  // and `texts` above already holds all of it.
   if (file.endsWith('.json')) {
-    const { frames } = JSON.parse(text) as {
-      frames: { base64: string }[];
-    };
+    const parsed = JSON.parse(text) as { frames?: unknown };
+    if (!('frames' in parsed)) return reading;
+    const frames = parsed.frames as { base64: string }[];
     for (const frame of frames)
       decodeInto(Buffer.from(frame.base64, 'base64'), reading);
   }
