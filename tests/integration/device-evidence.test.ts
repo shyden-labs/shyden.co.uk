@@ -157,7 +157,7 @@ describe('the device leg writes the same evidence every other leg does', () => {
 
     // Asserting the builder's own sniffer against the device leg's own bytes.
     // Either side alone proves nothing: the builder is happy with PNG in the
-    // abstract, and this leg is happy to write whatever WebDriver hands back.
+    // abstract, and this leg is happy to write whatever the page driver hands back.
     expect(mediaType(readFileSync(join(dir, file!)))).toBe('image/png');
   });
 
@@ -190,7 +190,7 @@ describe('the device leg writes the same evidence every other leg does', () => {
     );
   });
 
-  // The leg runs only on a Mac (safaridriver, an iPhone on USB), and `sips` is
+  // The leg runs only on a Mac (devicectl, an iPhone on USB), and `sips` is
   // a macOS built-in, so elsewhere there is nothing here to measure: a Linux
   // runner has no `sips`, and the resample degrades to a no-op by design.
   it.runIf(process.platform === 'darwin')(

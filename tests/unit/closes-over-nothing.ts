@@ -8,7 +8,7 @@ import { withoutTsComments } from './source-text';
  * as TEXT, imports nothing (#390).
  *
  * Playwright serialises such a function into the page, and the iOS leg sends
- * `(${fn})()` down a WebDriver wire. A reference to a module-scope binding
+ * `(${fn})()` down the Web Inspector wire. A reference to a module-scope binding
  * type-checks perfectly here and is `undefined` over there -- a failure that
  * appears only at the far end. `declaration` is a line the module must contain,
  * the positive control that the read found the right file, so "no imports" is a

@@ -117,7 +117,7 @@ export const flattenReport = (report) => {
 
 /**
  * The projects that capture stills and can record no video: the real-device
- * iOS leg drives Safari over WebDriver, which offers screenshots only (#354).
+ * iOS leg drives Safari through its Web Inspector, and captures screenshots only (#354).
  * Their journeys read "no recording for this leg", because "not recorded by
  * policy" would claim a choice nobody made.
  */

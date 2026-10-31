@@ -11,8 +11,8 @@
  * email field. One definition now serves both.
  *
  * Both callers ship `measureTypedFields` as TEXT: Playwright serialises it into
- * the page, and the iOS leg sends `(${measureTypedFields})()` down a WebDriver
- * wire. So it closes over nothing and this module imports nothing: a binding
+ * the page, and the iOS leg sends `(${measureTypedFields})()` down the Web
+ * Inspector wire. So it closes over nothing and this module imports nothing: a binding
  * from outside would type-check here and be `undefined` there.
  * `tests/guards/typed-fields.test.ts` holds both properties.
  */
@@ -57,6 +57,6 @@ export const measureTypedFields = (): { field: string; fontSize: number }[] => {
     }));
 };
 
-/** The wrapper the device leg sends over WebDriver's `execute/sync`. */
+/** The wrapper the device leg sends through the page driver's `executeScript`. */
 export const measureTypedFieldsScript = (): string =>
   `return (${measureTypedFields})();`;

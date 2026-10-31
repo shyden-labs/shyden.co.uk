@@ -3,7 +3,7 @@
  *
  * Two legs now ask this question and they must not answer it differently. The
  * desktop suite runs it through `page.evaluate` (Playwright); the iOS journeys
- * run it through `executeScript` on a real phone over WebDriver, where
+ * run it through `executeScript` on a real phone through its Web Inspector, where
  * Playwright does not exist. #189 AC11 exists precisely because the phone is
  * the case the desktop suite cannot reach -- so a second, hand-copied
  * measurement over there would be the one place a divergence could hide, in
@@ -79,7 +79,7 @@ export const measureBoard = () => {
 export type BoardGeometry = ReturnType<typeof measureBoard>;
 
 /**
- * The same measurement, as a string a WebDriver session can run.
+ * The same measurement, as a string the iOS page driver can run.
  *
  * `executeScript` takes source, not a function, so the iOS leg cannot pass
  * `measureBoard` itself. Built here rather than at the call site so there is

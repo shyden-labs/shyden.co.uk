@@ -7,9 +7,7 @@ import path from 'node:path';
 import {
   confirmServesBuild,
   contained,
-  deleteSession,
   exitCodeFor,
-  leakedSessionOf,
   once,
   playwrightVerdict,
   iosEvidenceReportOf,
@@ -428,49 +426,6 @@ describe('confirmServesBuild: the preview serves the bytes this run built', () =
         builtFile(),
       ),
     ).rejects.toThrow('it answered 404');
-  });
-});
-
-describe('leakedSessionOf: a leaked session marker names a port and a session', () => {
-  it('reads a well-formed marker', () => {
-    expect(leakedSessionOf({ port: 4723, sessionId: 'abc-123' })).toEqual({
-      port: 4723,
-      sessionId: 'abc-123',
-    });
-  });
-
-  it.each([
-    ['no port', { sessionId: 'abc' }],
-    ['a port written as text', { port: '4723', sessionId: 'abc' }],
-    ['port 0', { port: 0, sessionId: 'abc' }],
-    ['a port past 65535', { port: 65_536, sessionId: 'abc' }],
-    ['no session', { port: 4723 }],
-    ['an empty session', { port: 4723, sessionId: '' }],
-    ['null', null],
-  ])('refuses a marker with %s', (_, marker) => {
-    expect(() => leakedSessionOf(marker)).toThrow(
-      `expected the iOS session marker to name a port and a session id -- got ${JSON.stringify(marker)}`,
-    );
-  });
-});
-
-describe('deleteSession: a leaked session is reported deleted only when it was', () => {
-  it('sends DELETE for the session and accepts a 200', async () => {
-    const { server, port, seen } = await serving(() => ({
-      status: 200,
-      body: '{"value":null}',
-    }));
-    servers.push(server);
-    await deleteSession({ port, sessionId: 'abc-123' });
-    expect(seen).toEqual(['DELETE /session/abc-123']);
-  });
-
-  it('refuses a session safaridriver does not know', async () => {
-    const { server, port } = await serving(() => ({ status: 404, body: '' }));
-    servers.push(server);
-    await expect(deleteSession({ port, sessionId: 'abc-123' })).rejects.toThrow(
-      'safaridriver answered 404 to DELETE /session/abc-123',
-    );
   });
 });
 

@@ -83,19 +83,13 @@
     "indirectChecks": 25,
     "harnessCalls": 261
   },
-  "tests/device/ios/server-process.ts": {
+  "tests/device/ios/page-driver.ts": {
     "tests": 0,
     "assertions": 0,
     "indirectChecks": 0,
     "harnessCalls": 0
   },
   "tests/device/ios/session.ts": {
-    "tests": 0,
-    "assertions": 0,
-    "indirectChecks": 0,
-    "harnessCalls": 0
-  },
-  "tests/device/ios/webdriver.ts": {
     "tests": 0,
     "assertions": 0,
     "indirectChecks": 0,

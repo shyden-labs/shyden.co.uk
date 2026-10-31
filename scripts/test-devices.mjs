@@ -2,7 +2,7 @@
 /**
  * `npm run test:devices` -- one build, one shared server, three device
  * groups at once: the existing emulated Playwright suite (5 projects), the
- * real Android phone over CDP, and the real iPhone over WebDriver. See
+ * real Android phone over CDP, and the real iPhone over its Web Inspector. See
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 7 ("Parallelism"), for the shape this implements:
  *
@@ -47,7 +47,7 @@
  *    and `isIosPresent`, and the overall exit-code rule at the end of
  *    `main()` (any `not-run` group fails the whole run, same as a real
  *    failure would).
- *  - Cleanup (preview server, adb tunnels, any live iOS WebDriver session)
+ *  - Cleanup (preview server, adb tunnels)
  *    always runs, via `finally` and a signal handler -- see `cleanup()`.
  */
 import { execFileSync, spawn } from 'node:child_process';
@@ -73,10 +73,6 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
 const TEST_RESULTS_DIR = path.join(ROOT, 'test-results');
 export const IOS_MODE_FILE = path.join(TEST_RESULTS_DIR, 'ios-mode.json');
-const IOS_SESSION_MARKER_FILE = path.join(
-  TEST_RESULTS_DIR,
-  'ios-session-marker.json',
-);
 
 /**
  * Each group's machine-readable report, named once.
@@ -109,7 +105,7 @@ export const iosEvidenceReportOf = (env) =>
 // outlives this one ("keep the server alive after the run so the final
 // state stays readable" -- task brief step 2). Everything here is
 // artifact files on disk, the same mechanism this file already uses for
-// ios-mode.json / ios-session-marker.json: this script writes small JSON
+// ios-mode.json: this script writes small JSON
 // facts the dashboard polls for, and points each test child at its own
 // JSONL file via env vars the two reporters
 // (tests/reporters/jsonl-reporter.ts, tests/reporters/jsonl-vitest.ts)
@@ -613,8 +609,8 @@ function isAndroidPresent() {
  * style choice: importing `tests/device/ios/session.ts` failed with
  * `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` under this repo's pinned Node (.nvmrc:
  * 24, which strips TypeScript *types* natively), because the session pulls in
- * `webdriver.ts` and `interaction.ts`, both of which use constructor PARAMETER
- * PROPERTIES (`constructor(private readonly driver: WebDriver)`), a real
+ * modules that use constructor PARAMETER PROPERTIES
+ * (`constructor(private readonly page: PagePort)`, page-driver.ts), a real
  * syntax transform that Node's strip-only mode does not support. The session
  * can import a plain module, so the listing and its parsing live in one.
  */
@@ -1130,102 +1126,6 @@ async function cleanupAdbTunnels() {
   }
 }
 
-/**
- * The port and session a leaked-session marker names, refused unless both are
- * there: read blind, a marker without a port sent `DELETE` to `:undefined` and
- * asked `lsof` about port `undefined` (#390).
- *
- * @param {unknown} marker
- * @returns {{ port: number, sessionId: string }}
- */
-export function leakedSessionOf(marker) {
-  const { port, sessionId } = /** @type {Record<string, unknown>} */ (
-    marker ?? {}
-  );
-  if (
-    typeof port !== 'number' ||
-    !Number.isInteger(port) ||
-    port < 1 ||
-    port > 65_535 ||
-    typeof sessionId !== 'string' ||
-    sessionId === ''
-  ) {
-    throw new Error(
-      `expected the iOS session marker to name a port and a session id -- got ${JSON.stringify(marker)}`,
-    );
-  }
-  return { port, sessionId };
-}
-
-/**
- * Ends a WebDriver session, refused unless safaridriver says it did. The
- * answer went unread once, so a 404 printed "Deleted leaked WebDriver session"
- * (#390).
- *
- * @param {{ port: number, sessionId: string }} session
- * @returns {Promise<void>}
- */
-export async function deleteSession({ port, sessionId }) {
-  const response = await fetch(
-    `http://127.0.0.1:${port}/session/${encodeURIComponent(sessionId)}`,
-    { method: 'DELETE' },
-  );
-  if (!response.ok) {
-    throw new Error(
-      `safaridriver answered ${response.status} to DELETE /session/${sessionId}`,
-    );
-  }
-}
-
-/**
- * "one leaked iOS session locks the phone out of every later run" (task
- * brief). If `tests/device/ios/session.ts` left its marker file behind,
- * `teardown()` either never ran (this process was killed) or ran and its
- * own DELETE failed -- either way, close the session directly and free its
- * safaridriver port BY PORT (the same mechanism as the preview server,
- * never a process-name match).
- */
-async function cleanupLeakedIosSession() {
-  if (!existsSync(IOS_SESSION_MARKER_FILE)) return;
-  process.stdout.write(
-    '==> Found a leaked iOS WebDriver session marker -- cleaning it up so the phone is not locked ' +
-      'out of the next run...\n',
-  );
-  let marker;
-  try {
-    marker = leakedSessionOf(
-      readJson(IOS_SESSION_MARKER_FILE, 'the leaked iOS session marker'),
-    );
-  } catch (error) {
-    process.stderr.write(
-      `cleanup: could not read the iOS session marker: ${messageOf(error)}\n`,
-    );
-    return;
-  }
-  const { port, sessionId } = marker;
-  try {
-    await deleteSession(marker);
-    process.stdout.write(
-      `==> Deleted leaked WebDriver session ${sessionId}.\n`,
-    );
-  } catch (error) {
-    process.stderr.write(
-      `cleanup: DELETE on the leaked WebDriver session failed (continuing to free its port anyway): ` +
-        `${messageOf(error)}\n`,
-    );
-  }
-  await killByPort(port).catch((error) =>
-    process.stderr.write(
-      `cleanup: failed to free safaridriver's port ${port}: ${messageOf(error)}\n`,
-    ),
-  );
-  try {
-    unlinkSync(IOS_SESSION_MARKER_FILE);
-  } catch {
-    // Already gone -- fine.
-  }
-}
-
 // ── reporting ────────────────────────────────────────────────────────────
 
 /** @param {unknown} value */
@@ -1325,12 +1225,11 @@ const cleanup = once(async () => {
     );
   }
   await cleanupAdbTunnels();
-  await cleanupLeakedIosSession();
 });
 
 /**
- * Ctrl+C (or a CI-style SIGTERM) must not skip cleanup -- a leaked iOS
- * session locks the phone out of every later run, which is worse than
+ * Ctrl+C (or a CI-style SIGTERM) must not skip cleanup -- a leaked preview
+ * server or adb tunnel trips up every later run, which is worse than
  * letting the interrupted run's own results go unreported. The default
  * Node behaviour for these signals is to exit immediately without running
  * pending `finally` blocks, so this is not redundant with the try/finally
@@ -1431,18 +1330,6 @@ async function main() {
     // doc) and the rest of this run proceeds exactly as it would without
     // it.
     await startDashboard();
-
-    // MUST run before anything else, not only in the end-of-run `cleanup()`
-    // below. Measured directly: `startIosSession` (session.ts) clears its
-    // OWN marker file unconditionally the moment it is called, so this
-    // run's iOS group would otherwise silently destroy
-    // the evidence of a PREVIOUS run's leaked session before ever cleaning
-    // it up -- and then fail anyway, because the device still considers
-    // itself paired with that orphaned session (Apple allows exactly one).
-    // Cleaning up any pre-existing leak here, before the iOS group ever
-    // attempts a new session, is what actually prevents "one leaked session
-    // locks the phone out of every later run".
-    await cleanupLeakedIosSession();
 
     process.stdout.write(
       '==> Freeing port 4321 (any stale server from a previous run)...\n',
