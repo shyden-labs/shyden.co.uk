@@ -1517,26 +1517,28 @@ test.describe('absent students on the board (#999)', () => {
     });
   }
 
-  test('at 320px the marked board does not scroll sideways', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 320, height: 640 });
-    await absentClass(page);
-    await page.locator('#cg-board-open').click();
-    await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
-    const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
-    );
-    expect(overflow).toBe(0);
-    // Containment, not only the page: every chip inside the board's stage.
-    const stage = await page.locator('#cg-board-stage').boundingBox();
-    for (const box of await board(page)
-      .locator('#cg-waiting-list .waiting-student')
-      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
-      expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
-  });
+  test(
+    'at 320px the marked board does not scroll sideways',
+    { tag: '@emulated-viewport' },
+    async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await absentClass(page);
+      await page.locator('#cg-board-open').click();
+      await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+      // Containment, not only the page: every chip inside the board's stage.
+      const stage = await page.locator('#cg-board-stage').boundingBox();
+      for (const box of await board(page)
+        .locator('#cg-waiting-list .waiting-student')
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
+        expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
+    },
+  );
 
   const sentences = {
     en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
