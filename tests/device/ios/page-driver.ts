@@ -228,8 +228,88 @@ const asyncDeclaration = (body: string): string =>
     '}',
   ].join('\n');
 
+/** How long a navigation may take to report its load (#859 design). */
+export const NAVIGATION_CEILING_MS = 15_000;
+
+const PNG_PREFIX = 'data:image/png;base64,';
+
 export class PageDriver {
   constructor(private readonly page: PagePort) {}
+
+  /**
+   * Loads `url` and waits for `Page.loadEventFired`. The listener is in place
+   * before the navigation starts, so a fast load cannot be missed. An assign
+   * to the URL the page is already at does not always load, so that case is
+   * a reload.
+   */
+  async navigate(url: string): Promise<void> {
+    const here = valueOf(
+      await this.page.command<RemoteResult>('Runtime.evaluate', {
+        expression: 'location.href',
+        returnByValue: true,
+      }),
+      'location.href',
+    );
+    let stopListening = (): void => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const loaded = new Promise<void>((resolve, reject) => {
+      stopListening = this.page.on('Page.loadEventFired', () => resolve());
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `no Page.loadEventFired within ${NAVIGATION_CEILING_MS / 1000} s of navigating to ${url}`,
+            ),
+          ),
+        NAVIGATION_CEILING_MS,
+      );
+    });
+    try {
+      if (here === url) await this.page.command('Page.reload', {});
+      else {
+        const expression = `location.assign(${JSON.stringify(url)})`;
+        valueOf(
+          await this.page.command<RemoteResult>('Runtime.evaluate', {
+            expression,
+          }),
+          expression,
+        );
+      }
+      await loaded;
+    } finally {
+      stopListening();
+      clearTimeout(timer);
+    }
+  }
+
+  /** The viewport as a base64 PNG, at device pixels, with no data-URL prefix. */
+  async screenshot(): Promise<string> {
+    const size = valueOf(
+      await this.page.command<RemoteResult>('Runtime.evaluate', {
+        expression: '[innerWidth, innerHeight]',
+        returnByValue: true,
+      }),
+      '[innerWidth, innerHeight]',
+    );
+    if (
+      !Array.isArray(size) ||
+      size.length !== 2 ||
+      !size.every((side) => typeof side === 'number' && side > 0)
+    )
+      throw new Error(
+        `expected the viewport to be two positive numbers, got ${JSON.stringify(size)}`,
+      );
+    const [width, height] = size as [number, number];
+    const { dataURL } = await this.page.command<{ dataURL?: unknown }>(
+      'Page.snapshotRect',
+      { x: 0, y: 0, width, height, coordinateSystem: 'Viewport' },
+    );
+    if (typeof dataURL !== 'string' || !dataURL.startsWith(PNG_PREFIX))
+      throw new Error(
+        `expected Page.snapshotRect to answer a PNG data URL, got ${String(dataURL).slice(0, 30)}…`,
+      );
+    return dataURL.slice(PNG_PREFIX.length);
+  }
 
   /** Every element `cssSelector` matches, in document order. */
   async findElements(cssSelector: string): Promise<PageElement[]> {

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectorError } from '../device/ios/inspector/protocol';
 import {
+  NAVIGATION_CEILING_MS,
   PageDriver,
   PageElement,
   PageScriptError,
@@ -359,6 +360,137 @@ describe('a PageElement refuses answers of the wrong shape', () => {
     });
     await expect(new PageDriver(page).findElements('a')).rejects.toThrow(
       'expected match 0 to come back as a handle, got {"type":"undefined"}',
+    );
+  });
+});
+
+const HERE = 'http://192.168.1.6:4321/';
+const THERE = 'http://192.168.1.6:4321/classroom-groups/';
+
+describe('navigate: a load the page reports finished', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('listens for the load before assigning the URL, and resolves on Page.loadEventFired', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued(HERE), recorded('location.assign')],
+    });
+    let settled = false;
+    const navigation = new PageDriver(page).navigate(THERE).then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    expect(page.sent).toEqual([
+      {
+        method: 'Runtime.evaluate',
+        params: { expression: 'location.href', returnByValue: true },
+      },
+      {
+        method: 'Runtime.evaluate',
+        params: { expression: `location.assign(${JSON.stringify(THERE)})` },
+      },
+    ]);
+    expect(page.log.indexOf('on:Page.loadEventFired')).toBeLessThan(
+      page.log.lastIndexOf('send:Runtime.evaluate'),
+    );
+    page.emit('Page.loadEventFired', { timestamp: 1 });
+    await navigation;
+    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
+  });
+
+  it('reloads instead when the page is already at the URL', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued(THERE)],
+      'Page.reload': [recorded('Page.reload')],
+    });
+    const navigation = new PageDriver(page).navigate(THERE);
+    await vi.advanceTimersByTimeAsync(0);
+    page.emit('Page.loadEventFired');
+    await navigation;
+    expect(page.sent.map((sent) => sent.method)).toEqual([
+      'Runtime.evaluate',
+      'Page.reload',
+    ]);
+  });
+
+  it('past 15 s with no load, fails naming the URL, and stops listening', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued(HERE), recorded('location.assign')],
+    });
+    const navigation = new PageDriver(page).navigate(THERE);
+    const verdict = expect(navigation).rejects.toThrow(
+      `no Page.loadEventFired within 15 s of navigating to ${THERE}`,
+    );
+    await vi.advanceTimersByTimeAsync(NAVIGATION_CEILING_MS);
+    await verdict;
+    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
+  });
+
+  it('a refused assign fails at once, and stops listening', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued(HERE), new Refusal('no page')],
+    });
+    await expect(new PageDriver(page).navigate(THERE)).rejects.toBeInstanceOf(
+      InspectorError,
+    );
+    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
+  });
+});
+
+describe('screenshot: the viewport as a base64 PNG', () => {
+  const SHOT = recorded('snapshotRect (dataURL cut to 86 chars)') as {
+    dataURL: string;
+  };
+
+  it('snapshots the viewport at its CSS size and returns the base64 after the prefix', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued([390, 300])],
+      'Page.snapshotRect': [SHOT],
+    });
+    const base64 = await new PageDriver(page).screenshot();
+    expect(base64).toBe(SHOT.dataURL.slice('data:image/png;base64,'.length));
+    expect(page.sent).toEqual([
+      {
+        method: 'Runtime.evaluate',
+        params: {
+          expression: '[innerWidth, innerHeight]',
+          returnByValue: true,
+        },
+      },
+      {
+        method: 'Page.snapshotRect',
+        params: {
+          x: 0,
+          y: 0,
+          width: 390,
+          height: 300,
+          coordinateSystem: 'Viewport',
+        },
+      },
+    ]);
+  });
+
+  it('refuses a viewport size that is not two positive numbers', async () => {
+    const page = fakePage({ 'Runtime.evaluate': [valued([390, 0])] });
+    await expect(new PageDriver(page).screenshot()).rejects.toThrow(
+      'expected the viewport to be two positive numbers, got [390,0]',
+    );
+  });
+
+  it('refuses an answer that is not a PNG data URL, naming its start', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [valued([390, 300])],
+      'Page.snapshotRect': [
+        { dataURL: 'data:image/jpeg;base64,/9j/4AAQSkZJRg' },
+      ],
+    });
+    await expect(new PageDriver(page).screenshot()).rejects.toThrow(
+      'expected Page.snapshotRect to answer a PNG data URL, got data:image/jpeg;base64,/9j/4AA…',
     );
   });
 });
