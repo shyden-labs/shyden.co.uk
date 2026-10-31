@@ -37,6 +37,16 @@ Logs in `.superpowers/sdd/859/` (git-ignored): `drive-probe-2026-10-31.log`, `dr
 | screenshot | `Page.snapshotRect { x, y, width, height, coordinateSystem: 'Viewport' }` | a PNG `dataURL` at device pixels (1170 x 900 for 390 x 300) |
 | LAN reachability from the page | `fetch(lan, { mode: 'no-cors' })` from `about:blank` | `opaque` from both of the Mac's addresses (`en0` and the USB link-local `en2`) |
 
+## After the first phone run, 2026-10-31
+
+The first run gave 0 of 80: every navigation waited out its 15 s for `Page.loadEventFired`. Probes on the phone (`.superpowers/sdd/859/swap-probe-2026-10-31.log`, `swap-probe-2-2026-10-31.log`) showed why:
+
+- `about:blank` to the LAN page swaps the page's target (`Target.targetCreated` provisional `page-50`, `Target.didCommitProvisionalTarget`, `Target.targetDestroyed page-39`).
+- Those messages reach us only with the answer to the next command we send: at 1.35 s when the next command went at 1.35 s, at 12.35 s when it went at 12.35 s.
+- The new target sends no `Page.loadEventFired`, not even after `Page.reload`; its commands answer normally.
+
+So `navigate` polls instead (below). `nav-probe-2026-10-31.log`: `about:blank` to `/` in 749 ms, then `/classroom-groups`, `/classroom-groups/` and a same-URL reload, each found `#cg-go`.
+
 ## The design
 
 ### One new file: `tests/device/ios/page-driver.ts`
@@ -45,7 +55,7 @@ Logs in `.superpowers/sdd/859/` (git-ignored): `drive-probe-2026-10-31.log`, `dr
 
 | today | new |
 | --- | --- |
-| `navigate(url)` | The `Page.loadEventFired` listener is registered first, then `location.assign(url)` by `Runtime.evaluate`, then the wait for that event, ceiling 15 s naming the URL. If the URL equals the current `location.href`, `Page.reload` instead (an assign to the same URL does not always load). |
+| `navigate(url)` | The current document is marked (`window.__pageDriverLeaving = true`), then `location.assign(url)` by `Runtime.evaluate`, then the page is asked every 100 ms whether its document is unmarked and `readyState` is `complete`, ceiling 15 s naming the URL. A `Missing target for given targetId` answer during the poll means "not loaded yet"; any other refusal ends the wait. If the URL equals the current `location.href`, `Page.reload` instead (an assign to the same URL does not always load). Not by `Page.loadEventFired`: see *After the first phone run*. |
 | `executeScript(script, args)` | WebDriver semantics kept: `script` is a function body. `Runtime.evaluate('window')` gives a fresh handle each call (2 ms measured, so no handle is ever stale), then `Runtime.callFunctionOn` on it with `functionDeclaration: 'function () {' + script + '\n}'`, `arguments` mapped `PageElement` → `{ objectId }`, else `{ value }`, `returnByValue: true`. No caller returns an element (read 2026-10-31), so none is supported. |
 | `executeAsyncScript(script, args)` | The body is wrapped in `new Promise((resolve) => { ...; })` with `resolve` as the last argument (WebDriver's callback), then `Runtime.awaitPromise`. |
 | `findElement(css)` / `findElements(css)` | `document.querySelectorAll` as an array handle, then `Runtime.getProperties`; `findElement` throws naming the selector when none match, as today. |

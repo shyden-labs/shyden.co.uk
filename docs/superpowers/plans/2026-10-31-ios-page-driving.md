@@ -20,6 +20,10 @@
 - `tests/ios-ceilings.json` covers every file under `tests/device/ios/`; `journeys.journey.ts` `harnessCalls` may only fall (today 261). Re-record with `npm run ceilings:record`.
 - Commit messages end `Refs #859`; never a closing keyword.
 
+## After the first phone run
+
+Review Focus 1 bit: 0 of 80, see the design's *After the first phone run*. `navigate` now polls a marked document instead of waiting for `Page.loadEventFired`, and `PagePort` is `command` alone.
+
 ## Review Focus
 
 1. **`about:blank` → LAN URL is the first navigation, and it may swap the page's process (target).** Not measured: the 2026-10-31 cross-origin probe did not see the swap land. `navigate` must still resolve on the new target's `Page.loadEventFired`. Pinned only on the phone (Task 6 Step 2); if it fails there, the fix is in `protocol.ts`'s event routing, not a retry.

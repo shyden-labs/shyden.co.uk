@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectorError } from '../device/ios/inspector/protocol';
 import {
+  DOCUMENT_MARK,
   NAVIGATION_CEILING_MS,
+  NAVIGATION_POLL_MS,
   PageDriver,
   PageElement,
   PageScriptError,
@@ -367,7 +369,10 @@ describe('a PageElement refuses answers of the wrong shape', () => {
 const HERE = 'http://192.168.1.6:4321/';
 const THERE = 'http://192.168.1.6:4321/classroom-groups/';
 
-describe('navigate: a load the page reports finished', () => {
+/** The swap error the phone gave a command sent to the old target (measured 2026-10-31). */
+const SWAPPED = new Refusal('Missing target for given targetId');
+
+describe('navigate: a new document, finished loading', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -375,70 +380,107 @@ describe('navigate: a load the page reports finished', () => {
     vi.useRealTimers();
   });
 
-  it('listens for the load before assigning the URL, and resolves on Page.loadEventFired', async () => {
+  it('marks the current document, assigns the URL, then polls until a new document has loaded', async () => {
     const page = fakePage({
-      'Runtime.evaluate': [valued(HERE), recorded('location.assign')],
+      'Runtime.evaluate': [
+        valued(HERE),
+        recorded('location.assign'),
+        valued(false),
+        valued(true),
+      ],
     });
-    let settled = false;
-    const navigation = new PageDriver(page).navigate(THERE).then(() => {
-      settled = true;
-    });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(settled).toBe(false);
+    const navigation = new PageDriver(page).navigate(THERE);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_POLL_MS);
+    await navigation;
     expect(page.sent).toEqual([
       {
         method: 'Runtime.evaluate',
-        params: { expression: 'location.href', returnByValue: true },
+        params: {
+          expression: `(window.${DOCUMENT_MARK} = true, location.href)`,
+          returnByValue: true,
+        },
       },
       {
         method: 'Runtime.evaluate',
         params: { expression: `location.assign(${JSON.stringify(THERE)})` },
       },
+      ...[1, 2].map(() => ({
+        method: 'Runtime.evaluate',
+        params: {
+          expression: `window.${DOCUMENT_MARK} === undefined && document.readyState === 'complete'`,
+          returnByValue: true,
+        },
+      })),
     ]);
-    expect(page.log.indexOf('on:Page.loadEventFired')).toBeLessThan(
-      page.log.lastIndexOf('send:Runtime.evaluate'),
-    );
-    page.emit('Page.loadEventFired', { timestamp: 1 });
-    await navigation;
-    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
   });
 
   it('reloads instead when the page is already at the URL', async () => {
     const page = fakePage({
-      'Runtime.evaluate': [valued(THERE)],
+      'Runtime.evaluate': [valued(THERE), valued(true)],
       'Page.reload': [recorded('Page.reload')],
     });
-    const navigation = new PageDriver(page).navigate(THERE);
-    await vi.advanceTimersByTimeAsync(0);
-    page.emit('Page.loadEventFired');
-    await navigation;
+    await new PageDriver(page).navigate(THERE);
     expect(page.sent.map((sent) => sent.method)).toEqual([
       'Runtime.evaluate',
       'Page.reload',
+      'Runtime.evaluate',
     ]);
   });
 
-  it('past 15 s with no load, fails naming the URL, and stops listening', async () => {
+  it('waits past the old target going away mid-swap, and reads the new one', async () => {
     const page = fakePage({
-      'Runtime.evaluate': [valued(HERE), recorded('location.assign')],
+      'Runtime.evaluate': [
+        valued('about:blank'),
+        recorded('location.assign'),
+        SWAPPED,
+        valued(true),
+      ],
     });
     const navigation = new PageDriver(page).navigate(THERE);
-    const verdict = expect(navigation).rejects.toThrow(
-      `no Page.loadEventFired within 15 s of navigating to ${THERE}`,
-    );
-    await vi.advanceTimersByTimeAsync(NAVIGATION_CEILING_MS);
-    await verdict;
-    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_POLL_MS);
+    await navigation;
+    expect(page.sent).toHaveLength(4);
   });
 
-  it('a refused assign fails at once, and stops listening', async () => {
+  it('any other refusal while polling ends the wait at once', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [
+        valued(HERE),
+        recorded('location.assign'),
+        new Refusal('something else'),
+      ],
+    });
+    await expect(new PageDriver(page).navigate(THERE)).rejects.toThrow(
+      'Runtime.evaluate failed on the page: something else',
+    );
+  });
+
+  it('past 15 s with no new document, fails naming the URL', async () => {
+    const page = fakePage({
+      'Runtime.evaluate': [
+        valued(HERE),
+        recorded('location.assign'),
+        ...Array.from({ length: 200 }, () => valued(false)),
+      ],
+    });
+    const verdict = expect(
+      new PageDriver(page).navigate(THERE),
+    ).rejects.toThrow(
+      `Timed out after 15000ms waiting for: a new document to finish loading ${THERE}`,
+    );
+    await vi.advanceTimersByTimeAsync(
+      NAVIGATION_CEILING_MS + NAVIGATION_POLL_MS,
+    );
+    await verdict;
+  });
+
+  it('a refused assign fails at once', async () => {
     const page = fakePage({
       'Runtime.evaluate': [valued(HERE), new Refusal('no page')],
     });
     await expect(new PageDriver(page).navigate(THERE)).rejects.toBeInstanceOf(
       InspectorError,
     );
-    expect(page.listenerCount('Page.loadEventFired')).toBe(0);
   });
 });
 

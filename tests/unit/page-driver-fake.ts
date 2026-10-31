@@ -35,25 +35,17 @@ export class Refusal {
 
 export interface FakePage extends PagePort {
   readonly sent: { method: string; params: unknown }[];
-  /** `on:<event>` and `off:<event>`, interleaved with `send:<method>`, in order. */
-  readonly log: string[];
-  listenerCount(event: string): number;
-  emit(event: string, params?: unknown): void;
 }
 
 export function fakePage(answers: Record<string, unknown[]>): FakePage {
   const queues = new Map(
     Object.entries(answers).map(([method, list]) => [method, [...list]]),
   );
-  const listeners = new Map<string, Set<(params: unknown) => void>>();
   const sent: { method: string; params: unknown }[] = [];
-  const log: string[] = [];
   return {
     sent,
-    log,
     async command<T>(method: string, params: object = {}): Promise<T> {
       sent.push({ method, params });
-      log.push(`send:${method}`);
       const next = queues.get(method)?.shift();
       if (next === undefined)
         throw new Error(`the fake page has no answer queued for ${method}`);
@@ -64,21 +56,6 @@ export function fakePage(answers: Record<string, unknown[]>): FakePage {
           params,
         );
       return next as T;
-    },
-    on(event: string, listener: (params: unknown) => void): () => void {
-      const set = listeners.get(event) ?? new Set();
-      set.add(listener);
-      listeners.set(event, set);
-      log.push(`on:${event}`);
-      return () => {
-        set.delete(listener);
-        log.push(`off:${event}`);
-      };
-    },
-    listenerCount: (event) => listeners.get(event)?.size ?? 0,
-    emit(event, params = {}) {
-      for (const listener of [...(listeners.get(event) ?? [])])
-        listener(params);
     },
   };
 }

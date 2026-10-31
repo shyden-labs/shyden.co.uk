@@ -17,8 +17,8 @@
 import { messageOf } from '../../../scripts/errors.mjs';
 import { InspectorError, type PageProtocol } from './inspector/protocol';
 
-/** The two calls the driver makes on the page's protocol. */
-export type PagePort = Pick<PageProtocol, 'command' | 'on'>;
+/** The one call the driver makes on the page's protocol. */
+export type PagePort = Pick<PageProtocol, 'command'>;
 
 /** What `Runtime.evaluate`, `callFunctionOn` and `awaitPromise` answer. */
 interface RemoteResult {
@@ -228,8 +228,17 @@ const asyncDeclaration = (body: string): string =>
     '}',
   ].join('\n');
 
-/** How long a navigation may take to report its load (#859 design). */
+/** How long a navigation may take to load (#859 design). */
 export const NAVIGATION_CEILING_MS = 15_000;
+
+/** How often a navigation asks whether its new document has loaded. */
+export const NAVIGATION_POLL_MS = 100;
+
+/** Set on the document a navigation leaves, so the one it arrives at is told apart. */
+export const DOCUMENT_MARK = '__pageDriverLeaving';
+
+/** The phone's answer to a command sent to a target that has just been swapped out. */
+const TARGET_SWAPPED = 'Missing target for given targetId';
 
 const PNG_PREFIX = 'data:image/png;base64,';
 
@@ -237,49 +246,58 @@ export class PageDriver {
   constructor(private readonly page: PagePort) {}
 
   /**
-   * Loads `url` and waits for `Page.loadEventFired`. The listener is in place
-   * before the navigation starts, so a fast load cannot be missed. An assign
-   * to the URL the page is already at does not always load, so that case is
-   * a reload.
+   * Loads `url` and waits until a NEW document there has finished loading.
+   *
+   * Not by `Page.loadEventFired`: measured on the iPhone Air 2026-10-31
+   * (`.superpowers/sdd/859/swap-probe*.log`), going from `about:blank` to the
+   * LAN page swaps the page's target, the new target sends no load event at
+   * all, and the swap itself reaches us only with the answer to the next
+   * command we send. So the current document is marked first, and the page
+   * is asked every `NAVIGATION_POLL_MS` whether the document it now holds is
+   * unmarked and complete; each ask is also what brings the swap in. A
+   * command that reached the old target as it went away is answered
+   * `Missing target for given targetId`, which means "not loaded yet"; any
+   * other refusal ends the wait. An assign to the URL the page is already at
+   * does not always load, so that case is a reload.
    */
   async navigate(url: string): Promise<void> {
+    const markExpression = `(window.${DOCUMENT_MARK} = true, location.href)`;
     const here = valueOf(
       await this.page.command<RemoteResult>('Runtime.evaluate', {
-        expression: 'location.href',
+        expression: markExpression,
         returnByValue: true,
       }),
-      'location.href',
+      markExpression,
     );
-    let stopListening = (): void => {};
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const loaded = new Promise<void>((resolve, reject) => {
-      stopListening = this.page.on('Page.loadEventFired', () => resolve());
-      timer = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `no Page.loadEventFired within ${NAVIGATION_CEILING_MS / 1000} s of navigating to ${url}`,
-            ),
-          ),
-        NAVIGATION_CEILING_MS,
+    if (here === url) await this.page.command('Page.reload', {});
+    else {
+      const expression = `location.assign(${JSON.stringify(url)})`;
+      valueOf(
+        await this.page.command<RemoteResult>('Runtime.evaluate', {
+          expression,
+        }),
+        expression,
       );
-    });
-    try {
-      if (here === url) await this.page.command('Page.reload', {});
-      else {
-        const expression = `location.assign(${JSON.stringify(url)})`;
+    }
+    const readyExpression = `window.${DOCUMENT_MARK} === undefined && document.readyState === 'complete'`;
+    await waitFor(
+      async () =>
         valueOf(
           await this.page.command<RemoteResult>('Runtime.evaluate', {
-            expression,
+            expression: readyExpression,
+            returnByValue: true,
           }),
-          expression,
-        );
-      }
-      await loaded;
-    } finally {
-      stopListening();
-      clearTimeout(timer);
-    }
+          readyExpression,
+        ) === true,
+      {
+        timeout: NAVIGATION_CEILING_MS,
+        interval: NAVIGATION_POLL_MS,
+        describe: `a new document to finish loading ${url}`,
+        retryable: (error) =>
+          error instanceof InspectorError &&
+          error.message.includes(TARGET_SWAPPED),
+      },
+    );
   }
 
   /** The viewport as a base64 PNG, at device pixels, with no data-URL prefix. */
