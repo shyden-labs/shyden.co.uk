@@ -206,6 +206,24 @@ for (var i = 0; i < select.options.length; i++)
   if (select.options[i].value === value) return select.options[i].text;
 return null;`;
 
+/**
+ * Async: waits up to arguments[0] ms for the keyboard to be gone (the
+ * visual viewport back to the layout viewport's height) and the view to
+ * hold still for three frames. Answers true, or false at the ceiling.
+ */
+export const KEYBOARD_GONE_SCRIPT = `
+var ceiling = arguments[0], done = arguments[arguments.length - 1];
+var vv = window.visualViewport, started = Date.now(), last = '', still = 0;
+(function look() {
+  var gone = vv.height >= window.innerHeight - 1;
+  var now = [vv.height, vv.offsetTop].join(',');
+  still = gone && now === last ? still + 1 : 0;
+  last = now;
+  if (still >= 3) return done(true);
+  if (Date.now() - started >= ceiling) return done(false);
+  requestAnimationFrame(look);
+})();`;
+
 /** The field's value, and whether it already has the focus. */
 export const FIELD_SCRIPT = `
 var el = arguments[0];
@@ -251,6 +269,11 @@ if (layer) layer.remove();
 window.__realTap = null;
 return true;`;
 
+/** Whether a keyboard is up: the visible page at least 150 px shorter than the layout viewport. */
+function keyboardUp({ viewHeight, innerHeight }: Prepared): boolean {
+  return viewHeight < innerHeight - 150;
+}
+
 /** Why `touch` is not a real tap that landed, or null when it is. */
 function whyNotLanded(touch: Touch | null, nothing: string): string | null {
   if (touch === null) return nothing;
@@ -280,10 +303,10 @@ export class RealTapInteraction implements Interaction {
     ) {
       // A real drag collapsed Safari's bars, or a keyboard came up: the page
       // has moved on screen, so measure where with a real tap, then re-arm.
-      this.calibration = await runTapCanary(this.page, this.wda, this.screen, {
-        x: this.screen.x + this.screen.width / 2,
-        y: this.calibration.origin.y + this.calibration.viewHeight / 2,
-      });
+      // Aimed at the middle of the screen, which is page with or without a
+      // keyboard (measured 2026-10-31), never at a spot an earlier
+      // measurement gave: one bad measurement must not spoil the next.
+      this.calibration = await runTapCanary(this.page, this.wda, this.screen);
       prepared = await this.bringIntoView(element);
     }
     const { rect, vv } = prepared;
@@ -393,6 +416,14 @@ export class RealTapInteraction implements Interaction {
    */
   private async bringIntoView(element: PageElement): Promise<Prepared> {
     let prepared = await this.prepare(element);
+    if (keyboardUp(prepared) && this.mustMove(prepared)) {
+      // A visitor whose keyboard hides the next control, or whose lifted
+      // Make Groups bar covers it, taps Done on the bar above the keyboard;
+      // with it up, Safari keeps the focused field in view and a drag does
+      // not stay where it is put (measured 2026-10-31).
+      await this.closeKeyboard(element);
+      prepared = await this.prepare(element);
+    }
     for (let swipes = 0; this.mustMove(prepared); swipes++) {
       if (swipes === MAX_SWIPES)
         throw new TapNotLandedError(
@@ -415,6 +446,30 @@ export class RealTapInteraction implements Interaction {
         `${element.selector} is covered: a finger at its centre would touch ${prepared.hit}`,
       );
     return prepared;
+  }
+
+  /** A real tap on the Done button of Safari's bar above the keyboard, then the keyboard gone. */
+  private async closeKeyboard(element: PageElement): Promise<void> {
+    const buttons = await this.wda.buttonsLabelled('Done');
+    if (buttons.length !== 1)
+      throw new TapNotLandedError(
+        element.selector,
+        `the keyboard hides ${element.selector}, and the phone shows ${buttons.length} buttons labelled "Done" to close it`,
+      );
+    const [done] = buttons;
+    await this.wda.tap({
+      x: done.x + done.width / 2,
+      y: done.y + done.height / 2,
+    });
+    const gone = await this.page.executeAsyncScript<boolean>(
+      KEYBOARD_GONE_SCRIPT,
+      [KEYBOARD_SETTLE_CEILING_MS],
+    );
+    if (!gone)
+      throw new TapNotLandedError(
+        element.selector,
+        `tapped Done, and the keyboard was still up after ${KEYBOARD_SETTLE_CEILING_MS / 1000} s, hiding ${element.selector}`,
+      );
   }
 
   /** Out of view, or covered away from the middle of the view (passing under a bar). */

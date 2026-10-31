@@ -4,6 +4,7 @@ import {
   CANARY_REMOVE_SCRIPT,
   CANARY_SCRIPT,
   FIELD_SCRIPT,
+  KEYBOARD_GONE_SCRIPT,
   KEYBOARD_SCRIPT,
   LANDING_SCRIPT,
   OPTION_SCRIPT,
@@ -64,6 +65,7 @@ const NAMES = new Map<string, string>([
   [LANDING_SCRIPT, 'landing'],
   [FIELD_SCRIPT, 'field'],
   [KEYBOARD_SCRIPT, 'keyboard'],
+  [KEYBOARD_GONE_SCRIPT, 'keyboard-gone'],
   [OPTION_SCRIPT, 'option'],
   [CANARY_INSTALL_SCRIPT, 'canary-install'],
   [CANARY_SCRIPT, 'canary'],
@@ -81,6 +83,7 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
     ['landing', () => landed()],
     ['field', () => ({ value: '', focused: false })],
     ['keyboard', () => true],
+    ['keyboard-gone', () => true],
     ['option', () => 'Skip the animation'],
     ['canary-install', () => true],
     [
@@ -362,10 +365,11 @@ describe('RealTapInteraction.click: the page moved on screen', () => {
       'tap',
       'landing',
     ]);
-    // The canary aimed at the middle of the view it last knew (68 + 746/2 = 441).
-    expect(f.taps[0]).toEqual({ x: 210, y: 441 });
-    // Origin now 441 - 470 = -29: the element's centre 320 lands at 291.
-    expect(f.taps[1]).toEqual({ x: 150, y: 291 });
+    // The canary aims at the middle of the screen, never at a position an
+    // earlier, possibly bad, measurement gave.
+    expect(f.taps[0]).toEqual({ x: 210, y: 456 });
+    // Origin now 456 - 470 = -14: the element's centre 320 lands at 306.
+    expect(f.taps[1]).toEqual({ x: 150, y: 306 });
   });
 });
 
@@ -575,6 +579,62 @@ describe('RealTapInteraction.select', () => {
       interaction(f).select(element('#cg-speed'), 'skip'),
     ).rejects.toThrow(
       /chose "Skip the animation" in #cg-speed, which now holds "normal"/,
+    );
+  });
+});
+
+describe('RealTapInteraction.click: the keyboard is in the way', () => {
+  const hidden = prepared({
+    rect: { x: 100, y: 467, width: 100, height: 40 },
+    inView: false,
+    viewHeight: 423,
+  });
+
+  it("taps the keyboard bar's Done for real when the keyboard hides the target, waits for it to go, then taps", async () => {
+    const f = fakes({ prepare: inTurn(hidden, prepared()) });
+    f.setMenu([{ x: 355, y: 538, width: 40, height: 38 }]);
+    await interaction(f).click(element('#cg-size'));
+    expect(f.log).toEqual([
+      'prepare',
+      'menu:Done',
+      'tap',
+      'keyboard-gone',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
+    expect(f.taps[0]).toEqual({ x: 375, y: 557 });
+  });
+
+  it('closes the keyboard too when the lifted bar covers the target', async () => {
+    const f = fakes({
+      prepare: inTurn(
+        prepared({
+          rect: { x: 100, y: 390, width: 100, height: 40 },
+          viewHeight: 423,
+          hit: 'p.actions',
+        }),
+        prepared(),
+      ),
+    });
+    f.setMenu([{ x: 355, y: 538, width: 40, height: 38 }]);
+    await interaction(f).click(element('#cg-count'));
+    expect(f.log.slice(0, 3)).toEqual(['prepare', 'menu:Done', 'tap']);
+  });
+
+  it('fails naming the keyboard when the phone shows no single Done button', async () => {
+    const f = fakes({ prepare: () => hidden });
+    f.setMenu([]);
+    await expect(interaction(f).click(element('#cg-size'))).rejects.toThrow(
+      /the keyboard hides #cg-size, and the phone shows 0 buttons labelled "Done" to close it/,
+    );
+  });
+
+  it('fails when the keyboard does not go after Done', async () => {
+    const f = fakes({ prepare: () => hidden, 'keyboard-gone': () => false });
+    f.setMenu([{ x: 355, y: 538, width: 40, height: 38 }]);
+    await expect(interaction(f).click(element('#cg-size'))).rejects.toThrow(
+      /tapped Done, and the keyboard was still up after 3 s/,
     );
   });
 });
