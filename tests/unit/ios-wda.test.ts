@@ -135,25 +135,14 @@ describe('WdaSession', () => {
     ]);
   });
 
-  it('keys posts the text to wda/keys as one value array', async () => {
+  it('keys types the text at a human 10 keys a second (full speed dropped a key)', async () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.keys('Ana');
     expect(calls[1]).toEqual([
       'POST',
       '/session/S1/wda/keys',
-      { value: ['Ana'] },
-    ]);
-  });
-
-  it("dismissKeyboard taps the keyboard bar's Done key", async () => {
-    const { calls, http } = recorder();
-    const wda = await WdaSession.open(http);
-    await wda.dismissKeyboard();
-    expect(calls[1]).toEqual([
-      'POST',
-      '/session/S1/wda/keyboard/dismiss',
-      { keyNames: ['Done'] },
+      { value: ['Ana'], frequency: 10 },
     ]);
   });
 

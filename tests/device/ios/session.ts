@@ -373,8 +373,8 @@ export async function startIosSession(): Promise<DeviceSession> {
   try {
     const screen = await wda.windowRect();
     await driver.navigate(`${resolved.baseUrl}/`);
-    const origin = await runTapCanary(driver, wda, screen);
-    interaction = new RealTapInteraction(driver, wda, origin, screen);
+    const calibration = await runTapCanary(driver, wda, screen);
+    interaction = new RealTapInteraction(driver, wda, calibration, screen);
   } catch (error) {
     await wda.close().catch(() => undefined);
     inspector.close();

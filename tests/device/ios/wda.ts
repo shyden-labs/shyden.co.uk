@@ -43,6 +43,8 @@ export const WDA_COMMAND_CEILING_MS = 10_000;
 
 /** How long the finger rests on the glass: a quick, ordinary tap. */
 const TAP_HOLD_MS = 50;
+/** A human pace: WDA's full speed dropped a key ("15" became "1", measured 2026-10-31). */
+const TYPING_KEYS_PER_SECOND = 10;
 /** A deliberate drag, not a flick: 0.4 s across the glass. */
 const SWIPE_MS = 400;
 /** Held still before lifting, so the page stops with the finger. */
@@ -224,16 +226,9 @@ export class WdaSession {
 
   /** Types `text` on the iPhone's own keyboard into the focused field. */
   async keys(text: string): Promise<void> {
-    await this.http('POST', `/session/${this.id}/wda/keys`, { value: [text] });
-  }
-
-  /**
-   * Closes the iPhone's keyboard as a visitor does: a real tap on the Done
-   * key of Safari's bar above it.
-   */
-  async dismissKeyboard(): Promise<void> {
-    await this.http('POST', `/session/${this.id}/wda/keyboard/dismiss`, {
-      keyNames: ['Done'],
+    await this.http('POST', `/session/${this.id}/wda/keys`, {
+      value: [text],
+      frequency: TYPING_KEYS_PER_SECOND,
     });
   }
 
