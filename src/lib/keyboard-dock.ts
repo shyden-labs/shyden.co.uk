@@ -67,7 +67,8 @@ export function takesTyping(field: Focused | null): boolean {
 
 /**
  * How far to lift the docked row: `keyboardOverlap` while a field that takes
- * typing has focus, otherwise 0. Shyden ruled 2026-10-23 that a pinch zoom
+ * typing has focus; once it blurs, the overlap still while `held` (the lift
+ * last set) is up, so the row follows the closing keyboard down; otherwise 0. Shyden ruled 2026-10-23 that a pinch zoom
  * never moves the bar; Chrome keeps `innerHeight` at the layout height while
  * zoomed, so the overlap alone would lift it there (measured on the Android
  * at 2.5x: 720px layout, 288px visible from 180px down).
@@ -76,6 +77,14 @@ export function liftFor(
   layoutHeight: number,
   view: { offsetTop: number; height: number },
   focused: Focused | null,
+  held = 0,
 ): number {
-  return takesTyping(focused) ? keyboardOverlap(layoutHeight, view) : 0;
+  const overlap = keyboardOverlap(layoutHeight, view);
+  if (takesTyping(focused)) return overlap;
+  // The field blurs on the tap's touchend, before Safari sends the click:
+  // dropping the lift then moved Make Groups out from under the finger, and
+  // the first tap did nothing (measured on the iPhone, 2026-10-31, #838).
+  // A lift already up follows the closing keyboard down instead. One never
+  // up stays down, so a pinch zoom still never lifts the row.
+  return held > 0 ? overlap : 0;
 }
