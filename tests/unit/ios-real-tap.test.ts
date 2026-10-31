@@ -87,6 +87,11 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
     ['option', () => 'Skip the animation'],
     ['canary-install', () => true],
     [
+      'source',
+      () =>
+        '<XCUIElementTypeApplication type="XCUIElementTypeApplication" visible="true" x="0" y="0" width="420" height="912"/>',
+    ],
+    [
       'canary',
       () => ({
         touch: {
@@ -127,6 +132,10 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
     async buttonsLabelled(label: string) {
       log.push(`menu:${label}`);
       return menu;
+    },
+    async source() {
+      log.push('source');
+      return (answers.get('source') as Handler)([]) as string;
     },
   };
   return {
@@ -178,6 +187,32 @@ describe('RealTapInteraction.click: the tap', () => {
     const f = fakes({ landing: () => ({ touch: null, stray: null }) });
     await expect(interaction(f).click(element())).rejects.toThrow(
       /a real tap on #cg-go did not land: no touch reached it within 2 s/,
+    );
+  });
+
+  it('names the native element a missed touch reached outside the page', async () => {
+    // Run 10 (2026-11-01): #cg-go sat in the bottom 57 px of the view and a
+    // real tap reached nothing in the page. Safari's own bars are no part of
+    // the DOM, so only WebDriverAgent's tree can say what took the touch.
+    const f = fakes({
+      prepare: () =>
+        prepared({ rect: { x: 100, y: 720, width: 100, height: 40 } }),
+      landing: () => ({ touch: null, stray: null }),
+      source: () =>
+        [
+          '<XCUIElementTypeApplication type="XCUIElementTypeApplication" name="Safari" visible="true" x="0" y="0" width="420" height="912">',
+          '  <XCUIElementTypeWebView type="XCUIElementTypeWebView" visible="true" x="0" y="62" width="420" height="850">',
+          '    <XCUIElementTypeButton type="XCUIElementTypeButton" name="Make Groups" visible="true" x="20" y="791" width="380" height="44"/>',
+          '  </XCUIElementTypeWebView>',
+          '  <XCUIElementTypeToolbar type="XCUIElementTypeToolbar" name="TabBar" visible="true" x="0" y="780" width="420" height="132">',
+          '    <XCUIElementTypeButton type="XCUIElementTypeButton" name="Back" visible="false" x="10" y="790" width="44" height="44"/>',
+          '    <XCUIElementTypeTextField type="XCUIElementTypeTextField" name="Address" visible="true" x="70" y="790" width="280" height="44"/>',
+          '  </XCUIElementTypeToolbar>',
+          '</XCUIElementTypeApplication>',
+        ].join('\n'),
+    });
+    await expect(interaction(f).click(element())).rejects.toThrow(
+      /did not land: no touch reached it within 2 s; on screen at \(150, 808\) Safari shows Toolbar "TabBar" > TextField "Address", outside the page/,
     );
   });
 

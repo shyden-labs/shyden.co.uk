@@ -246,6 +246,11 @@ export class WdaSession {
     );
   }
 
+  /** The native element tree on screen, as WebDriverAgent's XML. */
+  async source(): Promise<string> {
+    return (await this.http('GET', `/session/${this.id}/source`)) as string;
+  }
+
   /** Types `text` on the iPhone's own keyboard into the focused field. */
   async keys(text: string): Promise<void> {
     await this.http('POST', `/session/${this.id}/wda/keys`, {

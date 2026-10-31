@@ -47,8 +47,56 @@ export type ScriptPort = Pick<
 >;
 export type TapPort = Pick<
   WdaSession,
-  'tap' | 'keys' | 'swipe' | 'buttonsLabelled'
+  'tap' | 'keys' | 'swipe' | 'buttonsLabelled' | 'source'
 >;
+
+/**
+ * The visible native elements at `point` (screen points) that are no part of
+ * the page, outermost first, read from WebDriverAgent's XML tree. Safari's
+ * own bars float over the page and are no part of the DOM, so when a real tap
+ * reaches nothing in the page this is the only way to say what took it
+ * (iPhone run 10, 2026-11-01). Empty when only the page is there.
+ */
+export function nativeAt(xml: string, point: Point): string[] {
+  const stack: { inPage: boolean; label: string | null }[] = [];
+  let deepest: string[] = [];
+  for (const [, close, type, attrs, selfClose] of xml.matchAll(
+    /<(\/?)XCUIElementType(\w+)([^>]*?)(\/?)>/g,
+  )) {
+    if (close) {
+      stack.pop();
+      continue;
+    }
+    const attr = (name: string) =>
+      new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
+    const [x, y, width, height] = ['x', 'y', 'width', 'height'].map((n) =>
+      Number(attr(n)),
+    );
+    const parentInPage = stack.at(-1)?.inPage ?? false;
+    const inPage = parentInPage || type === 'WebView';
+    const covers =
+      attr('visible') === 'true' &&
+      point.x >= x &&
+      point.x <= x + width &&
+      point.y >= y &&
+      point.y <= y + height;
+    const name = attr('name') ?? attr('label');
+    const label =
+      !inPage && covers && type !== 'Application' && type !== 'Window'
+        ? name
+          ? `${type} "${name}"`
+          : type
+        : null;
+    if (label !== null) {
+      const chain = [...stack.map((s) => s.label), label].filter(
+        (l): l is string => l !== null,
+      );
+      if (chain.length >= deepest.length) deepest = chain;
+    }
+    if (!selfClose) stack.push({ inPage, label });
+  }
+  return deepest;
+}
 
 /** Where the page sits on screen, and the view it was measured in. */
 export interface Calibration {
@@ -310,17 +358,18 @@ export class RealTapInteraction implements Interaction {
       prepared = await this.bringIntoView(element);
     }
     const { rect, vv } = prepared;
-    await this.wda.tap(
-      toScreenPoint(rect, vv, this.calibration.origin, this.screen),
-    );
+    const point = toScreenPoint(rect, vv, this.calibration.origin, this.screen);
+    await this.wda.tap(point);
     const { touch, stray } = await this.page.executeAsyncScript<{
       touch: Touch | null;
       stray: Stray | null;
     }>(LANDING_SCRIPT, [this.token, TAP_LANDING_CEILING_MS]);
+    const missed =
+      touch === null && stray === null ? await this.nativeNote(point) : '';
     const why = whyNotLanded(
       touch,
       stray === null
-        ? `no touch reached it within ${TAP_LANDING_CEILING_MS / 1000} s`
+        ? `no touch reached it within ${TAP_LANDING_CEILING_MS / 1000} s${missed}`
         : `the touch reached ${stray.target} at (${stray.clientX}, ${stray.clientY}) instead`,
     );
     if (why !== null || touch === null)
@@ -473,6 +522,15 @@ export class RealTapInteraction implements Interaction {
         element.selector,
         `tapped Done, and the keyboard was still up after ${KEYBOARD_SETTLE_CEILING_MS / 1000} s, hiding ${element.selector}`,
       );
+  }
+
+  /** What a tap that reached no page element touched instead, read off the phone. */
+  private async nativeNote(point: Point): Promise<string> {
+    const at = `(${Math.round(point.x)}, ${Math.round(point.y)})`;
+    const chain = nativeAt(await this.wda.source(), point);
+    return chain.length === 0
+      ? `; on screen at ${at} only the page is there`
+      : `; on screen at ${at} Safari shows ${chain.join(' > ')}, outside the page`;
   }
 
   /** Out of view, or covered away from the middle of the view (passing under a bar). */
