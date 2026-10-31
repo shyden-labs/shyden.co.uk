@@ -224,6 +224,28 @@ export class WdaSession {
     });
   }
 
+  /**
+   * The boxes (screen points) of the visible native buttons labelled
+   * `label`: the options of the menu Safari opens for a `<select>`
+   * (measured 2026-10-31).
+   */
+  async buttonsLabelled(label: string): Promise<Rect[]> {
+    const quoted = label.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const found = (await this.http('POST', `/session/${this.id}/elements`, {
+      using: 'predicate string',
+      value: `type == 'XCUIElementTypeButton' AND label == "${quoted}" AND visible == 1`,
+    })) as Record<string, string>[];
+    return Promise.all(
+      found.map(
+        async (element) =>
+          (await this.http(
+            'GET',
+            `/session/${this.id}/element/${element.ELEMENT ?? Object.values(element)[0]}/rect`,
+          )) as Rect,
+      ),
+    );
+  }
+
   /** Types `text` on the iPhone's own keyboard into the focused field. */
   async keys(text: string): Promise<void> {
     await this.http('POST', `/session/${this.id}/wda/keys`, {

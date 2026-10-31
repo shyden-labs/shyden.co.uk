@@ -38,13 +38,17 @@ export interface Interaction {
   click(element: PageElement): Promise<void>;
   type(element: PageElement, text: string): Promise<void>;
   clear(element: PageElement): Promise<void>;
+  select(element: PageElement, value: string): Promise<void>;
 }
 
 export type ScriptPort = Pick<
   PageDriver,
   'executeScript' | 'executeAsyncScript'
 >;
-export type TapPort = Pick<WdaSession, 'tap' | 'keys' | 'swipe'>;
+export type TapPort = Pick<
+  WdaSession,
+  'tap' | 'keys' | 'swipe' | 'buttonsLabelled'
+>;
 
 /** Where the page sits on screen, and the view it was measured in. */
 export interface Calibration {
@@ -65,6 +69,11 @@ const SWIPE_SHARE = 0.6;
 const MIN_SWIPE_POINTS = 60;
 /** A covered element inside this middle share of the view is covered for real, not passing under a bar. */
 const MIDDLE_SHARE = 0.5;
+/** The page's own side gutter is 16px: a drag 8 points from the right edge starts on no control. */
+const SWIPE_EDGE_INSET = 8;
+/** Safari's menu for a `<select>` is up within a frame or two of the tap. */
+export const MENU_CEILING_MS = 2_000;
+const MENU_POLL_MS = 100;
 /** A tap is aimed at a whole screen point, so it lands within a point of its aim. */
 const AIM_TOLERANCE = 1;
 
@@ -73,6 +82,8 @@ interface Touch {
   pointerType: string;
   clientX: number;
   clientY: number;
+  /** The touch reached one of the element's own labels, which a finger taps to choose a radio or checkbox. */
+  viaLabel?: boolean;
 }
 
 interface Stray {
@@ -142,8 +153,9 @@ var last = shape(), still = 0, started = Date.now();
     window.__realTap = record;
     document.addEventListener('pointerdown', function (e) {
       if (window.__realTap !== record) return;
-      if (e.target === el || el.contains(e.target))
-        record.touch = { isTrusted: e.isTrusted, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY };
+      var viaLabel = !!el.labels && Array.prototype.some.call(el.labels, function (l) { return l === e.target || l.contains(e.target); });
+      if (e.target === el || el.contains(e.target) || viaLabel)
+        record.touch = { isTrusted: e.isTrusted, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, viaLabel: viaLabel };
       else record.stray = { target: describe(e.target), clientX: e.clientX, clientY: e.clientY };
     }, { capture: true, once: true });
   }
@@ -186,6 +198,13 @@ var vv = window.visualViewport, started = Date.now(), last = '', still = 0;
   if (Date.now() - started >= ceiling) return done(false);
   requestAnimationFrame(look);
 })();`;
+
+/** The text of arguments[0]'s option with the value arguments[1], or null. */
+export const OPTION_SCRIPT = `
+var select = arguments[0], value = arguments[1];
+for (var i = 0; i < select.options.length; i++)
+  if (select.options[i].value === value) return select.options[i].text;
+return null;`;
 
 /** The field's value, and whether it already has the focus. */
 export const FIELD_SCRIPT = `
@@ -287,10 +306,11 @@ export class RealTapInteraction implements Interaction {
       );
     const { clientX, clientY } = touch;
     if (
-      clientX < rect.x - AIM_TOLERANCE ||
-      clientX > rect.x + rect.width + AIM_TOLERANCE ||
-      clientY < rect.y - AIM_TOLERANCE ||
-      clientY > rect.y + rect.height + AIM_TOLERANCE
+      !touch.viaLabel &&
+      (clientX < rect.x - AIM_TOLERANCE ||
+        clientX > rect.x + rect.width + AIM_TOLERANCE ||
+        clientY < rect.y - AIM_TOLERANCE ||
+        clientY > rect.y + rect.height + AIM_TOLERANCE)
     )
       throw new TapNotLandedError(
         element.selector,
@@ -323,6 +343,46 @@ export class RealTapInteraction implements Interaction {
     if (after.value !== '')
       throw new Error(
         `cleared ${element.selector}, which still holds "${after.value}"`,
+      );
+  }
+
+  /**
+   * Chooses `value` in a `<select>` as a visitor does: a real tap opens the
+   * phone's own menu, and a real tap on the option's button chooses it.
+   */
+  async select(element: PageElement, value: string): Promise<void> {
+    const label = await this.page.executeScript<string | null>(OPTION_SCRIPT, [
+      element,
+      value,
+    ]);
+    if (label === null)
+      throw new Error(
+        `${element.selector} has no option with the value "${value}"`,
+      );
+    await this.click(element);
+    const started = Date.now();
+    let buttons = await this.wda.buttonsLabelled(label);
+    while (buttons.length === 0 && Date.now() - started < MENU_CEILING_MS) {
+      await new Promise((resolve) => setTimeout(resolve, MENU_POLL_MS));
+      buttons = await this.wda.buttonsLabelled(label);
+    }
+    if (buttons.length === 0)
+      throw new Error(
+        `the phone's menu for ${element.selector} never showed "${label}" within ${MENU_CEILING_MS / 1000} s`,
+      );
+    if (buttons.length > 1)
+      throw new Error(
+        `the phone shows ${buttons.length} buttons labelled "${label}"; which one is ${element.selector}'s option is not known`,
+      );
+    const [button] = buttons;
+    await this.wda.tap({
+      x: button.x + button.width / 2,
+      y: button.y + button.height / 2,
+    });
+    const after = await this.field(element);
+    if (after.value !== value)
+      throw new Error(
+        `chose "${label}" in ${element.selector}, which now holds "${after.value}"`,
       );
   }
 
@@ -388,7 +448,7 @@ export class RealTapInteraction implements Interaction {
     const distance =
       Math.sign(need) *
       Math.max(MIN_SWIPE_POINTS, Math.min(Math.abs(need), reach));
-    const x = this.screen.x + this.screen.width / 2;
+    const x = this.screen.x + this.screen.width - SWIPE_EDGE_INSET;
     const middle = this.calibration.origin.y + (viewHeight * vv.scale) / 2;
     await this.wda.swipe(
       { x, y: middle + distance / 2 },

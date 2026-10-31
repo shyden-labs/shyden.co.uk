@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CANARY_INSTALL_SCRIPT,
   CANARY_REMOVE_SCRIPT,
@@ -6,6 +6,7 @@ import {
   FIELD_SCRIPT,
   KEYBOARD_SCRIPT,
   LANDING_SCRIPT,
+  OPTION_SCRIPT,
   MAX_SWIPES,
   PREPARE_SCRIPT,
   RealTapInteraction,
@@ -63,6 +64,7 @@ const NAMES = new Map<string, string>([
   [LANDING_SCRIPT, 'landing'],
   [FIELD_SCRIPT, 'field'],
   [KEYBOARD_SCRIPT, 'keyboard'],
+  [OPTION_SCRIPT, 'option'],
   [CANARY_INSTALL_SCRIPT, 'canary-install'],
   [CANARY_SCRIPT, 'canary'],
   [CANARY_REMOVE_SCRIPT, 'canary-remove'],
@@ -73,11 +75,13 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
   const taps: Point[] = [];
   const keys: string[] = [];
   const swipes: [Point, Point][] = [];
+  let menu = [{ x: 85, y: 551, width: 250, height: 36 }];
   const answers = new Map<string, Handler>([
     ['prepare', () => prepared()],
     ['landing', () => landed()],
     ['field', () => ({ value: '', focused: false })],
     ['keyboard', () => true],
+    ['option', () => 'Skip the animation'],
     ['canary-install', () => true],
     [
       'canary',
@@ -117,8 +121,21 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
       log.push('swipe');
       swipes.push([from, to]);
     },
+    async buttonsLabelled(label: string) {
+      log.push(`menu:${label}`);
+      return menu;
+    },
   };
-  return { page, wda, log, taps, keys, swipes, answers };
+  return {
+    page,
+    wda,
+    log,
+    taps,
+    keys,
+    swipes,
+    answers,
+    setMenu: (m: typeof menu) => (menu = m),
+  };
 }
 
 const interaction = (f: ReturnType<typeof fakes>) =>
@@ -194,6 +211,16 @@ describe('RealTapInteraction.click: the tap', () => {
     );
   });
 
+  it("counts a touch on the element's own label as landing, as a finger on a radio button's option does", async () => {
+    const f = fakes({
+      landing: () => landed({ viaLabel: true, clientX: 29, clientY: 305 }),
+    });
+    await interaction(f).click(
+      element('input[name="mode"][value="groupCount"]'),
+    );
+    expect(f.taps).toHaveLength(1);
+  });
+
   it('passes each tap its own token, so a late event from an earlier tap cannot count', async () => {
     const tokens: unknown[] = [];
     const f = fakes({
@@ -220,7 +247,10 @@ describe('RealTapInteraction.click: real scrolling', () => {
     await interaction(f).click(element());
     expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
     const [[from, to]] = f.swipes;
-    expect([from.x, to.x]).toEqual([210, 210]);
+    expect(
+      [from.x, to.x],
+      "in the page's right-hand margin, clear of every control",
+    ).toEqual([412, 412]);
     expect(from.y - to.y, 'up, at most 60% of the view').toBeCloseTo(
       746 * 0.6,
       0,
@@ -454,6 +484,75 @@ describe('wdaUrlFrom', () => {
     const { wdaUrlFrom } = await import('../device/ios/session');
     expect(wdaUrlFrom({ WDA_URL: 'http://[fd97::1]:8100' })).toBe(
       'http://[fd97::1]:8100',
+    );
+  });
+});
+
+describe('RealTapInteraction.select', () => {
+  it("opens the menu with a real tap, then taps the option in the phone's own menu and checks the value", async () => {
+    let value = 'normal';
+    const f = fakes({ field: () => ({ value, focused: false }) });
+    const tap = f.wda.tap;
+    f.wda.tap = async (point: Point) => {
+      await tap(point);
+      if (f.taps.length === 2) value = 'skip';
+    };
+    await interaction(f).select(element('#cg-speed'), 'skip');
+    expect(f.log).toEqual([
+      'option',
+      'prepare',
+      'tap',
+      'landing',
+      'menu:Skip the animation',
+      'tap',
+      'field',
+    ]);
+    expect(f.taps[1]).toEqual({ x: 210, y: 569 });
+  });
+
+  it('fails when no option has that value', async () => {
+    const f = fakes({ option: () => null });
+    await expect(
+      interaction(f).select(element('#cg-speed'), 'warp'),
+    ).rejects.toThrow(/#cg-speed has no option with the value "warp"/);
+    expect(f.taps).toEqual([]);
+  });
+
+  it("fails when the phone's menu never shows the option", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakes();
+      f.setMenu([]);
+      const choosing = interaction(f).select(element('#cg-speed'), 'skip');
+      const verdict = expect(choosing).rejects.toThrow(
+        /the phone's menu for #cg-speed never showed "Skip the animation" within 2 s/,
+      );
+      await vi.advanceTimersByTimeAsync(2_100);
+      await verdict;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails when the menu shows the label more than once', async () => {
+    const f = fakes();
+    f.setMenu([
+      { x: 85, y: 551, width: 250, height: 36 },
+      { x: 85, y: 600, width: 250, height: 36 },
+    ]);
+    await expect(
+      interaction(f).select(element('#cg-speed'), 'skip'),
+    ).rejects.toThrow(
+      /the phone shows 2 buttons labelled "Skip the animation"/,
+    );
+  });
+
+  it('fails when the tap left a different value', async () => {
+    const f = fakes({ field: () => ({ value: 'normal', focused: false }) });
+    await expect(
+      interaction(f).select(element('#cg-speed'), 'skip'),
+    ).rejects.toThrow(
+      /chose "Skip the animation" in #cg-speed, which now holds "normal"/,
     );
   });
 });

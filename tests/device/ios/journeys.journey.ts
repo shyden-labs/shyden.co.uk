@@ -125,6 +125,21 @@ afterAll(async () => {
  * session start. `session.mode` is read fresh (not captured at module
  * load) because it is only known once `beforeAll` has resolved.
  */
+/**
+ * Chooses "Skip the animation" the way a teacher does: a real tap opens the
+ * Sound and animation section if it is closed, and the speed is picked in
+ * the phone's own menu (global rule 2026-10-31: all device input is real).
+ */
+async function skipTheAnimation(): Promise<void> {
+  const toggle = await session.driver.findElement('#cg-sound-toggle');
+  if ((await toggle.attribute('aria-expanded')) !== 'true')
+    await session.interaction.click(toggle);
+  await session.interaction.select(
+    await session.driver.findElement('#cg-speed'),
+    'skip',
+  );
+}
+
 function logMode(journeyName: string): void {
   // eslint-disable-next-line no-console -- the required per-test mode announcement, not incidental debug output
   console.log(`  [mode: ${session.mode}] ${journeyName}`);
@@ -550,23 +565,10 @@ describe.each(LOCALES)(
       logMode(`Journey 8a (${locale})`);
       await session.navigateToPath(path);
 
-      // A real, product-level preference (Skip the animation) -- exactly
-      // what a reduced-motion device gets by default, per
-      // src/scripts/classroom-groups.ts's own `reduceMotion` branch, which
-      // sets this same field the same direct way: no dispatched event,
-      // because the submit handler reads `speedSelect.value` fresh at
-      // shuffle time and nothing listens for a `change` on this field.
-      // Set here purely so MAX_STUDENTS worth of per-card deal animation
-      // (otherwise ~110ms EACH, on the phone's one shared main thread) does
-      // not still be running when the very next journey issues its own
-      // commands against the same page. A plain script, a
-      // direct value assignment exactly like the product's own
-      // `reduceMotion` branch already performs -- not a synthetic
-      // click/keyboard interaction, so this does not go through
-      // `session.interaction` either.
-      await session.driver.executeScript(
-        `document.getElementById('cg-speed').value = 'skip';`,
-      );
+      // Skip the animation, so MAX_STUDENTS cards are not dealt one by one
+      // (~110ms each on the phone's one main thread) while the next journey
+      // starts. Chosen with real taps, as a teacher would.
+      await skipTheAnimation();
 
       const count = await session.driver.findElement('#cg-count');
       await session.interaction.click(count);
@@ -924,22 +926,9 @@ describe.each(LOCALES)(
         await session.interaction.clear(size);
         await session.interaction.type(size, shape.size);
 
-        // `#cg-speed` is a <select>, and `Interaction` deliberately offers only
-        // click/type/clear -- so this one control goes through the driver. Two
-        // things make that safe rather than a shortcut: the value is READ BACK
-        // (a set that silently did nothing would leave the shuffle animating
-        // while the layout below was measured mid-flight), and JavaScript needs
-        // no visibility, so the phone skips expanding the sound section that the
-        // desktop leg has to open first.
-        const speed = await session.driver.executeScript<string>(
-          `var s = document.getElementById('cg-speed');
-         s.value = 'skip';
-         s.dispatchEvent(new Event('change', { bubbles: true }));
-         return s.value;`,
-        );
-        expect(speed, `the shuffle animation was skipped (${locale})`).toBe(
-          'skip',
-        );
+        // Skip the animation with real taps, so the layout below is not
+        // measured mid-deal; `select` reads the value back.
+        await skipTheAnimation();
 
         const go = await session.driver.findElement('#cg-go');
         await session.interaction.click(go);

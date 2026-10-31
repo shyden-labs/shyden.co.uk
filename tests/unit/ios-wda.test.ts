@@ -146,6 +146,31 @@ describe('WdaSession', () => {
     ]);
   });
 
+  it('buttonsLabelled finds the visible native buttons with that label and reads their boxes', async () => {
+    const { calls, http } = recorder({
+      'POST /session/S1/elements': [{ ELEMENT: 'E1' }],
+      'GET /session/S1/element/E1/rect': {
+        x: 85,
+        y: 551,
+        width: 250,
+        height: 36,
+      },
+    });
+    const wda = await WdaSession.open(http);
+    expect(await wda.buttonsLabelled('Skip "the" animation')).toEqual([
+      { x: 85, y: 551, width: 250, height: 36 },
+    ]);
+    expect(calls[1]).toEqual([
+      'POST',
+      '/session/S1/elements',
+      {
+        using: 'predicate string',
+        value:
+          'type == \'XCUIElementTypeButton\' AND label == "Skip \\"the\\" animation" AND visible == 1',
+      },
+    ]);
+  });
+
   it('windowRect reads the screen in points', async () => {
     const { http } = recorder({ 'GET /session/S1/window/rect': SCREEN });
     const wda = await WdaSession.open(http);
