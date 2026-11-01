@@ -1,0 +1,23 @@
+name: Node from the pin
+description: Sets up the exact Node release .github/node/Dockerfile names (#990).
+inputs:
+  cache:
+    description: "setup-node's cache: 'npm', or empty for none."
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - id: node
+      shell: bash
+      run: |
+        version=$(sed -nE 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)@sha256:[0-9a-f]{64}$/\1/p' .github/node/Dockerfile)
+        if [ -z "$version" ] || [ "$(printf '%s\n' "$version" | wc -l)" -ne 1 ]; then
+          echo "::error file=.github/node/Dockerfile::needs exactly one line FROM node:X.Y.Z@sha256:<digest>"
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ steps.node.outputs.version }}
+        cache: ${{ inputs.cache }}
