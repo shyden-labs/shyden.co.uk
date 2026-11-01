@@ -1488,9 +1488,7 @@ test.describe('absent students on the board (#999)', () => {
       .locator('.cg-student')
       .nth(1)
       .getByLabel('Name', { exact: true });
-    await tapOn(name);
-    await name.press('ControlOrMeta+a');
-    await name.pressSequentially('Bea');
+    await typeInto(name, 'Bea');
     await tapOn(page.locator('#cg-board-open'));
     await expect(row.locator('.who')).toHaveText(['Bea']);
   });

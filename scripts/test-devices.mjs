@@ -607,7 +607,7 @@ function isAndroidPresent() {
  *
  * This script cannot import the session's own TypeScript. Measured, not a
  * style choice: importing `tests/device/ios/session.ts` failed with
- * `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` under this repo's pinned Node (.nvmrc:
+ * `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` under this repo's pinned Node (then
  * 24, which strips TypeScript *types* natively), because the session pulls in
  * modules that use constructor PARAMETER PROPERTIES
  * (`constructor(private readonly page: PagePort)`, page-driver.ts), a real

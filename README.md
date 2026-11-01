@@ -28,7 +28,7 @@ fetches one.
 - **Cloudflare Pages** hosting, deployed by `wrangler` from CI.
 - Fonts self-hosted via `@fontsource`; sound effects self-hosted in
   `src/assets/sfx/`. **No third-party requests at runtime.**
-- Node **24** (`.nvmrc`). Formatting by Prettier.
+- Node **26**, the exact release in `.github/node/Dockerfile`, which Dependabot bumps. Formatting by Prettier.
 
 ## Development
 

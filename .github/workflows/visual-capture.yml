@@ -97,9 +97,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
+      - uses: ./.github/actions/setup-node
       - id: pick
         run: node scripts/playwright-image.mjs
 
@@ -127,9 +125,8 @@ jobs:
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD > "$RUNNER_TEMP/sha.txt"
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: ./.github/actions/setup-node
         with:
-          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: Capture the baselines
