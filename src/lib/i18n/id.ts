@@ -351,6 +351,8 @@ export const id: Catalogue = {
   boardExit: 'Keluar dari layar penuh',
   boardShuffle: 'Acak lagi',
   boardWaiting: 'Menunggu dikelompokkan',
+  // Lihat komentar pada versi Inggrisnya (en.ts), #999.
+  boardAbsentNote: 'Nomor {absent} tidak hadir.',
 
   // Lihat komentar pada versi Inggrisnya (en.ts). Terjemahan pelaksana --
   // PERLU DITINJAU.
