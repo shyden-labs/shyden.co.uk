@@ -1668,7 +1668,8 @@ test.describe('site-wide language switching', () => {
     // summary opens it and the entry inside is the link.
     const open = () =>
       tapOn(page.locator('header details.lang-switch > summary'));
-    const choose = () => tapOn(page.locator('header details.lang-switch li a'));
+    const choose = () =>
+      tapOn(page.locator('header details.lang-switch li a').first());
 
     await page.goto('/classroom-groups');
     await open();
