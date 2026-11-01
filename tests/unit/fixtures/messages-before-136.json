@@ -8,6 +8,18 @@
     "'M' | 'F'": ["M", "F"]
   },
   "messages": {
+    "boardAbsentNote": [
+      {
+        "params": { "absent": [4] },
+        "en": "Number 4 is absent.",
+        "id": "Nomor 4 tidak hadir."
+      },
+      {
+        "params": { "absent": [4, 6] },
+        "en": "Numbers 4 and 6 are absent.",
+        "id": "Nomor 4 dan 6 tidak hadir."
+      }
+    ],
     "numbersNotWholeMessage": [
       {
         "params": { "text": "Ana", "count": 2 },

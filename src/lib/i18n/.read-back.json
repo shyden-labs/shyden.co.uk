@@ -1312,6 +1312,12 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "every point carried; the tagline reads \"Learn through games\", the site's own zh kicker"
+      },
+      "{absent} 号缺席。": {
+        "english": "The {absent} symbol is missing.",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "Google took 号 as \"symbol\" with the bare slot; the same clause in groupedNote reads \"the {absent} number is absent\""
       }
     },
     "th": {
@@ -2681,6 +2687,12 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "every point carried; Google's reading leaves out the quoted tagline the line holds (the site's th kicker); \"pay-to-play\" for paywalls"
+      },
+      "หมายเลข {absent} ขาดเรียน": {
+        "english": "Student ID {absent} is absent from class.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "\"student ID\" is the class-number sense of หมายเลข"
       }
     },
     "id": {
@@ -4110,6 +4122,11 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "every point carried"
+      },
+      "Nomor {absent} tidak hadir.": {
+        "english": "Number {absent} is not present.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees"
       }
     },
     "vi": {
@@ -5505,6 +5522,11 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "every point carried; \"will motivate the game\" reads the phrase the approved vi yaweloIdleBody uses for \"power the game\""
+      },
+      "Số {absent} vắng mặt.": {
+        "english": "The number {absent} is absent.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees"
       }
     }
   },

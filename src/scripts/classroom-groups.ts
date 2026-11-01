@@ -100,6 +100,7 @@ import land3AssetUrl from '../assets/sfx/land-3.m4a';
 import land4AssetUrl from '../assets/sfx/land-4.m4a';
 import doneAssetUrl from '../assets/sfx/done.m4a';
 import { enhanceReportForm } from './report-form';
+import { absentNumbers, waitingRoll } from '../lib/absence';
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T | null;
@@ -1035,6 +1036,24 @@ if (form) {
       if (!who || !Number.isFinite(number)) continue;
       const next = resolveStudent(number);
       if (who.textContent !== next) who.textContent = next;
+    }
+    // #999: the board's Absent row names a student only where the roster
+    // has a name, so a rename can add, change or take away the name.
+    for (const chip of document.querySelectorAll<HTMLElement>(
+      '#cg-absent-list .waiting-student',
+    )) {
+      const name = rosterNames.get(Number(chip.dataset.number));
+      let who = chip.querySelector<HTMLElement>('.who');
+      if (!name) {
+        who?.remove();
+        continue;
+      }
+      if (!who) {
+        who = document.createElement('span');
+        who.className = 'who';
+        chip.querySelector('.number')?.after(who);
+      }
+      if (who.textContent !== name) who.textContent = name; // set as TEXT
     }
   };
 
@@ -2221,39 +2240,70 @@ if (form) {
   const waiting = $<HTMLElement>('cg-waiting')!;
   const waitingList = $<HTMLUListElement>('cg-waiting-list')!;
   const waitingError = $<HTMLParagraphElement>('cg-waiting-error')!;
-
-  /** Everyone the deal will place who is not already seated (#743). */
-  const waitingPool = (input: ReturnType<typeof dealInput>): Student[] => {
-    const pinned = new Set(input.pinned.flat().map((s) => s.number));
-    return (
-      typeof input.students === 'number'
-        ? Array.from({ length: input.students }, (_, i) =>
-            anonymousStudent(i + 1),
-          )
-        : input.students.filter((s) => !s.absent)
-    ).filter((s) => !pinned.has(s.number));
+  const waitingAbsent = $<HTMLParagraphElement>('cg-waiting-absent')!;
+  // #999: under the groups after a deal, on the board, everyone absent.
+  const absentRow = $<HTMLElement>('cg-absent')!;
+  const absentList = $<HTMLUListElement>('cg-absent-list')!;
+  const showAbsentRow = (numbers: readonly number[]) => {
+    absentList.textContent = '';
+    for (const number of numbers)
+      absentList.appendChild(studentChip(number, true));
+    absentRow.hidden = numbers.length === 0;
   };
 
-  /** The waiting list, shown: every student in `pool`, numbered (#743). */
-  const showList = (pool: readonly Student[]) => {
-    waitingList.textContent = '';
-    for (const student of pool) {
-      const li = document.createElement('li');
-      li.className = 'waiting-student';
-      li.dataset.number = String(student.number);
-      const number = document.createElement('span');
-      number.className = 'number';
-      number.textContent = String(student.number);
-      li.appendChild(number);
-      const name = rosterNames.get(student.number);
-      if (name) {
-        const who = document.createElement('span');
-        who.className = 'who';
-        who.textContent = name; // the untrusted value, set as TEXT
-        li.appendChild(who);
-      }
-      waitingList.appendChild(li);
+  /**
+   * Everyone the deal will place who is not already seated (#743), and the
+   * absent ones beside them, marked (#999): the class sees every number.
+   */
+  const waitingPool = (input: ReturnType<typeof dealInput>): Student[] =>
+    waitingRoll(
+      input.students,
+      new Set(input.pinned.flat().map((s) => s.number)),
+    );
+
+  /**
+   * One student's chip: the number, the name where the roster has one, and
+   * for an absent student the word "absent" beside them, so colour is never
+   * the only signal (#999). Shared by the waiting list and the absent row.
+   */
+  const studentChip = (number: number, absent: boolean): HTMLLIElement => {
+    const li = document.createElement('li');
+    li.className = absent ? 'waiting-student absent' : 'waiting-student';
+    li.dataset.number = String(number);
+    const numberEl = document.createElement('span');
+    numberEl.className = 'number';
+    numberEl.textContent = String(number);
+    li.appendChild(numberEl);
+    const name = rosterNames.get(number);
+    if (name) {
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = name; // the untrusted value, set as TEXT
+      li.appendChild(who);
     }
+    if (absent) {
+      const tag = document.createElement('span');
+      tag.className = 'absent-tag';
+      tag.textContent = t.rosterAbsentPill;
+      li.appendChild(tag);
+    }
+    return li;
+  };
+
+  /**
+   * The waiting list, shown: every student in `pool`, numbered (#743), the
+   * absent ones marked (#999). Before the first deal the board also says
+   * who is absent; once a deal has run, `groupedNote` says it instead, so
+   * `before` is false from the submit.
+   */
+  const showList = (pool: readonly Student[], before: boolean) => {
+    waitingList.textContent = '';
+    for (const student of pool)
+      waitingList.appendChild(studentChip(student.number, student.absent));
+    const absent = before ? absentNumbers(pool) : [];
+    waitingAbsent.hidden = absent.length === 0;
+    waitingAbsent.textContent =
+      absent.length === 0 ? '' : t.boardAbsentNote({ absent });
     waitingError.hidden = true;
     waitingError.textContent = '';
     waiting.hidden = false;
@@ -2275,7 +2325,8 @@ if (form) {
     tables
       .querySelectorAll('.student')
       .forEach((c) => c.classList.add('dealt'));
-    showList(waitingPool(input));
+    showList(waitingPool(input), true);
+    showAbsentRow([]);
     results.hidden = false;
     projector?.setShuffleLabel(t.makeGroups);
   };
@@ -2284,6 +2335,8 @@ if (form) {
   const hideWaiting = () => {
     waiting.hidden = true;
     waitingList.textContent = '';
+    waitingAbsent.hidden = true;
+    waitingAbsent.textContent = '';
     waitingError.hidden = true;
     waitingError.textContent = '';
   };
@@ -2459,7 +2512,7 @@ if (form) {
       (projector?.isOpen() ?? false) && speedSelect.value !== 'skip';
     travelling?.abort('superseded');
     travelling = null;
-    if (travels) showList(waitingPool(input));
+    if (travels) showList(waitingPool(input), false);
     else hideWaiting();
     projector?.setShuffleLabel(t.boardShuffle);
     // What the sheet is showing, for "Export groups" -- see `lastGroups`'s
@@ -2484,6 +2537,7 @@ if (form) {
     resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
     // Text first, animation second — see the note at the top of this file.
     render(groups);
+    showAbsentRow(absentNumbers(students));
     // Same ordering rule as the error path: the region joins the tree, and
     // only then is the sentence written into it.
     results.hidden = false;

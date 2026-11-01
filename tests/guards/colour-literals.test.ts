@@ -116,6 +116,18 @@ const ALLOWED: Allowance[] = [
   },
   {
     file: CG,
+    rule: ['#cg-results .waiting-student.absent'],
+    literals: ['#956b1e', '#fff6e3', '#1a1a1a'],
+    reason: REASON.callout,
+  },
+  {
+    file: CG,
+    rule: ['#cg-results .waiting-student.absent .number'],
+    literals: ['#7a5512'],
+    reason: REASON.callout,
+  },
+  {
+    file: CG,
     rule: [
       '@media (min-width: 768px)',
       '#cg-roster .cg-student.is-absent > td:first-child',
