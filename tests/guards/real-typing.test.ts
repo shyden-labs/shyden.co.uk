@@ -36,6 +36,10 @@ const SCRIPTED_TYPING: readonly [string, RegExp][] = [
     'a scripted input or change event',
     /new\s+(?:Input)?Event\(\s*['"`](?:input|change)['"`]/,
   ],
+  // Playwright resolves ControlOrMeta from the machine running the tests, so
+  // from a Mac the Android phone got Meta+A, which it ignores, and a rename
+  // typed "Bea" in front of "Ben" (2026-11-02). typeInto picks the keys.
+  ['a select-all key typed by hand', /ControlOrMeta/],
 ];
 
 describe('every browser test types with real key presses (#998)', () => {

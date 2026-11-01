@@ -790,7 +790,7 @@ describe('the deploy pipeline runs what it claims to', () => {
     ).toEqual([
       'Check the secrets are set: always',
       'actions/checkout: always',
-      'actions/setup-node: always',
+      './.github/actions/setup-node: always',
       'Find the deployment to roll back to: always',
       'Promote it: !inputs.dry_run',
     ]);
@@ -3189,7 +3189,7 @@ describe('a failed develop deploy reaches the operator (#725)', () => {
 
   it('runs no npm package code: checkout, setup-node and the script, nothing else', () => {
     expect(steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null)).toEqual(
-      ['actions/checkout', 'actions/setup-node', null],
+      ['actions/checkout', './.github/actions/setup-node', null],
     );
     expect(jobNamed(FILE, 'report-failure').runs).toEqual([
       'node scripts/deploy-failure.mjs',
@@ -3335,7 +3335,7 @@ describe.each(DAILY_WORKFLOWS)('$name', (daily) => {
 
   it('runs no npm package code: checkout, setup-node and the script, nothing else', () => {
     expect(steps().map(({ uses }) => uses?.replace(/@.*/, '') ?? null)).toEqual(
-      ['actions/checkout', 'actions/setup-node', null, null],
+      ['actions/checkout', './.github/actions/setup-node', null, null],
     );
     expect(jobNamed(file, job).runs).toEqual([
       script,
@@ -3365,7 +3365,7 @@ describe.each(DAILY_WORKFLOWS)('$name', (daily) => {
     const dispatching = parsed().jobs?.dispatch?.steps ?? [];
     expect(
       dispatching.map(({ uses }) => uses?.replace(/@.*/, '') ?? null),
-    ).toEqual([null, 'actions/checkout', 'actions/setup-node', null]);
+    ).toEqual([null, 'actions/checkout', './.github/actions/setup-node', null]);
     expect(dispatching.map(({ if: when }) => unwrapped(when))).toEqual([
       undefined,
       'failure()',
@@ -3791,8 +3791,8 @@ describe('neither bot can push, commit or amend (#889)', () => {
 
   it('visual-capture.yml uses checkout, setup-node and upload-artifact, and no other action', () => {
     expect(actionsOf(CAPTURE_WORKFLOW).sort()).toEqual([
+      './.github/actions/setup-node',
       'actions/checkout',
-      'actions/setup-node',
       'actions/upload-artifact',
     ]);
   });
