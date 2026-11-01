@@ -3791,8 +3791,8 @@ describe('neither bot can push, commit or amend (#889)', () => {
 
   it('visual-capture.yml uses checkout, setup-node and upload-artifact, and no other action', () => {
     expect(actionsOf(CAPTURE_WORKFLOW).sort()).toEqual([
-      'actions/checkout',
       './.github/actions/setup-node',
+      'actions/checkout',
       'actions/upload-artifact',
     ]);
   });

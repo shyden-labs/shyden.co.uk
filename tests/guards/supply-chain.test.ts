@@ -377,14 +377,6 @@ describe('TypeScript is held at 6 until it can move', () => {
 });
 
 /**
- * `@types/node` follows the pinned Node (`.github/node/Dockerfile`), not the newest Node (#646, global rule
- * 2026-10-08). Every Node major ships its types the day it ships, odd and
- * even alike, so without a hold Dependabot would move the types to a Node this
- * repo does not run, and a type check would pass over an API CI never has.
- * The major moves by hand, with the pin (`node-contract.test.ts` pins that
- * the two agree). Majors only, so 26.x patches and minors still arrive.
- */
-/**
  * CI's exact Node lives in one Dockerfile Dependabot's docker ecosystem
  * watches, so each release arrives as a pull request into develop and a new
  * major is chosen by hand (#990, shyden-labs/repo-template#143).
@@ -410,6 +402,14 @@ describe("CI's Node arrives as a Dependabot pull request against one pin", () =>
   });
 });
 
+/**
+ * `@types/node` follows the pinned Node (`.github/node/Dockerfile`), not the newest Node (#646, global rule
+ * 2026-10-08). Every Node major ships its types the day it ships, odd and
+ * even alike, so without a hold Dependabot would move the types to a Node this
+ * repo does not run, and a type check would pass over an API CI never has.
+ * The major moves by hand, with the pin (`node-contract.test.ts` pins that
+ * the two agree). Majors only, so 26.x patches and minors still arrive.
+ */
 describe('@types/node is held to the pinned Node major', () => {
   it('ignores @types/node majors, and only majors', () => {
     expect(

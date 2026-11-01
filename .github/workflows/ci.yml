@@ -351,8 +351,6 @@ jobs:
       - run: |
           tests=$(node scripts/release-inventory.mjs --tests)
           test -n "$tests"
-          # One argument per test id: the split is the point.
-          # shellcheck disable=SC2086
           npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $tests
         # Each shard counts the SELECTION it was handed, not the whole suite,
         # and writes down what it ran, for build-and-test to add up exactly as
