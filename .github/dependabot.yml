@@ -39,10 +39,11 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           - 'version-update:semver-major'
-      # @types/node follows .nvmrc's major, not the newest Node (#646): every
-      # Node major ships its types the day it ships, so without this the types
-      # would describe a Node CI does not run. The major moves by hand, with
-      # .nvmrc (node-contract.test.ts pins that the two agree).
+      # @types/node follows the pinned Node's major (.github/node/Dockerfile),
+      # not the newest Node (#646): every Node major ships its types the day it
+      # ships, so without this the types would describe a Node CI does not run.
+      # The major moves by hand, with the pin (node-contract.test.ts pins that
+      # the two agree).
       - dependency-name: '@types/node'
         update-types:
           - 'version-update:semver-major'
@@ -119,4 +120,24 @@ updates:
     labels:
       - 'dependencies'
       - 'docker'
+    open-pull-requests-limit: 5
+
+  # The exact Node CI runs (#990, shyden-labs/repo-template#143): one pull
+  # request per Node release, read by .github/actions/setup-node. A new major
+  # is chosen by hand, with @types/node.
+  - package-ecosystem: 'docker'
+    directory: '/.github/node'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'docker'
+    ignore:
+      - dependency-name: 'node'
+        update-types:
+          - 'version-update:semver-major'
     open-pull-requests-limit: 5
