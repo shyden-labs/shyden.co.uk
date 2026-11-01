@@ -7,21 +7,22 @@ import { withoutIniComments, withoutYamlComments } from './source-text';
 /**
  * The Node version this repo runs on is stated ONCE, and everything agrees.
  *
- * `.nvmrc` is the single source of truth. Every CI job reads it via
- * `node-version-file:`, so CI cannot drift. But `.nvmrc` is invisible to npm:
- * a contributor on volta, asdf, fnm-without-nvmrc, or a system Node installs
+ * `.github/node/Dockerfile` is the single source of truth (#990): one exact
+ * release, which Dependabot bumps, read by the one setup action every CI job
+ * uses, so CI cannot drift. But that pin is invisible to npm:
+ * a contributor on volta, asdf, fnm, or a system Node installs
  * happily on Node 20 and the failure surfaces much later, at build or test
  * time, as a confusing runtime error instead of at install time as a clear
  * one. `engines` + `engine-strict` is what closes that hole (#31).
  *
  * Three ways the contract can rot, and this file guards all three:
  *
- * 1. `.nvmrc` is bumped and `engines` is not — npm now permits a Node that CI
+ * 1. The pin is bumped and `engines` is not — npm now permits a Node that CI
  *    never exercises.
- * 2. `engines` is bumped and `.nvmrc` is not — CI now runs a Node that npm
+ * 2. `engines` is bumped and the pin is not — CI now runs a Node that npm
  *    refuses to install on.
- * 3. A NEW workflow hardcodes `node-version: 20` instead of reading the file,
- *    quietly reintroducing the drift that `node-version-file:` removed. Found
+ * 3. A NEW workflow sets Node up itself (`node-version: 20`) instead of
+ *    through the setup action, quietly reintroducing the drift. Found
  *    by the #31 sweep: all six existing references were already correct, but
  *    nothing stopped a seventh from being wrong.
  *
@@ -35,32 +36,45 @@ import { withoutIniComments, withoutYamlComments } from './source-text';
 
 const WORKFLOWS = '.github/workflows';
 
-/** `.nvmrc` as a major integer. `24`, `v24`, and trailing newlines all mean 24. */
-const nvmrcMajor = (): number => {
-  const raw = readFileSync('.nvmrc', 'utf8').trim().replace(/^v/i, '');
-  const major = Number(raw.split('.')[0]);
-  if (!Number.isInteger(major)) {
-    throw new Error(
-      `.nvmrc is not a parseable version: ${JSON.stringify(raw)}`,
-    );
-  }
-  return major;
+const PIN = '.github/node/Dockerfile';
+const SETUP_ACTION = '.github/actions/setup-node/action.yml';
+
+/**
+ * The pattern the setup action reads the pin with, taken from its own `sed`
+ * line, so this file judges exactly what CI reads and cannot drift from it.
+ */
+const actionPattern = (): RegExp => {
+  const action = withoutYamlComments(readFileSync(SETUP_ACTION, 'utf8'));
+  const sed = action.match(
+    /sed -nE 's\/(.+?)\/\\1\/p' \.github\/node\/Dockerfile/,
+  );
+  if (sed?.[1] === undefined)
+    throw new Error(`${SETUP_ACTION} no longer reads ${PIN} with sed -nE`);
+  return new RegExp(sed[1]);
 };
 
 /**
- * `content`, a `.nvmrc`, as one exact `x.y.z` release, or a refusal naming
- * what it holds (#982). A bare major lets setup-node fetch the newest release
- * on every run, so CI's Node would change with no pull request.
+ * `content`, the pin's Dockerfile, as one exact `x.y.z` release, or a refusal
+ * naming what it holds (#982, #990). A bare major or a tag would let CI's
+ * Node change with no pull request, and a second FROM line would hand the
+ * action two versions.
  */
 const exactNodeVersion = (content: string): string => {
-  const raw = content.trim().replace(/^v/, '');
-  if (!/^\d+\.\d+\.\d+$/.test(raw)) {
+  const pattern = actionPattern();
+  const found = content
+    .split('\n')
+    .map((line) => pattern.exec(line.trim())?.[1])
+    .filter((version): version is string => version !== undefined);
+  if (found.length !== 1)
     throw new Error(
-      `.nvmrc must name one exact release (x.y.z), not ${JSON.stringify(content.trim())}`,
+      `${PIN} must hold exactly one FROM node:x.y.z@sha256:<digest> line, not ${JSON.stringify(content.trim())}`,
     );
-  }
-  return raw;
+  return found[0]!;
 };
+
+/** The pinned release's major. */
+const pinnedMajor = (): number =>
+  Number(exactNodeVersion(readFileSync(PIN, 'utf8')).split('.')[0]);
 
 const packageJson = (): Record<string, unknown> =>
   JSON.parse(readFileSync('package.json', 'utf8'));
@@ -80,7 +94,7 @@ const enginesRange = (): string => {
  * `[major, minor, patch]`, in the order written.
  *
  * A range may hold alternatives (`^24.16.0 || >=26.3.0`, #646: Dependabot's
- * npm updater installs on Node 24, so 24 stays admitted while `.nvmrc` moves
+ * npm updater installs on Node 24, so 24 stays admitted while the pin moves
  * to 26). Each one is read on its own. Deliberately tolerant of how a floor is
  * written (`>=24`, `>= 24.0.0`, `^24.0.0`) but strict that every alternative
  * states one: an alternative with no lower bound states no contract and must
@@ -151,26 +165,45 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
   // project on Node 26, 26.3 or later). A figure asserted against the file it
   // was read from would move with it and pin nothing.
   it('runs on Node 26 (#646)', () => {
-    expect(nvmrcMajor()).toBe(26);
+    expect(pinnedMajor()).toBe(26);
   });
 
   // One exact release, so CI's Node changes only in the pull request that
   // bumps it (#982, global rule 2026-10-29). The literal moves with each bump.
-  it('names the exact release every project runs (#982)', () => {
-    expect(exactNodeVersion(readFileSync('.nvmrc', 'utf8'))).toBe('26.12.1');
+  it('names the exact release every project runs (#982, #990)', () => {
+    expect(exactNodeVersion(readFileSync(PIN, 'utf8'))).toBe('26.12.1');
   });
 
-  it.each(['26', '26.12', '26.x', 'lts/*', 'node', '', '26.12.1-rc.1'])(
-    'refuses an .nvmrc of %j, which names no one release (#982)',
+  const DIGEST =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  it.each([
+    'FROM node:26',
+    'FROM node:26.12',
+    'FROM node:26.12.1',
+    'FROM node:lts@sha256:' + DIGEST,
+    'FROM node:v26.12.1@sha256:' + DIGEST,
+    'FROM node:26.12.1-alpine@sha256:' + DIGEST,
+    'FROM node:26.12.1@sha256:abc',
+    'FROM node@sha256:' + DIGEST,
+    '# FROM node:26.12.1@sha256:' + DIGEST,
+    '',
+    'FROM node:26.12.1@sha256:' +
+      DIGEST +
+      '\nFROM node:26.13.0@sha256:' +
+      DIGEST,
+  ])(
+    'refuses a pin of %j, which names no one exact release (#990)',
     (content) => {
       expect(() => exactNodeVersion(`${content}\n`)).toThrow(
-        `.nvmrc must name one exact release (x.y.z), not ${JSON.stringify(content)}`,
+        `${PIN} must hold exactly one FROM node:x.y.z@sha256:<digest> line`,
       );
     },
   );
 
-  it('reads an exact release whatever its v prefix or newline (#982)', () => {
-    expect(exactNodeVersion('v26.12.1\n')).toBe('26.12.1');
+  it('reads the release past comment lines (#990)', () => {
+    expect(
+      exactNodeVersion(`# a note\nFROM node:26.12.1@sha256:${DIGEST}\n`),
+    ).toBe('26.12.1');
   });
 
   it('admits Node 26.3 or later, and the 24 line Dependabot installs on (#646)', () => {
@@ -228,12 +261,12 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
     ).toEqual([]);
   });
 
-  it('keeps the highest engines.node floor and .nvmrc on the same major, in both directions', () => {
+  it('keeps the highest engines.node floor and the pin on the same major, in both directions', () => {
     // One assertion, two failure modes: bumping either file alone breaks it.
     // The highest floor is the line CI runs; a lower alternative (#646's 24)
     // stays admitted for installers that cannot move yet.
     const majors = enginesFloors().map(([major]) => major);
-    expect(Math.max(...majors)).toBe(nvmrcMajor());
+    expect(Math.max(...majors)).toBe(pinnedMajor());
   });
 
   it('names floors that ship import.meta.main, which every entry script relies on (#221)', () => {
@@ -254,32 +287,42 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
   // The types describe the Node CI runs, not the newest one, nor the older
   // one npm would otherwise resolve through vitest and vite (#646, operator
   // 2026-10-09: declare it).
-  it('declares @types/node on the major .nvmrc names (#646)', () => {
+  it('declares @types/node on the pinned major (#646)', () => {
     const declared = (
       packageJson().devDependencies as Record<string, string> | undefined
     )?.['@types/node'];
     expect(declared, 'devDependencies["@types/node"]').toBeTypeOf('string');
-    expect(majorOf(declared ?? '')).toBe(nvmrcMajor());
+    expect(majorOf(declared ?? '')).toBe(pinnedMajor());
   });
 
-  it('installs @types/node on the major .nvmrc names (#646)', () => {
+  it('installs @types/node on the pinned major (#646)', () => {
     const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
       packages?: Record<string, { version?: string }>;
     };
     const installed = lock.packages?.['node_modules/@types/node']?.version;
     expect(installed, 'the lock installs @types/node').toBeTypeOf('string');
-    expect(majorOf(installed ?? '')).toBe(nvmrcMajor());
+    expect(majorOf(installed ?? '')).toBe(pinnedMajor());
   });
 
-  it('reads Node from .nvmrc in every workflow that sets Node up', () => {
-    for (const [file, body] of workflowBodies()) {
-      const setups = body.match(/uses:\s*actions\/setup-node@/g)?.length ?? 0;
-      const fromFile = body.match(/node-version-file:\s*\.nvmrc/g)?.length ?? 0;
-      expect(
-        fromFile,
-        `${file}: ${setups} setup-node step(s) but ${fromFile} reading .nvmrc`,
-      ).toBe(setups);
-    }
+  it('sets Node up only through the setup action, in every workflow (#990)', () => {
+    const direct = workflowBodies()
+      .filter(([, body]) => /uses:\s*actions\/setup-node@/.test(body))
+      .map(([file]) => file);
+    expect(direct).toEqual([]);
+    const through = workflowBodies().filter(([, body]) =>
+      /uses:\s*\.\/\.github\/actions\/setup-node\s*$/m.test(body),
+    );
+    expect(through.length).toBeGreaterThan(0);
+  });
+
+  it('the setup action hands setup-node the version it read, and nothing else (#990)', () => {
+    const action = withoutYamlComments(readFileSync(SETUP_ACTION, 'utf8'));
+    expect(action.match(/node-version(-file)?:.*/g)).toEqual([
+      'node-version: ${{ steps.node.outputs.version }}',
+    ]);
+    expect(actionPattern().source).toBe(
+      '^FROM node:([0-9]+\\.[0-9]+\\.[0-9]+)@sha256:[0-9a-f]{64}$',
+    );
   });
 
   it('never hardcodes a Node version in a workflow', () => {

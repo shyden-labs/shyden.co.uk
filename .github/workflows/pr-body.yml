@@ -81,9 +81,7 @@ jobs:
           # The pull request's own commits, not just its tip: the messages are
           # read below, and a shallow clone has none of them.
           fetch-depth: 0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
+      - uses: ./.github/actions/setup-node
       - name: A dispatched run judges only the pull request that owns its head
         # The check attaches to the dispatched ref's head, so the body and the
         # commits judged must be that head's own pull request: a clean body
