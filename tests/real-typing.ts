@@ -1,4 +1,5 @@
 import type { Locator } from '@playwright/test';
+import { onRealDevice } from './device/device-downloads';
 
 /**
  * Types `text` into a field the way a visitor does (#998): a real click puts
@@ -14,8 +15,19 @@ import type { Locator } from '@playwright/test';
 export async function typeInto(field: Locator, text: string): Promise<void> {
   await field.click();
   if ((await field.inputValue()) !== '') {
-    await field.press('ControlOrMeta+A');
+    await field.press(selectAllKeys());
     await field.press('Backspace');
   }
   if (text !== '') await field.pressSequentially(text);
 }
+
+/**
+ * The keys that select a field's whole text where the browser runs.
+ * Playwright resolves `ControlOrMeta` from the machine running the tests, so
+ * from a Mac it sends Meta+A to the Android phone, which Chrome there ignores:
+ * Backspace then removed one character and the typed digits joined the rest
+ * ("24" became "212", measured 2026-11-02). Android Chrome selects all with
+ * Control+A.
+ */
+export const selectAllKeys = (): string =>
+  onRealDevice() ? 'Control+A' : 'ControlOrMeta+A';
