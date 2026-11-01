@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { docsPaths } from '../site-pages';
@@ -83,7 +84,7 @@ const openEverything = async (page: Page, path: string) => {
   // The fields the page's own spec requires a visitor to type: Swagger UI
   // sends nothing while one is empty, and labels each with its name.
   for (const name of requiredTextFields(docsSpecFile(path)))
-    await page.getByPlaceholder(name, { exact: true }).fill('x');
+    await typeInto(page.getByPlaceholder(name, { exact: true }), 'x');
   // runtime population: one Execute per operation.
   for (const execute of await executes.all()) await execute.click();
   await expect(

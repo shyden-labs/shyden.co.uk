@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
@@ -36,7 +37,7 @@ test.describe('gift value calculator', () => {
       page,
     }) => {
       await page.goto(path);
-      await page.fill('#gift-input', gift);
+      await typeInto(page.locator('#gift-input'), gift);
       await page.click('#gift-submit');
       const t = path.startsWith('/id') ? id : en;
       await expectVisibleText(
@@ -48,7 +49,7 @@ test.describe('gift value calculator', () => {
 
   test('the two calculators do not share a result', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
-    await page.fill('#gift-input', '1000');
+    await typeInto(page.locator('#gift-input'), '1000');
     await page.click('#gift-submit');
     await expect(page.locator('#glory-result')).toBeEmpty();
     await expect(page.locator('#glory-error')).toBeEmpty();
@@ -56,10 +57,10 @@ test.describe('gift value calculator', () => {
 
   test('a result clears the earlier error', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
-    await page.fill('#gift-input', 'abc');
+    await typeInto(page.locator('#gift-input'), 'abc');
     await page.click('#gift-submit');
     await expect(page.locator('#gift-error')).not.toBeEmpty();
-    await page.fill('#gift-input', '1000');
+    await typeInto(page.locator('#gift-input'), '1000');
     await page.click('#gift-submit');
     await expect(page.locator('#gift-result')).not.toBeEmpty();
     await expect(page.locator('#gift-error')).toBeEmpty();
@@ -67,10 +68,10 @@ test.describe('gift value calculator', () => {
 
   test('an error clears the earlier result', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
-    await page.fill('#gift-input', '1000');
+    await typeInto(page.locator('#gift-input'), '1000');
     await page.click('#gift-submit');
     await expect(page.locator('#gift-result')).not.toBeEmpty();
-    await page.fill('#gift-input', 'abc');
+    await typeInto(page.locator('#gift-input'), 'abc');
     await page.click('#gift-submit');
     await expect(page.locator('#gift-result')).toBeEmpty();
   });
@@ -150,7 +151,7 @@ test.describe('gift value — mobile-first layout', () => {
         async ({ page }) => {
           await page.setViewportSize({ width, height: 900 });
           await page.goto(path);
-          await page.fill('#gift-input', '1000000000');
+          await typeInto(page.locator('#gift-input'), '1000000000');
           await page.click('#gift-submit');
           await expect(page.locator('#gift-result')).not.toBeEmpty();
           await expectNoHorizontalScroll(page);

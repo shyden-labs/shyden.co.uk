@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { randomUUID } from 'node:crypto';
 import {
   test,
@@ -34,8 +35,8 @@ test.beforeEach(async () => {
 
 async function fillReport(page: Page, quote: string, note: string) {
   await page.locator('[data-report] summary').click();
-  await page.getByLabel(vi.quoteLabel, { exact: true }).fill(quote);
-  await page.getByLabel(vi.noteLabel, { exact: true }).fill(note);
+  await typeInto(page.getByLabel(vi.quoteLabel, { exact: true }), quote);
+  await typeInto(page.getByLabel(vi.noteLabel, { exact: true }), note);
 }
 
 test('the health check sees the binding and the migrated table', async ({
@@ -107,10 +108,14 @@ test.describe('with JavaScript disabled', () => {
         const block = page.locator(`details[data-report][lang="${locale}"]`);
         await page.goto('/404');
         await block.locator('summary').click();
-        await block
-          .getByLabel(t.report.quoteLabel, { exact: true })
-          .fill(t.notFound.heading);
-        await block.getByLabel(t.report.noteLabel, { exact: true }).fill(note);
+        await typeInto(
+          block.getByLabel(t.report.quoteLabel, { exact: true }),
+          t.notFound.heading,
+        );
+        await typeInto(
+          block.getByLabel(t.report.noteLabel, { exact: true }),
+          note,
+        );
         await block.getByRole('button', { name: t.report.send }).click();
         await expect(page).toHaveURL(new RegExp(`/404#report-${locale}-sent$`));
         await expect(page.locator(`#report-${locale}-sent`)).toBeVisible();
@@ -136,10 +141,11 @@ test.describe('with JavaScript disabled', () => {
       const block = page.locator('details[data-report][lang="vi"]');
       await page.goto('/404');
       await block.locator('summary').click();
-      await block
-        .getByLabel(vi.quoteLabel, { exact: true })
-        .fill(getSiteStrings('zh').notFound.heading);
-      await block.getByLabel(vi.noteLabel, { exact: true }).fill(note);
+      await typeInto(
+        block.getByLabel(vi.quoteLabel, { exact: true }),
+        getSiteStrings('zh').notFound.heading,
+      );
+      await typeInto(block.getByLabel(vi.noteLabel, { exact: true }), note);
       await block.getByRole('button', { name: vi.send }).click();
       await expect(page).toHaveURL(/\/404#report-vi-not-found$/);
       await expect(page.locator('#report-vi-not-found')).toBeVisible();
@@ -190,11 +196,10 @@ test.describe('on a tool page', () => {
     await page.goto(pagePath('classroom-groups', 'vi'));
     await page.locator('#cg-students-toggle').click();
     await page.getByRole('button', { name: tool.rosterAddStudent }).click();
-    await page
-      .locator('.cg-student')
-      .first()
-      .getByLabel(tool.rosterColName)
-      .fill('Lan');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel(tool.rosterColName),
+      'Lan',
+    );
   }
 
   test('/vi/classroom-groups sends in place and the roster is still there', async ({
@@ -231,7 +236,7 @@ test.describe('on a tool page', () => {
     await fillReport(page, 'on no page at all, anywhere', note);
     await page.getByRole('button', { name: vi.send }).click();
     await expect(page.locator('#report-not-found')).toBeVisible();
-    await page.getByLabel(vi.quoteLabel, { exact: true }).fill(vi.open);
+    await typeInto(page.getByLabel(vi.quoteLabel, { exact: true }), vi.open);
     await page.getByRole('button', { name: vi.send }).click();
     await expect(page.locator('#report-sent')).toBeVisible();
     await expect(page.locator('#report-not-found')).toBeHidden();

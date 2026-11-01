@@ -1,3 +1,4 @@
+import { typeInto } from './real-typing';
 import type { Page } from '@playwright/test';
 
 /**
@@ -28,8 +29,8 @@ export const makeGroups = async (
   count: string,
   size: string,
 ): Promise<void> => {
-  await page.fill('#cg-count', count);
-  await page.fill('#cg-size', size);
+  await typeInto(page.locator('#cg-count'), count);
+  await typeInto(page.locator('#cg-size'), size);
   await chooseSpeed(page, 'skip');
   await page.click('#cg-go');
 };
