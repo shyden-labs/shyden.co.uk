@@ -12,7 +12,6 @@ import {
   holdFirstGrantUntilTheNext,
   holdTheTidyUpExit,
   openWaitingBoard,
-  typeInto,
   contrastRatio,
 } from './helpers';
 import { searched } from '../source-files';
@@ -1356,9 +1355,9 @@ test.describe('absent students on the board (#999)', () => {
     path = '/classroom-groups',
   ) => {
     await page.goto(path);
-    await typeInto(page, '#cg-count', '12');
-    await typeInto(page, '#cg-size', '4');
-    await typeInto(page, '#cg-numbers-absent', '3, 7');
+    await typeInto(page.locator('#cg-count'), '12');
+    await typeInto(page.locator('#cg-size'), '4');
+    await typeInto(page.locator('#cg-numbers-absent'), '3, 7');
   };
 
   test('before the shuffle, every number waits and the absent ones are marked', async ({
@@ -1398,7 +1397,7 @@ test.describe('absent students on the board (#999)', () => {
       ['F', 'Dev'],
     ]);
     await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
-    await typeInto(page, '#cg-size', '2');
+    await typeInto(page.locator('#cg-size'), '2');
     await page.locator('#cg-board-open').click();
     await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
       'Number 2 is absent.',
@@ -1410,8 +1409,8 @@ test.describe('absent students on the board (#999)', () => {
 
   test('nobody absent: no sentence and no marked number', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await typeInto(page, '#cg-count', '10');
-    await typeInto(page, '#cg-size', '5');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '5');
     await page.locator('#cg-board-open').click();
     await expect(board(page).locator('.waiting-student')).toHaveCount(10);
     await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
@@ -1462,7 +1461,7 @@ test.describe('absent students on the board (#999)', () => {
       ['F', 'Dev'],
     ]);
     await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
-    await typeInto(page, '#cg-size', '2');
+    await typeInto(page.locator('#cg-size'), '2');
     await chooseSpeed(page, 'skip');
     await page.locator('#cg-board-open').click();
     await page
@@ -1488,8 +1487,8 @@ test.describe('absent students on the board (#999)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await typeInto(page, '#cg-count', '8');
-    await typeInto(page, '#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '8');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.locator('#cg-board-open').click();
     await page

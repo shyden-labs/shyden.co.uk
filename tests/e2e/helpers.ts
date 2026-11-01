@@ -730,16 +730,3 @@ export const formTextsUnderAA = async (
   }
   return { failing, read };
 };
-
-/**
- * Real typing (global rule, 2026-10-31): the field is clicked, what it holds
- * is selected and deleted with the keyboard, and each key is pressed. No
- * `fill()`, which sets the value without a key ever going down.
- */
-export const typeInto = async (page: Page, selector: string, text: string) => {
-  const field = page.locator(selector);
-  await field.click();
-  await field.press('ControlOrMeta+a');
-  await field.press('Backspace');
-  await field.pressSequentially(text);
-};
