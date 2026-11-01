@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { chooseSpeed, makeGroups } from '../make-groups';
 import {
@@ -11,7 +12,6 @@ import {
   holdFirstGrantUntilTheNext,
   holdTheTidyUpExit,
   openWaitingBoard,
-  typeInto,
   contrastRatio,
 } from './helpers';
 import { searched } from '../source-files';
@@ -101,12 +101,12 @@ test.describe('the projector view', () => {
     await page.goto('/classroom-groups');
     await expect(go).toBeEnabled();
     await expect(open).toBeVisible();
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '26');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
     await expect(go).toBeDisabled();
     await expect(openEvenHidden).toHaveCount(1);
     await expect(openEvenHidden).toBeHidden();
-    await page.fill('#cg-numbers-absent', '7');
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
     await expect(go).toBeEnabled();
     await expect(open).toBeVisible();
   });
@@ -514,7 +514,7 @@ test.describe('the board before a shuffle (#743)', () => {
       ['M', 'Eli'],
       ['F', 'Fay'],
     ]);
-    await page.fill('#cg-size', '3');
+    await typeInto(page.locator('#cg-size'), '3');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page)).toBeVisible();
     await expect(board(page).locator('#cg-results-h')).toHaveText(
@@ -556,8 +556,8 @@ test.describe('the board before a shuffle (#743)', () => {
 
   test('a bare count waits by number alone', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page).locator('.group h3')).toHaveText([
       'Group 1',
@@ -574,8 +574,8 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.getByRole('button', { name: 'Full screen' }).click();
     // Nothing has been shuffled yet, so the board's button says what the
@@ -598,7 +598,7 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '10');
+    await typeInto(page.locator('#cg-count'), '10');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await expect(board(page)).toBeVisible();
     await page.keyboard.press('Escape');
@@ -616,8 +616,8 @@ test.describe('the board before a shuffle (#743)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '0');
-    await page.fill('#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '0');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.getByRole('button', { name: 'Full screen' }).click();
     await bar(page).getByRole('button', { name: 'Make Groups' }).click();
@@ -1355,9 +1355,9 @@ test.describe('absent students on the board (#999)', () => {
     path = '/classroom-groups',
   ) => {
     await page.goto(path);
-    await typeInto(page, '#cg-count', '12');
-    await typeInto(page, '#cg-size', '4');
-    await typeInto(page, '#cg-numbers-absent', '3, 7');
+    await typeInto(page.locator('#cg-count'), '12');
+    await typeInto(page.locator('#cg-size'), '4');
+    await typeInto(page.locator('#cg-numbers-absent'), '3, 7');
   };
 
   test('before the shuffle, every number waits and the absent ones are marked', async ({
@@ -1397,7 +1397,7 @@ test.describe('absent students on the board (#999)', () => {
       ['F', 'Dev'],
     ]);
     await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
-    await typeInto(page, '#cg-size', '2');
+    await typeInto(page.locator('#cg-size'), '2');
     await page.locator('#cg-board-open').click();
     await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
       'Number 2 is absent.',
@@ -1409,8 +1409,8 @@ test.describe('absent students on the board (#999)', () => {
 
   test('nobody absent: no sentence and no marked number', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await typeInto(page, '#cg-count', '10');
-    await typeInto(page, '#cg-size', '5');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '5');
     await page.locator('#cg-board-open').click();
     await expect(board(page).locator('.waiting-student')).toHaveCount(10);
     await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
@@ -1461,7 +1461,7 @@ test.describe('absent students on the board (#999)', () => {
       ['F', 'Dev'],
     ]);
     await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
-    await typeInto(page, '#cg-size', '2');
+    await typeInto(page.locator('#cg-size'), '2');
     await chooseSpeed(page, 'skip');
     await page.locator('#cg-board-open').click();
     await page
@@ -1487,8 +1487,8 @@ test.describe('absent students on the board (#999)', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await typeInto(page, '#cg-count', '8');
-    await typeInto(page, '#cg-size', '4');
+    await typeInto(page.locator('#cg-count'), '8');
+    await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
     await page.locator('#cg-board-open').click();
     await page

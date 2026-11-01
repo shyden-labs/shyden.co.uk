@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
 import type { Page } from '@playwright/test';
@@ -136,8 +137,8 @@ test.describe('screen-reader announcements', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '26');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
 
     const problem = page.locator('#cg-numbers-problem');
     await expect(problem).toBeVisible();
@@ -163,7 +164,7 @@ test.describe('screen-reader announcements', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '300');
+    await typeInto(page.locator('#cg-count'), '300');
     await page.locator('#cg-students-toggle').click();
 
     const limit = page.locator('#cg-students-limit');
@@ -234,7 +235,7 @@ test.describe('screen-reader announcements', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '0');
+    await typeInto(page.locator('#cg-count'), '0');
     await page.click('#cg-go');
     await expect(page.locator('#cg-error')).toBeVisible();
 

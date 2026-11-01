@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -147,7 +148,7 @@ test.describe('the copy the operator approved on #161', () => {
         tool.locator('#cg-results'),
       );
 
-      await tool.getByLabel(t.classLabel, { exact: true }).fill('6A');
+      await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
       await go.click();
       await expectVisibleText(
         heading,
@@ -190,7 +191,7 @@ test.describe('the copy the operator approved on #161', () => {
 
       // Named for a class, as a teacher's list is: the file then opens with
       // the class comment, and the header is its second line.
-      await tool.getByLabel(t.classLabel, { exact: true }).fill('6A');
+      await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
       await tool.locator('#cg-io-toggle').click();
       const file = await downloadText(tool, t.ioExportClassList);
       // The header CELLS, compared exactly: a header word is a parsing token,

@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { randomUUID } from 'node:crypto';
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { asPublished, evidencePageOf } from '../evidence-fixture';
@@ -1331,7 +1332,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     await toggleAndWait(page, ADDED);
     await writtenAfter(
       page,
-      () => page.locator('#note').fill('the sixth journey looks right'),
+      () => typeInto(page.locator('#note'), 'the sixth journey looks right'),
       'the note',
     );
     expect(await storedTicks(page), 'the tick was stored').toEqual([ADDED_ID]);

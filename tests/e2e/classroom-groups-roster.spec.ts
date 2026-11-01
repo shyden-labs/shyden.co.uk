@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { recordErrors } from './recorders';
@@ -130,7 +131,7 @@ test.describe('the roster table', () => {
           .locator('#cg-roster tbody tr')
           .nth(row)
           .getByLabel(t.rosterColName, { exact: true });
-      await nameBox(0).fill('Sebastianus');
+      await typeInto(nameBox(0), 'Sebastianus');
       const a = (await nameBox(0).boundingBox())!;
       const b = (await nameBox(1).boundingBox())!;
       expect(b.width).toBeCloseTo(a.width, 0);
@@ -142,11 +143,10 @@ test.describe('the roster table', () => {
     async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await openRoster(page);
-      await page
-        .locator('#cg-roster tbody tr')
-        .nth(0)
-        .getByLabel('Name')
-        .fill('Maria Anastasia Wijayanti');
+      await typeInto(
+        page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
+        'Maria Anastasia Wijayanti',
+      );
       await expectNoHorizontalScroll(page);
     },
   );
@@ -226,7 +226,7 @@ test.describe('the roster table', () => {
     await openRoster(page);
     await addSeveral(page, 3);
     const row = page.locator('.cg-student').first();
-    await row.getByLabel('Name').fill('Ana');
+    await typeInto(row.getByLabel('Name'), 'Ana');
     await row.getByLabel('Sex').selectOption('F');
     await row.getByLabel('Absent').check();
     await row.getByLabel('Together').selectOption('A');
@@ -263,7 +263,7 @@ test.describe('numbers', () => {
   }) => {
     await openRoster(page);
     const first = page.locator('.cg-student').first().getByLabel('#');
-    await first.fill('50');
+    await typeInto(first, '50');
     await expect(first).toHaveValue('50');
     // Proves the override reached the actual roster, not just the visible
     // input: the next student added takes one past 50, not one past 1.
@@ -350,8 +350,8 @@ test.describe('an absent student', () => {
     // Absent itself is the field that made the row absent. Counted off the
     // row, so a seventh field fails here until it is edited below too.
     await expect(row.locator('input, select')).toHaveCount(6);
-    await row.getByLabel('#', { exact: true }).fill('7');
-    await row.getByLabel('Name').fill('Dewi');
+    await typeInto(row.getByLabel('#', { exact: true }), '7');
+    await typeInto(row.getByLabel('Name'), 'Dewi');
     await row.getByLabel('Sex').selectOption('F');
     await row.getByLabel('Together').selectOption('A');
     await row.getByLabel('Apart').selectOption('A');
@@ -555,11 +555,10 @@ test.describe('the roster is never persisted', () => {
   }) => {
     await openRoster(page);
     await addSeveral(page, 2);
-    await page
-      .locator('.cg-student')
-      .first()
-      .getByLabel('Name')
-      .fill('PrivacyProbeStudentName');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'PrivacyProbeStudentName',
+    );
     await expectNothingStored(
       page,
       'after typing a name',
@@ -586,7 +585,10 @@ test.describe('headers follow the roster, live', () => {
 
   test('and counts a named student once one is named', async ({ page }) => {
     await openRoster(page);
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Ana');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Ana',
+    );
     await expect(page.locator('#cg-students-toggle')).toHaveText(
       'Student details · 1 named',
     );
@@ -614,16 +616,15 @@ test.describe('headers follow the roster, live', () => {
     [
       'a name',
       (page) =>
-        page.locator('.cg-student').first().getByLabel('Name').fill('Ana'),
+        typeInto(page.locator('.cg-student').first().getByLabel('Name'), 'Ana'),
     ],
     [
       'a number',
       (page) =>
-        page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('#', { exact: true })
-          .fill('9'),
+        typeInto(
+          page.locator('.cg-student').first().getByLabel('#', { exact: true }),
+          '9',
+        ),
     ],
     [
       'a sex',
@@ -729,7 +730,7 @@ test.describe('validation as it is typed', () => {
   test('a duplicate number is refused as it is typed', async ({ page }) => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('1');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
     // and before the button is ever pressed
     await expect(
@@ -759,7 +760,7 @@ test.describe('validation as it is typed', () => {
   test('a gap warns but does not block', async ({ page }) => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('4');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.getByText(/looks incomplete/)).toBeVisible();
     await giveEveryoneASex(page);
     const go = page.getByRole('button', { name: 'Make groups' });
@@ -777,9 +778,12 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Eko');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Eko',
+    );
     await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('1');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(
       page.getByText(
         'Number 1 is already used by Eko. Every student needs their own.',
@@ -800,7 +804,7 @@ test.describe('validation as it is typed', () => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
     const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
-    await secondNumber.fill('1');
+    await typeInto(secondNumber, '1');
     await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
     await expect(secondNumber).toBeFocused();
     await expect(secondNumber).toHaveValue('1');
@@ -816,7 +820,7 @@ test.describe('validation as it is typed', () => {
   }) => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('1');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.locator('#cg-roster-problem')).toHaveAttribute(
       'role',
       'alert',
@@ -832,7 +836,7 @@ test.describe('validation as it is typed', () => {
   }) => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('4');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.locator('#cg-roster-warning')).toHaveAttribute(
       'role',
       'status',
@@ -849,7 +853,7 @@ test.describe('validation as it is typed', () => {
     }) => {
       await openRoster(page);
       await page.getByRole('button', { name: 'Add student' }).click();
-      await page.locator('.cg-student').nth(1).getByLabel('#').fill('4');
+      await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
       const warning = page.locator('#cg-roster-warning');
       await expect(warning).toBeVisible();
       await expect(warning).toContainText('Your class list looks incomplete.');
@@ -873,11 +877,11 @@ test.describe('validation as it is typed', () => {
     await openRoster(page);
     await page.getByRole('button', { name: 'Add student' }).click();
     const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
-    await secondNumber.fill('1');
+    await typeInto(secondNumber, '1');
     await expect(
       page.getByRole('button', { name: 'Make groups' }),
     ).toBeDisabled();
-    await secondNumber.fill('2');
+    await typeInto(secondNumber, '2');
     await expect(page.getByText(/Number 1 is already used/)).toBeHidden();
     await giveEveryoneASex(page);
     await expect(
@@ -926,7 +930,7 @@ test.describe('adding, removing, and the two limits', () => {
 
   test('a new student takes one past the highest', async ({ page }) => {
     await openRoster(page);
-    await page.locator('.cg-student').first().getByLabel('#').fill('5');
+    await typeInto(page.locator('.cg-student').first().getByLabel('#'), '5');
     await page.getByRole('button', { name: 'Add student' }).click();
     await expect(
       page.locator('.cg-student').nth(1).getByLabel('#'),
@@ -941,7 +945,7 @@ test.describe('adding, removing, and the two limits', () => {
   }) => {
     await openRoster(page);
     await addSeveral(page, 3); // rows #1, 2, 3, 4
-    await page.locator('.cg-student').nth(3).getByLabel('#').fill('5'); // now 1, 2, 3, 5 -- a real gap at 4
+    await typeInto(page.locator('.cg-student').nth(3).getByLabel('#'), '5'); // now 1, 2, 3, 5 -- a real gap at 4
     await page.getByRole('button', { name: 'Add student' }).click();
     await expect(
       page.locator('.cg-student').nth(4).getByLabel('#'),
@@ -989,7 +993,7 @@ test.describe('adding, removing, and the two limits', () => {
     await openRoster(page);
     await addSeveral(page, 89);
     await page.getByRole('button', { name: 'Add several' }).click();
-    await page.getByLabel('How many to add?').fill('20');
+    await typeInto(page.getByLabel('How many to add?'), '20');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(
       page.getByText('There is room for 10 more students.'),
@@ -1003,7 +1007,7 @@ test.describe('adding, removing, and the two limits', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Number of students').fill('300');
+    await typeInto(page.getByLabel('Number of students'), '300');
     await page.locator('#cg-students-toggle').click();
     await expect(
       page.getByText(
@@ -1027,12 +1031,12 @@ test.describe('adding, removing, and the two limits', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Number of students').fill('300');
+    await typeInto(page.getByLabel('Number of students'), '300');
     await page.locator('#cg-students-toggle').click();
     await expect(
       page.getByText('Student details holds up to 100 students.'),
     ).toBeVisible();
-    await page.getByLabel('Number of students').fill('50');
+    await typeInto(page.getByLabel('Number of students'), '50');
     await page.locator('#cg-students-toggle').click();
     await expect(
       page.getByRole('button', { name: 'Add student' }),
@@ -1090,7 +1094,7 @@ test.describe('removing a student', () => {
     await openRoster(page);
     await addSeveral(page, 2); // three rows: 1, 2, 3
     const rows = page.locator('.cg-student');
-    await rows.nth(0).getByLabel('Name').fill('Ana');
+    await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
     await rows.nth(1).getByRole('button', { name: 'Remove' }).click();
     await expect(page.locator('.cg-student')).toHaveCount(2);
     await expect(
@@ -1222,8 +1226,8 @@ test.describe('the Students box becomes a read-out', () => {
 
     // Refused FIRST, so the lock below is a transition away from a standing
     // refusal rather than a state the page started in.
-    await page.fill('#cg-count', '25');
-    await page.fill('#cg-numbers-absent', '26');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
     await expect(problem).toBeVisible();
     await expect(go).toBeDisabled();
 
@@ -1243,11 +1247,10 @@ test.describe('the Students box becomes a read-out', () => {
     );
 
     // A keystroke in the roster reaches the form's delegated listener.
-    await page
-      .locator('#cg-roster tbody tr')
-      .nth(0)
-      .getByLabel('Name')
-      .fill('Ana');
+    await typeInto(
+      page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
+      'Ana',
+    );
     await expect(problem).toBeHidden();
     await expect(go).toBeEnabled();
 
@@ -1466,7 +1469,7 @@ test.describe('Indonesian', () => {
   }) => {
     await openRoster(page, '/id/classroom-groups');
     await page.getByRole('button', { name: 'Tambah siswa' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('1');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.getByText(/Nomor 1 sudah dipakai/)).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Buat Kelompok' }),
@@ -1497,7 +1500,7 @@ test.describe('Indonesian', () => {
   test('a gap warns but does not block, in Indonesian', async ({ page }) => {
     await openRoster(page, '/id/classroom-groups');
     await page.getByRole('button', { name: 'Tambah siswa' }).click();
-    await page.locator('.cg-student').nth(1).getByLabel('#').fill('4');
+    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.getByText(/tampak belum lengkap/)).toBeVisible();
     await giveEveryoneASex(page);
     const go = page.getByRole('button', { name: 'Buat Kelompok' });
@@ -1513,7 +1516,7 @@ test.describe('Indonesian', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('300');
+    await typeInto(page.getByLabel('Jumlah siswa'), '300');
     await page.locator('#cg-students-toggle').click();
     await expect(
       page.getByText(
@@ -1555,7 +1558,7 @@ test.describe('Indonesian', () => {
     await openRoster(page, '/id/classroom-groups');
     await addSeveral(page, 89);
     await page.getByRole('button', { name: 'Tambah beberapa' }).click();
-    await page.getByLabel('Berapa yang ditambahkan?').fill('20');
+    await typeInto(page.getByLabel('Berapa yang ditambahkan?'), '20');
     await page.getByRole('button', { name: 'Tambah', exact: true }).click();
     await expect(
       page.getByText('Masih ada ruang untuk 10 siswa lagi.'),
@@ -1667,8 +1670,8 @@ for (const { name, width } of LAYOUTS) {
       await openRoster(page);
       const row = page.locator('.cg-student').first();
       // All six (#390 F133): this edited four, never the number or Apart.
-      await row.getByLabel('#', { exact: true }).fill('7');
-      await row.getByLabel('Name').fill('Ana');
+      await typeInto(row.getByLabel('#', { exact: true }), '7');
+      await typeInto(row.getByLabel('Name'), 'Ana');
       await row.getByLabel('Sex').selectOption('F');
       await row.getByLabel('Together').selectOption('A');
       await row.getByLabel('Apart').selectOption('A');
@@ -1701,8 +1704,8 @@ test('editing two different rows by text, neither of which re-renders on its own
   await openRoster(page);
   await addSeveral(page, 1);
   const rows = page.locator('.cg-student');
-  await rows.nth(0).getByLabel('Name').fill('Ana');
-  await rows.nth(1).getByLabel('Name').fill('Budi');
+  await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
+  await typeInto(rows.nth(1).getByLabel('Name'), 'Budi');
   await expect(rows.nth(0).getByLabel('Name')).toHaveValue('Ana');
   await expect(rows.nth(1).getByLabel('Name')).toHaveValue('Budi');
 });

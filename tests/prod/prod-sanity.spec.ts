@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import { deployedRoutes } from '../site-pages';
@@ -72,7 +73,7 @@ test('the Glory Points calculator computes, not just loads', async ({
   // The script is what makes this a calculator rather than a form. If the
   // bundle 404s after a partial deploy, the page still serves 200 and still
   // contains every label — and this is where that shows.
-  await page.fill('#glory-input', '1000');
+  await typeInto(page.locator('#glory-input'), '1000');
   await page.click('#glory-submit');
 
   // The handler fills exactly one of the two boxes. Wait for its answer,

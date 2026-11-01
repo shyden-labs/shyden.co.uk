@@ -1,3 +1,4 @@
+import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
@@ -795,7 +796,7 @@ test.describe('How to use', () => {
   test('only the preference is stored, never class data', async ({ page }) => {
     await page.goto('/classroom-groups');
     // Not 'How many students?' -- see the describe block's own comment.
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await page.getByRole('button', { name: 'How to use' }).click();
     const stored = await page.evaluate(() => ({ ...localStorage }));
     expect(Object.values(stored).join(' ')).not.toContain('12');
@@ -913,7 +914,7 @@ test.describe('How to use — Indonesian', () => {
 
   test('only the preference is stored, never class data', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
     await page.getByRole('button', { name: 'Cara menggunakan' }).click();
     const stored = await page.evaluate(() => ({ ...localStorage }));
     expect(Object.values(stored).join(' ')).not.toContain('12');
@@ -1466,7 +1467,7 @@ test.describe('Grouping options', () => {
     ]);
     await page.locator('#cg-grouping-toggle').click();
     await page.getByLabel('Keep boys and girls separate').check();
-    await page.getByLabel('Students in each group').fill('4');
+    await typeInto(page.getByLabel('Students in each group'), '4');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await expect(
@@ -1496,7 +1497,7 @@ test.describe('Grouping options', () => {
     ]);
     await page.locator('#cg-grouping-toggle').click();
     await page.getByLabel('Keep boys and girls separate').check();
-    await page.getByLabel('Students in each group').fill('4');
+    await typeInto(page.getByLabel('Students in each group'), '4');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make Groups' }).click();
     await expect(page.getByText(/have joined a group of boys/)).toBeVisible();
@@ -1630,7 +1631,7 @@ test.describe('Grouping options, live from the roster — Indonesian', () => {
       .getByLabel('Jenis kelamin')
       .selectOption('F');
     const dewi = page.locator('.cg-student').nth(2);
-    await dewi.getByLabel('Nama').fill('Dewi');
+    await typeInto(dewi.getByLabel('Nama'), 'Dewi');
     await dewi.getByLabel('Tidak hadir').check();
     await page.locator('#cg-grouping-toggle').click();
     await expect(
@@ -1811,7 +1812,7 @@ test.describe('the five the operator asked for', () => {
   test('the class size ceiling is 100', async ({ page }) => {
     await page.goto('/classroom-groups');
     await expect(page.locator('#cg-count')).toHaveAttribute('max', '100');
-    await page.locator('#cg-count').fill('101');
+    await typeInto(page.locator('#cg-count'), '101');
     await giveEveryoneASex(page);
     await page.getByRole('button', { name: 'Make groups' }).click();
     await expect(page.locator('#cg-error')).toContainText('The most is 100');
@@ -1889,7 +1890,7 @@ test.describe('the five the operator asked for', () => {
     await expect(go).toBeEnabled();
     // Editing anything ends the animation immediately rather than leaving a
     // half-dealt sheet: every card is landed.
-    await page.locator('#cg-class').fill('Year 9');
+    await typeInto(page.locator('#cg-class'), 'Year 9');
     await expect(page.locator('#cg-results .student:not(.dealt)')).toHaveCount(
       0,
     );
