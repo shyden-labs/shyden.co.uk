@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
@@ -38,7 +39,7 @@ test.describe('gift value calculator', () => {
     }) => {
       await page.goto(path);
       await typeInto(page.locator('#gift-input'), gift);
-      await page.click('#gift-submit');
+      await tapOn(page.locator('#gift-submit'));
       const t = path.startsWith('/id') ? id : en;
       await expectVisibleText(
         page.locator('#gift-result'),
@@ -50,7 +51,7 @@ test.describe('gift value calculator', () => {
   test('the two calculators do not share a result', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
     await typeInto(page.locator('#gift-input'), '1000');
-    await page.click('#gift-submit');
+    await tapOn(page.locator('#gift-submit'));
     await expect(page.locator('#glory-result')).toBeEmpty();
     await expect(page.locator('#glory-error')).toBeEmpty();
   });
@@ -58,10 +59,10 @@ test.describe('gift value calculator', () => {
   test('a result clears the earlier error', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
     await typeInto(page.locator('#gift-input'), 'abc');
-    await page.click('#gift-submit');
+    await tapOn(page.locator('#gift-submit'));
     await expect(page.locator('#gift-error')).not.toBeEmpty();
     await typeInto(page.locator('#gift-input'), '1000');
-    await page.click('#gift-submit');
+    await tapOn(page.locator('#gift-submit'));
     await expect(page.locator('#gift-result')).not.toBeEmpty();
     await expect(page.locator('#gift-error')).toBeEmpty();
   });
@@ -69,10 +70,10 @@ test.describe('gift value calculator', () => {
   test('an error clears the earlier result', async ({ page }) => {
     await page.goto('/yeetalk-calculators');
     await typeInto(page.locator('#gift-input'), '1000');
-    await page.click('#gift-submit');
+    await tapOn(page.locator('#gift-submit'));
     await expect(page.locator('#gift-result')).not.toBeEmpty();
     await typeInto(page.locator('#gift-input'), 'abc');
-    await page.click('#gift-submit');
+    await tapOn(page.locator('#gift-submit'));
     await expect(page.locator('#gift-result')).toBeEmpty();
   });
 });
@@ -110,7 +111,7 @@ test.describe('gift value — jump link', () => {
     await expect(jump).toHaveCount(1);
     await expect(jump).toBeVisible();
     await expect(jump).toHaveText(en.gift.heading);
-    await jump.click();
+    await tapOn(jump);
     await expect(page.locator('#gift-input')).toBeInViewport();
   });
 
@@ -152,7 +153,7 @@ test.describe('gift value — mobile-first layout', () => {
           await page.setViewportSize({ width, height: 900 });
           await page.goto(path);
           await typeInto(page.locator('#gift-input'), '1000000000');
-          await page.click('#gift-submit');
+          await tapOn(page.locator('#gift-submit'));
           await expect(page.locator('#gift-result')).not.toBeEmpty();
           await expectNoHorizontalScroll(page);
           // The worst overshoot past the card's edge, and how many boxes were

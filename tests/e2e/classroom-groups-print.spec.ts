@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import {
@@ -82,9 +83,9 @@ const changeOneAndReload = async (
   await openPrintPanel(page);
   const choice = (label: string) => panel(page).getByLabel(label);
   if (language.choices.find((c) => c.label === changed)!.radio)
-    await choice(changed).check();
-  else await choice(changed).uncheck();
-  await panel(page).getByRole('button', { name: language.cancel }).click();
+    await setCheckedOn(choice(changed));
+  else await setCheckedOn(choice(changed), false);
+  await tapOn(panel(page).getByRole('button', { name: language.cancel }));
 
   await page.reload();
   await withGroups(page, 2, language.path);
@@ -142,7 +143,7 @@ test.describe('the print panel', () => {
     await withGroups(page);
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openPrintPanel(page);
-    await panel(page).getByLabel('Class list').check();
+    await setCheckedOn(panel(page).getByLabel('Class list'));
     const stored = await page.evaluate(() =>
       JSON.stringify({ ...localStorage }),
     );
@@ -202,8 +203,8 @@ test.describe('the print panel', () => {
     });
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Group results').check();
-    await panel(page).getByRole('button', { name: 'Cancel' }).click();
+    await setCheckedOn(panel(page).getByLabel('Group results'));
+    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
 
     await page.reload();
     // No panel opened on this load at all.
@@ -216,8 +217,8 @@ test.describe('the print panel', () => {
   test('Cancel closes it and keeps the choices made', async ({ page }) => {
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Group results').check();
-    await panel(page).getByRole('button', { name: 'Cancel' }).click();
+    await setCheckedOn(panel(page).getByLabel('Group results'));
+    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
     await expect(page.locator('#cg-print-panel')).toBeHidden();
     await openPrintPanel(page);
     await expect(panel(page).getByLabel('Group results')).toBeChecked();
@@ -241,9 +242,9 @@ test.describe('the print panel', () => {
     });
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Class list').check();
-    await panel(page).getByLabel('Include avatars').uncheck();
-    await panel(page).getByRole('button', { name: 'Print' }).click();
+    await setCheckedOn(panel(page).getByLabel('Class list'));
+    await setCheckedOn(panel(page).getByLabel('Include avatars'), false);
+    await tapOn(panel(page).getByRole('button', { name: 'Print' }));
     const html = page.locator('html');
     await expect(html).toHaveAttribute('data-print-what', 'class-list');
     await expect(html).toHaveAttribute('data-print-avatars', 'off');
@@ -300,14 +301,16 @@ const sheet = async (
   },
 ) => {
   await openPrintPanel(page);
-  await panel(page).getByLabel(opts.what).check();
-  await panel(page)
-    .getByLabel('Show students who are absent')
-    .setChecked(opts.absent);
-  await panel(page)
-    .getByLabel('Show sex and the together/apart letters')
-    .setChecked(opts.letters);
-  await panel(page).getByLabel('Include avatars').setChecked(opts.avatars);
+  await setCheckedOn(panel(page).getByLabel(opts.what));
+  await setCheckedOn(
+    panel(page).getByLabel('Show students who are absent'),
+    opts.absent,
+  );
+  await setCheckedOn(
+    panel(page).getByLabel('Show sex and the together/apart letters'),
+    opts.letters,
+  );
+  await setCheckedOn(panel(page).getByLabel('Include avatars'), opts.avatars);
   // The Print button's last act is `window.print()`. Chromium headless makes
   // that a no-op, so a describe block that forgets the stub passes here and
   // hangs for 30s on Firefox, which opens a dialog Playwright cannot dismiss
@@ -321,7 +324,7 @@ const sheet = async (
     unstubbed,
     "window.print is not stubbed: add `await page.addInitScript(() => { window.print = () => {}; })` to this block's beforeEach",
   ).toBe(false);
-  await panel(page).getByRole('button', { name: 'Print' }).click();
+  await tapOn(panel(page).getByRole('button', { name: 'Print' }));
   await page.emulateMedia({ media: 'print' });
 };
 
@@ -498,7 +501,7 @@ test.describe('the printed class list', () => {
   // section. Without this a sheet asked for one could quietly carry both.
   test('Class list prints the roster and not the groups', async ({ page }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -513,7 +516,7 @@ test.describe('the printed class list', () => {
     page,
   }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -526,7 +529,7 @@ test.describe('the printed class list', () => {
 
   test('Both prints both', async ({ page }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Both',
       absent: true,
@@ -585,7 +588,7 @@ test.describe('the printed groups', () => {
   test('avatars on: faces print; off: names only', async ({ page }) => {
     await rosterWithAnAbsence(page);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -606,7 +609,7 @@ test.describe('the printed groups', () => {
   test('group results print minus absent students', async ({ page }) => {
     await rosterWithAnAbsence(page);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -627,7 +630,7 @@ test.describe('the printed groups', () => {
       ['M', 'Dedi'],
     ]);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     // The groups arrived before anything is judged legible (#424). The class
     // list prints these names too, so with the roster refused this read the
     // class list alone and passed with no groups on the sheet at all.
@@ -763,7 +766,7 @@ test.describe('the printed register after an edit', () => {
 
   const useTheSelects = async (row: import('@playwright/test').Locator) => {
     await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Absent').check();
+    await setCheckedOn(row.getByLabel('Absent'));
   };
 
   const CASES = [
@@ -795,7 +798,7 @@ test.describe('the printed register after an edit', () => {
       // A second row, because `refreshPrintMirrors` walks rows by index
       // against the live roster and an off-by-one there would look identical
       // to a correct single row.
-      await page.getByRole('button', { name: 'Add student' }).click();
+      await tapOn(page.getByRole('button', { name: 'Add student' }));
       const row = page.locator('.cg-student').nth(0);
       const second = page.locator('.cg-student').nth(1);
 
@@ -882,7 +885,7 @@ test.describe('the absent bookkeeping the printed register is built on', () => {
       .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-absent')));
 
   const tickAbsent = async (row: import('@playwright/test').Locator) => {
-    await row.getByLabel('Absent').check();
+    await setCheckedOn(row.getByLabel('Absent'));
   };
 
   /**
@@ -920,7 +923,7 @@ test.describe('the absent bookkeeping the printed register is built on', () => {
       // A second row for the same reason the column guard above keeps one:
       // `refreshPrintMirrors` walks rows by index against the live roster, and
       // an off-by-one there is invisible with a single row.
-      await page.getByRole('button', { name: 'Add student' }).click();
+      await tapOn(page.getByRole('button', { name: 'Add student' }));
       const row = page.locator('.cg-student').nth(0);
 
       for (const edit of edits) await edit(row);
@@ -988,7 +991,7 @@ test.describe('which columns reach paper is decided by name, not by position', (
       ['M', 'Ana'],
       ['F', 'Budi'],
     ]);
-    await page.locator('.cg-student').nth(0).getByLabel('Absent').check();
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -1014,7 +1017,7 @@ test.describe('which columns reach paper is decided by name, not by position', (
       ['M', 'Ana'],
       ['F', 'Budi'],
     ]);
-    await page.locator('.cg-student').nth(0).getByLabel('Absent').check();
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
     await sheet(page, {
       what: 'Class list',
       absent: false,
@@ -1075,7 +1078,7 @@ test.describe('which columns reach paper is decided by name, not by position', (
       ['M', 'Ana'],
       ['F', 'Budi'],
     ]);
-    await page.locator('.cg-student').nth(0).getByLabel('Absent').check();
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
     await sheet(page, {
       what: 'Class list',
       absent: false,

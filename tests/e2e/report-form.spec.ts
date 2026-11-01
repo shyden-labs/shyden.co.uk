@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -86,7 +87,7 @@ for (const locale of PREFIXED_LOCALES)
   }) => {
     await page.goto(pagePath('yeetalk-calculators', locale));
     const t = getSiteStrings(locale).report;
-    await page.locator('[data-report] summary').click();
+    await tapOn(page.locator('[data-report] summary'));
     for (const target of [
       page.locator('[data-report] summary'),
       page.getByLabel(t.quoteLabel, { exact: true }),
@@ -121,7 +122,7 @@ for (const locale of PREFIXED_LOCALES)
       async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 800 });
         await page.goto(pagePath(pageId, locale));
-        await page.locator('[data-report] summary').click();
+        await tapOn(page.locator('[data-report] summary'));
         await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
         await expectNoHorizontalScroll(page);
         // Page-level scrollWidth is not containment (CLAUDE.md): nothing in the
@@ -155,8 +156,8 @@ test('/vi/classroom-groups submits in place: failed shows, takes focus, and the 
   const tool = getStrings('vi');
   const t = getSiteStrings('vi').report;
   await page.goto(pagePath('classroom-groups', 'vi'));
-  await page.locator('#cg-students-toggle').click();
-  await page.getByRole('button', { name: tool.rosterAddStudent }).click();
+  await tapOn(page.locator('#cg-students-toggle'));
+  await tapOn(page.getByRole('button', { name: tool.rosterAddStudent }));
   await typeInto(
     page.locator('.cg-student').first().getByLabel(tool.rosterColName),
     'Lan',
@@ -165,9 +166,9 @@ test('/vi/classroom-groups submits in place: failed shows, takes focus, and the 
     () => ((window as unknown as { unreloaded: boolean }).unreloaded = true),
   );
 
-  await page.locator('[data-report] summary').click();
+  await tapOn(page.locator('[data-report] summary'));
   await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
-  await page.getByRole('button', { name: t.send }).click();
+  await tapOn(page.getByRole('button', { name: t.send }));
 
   const failed = page.locator('#report-failed');
   await expect(failed).toBeVisible();
@@ -217,7 +218,7 @@ test('/vi/classroom-groups: one report at a time, and Send comes back for the ne
     });
   });
   await page.goto(pagePath('classroom-groups', 'vi'));
-  await page.locator('[data-report] summary').click();
+  await tapOn(page.locator('[data-report] summary'));
   await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
   const send = page.getByRole('button', { name: t.send });
 
@@ -242,7 +243,7 @@ test('/vi/classroom-groups: one report at a time, and Send comes back for the ne
     page.waitForResponse((response) =>
       new URL(response.url()).pathname.endsWith('/api/report'),
     ),
-    send.click(),
+    tapOn(send),
   ]);
   expect(routed, 'two submissions at once sent more than one report').toBe(2);
 });
@@ -253,9 +254,9 @@ test('/vi/classroom-groups: sending a report makes no request off the site (AC11
   const seen = recordRequests(page);
   const t = getSiteStrings('vi').report;
   await page.goto(pagePath('classroom-groups', 'vi'));
-  await page.locator('[data-report] summary').click();
+  await tapOn(page.locator('[data-report] summary'));
   await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
-  await page.getByRole('button', { name: t.send }).click();
+  await tapOn(page.getByRole('button', { name: t.send }));
   await expect(page.locator('#report-failed')).toBeVisible();
   // Liveness by content: the report itself is among the requests seen.
   await expect
@@ -292,9 +293,9 @@ for (const [outcome, key] of [
       }),
     );
     await page.goto(pagePath('classroom-groups', 'vi'));
-    await page.locator('[data-report] summary').click();
+    await tapOn(page.locator('[data-report] summary'));
     await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
-    await page.getByRole('button', { name: t.send }).click();
+    await tapOn(page.getByRole('button', { name: t.send }));
     const shown = page.locator(`#report-${outcome}`);
     await expect(shown).toBeVisible();
     await expect(shown).toHaveText(t[key]);

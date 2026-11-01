@@ -1,3 +1,5 @@
+import { scrollToOn, tapOn } from '../real-touch';
+import { onRealDevice } from '../device/device-downloads';
 import { type Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { searched } from '../source-files';
@@ -55,7 +57,7 @@ const openEveryDisclosure = async (page: Page) => {
   for (let i = 0; i < (await toggles.count()); i += 1) {
     const toggle = toggles.nth(i);
     if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-      await toggle.click();
+      await tapOn(toggle);
     }
   }
 };
@@ -211,15 +213,21 @@ const affordances = async (page: Page): Promise<Population> => {
     // header (Header.astro:49): a control scrolled to the top sits under it
     // and the header legitimately wins the hit test. Both were measured
     // artefacts of the first probe (run 35521737392, every reading void).
-    await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    // On the phone a real finger drag brings it to the middle (#996), and
+    // there is no pointer to move: the reading below needs none.
+    if (onRealDevice()) await scrollToOn(control);
+    else
+      await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const box = await control.boundingBox();
     if (box === null) continue; // not rendered; nothing a pointer can reach
 
     // Move away first. Two controls can land on the SAME viewport point once
     // each is centred (`.switches` is a flex COLUMN), and a move to the point
     // the pointer already occupies fires nothing.
-    await page.mouse.move(0, 0);
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    if (!onRealDevice()) {
+      await page.mouse.move(0, 0);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    }
 
     reachable.push(
       await page.evaluate((id) => {

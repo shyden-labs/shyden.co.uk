@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -74,7 +75,7 @@ const openTool = async (
       .nth(row)
       .getByLabel('Together')
       .selectOption('A');
-  await page.locator('#cg-io-toggle').click();
+  await tapOn(page.locator('#cg-io-toggle'));
   const [, tool] = await Promise.all([
     page.waitForEvent('download'),
     context.waitForEvent('page'),
@@ -101,7 +102,7 @@ test.describe('the sentences corrected on #319', () => {
       const { tool } = await openTool(page, context, locale);
 
       // The how-to's second step names who is being split.
-      await tool.locator('#cg-howto-toggle').click();
+      await tapOn(tool.locator('#cg-howto-toggle'));
       const step = tool.locator('#cg-howto-body ol li').nth(1);
       await expectVisibleText(step, t.howToSteps[1]);
       await shoot(
@@ -111,7 +112,7 @@ test.describe('the sentences corrected on #319', () => {
       );
 
       // The leftover-student choices, under the grouping options.
-      await tool.locator('#cg-grouping-toggle').click();
+      await tapOn(tool.locator('#cg-grouping-toggle'));
       for (const [value, text] of [
         ['spread', t.leftoversSpread],
         ['bunch', t.leftoversBunch],
@@ -132,15 +133,17 @@ test.describe('the sentences corrected on #319', () => {
 
       // The section's own summary names each option chosen (#390).
       const summary = tool.locator('#cg-grouping-toggle .state');
-      await tool.locator('#cg-sex-mix').check();
+      await setCheckedOn(tool.locator('#cg-sex-mix'));
       await expectVisibleText(summary, t.stateMixed);
       await shoot(
         tool,
         `${locale}: mixing boys and girls reads “${t.stateMixed}”`,
         summary,
       );
-      await tool.locator('#cg-sex-mix').uncheck();
-      await tool.locator('input[name="leftovers"][value="bunch"]').check();
+      await setCheckedOn(tool.locator('#cg-sex-mix'), false);
+      await setCheckedOn(
+        tool.locator('input[name="leftovers"][value="bunch"]'),
+      );
       await expectVisibleText(summary, t.stateBunched);
       await shoot(
         tool,
@@ -157,11 +160,11 @@ test.describe('the sentences corrected on #319', () => {
       const { tool, rows, go, error } = await openTool(page, context, locale);
 
       // The grouping options arrive folded, and separate mode is one of them.
-      await tool.locator('#cg-grouping-toggle').click();
+      await tapOn(tool.locator('#cg-grouping-toggle'));
 
       // A mixed-sex together pair cannot make a single-sex group.
-      await tool.locator('#cg-sex-separate').check();
-      await go.click();
+      await setCheckedOn(tool.locator('#cg-sex-separate'));
+      await tapOn(go);
       await expectVisibleText(
         error,
         await listedByThisBrowser(
@@ -180,10 +183,10 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: a mixed-sex together pair is refused in separate mode`,
         error,
       );
-      await tool.locator('#cg-sex-separate').uncheck();
+      await setCheckedOn(tool.locator('#cg-sex-separate'), false);
 
       // The roster arrives folded; its rows are edited from here on.
-      await tool.locator('#cg-students-toggle').click();
+      await tapOn(tool.locator('#cg-students-toggle'));
       await expect(rows.first()).toBeVisible();
 
       // Four students on one together letter cannot fit a group of two.
@@ -193,7 +196,7 @@ test.describe('the sentences corrected on #319', () => {
           .getByLabel(t.rosterColTogether, { exact: true })
           .selectOption('A');
       await typeInto(tool.locator('#cg-size'), '2');
-      await go.click();
+      await tapOn(go);
       await expectVisibleText(
         error,
         renderError(
@@ -215,11 +218,10 @@ test.describe('the sentences corrected on #319', () => {
 
       // Everyone absent is the same refusal as nobody at all.
       for (let row = 0; row < NAMES.length; row++)
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColAbsent, { exact: true })
-          .check();
-      await go.click();
+        await setCheckedOn(
+          rows.nth(row).getByLabel(t.rosterColAbsent, { exact: true }),
+        );
+      await tapOn(go);
       await expectVisibleText(
         error,
         renderError({ code: ERROR_CODES.noStudents }, t),
@@ -239,9 +241,9 @@ test.describe('the sentences corrected on #319', () => {
       const { tool, go, error } = await openTool(page, context, locale);
 
       // Groups made, the print panel offers the group results and the letters.
-      await go.click();
+      await tapOn(go);
       await expect(error).toBeHidden();
-      await tool.locator('#cg-print-open').click();
+      await tapOn(tool.locator('#cg-print-open'));
       const panel = tool.locator('#cg-print-panel');
       await expect(panel).toBeVisible();
       await expectVisibleText(
@@ -267,8 +269,10 @@ test.describe('the sentences corrected on #319', () => {
       // Changing the leftovers choice makes those groups out of date, and the
       // notice names the choice in the words of its own label (#390).
       const stale = tool.locator('#cg-stale');
-      await tool.locator('#cg-grouping-toggle').click();
-      await tool.locator('input[name="leftovers"][value="bunch"]').check();
+      await tapOn(tool.locator('#cg-grouping-toggle'));
+      await setCheckedOn(
+        tool.locator('input[name="leftovers"][value="bunch"]'),
+      );
       await expectVisibleText(
         stale.locator('#cg-stale-text'),
         t.staleLeftovers,
@@ -278,7 +282,9 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: out of date because “${t.staleLeftovers}”`,
         stale,
       );
-      await tool.locator('input[name="leftovers"][value="spread"]').check();
+      await setCheckedOn(
+        tool.locator('input[name="leftovers"][value="spread"]'),
+      );
       await expect(stale).toHaveCount(1);
       await expect(stale).toBeHidden();
     });
@@ -291,7 +297,7 @@ test.describe('the sentences corrected on #319', () => {
       const { tool, rows } = await openTool(page, context, locale);
 
       // The roster arrives folded; its rows are edited from here on.
-      await tool.locator('#cg-students-toggle').click();
+      await tapOn(tool.locator('#cg-students-toggle'));
       await expect(rows.first()).toBeVisible();
 
       // A together pair that is also an apart pair is refused as it is typed.
@@ -335,7 +341,7 @@ test.describe('the sentences corrected on #319', () => {
       const listed = tool.locator('#cg-io-problems li');
 
       // A file in the page's own language, with one fault on every row.
-      await tool.locator('#cg-io-toggle').click();
+      await tapOn(tool.locator('#cg-io-toggle'));
       const faulty = [
         [columns.number, columns.name, columns.absent].join(','),
         `1,${NAMES[0]},?`,
@@ -420,11 +426,10 @@ test.describe('the sentences corrected on #319', () => {
     ]);
     const rows = page.locator('.cg-student');
     for (let row = 0; row < 2; row++)
-      await rows
-        .nth(row)
-        .getByLabel(t.rosterColAbsent, { exact: true })
-        .check();
-    await page.locator('#cg-go').click();
+      await setCheckedOn(
+        rows.nth(row).getByLabel(t.rosterColAbsent, { exact: true }),
+      );
+    await tapOn(page.locator('#cg-go'));
     const error = page.locator('#cg-error');
     await expectVisibleText(
       error,

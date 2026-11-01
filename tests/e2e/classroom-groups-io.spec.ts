@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recordErrors } from './recorders';
@@ -37,7 +38,7 @@ test.use(recorded);
  */
 
 const openIo = async (page: import('@playwright/test').Page) => {
-  await page.locator('#cg-io-toggle').click();
+  await tapOn(page.locator('#cg-io-toggle'));
 };
 
 test.describe('Import / export', () => {
@@ -113,7 +114,7 @@ test.describe('Import / export', () => {
     ]);
     await openIo(page);
     await upload(page, 'new.csv', 'number,name\n7,Gita\n');
-    await page.getByRole('button', { name: 'Replace it' }).click();
+    await tapOn(page.getByRole('button', { name: 'Replace it' }));
     await expect(page.locator('.cg-student')).toHaveCount(1);
     await expect(
       page.locator('.cg-student').first().getByLabel('Name'),
@@ -127,7 +128,7 @@ test.describe('Import / export', () => {
     ]);
     await openIo(page);
     await upload(page, 'new.csv', 'number,name\n7,Gita\n');
-    await page.getByRole('button', { name: 'Keep what I have' }).click();
+    await tapOn(page.getByRole('button', { name: 'Keep what I have' }));
     await expect(page.locator('.cg-student')).toHaveCount(2);
     await expect(
       page.locator('.cg-student').first().getByLabel('Name'),
@@ -190,7 +191,7 @@ test.describe('Import / export', () => {
       page.getByRole('button', { name: 'Export groups' }),
     ).toHaveCount(0);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(
       page.getByRole('button', { name: 'Export groups' }),
     ).toBeVisible();
@@ -268,7 +269,7 @@ test.describe('Import / export', () => {
     await rosterOf(page, 4);
     await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results-h')).toContainText('Year 7 / Set B');
     await expect(page.locator('#cg-results-h')).not.toContainText(
       'Year-7-Set-B',
@@ -306,7 +307,7 @@ test.describe('Import / export', () => {
     await rosterOf(page, 4);
     await typeInto(page.getByLabel('Students in each group'), '2');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await openIo(page);
     const text = await downloadText(page, 'Export groups');
     const lines = text.split('\n').filter(Boolean);
@@ -350,7 +351,7 @@ test.describe('Import / export', () => {
     // Student details is still COLLAPSED -- an import fills it but does not
     // open it, and a hidden input cannot be typed into. Opening it is the
     // same thing a teacher does, not a workaround.
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await typeInto(
       page.locator('.cg-student').first().getByLabel('Name'),
       'Anna',
@@ -396,7 +397,7 @@ test.describe('Import / export', () => {
 test.describe('Import / export — Indonesian', () => {
   test('the section carries its own controls, translated', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await expect(
       page.getByRole('button', { name: 'Ekspor daftar kelas' }),
     ).toBeVisible();
@@ -415,7 +416,7 @@ test.describe('Import / export — Indonesian', () => {
       ],
       '/id/classroom-groups',
     );
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const text = await downloadText(page, 'Ekspor daftar kelas');
     expect(text).toBe(
       'nomor,nama,jenis kelamin,tidak hadir,bersama,terpisah\n' +
@@ -428,7 +429,7 @@ test.describe('Import / export — Indonesian', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'ok.csv', 'nomor,nama\n1,Ana\n2,Budi\n');
     await expect(page.getByText('2 siswa diimpor.')).toBeVisible();
   });
@@ -437,7 +438,7 @@ test.describe('Import / export — Indonesian', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'english.csv', 'number,name\n1,Ana\n');
     await expect(page.getByText(/bahasa Inggris/)).toBeVisible();
     await expect(page.locator('.cg-student')).toHaveCount(0);
@@ -450,7 +451,7 @@ test.describe('Import / export — Indonesian', () => {
     await page.goto('/id/classroom-groups');
     await buildRoster(page, [['F', 'Ana']], '/id/classroom-groups');
     await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const name = await downloadName(page, 'Ekspor daftar kelas');
     expect(name).toBe(`7B-daftar-kelas-${todayISO()}.csv`);
   });
@@ -487,7 +488,7 @@ test.describe('exporting in both languages', () => {
         ['F', 'Ana'],
         ['M', 'Budi'],
       ]);
-      await page.locator('#cg-io-toggle').click();
+      await tapOn(page.locator('#cg-io-toggle'));
 
       const [download, newPage] = await Promise.all([
         page.waitForEvent('download'),
@@ -499,7 +500,7 @@ test.describe('exporting in both languages', () => {
       await newPage.waitForLoadState();
       expect(new URL(newPage.url()).pathname).toBe(to);
 
-      await newPage.locator('#cg-students-toggle').click();
+      await tapOn(newPage.locator('#cg-students-toggle'));
       await expect(newPage.locator('.cg-student')).toHaveCount(2);
       await expect(
         newPage
@@ -508,10 +509,10 @@ test.describe('exporting in both languages', () => {
           .getByLabel(/Name|Nama/),
       ).toHaveValue('Ana');
 
-      await newPage.locator('#cg-io-toggle').click();
+      await tapOn(newPage.locator('#cg-io-toggle'));
       const [second] = await Promise.all([
         newPage.waitForEvent('download'),
-        newPage.getByRole('button', { name: secondButton }).click(),
+        tapOn(newPage.getByRole('button', { name: secondButton })),
       ]);
       expect(second.suggestedFilename()).toContain(secondFile);
     });
@@ -526,14 +527,14 @@ test.describe('exporting in both languages', () => {
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await newPage.waitForLoadState();
-    await newPage.locator('#cg-students-toggle').click();
+    await tapOn(newPage.locator('#cg-students-toggle'));
     await expect(
       newPage.locator('.cg-student').first().getByLabel('Jenis kelamin'),
     ).toHaveValue('F');
@@ -552,14 +553,14 @@ test.describe('exporting in both languages', () => {
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await newPage.waitForLoadState();
-    await newPage.locator('#cg-students-toggle').click();
+    await tapOn(newPage.locator('#cg-students-toggle'));
     await expect(newPage.locator('.cg-student')).toHaveCount(1);
     for (const p of [page, newPage])
       await expectNothingStored(p, 'after the handover', 'Ana');
@@ -570,14 +571,14 @@ test.describe('exporting in both languages', () => {
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await newPage.waitForLoadState();
-    await newPage.locator('#cg-students-toggle').click();
+    await tapOn(newPage.locator('#cg-students-toggle'));
     await expect(newPage.locator('.cg-student')).toHaveCount(1);
     await expect(page.locator('.cg-student')).toHaveCount(1); // still there
     await expect(
@@ -593,7 +594,7 @@ test.describe('exporting in both languages', () => {
       window.open = () => null;
     });
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     // The file still saves -- a blocked pop-up must not cost a teacher the
     // export they actually asked for.
     const [download] = await Promise.all([
@@ -629,7 +630,7 @@ test.describe('exporting in both languages', () => {
       window.open = () => ({ closed: false }) as unknown as Window;
     });
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await Promise.all([
       page.waitForEvent('download'),
       handoverTo(page, 'Bahasa Indonesia'),
@@ -658,7 +659,7 @@ test.describe('exporting in both languages', () => {
       window.open = () => ({ closed: false }) as unknown as Window;
     });
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await Promise.all([
       page.waitForEvent('download'),
       handoverTo(page, 'Bahasa Indonesia'),
@@ -690,7 +691,7 @@ test.describe('exporting in both languages', () => {
       window.open = () => null;
     });
     await buildRosterAtPath(page, '/id/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await expect(
       page.getByText(
         'Berkas Anda tersimpan sekarang, dalam bahasa ini. Tab kedua akan ' +
@@ -717,7 +718,7 @@ test.describe('exporting in both languages', () => {
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const other = await context.newPage();
     // An ABSOLUTE url, built from the page under test. `context.newPage()`
     // carries no `baseURL` over a CDP connection to a real phone, so a
@@ -725,7 +726,7 @@ test.describe('exporting in both languages', () => {
     // real Android, where every other page in this suite comes from the
     // `page` fixture and never hits it.
     await other.goto(new URL('/id/classroom-groups', page.url()).href);
-    await other.locator('#cg-students-toggle').click();
+    await tapOn(other.locator('#cg-students-toggle'));
     await expect(other.locator('.cg-student')).toHaveCount(0);
     await expect(page.locator('.cg-student')).toHaveCount(1);
   });
@@ -752,7 +753,7 @@ test.describe('the handover destination is chosen, not assumed', () => {
     // since #22) and a bare locator would be a strict-mode violation rather
     // than an assertion. The list is one `<details>`, so shut is shut for all.
     await expect(page.locator('.cg-io-both-target').first()).toBeHidden();
-    await page.locator('#cg-io-both-toggle').click();
+    await tapOn(page.locator('#cg-io-both-toggle'));
     await expect(page.locator('.cg-io-both-target').first()).toBeVisible();
   });
 
@@ -761,7 +762,7 @@ test.describe('the handover destination is chosen, not assumed', () => {
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
     await openIo(page);
-    await page.locator('#cg-io-both-toggle').click();
+    await tapOn(page.locator('#cg-io-both-toggle'));
 
     // Derived from LOCALES: this asserted a count of 1 and the single name
     // 'Bahasa Indonesia', which was a fact about there being two languages
@@ -786,7 +787,7 @@ test.describe('the handover destination is chosen, not assumed', () => {
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
     await openIo(page);
-    await page.locator('#cg-io-both-toggle').click();
+    await tapOn(page.locator('#cg-io-both-toggle'));
 
     // `<use href="#flag-id">` resolving against a symbol the page defines is
     // what proves the picker and the header switcher draw the SAME shapes.
@@ -812,7 +813,7 @@ test.describe('the handover destination is chosen, not assumed', () => {
     await openIo(page);
     const summary = page.locator('#cg-io-both-toggle');
     await atLeast44(summary, '#cg-io-both-toggle');
-    await summary.click();
+    await tapOn(summary);
     const choices = page.locator('.cg-io-both-target');
     // `.all()` resolves to [] when nothing matches -- it neither waits nor
     // fails -- so without this count the loop below runs zero times and a
@@ -899,7 +900,7 @@ test.describe('the handover cannot be overheard', () => {
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
 
     // An ordinary third tab on the same origin, listening on BOTH the old
     // channel and its own window, and asking every way the protocol has
@@ -925,7 +926,7 @@ test.describe('the handover cannot be overheard', () => {
     ]);
     await receiver.waitForLoadState();
     // The legitimate receiver got it…
-    await receiver.locator('#cg-students-toggle').click();
+    await tapOn(receiver.locator('#cg-students-toggle'));
     await expect(receiver.locator('.cg-student')).toHaveCount(2);
 
     // …and the third tab got nothing, by any route. Asked again mid-flight
@@ -951,21 +952,21 @@ test.describe('the handover cannot be overheard', () => {
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, receiver] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await receiver.waitForLoadState();
-    await receiver.locator('#cg-students-toggle').click();
+    await tapOn(receiver.locator('#cg-students-toggle'));
     await expect(receiver.locator('.cg-student')).toHaveCount(1);
 
     // The hash is spent: it is gone from the URL, so a reload cannot make
     // this tab go looking for somebody's class list a second time.
     expect(new URL(receiver.url()).hash).toBe('');
     await receiver.reload();
-    await receiver.locator('#cg-students-toggle').click();
+    await tapOn(receiver.locator('#cg-students-toggle'));
     await expect(receiver.locator('.cg-student')).toHaveCount(0);
   });
 
@@ -977,7 +978,7 @@ test.describe('the handover cannot be overheard', () => {
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, receiver] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
@@ -1005,7 +1006,7 @@ test.describe('the handover cannot be overheard', () => {
     ]);
     await second.waitForLoadState();
     // The NEW tab takes it, because it is empty…
-    await second.locator('#cg-students-toggle').click();
+    await tapOn(second.locator('#cg-students-toggle'));
     await expect(second.locator('.cg-student')).toHaveCount(2);
     // …and the tab the teacher was working in is untouched.
     await expect(receiver.locator('.cg-student')).toHaveCount(3);

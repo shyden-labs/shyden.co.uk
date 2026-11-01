@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { randomUUID } from 'node:crypto';
 import type { Locator, Page, TestInfo } from '@playwright/test';
@@ -214,10 +215,11 @@ const tickBox = (page: Page, title: string) =>
 
 /** What a person clicks: the label around the tick, not the transparent input inside it. */
 const toggle = (page: Page, title: string) =>
-  journeySection(page, title)
-    .locator('label')
-    .filter({ has: page.getByRole('checkbox') })
-    .click();
+  tapOn(
+    journeySection(page, title)
+      .locator('label')
+      .filter({ has: page.getByRole('checkbox') }),
+  );
 
 /** Does what a person does, then waits for the page to write it and the store to confirm it. */
 async function writtenAfter(
@@ -1173,7 +1175,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     page,
   }, testInfo) => {
     await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    await writtenAfter(page, () => approveButton(page).click(), 'the approval');
+    await writtenAfter(page, () => tapOn(approveButton(page)), 'the approval');
     await expect(approveButton(page)).toHaveAttribute('aria-pressed', 'true');
     expect(
       await storedVerdict(page),
@@ -1211,7 +1213,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
 
     await writtenAfter(
       page,
-      () => approveButton(page).click(),
+      () => tapOn(approveButton(page)),
       'the approval given again',
     );
     await expectCurrent(page, approveButton(page));
@@ -1226,7 +1228,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     page,
   }, testInfo) => {
     await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    await writtenAfter(page, () => approveButton(page).click(), 'the approval');
+    await writtenAfter(page, () => tapOn(approveButton(page)), 'the approval');
     await republish(page, pageOf(TITLES));
     await expectCurrent(page, approveButton(page));
     expect(await storedVerdict(page)).toEqual({
@@ -1349,14 +1351,14 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     page,
   }, testInfo) => {
     await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    await writtenAfter(page, () => approveButton(page).click(), 'the approval');
+    await writtenAfter(page, () => tapOn(approveButton(page)), 'the approval');
     expect(await storedVerdict(page), 'given, it covers the page').toEqual({
       verdict: 'approved',
       covers: coveredBy(HTML),
     });
     await writtenAfter(
       page,
-      () => approveButton(page).click(),
+      () => tapOn(approveButton(page)),
       'the approval withdrawn',
     );
     await expect(approveButton(page)).toHaveAttribute('aria-pressed', 'false');
@@ -1476,7 +1478,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     );
     await toggle(page, ADDED);
     await expect(tickBox(page, ADDED)).toBeChecked();
-    await approveButton(page).click();
+    await tapOn(approveButton(page));
     await expectCurrent(page, approveButton(page));
     await expect(
       page.locator('#state'),
@@ -1625,7 +1627,7 @@ test.describe('release checks (#362)', () => {
     await expect(page.locator('#progress')).toHaveText(
       '0 of 7 journeys and checks reviewed',
     );
-    await box.check();
+    await setCheckedOn(box);
     await expect
       .poll(() => storedTicks(page), 'the store keeps the check ticked')
       .toEqual(['check-dev-home']);

@@ -1,3 +1,4 @@
+import { tapOn } from './real-touch';
 import type { Locator } from '@playwright/test';
 
 /**
@@ -12,7 +13,7 @@ import type { Locator } from '@playwright/test';
  * listeners count every `input` event.
  */
 export async function typeInto(field: Locator, text: string): Promise<void> {
-  await field.click();
+  await tapOn(field);
   if ((await field.inputValue()) !== '') {
     await field.press('ControlOrMeta+A');
     await field.press('Backspace');

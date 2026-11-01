@@ -1,3 +1,4 @@
+import { refuseMouseOnPhone } from '../device/no-mouse-on-phone';
 import {
   test as base,
   expect,
@@ -317,6 +318,8 @@ const realDeviceTest = base.extend<
     // Emulating it on each page applies the project's scheme, or a test's own
     // `test.use({ colorScheme })`, over CDP (Emulation.setEmulatedMedia).
     await page.emulateMedia({ colorScheme });
+    // A tap on the phone is a touch and a scroll a finger drag (#996).
+    refuseMouseOnPhone(page);
     // Every download a test causes must COMPLETE on the phone (#308). A test that checks only a
     // filename would otherwise pass over a download that never saved, which is how every export
     // in the phone run failed, `canceled` with 0 bytes, while its tests stayed green.

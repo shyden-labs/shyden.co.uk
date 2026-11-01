@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import {
   expect,
@@ -55,13 +56,13 @@ const stringsOf = (page: Page): Strings =>
  */
 export const openRoster = async (page: Page, path = '/classroom-groups') => {
   await page.goto(path);
-  await page.locator('#cg-students-toggle').click();
-  await page
-    .getByRole('button', {
+  await tapOn(page.locator('#cg-students-toggle'));
+  await tapOn(
+    page.getByRole('button', {
       name: stringsOf(page).rosterAddStudent,
       exact: true,
-    })
-    .click();
+    }),
+  );
 };
 
 /**
@@ -81,7 +82,7 @@ export const openWaitingBoard = async (
   // #744: a board Shuffle travels unless the speed is Skip, so a test that
   // presses it says which it means; left out, the page's default stands.
   if (speed) await chooseSpeed(page, speed);
-  await page.getByRole('button', { name: 'Full screen' }).click();
+  await tapOn(page.getByRole('button', { name: 'Full screen' }));
   await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
@@ -148,16 +149,16 @@ export const giveEveryoneASex = async (page: Page, sex: 'M' | 'F' = 'M') => {
 
 export const addSeveral = async (page: Page, howMany: number) => {
   const t = stringsOf(page);
-  await page
-    .getByRole('button', { name: t.rosterAddSeveral, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddSeveral, exact: true }),
+  );
   await typeInto(
     page.getByLabel(t.rosterHowMany, { exact: true }),
     String(howMany),
   );
-  await page
-    .getByRole('button', { name: t.rosterAddConfirm, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddConfirm, exact: true }),
+  );
 };
 
 /**
@@ -205,11 +206,12 @@ export const expectStudentsBoxReports = async (
  */
 export const markAbsent = async (page: Page, path = '/classroom-groups') => {
   await openRoster(page, path);
-  await page
-    .locator('.cg-student')
-    .first()
-    .getByLabel(stringsOf(page).rosterColAbsent)
-    .check();
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .first()
+      .getByLabel(stringsOf(page).rosterColAbsent),
+  );
 };
 
 export const setSex = async (page: Page, row: number, sex: 'M' | 'F') =>
@@ -270,9 +272,9 @@ export const withGroups = async (
 ) => {
   await rosterOf(page, n, path);
   // The page's own `makeGroups`, exactly, in whichever language it shows.
-  await page
-    .getByRole('button', { name: stringsOf(page).makeGroups, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: stringsOf(page).makeGroups, exact: true }),
+  );
   await expect(page.locator('#cg-results .group').first()).toBeVisible();
 };
 
@@ -318,7 +320,7 @@ export const downloadText = async (page: Page, button: string | RegExp) => {
   if (onRealDevice()) emptyDeviceDownloads();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
   if (onRealDevice()) return deviceDownloadText(download);
   const stream = await download.createReadStream();
@@ -330,7 +332,7 @@ export const downloadText = async (page: Page, button: string | RegExp) => {
 export const downloadName = async (page: Page, button: string | RegExp) => {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
   return download.suggestedFilename();
 };
@@ -375,11 +377,12 @@ export const rosterWithAnAbsence = async (page: Page) => {
     .nth(2)
     .getByLabel(/Apart/)
     .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(3)
-    .getByLabel(/Absent/)
-    .check();
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .nth(3)
+      .getByLabel(/Absent/),
+  );
 };
 
 /** Six boys and two girls — separate mode then cannot give the girls a group. */
@@ -394,8 +397,8 @@ export const rosterForSpillover = async (page: Page) => {
     ['F', 'Gita'],
     ['F', 'Hani'],
   ]);
-  await page.locator('#cg-grouping-toggle').click();
-  await page.getByLabel(/Keep boys and girls separate/).check();
+  await tapOn(page.locator('#cg-grouping-toggle'));
+  await setCheckedOn(page.getByLabel(/Keep boys and girls separate/));
   await typeInto(page.getByLabel(/Students in each group/), '4');
 };
 
@@ -404,10 +407,11 @@ export const namesIn = (text: string): string[] =>
 
 /** Open the print panel from the results section. */
 export const openPrintPanel = async (page: Page) => {
-  await page
-    .getByRole('button', { name: stringsOf(page).printOpen, exact: true })
-    .first()
-    .click();
+  await tapOn(
+    page
+      .getByRole('button', { name: stringsOf(page).printOpen, exact: true })
+      .first(),
+  );
   await expect(page.locator('#cg-print-panel')).toBeVisible();
 };
 
@@ -426,8 +430,8 @@ export const openPrintPanel = async (page: Page) => {
  * which a two-statement version would not.
  */
 export const handoverTo = async (page: Page, language: string | RegExp) => {
-  await page.locator('#cg-io-both-toggle').click();
-  await page.getByRole('button', { name: language }).click();
+  await tapOn(page.locator('#cg-io-both-toggle'));
+  await tapOn(page.getByRole('button', { name: language }));
 };
 
 /**
