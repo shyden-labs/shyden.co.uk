@@ -943,6 +943,10 @@ const sexWhyText = sexWhy(roster, t);
         hidden
       >
         <h3 id="cg-waiting-h">{t.boardWaiting}</h3>
+        {/* #999. Who is absent, said before the first shuffle, so the class
+             is not left wondering where a number went. After a deal
+             #cg-grouped-note says it instead. */}
+        <p class="absent-note" id="cg-waiting-absent" role="status" hidden></p>
         {/* A deal refused from the waiting board says why ON the board
              (#743 AC5); #cg-error, on the page, says it too. */}
         <p class="error" id="cg-waiting-error" role="alert" hidden></p>
@@ -950,6 +954,20 @@ const sexWhyText = sexWhy(roster, t);
       </section>
 
       <div class="tables" id="cg-tables"></div>
+
+      {/* #999. Under the groups after a deal: everyone absent, in the same
+           amber chips the waiting list marks them with. Filled by
+           classroom-groups.ts; shown on the full-screen board only (the
+           ruling was for the board), see the rule in the global styles. */}
+      <section
+        class="absent-row"
+        id="cg-absent"
+        aria-labelledby="cg-absent-h"
+        hidden
+      >
+        <h3 id="cg-absent-h">{t.rosterColAbsent}</h3>
+        <ul class="waiting-list" id="cg-absent-list"></ul>
+      </section>
     </section>
   </section>
 
@@ -1164,6 +1182,41 @@ const sexWhyText = sexWhy(roster, t);
   }
   #cg-results .waiting-student .number {
     font-variant-numeric: tabular-nums;
+  }
+  /* #999. An absent student, on the board: the page's warning amber (the
+     cream and border .roster-warning and .stale-notice use), the number in
+     a darker amber, and the word "absent" beside it so colour is never the
+     only signal. Every colour here is a literal no theme moves, so the ink
+     is a literal too (literal-grounds.test.ts); the rendered contrast is
+     measured in both themes by classroom-groups-projector.spec.ts. */
+  #cg-results .waiting-student.absent {
+    border-color: #956b1e;
+    background: #fff6e3;
+    color: #1a1a1a;
+  }
+  #cg-results .waiting-student.absent .number {
+    color: #7a5512;
+    font-weight: 700;
+  }
+  #cg-results .absent-tag {
+    font-size: 0.85em;
+    font-style: italic;
+  }
+  #cg-results .absent-note {
+    margin: 0 0 0.5rem;
+  }
+  /* The row is the board's: on the page and in print it stays out, since
+     #cg-grouped-note already says who is absent there. */
+  #cg-results .absent-row {
+    display: none;
+  }
+  .cg-board-stage #cg-results .absent-row:not([hidden]) {
+    display: block;
+    margin-block-start: 1rem;
+  }
+  .cg-board-stage #cg-results .absent-row h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
   }
   /* `.stale` on #cg-results, toggled by classroom-groups.ts's own
      `updateStaleness` (design spec section 8: "dimmed and badged"). Only

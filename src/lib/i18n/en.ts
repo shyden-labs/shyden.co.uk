@@ -701,6 +701,14 @@ export const en = {
   // that deal the board's Shuffle reads `makeGroups`, the page's own words,
   // since nothing has been shuffled yet to do "again".
   boardWaiting: 'Waiting to be grouped',
+  // #999. Before the first shuffle the board says who is absent, so the
+  // class is not left wondering where a number went (Shyden, 2026-10-31).
+  // After a shuffle `groupedNote` takes over. Plural on the count, like
+  // `groupedNote`, since one absentee is a real class.
+  boardAbsentNote:
+    '{absent, plural, one {Number {absent} is} other {Numbers {absent} are}} absent.' as Message<{
+      absent: number[];
+    }>,
 
   // Design spec section 8's rule, applied at the three places groups LEAVE
   // the screen. Three separate sentences, not one: each names the thing the

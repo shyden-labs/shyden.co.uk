@@ -219,6 +219,7 @@ export const th: Catalogue = {
   boardExit: 'ปิดโหมดเต็มหน้าจอ',
   boardShuffle: 'สุ่มใหม่',
   boardWaiting: 'กำลังรอการจัดกลุ่ม',
+  boardAbsentNote: 'หมายเลข {absent} ขาดเรียน',
   staleRefuseExport: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนที่จะบันทึก',
   staleRefusePrint: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนพิมพ์',
   staleRefuseBoard: 'กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนที่จะแสดงออกมา',

@@ -11,6 +11,8 @@ import {
   holdFirstGrantUntilTheNext,
   holdTheTidyUpExit,
   openWaitingBoard,
+  typeInto,
+  contrastRatio,
 } from './helpers';
 import { searched } from '../source-files';
 import { FLOOR_PX } from '../../src/scripts/projector';
@@ -1336,4 +1338,222 @@ test.describe('the projector board never hides a name', () => {
       page.locator('#cg-board'),
     );
   });
+});
+
+/**
+ * #999. Every number on the board, the absent ones in amber with the word
+ * "absent" beside them; before the first shuffle a sentence says who is
+ * absent, and after it a row under the groups lists them. Real clicks and
+ * key presses throughout (global rule, 2026-10-31).
+ */
+test.describe('absent students on the board (#999)', () => {
+  const board = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board #cg-results');
+
+  const absentClass = async (
+    page: import('@playwright/test').Page,
+    path = '/classroom-groups',
+  ) => {
+    await page.goto(path);
+    await typeInto(page, '#cg-count', '12');
+    await typeInto(page, '#cg-size', '4');
+    await typeInto(page, '#cg-numbers-absent', '3, 7');
+  };
+
+  test('before the shuffle, every number waits and the absent ones are marked', async ({
+    page,
+  }) => {
+    await absentClass(page);
+    await page.locator('#cg-board-open').click();
+    const waiting = board(page).locator('#cg-waiting-list .waiting-student');
+    await expect(waiting.locator('.number')).toHaveText(
+      Array.from({ length: 12 }, (_, i) => String(i + 1)),
+    );
+    const absent = board(page).locator('#cg-waiting-list .absent');
+    await expect(absent.locator('.number')).toHaveText(['3', '7']);
+    await expect(absent.locator('.absent-tag')).toHaveText([
+      'absent',
+      'absent',
+    ]);
+    await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+      'Numbers 3 and 7 are absent.',
+    );
+    // The word sits apart from the number on screen, not only in the text:
+    // a flex row discards a space between its children (the page's CLAUDE.md).
+    const [number, tag] = await Promise.all([
+      absent.first().locator('.number').boundingBox(),
+      absent.first().locator('.absent-tag').boundingBox(),
+    ]);
+    expect(tag!.x).toBeGreaterThan(number!.x + number!.width);
+  });
+
+  test('one absentee from the roster tick reads in the singular', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+    ]);
+    await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
+    await typeInto(page, '#cg-size', '2');
+    await page.locator('#cg-board-open').click();
+    await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+      'Number 2 is absent.',
+    );
+    const absent = board(page).locator('#cg-waiting-list .absent');
+    await expect(absent.locator('.number')).toHaveText(['2']);
+    await expect(absent.locator('.who')).toHaveText(['Ben']);
+  });
+
+  test('nobody absent: no sentence and no marked number', async ({ page }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page, '#cg-count', '10');
+    await typeInto(page, '#cg-size', '5');
+    await page.locator('#cg-board-open').click();
+    await expect(board(page).locator('.waiting-student')).toHaveCount(10);
+    await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
+    await expect(board(page).locator('.waiting-student.absent')).toHaveCount(0);
+  });
+
+  test('after the shuffle an Absent row under the groups lists them', async ({
+    page,
+  }) => {
+    await absentClass(page);
+    await chooseSpeed(page, 'skip');
+    await page.locator('#cg-board-open').click();
+    await page
+      .locator('#cg-board-bar')
+      .getByRole('button', { name: 'Make groups' })
+      .click();
+    await expect(board(page).locator('.group .student')).toHaveCount(10);
+    const row = board(page).locator('#cg-absent');
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('heading', { name: 'Absent' })).toBeVisible();
+    await expect(row.locator('.number')).toHaveText(['3', '7']);
+    await expect(row.locator('.absent-tag')).toHaveText(['absent', 'absent']);
+    // Under the groups, as ruled.
+    const [lastGroup, rowBox] = await Promise.all([
+      board(page).locator('.group').last().boundingBox(),
+      row.boundingBox(),
+    ]);
+    expect(rowBox!.y).toBeGreaterThanOrEqual(lastGroup!.y + lastGroup!.height);
+    // The grouped note takes over from the waiting sentence.
+    await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
+    await expect(board(page).locator('#cg-grouped-note')).toHaveText(
+      '10 of 12 grouped — numbers 3 and 7 are absent.',
+    );
+    // The row is the board's: back on the page it is not shown.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await expect(page.locator('#cg-absent')).toBeHidden();
+  });
+
+  test('a rename after the shuffle reaches the Absent row', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+    ]);
+    await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
+    await typeInto(page, '#cg-size', '2');
+    await chooseSpeed(page, 'skip');
+    await page.locator('#cg-board-open').click();
+    await page
+      .locator('#cg-board-bar')
+      .getByRole('button', { name: 'Make groups' })
+      .click();
+    const row = board(page).locator('#cg-absent');
+    await expect(row.locator('.who')).toHaveText(['Ben']);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    const name = page
+      .locator('.cg-student')
+      .nth(1)
+      .getByLabel('Name', { exact: true });
+    await name.click();
+    await name.press('ControlOrMeta+a');
+    await name.pressSequentially('Bea');
+    await page.locator('#cg-board-open').click();
+    await expect(row.locator('.who')).toHaveText(['Bea']);
+  });
+
+  test('after a shuffle with nobody absent there is no Absent row', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page, '#cg-count', '8');
+    await typeInto(page, '#cg-size', '4');
+    await chooseSpeed(page, 'skip');
+    await page.locator('#cg-board-open').click();
+    await page
+      .locator('#cg-board-bar')
+      .getByRole('button', { name: 'Make groups' })
+      .click();
+    await expect(board(page).locator('.group .student')).toHaveCount(8);
+    await expect(board(page).locator('#cg-absent')).toBeHidden();
+  });
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`an absent chip clears AA in the ${scheme} theme`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await absentClass(page);
+      await page.locator('#cg-board-open').click();
+      const chip = board(page).locator('#cg-waiting-list .absent').first();
+      await expect(chip).toBeVisible();
+      expect(
+        await contrastRatio(chip.locator('.number')),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        await contrastRatio(chip.locator('.absent-tag')),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  test(
+    'at 320px the marked board does not scroll sideways',
+    { tag: '@emulated-viewport' },
+    async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await absentClass(page);
+      await page.locator('#cg-board-open').click();
+      await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+      // Containment, not only the page: every chip inside the board's stage.
+      const stage = await page.locator('#cg-board-stage').boundingBox();
+      for (const box of await board(page)
+        .locator('#cg-waiting-list .waiting-student')
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
+        expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
+    },
+  );
+
+  const sentences = {
+    en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
+    id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
+    zh: ['/zh/classroom-groups', '3和7 号缺席。'],
+    vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],
+    th: ['/th/classroom-groups', 'หมายเลข 3และ7 ขาดเรียน'],
+  } as const;
+  for (const [locale, [path, sentence]] of Object.entries(sentences)) {
+    test(`the board says who is absent in ${locale}`, async ({ page }) => {
+      await absentClass(page, path);
+      await page.locator('#cg-board-open').click();
+      await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+        sentence,
+      );
+    });
+  }
 });
