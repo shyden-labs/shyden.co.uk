@@ -28,6 +28,8 @@ export const WDA_READY_CEILING_MS = 180_000;
 /** A build from nothing: measured ~2 min on 2026-10-18 and 2026-10-31. */
 export const WDA_BUILD_CEILING_MS = 900_000;
 export const WDA_STOP_CEILING_MS = 10_000;
+/** /status answered in 5-90 ms over the tunnel on 2026-11-02. */
+const WDA_ANSWER_CEILING_MS = 10_000;
 const DEVICECTL_CEILING_MS = 15_000;
 const WDA_PORT = 8100;
 
@@ -98,6 +100,7 @@ function alive(udid) {
  *   findXctestrun?: (productsDir: string) => string | null,
  *   hasSource?: (srcDir: string) => boolean,
  *   alive?: (udid: string) => string | null | Promise<string | null>,
+ *   answers?: (url: string) => Promise<void>,
  * }} options
  * @returns {Promise<{ url: string, stop(): Promise<void> }>}
  */
@@ -112,6 +115,7 @@ export async function startWda({
   hasSource = (srcDir) =>
     existsSync(path.join(srcDir, 'WebDriverAgent.xcodeproj')),
   alive: isAlive = alive,
+  answers = wdaAnswers,
 }) {
   const leftover = await isAlive(udid);
   if (leftover !== null)
@@ -160,14 +164,6 @@ export async function startWda({
         `WebDriverAgent built, but no WebDriverAgentRunner_iphoneos*.xctestrun is in ${products}`,
       );
   }
-
-  const tunnel = parseTunnelAddress(
-    await runCommand(
-      'xcrun',
-      ['devicectl', 'device', 'info', 'details', '--device', udid],
-      { timeoutMs: DEVICECTL_CEILING_MS },
-    ),
-  );
 
   const child = spawn('xcodebuild', [
     'test-without-building',
@@ -229,8 +225,8 @@ export async function startWda({
     );
   });
 
-  return {
-    url: `http://[${tunnel}]:${WDA_PORT}`,
+  const handle = {
+    url: '',
     async stop() {
       if (!exited) {
         child.kill('SIGTERM');
@@ -255,4 +251,46 @@ export async function startWda({
         );
     },
   };
+
+  // The tunnel is read only now, after the ready line. Measured 2026-11-02:
+  // an address read before xcodebuild started answered EHOSTUNREACH once WDA
+  // was up, while a read made here brings the tunnel back and it then answered
+  // every call, busy and idle, for 220 s. WDA is handed on only once it answers.
+  try {
+    const tunnel = parseTunnelAddress(
+      await runCommand(
+        'xcrun',
+        ['devicectl', 'device', 'info', 'details', '--device', udid],
+        { timeoutMs: DEVICECTL_CEILING_MS },
+      ),
+    );
+    handle.url = `http://[${tunnel}]:${WDA_PORT}`;
+    try {
+      await answers(handle.url);
+    } catch (error) {
+      throw new Error(
+        `WebDriverAgent is up but its tunnel ${handle.url} did not answer: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  } catch (error) {
+    await handle.stop();
+    throw error;
+  }
+  return handle;
+}
+
+/** @param {string} url @returns {Promise<void>} resolves once WDA's /status answers 200 within the ceiling */
+async function wdaAnswers(url) {
+  let response;
+  try {
+    response = await fetch(`${url}/status`, {
+      signal: AbortSignal.timeout(WDA_ANSWER_CEILING_MS),
+    });
+  } catch (error) {
+    const cause = /** @type {{ cause?: { code?: string } }} */ (error).cause;
+    throw new Error(
+      `GET /status: ${error instanceof Error ? error.message : String(error)}${cause?.code ? ` ${cause.code}` : ''} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
+    );
+  }
+  if (!response.ok) throw new Error(`GET /status answered ${response.status}`);
 }

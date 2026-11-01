@@ -14,5 +14,10 @@
     // and .mjs the program already admits, so a script added next year is
     // checked the day it is written (#228).
     "checkJs": true
-  }
+  },
+  // Astro's base excludes only `dist`. The device run writes Playwright's
+  // bundled report (minified, untyped JS) into `playwright-report/`, and with
+  // `checkJs` every typecheck after a device run failed on it (2026-11-02).
+  // Both folders are git-ignored output, never source.
+  "exclude": ["dist", "playwright-report", "test-results"]
 }

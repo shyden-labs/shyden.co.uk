@@ -59,6 +59,7 @@ function harness({
     findXctestrun: vi.fn(() => (built ? XCTESTRUN : null)),
     hasSource: vi.fn(() => true),
     alive: vi.fn(() => aliveNow),
+    answers: vi.fn(async (_url: string): Promise<void> => {}),
   };
   return {
     child,
@@ -228,5 +229,120 @@ describe('startWda', () => {
     const wda = await started;
     h.setAlive('5151');
     await expect(wda.stop()).rejects.toThrow(/still running .*pid 5151/);
+  });
+
+  // Measured 2026-11-02 on the iPhone Air: the tunnel address read before
+  // xcodebuild starts answered EHOSTUNREACH once WDA was up (the device run
+  // and a hand probe alike), while one read after the ready line brought the
+  // tunnel back and it answered every call, busy and idle, for 220 s.
+  it('reads the tunnel address only after the ready line', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    expect(h.runs.some((r) => r[0] === 'xcrun')).toBe(false);
+    h.child.print(READY);
+    await started;
+    expect(h.runs.filter((r) => r[0] === 'xcrun')).toHaveLength(1);
+  });
+
+  it('hands WDA on only once its tunnel URL answers', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    await started;
+    expect(h.deps.answers).toHaveBeenCalledWith(
+      'http://[fd97:eff2:bed2::1]:8100',
+    );
+  });
+
+  it('fails naming the tunnel, and stops WDA, when the URL does not answer', async () => {
+    const h = harness();
+    h.deps.answers.mockRejectedValue(new Error('fetch failed EHOSTUNREACH'));
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    await expect(started).rejects.toThrow(
+      /WebDriverAgent is up but its tunnel http:\/\/\[fd97:eff2:bed2::1\]:8100 did not answer: fetch failed EHOSTUNREACH/,
+    );
+    expect(h.child.signals).toContain('SIGTERM');
+  });
+
+  it('stops WDA when the tunnel cannot be read after the ready line', async () => {
+    const h = harness();
+    h.deps.run.mockImplementation(async (file: string) => {
+      if (file === 'xcrun') throw new Error('devicectl: device not found');
+      return '';
+    });
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    await expect(started).rejects.toThrow(/device not found/);
+    expect(h.child.signals).toContain('SIGTERM');
+  });
+
+  describe('the default answer check, GET /status', () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const withoutAnswers = (h: ReturnType<typeof harness>) => {
+      const { answers: _unused, ...rest } = h.deps;
+      return rest;
+    };
+
+    it('asks the tunnel URL for /status and hands WDA on at 200', async () => {
+      const fetch = vi.fn(
+        async (_url: string) => new Response('{}', { status: 200 }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const h = harness();
+      const started = startWda({
+        udid: UDID,
+        cacheDir: CACHE,
+        ...withoutAnswers(h),
+      });
+      await flush();
+      h.child.print(READY);
+      await started;
+      expect(fetch.mock.calls[0]?.[0]).toBe(
+        'http://[fd97:eff2:bed2::1]:8100/status',
+      );
+    });
+
+    it('names the network error code and the ceiling', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new TypeError('fetch failed', {
+            cause: { code: 'EHOSTUNREACH' },
+          });
+        }),
+      );
+      const h = harness();
+      const started = startWda({
+        udid: UDID,
+        cacheDir: CACHE,
+        ...withoutAnswers(h),
+      });
+      await flush();
+      h.child.print(READY);
+      await expect(started).rejects.toThrow(
+        /did not answer: GET \/status: fetch failed EHOSTUNREACH \(ceiling 10 s\)/,
+      );
+    });
+
+    it('refuses an answer that is not 200', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('', { status: 503 })),
+      );
+      const h = harness();
+      const started = startWda({
+        udid: UDID,
+        cacheDir: CACHE,
+        ...withoutAnswers(h),
+      });
+      await flush();
+      h.child.print(READY);
+      await expect(started).rejects.toThrow(/GET \/status answered 503/);
+    });
   });
 });
