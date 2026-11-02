@@ -187,7 +187,7 @@ export const th: Catalogue = {
   ioReplaceWarning:
     'ข้อมูลนี้จะแทนที่รายชื่อนักเรียนปัจจุบันของคุณ — นักเรียน {total} คน มีชื่อแล้ว {named} คน',
   ioReplaceConfirm: 'แทนที่',
-  ioReplaceCancel: 'เก็บสิ่งที่ฉันมีไว้',
+  ioReplaceCancel: 'เก็บรายชื่อปัจจุบันไว้',
   ioImported: 'นำเข้านักเรียน {total} คนแล้ว',
   ioBothLanguages: 'ส่งออกเป็นภาษาอื่นด้วย',
   ioBothLanguagesHint:

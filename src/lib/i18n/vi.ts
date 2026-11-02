@@ -192,7 +192,7 @@ export const vi: Catalogue = {
   ioReplaceWarning:
     'Danh sách này sẽ thay thế danh sách lớp hiện tại của bạn — {total} học sinh, {named} em đã có tên.',
   ioReplaceConfirm: 'Thay thế nó',
-  ioReplaceCancel: 'Giữ lại những gì tôi đang có',
+  ioReplaceCancel: 'Giữ nguyên danh sách hiện tại',
   ioImported: 'Đã nhập {total} học sinh.',
   ioBothLanguages: 'Cũng xuất sang ngôn ngữ khác',
   ioBothLanguagesHint:

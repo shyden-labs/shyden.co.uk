@@ -303,7 +303,7 @@ export const id: Catalogue = {
   ioReplaceWarning:
     'Ini akan mengganti daftar kelas Anda saat ini — {total} siswa, {named} sudah diberi nama.',
   ioReplaceConfirm: 'Ganti',
-  ioReplaceCancel: 'Pertahankan yang ada',
+  ioReplaceCancel: 'Pertahankan daftar saat ini',
   ioImported: '{total} siswa diimpor.',
 
   // ── Serah-terima dua bahasa (tahap 4, Tugas 6) ─────────────────────────

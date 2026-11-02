@@ -15,9 +15,10 @@
     // checked the day it is written (#228).
     "checkJs": true
   },
-  // Astro's base excludes only `dist`. The device run writes Playwright's
-  // bundled report (minified, untyped JS) into `playwright-report/`, and with
-  // `checkJs` every typecheck after a device run failed on it (2026-11-02).
-  // Both folders are git-ignored output, never source.
+  // Astro's base excludes `dist` alone; a local `exclude` replaces that list,
+  // so `dist` is repeated here. The other two are test output, git-ignored:
+  // a real-device run's HTML report ships Playwright's minified trace viewer,
+  // which `checkJs` failed with 14 errors and then a Node abort, refusing a
+  // push (#1022).
   "exclude": ["dist", "playwright-report", "test-results"]
 }
