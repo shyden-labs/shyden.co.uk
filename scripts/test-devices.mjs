@@ -915,6 +915,12 @@ async function runDesktopGroup() {
       // measured directly against this exact invocation shape before being
       // trusted, not assumed.
       '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+      // Two workers, not Playwright's default of half the cores (3 on the
+      // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
+      // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
+      // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
+      // by Shyden 2026-11-02).
+      '--workers=2',
     ],
     {
       env: {
