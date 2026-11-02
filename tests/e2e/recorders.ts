@@ -132,7 +132,7 @@ export function recordErrors(page: Page): ErrorRecorder {
    */
   const delivered: string[] = [];
   const sentinelsSeen = new Set<string>();
-  // The engine, for the one message Safari logs on every page (see
+  // The engine, for the messages only WebKit is allowed (see
   // tests/console-allowance.ts). Absent on the real phone's adopted context,
   // which is Chrome: '' then allows nothing.
   const engine = page.context().browser()?.browserType().name() ?? '';
