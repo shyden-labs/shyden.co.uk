@@ -14,6 +14,7 @@
  *   touchstart and click; `wda/keys` types into the focused field, `\b`
  *   deletes.
  */
+import { messageOf } from '../../../scripts/errors.mjs';
 
 export interface Point {
   x: number;
@@ -73,7 +74,7 @@ export function httpFor(baseUrl: string): Http {
         method,
         path,
         0,
-        `no answer within ${WDA_COMMAND_CEILING_MS / 1000} s (${error instanceof Error ? error.message : String(error)}); is WebDriverAgent still running?`,
+        `no answer within ${WDA_COMMAND_CEILING_MS / 1000} s (${messageOf(error)}); is WebDriverAgent still running?`,
       );
     }
     const text = await response.text();

@@ -490,7 +490,7 @@ export class RealTapInteraction implements Interaction {
     if (!prepared.inView)
       throw new TapNotLandedError(
         element.selector,
-        `${element.selector} did not come into view: a real swipe no longer moves it (its box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall)`,
+        `${element.selector} did not come into view: a real swipe no longer moves the page toward it; the box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall`,
       );
     if (prepared.hit !== null)
       throw new TapNotLandedError(

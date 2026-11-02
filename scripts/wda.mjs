@@ -18,6 +18,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseTunnelAddress } from './devicectl.mjs';
+import { messageOf, nonEmpty } from './errors.mjs';
 
 /** appium/WebDriverAgent v16.14.0 (BSD), tag dated 2026-10-04. */
 export const WDA_PIN = 'd17782422d55ff1e5e0ceb74eb1fd509cc0c35b6';
@@ -71,9 +72,10 @@ function run(file, args, { timeoutMs }) {
 /** @param {string} productsDir @returns {string | null} */
 function findXctestrun(productsDir) {
   if (!existsSync(productsDir)) return null;
-  const found = readdirSync(productsDir).find((name) =>
-    /^WebDriverAgentRunner_iphoneos.*\.xctestrun$/.test(name),
-  );
+  const found = nonEmpty(
+    readdirSync(productsDir),
+    `entries in ${productsDir}, which a WebDriverAgent build leaves its products in`,
+  ).find((name) => /^WebDriverAgentRunner_iphoneos.*\.xctestrun$/.test(name));
   return found === undefined ? null : path.join(productsDir, found);
 }
 
@@ -269,7 +271,7 @@ export async function startWda({
       await answers(handle.url);
     } catch (error) {
       throw new Error(
-        `WebDriverAgent is up but its tunnel ${handle.url} did not answer: ${error instanceof Error ? error.message : String(error)}`,
+        `WebDriverAgent is up but its tunnel ${handle.url} did not answer: ${messageOf(error)}`,
       );
     }
   } catch (error) {
@@ -289,7 +291,7 @@ async function wdaAnswers(url) {
   } catch (error) {
     const cause = /** @type {{ cause?: { code?: string } }} */ (error).cause;
     throw new Error(
-      `GET /status: ${error instanceof Error ? error.message : String(error)}${cause?.code ? ` ${cause.code}` : ''} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
+      `GET /status: ${messageOf(error)}${cause?.code ? ` ${cause.code}` : ''} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
     );
   }
   if (!response.ok) throw new Error(`GET /status answered ${response.status}`);

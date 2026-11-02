@@ -368,7 +368,7 @@ describe('RealTapInteraction.click: real scrolling', () => {
   it('fails naming the element when the page stops moving before it comes into view', async () => {
     const f = fakes({ prepare: () => below });
     await expect(interaction(f).click(element())).rejects.toThrow(
-      /#cg-go did not come into view: a real swipe no longer moves it/,
+      /#cg-go did not come into view: a real swipe no longer moves the page toward it/,
     );
     expect(f.taps).toEqual([]);
   });

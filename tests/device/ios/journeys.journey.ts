@@ -24,7 +24,7 @@
  * that way in the first place: a later journey drops in with no new
  * plumbing.
  *
- * Journey 11 taps into a field for real and checks the page did not zoom;
+ * Journey 11 measures each typed field's computed font-size;
  * Journey 13 taps each primary control for real, so a control a finger
  * cannot reach fails there. Journey 12 is a measurement, not a threshold -- see
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
@@ -120,12 +120,6 @@ afterAll(async () => {
 }, 120_000);
 
 /**
- * Design doc s5a's own requirement, restated at the point every reader
- * actually looks: the top of each test's own output, not only once at
- * session start. `session.mode` is read fresh (not captured at module
- * load) because it is only known once `beforeAll` has resolved.
- */
-/**
  * Chooses "Skip the animation" the way a teacher does: a real tap opens the
  * Sound and animation section if it is closed, and the speed is picked in
  * the phone's own menu (global rule 2026-10-31: all device input is real).
@@ -140,6 +134,12 @@ async function skipTheAnimation(): Promise<void> {
   );
 }
 
+/**
+ * Design doc s5a's own requirement, restated at the point every reader
+ * actually looks: the top of each test's own output, not only once at
+ * session start. `session.mode` is read fresh (not captured at module
+ * load) because it is only known once `beforeAll` has resolved.
+ */
 function logMode(journeyName: string): void {
   // eslint-disable-next-line no-console -- the required per-test mode announcement, not incidental debug output
   console.log(`  [mode: ${session.mode}] ${journeyName}`);
@@ -727,7 +727,7 @@ describe.each(LOCALES)(
     // one definition in tests/typed-fields.ts. This journey used to check only
     // `input[type=text|number]`, so the one leg on real WebKit skipped every
     // select, textarea and email field (#390).
-    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px, and a real tap into the student count focuses it with the page left at scale 1', async () => {
+    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px (the zoom a real tap causes is a shared-spec check for both phones)', async () => {
       logMode(`Journey 11 (${locale})`);
       await session.navigateToPath(path);
 
@@ -748,23 +748,6 @@ describe.each(LOCALES)(
           `${field} computed font-size (${locale})`,
         ).toBeGreaterThanOrEqual(IOS_ZOOM_FLOOR_PX);
       }
-
-      // The zoom itself, as a visitor meets it: a real tap into the field
-      // the tool opens on, then what Safari did with the page.
-      await session.interaction.click(
-        await session.driver.findElement('#cg-count'),
-      );
-      const afterTap = await session.driver.executeScript<{
-        focused: string | null;
-        scale: number;
-      }>(
-        'return { focused: document.activeElement && document.activeElement.id, scale: window.visualViewport.scale };',
-      );
-      expect(
-        afterTap.focused,
-        `the tapped field has the focus (${locale})`,
-      ).toBe('cg-count');
-      expect(afterTap.scale, `the page did not zoom (${locale})`).toBe(1);
     });
 
     test('Journey 12 -- iOS-only geometry: viewport, device pixel ratio, and the fold position of #cg-go (a measurement, not a threshold)', async () => {
