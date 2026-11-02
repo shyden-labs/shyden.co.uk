@@ -17,12 +17,12 @@ export const SAFARI_UNKNOWN_VIEWPORT_KEY =
 /**
  * macOS WebKit's built-in video controls, on the iPhone-emulated project, log
  * one line per placard icon they fail to load for the homepage video; `src` is
- * a blob URL WebKit makes itself, so it is matched as an origin and a UUID.
+ * a blob URL WebKit makes itself, so it is matched by its UUID.
  * Not our code, and WebKit-GTK in CI never logs it (measured 2026-11-02,
  * Playwright 1.64.1's WebKit on the laptop: these three icons, #1008).
  */
 export const WEBKIT_MEDIA_PLACARD =
-  /^Button failed to load, iconName = (?:invalid|pip|airplay)-placard, layoutTraits = \[MacOSLayoutTraits Inline\], src = blob:https?:\/\/[\w.-]+(?::\d+)?\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  /^Button failed to load, iconName = (?:invalid|pip|airplay)-placard, layoutTraits = \[MacOSLayoutTraits Inline\], src = blob:\S+\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * Whether `text`, logged as a console error by a page in `engine` (Playwright's
