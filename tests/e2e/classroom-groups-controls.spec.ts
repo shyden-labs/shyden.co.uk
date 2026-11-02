@@ -1794,10 +1794,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     // A touch device has no wheel to guard against, and WebKit's mobile
     // emulation rejects mouse.wheel outright. The behaviour under test only
     // exists where a wheel does.
-    test.skip(
-      !!isMobile || onRealDevice(),
-      'no mouse wheel on a touch device',
-    );
+    test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
     await count.focus();

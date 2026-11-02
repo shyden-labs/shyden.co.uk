@@ -216,8 +216,7 @@ const affordances = async (page: Page): Promise<Population> => {
     // On the phone a real finger drag brings it to the middle (#996), and
     // there is no pointer to move: the reading below needs none.
     if (onRealDevice()) await scrollToOn(control);
-    else
-      await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    else await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const box = await control.boundingBox();
     if (box === null) continue; // not rendered; nothing a pointer can reach
 

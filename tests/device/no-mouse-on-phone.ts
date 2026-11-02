@@ -57,7 +57,11 @@ export function refuse(
 
 /** Refuses mouse input and protocol scrolls on this page, its mouse, and every locator. */
 export function refuseMouseOnPhone(page: Page): void {
-  refuse(Object.getPrototypeOf(page.locator('html')) as object, LOCATOR, 'locator');
+  refuse(
+    Object.getPrototypeOf(page.locator('html')) as object,
+    LOCATOR,
+    'locator',
+  );
   refuse(page, PAGE, 'page');
   refuse(page.mouse, MOUSE, 'page.mouse');
 }
