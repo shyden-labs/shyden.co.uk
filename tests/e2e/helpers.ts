@@ -449,11 +449,23 @@ export const handoverTo = async (page: Page, language: string | RegExp) => {
  *
  * Takes a context as well as a page, because an init script added to a page
  * never reaches the popup that page opens.
+ *
+ * A refusal is answered the way a browser answers one: a `fullscreenerror`
+ * on the document, then the rejection. Rejecting alone left `boardSettled`
+ * waiting for an answer that never came (#1007, measured on the Android).
  */
 export const refuseFullscreen = (target: Page | BrowserContext) =>
   target.addInitScript(() => {
-    Element.prototype.requestFullscreen = () =>
-      Promise.reject(new Error('refused'));
+    Element.prototype.requestFullscreen = function (this: Element) {
+      return new Promise<void>((_, refuse) =>
+        queueMicrotask(() => {
+          this.dispatchEvent(
+            new Event('fullscreenerror', { bubbles: true, composed: true }),
+          );
+          refuse(new TypeError('Permissions check failed'));
+        }),
+      );
+    };
   });
 
 /**
