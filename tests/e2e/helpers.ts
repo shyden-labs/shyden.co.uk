@@ -1,5 +1,6 @@
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import {
   expect,
   type BrowserContext,
@@ -82,8 +83,8 @@ export const openWaitingBoard = async (
   // #744: a board Shuffle travels unless the speed is Skip, so a test that
   // presses it says which it means; left out, the page's default stands.
   if (speed) await chooseSpeed(page, speed);
-  await tapOn(page.getByRole('button', { name: 'Full screen' }));
-  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+  // Settled before anything acts on it, as a person would (#1007).
+  await openBoard(page);
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
   );
