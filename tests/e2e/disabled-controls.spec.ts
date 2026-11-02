@@ -452,6 +452,13 @@ test.describe('a disabled control affords that it is disabled', () => {
     test(`${theme}: roster at the limit — the add buttons and Make groups too`, async ({
       page,
     }) => {
+      // On the phone each disabled control is reached by a real drag, about a
+      // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+      // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+      test.slow(
+        onRealDevice(),
+        'a real drag to each of ~100 disabled controls',
+      );
       await openRoster(page);
       // `openRoster` already added one, so this lands exactly ON the limit
       // rather than asking the page to clamp an overshoot.
@@ -490,6 +497,10 @@ test.describe('a disabled control affords that it is disabled', () => {
   test('only checkbox, radio and file inputs are left to the UA to paint', async ({
     page,
   }) => {
+    // On the phone each disabled control is reached by a real drag, about a
+    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
     // The fill carve-out, asserted rather than assumed. Without this the
     // `uaPainted` branch could grow to swallow a control that SHOULD be
     // painted, and `expectDisabledPaint` would quietly stop covering it.
@@ -509,6 +520,10 @@ test.describe('a disabled control affords that it is disabled', () => {
   test('the no-entry cursor marks the disabled controls apart from the enabled ones', async ({
     page,
   }) => {
+    // On the phone each disabled control is reached by a real drag, about a
+    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
     await openRoster(page);
     await addSeveral(page, MAX_ROSTER - 1);
     await openEveryDisclosure(page);
