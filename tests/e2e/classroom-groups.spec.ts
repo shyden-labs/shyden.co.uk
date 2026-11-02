@@ -30,7 +30,6 @@ import {
   buildRoster,
   giveEveryoneASex,
   contrastRatio,
-  listedByThisBrowser,
 } from './helpers';
 
 test.use(recorded);
@@ -2294,7 +2293,7 @@ test.describe('the no-scroll rule, measured', () => {
  *
  * One of each shape a message takes: a slot (a student's number, a group's),
  * a plural (the summary), a refusal carrying a value, and a list (the roster's
- * missing-sex problem, joined by the browser's own `Intl.ListFormat`).
+ * missing-sex problem, joined by the site's own list joins, #1008).
  */
 test.describe('every language renders its own messages', () => {
   for (const locale of LOCALES) {
@@ -2358,12 +2357,7 @@ test.describe('every language renders its own messages', () => {
       await tapOn(add);
       await expect(page.locator('.cg-student')).toHaveCount(2);
       const names = [t.studentNumber({ n: 1 }), t.studentNumber({ n: 2 })];
-      const problem = await listedByThisBrowser(
-        page,
-        locale,
-        names,
-        t.rosterNoSexMessage({ names }),
-      );
+      const problem = t.rosterNoSexMessage({ names });
       await expect(page.locator('#cg-roster-problem')).toHaveText(problem);
       notEnglish(
         problem,

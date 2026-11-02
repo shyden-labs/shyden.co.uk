@@ -69,7 +69,7 @@ describe('formatMessage: lists', () => {
     ['id', 'Ana, Budi, dan Citra'],
     ['zh-Hans', 'Ana、Budi和Citra'],
     ['vi', 'Ana, Budi và Citra'],
-    ['th', 'Ana Budi และCitra'],
+    ['th', 'Ana Budi และ Citra'],
   ])(
     '%s: an array slot is a conjunction list in the page language',
     (locale, expected) => {
@@ -78,6 +78,62 @@ describe('formatMessage: lists', () => {
       ).toBe(expected);
     },
   );
+
+  it.each([
+    ['en-GB', 'Ana and Budi'],
+    ['id-ID', 'Ana dan Budi'],
+    ['zh-CN', 'Ana和Budi'],
+    ['vi-VN', 'Ana và Budi'],
+    ['th-TH', 'Ana และ Budi'],
+  ])('%s: a two-item list takes its own join', (locale, expected) => {
+    expect(formatMessage('{names}', { names: ['Ana', 'Budi'] }, locale)).toBe(
+      expected,
+    );
+  });
+
+  it.each([
+    ['en-GB', 'Ana, Budi, Citra and Dewi'],
+    ['id-ID', 'Ana, Budi, Citra, dan Dewi'],
+    ['zh-CN', 'Ana、Budi、Citra和Dewi'],
+    ['vi-VN', 'Ana, Budi, Citra và Dewi'],
+    ['th-TH', 'Ana Budi Citra และ Dewi'],
+  ])('%s: a longer list repeats its middle separator', (locale, expected) => {
+    expect(
+      formatMessage(
+        '{names}',
+        { names: ['Ana', 'Budi', 'Citra', 'Dewi'] },
+        locale,
+      ),
+    ).toBe(expected);
+  });
+
+  // Shyden 2026-11-02 (#1008): the site joins lists itself, so every browser
+  // shows one spelling. macOS WebKit's ICU spaced Thai "และ" where Linux and
+  // Android did not; an engine that formats lists differently, or not at all,
+  // must not change what the page says.
+  it('does not depend on the engine formatting lists', () => {
+    const engine = Intl.ListFormat;
+    Object.defineProperty(Intl, 'ListFormat', {
+      configurable: true,
+      value: function refused() {
+        throw new Error('Intl.ListFormat was called');
+      },
+    });
+    try {
+      expect(formatMessage('{n}', { n: [3, 7] }, 'th-TH')).toBe('3 และ 7');
+    } finally {
+      Object.defineProperty(Intl, 'ListFormat', {
+        configurable: true,
+        value: engine,
+      });
+    }
+  });
+
+  it('refuses a language it has no join for, naming it', () => {
+    expect(() => formatMessage('{n}', { n: [1, 2] }, 'fr-FR')).toThrow(
+      'no list join for fr-FR',
+    );
+  });
 
   it('a one-item list is just that item', () => {
     expect(formatMessage('{names} left', { names: ['Ana'] }, 'en-GB')).toBe(

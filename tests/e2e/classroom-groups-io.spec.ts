@@ -128,7 +128,7 @@ test.describe('Import / export', () => {
     ]);
     await openIo(page);
     await upload(page, 'new.csv', 'number,name\n7,Gita\n');
-    await tapOn(page.getByRole('button', { name: 'Keep what I have' }));
+    await tapOn(page.getByRole('button', { name: 'Keep the current list' }));
     await expect(page.locator('.cg-student')).toHaveCount(2);
     await expect(
       page.locator('.cg-student').first().getByLabel('Name'),

@@ -13,7 +13,6 @@ import {
   buildRosterAtPath,
   expectVisibleText,
   handoverTo,
-  listedByThisBrowser,
   upload,
 } from './helpers';
 
@@ -167,15 +166,10 @@ test.describe('the sentences corrected on #319', () => {
       await tapOn(go);
       await expectVisibleText(
         error,
-        await listedByThisBrowser(
-          tool,
-          locale,
-          [1, 2].map(byNumber),
-          renderError(
-            { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 2] },
-            t,
-            byNumber,
-          ),
+        renderError(
+          { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 2] },
+          t,
+          byNumber,
         ),
       );
       await shoot(
@@ -315,12 +309,7 @@ test.describe('the sentences corrected on #319', () => {
       const clash = tool.locator('#cg-roster-problem');
       await expectVisibleText(
         clash,
-        await listedByThisBrowser(
-          tool,
-          locale,
-          [NAMES[0], NAMES[1]],
-          t.rosterClashMessage({ names: [NAMES[0], NAMES[1]] }),
-        ),
+        t.rosterClashMessage({ names: [NAMES[0], NAMES[1]] }),
       );
       await shoot(
         tool,

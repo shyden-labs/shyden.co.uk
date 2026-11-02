@@ -1560,7 +1560,7 @@ test.describe('absent students on the board (#999)', () => {
     id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
     zh: ['/zh/classroom-groups', '3和7 号缺席。'],
     vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],
-    th: ['/th/classroom-groups', 'หมายเลข 3และ7 ขาดเรียน'],
+    th: ['/th/classroom-groups', 'หมายเลข 3 และ 7 ขาดเรียน'],
   } as const;
   for (const [locale, [path, sentence]] of Object.entries(sentences)) {
     test(`the board says who is absent in ${locale}`, async ({ page }) => {
