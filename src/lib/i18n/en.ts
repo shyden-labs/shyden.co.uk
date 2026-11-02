@@ -610,7 +610,7 @@ export const en = {
       named: number;
     }>,
   ioReplaceConfirm: 'Replace it',
-  ioReplaceCancel: 'Keep what I have',
+  ioReplaceCancel: 'Keep the current list',
   ioImported:
     'Imported {total} {total, plural, one {student} other {students}}.' as Message<{
       total: number;
