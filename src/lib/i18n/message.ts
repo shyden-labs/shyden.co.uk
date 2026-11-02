@@ -6,15 +6,15 @@
  * sentence, not a function body, so zh, vi and th referenced `en.<key>` -- and
  * it put logic (a ternary per plural, a hand-written list join) where only
  * copy belongs. A template separates the two: the catalogue holds prose with
- * slots, and this module supplies the grammar from the platform's CLDR data
- * for the page's language, so no translator writes code and no catalogue
- * hand-writes a join.
+ * slots, and this module supplies the grammar for the page's language (plural
+ * rules from the platform's CLDR data, list joins from its own table), so no
+ * translator writes code and no catalogue hand-writes a join.
  *
  * The supported subset, and nothing else:
  *
  * - `{name}` -- a string or number exactly as given (numbers without grouping
  *   separators, as the function-era copy wrote them). An array is a
- *   conjunction list in the page's language, via `Intl.ListFormat`.
+ *   conjunction list in the page's language, from `LIST_JOINS` below.
  * - `{name, plural, one {…} other {…}}` -- the CLDR categories (`zero`, `one`,
  *   `two`, `few`, `many`, `other`) plus exact `=N` branches, which win.
  *   `other` is required. Directly inside a branch, `#` is the count. An
@@ -239,9 +239,40 @@ const perLocale = <T>(make: (locale: string) => T) => {
 };
 
 const pluralRules = perLocale((locale) => new Intl.PluralRules(locale));
-const conjunctionList = perLocale(
-  (locale) => new Intl.ListFormat(locale, { type: 'conjunction' }),
-);
+
+/**
+ * How each language joins a list: `between` separates every item but the
+ * last, `two` joins a two-item list, `last` puts the final item on a longer
+ * one.
+ *
+ * The site writes these itself rather than asking `Intl.ListFormat` (Shyden,
+ * 2026-11-02, #1008), so every browser shows one spelling: macOS WebKit's ICU
+ * spaced Thai "และ" where Linux and Android did not. en, id, zh and vi are
+ * CLDR 48's conjunction lists for the site's locales (en-GB, so no comma
+ * before "and"). Thai is spaced on both sides of "และ" by Shyden's ruling,
+ * following Thai usage around numerals and CLDR's own Thai quantity list,
+ * where CLDR's word list writes `{0}และ{1}`.
+ */
+const LIST_JOINS: Readonly<
+  Record<
+    string,
+    { readonly between: string; readonly two: string; readonly last: string }
+  >
+> = {
+  en: { between: ', ', two: ' and ', last: ' and ' },
+  id: { between: ', ', two: ' dan ', last: ', dan ' },
+  zh: { between: '、', two: '和', last: '和' },
+  vi: { between: ', ', two: ' và ', last: ' và ' },
+  th: { between: ' ', two: ' และ ', last: ' และ ' },
+};
+
+function joinList(items: readonly string[], locale: string): string {
+  const join = LIST_JOINS[locale.split('-')[0].toLowerCase()];
+  if (join === undefined) throw new Error(`no list join for ${locale}`);
+  if (items.length <= 1) return items.join('');
+  if (items.length === 2) return items.join(join.two);
+  return items.slice(0, -1).join(join.between) + join.last + items.at(-1);
+}
 
 const isList = (
   value: MessageValue,
@@ -281,7 +312,7 @@ function render(
       case 'value': {
         const value = valueOf(params, part.name);
         out += isList(value)
-          ? conjunctionList(locale).format(value.map(String))
+          ? joinList(value.map(String), locale)
           : String(value);
         break;
       }

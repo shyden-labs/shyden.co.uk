@@ -15,10 +15,8 @@ import {
 import {
   getStrings,
   localeFromPath,
-  type Locale,
   type Strings,
 } from '../../src/lib/i18n/index';
-import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { chooseSpeed } from '../make-groups';
 
 /**
@@ -87,36 +85,6 @@ export const openWaitingBoard = async (
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
   );
-};
-
-/**
- * `expected` with its list of names joined the way THIS browser joins them.
- *
- * Messages are rendered here in Node, and the page joins a list with its own
- * engine's `Intl.ListFormat`, in the locale's `numberLocale`. Engines
- * disagree: measured 2026-09-14, WebKit 26.6 spaces Thai "และ" where Chromium
- * 153, Firefox 155 and Node's CLDR 48 do not. So the join comes from the
- * page's engine and every word around it from the catalogue. Node's join must
- * occur exactly once, or the swap would compare nothing it meant to; the
- * replacement is a function so a `$` in a name is never read as a pattern.
- */
-export const listedByThisBrowser = async (
-  page: Page,
-  locale: Locale,
-  names: readonly string[],
-  expected: string,
-): Promise<string> => {
-  const { numberLocale } = LOCALE_METADATA[locale];
-  const inNode = new Intl.ListFormat(numberLocale, {
-    type: 'conjunction',
-  }).format(names);
-  const inBrowser = await page.evaluate(
-    ([tag, items]) =>
-      new Intl.ListFormat(tag, { type: 'conjunction' }).format(items),
-    [numberLocale, [...names]] as [string, string[]],
-  );
-  expect(expected.split(inNode), `the list "${inNode}", once`).toHaveLength(2);
-  return expected.replace(inNode, () => inBrowser);
 };
 
 /** Visible copy is both: `toHaveText` alone passes on a hidden element. */
