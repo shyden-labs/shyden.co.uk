@@ -742,7 +742,7 @@ function countAt(report, at, description) {
  *
  * @param {{ name: string, code: number | null, passed: number, failed: number,
  *   skippedByDesign: number, reportSaysOk: boolean, reportSays: string,
- *   failures: string, retried?: number }} counts
+ *   failures: string, retried?: number, retriedNote?: string }} counts
  */
 function judged({
   name,
@@ -754,6 +754,7 @@ function judged({
   reportSays,
   failures,
   retried = 0,
+  retriedNote = '',
 }) {
   const processSaysOk = code === 0;
   const reason =
@@ -763,7 +764,7 @@ function judged({
       : !processSaysOk
         ? `${failures} (process exit code ${code})`
         : retried > 0
-          ? `${retried} test(s) passed only on a retry -- a retry is not a fix, so this group is failed`
+          ? `${retried} test(s) passed only on a retry -- a retry is not a fix, so this group is failed${retriedNote}`
           : passed === 0
             ? 'no test passed, so this group proved nothing -- a run that measured nothing is not a pass'
             : undefined;
@@ -818,6 +819,7 @@ export function playwrightVerdict({
   const passed = count('expected');
   const retried = count('flaky');
   const unexpected = count('unexpected');
+  const crashNote = screenTimeCrashNote(report);
   return judged({
     name,
     code,
@@ -826,9 +828,59 @@ export function playwrightVerdict({
     skippedByDesign: count('skipped') + extraSkipped,
     reportSaysOk: unexpected === 0,
     reportSays: `${unexpected} failed`,
-    failures: `${unexpected} test(s) failed`,
+    failures: `${unexpected} test(s) failed${crashNote}`,
     retried,
+    retriedNote: crashNote,
   });
+}
+
+/**
+ * The exact text macOS WebKit aborts with when its own Screen Time observer
+ * is removed during a page's teardown (#1020): `-[WKScreenTimeConfigurationObserver
+ * stopObserving]` from `-[WKWebView dealloc]`. It is WebKit's crash, not the
+ * site's, and nothing outside WebKit can switch it off: `ScreenTimeEnabled` is
+ * not one of the preferences WebKit reads from `defaults` (measured 2026-11-04).
+ */
+const SCREEN_TIME_CRASH =
+  'Cannot remove an observer <WKScreenTimeConfigurationObserver';
+
+/**
+ * Names each failed or retried test whose browser logs carry WebKit's Screen
+ * Time crash, as a note for the group's reason. The group stays failed: the
+ * note only says which red is WebKit's own (#1020). Empty when there are none.
+ *
+ * @param {unknown} report a Playwright JSON report
+ */
+function screenTimeCrashNote(report) {
+  /** @type {string[]} */
+  const crashed = [];
+  /** @param {any} suite */
+  const walk = (suite) => {
+    for (const spec of suite?.specs ?? []) {
+      for (const test of spec.tests ?? []) {
+        if (test.status !== 'unexpected' && test.status !== 'flaky') continue;
+        const messages = (test.results ?? []).flatMap(
+          (/** @type {any} */ r) => [
+            r.error?.message,
+            ...(r.errors ?? []).map((/** @type {any} */ e) => e?.message),
+          ],
+        );
+        if (
+          messages.some(
+            (/** @type {unknown} */ m) =>
+              typeof m === 'string' && m.includes(SCREEN_TIME_CRASH),
+          )
+        )
+          crashed.push(`[${test.projectName}] ${spec.title}`);
+      }
+    }
+    for (const child of suite?.suites ?? []) walk(child);
+  };
+  walk(report);
+  return crashed.length === 0
+    ? ''
+    : `; ${crashed.length} of them crashed inside macOS WebKit's own Screen Time teardown, ` +
+        `not the site (#1020): ${crashed.join(', ')}`;
 }
 
 /**
