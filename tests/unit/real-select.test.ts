@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { whyNoLabel, whyNoPickerPath, whyNotChosen } from '../real-select';
+import {
+  arrowKeysFor,
+  whyNoOption,
+  whyNoPickerPath,
+  whyNotChosen,
+} from '../real-select';
 
 /**
  * The messages chooseOption fails with (#1027). Pure strings: no browser, no
@@ -16,11 +21,30 @@ describe('chooseOption failures', () => {
     expect(whyNotChosen("locator('#s')", 'F', 'F')).toBeNull();
   });
 
-  it('says a missing option is missing, and a blank label cannot be typed', () => {
-    expect(whyNoLabel('sel', 'Z', null)).toMatch(
-      /no option with the value "Z"/,
-    );
-    expect(whyNoLabel('sel', '', '')).toMatch(/no visible label to type/);
+  it('says a missing option cannot be reached', () => {
+    expect(whyNoOption('sel', 'Z')).toMatch(/no option with the value "Z"/);
+  });
+
+  it('counts arrow presses between reachable options', () => {
+    const o = [
+      { value: '', disabled: false },
+      { value: 'M', disabled: false },
+      { value: 'F', disabled: false },
+    ];
+    expect(arrowKeysFor(o, '', 'F')).toEqual(['ArrowDown', 'ArrowDown']);
+    expect(arrowKeysFor(o, 'F', 'M')).toEqual(['ArrowUp']);
+    expect(arrowKeysFor(o, 'M', 'M')).toEqual([]);
+  });
+
+  it('skips a disabled option and refuses to choose one', () => {
+    const o = [
+      { value: '', disabled: true },
+      { value: 'M', disabled: false },
+      { value: 'F', disabled: false },
+    ];
+    expect(arrowKeysFor(o, 'M', 'F')).toEqual(['ArrowDown']);
+    expect(arrowKeysFor(o, 'M', '')).toBeNull();
+    expect(arrowKeysFor(o, 'M', 'Z')).toBeNull();
   });
 
   it('says the phone path is not built yet and no script stands in (#1027)', () => {

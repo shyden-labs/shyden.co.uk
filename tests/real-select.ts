@@ -5,11 +5,15 @@ import { TapNotPossibleError, tapOn } from './real-touch';
 /**
  * Chooses an option of a `<select>` the way a visitor does (#1027): a real
  * click focuses the select (and opens its list where the browser draws one),
- * the option's visible label is typed key by key (the browser's own
- * type-ahead moves to it), and Enter commits. Playwright's `selectOption()`
- * sets `option.selected` in an injected script and dispatches `input` and
- * `change` itself, so a select that a finger or a keyboard cannot work passed
- * under it.
+ * real ArrowDown / ArrowUp key presses move to the option, and Enter commits.
+ * Playwright's `selectOption()` sets `option.selected` in an injected script
+ * and dispatches `input` and `change` itself, so a select that a finger or a
+ * keyboard cannot work passed under it.
+ *
+ * Arrow keys, not type-ahead: `keyboard.type()` sends characters outside the
+ * keyboard (zh, vi, th labels) as inserted text with no key press, so the
+ * browser's type-ahead never sees them (measured on CI, every engine).
+ * Disabled options are skipped by the browser, so they are not counted.
  *
  * The chosen value is read back. If real input did not pick the wanted option
  * the test fails naming the select and the option: nothing falls back to
@@ -22,21 +26,48 @@ export async function chooseOption(
 ): Promise<void> {
   if (onRealDevice())
     throw new TapNotPossibleError(whyNoPickerPath(String(select), value));
-  const label = await select.evaluate(
-    (el, wanted) =>
-      Array.from((el as HTMLSelectElement).options).find(
-        (option) => option.value === wanted,
-      )?.label ?? null,
-    value,
+  const options = await select.evaluate((el) =>
+    Array.from((el as HTMLSelectElement).options).map((option) => ({
+      value: option.value,
+      disabled: option.disabled,
+    })),
   );
-  if (label === null || label === '')
-    throw new Error(whyNoLabel(String(select), value, label));
+  const current = await select.inputValue();
+  const keys = arrowKeysFor(options, current, value);
+  if (keys === null) throw new Error(whyNoOption(String(select), value));
   await tapOn(select);
-  await select.page().keyboard.type(label);
+  for (const key of keys) await select.page().keyboard.press(key);
   await select.page().keyboard.press('Enter');
   const got = await select.inputValue();
   const why = whyNotChosen(String(select), value, got);
   if (why !== null) throw new Error(why);
+}
+
+export interface OptionState {
+  value: string;
+  disabled: boolean;
+}
+
+/**
+ * The arrow presses from the selected option to the wanted one, counting only
+ * options a keyboard can reach; null when the wanted option is missing or
+ * disabled. Nothing to press when it is already selected.
+ */
+export function arrowKeysFor(
+  options: readonly OptionState[],
+  current: string,
+  wanted: string,
+): ('ArrowDown' | 'ArrowUp')[] | null {
+  const to = options.find((option) => option.value === wanted);
+  if (to === undefined || to.disabled) return null;
+  const reachable = options.filter(
+    (option) => !option.disabled || option.value === current,
+  );
+  const from = reachable.findIndex((option) => option.value === current);
+  const target = reachable.findIndex((option) => option.value === wanted);
+  if (from === -1) return null;
+  const steps = target - from;
+  return Array(Math.abs(steps)).fill(steps > 0 ? 'ArrowDown' : 'ArrowUp');
 }
 
 /** Why the phone cannot choose yet: its native picker has no real-input path. */
@@ -44,15 +75,9 @@ export function whyNoPickerPath(select: string, value: string): string {
   return `${select}: choosing "${value}" on the real Android phone needs its native picker, and that path is not built yet (#1027); no script stands in for it`;
 }
 
-/** Why an option cannot be typed: it is missing, or has no visible label. */
-export function whyNoLabel(
-  select: string,
-  value: string,
-  label: string | null,
-): string {
-  return label === null
-    ? `${select} has no option with the value "${value}"`
-    : `${select}: the option "${value}" has no visible label to type, so real key presses cannot choose it`;
+/** Why an option cannot be chosen: it is missing, or disabled. */
+export function whyNoOption(select: string, value: string): string {
+  return `${select} has no option with the value "${value}" that a keyboard can reach`;
 }
 
 /** Why real input missed the wanted option, or null when it chose it. */
