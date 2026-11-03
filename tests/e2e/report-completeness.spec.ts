@@ -73,7 +73,10 @@ for (const locale of PREFIXED_LOCALES)
       // sections and the report form itself unread (RC1). Each is opened by
       // a real tap, as a visitor opens it (#1003), re-read after every tap
       // so a disclosure inside one just opened is found too. A closed one no
-      // visitor can see has no visible words to check either.
+      // visitor can see has no visible words to check either. Last in the
+      // page first: the header's language list drops over what follows it
+      // (it covered a toggle on /zh/classroom-groups), and no visitor taps
+      // beneath an open list, so the header's own are opened last.
       const closed = page.locator(
         '[aria-expanded="false"][aria-controls]:visible, details:not([open]) > summary:visible',
       );
@@ -82,7 +85,7 @@ for (const locale of PREFIXED_LOCALES)
           throw new Error(
             `${await closed.count()} disclosures still closed after ${OPEN_CEILING} real taps: one does not open when tapped`,
           );
-        await tapOn(closed.first());
+        await tapOn(closed.last());
       }
       const rendered = await page.evaluate(() => {
         const texts: string[] = [];
