@@ -179,8 +179,22 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * Re-read on 7.3.6 (2026-10-10, Dependabot #656): generate.js, build/remote.js,
  * utils/redirectValidation.js and the config schemas are byte-identical to
  * 7.3.5's, and so is isRemoteAllowed in @astrojs/internal-helpers 0.12.0.
+ * Re-read on 7.4.4 (2026-11-03, Dependabot #1015), each file minified on
+ * both sides so only logic is compared: build/remote.js (still the
+ * library's only importer), utils/redirectValidation.js and the image
+ * domains/remotePatterns schema are unchanged; isRemoteAllowed in
+ * @astrojs/internal-helpers 0.13.0 is 0.12.0's. generate.js moved the
+ * static-image store from globalThis into its env; a remote image still
+ * reaches loadRemoteImage only as a static image, registered only when
+ * service.getURL rewrote it, which it does only when isRemoteAllowed passes
+ * (services/service.js). astro now asks for http-cache-semantics ^4.3.0; the
+ * override still holds it at 4.2.0 (the pin test above).
+ * Re-read on 7.4.5 (2026-11-03, the lock's resolution of ^7.4.4): generate.js,
+ * build/remote.js, utils/redirectValidation.js, internal.js,
+ * services/service.js and the config schema are 7.4.4's, minified on both
+ * sides, on the same internal-helpers 0.13.0.
  */
-const ASTRO_READ = '7.3.6';
+const ASTRO_READ = '7.4.5';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {
