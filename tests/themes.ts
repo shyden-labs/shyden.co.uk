@@ -1,3 +1,4 @@
+import { tapOn } from './real-touch';
 import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 import { themeColour, type Theme } from './palette';
@@ -54,7 +55,7 @@ export async function expectTheSwitchPersists(page: Page): Promise<void> {
   const toggle = page.locator('header [data-theme-toggle]');
   await page.goto('/');
   await expectTheme(page, 'dark');
-  await toggle.click();
+  await tapOn(toggle);
   await expectTheme(page, 'light');
   await page.reload();
   await expectTheme(page, 'light');

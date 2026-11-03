@@ -57,7 +57,7 @@ export const siteEn = {
       "A 10-second preview with music and no speech. 'Learn by playing' introduces Yawelo Idle over a night sky of floating islands. Three points follow: learn Indonesian and English, no ads or paywalls, and learn at your own pace, because the words you pick up power the game. It ends on 'Yawelo Idle, coming soon' and the address yawelo-idle.shyden.co.uk.",
     toolsHeading: "While you're waiting, try these.",
     toolsLead:
-      "Two tools I've already built. Free, no sign-up, and working right now.",
+      'Two tools, ready to use. Free, no sign-up, and working right now.',
     toolBadge: 'Live now',
     workCalculatorsTitle: 'YeeTalk Calculators',
     workCalculatorsBody:
@@ -67,7 +67,7 @@ export const siteEn = {
     workClassroomBody:
       'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
     openClassroom: 'Open the group creator',
-    emailMe: 'Email me',
+    getInTouch: 'Get in touch',
     pauseMotion: 'Pause motion',
   },
 
@@ -138,7 +138,8 @@ export const siteEn = {
     // text is BETA_BADGE and is deliberately NOT translated (it labels a
     // language the reader may not speak). This label and the notice ARE.
     betaLabel: 'beta translation',
-    betaNotice: 'Translations may not be accurate. If you notice it, tell me.',
+    betaNotice:
+      'Translations may not be accurate. If you notice a mistake, please report it.',
   },
 
   // The footer's "report a translation problem" form (#97). The English is
@@ -222,7 +223,7 @@ export const siteId: SiteStrings = {
       "Cuplikan 10 detik dengan musik, tanpa narasi. 'Belajar dengan bermain' memperkenalkan Yawelo Idle dengan latar langit malam dan pulau-pulau yang melayang. Lalu muncul tiga poin: belajar bahasa Indonesia dan Inggris, tanpa iklan atau dinding berbayar, dan belajar sesuai kecepatan Anda sendiri, karena kata-kata yang Anda pelajari menggerakkan permainan. Cuplikan ditutup dengan 'Yawelo Idle, segera hadir' dan alamat yawelo-idle.shyden.co.uk.",
     toolsHeading: 'Sambil menunggu, coba ini.',
     toolsLead:
-      'Dua alat yang sudah saya buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
+      'Dua alat, siap dipakai. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.',
     toolBadge: 'Aktif sekarang',
     workCalculatorsTitle: 'Kalkulator YeeTalk',
     workCalculatorsBody:
@@ -232,7 +233,7 @@ export const siteId: SiteStrings = {
     workClassroomBody:
       'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
     openClassroom: 'Buka pembuat kelompok',
-    emailMe: 'Kirim email',
+    getInTouch: 'Hubungi',
     pauseMotion: 'Jeda gerakan',
   },
 
@@ -294,7 +295,7 @@ export const siteId: SiteStrings = {
     label: 'Bahasa',
     betaLabel: 'terjemahan beta',
     betaNotice:
-      'Terjemahan mungkin tidak akurat. Jika Anda melihatnya, beri tahu saya.',
+      'Terjemahan mungkin tidak akurat. Jika Anda menemukan kesalahan, silakan laporkan.',
   },
 
   report: {
@@ -371,7 +372,7 @@ export const siteZh: SiteStrings = {
     yaweloIdleVideoDescription:
       '一段10秒的预告片，配有音乐但无旁白。“通过游戏学习”的宣传语在夜空中漂浮的岛屿背景下，引出了 Yawelo Idle。随后呈现三点核心信息：学习印尼语和英语、无广告且无付费墙、按自己的节奏学习——因为你掌握的单词将驱动游戏进程。预告片以“Yawelo Idle，即将推出”以及网址 yawelo-idle.shyden.co.uk 收尾。',
     toolsHeading: '等待期间，先试试这些。',
-    toolsLead: '我已经开发了两个工具。免费、无需注册，而且现在就可以使用。',
+    toolsLead: '两款工具，即开即用。免费、无需注册，现在就能用。',
     toolBadge: '已上线',
     workCalculatorsTitle: 'YeeTalk 计算器',
     workCalculatorsBody:
@@ -381,7 +382,7 @@ export const siteZh: SiteStrings = {
     workClassroomBody:
       '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
     openClassroom: '打开小组创建器',
-    emailMe: '给我发邮件',
+    getInTouch: '取得联系',
     pauseMotion: '暂停动画',
   },
   notFound: {
@@ -439,7 +440,7 @@ export const siteZh: SiteStrings = {
   language: {
     label: '语言',
     betaLabel: '测试版翻译',
-    betaNotice: '翻译可能不够准确。如果您发现问题，请告诉我。',
+    betaNotice: '翻译内容可能不准确。如果您发现错误，请报告。',
   },
 
   report: {
@@ -518,7 +519,7 @@ export const siteVi: SiteStrings = {
       'Một đoạn giới thiệu dài 10 giây có nhạc nền và không có lời thoại. Slogan “Học qua trò chơi” giới thiệu Yawelo Idle trên nền bầu trời đêm với những hòn đảo lơ lửng. Ba điểm chính được nêu ra: học tiếng Indonesia và tiếng Anh, không có quảng cáo hay rào cản thanh toán, và học theo tốc độ của riêng bạn, bởi vì những từ vựng bạn học được sẽ là động lực cho trò chơi. Đoạn video kết thúc với dòng chữ “Yawelo Idle, sắp ra mắt” và địa chỉ yawelo-idle.shyden.co.uk.',
     toolsHeading: 'Trong lúc chờ, hãy thử những công cụ này.',
     toolsLead:
-      'Hai công cụ mà tôi đã phát triển. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.',
+      'Hai công cụ, sẵn sàng sử dụng. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.',
     toolBadge: 'Đang hoạt động',
     workCalculatorsTitle: 'Máy tính YeeTalk',
     workCalculatorsBody:
@@ -528,7 +529,7 @@ export const siteVi: SiteStrings = {
     workClassroomBody:
       'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
     openClassroom: 'Mở trình tạo nhóm',
-    emailMe: 'Gửi email cho tôi',
+    getInTouch: 'Liên hệ',
     pauseMotion: 'Tạm dừng chuyển động',
   },
   notFound: {
@@ -587,7 +588,7 @@ export const siteVi: SiteStrings = {
     label: 'Ngôn ngữ',
     betaLabel: 'bản dịch beta',
     betaNotice:
-      'Bản dịch có thể không chính xác. Nếu bạn phát hiện ra điều đó, hãy cho tôi biết.',
+      'Các bản dịch có thể không chính xác. Nếu bạn phát hiện lỗi, vui lòng báo cáo.',
   },
 
   report: {
@@ -669,7 +670,7 @@ export const siteTh: SiteStrings = {
       "คลิปตัวอย่าง 10 วินาที พร้อมเพลงและไม่มีเสียงพูด 'เรียนรู้ผ่านการเล่น' แนะนำเกม Yawelo Idle บนท้องฟ้ายามค่ำคืนที่มีเกาะลอยอยู่ ตามมาด้วยสามจุดสำคัญ: เรียนภาษาอินโดนีเซียและภาษาอังกฤษ ไม่มีโฆษณาหรือระบบจ่ายเพื่อเข้าถึงเนื้อหา และเรียนตามจังหวะของคุณเอง เพราะคำที่คุณเรียนรู้จะขับเคลื่อนเกมไปข้างหน้า วิดีโอจบด้วยข้อความ 'Yawelo Idle, เร็วๆ นี้' และที่อยู่เว็บไซต์ yawelo-idle.shyden.co.uk",
     toolsHeading: 'ระหว่างที่รอ ลองสิ่งเหล่านี้ดู',
     toolsLead:
-      'เครื่องมือสองตัวที่พัฒนาไว้แล้ว ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',
+      'เครื่องมือสองตัว พร้อมใช้งาน ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',
     toolBadge: 'พร้อมใช้งาน',
     workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
     workCalculatorsBody:
@@ -679,7 +680,7 @@ export const siteTh: SiteStrings = {
     workClassroomBody:
       'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
-    emailMe: 'ส่งอีเมล',
+    getInTouch: 'ติดต่อ',
     pauseMotion: 'หยุดภาพเคลื่อนไหว',
   },
   notFound: {
@@ -737,7 +738,7 @@ export const siteTh: SiteStrings = {
   language: {
     label: 'ภาษา',
     betaLabel: 'คำแปลเวอร์ชันเบต้า',
-    betaNotice: 'การแปลอาจไม่ถูกต้อง หากคุณสังเกตเห็น โปรดแจ้งให้ทราบ',
+    betaNotice: 'การแปลอาจไม่ถูกต้อง หากพบข้อผิดพลาด โปรดแจ้งให้ทราบ',
   },
 
   report: {

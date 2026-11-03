@@ -189,8 +189,12 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * service.getURL rewrote it, which it does only when isRemoteAllowed passes
  * (services/service.js). astro now asks for http-cache-semantics ^4.3.0; the
  * override still holds it at 4.2.0 (the pin test above).
+ * Re-read on 7.4.5 (2026-11-03, the lock's resolution of ^7.4.4): generate.js,
+ * build/remote.js, utils/redirectValidation.js, internal.js,
+ * services/service.js and the config schema are 7.4.4's, minified on both
+ * sides, on the same internal-helpers 0.13.0.
  */
-const ASTRO_READ = '7.4.4';
+const ASTRO_READ = '7.4.5';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {

@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
@@ -165,7 +166,7 @@ test.describe('screen-reader announcements', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '300');
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
 
     const limit = page.locator('#cg-students-limit');
     await expect(limit).toBeVisible();
@@ -187,7 +188,7 @@ test.describe('screen-reader announcements', () => {
   // first, because a missing reveal would put both at -1.
   test('a refused file is announced, not just revealed', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'bad.csv', 'number\nabc\n');
 
     const problems = page.locator('#cg-io-problems');
@@ -211,7 +212,7 @@ test.describe('screen-reader announcements', () => {
     page,
   }) => {
     await rosterOf(page, 3);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'three.csv', 'number\n1\n2\n3\n');
 
     const confirm = page.locator('#cg-io-confirm');
@@ -236,7 +237,7 @@ test.describe('screen-reader announcements', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '0');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-error')).toBeVisible();
 
     // Cleared, revealed, then written. The write is the mutation a live

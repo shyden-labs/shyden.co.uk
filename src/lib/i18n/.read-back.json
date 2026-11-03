@@ -395,7 +395,7 @@
       },
       "保留当前名单": {
         "english": "Retain the current list",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
       "还以另一种语言导出": {
@@ -671,11 +671,6 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
-      "我已经开发了两个工具。免费、无需注册，而且现在就可以使用。": {
-        "english": "I have developed two tools. They are free, require no registration, and are available for use right now.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
       "已上线": {
         "english": "It is now online.",
         "writers": ["edited after DeepL"],
@@ -699,11 +694,6 @@
       "打开小组创建器": {
         "english": "Open Group Creator",
         "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "给我发邮件": {
-        "english": "Send me an email",
-        "writers": ["DeepL"],
         "verdict": "agrees"
       },
       "暂停动画": {
@@ -804,11 +794,6 @@
       "测试版翻译": {
         "english": "Beta translation",
         "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "翻译可能不够准确。如果您发现问题，请告诉我。": {
-        "english": "The translation may not be entirely accurate. Please let me know if you find any issues.",
-        "writers": ["DeepL"],
         "verdict": "agrees"
       },
       "报告翻译问题": {
@@ -1318,6 +1303,24 @@
         "writers": ["edited after DeepL"],
         "verdict": "ambiguous",
         "note": "Google took 号 as \"symbol\" with the bare slot; the same clause in groupedNote reads \"the {absent} number is absent\""
+      },
+      "两款工具，即开即用。免费、无需注册，现在就能用。": {
+        "english": "Both tools are ready to use right out of the box. They're free, require no registration, and are available immediately.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "翻译内容可能不准确。如果您发现错误，请报告。": {
+        "english": "The translation may be inaccurate. Please report any errors you find.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "取得联系": {
+        "english": "Get in touch",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
       }
     },
     "th": {
@@ -1793,11 +1796,6 @@
         "verdict": "ambiguous",
         "note": "เปิด is both open and turn on; the link opens the calculator"
       },
-      "ส่งอีเมล": {
-        "english": "Send email",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "หยุดภาพเคลื่อนไหว": {
         "english": "Stop animation.",
         "writers": ["DeepL"],
@@ -2160,11 +2158,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "เก็บสิ่งที่ฉันมีไว้": {
-        "english": "Keep what I have.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
       "ส่งออกเป็นภาษาอื่นด้วย": {
         "english": "Export to other languages as well.",
         "writers": ["DeepL"],
@@ -2302,7 +2295,7 @@
       },
       "ติดต่อ": {
         "english": "contact",
-        "writers": ["DeepL"],
+        "writers": ["DeepL", "edited after DeepL"],
         "verdict": "agrees"
       },
       "Shyden — ซอฟต์แวร์ขนาดเล็ก ที่พัฒนาด้วยความใส่ใจ": {
@@ -2400,11 +2393,6 @@
       },
       "ระหว่างที่รอ ลองสิ่งเหล่านี้ดู": {
         "english": "While you wait, try these.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "เครื่องมือสองตัวที่พัฒนาไว้แล้ว ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที": {
-        "english": "Two pre-developed tools are available, free to use, require no registration, and can be used immediately.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
@@ -2514,11 +2502,6 @@
       "ภาษา": {
         "english": "language",
         "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "การแปลอาจไม่ถูกต้อง หากคุณสังเกตเห็น โปรดแจ้งให้ทราบ": {
-        "english": "The translation may not be entirely accurate. Please let us know if you notice any.",
-        "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
       "แจ้งปัญหาคำแปล": {
@@ -2693,6 +2676,24 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "\"student ID\" is the class-number sense of หมายเลข"
+      },
+      "เก็บรายชื่อปัจจุบันไว้": {
+        "english": "Keep the current list.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "เครื่องมือสองตัว พร้อมใช้งาน ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที": {
+        "english": "Two tools available, ready to use, free, no registration required, and usable immediately.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "การแปลอาจไม่ถูกต้อง หากพบข้อผิดพลาด โปรดแจ้งให้ทราบ": {
+        "english": "The translation may not be entirely accurate. Please report any errors you find.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
       }
     },
     "id": {
@@ -2964,11 +2965,6 @@
       "Buka kalkulator": {
         "english": "Open the calculator",
         "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Kirim email": {
-        "english": "Send email",
-        "writers": ["no DeepL draft"],
         "verdict": "agrees"
       },
       "Jeda gerakan": {
@@ -3453,11 +3449,6 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees"
       },
-      "Pertahankan yang ada": {
-        "english": "Keep what you have",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "Ekspor juga dalam bahasa lain": {
         "english": "Export also in other languages",
         "writers": ["DeepL"],
@@ -3833,11 +3824,6 @@
         "verdict": "ambiguous",
         "note": "Indonesian has no plural; ini is these"
       },
-      "Dua alat yang sudah saya buat. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.": {
-        "english": "Two tools I've created. They're free, require no registration, and work right now.",
-        "writers": ["no DeepL draft"],
-        "verdict": "agrees"
-      },
       "Kalkulator YeeTalk": {
         "english": "YeeTalk Calculator",
         "writers": ["DeepL"],
@@ -3969,11 +3955,6 @@
       "Bahasa": {
         "english": "Language",
         "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Terjemahan mungkin tidak akurat. Jika Anda melihatnya, beri tahu saya.": {
-        "english": "The translation may be inaccurate. If you see any, please let me know.",
-        "writers": ["no DeepL draft"],
         "verdict": "agrees"
       },
       "Laporkan masalah terjemahan": {
@@ -4127,6 +4108,30 @@
         "english": "Number {absent} is not present.",
         "writers": ["no DeepL draft"],
         "verdict": "agrees"
+      },
+      "Hubungi": {
+        "english": "Contact",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Pertahankan daftar saat ini": {
+        "english": "Maintain current list",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Dua alat, siap dipakai. Gratis, tanpa pendaftaran, dan berfungsi sekarang juga.": {
+        "english": "Two tools, ready to use. Free, no registration required, and working right now.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Terjemahan mungkin tidak akurat. Jika Anda menemukan kesalahan, silakan laporkan.": {
+        "english": "The translation may be inaccurate. If you find any errors, please report them.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
       }
     },
     "vi": {
@@ -4438,11 +4443,6 @@
         "writers": ["DeepL"],
         "verdict": "ambiguous",
         "note": "máy tính is both calculator and computer; the page is the calculator"
-      },
-      "Gửi email cho tôi": {
-        "english": "Send me an email",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
       },
       "Tạm dừng chuyển động": {
         "english": "Pause motion",
@@ -4933,11 +4933,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "Giữ lại những gì tôi đang có": {
-        "english": "Keep what I have",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
       "Cũng xuất sang ngôn ngữ khác": {
         "english": "Also translate into other languages",
         "writers": ["DeepL"],
@@ -5121,7 +5116,7 @@
       },
       "Liên hệ": {
         "english": "Contact",
-        "writers": ["DeepL"],
+        "writers": ["DeepL", "edited after DeepL"],
         "verdict": "agrees"
       },
       "Shyden — phần mềm nhỏ, được phát triển với sự tận tâm": {
@@ -5222,11 +5217,6 @@
       "Trong lúc chờ, hãy thử những công cụ này.": {
         "english": "While you wait, try these tools.",
         "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "Hai công cụ mà tôi đã phát triển. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.": {
-        "english": "These are two tools I've developed. They're free, require no registration, and are working right now.",
-        "writers": ["DeepL"],
         "verdict": "agrees"
       },
       "Máy tính YeeTalk": {
@@ -5344,11 +5334,6 @@
       },
       "Ngôn ngữ": {
         "english": "Language",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Bản dịch có thể không chính xác. Nếu bạn phát hiện ra điều đó, hãy cho tôi biết.": {
-        "english": "The translation may not be accurate. If you find any inaccuracies, please let me know.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -5527,6 +5512,24 @@
         "english": "The number {absent} is absent.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
+      },
+      "Giữ nguyên danh sách hiện tại": {
+        "english": "Keep the current list.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Hai công cụ, sẵn sàng sử dụng. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.": {
+        "english": "Two tools, ready to use. Free, no registration required, and working now.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Các bản dịch có thể không chính xác. Nếu bạn phát hiện lỗi, vui lòng báo cáo.": {
+        "english": "The translations may not be accurate. If you find any errors, please report them.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
       }
     }
   },

@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -47,7 +48,7 @@ test.describe('each calculator speaks the page it is on', () => {
         const t = getSiteStrings(locale).calculators;
 
         await typeInto(page.locator(input), '');
-        await page.locator(submit).click();
+        await tapOn(page.locator(submit));
 
         // Visible copy: `toHaveText` alone passes for a message the page
         // wrote and never showed (#390 F123).
@@ -66,7 +67,7 @@ test.describe('each calculator speaks the page it is on', () => {
         await page.goto(localisePath('/yeetalk-calculators', locale));
 
         await typeInto(page.locator(input), '1112');
-        await page.locator(submit).click();
+        await tapOn(page.locator(submit));
 
         const result = page.locator(`#${key}-result`);
         await expect(result).toBeVisible();

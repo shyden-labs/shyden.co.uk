@@ -57,6 +57,14 @@ const ACTIONS = [
   'mouse.down(',
   'scrollTo(',
   'scrollBy(',
+  // The real-input helpers (tests/real-touch.ts, tests/real-typing.ts):
+  // a real touch, drag or key press, every engine (#996, #998).
+  'tapOn(',
+  'doubleTapOn(',
+  'tapAt(',
+  'setCheckedOn(',
+  'scrollToOn(',
+  'typeInto(',
 ] as const;
 
 /** Comment-stripped, so a spec's own prose can never satisfy or defeat this. */

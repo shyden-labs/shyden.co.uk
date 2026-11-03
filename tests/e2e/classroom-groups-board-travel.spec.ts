@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { openWaitingBoard } from './helpers';
@@ -30,7 +31,7 @@ const COUNT = 12;
 const bar = (page: Page) => page.locator('#cg-board-bar');
 const board = (page: Page) => page.locator('#cg-board');
 const press = (page: Page, name: 'Make Groups' | 'Shuffle again') =>
-  bar(page).getByRole('button', { name }).click();
+  tapOn(bar(page).getByRole('button', { name }));
 
 /**
  * One frame in which a student was seen nowhere, or twice: what the board,
@@ -727,9 +728,7 @@ test.describe('the board deals by moving students into their cards', () => {
     const afterFold = await font();
     await page.keyboard.press('Escape');
     // Exact: while the board closes, its own "Exit full screen" matches too.
-    await page
-      .getByRole('button', { name: 'Full screen', exact: true })
-      .click();
+    await tapOn(page.getByRole('button', { name: 'Full screen', exact: true }));
     await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
     expect(await font()).toBe(afterFold);
     expect(afterFold).toBeGreaterThanOrEqual(FLOOR_PX);

@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -32,7 +33,7 @@ test.describe('the Gift Value result line reads in every language', () => {
         n.toLocaleString(LOCALE_METADATA[locale].numberLocale);
 
       await typeInto(page.locator('#gift-input'), '1000000');
-      await page.locator('#gift-submit').click();
+      await tapOn(page.locator('#gift-submit'));
 
       const result = page.locator('#gift-result');
       await expectVisibleText(

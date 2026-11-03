@@ -1,4 +1,6 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import {
   expect,
   type BrowserContext,
@@ -14,10 +16,8 @@ import {
 import {
   getStrings,
   localeFromPath,
-  type Locale,
   type Strings,
 } from '../../src/lib/i18n/index';
-import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { chooseSpeed } from '../make-groups';
 
 /**
@@ -55,13 +55,13 @@ const stringsOf = (page: Page): Strings =>
  */
 export const openRoster = async (page: Page, path = '/classroom-groups') => {
   await page.goto(path);
-  await page.locator('#cg-students-toggle').click();
-  await page
-    .getByRole('button', {
+  await tapOn(page.locator('#cg-students-toggle'));
+  await tapOn(
+    page.getByRole('button', {
       name: stringsOf(page).rosterAddStudent,
       exact: true,
-    })
-    .click();
+    }),
+  );
 };
 
 /**
@@ -81,41 +81,11 @@ export const openWaitingBoard = async (
   // #744: a board Shuffle travels unless the speed is Skip, so a test that
   // presses it says which it means; left out, the page's default stands.
   if (speed) await chooseSpeed(page, speed);
-  await page.getByRole('button', { name: 'Full screen' }).click();
-  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+  // Settled before anything acts on it, as a person would (#1007).
+  await openBoard(page);
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
   );
-};
-
-/**
- * `expected` with its list of names joined the way THIS browser joins them.
- *
- * Messages are rendered here in Node, and the page joins a list with its own
- * engine's `Intl.ListFormat`, in the locale's `numberLocale`. Engines
- * disagree: measured 2026-09-14, WebKit 26.6 spaces Thai "และ" where Chromium
- * 153, Firefox 155 and Node's CLDR 48 do not. So the join comes from the
- * page's engine and every word around it from the catalogue. Node's join must
- * occur exactly once, or the swap would compare nothing it meant to; the
- * replacement is a function so a `$` in a name is never read as a pattern.
- */
-export const listedByThisBrowser = async (
-  page: Page,
-  locale: Locale,
-  names: readonly string[],
-  expected: string,
-): Promise<string> => {
-  const { numberLocale } = LOCALE_METADATA[locale];
-  const inNode = new Intl.ListFormat(numberLocale, {
-    type: 'conjunction',
-  }).format(names);
-  const inBrowser = await page.evaluate(
-    ([tag, items]) =>
-      new Intl.ListFormat(tag, { type: 'conjunction' }).format(items),
-    [numberLocale, [...names]] as [string, string[]],
-  );
-  expect(expected.split(inNode), `the list "${inNode}", once`).toHaveLength(2);
-  return expected.replace(inNode, () => inBrowser);
 };
 
 /** Visible copy is both: `toHaveText` alone passes on a hidden element. */
@@ -148,16 +118,16 @@ export const giveEveryoneASex = async (page: Page, sex: 'M' | 'F' = 'M') => {
 
 export const addSeveral = async (page: Page, howMany: number) => {
   const t = stringsOf(page);
-  await page
-    .getByRole('button', { name: t.rosterAddSeveral, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddSeveral, exact: true }),
+  );
   await typeInto(
     page.getByLabel(t.rosterHowMany, { exact: true }),
     String(howMany),
   );
-  await page
-    .getByRole('button', { name: t.rosterAddConfirm, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddConfirm, exact: true }),
+  );
 };
 
 /**
@@ -205,11 +175,12 @@ export const expectStudentsBoxReports = async (
  */
 export const markAbsent = async (page: Page, path = '/classroom-groups') => {
   await openRoster(page, path);
-  await page
-    .locator('.cg-student')
-    .first()
-    .getByLabel(stringsOf(page).rosterColAbsent)
-    .check();
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .first()
+      .getByLabel(stringsOf(page).rosterColAbsent),
+  );
 };
 
 export const setSex = async (page: Page, row: number, sex: 'M' | 'F') =>
@@ -270,9 +241,9 @@ export const withGroups = async (
 ) => {
   await rosterOf(page, n, path);
   // The page's own `makeGroups`, exactly, in whichever language it shows.
-  await page
-    .getByRole('button', { name: stringsOf(page).makeGroups, exact: true })
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: stringsOf(page).makeGroups, exact: true }),
+  );
   await expect(page.locator('#cg-results .group').first()).toBeVisible();
 };
 
@@ -318,7 +289,7 @@ export const downloadText = async (page: Page, button: string | RegExp) => {
   if (onRealDevice()) emptyDeviceDownloads();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
   if (onRealDevice()) return deviceDownloadText(download);
   const stream = await download.createReadStream();
@@ -330,7 +301,7 @@ export const downloadText = async (page: Page, button: string | RegExp) => {
 export const downloadName = async (page: Page, button: string | RegExp) => {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
   return download.suggestedFilename();
 };
@@ -375,11 +346,12 @@ export const rosterWithAnAbsence = async (page: Page) => {
     .nth(2)
     .getByLabel(/Apart/)
     .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(3)
-    .getByLabel(/Absent/)
-    .check();
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .nth(3)
+      .getByLabel(/Absent/),
+  );
 };
 
 /** Six boys and two girls — separate mode then cannot give the girls a group. */
@@ -394,8 +366,8 @@ export const rosterForSpillover = async (page: Page) => {
     ['F', 'Gita'],
     ['F', 'Hani'],
   ]);
-  await page.locator('#cg-grouping-toggle').click();
-  await page.getByLabel(/Keep boys and girls separate/).check();
+  await tapOn(page.locator('#cg-grouping-toggle'));
+  await setCheckedOn(page.getByLabel(/Keep boys and girls separate/));
   await typeInto(page.getByLabel(/Students in each group/), '4');
 };
 
@@ -404,10 +376,11 @@ export const namesIn = (text: string): string[] =>
 
 /** Open the print panel from the results section. */
 export const openPrintPanel = async (page: Page) => {
-  await page
-    .getByRole('button', { name: stringsOf(page).printOpen, exact: true })
-    .first()
-    .click();
+  await tapOn(
+    page
+      .getByRole('button', { name: stringsOf(page).printOpen, exact: true })
+      .first(),
+  );
   await expect(page.locator('#cg-print-panel')).toBeVisible();
 };
 
@@ -426,8 +399,8 @@ export const openPrintPanel = async (page: Page) => {
  * which a two-statement version would not.
  */
 export const handoverTo = async (page: Page, language: string | RegExp) => {
-  await page.locator('#cg-io-both-toggle').click();
-  await page.getByRole('button', { name: language }).click();
+  await tapOn(page.locator('#cg-io-both-toggle'));
+  await tapOn(page.getByRole('button', { name: language }));
 };
 
 /**
@@ -444,11 +417,23 @@ export const handoverTo = async (page: Page, language: string | RegExp) => {
  *
  * Takes a context as well as a page, because an init script added to a page
  * never reaches the popup that page opens.
+ *
+ * A refusal is answered the way a browser answers one: a `fullscreenerror`
+ * on the document, then the rejection. Rejecting alone left `boardSettled`
+ * waiting for an answer that never came (#1007, measured on the Android).
  */
 export const refuseFullscreen = (target: Page | BrowserContext) =>
   target.addInitScript(() => {
-    Element.prototype.requestFullscreen = () =>
-      Promise.reject(new Error('refused'));
+    Element.prototype.requestFullscreen = function (this: Element) {
+      return new Promise<void>((_, refuse) =>
+        queueMicrotask(() => {
+          this.dispatchEvent(
+            new Event('fullscreenerror', { bubbles: true, composed: true }),
+          );
+          refuse(new TypeError('Permissions check failed'));
+        }),
+      );
+    };
   });
 
 /**

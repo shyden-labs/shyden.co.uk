@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { contrastRatio } from './helpers';
 import { recorded, shoot } from './evidence';
@@ -71,7 +72,7 @@ test.describe('every unverified language is marked BETA', () => {
         page.locator(`${SWITCHER} > summary`),
       );
 
-      await page.locator(`${SWITCHER} > summary`).click();
+      await tapOn(page.locator(`${SWITCHER} > summary`));
       const current = page.locator(`${SWITCHER} li[aria-current]`);
       await expect(
         current.locator(BADGE),
@@ -160,7 +161,7 @@ test.describe('every unverified language is marked BETA', () => {
       page,
     }) => {
       await page.goto(localisePath('/', locale));
-      await page.locator(`${SWITCHER} > summary`).click();
+      await tapOn(page.locator(`${SWITCHER} > summary`));
       const voices = await page
         .locator(`${SWITCHER} ${BADGE} .visually-hidden`)
         .evaluateAll((labels) =>
@@ -185,7 +186,7 @@ test.describe('every unverified language is marked BETA', () => {
       page,
     }) => {
       await page.goto(localisePath('/', PREFIXED_LOCALES[0]));
-      await page.locator(`${SWITCHER} > summary`).click();
+      await tapOn(page.locator(`${SWITCHER} > summary`));
       const summaryBadge = page
         .locator(`${SWITCHER} > summary ${BADGE}`)
         .first();

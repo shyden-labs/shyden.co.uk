@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
@@ -118,7 +119,7 @@ test.describe('header + footer', () => {
       await expect(details).toHaveJSProperty('open', false);
       await expect(firstLink).toBeHidden();
       // Click the summary to open: the nav is revealed (no JS involved).
-      await page.locator('header details.menu > summary').click();
+      await tapOn(page.locator('header details.menu > summary'));
       await expect(details).toHaveJSProperty('open', true);
       await expect(firstLink).toBeVisible();
       // Keyboard: native <summary> activation toggles the disclosure on Enter.
@@ -139,7 +140,7 @@ test.describe('header + footer', () => {
       async ({ page }) => {
         await page.setViewportSize({ width: 375, height: 800 });
         await page.goto(localisePath('/', locale));
-        await page.locator('header details.menu > summary').click(); // open at mobile
+        await tapOn(page.locator('header details.menu > summary')); // open at mobile
         await expect(page.locator('header details.menu')).toHaveJSProperty(
           'open',
           true,
@@ -287,7 +288,7 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
         );
         for (let i = 0; i < howMany; i += 1)
           await atLeast44(summaries.nth(i), `header disclosure ${i}`);
-        await page.locator('header details.menu > summary').click(); // open the nav
+        await tapOn(page.locator('header details.menu > summary')); // open the nav
         const links = page.locator('header nav a');
         // `.all()` resolves to [] when nothing matches -- it neither waits nor
         // fails -- so without this count the loop below iterates zero times and
@@ -345,7 +346,7 @@ test.describe('mobile layout: no horizontal overflow', () => {
       async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 800 });
         await page.goto(localisePath('/', locale));
-        await page.locator('header details.menu > summary').click();
+        await tapOn(page.locator('header details.menu > summary'));
         await expectNoHorizontalScroll(
           page,
           `${locale}: sideways scroll at 320px with the menu open`,
