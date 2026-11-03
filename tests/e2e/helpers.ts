@@ -1,5 +1,6 @@
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import {
   expect,
   type BrowserContext,
@@ -80,8 +81,8 @@ export const openWaitingBoard = async (
   // #744: a board Shuffle travels unless the speed is Skip, so a test that
   // presses it says which it means; left out, the page's default stands.
   if (speed) await chooseSpeed(page, speed);
-  await tapOn(page.getByRole('button', { name: 'Full screen' }));
-  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+  // Settled before anything acts on it, as a person would (#1007).
+  await openBoard(page);
   await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
     Number(count),
   );
@@ -416,11 +417,23 @@ export const handoverTo = async (page: Page, language: string | RegExp) => {
  *
  * Takes a context as well as a page, because an init script added to a page
  * never reaches the popup that page opens.
+ *
+ * A refusal is answered the way a browser answers one: a `fullscreenerror`
+ * on the document, then the rejection. Rejecting alone left `boardSettled`
+ * waiting for an answer that never came (#1007, measured on the Android).
  */
 export const refuseFullscreen = (target: Page | BrowserContext) =>
   target.addInitScript(() => {
-    Element.prototype.requestFullscreen = () =>
-      Promise.reject(new Error('refused'));
+    Element.prototype.requestFullscreen = function (this: Element) {
+      return new Promise<void>((_, refuse) =>
+        queueMicrotask(() => {
+          this.dispatchEvent(
+            new Event('fullscreenerror', { bubbles: true, composed: true }),
+          );
+          refuse(new TypeError('Permissions check failed'));
+        }),
+      );
+    };
   });
 
 /**

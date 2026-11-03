@@ -71,10 +71,11 @@ const openTool = async (
   ]);
   await tool.waitForLoadState();
   // The refusal reached the popup. Without it this spec does not fail, it
-  // flakes, which is how #344 went unexplained.
+  // flakes, which is how #344 went unexplained. Judged by the function no
+  // longer being the browser's own, not by a word inside the stub (#1007).
   expect(
     await tool.evaluate(() => String(Element.prototype.requestFullscreen)),
-  ).toContain('refused');
+  ).not.toContain('[native code]');
   return tool;
 };
 

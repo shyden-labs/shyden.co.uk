@@ -1,6 +1,7 @@
 import { setCheckedOn, tapAt, tapOn } from '../real-touch';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import { test, expect } from './fixtures';
 import { chooseSpeed, makeGroups } from '../make-groups';
 import {
@@ -208,7 +209,7 @@ test.describe('the projector view', () => {
   // keyboard user mid-Tab with no visible way out.
   test('a faded bar can still be reached by keyboard', async ({ page }) => {
     await withGroups(page);
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     await expectFaded(page);
     await bar(page).getByRole('button', { name: 'Exit full screen' }).focus();
     await expect(bar(page)).not.toHaveClass(/faded/);
@@ -407,7 +408,7 @@ test.describe('the projector view', () => {
   }) => {
     await withGroups(page);
     for (const settle of [false, true]) {
-      await tapOn(page.getByRole('button', { name: 'Full screen' }));
+      await openBoard(page);
       await expect(page.locator('#cg-board')).toBeVisible();
       if (settle) {
         // "Settled" means the reveal has finished and the bar has faded.
@@ -431,7 +432,7 @@ test.describe('the projector view', () => {
 
   test('leaving puts the results back on the page', async ({ page }) => {
     await withGroups(page);
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
@@ -444,7 +445,7 @@ test.describe('the projector view', () => {
   }) => {
     await withGroups(page);
     const before = await page.locator('#cg-results').innerText();
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     // The board's Shuffle refuses only a roster the page cannot deal: the
     // deal button's enabled state, which a deal in progress never changes.
     // A press mid-deal starts a new deal from the top, so this test does
@@ -583,7 +584,7 @@ test.describe('the board before a shuffle (#743)', () => {
     await typeInto(page.locator('#cg-count'), '10');
     await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     // Nothing has been shuffled yet, so the board's button says what the
     // page's does, not "again".
     await tapOn(bar(page).getByRole('button', { name: 'Make Groups' }));
@@ -605,8 +606,11 @@ test.describe('the board before a shuffle (#743)', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '10');
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
-    await expect(board(page)).toBeVisible();
+    const settleMs = await openBoard(page);
+    test.info().annotations.push({
+      type: 'board-settle-ms',
+      description: settleMs.toFixed(0),
+    });
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
     await expect(page.locator('#cg-results')).toHaveCount(1);
@@ -648,7 +652,7 @@ test.describe('the reveal', () => {
   // reveal finish -- which is every other test in this block.
   test('leaving mid-reveal cancels the rest of it', async ({ page }) => {
     await withGroups(page, 24);
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     await expect(page.locator('#cg-board .group').first()).toHaveClass(
       /revealing/,
     );
@@ -774,7 +778,7 @@ test.describe('all three refuse while the groups are out of date', () => {
     await tapOn(page.locator('#cg-go'));
     await expect(page.getByText(/These groups are out of date/)).toHaveCount(0);
 
-    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await openBoard(page);
     await expect(page.locator('#cg-board')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
@@ -1432,7 +1436,7 @@ test.describe('absent students on the board (#999)', () => {
   }) => {
     await absentClass(page);
     await chooseSpeed(page, 'skip');
-    await tapOn(page.locator('#cg-board-open'));
+    await openBoard(page, page.locator('#cg-board-open'));
     await tapOn(
       page
         .locator('#cg-board-bar')
@@ -1474,7 +1478,7 @@ test.describe('absent students on the board (#999)', () => {
     await tapOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
     await typeInto(page.locator('#cg-size'), '2');
     await chooseSpeed(page, 'skip');
-    await tapOn(page.locator('#cg-board-open'));
+    await openBoard(page, page.locator('#cg-board-open'));
     await tapOn(
       page
         .locator('#cg-board-bar')
