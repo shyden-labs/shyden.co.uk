@@ -550,40 +550,81 @@ test.describe('the board deals by moving students into their cards', () => {
   });
 
   // #768: the board's Shuffle is not refused mid-deal (operator, 2026-10-14).
-  // The press and the reads around it run in ONE task, because the submit
-  // handler supersedes the running deal before its first await: the rows
-  // read before the click are the abandoned deal's, the rows read after it
-  // are the new deal's, and no landing can fall between the two reads.
+  // The press is a real one (#1003), and the reads around it run in the
+  // press's own task: a capture listener on the document reads the rows
+  // before the button's handler runs, and a bubbling one reads them after.
+  // The handler supersedes the running deal before its first await, so the
+  // rows read before are the abandoned deal's, the rows read after are the
+  // new deal's, and no landing can fall between the two reads.
   test('a board Shuffle mid-deal starts from the top, and the abandoned deal lands nobody', async ({
     page,
   }) => {
     await openWaitingBoard(page, String(COUNT), '4');
     await press(page, 'Make Groups');
     await expectThirdLanding(page);
-    const pressed = await bar(page)
-      .getByRole('button', { name: 'Shuffle again' })
-      .evaluate((button) => {
-        const rows = () =>
-          Array.from(
-            document.querySelectorAll<HTMLElement>('#cg-board .student'),
-          );
+    const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
+    await shuffle.evaluate((button) => {
+      type Pressed = {
+        unlandedAtPress: number;
+        freshDealt: number;
+        chipsWaiting: number;
+      };
+      const state = window as unknown as {
+        abandoned?: { old: HTMLElement[]; landed: boolean[] };
+        pressed?: Pressed;
+      };
+      const rows = () =>
+        Array.from(
+          document.querySelectorAll<HTMLElement>('#cg-board .student'),
+        );
+      const mine = (e: Event) =>
+        e.target instanceof Node && button.contains(e.target);
+      const before = (e: Event) => {
+        if (!mine(e)) return;
+        document.removeEventListener('click', before, true);
         const old = rows();
-        const landed = old.map((row) => row.classList.contains('dealt'));
-        (
-          window as unknown as {
-            abandoned: { old: HTMLElement[]; landed: boolean[] };
-          }
-        ).abandoned = { old, landed };
-        (button as HTMLButtonElement).click();
-        return {
-          unlandedAtPress: landed.filter((l) => !l).length,
+        state.abandoned = {
+          old,
+          landed: old.map((row) => row.classList.contains('dealt')),
+        };
+      };
+      const after = (e: Event) => {
+        if (!mine(e) || !state.abandoned) return;
+        document.removeEventListener('click', after);
+        state.pressed = {
+          unlandedAtPress: state.abandoned.landed.filter((l) => !l).length,
           freshDealt: rows().filter((row) => row.classList.contains('dealt'))
             .length,
           chipsWaiting: document.querySelectorAll(
             '#cg-board .waiting-student:not(.left)',
           ).length,
         };
-      });
+      };
+      document.addEventListener('click', before, true);
+      document.addEventListener('click', after);
+    });
+    await tapOn(shuffle);
+    const pressed = await page
+      .waitForFunction(
+        () =>
+          (
+            window as unknown as {
+              pressed?: {
+                unlandedAtPress: number;
+                freshDealt: number;
+                chipsWaiting: number;
+              };
+            }
+          ).pressed,
+      )
+      .then(
+        (handle) =>
+          handle.jsonValue() as Promise<{
+            unlandedAtPress: number;
+            freshDealt: number;
+            chipsWaiting: number;
+          }>,
+      );
     // The press fell mid-deal: some of the old deal had yet to land.
     expect(pressed.unlandedAtPress).toBeGreaterThan(0);
     // From the top: nobody of the new deal is seated, everyone waits.

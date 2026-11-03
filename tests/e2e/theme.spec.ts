@@ -157,15 +157,28 @@ test.describe('the switch (#142 §5, AC3)', () => {
   }) => {
     await page.goto('/');
     await expectTheme(page, 'dark');
-    const next = await toggle(page).evaluate(
-      (button) =>
-        new Promise<string>((resolve) => {
-          (button as HTMLElement).click();
-          requestAnimationFrame(() =>
-            resolve(getComputedStyle(document.documentElement).backgroundColor),
-          );
-        }),
-    );
+    // A real press (#1003). A bubbling click listener on the document runs
+    // straight after the switch's own handler, and asks for the next frame
+    // there, so the ground read is the first one painted after the press.
+    await page.evaluate(() => {
+      const state = window as unknown as { nextGround?: string };
+      document.addEventListener(
+        'click',
+        () =>
+          requestAnimationFrame(() => {
+            state.nextGround = getComputedStyle(
+              document.documentElement,
+            ).backgroundColor;
+          }),
+        { once: true },
+      );
+    });
+    await tapOn(toggle(page));
+    const next = await page
+      .waitForFunction(
+        () => (window as unknown as { nextGround?: string }).nextGround,
+      )
+      .then((handle) => handle.jsonValue());
     expect(next).toBe(themeColour('light', '--bg'));
   });
 
