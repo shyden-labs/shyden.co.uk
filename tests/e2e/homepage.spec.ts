@@ -1,3 +1,4 @@
+import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -217,7 +218,7 @@ test.describe('homepage content', () => {
 
       // The frame is below the fold and the image is lazy, so it must be
       // scrolled to before it will load at all.
-      await img.scrollIntoViewIfNeeded();
+      await scrollToOn(img);
       // A broken src still renders an <img> element and still passes
       // toHaveCount(1). naturalWidth is the only thing that separates "the
       // markup is there" from "the picture arrived".
@@ -347,10 +348,11 @@ test.describe('homepage content', () => {
   test('contact section CTA links to the support mailbox', async ({ page }) => {
     await page.goto('/');
     // The label from the catalogue, not a copy of it: #665 changed "Email us"
-    // to "Email me", and a literal here went red on copy it does not judge.
+    // to "Email me" and #1017 to "Get in touch", and a literal here went red
+    // on copy it does not judge.
     await expect(
       page.locator('#contact').getByRole('link', {
-        name: getSiteStrings('en').home.emailMe,
+        name: getSiteStrings('en').home.getInTouch,
         exact: true,
       }),
     ).toHaveAttribute('href', 'mailto:support@shyden.co.uk');
@@ -846,7 +848,7 @@ test.describe('pause motion', () => {
     expect(await moves(track), 'the band moves before it is paused').toBe(true);
     expect(await running(), 'animations running before the pause').toBe(1);
 
-    await control.check();
+    await setCheckedOn(control);
     await expect(track).toHaveCSS('animation-play-state', 'paused');
     expect(await running(), 'animations running while paused').toBe(0);
     const held = await offsetsOf(track);
@@ -855,7 +857,7 @@ test.describe('pause motion', () => {
       `the band's offset on six frames while paused: ${held.join(', ')}`,
     ).toBe(1);
 
-    await control.uncheck();
+    await setCheckedOn(control, false);
     await expect(track).toHaveCSS('animation-play-state', 'running');
     expect(await running(), 'animations running after resuming').toBe(1);
     expect(await moves(track), 'the band moves again once resumed').toBe(true);
@@ -1016,11 +1018,11 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
     await expect(play).toHaveCount(1);
     await expect(pause).toBeVisible();
     await expect(play).toBeHidden();
-    await control.check();
+    await setCheckedOn(control);
     await expect(play).toBeVisible();
     await expect(pause).toBeHidden();
     await shoot(page, 'paused: the control shows a play symbol');
-    await control.uncheck();
+    await setCheckedOn(control, false);
     await expect(pause).toBeVisible();
     await expect(play).toBeHidden();
   });
@@ -1145,7 +1147,7 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
         ).toBe(true);
         let ticked = false;
         for (const edge of at.edges) {
-          await page.mouse.click(edge.x, edge.y);
+          await tapAt(page, edge.x, edge.y);
           ticked = !ticked;
           await expect(
             control,
@@ -1400,7 +1402,7 @@ test.describe('the Yawelo Idle preview video', () => {
       const box = await summary.boundingBox();
       expect(box).not.toBeNull();
       expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-      await summary.click();
+      await tapOn(summary);
       await expect(description).toBeVisible();
       await expect(description).toHaveText(t.yaweloIdleVideoDescription);
       // The description is the video's own, closed or open.
@@ -1491,7 +1493,7 @@ test.describe('the Yawelo Idle preview video', () => {
       async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        await page.locator('#yawelo-idle summary').click();
+        await tapOn(page.locator('#yawelo-idle summary'));
         await expect(page.locator('#yawelo-idle details p')).toBeVisible();
         const boxes = await page.evaluate(() => {
           const rect = (selector: string) => {

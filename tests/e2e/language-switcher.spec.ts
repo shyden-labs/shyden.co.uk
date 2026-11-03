@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import {
@@ -120,7 +121,7 @@ test.describe('language switcher', () => {
       page,
     }) => {
       await page.goto(localisePath('/', locale));
-      await page.locator(`${SWITCHER} > summary`).click();
+      await tapOn(page.locator(`${SWITCHER} > summary`));
       // Every language, derived. A count of 1 and a single hard-coded name
       // asserted that the site had two languages, not that the switcher lists
       // them -- and it would have gone on passing if #22 had wired the three
@@ -178,7 +179,7 @@ test.describe('language switcher', () => {
     const entry = page.locator(`${SWITCHER} li a`).first();
 
     await expect(entry).toBeHidden();
-    await page.locator(`${SWITCHER} > summary`).click();
+    await tapOn(page.locator(`${SWITCHER} > summary`));
     await expect(details).toHaveAttribute('open', '');
     await expect(entry).toBeVisible();
   });
@@ -229,7 +230,7 @@ test.describe('language switcher', () => {
     const summary = page.locator(`${SWITCHER} > summary`);
     await atLeast44(summary, 'the switcher summary');
 
-    await summary.click();
+    await tapOn(summary);
     const entry = page.locator(`${SWITCHER} li a`).first();
     await atLeast44(entry, 'the first switcher entry');
     await atLeast44(
@@ -274,7 +275,7 @@ test.describe('language switcher', () => {
         await page.setViewportSize({ width: 320, height: 720 });
         await page.goto(localisePath('/', locale));
         await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
-        await page.locator(`${SWITCHER} > summary`).click();
+        await tapOn(page.locator(`${SWITCHER} > summary`));
         const box = (await page.locator(`${SWITCHER} ul`).boundingBox())!;
         expect(box.x, 'dropdown escapes the left edge').toBeGreaterThanOrEqual(
           0,

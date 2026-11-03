@@ -1,3 +1,5 @@
+import { setCheckedOn, tapOn } from '../real-touch';
+import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -108,9 +110,9 @@ test.describe('the controls that had no tests', () => {
     // its target to be visible, so a hidden radio times out rather than
     // being checked. Opening the section first is the same thing a teacher
     // has to do; it is not a workaround.
-    await page.locator('#cg-grouping-toggle').click();
-    await page.check('input[name="leftovers"][value="bunch"]');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.locator('input[name="leftovers"][value="bunch"]'));
+    await tapOn(page.locator('#cg-go'));
     const bunchSizes = await page
       .locator('#cg-results .group')
       .evaluateAll((els) =>
@@ -132,7 +134,7 @@ test.describe('the controls that had no tests', () => {
     // every visit starts collapsed (design spec section 11 names only the
     // how-to state and a later print panel as UI preferences allowed to
     // persist) -- so it has to be reopened after the reload below too.
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     // Task 8, the locale sweep. sectionSoundHeading ("Sound and animation")
     // had been clicked by id in every file that opens this section, but its
     // own rendered text had never been asserted anywhere -- this is the
@@ -143,10 +145,10 @@ test.describe('the controls that had no tests', () => {
       'Sound and animation',
     );
     await expect(page.locator('#cg-sound-text')).toHaveText('Sound on');
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await expect(page.locator('#cg-sound-text')).toHaveText('Sound off');
     await page.reload();
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).not.toBeChecked();
     await expect(page.locator('#cg-sound-text')).toHaveText('Sound off');
   });
@@ -159,12 +161,12 @@ test.describe('the controls that had no tests', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-toggle')).toHaveText(
       'Suara dan animasi',
     );
     await expect(page.locator('#cg-sound-text')).toHaveText('Suara aktif');
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await expect(page.locator('#cg-sound-text')).toHaveText('Suara mati');
     // { exact: true }: getByLabel's default match is a substring, not a
     // whole string -- a mutation spot-check on a sibling test in
@@ -180,7 +182,7 @@ test.describe('the controls that had no tests', () => {
   // place that fact is proven against the real page rather than assumed.
   test('the speed picker offers every option, translated', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-speed option')).toHaveText([
       'Normal',
       'Fast',
@@ -188,7 +190,7 @@ test.describe('the controls that had no tests', () => {
     ]);
 
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-speed option')).toHaveText([
       'Normal',
       'Cepat',
@@ -202,7 +204,7 @@ test.describe('the controls that had no tests', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/classroom-groups');
     // #cg-speed sits inside #cg-sound-body since Stage 2, Task 7.
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     // A default, not a lock — the teacher can still turn it back on.
     await expect(page.locator('#cg-speed')).toHaveValue('skip');
   });
@@ -212,7 +214,7 @@ test.describe('the controls that had no tests', () => {
     await makeGroups(page, '12', '4');
     await expect(page.locator('#cg-results .student')).toHaveCount(12);
 
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     // Not 24. The results are replaced, not added to.
     await expect(page.locator('#cg-results .student')).toHaveCount(12);
   });
@@ -384,7 +386,7 @@ test.describe('classroom groups — mobile-first layout', () => {
       async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/classroom-groups');
-        await page.locator('#cg-grouping-toggle').click();
+        await tapOn(page.locator('#cg-grouping-toggle'));
         await expectNoHorizontalScroll(page);
       },
     );
@@ -402,7 +404,7 @@ test.describe('classroom groups — mobile-first layout', () => {
       async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/classroom-groups');
-        await page.locator('#cg-sound-toggle').click();
+        await tapOn(page.locator('#cg-sound-toggle'));
         await expectNoHorizontalScroll(page);
       },
     );
@@ -504,7 +506,9 @@ test.describe('classroom groups — mobile-first layout', () => {
         // Every control measured, in both states: the population the verdict
         // below is drawn from (#610).
         const measured = [...(await measureVisible())];
-        await page.check('input[name="mode"][value="groupCount"]');
+        await setCheckedOn(
+          page.locator('input[name="mode"][value="groupCount"]'),
+        );
         measured.push(...(await measureVisible()));
         const small = measured.filter((c) => c.height < 44);
 
@@ -587,7 +591,7 @@ test.describe('classroom groups — mobile-first layout', () => {
           // day it appears; collection time cannot know them (#417).
           for (const id of ids) {
             await page.goto(path);
-            await page.locator(`#${id}`).click();
+            await tapOn(page.locator(`#${id}`));
             const overflow = await horizontalOverflow(page);
             if (overflow > 0)
               failures.push(
@@ -596,7 +600,7 @@ test.describe('classroom groups — mobile-first layout', () => {
           }
           // …and every section open at once, which no earlier test did.
           await page.goto(path);
-          for (const id of ids) await page.locator(`#${id}`).click();
+          for (const id of ids) await tapOn(page.locator(`#${id}`));
           const all = await horizontalOverflow(page);
           if (all > 0)
             failures.push(`${path} @${width}px with ALL open: ${all}px`);
@@ -740,7 +744,7 @@ test.describe('How to use', () => {
 
   test('clicking the toggle opens both parts', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByRole('button', { name: 'How to use' }).click();
+    await tapOn(page.getByRole('button', { name: 'How to use' }));
     await expect(
       page.getByText(
         'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
@@ -763,8 +767,8 @@ test.describe('How to use', () => {
   }) => {
     await page.goto('/classroom-groups');
     const toggle = page.getByRole('button', { name: 'How to use' });
-    await toggle.click();
-    await toggle.click();
+    await tapOn(toggle);
+    await tapOn(toggle);
     await expect(
       page.getByText(
         'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
@@ -783,7 +787,7 @@ test.describe('How to use', () => {
   // be open.
   test('the opened state survives a reload', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByRole('button', { name: 'How to use' }).click();
+    await tapOn(page.getByRole('button', { name: 'How to use' }));
     await page.reload();
     await expect(
       page.getByText('Say how many students are in your class.'),
@@ -797,7 +801,7 @@ test.describe('How to use', () => {
     await page.goto('/classroom-groups');
     // Not 'How many students?' -- see the describe block's own comment.
     await typeInto(page.getByLabel('Number of students'), '12');
-    await page.getByRole('button', { name: 'How to use' }).click();
+    await tapOn(page.getByRole('button', { name: 'How to use' }));
     const stored = await page.evaluate(() => ({ ...localStorage }));
     expect(Object.values(stored).join(' ')).not.toContain('12');
     expect(Object.keys(stored)).toContain('cg-howto-collapsed');
@@ -821,7 +825,7 @@ test.describe('How to use', () => {
       page.getByRole('heading', { name: 'How to use', level: 2 }),
     ).toBeVisible();
     const toggle = page.getByRole('button', { name: 'How to use' });
-    await toggle.click();
+    await tapOn(toggle);
     await expect(
       page.getByText('Say how many students are in your class.'),
     ).toBeVisible();
@@ -863,7 +867,7 @@ test.describe('How to use — Indonesian', () => {
 
   test('clicking the toggle opens both parts', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByRole('button', { name: 'Cara menggunakan' }).click();
+    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
     await expect(
       page.getByText(
         'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
@@ -884,8 +888,8 @@ test.describe('How to use — Indonesian', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     const toggle = page.getByRole('button', { name: 'Cara menggunakan' });
-    await toggle.click();
-    await toggle.click();
+    await tapOn(toggle);
+    await tapOn(toggle);
     await expect(
       page.getByText(
         'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
@@ -902,7 +906,7 @@ test.describe('How to use — Indonesian', () => {
   // not "collapsed".
   test('the opened state survives a reload', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByRole('button', { name: 'Cara menggunakan' }).click();
+    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
     await page.reload();
     await expect(
       page.getByText('Masukkan jumlah siswa di kelas Anda.'),
@@ -915,7 +919,7 @@ test.describe('How to use — Indonesian', () => {
   test('only the preference is stored, never class data', async ({ page }) => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await page.getByRole('button', { name: 'Cara menggunakan' }).click();
+    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
     const stored = await page.evaluate(() => ({ ...localStorage }));
     expect(Object.values(stored).join(' ')).not.toContain('12');
     expect(Object.keys(stored)).toContain('cg-howto-collapsed');
@@ -931,7 +935,7 @@ test.describe('How to use — Indonesian', () => {
       page.getByRole('heading', { name: 'Cara menggunakan', level: 2 }),
     ).toBeVisible();
     const toggle = page.getByRole('button', { name: 'Cara menggunakan' });
-    await toggle.click();
+    await tapOn(toggle);
     await expect(
       page.getByText('Masukkan jumlah siswa di kelas Anda.'),
     ).toBeVisible();
@@ -1003,8 +1007,8 @@ test.describe("the tool's collapsible sections", () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.check('input[name="leftovers"][value="bunch"]');
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.locator('input[name="leftovers"][value="bunch"]'));
     await expect(page.locator('#cg-grouping-toggle')).toHaveText(
       'Grouping options · leftovers in one group',
     );
@@ -1024,15 +1028,15 @@ test.describe("the tool's collapsible sections", () => {
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     const header = page.locator('#cg-grouping-toggle');
-    await page.check('#cg-sex-mix');
+    await setCheckedOn(page.locator('#cg-sex-mix'));
     await expect(header).toHaveText('Grouping options · mixed by sex');
-    await page.check('#cg-sex-separate');
+    await setCheckedOn(page.locator('#cg-sex-separate'));
     await expect(header).toHaveText('Grouping options · separated by sex');
-    await page
-      .getByRole('button', { name: '+ Add student', exact: true })
-      .click();
+    await tapOn(
+      page.getByRole('button', { name: '+ Add student', exact: true }),
+    );
     await expect(page.locator('.cg-student')).toHaveCount(3);
     await expect(page.locator('#cg-sex-separate')).toBeChecked();
     await expect(page.locator('#cg-sex-separate')).toBeDisabled();
@@ -1123,15 +1127,15 @@ test.describe("the tool's collapsible sections", () => {
 
       await expect(body).toBeHidden();
 
-      await toggle.click(); // open
+      await tapOn(toggle); // open
       await expect(body).toBeVisible();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-      await toggle.click(); // close
+      await tapOn(toggle); // close
       await expect(body).toBeHidden();
       await expect(toggle).toBeVisible(); // the header itself is never hidden
 
-      await toggle.click(); // reopen
+      await tapOn(toggle); // reopen
       await expect(body).toBeVisible();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
@@ -1171,8 +1175,8 @@ test.describe("the tool's collapsible sections — Indonesian", () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.check('input[name="leftovers"][value="bunch"]');
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.locator('input[name="leftovers"][value="bunch"]'));
     await expect(page.locator('#cg-grouping-toggle')).toHaveText(
       'Opsi pengelompokan · sisa dalam satu kelompok',
     );
@@ -1198,11 +1202,11 @@ test.describe("the tool's collapsible sections — Indonesian", () => {
     await page.goto('/id/classroom-groups');
     const toggle = page.locator('#cg-grouping-toggle');
     const body = page.locator('#cg-grouping-body');
-    await toggle.click();
+    await tapOn(toggle);
     await expect(body).toBeVisible();
-    await toggle.click();
+    await tapOn(toggle);
     await expect(body).toBeHidden();
-    await toggle.click();
+    await tapOn(toggle);
     await expect(body).toBeVisible();
   });
 });
@@ -1239,7 +1243,7 @@ test.describe('Grouping options', () => {
     await expect(page.getByText('If students are left over')).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(body.getByLabel('Mix boys and girls evenly')).toBeVisible();
     await expect(body.getByLabel('Keep boys and girls separate')).toBeVisible();
     await expect(body.getByText('If students are left over')).toBeVisible();
@@ -1251,7 +1255,7 @@ test.describe('Grouping options', () => {
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(
       body.getByLabel('Mix boys and girls evenly'),
     ).not.toBeChecked();
@@ -1267,7 +1271,7 @@ test.describe('Grouping options', () => {
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(body.getByLabel('Mix boys and girls evenly')).toBeDisabled();
     await expect(
       body.getByLabel('Keep boys and girls separate'),
@@ -1289,7 +1293,7 @@ test.describe('Grouping options', () => {
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(body.getByLabel('Mix boys and girls evenly')).toHaveAttribute(
       'aria-describedby',
       'cg-sex-why',
@@ -1325,7 +1329,7 @@ test.describe('Grouping options', () => {
         await expect(page.locator('#cg-sex-mix')).toBeHidden();
 
         const body = page.locator('#cg-grouping-body');
-        await page.locator('#cg-grouping-toggle').click();
+        await tapOn(page.locator('#cg-grouping-toggle'));
         const labels = await body
           .locator('#cg-sex-mix, #cg-sex-separate')
           .evaluateAll((els) =>
@@ -1367,7 +1371,7 @@ test.describe('Grouping options', () => {
       ['M', 'Ana'],
       ['F', 'Budi'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeEnabled();
     await expect(page.getByLabel('Keep boys and girls separate')).toBeEnabled();
     // The reason paragraph is not merely blank -- it is gone. A visible
@@ -1382,8 +1386,8 @@ test.describe('Grouping options', () => {
     page,
   }) => {
     await buildRoster(page, [['M', 'Ana'], ['F', 'Budi'], [null]]);
-    await page.locator('.cg-student').nth(2).getByLabel('Absent').check();
-    await page.locator('#cg-grouping-toggle').click();
+    await setCheckedOn(page.locator('.cg-student').nth(2).getByLabel('Absent'));
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeEnabled();
     await expect(page.getByLabel('Keep boys and girls separate')).toBeEnabled();
   });
@@ -1400,11 +1404,11 @@ test.describe('Grouping options', () => {
       [null, 'Dewi'],
     ]);
     const dewi = page.locator('.cg-student').nth(2);
-    await dewi.getByLabel('Absent').check();
-    await page.locator('#cg-grouping-toggle').click();
+    await setCheckedOn(dewi.getByLabel('Absent'));
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeEnabled();
 
-    await dewi.getByLabel('Absent').uncheck();
+    await setCheckedOn(dewi.getByLabel('Absent'), false);
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeDisabled();
     await expect(
       page.getByLabel('Keep boys and girls separate'),
@@ -1428,12 +1432,15 @@ test.describe('Grouping options', () => {
       [null, 'Cahya'],
       [null, 'Dewi'],
     ]);
-    await page.locator('.cg-student').nth(2).getByLabel('Absent').check();
-    await page.locator('#cg-grouping-toggle').click();
+    await setCheckedOn(page.locator('.cg-student').nth(2).getByLabel('Absent'));
+    await tapOn(page.locator('#cg-grouping-toggle'));
     // Cahya alone still holds them shut, so this was never open.
     await expect(page.getByLabel('Mix boys and girls evenly')).toBeDisabled();
 
-    await page.locator('.cg-student').nth(2).getByLabel('Absent').uncheck();
+    await setCheckedOn(
+      page.locator('.cg-student').nth(2).getByLabel('Absent'),
+      false,
+    );
     await expect(
       page.getByText(
         '2 of the 3 students being grouped have no sex set. Open Student ' +
@@ -1465,11 +1472,11 @@ test.describe('Grouping options', () => {
       ['F', 'Gita'],
       ['F', 'Sari'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     await typeInto(page.getByLabel('Students in each group'), '4');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(
       page.getByText(
         'Gita and Sari have joined a group of boys because there were not ' +
@@ -1495,15 +1502,15 @@ test.describe('Grouping options', () => {
       ['F', 'Gita'],
       ['F', 'Sari'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     await typeInto(page.getByLabel('Students in each group'), '4');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.getByText(/have joined a group of boys/)).toBeVisible();
 
-    await page.getByLabel('Keep boys and girls separate').uncheck();
-    await page.getByRole('button', { name: 'Shuffle again' }).first().click();
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'), false);
+    await tapOn(page.getByRole('button', { name: 'Shuffle again' }).first());
     await expect(page.getByText(/have joined a group of boys/)).toHaveCount(0);
   });
 });
@@ -1523,7 +1530,7 @@ test.describe('Grouping options — Indonesian', () => {
     await expect(page.getByText('Jika ada siswa tersisa')).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(
       body.getByLabel('Campur siswa laki-laki dan perempuan secara merata'),
     ).toBeVisible();
@@ -1541,7 +1548,7 @@ test.describe('Grouping options — Indonesian', () => {
     ).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(
       body.getByLabel('Campur siswa laki-laki dan perempuan secara merata'),
     ).not.toBeChecked();
@@ -1559,7 +1566,7 @@ test.describe('Grouping options — Indonesian', () => {
     ).toBeHidden();
 
     const body = page.locator('#cg-grouping-body');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(
       body.getByLabel('Campur siswa laki-laki dan perempuan secara merata'),
     ).toBeDisabled();
@@ -1584,8 +1591,8 @@ test.describe('Grouping options — Indonesian', () => {
 test.describe('Grouping options, live from the roster — Indonesian', () => {
   const openRosterId = async (page: import('@playwright/test').Page) => {
     await page.goto('/id/classroom-groups');
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Tambah siswa' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
   };
 
   test('enabled once every student being grouped has a sex', async ({
@@ -1603,7 +1610,7 @@ test.describe('Grouping options, live from the roster — Indonesian', () => {
       .nth(1)
       .getByLabel('Jenis kelamin')
       .selectOption('F');
-    await page.locator('#cg-grouping-toggle').click();
+    await tapOn(page.locator('#cg-grouping-toggle'));
     // Both switches, as its English twin reads (#426): this read Mix alone,
     // so a Separate switch that never enabled passed in Indonesian.
     await expect(
@@ -1632,13 +1639,13 @@ test.describe('Grouping options, live from the roster — Indonesian', () => {
       .selectOption('F');
     const dewi = page.locator('.cg-student').nth(2);
     await typeInto(dewi.getByLabel('Nama'), 'Dewi');
-    await dewi.getByLabel('Tidak hadir').check();
-    await page.locator('#cg-grouping-toggle').click();
+    await setCheckedOn(dewi.getByLabel('Tidak hadir'));
+    await tapOn(page.locator('#cg-grouping-toggle'));
     await expect(
       page.getByLabel('Campur siswa laki-laki dan perempuan secara merata'),
     ).toBeEnabled();
 
-    await dewi.getByLabel('Tidak hadir').uncheck();
+    await setCheckedOn(dewi.getByLabel('Tidak hadir'), false);
     await expect(
       page.getByLabel('Campur siswa laki-laki dan perempuan secara merata'),
     ).toBeDisabled();
@@ -1677,7 +1684,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
       async ({ page }) => {
         await page.setViewportSize({ width, height: 950 });
         await openRoster(page);
-        await page.locator('.cg-add-student').click();
+        await tapOn(page.locator('.cg-add-student'));
         await expect(page.locator('.cg-roster-number').first()).toHaveValue(
           '1',
         );
@@ -1737,7 +1744,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
           // openRoster already adds one, so three more makes four — enough rows
           // that a wrapping or spilling control shows up.
           for (let i = 0; i < 3; i++)
-            await page.locator('.cg-add-student').click();
+            await tapOn(page.locator('.cg-add-student'));
           await expect(page.locator('.cg-student')).toHaveCount(4);
           const worst = await spillPastCard(page, 'cg-students');
           expect(
@@ -1757,7 +1764,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.locator('.cg-add-student').click();
+    await tapOn(page.locator('.cg-add-student'));
     const appearances = await page.evaluate(() =>
       [...document.querySelectorAll('#cg-form input[type=number]')].map(
         (el) => ({
@@ -1787,7 +1794,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     // A touch device has no wheel to guard against, and WebKit's mobile
     // emulation rejects mouse.wheel outright. The behaviour under test only
     // exists where a wheel does.
-    test.skip(!!isMobile, 'no mouse wheel on a touch device');
+    test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
     await count.focus();
@@ -1814,7 +1821,7 @@ test.describe('the five the operator asked for', () => {
     await expect(page.locator('#cg-count')).toHaveAttribute('max', '100');
     await typeInto(page.locator('#cg-count'), '101');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     await expect(page.locator('#cg-error')).toContainText('The most is 100');
   });
 
@@ -1884,7 +1891,7 @@ test.describe('the five the operator asked for', () => {
     // moment the first deal starts, so a name-based locator stops resolving
     // exactly when this test needs to read it.
     const go = page.locator('#cg-go');
-    await go.click();
+    await tapOn(go);
     // The button stays live for the whole deal — pressing it again is the
     // documented way to reshuffle, so disabling it contradicted its label.
     await expect(go).toBeEnabled();
@@ -1906,10 +1913,10 @@ test.describe('the five the operator asked for', () => {
     }) => {
       const t = getStrings(localeFromPath(path));
       await page.goto(path);
-      await page.locator('#cg-students-toggle').click();
-      await page
-        .getByRole('button', { name: t.rosterAddSeveral, exact: true })
-        .click();
+      await tapOn(page.locator('#cg-students-toggle'));
+      await tapOn(
+        page.getByRole('button', { name: t.rosterAddSeveral, exact: true }),
+      );
       // A VISIBLE label, not only an aria-label: the field used to appear as
       // a bare number box with nothing on screen saying what it counted.
       await expect(page.locator('label.cg-add-several-label')).toBeVisible();
@@ -1984,7 +1991,7 @@ test.describe('the on-screen keyboard', () => {
     // Tapped, as a teacher does: Chrome raises the keyboard only for a field
     // focused by a gesture, never for one a script focuses (measured on the
     // phone: `fill` alone opened none).
-    await page.click('#cg-size');
+    await tapOn(page.locator('#cg-size'));
     await page.keyboard.type('3');
     // A keyboard rises a few hundred milliseconds after the field takes focus
     // (about 300 ms on the test phone); three seconds is the stated ceiling.
