@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { PUBLISHED_ROUTES } from './published-paths';
@@ -48,20 +49,20 @@ for (const theme of THEMES) {
           await page.goto('/');
           await expectTheme(page, theme);
           const menu = page.locator('header details.menu > summary');
-          await menu.click();
+          await tapOn(menu);
           await expect(page.locator('header nav a').first()).toBeVisible();
           await shoot(page, `${theme}: the phone menu, open`);
-          await menu.click();
+          await tapOn(menu);
 
           const languages = page.locator('header details.lang-switch');
-          await languages.locator('summary').click();
+          await tapOn(languages.locator('summary'));
           await expect(languages.locator('a.entry').first()).toBeVisible();
           await shoot(
             page,
             `${theme}: the language list, open beside the compact label`,
             languages,
           );
-          await languages.locator('summary').click();
+          await tapOn(languages.locator('summary'));
 
           const toggle = page.locator('header [data-theme-toggle]');
           await page.keyboard.press('Shift');
@@ -117,7 +118,7 @@ for (const theme of THEMES) {
           await shoot(page, `${theme}: the print preview`);
           await page.emulateMedia({ media: 'screen' });
 
-          await page.getByRole('button', { name: 'Full screen' }).click();
+          await tapOn(page.getByRole('button', { name: 'Full screen' }));
           await expect(page.locator('#cg-board')).toBeVisible();
           await shoot(page, `${theme}: the full-screen board`);
         },

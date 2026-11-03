@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { makeGroups } from '../make-groups';
@@ -103,8 +104,8 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
     // script never ran at all. The first version of this test named
     // `cg-sound` as its control in a comment and never asserted it: a
     // comment is not a control.
-    await page.locator('#cg-sound-toggle').click();
-    await page.uncheck('#cg-sound-check');
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
 
     // The WHOLE of both stores, not a probe for a key name this test
     // invented: a guessed key would pass against any implementation that
@@ -274,7 +275,7 @@ test.describe('privacy — with JavaScript blocked', () => {
       // proof is concrete rather than resting on that guarantee alone.
       await typeInto(page.locator('#cg-count'), '24');
       await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B');
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       // WebKit schedules the form's GET after the click has returned, so the
       // click's own wait for navigations can end before it starts, and the URL
       // read next was the old one (#449, run 37026039545). Wait for the
@@ -347,7 +348,7 @@ test.describe('privacy — when the script dies half-way', () => {
         );
       });
     });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('html')).toHaveAttribute(
       'data-submit-prevented',
       'true',
@@ -391,9 +392,9 @@ test.describe('privacy — when storage is unavailable', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).toBeChecked();
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     // The label still tracks the control — the write failed, silently and
     // correctly, without breaking the widget.
     await expect(page.locator('#cg-sound-text')).toHaveText('Sound off');
@@ -462,7 +463,9 @@ test.describe('privacy — the roster never leaves memory', () => {
       ...ROSTER_NAMES,
     );
 
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await expectNothingStored(
       page,
       'after marking a student absent',
@@ -470,7 +473,7 @@ test.describe('privacy — the roster never leaves memory', () => {
     );
 
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await expectNothingStored(page, 'after shuffling', ...ROSTER_NAMES);
 
@@ -484,8 +487,8 @@ test.describe('privacy — the roster never leaves memory', () => {
     // under a fixed key, with a value from a fixed set. That is the whole
     // of what this tool is permitted to persist, and it is why the
     // assertions above can be as blunt as "the word Ana is nowhere".
-    await page.locator('#cg-sound-toggle').click();
-    await page.uncheck('#cg-sound-check');
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('cg-sound')))
       .toBe('off');
@@ -499,7 +502,7 @@ test.describe('privacy — the roster never leaves memory', () => {
   test('a reload loses the roster', async ({ page }) => {
     await buildRoster(page, [['F', 'Ana']]);
     await page.reload();
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(page.locator('.cg-student')).toHaveCount(0);
   });
 
@@ -543,10 +546,10 @@ test.describe('privacy — the roster never leaves memory', () => {
       .nth(2)
       .getByLabel('Apart')
       .selectOption('A');
-    await page.getByLabel('Number of groups').check();
+    await setCheckedOn(page.getByLabel('Number of groups'));
     await typeInto(page.getByLabel('How many groups'), '2');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
 
     // Both Anas are on the sheet. Under a name-matching engine the second
@@ -591,7 +594,7 @@ test.describe('privacy — the roster never leaves memory', () => {
 test.describe('privacy — the roster still never persists, after the new paths', () => {
   test('an import writes nothing', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
     await expect(page.getByText('Imported 2 students.')).toBeVisible();
     await expectNothingStored(page, 'after an import', ...ROSTER_NAMES);
@@ -604,7 +607,7 @@ test.describe('privacy — the roster still never persists, after the new paths'
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await downloadName(page, 'Export class list');
     await expectNothingStored(page, 'after an export', ...ROSTER_NAMES);
     // The blob URL is revoked the moment the click is dispatched, so no
@@ -625,14 +628,14 @@ test.describe('privacy — the roster still never persists, after the new paths'
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await newPage.waitForLoadState();
-    await newPage.locator('#cg-students-toggle').click();
+    await tapOn(newPage.locator('#cg-students-toggle'));
     await expect(newPage.locator('.cg-student')).toHaveCount(2);
     await expectNothingStored(
       page,
@@ -648,11 +651,11 @@ test.describe('privacy — the roster still never persists, after the new paths'
 
   test('a reload after an import still loses the roster', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
     await expect(page.getByText('Imported 1 student.')).toBeVisible();
     await page.reload();
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(page.locator('.cg-student')).toHaveCount(0);
   });
 });

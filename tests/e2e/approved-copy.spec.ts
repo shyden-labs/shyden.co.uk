@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -62,7 +63,7 @@ const openTool = async (
   await refuseFullscreen(context);
   await rosterWithAnAbsence(page);
   await giveEveryoneASex(page);
-  await page.locator('#cg-io-toggle').click();
+  await tapOn(page.locator('#cg-io-toggle'));
   const [, tool] = await Promise.all([
     page.waitForEvent('download'),
     context.waitForEvent('page'),
@@ -70,10 +71,11 @@ const openTool = async (
   ]);
   await tool.waitForLoadState();
   // The refusal reached the popup. Without it this spec does not fail, it
-  // flakes, which is how #344 went unexplained.
+  // flakes, which is how #344 went unexplained. Judged by the function no
+  // longer being the browser's own, not by a word inside the stub (#1007).
   expect(
     await tool.evaluate(() => String(Element.prototype.requestFullscreen)),
-  ).toContain('refused');
+  ).not.toContain('[native code]');
   return tool;
 };
 
@@ -89,7 +91,7 @@ test.describe('the copy the operator approved on #161', () => {
 
       const howTo = tool.locator('#cg-howto-toggle');
       await expect(howTo).toHaveAttribute('aria-expanded', 'false');
-      await howTo.click();
+      await tapOn(howTo);
       const step = tool.locator('#cg-howto-body ol li').nth(2);
       await expectVisibleText(step, t.howToSteps[2]);
       await shoot(
@@ -115,7 +117,7 @@ test.describe('the copy the operator approved on #161', () => {
         students,
       );
 
-      await students.click();
+      await tapOn(students);
       const together = tool.getByRole('columnheader', {
         name: t.rosterColTogether,
         exact: true,
@@ -136,7 +138,7 @@ test.describe('the copy the operator approved on #161', () => {
       const tool = await openTool(page, context, locale);
 
       const go = tool.locator('#cg-go');
-      await go.click();
+      await tapOn(go);
       const heading = tool.locator('#cg-results-h');
       await expectVisibleText(heading, t.resultsHeading);
       await expectVisibleText(go, t.again);
@@ -149,7 +151,7 @@ test.describe('the copy the operator approved on #161', () => {
       );
 
       await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
-      await go.click();
+      await tapOn(go);
       await expectVisibleText(
         heading,
         t.resultsHeadingNamed({ className: '6A' }),
@@ -160,7 +162,7 @@ test.describe('the copy the operator approved on #161', () => {
         heading,
       );
 
-      await board.click();
+      await tapOn(board);
       // Inside the board's own bar: in zh the page's button reads the same
       // `重新洗牌`, and a page-wide match would find that one too.
       const bar = tool.locator('#cg-board-bar');
@@ -179,7 +181,7 @@ test.describe('the copy the operator approved on #161', () => {
         `${locale}: the board offers “${t.boardShuffle}”`,
         shuffle,
       );
-      await bar.getByRole('button', { name: t.boardExit, exact: true }).click();
+      await tapOn(bar.getByRole('button', { name: t.boardExit, exact: true }));
     });
 
     test(`${locale}: the class list file reads as approved`, async ({
@@ -192,7 +194,7 @@ test.describe('the copy the operator approved on #161', () => {
       // Named for a class, as a teacher's list is: the file then opens with
       // the class comment, and the header is its second line.
       await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
-      await tool.locator('#cg-io-toggle').click();
+      await tapOn(tool.locator('#cg-io-toggle'));
       const file = await downloadText(tool, t.ioExportClassList);
       // The header CELLS, compared exactly: a header word is a parsing token,
       // and a substring test would pass `性` inside `性别`.

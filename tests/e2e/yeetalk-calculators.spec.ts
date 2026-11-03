@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
@@ -40,7 +41,7 @@ test.describe('glory points calculator', () => {
     }) => {
       await page.goto('/yeetalk-calculators');
       await typeInto(page.locator(`#${calculator.id}-input`), '1000');
-      await page.click(`#${calculator.id}-submit`);
+      await tapOn(page.locator(`#${calculator.id}-submit`));
       // The whole line, so each amount sits in its own place: three
       // order-free substring checks passed with coins and beans swapped (#390
       // F124). The amounts are literals, the sentence is the catalogue's.
@@ -64,7 +65,7 @@ test.describe('glory points calculator', () => {
     // yeetalk-calculators.ts.
     await page.goto('/id/yeetalk-calculators');
     await typeInto(page.locator('#glory-input'), '1000');
-    await page.click('#glory-submit');
+    await tapOn(page.locator('#glory-submit'));
     await expectVisibleText(
       page.locator('#glory-result'),
       id.glory.resultLine('1.000', '1.112', '2.780'),
@@ -74,7 +75,7 @@ test.describe('glory points calculator', () => {
   test('the Indonesian calculator refuses in Indonesian', async ({ page }) => {
     await page.goto('/id/yeetalk-calculators');
     await typeInto(page.locator('#glory-input'), 'abc');
-    await page.click('#glory-submit');
+    await tapOn(page.locator('#glory-submit'));
     // The English fallback at yeetalk-calculators.ts would render the raw English
     // message here; the map must actually cover this code. Named, not merely
     // "not English": any other Indonesian sentence passed that (#390 F124).
@@ -125,7 +126,7 @@ test.describe('glory points calculator', () => {
         await page.goto('/yeetalk-calculators');
         if (input)
           await typeInto(page.locator(`#${calculator.id}-input`), input);
-        await page.click(`#${calculator.id}-submit`);
+        await tapOn(page.locator(`#${calculator.id}-submit`));
         await expectVisibleText(
           page.locator(`#${calculator.id}-error`),
           message,
