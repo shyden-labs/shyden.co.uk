@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -111,7 +112,7 @@ test.describe('the roster table', () => {
   test('an unnamed row renders Student N in the results', async ({ page }) => {
     await openRoster(page);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     await expect(page.locator('#cg-results')).toContainText('Student 1');
   });
 
@@ -123,9 +124,9 @@ test.describe('the roster table', () => {
     }) => {
       await openRoster(page, path);
       const t = getStrings(localeFromPath(path));
-      await page
-        .getByRole('button', { name: t.rosterAddStudent, exact: true })
-        .click();
+      await tapOn(
+        page.getByRole('button', { name: t.rosterAddStudent, exact: true }),
+      );
       const nameBox = (row: number) =>
         page
           .locator('#cg-roster tbody tr')
@@ -228,10 +229,10 @@ test.describe('the roster table', () => {
     const row = page.locator('.cg-student').first();
     await typeInto(row.getByLabel('Name'), 'Ana');
     await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Absent').check();
+    await setCheckedOn(row.getByLabel('Absent'));
     await row.getByLabel('Together').selectOption('A');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     // The groups arrived (#425): a silence over a press that made nothing
     // has not run the code that renders them.
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
@@ -246,8 +247,8 @@ test.describe('the roster table', () => {
 test.describe('numbers', () => {
   test('assigned 1, 2, 3… in the order rows are added', async ({ page }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     // Individually, not `toHaveValue(['1','2','3'])` against the whole
     // multi-element locator -- unlike `toHaveText`, `toHaveValue` is a
     // single-element (strict-mode) matcher and does not accept an array for
@@ -267,7 +268,7 @@ test.describe('numbers', () => {
     await expect(first).toHaveValue('50');
     // Proves the override reached the actual roster, not just the visible
     // input: the next student added takes one past 50, not one past 1.
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(
       page.locator('.cg-student').nth(1).getByLabel('#'),
     ).toHaveValue('51');
@@ -283,10 +284,12 @@ test.describe('absence', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     await expect(page.locator('#cg-results')).not.toContainText('Student 1');
     await expect(page.locator('#cg-results')).toContainText('Student 2');
   });
@@ -294,7 +297,7 @@ test.describe('absence', () => {
   test('nothing in the row is disabled by ticking it', async ({ page }) => {
     await openRoster(page);
     const row = page.locator('.cg-student').first();
-    await row.getByLabel('Absent').check();
+    await setCheckedOn(row.getByLabel('Absent'));
     for (const label of ['Name', 'Sex', 'Together', 'Apart']) {
       await expect(row.getByLabel(label), label).toBeEnabled();
     }
@@ -399,8 +402,10 @@ test.describe('an absent student', () => {
   test('the count line reads students, here and absent', async ({ page }) => {
     await openRoster(page);
     await addSeveral(page, 23);
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await page.locator('.cg-student').nth(1).getByLabel('Absent').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await setCheckedOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
     await expect(page.locator('#cg-roster-count')).toHaveText(
       '24 students · 22 here · 2 absent',
     );
@@ -412,7 +417,7 @@ test.describe('an absent student', () => {
     // refused to group, so "anywhere" never included the results.
     await addSeveral(page, 3);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/\baway\b/);
   });
@@ -504,7 +509,7 @@ test.describe('together/apart letters', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const row0 = page.locator('.cg-student').nth(0);
     const row1 = page.locator('.cg-student').nth(1);
 
@@ -639,7 +644,7 @@ test.describe('headers follow the roster, live', () => {
     [
       'an absence',
       (page) =>
-        page.locator('.cg-student').first().getByLabel('Absent').check(),
+        setCheckedOn(page.locator('.cg-student').first().getByLabel('Absent')),
     ],
     [
       'a together letter',
@@ -663,23 +668,24 @@ test.describe('headers follow the roster, live', () => {
     ],
     [
       'a student added',
-      (page) => page.getByRole('button', { name: 'Add student' }).click(),
+      (page) => tapOn(page.getByRole('button', { name: 'Add student' })),
     ],
     [
       'a student removed',
       (page) =>
-        page
-          .locator('.cg-student')
-          .first()
-          .getByRole('button', { name: 'Remove' })
-          .click(),
+        tapOn(
+          page
+            .locator('.cg-student')
+            .first()
+            .getByRole('button', { name: 'Remove' }),
+        ),
     ],
   ];
   for (const [change, make] of ROSTER_CHANGES)
     test(`${change} makes a saved roster unsaved`, async ({ page }) => {
       await openRoster(page);
       await addSeveral(page, 1);
-      await page.locator('#cg-io-toggle').click();
+      await tapOn(page.locator('#cg-io-toggle'));
       await downloadName(page, 'Export class list');
       const state = page.locator('#cg-io .state');
       await expect(state).toHaveText('nothing to save yet');
@@ -699,7 +705,7 @@ test.describe('headers follow the roster, live', () => {
     await expect(page.locator('#cg-io .state')).toHaveText(
       'unsaved changes — export to keep them',
     );
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
     await expect(page.locator('#cg-io .state')).toHaveText(
       'nothing to save yet',
     );
@@ -729,7 +735,7 @@ test.describe('headers follow the roster, live', () => {
 test.describe('validation as it is typed', () => {
   test('a duplicate number is refused as it is typed', async ({ page }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
     // and before the button is ever pressed
@@ -742,7 +748,7 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const row0 = page.locator('.cg-student').nth(0);
     const row1 = page.locator('.cg-student').nth(1);
     await row0.getByLabel('Together').selectOption('A');
@@ -759,7 +765,7 @@ test.describe('validation as it is typed', () => {
 
   test('a gap warns but does not block', async ({ page }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.getByText(/looks incomplete/)).toBeVisible();
     await giveEveryoneASex(page);
@@ -767,7 +773,7 @@ test.describe('validation as it is typed', () => {
     await expect(go).toBeEnabled();
     // And pressing it makes groups (#425): an enabled button that then
     // refused would still be a block.
-    await go.click();
+    await tapOn(go);
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
   });
 
@@ -782,7 +788,7 @@ test.describe('validation as it is typed', () => {
       page.locator('.cg-student').first().getByLabel('Name'),
       'Eko',
     );
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(
       page.getByText(
@@ -802,7 +808,7 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
     await typeInto(secondNumber, '1');
     await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
@@ -819,7 +825,7 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.locator('#cg-roster-problem')).toHaveAttribute(
       'role',
@@ -835,7 +841,7 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.locator('#cg-roster-warning')).toHaveAttribute(
       'role',
@@ -852,7 +858,7 @@ test.describe('validation as it is typed', () => {
       page,
     }) => {
       await openRoster(page);
-      await page.getByRole('button', { name: 'Add student' }).click();
+      await tapOn(page.getByRole('button', { name: 'Add student' }));
       await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
       const warning = page.locator('#cg-roster-warning');
       await expect(warning).toBeVisible();
@@ -875,7 +881,7 @@ test.describe('validation as it is typed', () => {
     page,
   }) => {
     await openRoster(page);
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
     await typeInto(secondNumber, '1');
     await expect(
@@ -924,14 +930,14 @@ test.describe('adding, removing, and the two limits', () => {
     page.on('dialog', () => {
       throw new Error('a dialog was opened');
     });
-    await page.getByRole('button', { name: 'Add several' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add several' }));
     await expect(page.getByLabel('How many to add?')).toBeVisible();
   });
 
   test('a new student takes one past the highest', async ({ page }) => {
     await openRoster(page);
     await typeInto(page.locator('.cg-student').first().getByLabel('#'), '5');
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(
       page.locator('.cg-student').nth(1).getByLabel('#'),
     ).toHaveValue('6');
@@ -946,7 +952,7 @@ test.describe('adding, removing, and the two limits', () => {
     await openRoster(page);
     await addSeveral(page, 3); // rows #1, 2, 3, 4
     await typeInto(page.locator('.cg-student').nth(3).getByLabel('#'), '5'); // now 1, 2, 3, 5 -- a real gap at 4
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(
       page.locator('.cg-student').nth(4).getByLabel('#'),
     ).toHaveValue('6');
@@ -992,9 +998,9 @@ test.describe('adding, removing, and the two limits', () => {
   }) => {
     await openRoster(page);
     await addSeveral(page, 89);
-    await page.getByRole('button', { name: 'Add several' }).click();
+    await tapOn(page.getByRole('button', { name: 'Add several' }));
     await typeInto(page.getByLabel('How many to add?'), '20');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await tapOn(page.getByRole('button', { name: 'Add', exact: true }));
     await expect(
       page.getByText('There is room for 10 more students.'),
     ).toBeVisible();
@@ -1008,7 +1014,7 @@ test.describe('adding, removing, and the two limits', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Number of students'), '300');
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(
       page.getByText(
         'Student details holds up to 100 students. Lower the number to list this class individually.',
@@ -1032,12 +1038,12 @@ test.describe('adding, removing, and the two limits', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Number of students'), '300');
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(
       page.getByText('Student details holds up to 100 students.'),
     ).toBeVisible();
     await typeInto(page.getByLabel('Number of students'), '50');
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(
       page.getByRole('button', { name: 'Add student' }),
     ).toBeVisible();
@@ -1056,11 +1062,12 @@ test.describe('removing a student', () => {
     await openRoster(page);
     await addSeveral(page, 2); // three rows: 1, 2, 3
     await expect(page.locator('.cg-student')).toHaveCount(3);
-    await page
-      .locator('.cg-student')
-      .nth(1)
-      .getByRole('button', { name: 'Remove' })
-      .click();
+    await tapOn(
+      page
+        .locator('.cg-student')
+        .nth(1)
+        .getByRole('button', { name: 'Remove' }),
+    );
     await expect(page.locator('.cg-student')).toHaveCount(2);
   });
 
@@ -1072,11 +1079,12 @@ test.describe('removing a student', () => {
   test('does not renumber the remaining students', async ({ page }) => {
     await openRoster(page);
     await addSeveral(page, 2); // three rows: 1, 2, 3
-    await page
-      .locator('.cg-student')
-      .nth(1)
-      .getByRole('button', { name: 'Remove' })
-      .click();
+    await tapOn(
+      page
+        .locator('.cg-student')
+        .nth(1)
+        .getByRole('button', { name: 'Remove' }),
+    );
     const rows = page.locator('.cg-student');
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0).getByLabel('#')).toHaveValue('1');
@@ -1095,7 +1103,7 @@ test.describe('removing a student', () => {
     await addSeveral(page, 2); // three rows: 1, 2, 3
     const rows = page.locator('.cg-student');
     await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
-    await rows.nth(1).getByRole('button', { name: 'Remove' }).click();
+    await tapOn(rows.nth(1).getByRole('button', { name: 'Remove' }));
     await expect(page.locator('.cg-student')).toHaveCount(2);
     await expect(
       page.locator('.cg-student').first().getByLabel('Name'),
@@ -1113,11 +1121,12 @@ test.describe('removing a student', () => {
     await expect(
       page.getByRole('button', { name: 'Add student' }),
     ).toBeDisabled();
-    await page
-      .locator('.cg-student')
-      .first()
-      .getByRole('button', { name: 'Remove' })
-      .click();
+    await tapOn(
+      page
+        .locator('.cg-student')
+        .first()
+        .getByRole('button', { name: 'Remove' }),
+    );
     await expect(page.locator('.cg-student')).toHaveCount(99);
     await expect(
       page.getByRole('button', { name: 'Add student' }),
@@ -1159,8 +1168,8 @@ test.describe('the Students box becomes a read-out', () => {
   test('typeable with no list; a read-out with one', async ({ page }) => {
     await page.goto('/classroom-groups');
     await expect(page.getByLabel('Number of students')).toBeEditable();
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(page.getByLabel('Number of students')).not.toBeEditable();
   });
 
@@ -1198,7 +1207,7 @@ test.describe('the Students box becomes a read-out', () => {
       page.locator('.number-fields'),
     );
 
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
     for (const field of fields) await expect(field).toBeEditable();
     await shoot(
       page,
@@ -1231,8 +1240,8 @@ test.describe('the Students box becomes a read-out', () => {
     await expect(problem).toBeVisible();
     await expect(go).toBeDisabled();
 
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     // The list's own rule, so that only the number fields could hold it.
     await giveEveryoneASex(page);
     await expect(page.locator('#cg-numbers-absent')).not.toBeEditable();
@@ -1254,7 +1263,7 @@ test.describe('the Students box becomes a read-out', () => {
     await expect(problem).toBeHidden();
     await expect(go).toBeEnabled();
 
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
     await expect(page.locator('#cg-numbers-absent')).toBeEditable();
     await expect(problem).toBeVisible();
     await expect(problem).toHaveText(/^There is no number 26\./);
@@ -1269,8 +1278,8 @@ test.describe('the Students box becomes a read-out', () => {
 
   test('the reason is rendered, not implied', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(
       page.getByText(
         'Set by your list. Add or remove students in Student details to change it.',
@@ -1308,7 +1317,7 @@ test.describe('the Students box becomes a read-out', () => {
     // and `toBeEditable()` alone asserts nothing.
     await expect(box).not.toBeEditable();
 
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
     await expect(box).toBeEditable();
     await expectStudentsBoxReports(box, built);
   });
@@ -1325,7 +1334,7 @@ test.describe('the Students box becomes a read-out', () => {
     // and one reading after the fact cannot tell an unmoved value from one
     // that was never right.
     await expectStudentsBoxReports(box, built);
-    await rows.first().getByLabel('Absent').check();
+    await setCheckedOn(rows.first().getByLabel('Absent'));
     await expectStudentsBoxReports(box, built);
 
     await expect(page.locator('#cg-roster-count')).toHaveText(
@@ -1338,12 +1347,15 @@ test.describe('the Students box becomes a read-out', () => {
   }) => {
     await openRoster(page);
     for (const n of [5, 3, 11]) await addSeveral(page, n);
-    await page
-      .locator('.cg-student')
-      .nth(2)
-      .getByRole('button', { name: 'Remove' })
-      .click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await tapOn(
+      page
+        .locator('.cg-student')
+        .nth(2)
+        .getByRole('button', { name: 'Remove' }),
+    );
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     const rows = await page.locator('.cg-student').count();
     await expect(page.getByLabel('Number of students')).toHaveValue(
       String(rows),
@@ -1395,12 +1407,12 @@ test.describe('the Students box becomes a read-out', () => {
     await expect(
       page.getByText('Students are anonymous and numbered'),
     ).toBeVisible();
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Add student' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     await expect(
       page.getByText('Students are anonymous and numbered'),
     ).toBeHidden();
-    await page.getByRole('button', { name: 'Clear all' }).click();
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
     await expect(
       page.getByText('Students are anonymous and numbered'),
     ).toBeVisible();
@@ -1429,7 +1441,7 @@ test.describe('Indonesian', () => {
   test('an unnamed row renders Siswa N in the results', async ({ page }) => {
     await openRoster(page, '/id/classroom-groups');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Buat Kelompok' }).click();
+    await tapOn(page.getByRole('button', { name: 'Buat Kelompok' }));
     await expect(page.locator('#cg-results')).toContainText('Siswa 1');
   });
 
@@ -1440,8 +1452,12 @@ test.describe('Indonesian', () => {
   }) => {
     await openRoster(page, '/id/classroom-groups');
     await addSeveral(page, 23);
-    await page.locator('.cg-student').first().getByLabel('Tidak hadir').check();
-    await page.locator('.cg-student').nth(1).getByLabel('Tidak hadir').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Tidak hadir'),
+    );
+    await setCheckedOn(
+      page.locator('.cg-student').nth(1).getByLabel('Tidak hadir'),
+    );
     await expect(page.locator('#cg-roster-count')).toHaveText(
       '24 siswa · 22 hadir · 2 tidak hadir',
     );
@@ -1451,12 +1467,14 @@ test.describe('Indonesian', () => {
   // against a stray, untranslated English word, run on the Indonesian page.
   test('the word is never "away", anywhere', async ({ page }) => {
     await openRoster(page, '/id/classroom-groups');
-    await page.locator('.cg-student').first().getByLabel('Tidak hadir').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Tidak hadir'),
+    );
     // Three who are here, as in English (#425): with the only student absent
     // the page refused to group, and the results were never read.
     await addSeveral(page, 3);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Buat Kelompok' }).click();
+    await tapOn(page.getByRole('button', { name: 'Buat Kelompok' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/\baway\b/);
   });
@@ -1468,7 +1486,7 @@ test.describe('Indonesian', () => {
     page,
   }) => {
     await openRoster(page, '/id/classroom-groups');
-    await page.getByRole('button', { name: 'Tambah siswa' }).click();
+    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
     await expect(page.getByText(/Nomor 1 sudah dipakai/)).toBeVisible();
     await expect(
@@ -1481,7 +1499,7 @@ test.describe('Indonesian', () => {
     page,
   }) => {
     await openRoster(page, '/id/classroom-groups');
-    await page.getByRole('button', { name: 'Tambah siswa' }).click();
+    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     const row0 = page.locator('.cg-student').nth(0);
     const row1 = page.locator('.cg-student').nth(1);
     await row0.getByLabel('Bersama').selectOption('A');
@@ -1499,14 +1517,14 @@ test.describe('Indonesian', () => {
   // Mirrors 'a gap warns but does not block', above.
   test('a gap warns but does not block, in Indonesian', async ({ page }) => {
     await openRoster(page, '/id/classroom-groups');
-    await page.getByRole('button', { name: 'Tambah siswa' }).click();
+    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
     await expect(page.getByText(/tampak belum lengkap/)).toBeVisible();
     await giveEveryoneASex(page);
     const go = page.getByRole('button', { name: 'Buat Kelompok' });
     await expect(go).toBeEnabled();
     // And pressing it makes groups, as in English (#425).
-    await go.click();
+    await tapOn(go);
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
   });
 
@@ -1517,7 +1535,7 @@ test.describe('Indonesian', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '300');
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(
       page.getByText(
         'Detail siswa menampung hingga 100 siswa. Turunkan angkanya untuk mendaftar kelas ini satu per satu.',
@@ -1557,9 +1575,9 @@ test.describe('Indonesian', () => {
   }) => {
     await openRoster(page, '/id/classroom-groups');
     await addSeveral(page, 89);
-    await page.getByRole('button', { name: 'Tambah beberapa' }).click();
+    await tapOn(page.getByRole('button', { name: 'Tambah beberapa' }));
     await typeInto(page.getByLabel('Berapa yang ditambahkan?'), '20');
-    await page.getByRole('button', { name: 'Tambah', exact: true }).click();
+    await tapOn(page.getByRole('button', { name: 'Tambah', exact: true }));
     await expect(
       page.getByText('Masih ada ruang untuk 10 siswa lagi.'),
     ).toBeVisible();
@@ -1570,11 +1588,9 @@ test.describe('Indonesian', () => {
   test('removing a row lowers the roster, in Indonesian', async ({ page }) => {
     await openRoster(page, '/id/classroom-groups');
     await addSeveral(page, 2);
-    await page
-      .locator('.cg-student')
-      .nth(1)
-      .getByRole('button', { name: 'Hapus' })
-      .click();
+    await tapOn(
+      page.locator('.cg-student').nth(1).getByRole('button', { name: 'Hapus' }),
+    );
     await expect(page.locator('.cg-student')).toHaveCount(2);
   });
 
@@ -1590,15 +1606,15 @@ test.describe('Indonesian', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await expect(page.getByLabel('Jumlah siswa')).toBeEditable();
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: 'Tambah siswa' }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     await expect(page.getByLabel('Jumlah siswa')).not.toBeEditable();
     await expect(
       page.getByText(
         'Ditentukan oleh daftar Anda. Tambah atau hapus siswa di Detail siswa untuk mengubahnya.',
       ),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Hapus semua' }).click();
+    await tapOn(page.getByRole('button', { name: 'Hapus semua' }));
     await expect(page.getByLabel('Jumlah siswa')).toBeEditable();
     await expect(page.getByLabel('Jumlah siswa')).toHaveValue('1');
   });
@@ -1675,7 +1691,7 @@ for (const { name, width } of LAYOUTS) {
       await row.getByLabel('Sex').selectOption('F');
       await row.getByLabel('Together').selectOption('A');
       await row.getByLabel('Apart').selectOption('A');
-      await row.getByLabel('Absent').check();
+      await setCheckedOn(row.getByLabel('Absent'));
       await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
       await expect(row.getByLabel('Name')).toHaveValue('Ana');
       await expect(row.getByLabel('Sex')).toHaveValue('F');

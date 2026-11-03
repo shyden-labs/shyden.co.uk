@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -73,12 +74,12 @@ const openEverything = async (page: Page, path: string) => {
   // runtime population: the operations Swagger UI drew from the spec.
   const summaries = page.locator('#swagger .opblock-summary-control');
   await expect(summaries).toHaveCount(count);
-  for (const summary of await summaries.all()) await summary.click();
+  for (const summary of await summaries.all()) await tapOn(summary);
   await expect(page.locator('#swagger .opblock.is-open')).toHaveCount(count);
   const tryOuts = page.locator('#swagger .try-out__btn');
   await expect(tryOuts).toHaveCount(count);
   // runtime population: one Try it out per open operation.
-  for (const tryIt of await tryOuts.all()) await tryIt.click();
+  for (const tryIt of await tryOuts.all()) await tapOn(tryIt);
   const executes = page.locator('#swagger .btn.execute');
   await expect(executes).toHaveCount(count);
   // The fields the page's own spec requires a visitor to type: Swagger UI
@@ -86,7 +87,7 @@ const openEverything = async (page: Page, path: string) => {
   for (const name of requiredTextFields(docsSpecFile(path)))
     await typeInto(page.getByPlaceholder(name, { exact: true }), 'x');
   // runtime population: one Execute per operation.
-  for (const execute of await executes.all()) await execute.click();
+  for (const execute of await executes.all()) await tapOn(execute);
   await expect(
     page.locator('#swagger .live-responses-table .response'),
   ).toHaveCount(count);

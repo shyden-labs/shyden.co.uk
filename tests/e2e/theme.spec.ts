@@ -1,3 +1,4 @@
+import { doubleTapOn, tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -104,7 +105,7 @@ test.describe('the switch (#142 §5, AC3)', () => {
       const button = page.getByRole('button', { name, exact: true });
       await expect(button).toHaveCount(1);
       await expect(button).toHaveAttribute('aria-pressed', 'true');
-      await button.click();
+      await tapOn(button);
       await expectTheme(page, 'light');
       await expect(button).toHaveAttribute('aria-pressed', 'false');
       await shoot(
@@ -230,7 +231,7 @@ test.describe('the choice persists (#142 AC4)', () => {
   test('across a reload and a second page', async ({ page }) => {
     await page.goto('/');
     await expectTheme(page, 'dark');
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     await page.reload();
     await expectTheme(page, 'light');
@@ -249,7 +250,7 @@ test.describe('the choice persists (#142 AC4)', () => {
     { tag: '@requires-isolated-context' },
     async ({ page, browser, baseURL }) => {
       await page.goto('/');
-      await toggle(page).click();
+      await tapOn(toggle(page));
       await expectTheme(page, 'light');
       const storageState = await page.context().storageState();
       const session = await browser.newContext({
@@ -273,7 +274,7 @@ test.describe('the choice persists (#142 AC4)', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.setItem('theme', 'Dark'));
     await page.reload();
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     expect(await page.evaluate(() => localStorage.getItem('theme'))).toBe(
       'light',
@@ -284,7 +285,7 @@ test.describe('the choice persists (#142 AC4)', () => {
     page,
   }) => {
     await page.goto('/');
-    await toggle(page).dblclick();
+    await doubleTapOn(toggle(page));
     await expectTheme(page, 'dark');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate(() => localStorage.getItem('theme'))).toBe(
@@ -308,7 +309,7 @@ test.describe('storage refused (#142 AC7)', () => {
     const errors = recordErrors(page);
     await page.goto('/');
     await expectTheme(page, 'dark');
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
     await errors.expectNone('the theme script threw where storage is refused');
@@ -346,7 +347,7 @@ test.describe('the device (#142 AC2)', () => {
     page,
   }) => {
     await page.goto('/');
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     await page.emulateMedia({ colorScheme: 'light' });
     await page.emulateMedia({ colorScheme: 'dark' });
@@ -366,7 +367,7 @@ test.describe('the device (#142 AC2)', () => {
     });
     const errors = recordErrors(page);
     await page.goto('/');
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     await page.reload();
     await expectTheme(page, 'light');
@@ -388,7 +389,7 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
       });
     });
     await page.goto('/yeetalk-calculators');
-    await toggle(page).click();
+    await tapOn(toggle(page));
     await expectTheme(page, 'light');
     // A page restored from the back-forward cache fires `pageshow` and no
     // `load`, so `goBack()`'s default wait for `load` never ends where the cache
@@ -560,10 +561,10 @@ test.describe('nothing moves when the theme changes (#386)', () => {
           await page.evaluate(() => document.fonts.ready);
           await emulateTheme(page, 'dark');
           const dark = await boxes(page);
-          await toggle(page).click();
+          await tapOn(toggle(page));
           await expectTheme(page, 'light');
           const light = await boxes(page);
-          await toggle(page).click();
+          await tapOn(toggle(page));
           await expectTheme(page, 'dark');
           const darkAgain = await boxes(page);
 

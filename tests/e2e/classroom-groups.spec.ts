@@ -1,3 +1,4 @@
+import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { chooseSpeed } from '../make-groups';
@@ -54,7 +55,7 @@ const fill = async (
   if (opts.size !== undefined)
     await typeInto(page.locator('#cg-size'), opts.size);
   if (opts.groups !== undefined) {
-    await page.check('input[name="mode"][value="groupCount"]');
+    await setCheckedOn(page.locator('input[name="mode"][value="groupCount"]'));
     await typeInto(page.locator('#cg-groups'), opts.groups);
   }
   // Default to skip so the tests assert the RESULT, not the show. The
@@ -133,7 +134,7 @@ test.describe('classroom group creator', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Number of students'), '12');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     // 12 students at the default group size (4) => 3 groups.
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   });
@@ -182,7 +183,7 @@ test.describe('classroom group creator', () => {
       'number 7 typed into Student numbers',
       page.locator('.number-fields'),
     );
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     const results = page.locator('#cg-results');
     await expect(results.locator('.group')).toHaveCount(5);
@@ -332,7 +333,7 @@ test.describe('classroom group creator', () => {
   }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '22', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     // 22 students in groups of 4 => 5 groups.
     await expect(page.locator('#cg-results .group')).toHaveCount(5);
@@ -359,7 +360,7 @@ test.describe('classroom group creator', () => {
     // not 4 and 3.
     await page.goto('/classroom-groups');
     await fill(page, { count: '7', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-results .group')).toHaveCount(1);
     await expect(page.locator('#cg-results .student')).toHaveCount(7);
@@ -389,7 +390,7 @@ test.describe('classroom group creator', () => {
     // pins each full sentence, not a fragment of one.
     await page.goto('/classroom-groups');
     await fill(page, { count: '4', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
     expect(labels.sort()).toEqual([
       'Student 1',
@@ -425,7 +426,7 @@ test.describe('classroom group creator', () => {
     // of whether anyone watched it being dealt.
     await page.goto('/classroom-groups');
     await fill(page, { count: '8', size: '4', speed: 'skip' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student')).toHaveCount(8);
     await expect(page.locator('#cg-results .student').first()).toBeVisible();
   });
@@ -433,7 +434,7 @@ test.describe('classroom group creator', () => {
   test('the animation deals every card and settles', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     // Auto-retries until the deal finishes — no timing bet.
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     await expect(page.locator('#cg-go')).toBeEnabled();
@@ -446,8 +447,8 @@ test.describe('classroom group creator', () => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     // Sound is ON by default (operator decision) -- mute it before the run.
-    await page.uncheck('#cg-sound-check');
-    await page.click('#cg-go');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     expect(await audioContextCount(page)).toBe(0);
   });
@@ -459,13 +460,13 @@ test.describe('classroom group creator', () => {
     await page.goto('/classroom-groups');
     // Sound stays ON (the default) for this one.
     await fill(page, { count: '4', size: '2', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(4);
     expect(await audioContextCount(page)).toBe(1);
 
     // Shuffle again -- a second effect run must REUSE the context that
     // already exists, not open a second one.
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(4);
     expect(await audioContextCount(page)).toBe(1);
   });
@@ -527,8 +528,8 @@ test.describe('classroom group creator', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
-    await page.uncheck('#cg-sound-check');
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
 
     const seen = recordRequests(page);
 
@@ -537,11 +538,11 @@ test.describe('classroom group creator', () => {
     // LOAD time, which only a fresh load (not a same-page uncheck) can
     // exercise -- see that section's own doc comment.
     await page.reload();
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).not.toBeChecked();
 
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     const heard = requestsEveryEngineMakes(seen.all);
     expect(
@@ -600,7 +601,7 @@ test.describe('classroom group creator', () => {
       // prefetch" section).
       await expect(page.locator('#cg-speed')).toHaveValue('skip');
       await typeInto(page.locator('#cg-count'), '6');
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       await expect(page.locator('#cg-results .student')).toHaveCount(6);
       const heard = requestsEveryEngineMakes(seen.all);
       expect(
@@ -637,7 +638,7 @@ test.describe('classroom group creator', () => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('/classroom-groups');
       await typeInto(page.locator('#cg-count'), '6');
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       const cards = page.locator('#cg-results .student');
       await expect(cards).toHaveCount(6);
       await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
@@ -692,7 +693,7 @@ test.describe('classroom group creator', () => {
 
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     // Same assertions "the animation deals every card and settles" already
     // makes for the unblocked case -- the point here is that blocking every
@@ -713,7 +714,7 @@ test.describe('classroom group creator', () => {
     // from the page, and until now asserted by nothing.
     await page.goto('/classroom-groups');
     await fill(page, { count: '20', groups: '3' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
     await expect(page.locator('#cg-results .student')).toHaveCount(20);
@@ -724,7 +725,7 @@ test.describe('classroom group creator', () => {
     // on a phone, taking the browser with it.
     await page.goto('/classroom-groups');
     await fill(page, { count: '100000000', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-error')).toHaveText(
       'That is more students than this tool will take. The most is 100.',
@@ -743,13 +744,13 @@ test.describe('classroom group creator', () => {
     // wrong way round.
     await page.goto('/classroom-groups');
     await fill(page, { count: '7', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-summary')).toHaveText(
       '1 group from 7 students.',
     );
 
     await fill(page, { count: '22', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-summary')).toHaveText(
       '5 groups from 22 students.',
     );
@@ -758,13 +759,13 @@ test.describe('classroom group creator', () => {
   test('the error clears the stale "Shuffle again" label', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-go')).toHaveText('Shuffle again');
 
     // Now a refusal. Offering to reshuffle results that are no longer on
     // screen is an offer the page cannot keep.
     await fill(page, { count: '0', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-error')).toBeVisible();
     await expect(page.locator('#cg-go')).toHaveText('Make Groups');
   });
@@ -776,12 +777,12 @@ test.describe('classroom group creator', () => {
     // section 11 names only the how-to state and a later print panel as
     // the UI preferences allowed to persist) -- so it has to be reopened
     // after the reload below too, not just before the first check.
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     // Sound is ON by default (operator decision).
     await expect(page.locator('#cg-sound-check')).toBeChecked();
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await page.reload();
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).not.toBeChecked();
   });
 });
@@ -801,7 +802,7 @@ test.describe('class name and results heading', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
     await expect(page.locator('#cg-tables').getByText('7B')).toHaveCount(0);
   });
@@ -827,7 +828,7 @@ test.describe('class name and results heading', () => {
   test('a blank class name blocks nothing', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
     await expect(page.locator('#cg-results .group')).toHaveCount(2);
     await expect(page.locator('#cg-results .student')).toHaveCount(9);
@@ -845,7 +846,7 @@ test.describe('class name and results heading', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), '   ');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
   });
 
@@ -865,7 +866,7 @@ test.describe('class name and results heading', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group h3').first()).toHaveText(
       'Group 1',
     );
@@ -894,7 +895,7 @@ test.describe('class name and results heading', () => {
     // This test keeps the default class size, so it chooses the speed
     // alone rather than going through fill().
     await chooseSpeed(page, 'skip');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       `${raw} — your groups`,
     );
@@ -915,7 +916,7 @@ test.describe('class name and results heading', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
     await chooseSpeed(page, 'skip');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       'Year 7 / Set B — your groups',
     );
@@ -936,7 +937,7 @@ test.describe('class name and results heading', () => {
       await page.goto('/classroom-groups');
       await typeInto(page.getByLabel('Class (optional)'), 'x'.repeat(300));
       await chooseSpeed(page, 'skip');
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       await expect(page.locator('#cg-results-h')).toBeVisible();
       await expectNoHorizontalScroll(page);
     },
@@ -956,11 +957,11 @@ test.describe('class name and results heading', () => {
     const classField = page.getByLabel('Class (optional)');
     await typeInto(classField, '7B');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
 
     await typeInto(classField, '8C');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('8C — your groups');
   });
 });
@@ -1017,7 +1018,7 @@ test.describe('the Split by row names its own fields', () => {
       // groups" is chosen -- the same reveal 'splits by number of groups,
       // not just by group size' already exercises by CSS value, exercised
       // here by the radio's own accessible name instead.
-      await page.getByLabel(groupCountRadio, { exact: true }).check();
+      await setCheckedOn(page.getByLabel(groupCountRadio, { exact: true }));
       await expect(page.getByLabel(howMany, { exact: true })).toBeVisible();
     });
   }
@@ -1037,7 +1038,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
     // also pass for a malformed "Siswa NaN".
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '4', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
     expect(labels.sort()).toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
     // groupLabel's Indonesian output ("Kelompok N") was only ever proven at
@@ -1055,7 +1056,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   test('errors are shown in Indonesian, not English', async ({ page }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '0', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const error = page.locator('#cg-error');
     await expect(error).toBeVisible();
     await expect(error).toContainText('Tambahkan siswa');
@@ -1081,11 +1082,11 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-go')).toHaveText('Acak lagi');
 
     await fill(page, { count: '0', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-error')).toBeVisible();
     await expect(page.locator('#cg-go')).toHaveText('Buat Kelompok');
   });
@@ -1098,7 +1099,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       '7B — kelompok Anda',
     );
@@ -1111,7 +1112,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   test('a blank class name blocks nothing', async ({ page }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Kelompok Anda');
     await expect(page.locator('#cg-results .group')).toHaveCount(2);
   });
@@ -1139,7 +1140,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
 test.describe('out-of-date groups', () => {
   const shuffle = async (page: Page) => {
     await typeInto(page.getByLabel('Number of students'), '12');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   };
 
@@ -1159,8 +1160,8 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
     await expect(
       page.getByText(
         'These groups are out of date — the leftovers choice changed.',
@@ -1231,7 +1232,7 @@ test.describe('out-of-date groups', () => {
     await page.goto('/classroom-groups');
     await shuffle(page);
     await typeInto(page.getByLabel('Students in each group'), '3');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
@@ -1259,20 +1260,21 @@ test.describe('out-of-date groups', () => {
     [
       'marking a student absent',
       (page: Page) =>
-        page.locator('.cg-student').first().getByLabel('Absent').check(),
+        setCheckedOn(page.locator('.cg-student').first().getByLabel('Absent')),
     ],
     [
       'adding a student',
-      (page: Page) => page.getByRole('button', { name: 'Add student' }).click(),
+      (page: Page) => tapOn(page.getByRole('button', { name: 'Add student' })),
     ],
     [
       'removing a student',
       (page: Page) =>
-        page
-          .locator('.cg-student')
-          .first()
-          .getByRole('button', { name: 'Remove' })
-          .click(),
+        tapOn(
+          page
+            .locator('.cg-student')
+            .first()
+            .getByRole('button', { name: 'Remove' }),
+        ),
     ],
     [
       'changing a letter',
@@ -1288,7 +1290,7 @@ test.describe('out-of-date groups', () => {
       await openRoster(page);
       await addSeveral(page, 11);
       await giveEveryoneASex(page);
-      await page.getByRole('button', { name: 'Make Groups' }).click();
+      await tapOn(page.getByRole('button', { name: 'Make Groups' }));
       await expect(page.locator('#cg-results .group').first()).toBeVisible();
       await edit(page);
       await expect(
@@ -1308,11 +1310,16 @@ test.describe('out-of-date groups', () => {
   }) => {
     await openRoster(page);
     await addSeveral(page, 11);
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('.cg-student').first().getByLabel('Absent').uncheck();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+      false,
+    );
     await expect(
       page.getByText('These groups are out of date — the class list changed.'),
     ).toBeVisible();
@@ -1337,10 +1344,10 @@ test.describe('out-of-date groups', () => {
       ['F'],
       ['F'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await page
       .locator('.cg-student')
@@ -1373,10 +1380,10 @@ test.describe('out-of-date groups', () => {
       ['F'],
     ]);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     // The literal sentence, not `en.staleSexMode`: importing the locale
     // would make this pass against whatever the table happens to say,
     // including a wrong or untranslated value (CLAUDE.md -- "locale files
@@ -1398,7 +1405,7 @@ test.describe('out-of-date groups', () => {
     await openRoster(page);
     await addSeveral(page, 11);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await typeInto(
       page.locator('.cg-student').first().getByLabel('Name'),
@@ -1423,8 +1430,8 @@ test.describe('out-of-date groups', () => {
     await page.goto('/classroom-groups');
     await shuffle(page);
     await typeInto(page.getByLabel('Students in each group'), '3');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
     await typeInto(page.getByLabel('Students in each group'), '4'); // undoes ONLY the size change
     await expect(
       page.getByText(
@@ -1438,10 +1445,10 @@ test.describe('out-of-date groups', () => {
     await page.goto('/classroom-groups');
     await shuffle(page);
     await typeInto(page.getByLabel('Students in each group'), '3');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
     await typeInto(page.getByLabel('Students in each group'), '4');
-    await page.getByLabel('Share them out evenly').check();
+    await setCheckedOn(page.getByLabel('Share them out evenly'));
     await expect(page.getByText('out of date')).toHaveCount(0);
     await expect(page.locator('#cg-results')).not.toHaveClass(/stale/);
   });
@@ -1476,7 +1483,7 @@ test.describe('out-of-date groups', () => {
     await shuffle(page);
     await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-stale')).toBeVisible();
-    await page.locator('#cg-stale button').click();
+    await tapOn(page.locator('#cg-stale button'));
     await expect(page.locator('#cg-stale')).toBeHidden();
     // 12 students at the NEW size (3) => 4 groups. Proves a real reshuffle
     // happened, not merely that the notice hid itself.
@@ -1575,7 +1582,7 @@ test.describe('out-of-date groups', () => {
         await page.setViewportSize({ width: 320, height: 900 });
         await page.goto(path);
         await typeInto(page.locator('#cg-count'), '12');
-        await page.click('#cg-go');
+        await tapOn(page.locator('#cg-go'));
         await expect(page.locator('#cg-results .group')).toHaveCount(3);
         await typeInto(page.locator('#cg-size'), '3');
         await expect(page.locator('#cg-stale')).toBeVisible();
@@ -1598,7 +1605,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
     await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '3');
     await expect(page.locator('#cg-stale-text')).toHaveText(
@@ -1623,12 +1630,12 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.locator('#cg-grouping-toggle').click();
-    await page
-      .getByLabel('Masukkan semuanya ke satu kelompok', { exact: true })
-      .check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(
+      page.getByLabel('Masukkan semuanya ke satu kelompok', { exact: true }),
+    );
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — pilihan siswa tersisa berubah.',
     );
@@ -1642,7 +1649,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
     await typeInto(page.getByLabel('Jumlah siswa'), '30');
     await expect(page.locator('#cg-stale-text')).toHaveText(
@@ -1658,8 +1665,10 @@ test.describe('site-wide language switching', () => {
     // The classic i18n bug is a switcher that dumps you on the homepage.
     // Two steps since #21 Stage 2: the switcher is a <details> dropdown, so the
     // summary opens it and the entry inside is the link.
-    const open = () => page.click('header details.lang-switch > summary');
-    const choose = () => page.click('header details.lang-switch li a');
+    const open = () =>
+      tapOn(page.locator('header details.lang-switch > summary'));
+    const choose = () =>
+      tapOn(page.locator('header details.lang-switch li a').first());
 
     await page.goto('/classroom-groups');
     await open();
@@ -2168,7 +2177,7 @@ test.describe('the no-scroll rule, measured', () => {
         await page.setViewportSize({ width: 320, height: 900 });
         await page.goto(path);
         for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
-          await page.locator(`#${id}-toggle`).click();
+          await tapOn(page.locator(`#${id}-toggle`));
         }
         // Every target on screen is measured; the ones too small are the
         // verdict, the ones measured are its population (#610).
@@ -2301,7 +2310,7 @@ test.describe('every language renders its own messages', () => {
 
       await page.goto(path);
       await fill(page, { count: '4', size: '2' });
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       const labels = await page
         .locator('#cg-results .student')
         .allTextContents();
@@ -2329,7 +2338,7 @@ test.describe('every language renders its own messages', () => {
       );
 
       await fill(page, { count: '100000000', size: '4' });
-      await page.click('#cg-go');
+      await tapOn(page.locator('#cg-go'));
       const refusal = t.errors.TOO_MANY_STUDENTS({ max: 100 });
       await expect(page.locator('#cg-error')).toHaveText(refusal);
       notEnglish(refusal, english.errors.TOO_MANY_STUDENTS({ max: 100 }));
@@ -2340,12 +2349,12 @@ test.describe('every language renders its own messages', () => {
       );
 
       await page.goto(path);
-      await page.locator('#cg-students-toggle').click();
+      await tapOn(page.locator('#cg-students-toggle'));
       const add = page.getByRole('button', {
         name: t.rosterAddStudent.replace(/^[+\s]+/, ''),
       });
-      await add.click();
-      await add.click();
+      await tapOn(add);
+      await tapOn(add);
       await expect(page.locator('.cg-student')).toHaveCount(2);
       const names = [t.studentNumber({ n: 1 }), t.studentNumber({ n: 2 })];
       const problem = t.rosterNoSexMessage({ names });
