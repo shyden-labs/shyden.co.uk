@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -228,9 +229,9 @@ test.describe('the roster table', () => {
     await addSeveral(page, 3);
     const row = page.locator('.cg-student').first();
     await typeInto(row.getByLabel('Name'), 'Ana');
-    await row.getByLabel('Sex').selectOption('F');
+    await chooseOption(row.getByLabel('Sex'), 'F');
     await setCheckedOn(row.getByLabel('Absent'));
-    await row.getByLabel('Together').selectOption('A');
+    await chooseOption(row.getByLabel('Together'), 'A');
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Make groups' }));
     // The groups arrived (#425): a silence over a press that made nothing
@@ -355,9 +356,9 @@ test.describe('an absent student', () => {
     await expect(row.locator('input, select')).toHaveCount(6);
     await typeInto(row.getByLabel('#', { exact: true }), '7');
     await typeInto(row.getByLabel('Name'), 'Dewi');
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
-    await row.getByLabel('Apart').selectOption('A');
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
+    await chooseOption(row.getByLabel('Apart'), 'A');
     await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
     await expect(row.getByLabel('Name')).toHaveValue('Dewi');
     await expect(row.getByLabel('Sex')).toHaveValue('F');
@@ -518,7 +519,7 @@ test.describe('together/apart letters', () => {
       'A',
     ]);
 
-    await row0.getByLabel('Together').selectOption('A');
+    await chooseOption(row0.getByLabel('Together'), 'A');
 
     // Every row's own dropdown grows, not only the one A was just set on.
     await expect(row0.getByLabel('Together').locator('option')).toHaveText([
@@ -536,7 +537,7 @@ test.describe('together/apart letters', () => {
   test('together and apart grow independently', async ({ page }) => {
     await openRoster(page);
     const row = page.locator('.cg-student').first();
-    await row.getByLabel('Together').selectOption('A');
+    await chooseOption(row.getByLabel('Together'), 'A');
     // Apart has had nothing set on it yet, so it must still offer only A --
     // a shared counter across both fields would leak Together's own use
     // into Apart's own list.
@@ -634,11 +635,10 @@ test.describe('headers follow the roster, live', () => {
     [
       'a sex',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Sex')
-          .selectOption('F');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Sex'),
+          'F',
+        );
       },
     ],
     [
@@ -649,21 +649,19 @@ test.describe('headers follow the roster, live', () => {
     [
       'a together letter',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Together')
-          .selectOption('A');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Together'),
+          'A',
+        );
       },
     ],
     [
       'an apart letter',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Apart')
-          .selectOption('A');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Apart'),
+          'A',
+        );
       },
     ],
     [
@@ -751,10 +749,10 @@ test.describe('validation as it is typed', () => {
     await tapOn(page.getByRole('button', { name: 'Add student' }));
     const row0 = page.locator('.cg-student').nth(0);
     const row1 = page.locator('.cg-student').nth(1);
-    await row0.getByLabel('Together').selectOption('A');
-    await row1.getByLabel('Together').selectOption('A');
-    await row0.getByLabel('Apart').selectOption('A');
-    await row1.getByLabel('Apart').selectOption('A');
+    await chooseOption(row0.getByLabel('Together'), 'A');
+    await chooseOption(row1.getByLabel('Together'), 'A');
+    await chooseOption(row0.getByLabel('Apart'), 'A');
+    await chooseOption(row1.getByLabel('Apart'), 'A');
     await expect(
       page.getByText(/are kept together, so they cannot also be kept apart/),
     ).toBeVisible();
@@ -1502,10 +1500,10 @@ test.describe('Indonesian', () => {
     await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     const row0 = page.locator('.cg-student').nth(0);
     const row1 = page.locator('.cg-student').nth(1);
-    await row0.getByLabel('Bersama').selectOption('A');
-    await row1.getByLabel('Bersama').selectOption('A');
-    await row0.getByLabel('Terpisah').selectOption('A');
-    await row1.getByLabel('Terpisah').selectOption('A');
+    await chooseOption(row0.getByLabel('Bersama'), 'A');
+    await chooseOption(row1.getByLabel('Bersama'), 'A');
+    await chooseOption(row0.getByLabel('Terpisah'), 'A');
+    await chooseOption(row1.getByLabel('Terpisah'), 'A');
     await expect(
       page.getByText(/sudah ditandai untuk disatukan/),
     ).toBeVisible();
@@ -1688,9 +1686,9 @@ for (const { name, width } of LAYOUTS) {
       // All six (#390 F133): this edited four, never the number or Apart.
       await typeInto(row.getByLabel('#', { exact: true }), '7');
       await typeInto(row.getByLabel('Name'), 'Ana');
-      await row.getByLabel('Sex').selectOption('F');
-      await row.getByLabel('Together').selectOption('A');
-      await row.getByLabel('Apart').selectOption('A');
+      await chooseOption(row.getByLabel('Sex'), 'F');
+      await chooseOption(row.getByLabel('Together'), 'A');
+      await chooseOption(row.getByLabel('Apart'), 'A');
       await setCheckedOn(row.getByLabel('Absent'));
       await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
       await expect(row.getByLabel('Name')).toHaveValue('Ana');
@@ -1824,8 +1822,8 @@ test.describe('an unset roster dropdown says which column it is for', () => {
     await openRoster(page);
     const row = page.locator('.cg-student').first();
 
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
 
     await expect(row.getByLabel('Sex').locator('option:checked')).toHaveText(
       'F',
@@ -1922,8 +1920,8 @@ test.describe('an unset roster dropdown says which column it is for', () => {
       await expect(placeholder(column)).toBeEnabled();
     }
 
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
 
     // Sex is one-way by design (operator, 2026-08-13): the placeholder says
     // "not answered yet" and is not itself an answer, so it stops being

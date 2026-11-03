@@ -65,6 +65,7 @@ const ACTIONS = [
   'setCheckedOn(',
   'scrollToOn(',
   'typeInto(',
+  'chooseOption(',
 ] as const;
 
 /** Comment-stripped, so a spec's own prose can never satisfy or defeat this. */

@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -536,16 +537,14 @@ test.describe('privacy — the roster never leaves memory', () => {
     // list grows as letters are taken, so a fresh roster offers exactly
     // "A"). Selecting 'X' waits forever on an option the page has no
     // reason to render. Found by running it.
-    await page
-      .locator('.cg-student')
-      .nth(0)
-      .getByLabel('Apart')
-      .selectOption('A');
-    await page
-      .locator('.cg-student')
-      .nth(2)
-      .getByLabel('Apart')
-      .selectOption('A');
+    await chooseOption(
+      page.locator('.cg-student').nth(0).getByLabel('Apart'),
+      'A',
+    );
+    await chooseOption(
+      page.locator('.cg-student').nth(2).getByLabel('Apart'),
+      'A',
+    );
     await setCheckedOn(page.getByLabel('Number of groups'));
     await typeInto(page.getByLabel('How many groups'), '2');
     await giveEveryoneASex(page);
