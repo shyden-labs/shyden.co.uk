@@ -901,11 +901,23 @@ test.describe('evidence page sign-off, whatever the write order', () => {
       `the page is laid out ${read.laidOut}px wide on a ${read.screen}px screen`,
     ).toBeLessThanOrEqual(read.screen);
     // The copy as written, where WebKit once showed "â€¦" for "…". Read in
-    // the click's own task: the page says it there, and its save replaces it.
-    const saying = await page.evaluate(() => {
-      document.querySelector<HTMLElement>('section.journey label')?.click();
-      return document.getElementById('state')?.textContent ?? '';
+    // the tick's own task: the page says it there, and its save replaces it.
+    // A real tap (#1003); a bubbling `change` listener on the document runs
+    // straight after the tick's own handler, in the same task.
+    await page.evaluate(() => {
+      const state = window as unknown as { saying?: string };
+      document.addEventListener(
+        'change',
+        () => {
+          state.saying = document.getElementById('state')?.textContent ?? '';
+        },
+        { once: true },
+      );
     });
+    await tapOn(page.locator('section.journey label').first());
+    const saying = await page
+      .waitForFunction(() => (window as unknown as { saying?: string }).saying)
+      .then((handle) => handle.jsonValue());
     expect(saying).toBe('Saving…');
   });
 
