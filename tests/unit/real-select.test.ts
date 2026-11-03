@@ -31,9 +31,16 @@ describe('chooseOption failures', () => {
       { value: 'M', disabled: false },
       { value: 'F', disabled: false },
     ];
-    expect(arrowKeysFor(o, '', 'F')).toEqual(['ArrowDown', 'ArrowDown']);
+    expect(arrowKeysFor(o, '', 'F')).toEqual(['End']);
+    expect(arrowKeysFor(o, 'F', '')).toEqual(['Home']);
+    expect(arrowKeysFor(o, '', 'M')).toEqual(['ArrowDown']);
     expect(arrowKeysFor(o, 'F', 'M')).toEqual(['ArrowUp']);
     expect(arrowKeysFor(o, 'M', 'M')).toEqual([]);
+  });
+
+  it('walks by arrows when the target is not an end', () => {
+    const o = ['a', 'b', 'c', 'd'].map((value) => ({ value, disabled: false }));
+    expect(arrowKeysFor(o, 'a', 'c')).toEqual(['ArrowDown', 'ArrowDown']);
   });
 
   it('skips a disabled option and refuses to choose one', () => {

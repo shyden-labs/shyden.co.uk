@@ -5,7 +5,7 @@ import { TapNotPossibleError, tapOn } from './real-touch';
 /**
  * Chooses an option of a `<select>` the way a visitor does (#1027): a real
  * click focuses the select (and opens its list where the browser draws one),
- * real ArrowDown / ArrowUp key presses move to the option, and Enter commits.
+ * real ArrowDown / ArrowUp key presses (Home or End for a far end) move to the option, and Enter commits.
  * Playwright's `selectOption()` sets `option.selected` in an injected script
  * and dispatches `input` and `change` itself, so a select that a finger or a
  * keyboard cannot work passed under it.
@@ -36,7 +36,14 @@ export async function chooseOption(
   const keys = arrowKeysFor(options, current, value);
   if (keys === null) throw new Error(whyNoOption(String(select), value));
   await tapOn(select);
-  for (const key of keys) await select.page().keyboard.press(key);
+  for (const key of keys) {
+    // Where the browser draws no list (WebKit, Firefox), a key changes the
+    // value at once and the page may rebuild the select, taking the focus
+    // with it (the roster does): focus it again with a real click.
+    if (!(await select.evaluate((el) => el === document.activeElement)))
+      await tapOn(select);
+    await select.page().keyboard.press(key);
+  }
   await select.page().keyboard.press('Enter');
   const got = await select.inputValue();
   const why = whyNotChosen(String(select), value, got);
@@ -57,7 +64,7 @@ export function arrowKeysFor(
   options: readonly OptionState[],
   current: string,
   wanted: string,
-): ('ArrowDown' | 'ArrowUp')[] | null {
+): ('ArrowDown' | 'ArrowUp' | 'Home' | 'End')[] | null {
   const to = options.find((option) => option.value === wanted);
   if (to === undefined || to.disabled) return null;
   const reachable = options.filter(
@@ -67,6 +74,9 @@ export function arrowKeysFor(
   const target = reachable.findIndex((option) => option.value === wanted);
   if (from === -1) return null;
   const steps = target - from;
+  // One key, one change: a long walk would change the value at every step.
+  if (Math.abs(steps) > 1 && target === reachable.length - 1) return ['End'];
+  if (Math.abs(steps) > 1 && target === 0) return ['Home'];
   return Array(Math.abs(steps)).fill(steps > 0 ? 'ArrowDown' : 'ArrowUp');
 }
 
