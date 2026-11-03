@@ -21,14 +21,6 @@ const SUITES = [
 // through WebDriverAgent); it joins this guard when that lands.
 const IPHONE_DRIVER = 'tests/device/ios/';
 
-/**
- * Still to be made real, by count, each with its ticket. The evidence page's
- * batched ticks land several presses in ONE task so they fall inside one
- * save window; real taps need the save window held open instead (#1003's
- * remaining design). A count, not a pass: one more, or one fewer, fails.
- */
-const AWAITING = new Map([['tests/e2e/evidence-page.spec.ts', 2]]);
-
 const files = SUITES.flatMap((dir) =>
   filesUnder(
     dir,
@@ -46,6 +38,6 @@ describe('every browser test presses with real input (#1003)', () => {
         .filter(({ clicks }) => clicks.length > 0)
         .map(({ path, clicks }) => [path, clicks.length]),
     );
-    expect(counts).toEqual(Object.fromEntries(AWAITING));
+    expect(counts).toEqual({});
   });
 });
