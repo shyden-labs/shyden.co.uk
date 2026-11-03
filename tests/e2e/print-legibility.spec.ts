@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { searched } from '../source-files';
 import { contrast, over, parseColour, type RGB } from '../wcag';
@@ -108,7 +109,7 @@ const PRINTED = PUBLISHED_ROUTES.map((path) => ({
     ? // The sheet a teacher actually prints has groups on it. Without this
       // the guard measures the empty form and never sees the results at all.
       async (page: import('@playwright/test').Page) => {
-        await page.click('#cg-go');
+        await tapOn(page.locator('#cg-go'));
         await expect(page.locator('#cg-results .group').first()).toBeVisible();
       }
     : async () => {},

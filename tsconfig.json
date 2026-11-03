@@ -14,5 +14,11 @@
     // and .mjs the program already admits, so a script added next year is
     // checked the day it is written (#228).
     "checkJs": true
-  }
+  },
+  // Astro's base excludes `dist` alone; a local `exclude` replaces that list,
+  // so `dist` is repeated here. The other two are test output, git-ignored:
+  // a real-device run's HTML report ships Playwright's minified trace viewer,
+  // which `checkJs` failed with 14 errors and then a Node abort, refusing a
+  // push (#1022).
+  "exclude": ["dist", "playwright-report", "test-results"]
 }

@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -160,7 +161,7 @@ for (const theme of THEMES)
         await page.goto(NOT_FOUND);
         const t = getSiteStrings(locale).report;
         const details = block(page, locale);
-        await details.locator('summary').click();
+        await tapOn(details.locator('summary'));
         await expect(details).toHaveAttribute('open', '');
         for (const target of [
           details.locator('summary'),
@@ -190,7 +191,7 @@ test(
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(NOT_FOUND);
     for (const locale of BETA)
-      await block(page, locale).locator('summary').click();
+      await tapOn(block(page, locale).locator('summary'));
     await expectNoHorizontalScroll(page);
   },
 );

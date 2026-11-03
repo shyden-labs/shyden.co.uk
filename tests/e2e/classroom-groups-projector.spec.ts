@@ -1,4 +1,7 @@
+import { setCheckedOn, tapAt, tapOn } from '../real-touch';
+import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import { test, expect } from './fixtures';
 import { chooseSpeed, makeGroups } from '../make-groups';
 import {
@@ -116,7 +119,7 @@ test.describe('the projector view', () => {
   }) => {
     await refuseFullscreen(page);
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     // The viewport is read from the PAGE, not from `page.viewportSize()`.
     // On a real device over CDP there is no emulated viewport and that
@@ -142,7 +145,7 @@ test.describe('the projector view', () => {
 
   test('no form or site chrome on the board', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     // The board covers the page rather than hiding its parts one at a time,
     // so this asserts what a teacher can SEE and reach: nothing behind the
     // overlay is visible at the board's own coordinates, and the page
@@ -163,15 +166,19 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expectFaded(page); // condition, not a sleep
     // Two moves: a move to where the pointer already is dispatches no
     // event at all, and the pointer starts at (0,0).
-    await page.mouse.move(200, 300);
-    await page.mouse.move(220, 320);
-    await expect(bar(page)).not.toHaveClass(/faded/);
-    await expectFaded(page);
-    await page.locator('#cg-board').click({ position: { x: 50, y: 300 } });
+    // A phone has no mouse pointer: the pointer half runs on the desktop
+    // engines, and the phone checks the tap and the key (#996).
+    if (!onRealDevice()) {
+      await page.mouse.move(200, 300);
+      await page.mouse.move(220, 320);
+      await expect(bar(page)).not.toHaveClass(/faded/);
+      await expectFaded(page);
+    }
+    await tapOn(page.locator('#cg-board'), { position: { x: 50, y: 300 } });
     await expect(bar(page)).not.toHaveClass(/faded/);
     await expectFaded(page);
     await page.keyboard.press('a');
@@ -182,7 +189,7 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await bar(page).getByRole('button', { name: 'Shuffle again' }).focus();
     await expect(bar(page)).not.toHaveClass(/faded/);
     // …and it STAYS that way. A keyboard user must not lose the control
@@ -202,7 +209,7 @@ test.describe('the projector view', () => {
   // keyboard user mid-Tab with no visible way out.
   test('a faded bar can still be reached by keyboard', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expectFaded(page);
     await bar(page).getByRole('button', { name: 'Exit full screen' }).focus();
     await expect(bar(page)).not.toHaveClass(/faded/);
@@ -220,13 +227,13 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     // Out immediately, while the grant is still in flight.
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     await clickable(page, '#cg-board-open');
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     // …and it STAYS open. The stray event arrives after the fact, so a
     // single assertion the instant it opens would pass either way. Waited
@@ -265,7 +272,7 @@ test.describe('the projector view', () => {
     );
     await holdFirstGrantUntilTheNext(page);
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     await clickable(page, '#cg-board-open');
@@ -280,7 +287,7 @@ test.describe('the projector view', () => {
       );
     const { exitsAsked: exitsBefore } = await race();
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     // Both answers delivered, and the page's handler for each has run.
     await page.waitForFunction(
       () =>
@@ -319,7 +326,7 @@ test.describe('the projector view', () => {
     await holdTheTidyUpExit(page);
     await withGroups(page);
     const open = page.getByRole('button', { name: 'Full screen' });
-    await open.click();
+    await tapOn(open);
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     // Read here, not before the click: on a phone the click scrolls the button
@@ -368,7 +375,7 @@ test.describe('the projector view', () => {
       .annotations.push({ type: 'hit-in-flight', description: String(hit) });
     // A teacher's click, where the button was: a raw pointer, with no
     // actionability wait, which would hold it until the window had closed.
-    await page.mouse.click(centre.x, centre.y);
+    await tapAt(page, centre.x, centre.y);
     const reopened = await page.evaluate(
       () => !document.getElementById('cg-board')!.hidden,
     );
@@ -401,7 +408,7 @@ test.describe('the projector view', () => {
   }) => {
     await withGroups(page);
     for (const settle of [false, true]) {
-      await page.getByRole('button', { name: 'Full screen' }).click();
+      await openBoard(page);
       await expect(page.locator('#cg-board')).toBeVisible();
       if (settle) {
         // "Settled" means the reveal has finished and the bar has faded.
@@ -425,7 +432,7 @@ test.describe('the projector view', () => {
 
   test('leaving puts the results back on the page', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
@@ -438,13 +445,13 @@ test.describe('the projector view', () => {
   }) => {
     await withGroups(page);
     const before = await page.locator('#cg-results').innerText();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     // The board's Shuffle refuses only a roster the page cannot deal: the
     // deal button's enabled state, which a deal in progress never changes.
     // A press mid-deal starts a new deal from the top, so this test does
     // not need the first deal to have finished.
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
+    await tapOn(bar(page).getByRole('button', { name: 'Shuffle again' }));
     // #744: a board Shuffle deals by travelling from the waiting list, which
     // it shows again first; read the board once that list has folded away,
     // or its heading is among the names.
@@ -469,10 +476,10 @@ test.describe('the projector view', () => {
   }) => {
     await rosterForSpillover(page); // six boys, two girls, separate, groups of 4
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
+    await tapOn(bar(page).getByRole('button', { name: 'Shuffle again' }));
     await expect(page.locator('#cg-board')).toContainText(
       'have joined a group of boys',
     );
@@ -483,7 +490,7 @@ test.describe('the projector view', () => {
     await expect(
       page.getByRole('button', { name: 'Layar penuh' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Layar penuh' }).click();
+    await tapOn(page.getByRole('button', { name: 'Layar penuh' }));
     await expect(
       bar(page).getByRole('button', { name: 'Acak lagi' }),
     ).toBeVisible();
@@ -515,7 +522,7 @@ test.describe('the board before a shuffle (#743)', () => {
       ['F', 'Fay'],
     ]);
     await typeInto(page.locator('#cg-size'), '3');
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(board(page)).toBeVisible();
     await expect(board(page).locator('#cg-results-h')).toHaveText(
       'Your groups',
@@ -558,7 +565,7 @@ test.describe('the board before a shuffle (#743)', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '10');
     await typeInto(page.locator('#cg-size'), '4');
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(board(page).locator('.group h3')).toHaveText([
       'Group 1',
       'Group 2',
@@ -577,10 +584,10 @@ test.describe('the board before a shuffle (#743)', () => {
     await typeInto(page.locator('#cg-count'), '10');
     await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     // Nothing has been shuffled yet, so the board's button says what the
     // page's does, not "again".
-    await bar(page).getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(bar(page).getByRole('button', { name: 'Make Groups' }));
     await expect(board(page).locator('.group')).toHaveCount(2);
     await expect(board(page).locator('.group .student.dealt')).toHaveCount(10);
     await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
@@ -599,8 +606,11 @@ test.describe('the board before a shuffle (#743)', () => {
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '10');
-    await page.getByRole('button', { name: 'Full screen' }).click();
-    await expect(board(page)).toBeVisible();
+    const settleMs = await openBoard(page);
+    test.info().annotations.push({
+      type: 'board-settle-ms',
+      description: settleMs.toFixed(0),
+    });
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
     await expect(page.locator('#cg-results')).toHaveCount(1);
@@ -619,8 +629,8 @@ test.describe('the board before a shuffle (#743)', () => {
     await typeInto(page.locator('#cg-count'), '0');
     await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
-    await page.getByRole('button', { name: 'Full screen' }).click();
-    await bar(page).getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await tapOn(bar(page).getByRole('button', { name: 'Make Groups' }));
     const said = board(page).locator('#cg-waiting-error');
     await expect(said).toBeVisible();
     await expect(said).toHaveText(
@@ -642,7 +652,7 @@ test.describe('the reveal', () => {
   // reveal finish -- which is every other test in this block.
   test('leaving mid-reveal cancels the rest of it', async ({ page }) => {
     await withGroups(page, 24);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board .group').first()).toHaveClass(
       /revealing/,
     );
@@ -667,7 +677,7 @@ test.describe('the reveal', () => {
 
   test('the reveal plays on the board', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).toHaveClass(
       /revealing/,
     );
@@ -685,7 +695,7 @@ test.describe('the reveal', () => {
     // A <select>, not a checkbox — the plan's snippet used `.check()` on a
     // label that is an <option>. The real control is `#cg-speed`.
     await chooseSpeed(page, 'skip');
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).not.toHaveClass(
       /revealing/,
     );
@@ -701,7 +711,7 @@ test.describe('the reveal', () => {
   test('prefers-reduced-motion suppresses it', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).not.toHaveClass(
       /revealing/,
     );
@@ -717,15 +727,17 @@ test.describe('the reveal', () => {
 test.describe('all three refuse while the groups are out of date', () => {
   const goStale = async (page: import('@playwright/test').Page) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await expect(page.getByText(/These groups are out of date/)).toBeVisible();
   };
 
   test('Export groups refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.locator('#cg-io-toggle').click();
-    await page.getByRole('button', { name: 'Export groups' }).click();
+    await tapOn(page.locator('#cg-io-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Export groups' }));
     await expect(
       page.getByText(
         'These groups are out of date. Shuffle again before saving them.',
@@ -735,7 +747,7 @@ test.describe('all three refuse while the groups are out of date', () => {
 
   test('Print refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeHidden();
     await expect(
       page.getByText(
@@ -746,7 +758,7 @@ test.describe('all three refuse while the groups are out of date', () => {
 
   test('Full screen refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeHidden();
     await expect(
       page.getByText(
@@ -763,21 +775,20 @@ test.describe('all three refuse while the groups are out of date', () => {
     // `#cg-go`, by id. After a successful shuffle its LABEL becomes
     // "Shuffle again" (classroom-groups.ts sets `goButton.textContent =
     // t.again`), so asking for it by the name it had at load finds nothing.
-    await page.locator('#cg-go').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(page.getByText(/These groups are out of date/)).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     await clickable(page, '#cg-print-open');
 
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeVisible();
-    await page
-      .locator('#cg-print-panel')
-      .getByRole('button', { name: 'Cancel' })
-      .click();
+    await tapOn(
+      page.locator('#cg-print-panel').getByRole('button', { name: 'Cancel' }),
+    );
   });
 });
 
@@ -794,9 +805,11 @@ test.describe('review findings', () => {
     page,
   }) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(
       page.getByText(
         'These groups are out of date. Shuffle again before printing them.',
@@ -805,7 +818,10 @@ test.describe('review findings', () => {
 
     // UNDO, rather than reshuffle: the staleness goes away by itself, and
     // nothing else on the page is touched.
-    await page.locator('.cg-student').first().getByLabel('Absent').uncheck();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+      false,
+    );
     await expect(
       page.getByText(/Shuffle again before printing them/),
     ).toHaveCount(0);
@@ -813,14 +829,16 @@ test.describe('review findings', () => {
 
   test('and it clears on a reshuffle too', async ({ page }) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(
       page.getByText(/Shuffle again before showing them/),
     ).toBeVisible();
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await page.locator('#cg-go').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(
       page.getByText(/Shuffle again before showing them/),
     ).toHaveCount(0);
@@ -844,13 +862,13 @@ test.describe('review findings', () => {
   }) => {
     await withGroups(page);
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
-    await shuffle.click();
+    await tapOn(shuffle);
     // Mid-deal the button stays usable — that is the change.
     await expect(page.locator('#cg-go')).toBeEnabled();
     // …and a second press is ACCEPTED rather than swallowed.
-    await shuffle.click();
+    await tapOn(shuffle);
     await expect(page.locator('#cg-go')).toBeEnabled();
     // One arrangement, every student once, nothing dealt twice.
     await expect(page.locator('#cg-board .student')).toHaveCount(12);
@@ -879,12 +897,11 @@ test.describe('the projector board holds a real name', () => {
       ['F', 'Dewi'],
       ['M', 'Eko'],
     ]);
-    await page.locator('#cg-go').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page
-      .getByRole('button', { name: /Full screen|Layar penuh/ })
-      .first()
-      .click();
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
     await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
 
     const board = await page.evaluate(() => {
@@ -991,10 +1008,9 @@ const boardOf = async (
   await page.goto('/classroom-groups');
   await makeGroups(page, count, size);
   await expect(page.locator('#cg-results .group').first()).toBeVisible();
-  await page
-    .getByRole('button', { name: /Full screen|Layar penuh/ })
-    .first()
-    .click();
+  await tapOn(
+    page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+  );
   await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
 };
 
@@ -1205,10 +1221,9 @@ test.describe('the projector board never hides a name', () => {
     await page.goto('/classroom-groups', { waitUntil: 'domcontentloaded' });
     await makeGroups(page, '8', '2');
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page
-      .getByRole('button', { name: /Full screen|Layar penuh/ })
-      .first()
-      .click();
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
     await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
 
     // Liveness: the first reading really is taken with fonts outstanding.
@@ -1299,10 +1314,9 @@ test.describe('the projector board never hides a name', () => {
       width: innerWidth,
       height: innerHeight,
     }));
-    await page
-      .getByRole('button', { name: /Full screen|Layar penuh/ })
-      .first()
-      .click();
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
     await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
     const grant = await page.waitForFunction(({ width, height }) => {
       const w = window as unknown as { __grant?: string; __resized?: boolean };
@@ -1364,7 +1378,7 @@ test.describe('absent students on the board (#999)', () => {
     page,
   }) => {
     await absentClass(page);
-    await page.locator('#cg-board-open').click();
+    await tapOn(page.locator('#cg-board-open'));
     const waiting = board(page).locator('#cg-waiting-list .waiting-student');
     await expect(waiting.locator('.number')).toHaveText(
       Array.from({ length: 12 }, (_, i) => String(i + 1)),
@@ -1396,9 +1410,9 @@ test.describe('absent students on the board (#999)', () => {
       ['M', 'Cleo'],
       ['F', 'Dev'],
     ]);
-    await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
+    await tapOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
     await typeInto(page.locator('#cg-size'), '2');
-    await page.locator('#cg-board-open').click();
+    await tapOn(page.locator('#cg-board-open'));
     await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
       'Number 2 is absent.',
     );
@@ -1411,7 +1425,7 @@ test.describe('absent students on the board (#999)', () => {
     await page.goto('/classroom-groups');
     await typeInto(page.locator('#cg-count'), '10');
     await typeInto(page.locator('#cg-size'), '5');
-    await page.locator('#cg-board-open').click();
+    await tapOn(page.locator('#cg-board-open'));
     await expect(board(page).locator('.waiting-student')).toHaveCount(10);
     await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
     await expect(board(page).locator('.waiting-student.absent')).toHaveCount(0);
@@ -1422,11 +1436,12 @@ test.describe('absent students on the board (#999)', () => {
   }) => {
     await absentClass(page);
     await chooseSpeed(page, 'skip');
-    await page.locator('#cg-board-open').click();
-    await page
-      .locator('#cg-board-bar')
-      .getByRole('button', { name: 'Make groups' })
-      .click();
+    await openBoard(page, page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
     await expect(board(page).locator('.group .student')).toHaveCount(10);
     const row = board(page).locator('#cg-absent');
     await expect(row).toBeVisible();
@@ -1460,14 +1475,15 @@ test.describe('absent students on the board (#999)', () => {
       ['M', 'Cleo'],
       ['F', 'Dev'],
     ]);
-    await page.locator('.cg-student').nth(1).getByLabel('Absent').click();
+    await tapOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
     await typeInto(page.locator('#cg-size'), '2');
     await chooseSpeed(page, 'skip');
-    await page.locator('#cg-board-open').click();
-    await page
-      .locator('#cg-board-bar')
-      .getByRole('button', { name: 'Make groups' })
-      .click();
+    await openBoard(page, page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
     const row = board(page).locator('#cg-absent');
     await expect(row.locator('.who')).toHaveText(['Ben']);
     await page.keyboard.press('Escape');
@@ -1477,7 +1493,7 @@ test.describe('absent students on the board (#999)', () => {
       .nth(1)
       .getByLabel('Name', { exact: true });
     await typeInto(name, 'Bea');
-    await page.locator('#cg-board-open').click();
+    await tapOn(page.locator('#cg-board-open'));
     await expect(row.locator('.who')).toHaveText(['Bea']);
   });
 
@@ -1488,11 +1504,12 @@ test.describe('absent students on the board (#999)', () => {
     await typeInto(page.locator('#cg-count'), '8');
     await typeInto(page.locator('#cg-size'), '4');
     await chooseSpeed(page, 'skip');
-    await page.locator('#cg-board-open').click();
-    await page
-      .locator('#cg-board-bar')
-      .getByRole('button', { name: 'Make groups' })
-      .click();
+    await tapOn(page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
     await expect(board(page).locator('.group .student')).toHaveCount(8);
     await expect(board(page).locator('#cg-absent')).toBeHidden();
   });
@@ -1503,7 +1520,7 @@ test.describe('absent students on the board (#999)', () => {
     }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await absentClass(page);
-      await page.locator('#cg-board-open').click();
+      await tapOn(page.locator('#cg-board-open'));
       const chip = board(page).locator('#cg-waiting-list .absent').first();
       await expect(chip).toBeVisible();
       expect(
@@ -1521,7 +1538,7 @@ test.describe('absent students on the board (#999)', () => {
     async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 640 });
       await absentClass(page);
-      await page.locator('#cg-board-open').click();
+      await tapOn(page.locator('#cg-board-open'));
       await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
       const overflow = await page.evaluate(
         () =>
@@ -1543,12 +1560,12 @@ test.describe('absent students on the board (#999)', () => {
     id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
     zh: ['/zh/classroom-groups', '3和7 号缺席。'],
     vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],
-    th: ['/th/classroom-groups', 'หมายเลข 3และ7 ขาดเรียน'],
+    th: ['/th/classroom-groups', 'หมายเลข 3 และ 7 ขาดเรียน'],
   } as const;
   for (const [locale, [path, sentence]] of Object.entries(sentences)) {
     test(`the board says who is absent in ${locale}`, async ({ page }) => {
       await absentClass(page, path);
-      await page.locator('#cg-board-open').click();
+      await tapOn(page.locator('#cg-board-open'));
       await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
         sentence,
       );

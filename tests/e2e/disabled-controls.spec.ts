@@ -1,3 +1,5 @@
+import { scrollToOn, tapOn } from '../real-touch';
+import { onRealDevice } from '../device/device-downloads';
 import { type Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { searched } from '../source-files';
@@ -55,7 +57,7 @@ const openEveryDisclosure = async (page: Page) => {
   for (let i = 0; i < (await toggles.count()); i += 1) {
     const toggle = toggles.nth(i);
     if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-      await toggle.click();
+      await tapOn(toggle);
     }
   }
 };
@@ -211,15 +213,20 @@ const affordances = async (page: Page): Promise<Population> => {
     // header (Header.astro:49): a control scrolled to the top sits under it
     // and the header legitimately wins the hit test. Both were measured
     // artefacts of the first probe (run 35521737392, every reading void).
-    await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    // On the phone a real finger drag brings it to the middle (#996), and
+    // there is no pointer to move: the reading below needs none.
+    if (onRealDevice()) await scrollToOn(control);
+    else await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const box = await control.boundingBox();
     if (box === null) continue; // not rendered; nothing a pointer can reach
 
     // Move away first. Two controls can land on the SAME viewport point once
     // each is centred (`.switches` is a flex COLUMN), and a move to the point
     // the pointer already occupies fires nothing.
-    await page.mouse.move(0, 0);
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    if (!onRealDevice()) {
+      await page.mouse.move(0, 0);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    }
 
     reachable.push(
       await page.evaluate((id) => {
@@ -445,6 +452,13 @@ test.describe('a disabled control affords that it is disabled', () => {
     test(`${theme}: roster at the limit — the add buttons and Make groups too`, async ({
       page,
     }) => {
+      // On the phone each disabled control is reached by a real drag, about a
+      // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+      // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+      test.slow(
+        onRealDevice(),
+        'a real drag to each of ~100 disabled controls',
+      );
       await openRoster(page);
       // `openRoster` already added one, so this lands exactly ON the limit
       // rather than asking the page to clamp an overshoot.
@@ -483,6 +497,10 @@ test.describe('a disabled control affords that it is disabled', () => {
   test('only checkbox, radio and file inputs are left to the UA to paint', async ({
     page,
   }) => {
+    // On the phone each disabled control is reached by a real drag, about a
+    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
     // The fill carve-out, asserted rather than assumed. Without this the
     // `uaPainted` branch could grow to swallow a control that SHOULD be
     // painted, and `expectDisabledPaint` would quietly stop covering it.
@@ -502,6 +520,10 @@ test.describe('a disabled control affords that it is disabled', () => {
   test('the no-entry cursor marks the disabled controls apart from the enabled ones', async ({
     page,
   }) => {
+    // On the phone each disabled control is reached by a real drag, about a
+    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
+    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
+    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
     await openRoster(page);
     await addSeveral(page, MAX_ROSTER - 1);
     await openEveryDisclosure(page);

@@ -1,3 +1,4 @@
+import { tapOn } from './real-touch';
 import { typeInto } from './real-typing';
 import type { Page } from '@playwright/test';
 
@@ -32,7 +33,7 @@ export const makeGroups = async (
   await typeInto(page.locator('#cg-count'), count);
   await typeInto(page.locator('#cg-size'), size);
   await chooseSpeed(page, 'skip');
-  await page.click('#cg-go');
+  await tapOn(page.locator('#cg-go'));
 };
 
 /**
@@ -53,7 +54,7 @@ export const chooseSpeed = async (
 ): Promise<void> => {
   const soundBody = page.locator('#cg-sound-body');
   if (await soundBody.isHidden()) {
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
   }
   await page.selectOption('#cg-speed', speed);
 };
