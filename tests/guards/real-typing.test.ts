@@ -58,4 +58,15 @@ describe('every browser test types with real key presses (#998)', () => {
       expect(hits).toEqual([]);
     });
   }
+
+  // A file is chosen the way a visitor chooses one: a real press on the
+  // picker, then the file handed to the chooser that press opened (`upload`
+  // in `tests/e2e/helpers.ts`). `setInputFiles` puts it on the input with
+  // no press at all.
+  it('no browser test sets a file on an input by script', () => {
+    const hits = searched(files, { of: files, what: 'browser test files' })
+      .filter(({ code }) => /\.setInputFiles\(/.test(code))
+      .map(({ path }) => path);
+    expect(hits).toEqual([]);
+  });
 });

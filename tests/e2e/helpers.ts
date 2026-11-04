@@ -268,9 +268,18 @@ export { todayISO } from '../../src/lib/csv';
  * Stage 4's fixtures. ADDED to this file, never started as a second one --
  * see this file's own header for why two versions of a helper is a bug
  * waiting to be blamed on the wrong test.
+ *
+ * The file picker is opened by a real press, as a teacher opens it (#998):
+ * a tap on the phone, a click elsewhere. STAND-IN: the file is then handed
+ * to the chooser that press opened, because the operating system's file
+ * dialog is outside the browser and no test can drive it.
  */
 export const upload = async (page: Page, name: string, body: string) => {
-  await page.locator('#cg-import').setInputFiles({
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    tapOn(page.locator('#cg-import')),
+  ]);
+  await chooser.setFiles({
     name,
     mimeType: 'text/csv',
     buffer: Buffer.from(body, 'utf8'),
