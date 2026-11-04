@@ -21,10 +21,11 @@ import { onRealDevice } from './device/device-downloads';
  * the way a visitor would (#1004): by real finger drags on Chromium's
  * emulated phone, and by the real mouse wheel everywhere else, so Playwright's
  * own scroll-into-view before its click finds nothing left to do. WebKit's
- * emulated iPhone turns the wheel too: Playwright has no touch drags there,
- * so its wheel is a marked STAND-IN for a finger (Shyden 2026-11-05, #1004);
- * the real iPhone run drags with a real finger. A point the wheel cannot
- * bring in fails the test, naming why, as on the phone.
+ * emulated iPhone presses real keys instead: Playwright refuses the wheel
+ * there and has no touch drags on WebKit, so its keys are a marked STAND-IN
+ * for a finger (Shyden 2026-11-05, #1036); the real iPhone run drags with a
+ * real finger. A point the wheel or the keys cannot bring in fails the test,
+ * naming why, as on the phone.
  */
 
 /** Drags allowed beyond the ones the distance itself needs. */
@@ -125,13 +126,43 @@ export function planWheel(p: Prepared, gain = 1): number[] {
   return steps;
 }
 
-/** How a page is moved: a finger's drags, or the mouse wheel. */
-export type Mover = 'touch' | 'wheel';
+/**
+ * How far one arrow press scrolls in WebKit (its line step), and the share of
+ * the view past which a page key is pressed instead. Assumed from WebKit's
+ * defaults, not measured: the page is read after each burst and moved again,
+ * so a different step costs presses, never a wrong tap.
+ */
+const ARROW_PX = 40;
+const PAGE_KEY_SHARE = 0.8;
+
+/**
+ * The key presses, one burst, that move the point toward the middle of the
+ * view (#1036): arrows for a near point, one page key for a far one, and page
+ * keys alone when the focused element would take the arrows itself (a radio
+ * group changes its choice, a field moves its caret).
+ */
+export function planKeys(
+  p: Prepared,
+  gain: number,
+  arrowsScroll: boolean,
+): string[] {
+  const need = needOf(p);
+  const down = need > 0;
+  if (!arrowsScroll || Math.abs(need) > p.viewHeight * PAGE_KEY_SHARE)
+    return [down ? 'PageDown' : 'PageUp'];
+  const presses = Math.max(1, Math.ceil((Math.abs(need) * gain) / ARROW_PX));
+  return Array<string>(presses).fill(down ? 'ArrowDown' : 'ArrowUp');
+}
+
+/** How a page is moved: a finger's drags, the mouse wheel, or key presses. */
+export type Mover = 'touch' | 'wheel' | 'keys';
 
 /**
  * Real finger drags on the phone and on Chromium's emulated phone (CDP touch
- * input is Chromium's alone); the real wheel everywhere else, which on
- * WebKit's emulated iPhone is a marked stand-in for a finger (#1004).
+ * input is Chromium's alone); real key presses on WebKit's emulated iPhone, a
+ * marked STAND-IN for a finger, since Playwright refuses the wheel there and
+ * has no touch drags on WebKit (Shyden 2026-11-05, #1036); the real wheel on
+ * the desktop engines.
  */
 export function scrollMover(where: {
   realDevice: boolean;
@@ -139,16 +170,20 @@ export function scrollMover(where: {
   touch: boolean;
 }): Mover {
   if (where.realDevice) return 'touch';
-  return where.engine === 'chromium' && where.touch ? 'touch' : 'wheel';
+  if (!where.touch) return 'wheel';
+  if (where.engine === 'chromium') return 'touch';
+  return where.engine === 'webkit' ? 'keys' : 'wheel';
 }
 
 const STEP_NAME: Record<Mover, string> = {
   touch: 'swipe',
   wheel: 'wheel step',
+  keys: 'key press',
 };
 const POINTER_NAME: Record<Mover, string> = {
   touch: 'a finger',
   wheel: 'a pointer',
+  keys: 'a pointer',
 };
 
 /** Why a tap cannot be made once the drags have stopped, or null when it can. */
@@ -536,6 +571,33 @@ async function turnWheel(page: Page, p: Prepared, gain = 1): Promise<number> {
   return steps.length;
 }
 
+/** Focused things that take arrow keys themselves instead of scrolling. */
+const TAKES_ARROWS = `${FIELDS}, [role="radiogroup"], [role="radio"], [role="slider"], [role="listbox"], [role="tablist"], [role="menu"]`;
+
+/**
+ * Whether an arrow press would scroll the page: true unless the focus is on
+ * something that takes arrows itself. A page with JavaScript off cannot be
+ * asked, so it is given page keys alone.
+ */
+async function arrowsScroll(page: Page): Promise<boolean> {
+  if (javaScriptOff(page)) return false;
+  return page.evaluate(
+    (takes) => !document.activeElement?.closest(takes),
+    TAKES_ARROWS,
+  );
+}
+
+/**
+ * One burst of real key presses toward the point (#1036): WebKit's emulated
+ * iPhone, where Playwright refuses the wheel. A marked STAND-IN for a finger
+ * (a phone has no keyboard); the real iPhone run drags with a real finger.
+ */
+async function pressKeys(page: Page, p: Prepared, gain = 1): Promise<number> {
+  for (const key of planKeys(p, gain, await arrowsScroll(page)))
+    await page.keyboard.press(key);
+  return 1;
+}
+
 export interface ScrollOptions {
   /** Bring the point into the middle band of the view, clear of a sticky header. */
   centre?: boolean;
@@ -582,6 +644,7 @@ async function bringIntoView(
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
     if (mover === 'wheel') swipes += await turnWheel(page, p, gain);
+    else if (mover === 'keys') swipes += await pressKeys(page, p, gain);
     else {
       const planned = planSwipe(p);
       // On Chromium's emulated phone the drag starts where no form field is:
@@ -802,7 +865,7 @@ export async function doubleTapOn(target: Locator): Promise<void> {
 
 /**
  * Brings an element into view with no tap, by real input: a finger's drags,
- * or the mouse wheel (#1004). With `centre`, into the middle band of the view.
+ * the mouse wheel (#1004), or key presses (#1036). With `centre`, into the middle band of the view.
  */
 export async function scrollToOn(
   target: Locator,
@@ -817,13 +880,15 @@ const ARRIVED_PX = 2;
 
 /**
  * Scrolls the page down by `dy` CSS pixels (up when negative) with real
- * input: the mouse wheel, or a finger's drags where the page takes touch.
+ * input: the mouse wheel, a finger's drags where the page takes touch, or
+ * key presses on WebKit's emulated iPhone (#1036).
  * An engine may move the page less than a wheel turn asks (desktop WebKit
  * fell 36 px short, run 41894120627), so the page is read after each move
  * and moved again toward the goal, until it arrives within 2 px, stops
  * moving (its end), or has taken as many moves as the distance needs and
- * six more. A finger cannot drag less than a tap's slop, so on touch the
- * page may stop up to 40 px short; a caller reads where it came to rest.
+ * six more. A finger cannot drag less than a tap's slop, nor a key press
+ * less than a line, so on touch or keys the page may stop up to 40 px from
+ * its goal; a caller reads where it came to rest.
  */
 export async function scrollByOn(page: Page, dy: number): Promise<void> {
   const mover = await moverOf(page);
@@ -881,6 +946,10 @@ export async function scrollByOn(page: Page, dy: number): Promise<void> {
         await page.mouse.wheel(0, step);
         owed -= step;
       }
+    } else if (mover === 'keys') {
+      // An arrow moves a whole line, so the page stops within one of its goal.
+      if (Math.abs(left) < ARROW_PX) return;
+      await pressKeys(page, toward(left));
     } else {
       if (Math.abs(left) < MIN_SWIPE_PX) return;
       const { from, to } = planSwipe(toward(left));

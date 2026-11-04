@@ -3,6 +3,7 @@ import {
   CENTRE_SHARE,
   mustMove,
   planSwipe,
+  planKeys,
   planWheel,
   scrollMover,
   type Prepared,
@@ -160,7 +161,7 @@ describe('scrollMover (#1004)', () => {
       scrollMover({ realDevice: false, engine: 'chromium', touch: true }),
     ).toBe('touch');
   });
-  it("turns the wheel on desktop engines, and on WebKit's emulated iPhone as a marked stand-in", () => {
+  it('turns the wheel on the desktop engines', () => {
     expect(
       scrollMover({ realDevice: false, engine: 'chromium', touch: false }),
     ).toBe('wheel');
@@ -170,8 +171,47 @@ describe('scrollMover (#1004)', () => {
     expect(
       scrollMover({ realDevice: false, engine: 'webkit', touch: false }),
     ).toBe('wheel');
+  });
+  it("presses keys on WebKit's emulated iPhone, a marked stand-in: Playwright refuses its wheel (#1036)", () => {
     expect(
       scrollMover({ realDevice: false, engine: 'webkit', touch: true }),
+    ).toBe('keys');
+  });
+  it('turns the wheel on any other engine given touch, which has no mobile refusal', () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'firefox', touch: true }),
     ).toBe('wheel');
+  });
+});
+
+describe('planKeys (#1036)', () => {
+  it('presses arrows for a near point when nothing focused takes them', () => {
+    // 300 px to the middle, at WebKit's 40 px a line: 8 presses (320 px).
+    expect(planKeys(at(700), 1, true)).toEqual(Array(8).fill('ArrowDown'));
+    expect(planKeys(at(100), 1, true)).toEqual(Array(8).fill('ArrowUp'));
+  });
+  it('presses one page key for a point more than a page away', () => {
+    expect(planKeys(at(2000), 1, true)).toEqual(['PageDown']);
+    expect(planKeys(at(-1000), 1, true)).toEqual(['PageUp']);
+  });
+  it('presses page keys alone when the focus would take arrows (a radio, a field)', () => {
+    expect(planKeys(at(700), 1, false)).toEqual(['PageDown']);
+    expect(planKeys(at(100), 1, false)).toEqual(['PageUp']);
+  });
+  it('presses a share of the arrows after an overshoot, never none', () => {
+    expect(planKeys(at(700), 0.5, true)).toEqual(Array(4).fill('ArrowDown'));
+    expect(planKeys(at(410), 0.25, true)).toEqual(['ArrowDown']);
+    expect(planKeys(at(390), 1, true)).toEqual(['ArrowUp']);
+  });
+});
+
+describe('whyNotTappable names key presses (#1036)', () => {
+  it('names key presses and a pointer when the page is moved by keys', () => {
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'keys')).toMatch(
+      /^#go did not come into view: a real key press no longer moves it/,
+    );
+    expect(
+      whyNotTappable('#go', at(400, { hit: 'div.bar' }), 0, 6, 'keys'),
+    ).toBe('#go is covered: a pointer there would touch div.bar');
   });
 });
