@@ -111,11 +111,11 @@ export function planSwipe(p: Prepared): {
  * the whole distance, in steps of at most the reach a drag has, and never
  * less than a drag's least (#1004). Positive turns scroll down the page.
  */
-export function planWheel(p: Prepared): number[] {
+export function planWheel(p: Prepared, gain = 1): number[] {
   const need = needOf(p);
   const reach = reachOf(p);
   const sign = need < 0 ? -1 : 1;
-  let left = Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need)));
+  let left = Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need) * gain));
   const steps: number[] = [];
   while (left > 0) {
     const step = Math.min(left, reach);
@@ -431,16 +431,25 @@ async function measureByProtocol(
   };
 }
 
-/** Where the page stands, for a failure off the phone to explain itself. */
-const pageState = (page: Page): Promise<string> =>
+/**
+ * Where the page stands, for a failure off the phone to explain itself: its
+ * scroll, height, window and zoom, what has the focus, and the last drag.
+ */
+const pageState = (page: Page, lastDrag = ''): Promise<string> =>
   javaScriptOff(page)
     ? Promise.resolve('the page has JavaScript off, so it cannot be read')
     : page
         .evaluate(() => {
           const vv = window.visualViewport;
           const doc = document.scrollingElement ?? document.documentElement;
-          return `the page is scrolled to y ${Math.round(window.scrollY)} of ${Math.round(doc.scrollHeight)}, the window is ${window.innerHeight} tall, zoom ${vv ? vv.scale : 1}`;
+          const active = document.activeElement;
+          const focus =
+            active && active !== document.body
+              ? `${active.tagName.toLowerCase()}${active.id ? `#${active.id}` : ''}`
+              : 'nothing';
+          return `the page is scrolled to y ${Math.round(window.scrollY)} of ${Math.round(doc.scrollHeight)}, the window is ${window.innerHeight} tall, zoom ${vv ? vv.scale : 1}, the focus is on ${focus}`;
         })
+        .then((state) => (lastDrag ? `${state}; ${lastDrag}` : state))
         .catch(
           (error: unknown) => `the page could not be read: ${String(error)}`,
         );
@@ -516,8 +525,8 @@ async function clearColumn(
  * One burst of real wheel turns with the pointer inside the view, over the
  * point's own column, so the wheel reaches whatever scrolls the element.
  */
-async function turnWheel(page: Page, p: Prepared): Promise<number> {
-  const steps = planWheel(p);
+async function turnWheel(page: Page, p: Prepared, gain = 1): Promise<number> {
+  const steps = planWheel(p, gain);
   const x = Math.min(Math.max(p.point.x, 1), p.viewWidth - 2);
   await page.mouse.move(
     Math.round(x),
@@ -568,9 +577,11 @@ async function bringIntoView(
     forATap ? mustMove(q, edge) : mustMove({ ...q, hit: null }, edge);
   const ceiling = swipeCeiling(p);
   let swipes = 0;
+  let gain = 1;
+  let lastDrag = '';
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    if (mover === 'wheel') swipes += await turnWheel(page, p);
+    if (mover === 'wheel') swipes += await turnWheel(page, p, gain);
     else {
       const planned = planSwipe(p);
       // On Chromium's emulated phone the drag starts where no form field is:
@@ -583,6 +594,7 @@ async function bringIntoView(
           : await clearColumn(page, planned);
       const from = { ...planned.from, x };
       const to = { ...planned.to, x };
+      lastDrag = `the last drag ran from (${from.x}, ${from.y}) to (${to.x}, ${to.y})`;
       await drag(
         page,
         from,
@@ -596,7 +608,12 @@ async function bringIntoView(
     // wait for the coast to end: a roster of 100 is about 22,000 px tall at
     // phone width, and waiting out each coast took 19 s (run 41905426210).
     const far = Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS;
+    const side = Math.sign(needOf(p));
     p = await read(before, !far);
+    // An engine that moves the page further than the wheel asks (WebKit took
+    // #cg-sex-separate past the view's top, run 41909354288) is answered with
+    // half the turn each time the point crosses the middle.
+    if (Math.sign(needOf(p)) === -side) gain /= 2;
     if (Math.abs(p.point.y - before) < STILL_PX) break;
   }
   const why = whyNotTappable(
@@ -608,7 +625,9 @@ async function bringIntoView(
   );
   if (why !== null)
     throw new TapNotPossibleError(
-      phone ? why : `${why}; ${await pageState(page)}`,
+      phone
+        ? why
+        : [why, await pageState(page, lastDrag)].filter(Boolean).join('; '),
     );
   return p;
 }

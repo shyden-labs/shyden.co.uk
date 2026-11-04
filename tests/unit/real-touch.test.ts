@@ -138,6 +138,11 @@ describe('planWheel (#1004)', () => {
     expect(steps.reduce((a, b) => a + b, 0)).toBe(1600);
     expect(planWheel(at(-1000))).toEqual([-480, -480, -440]);
   });
+  it('turns a share of the distance after an overshoot, never under 40 px', () => {
+    expect(planWheel(at(700), 0.5)).toEqual([150]);
+    expect(planWheel(at(2000), 0.25)).toEqual([400]);
+    expect(planWheel(at(450), 0.5)).toEqual([40]);
+  });
   it('never turns less than 40 px', () => {
     expect(planWheel(at(410))).toEqual([40]);
     expect(planWheel(at(390))).toEqual([-40]);
