@@ -332,24 +332,78 @@ function closeKeyboard(): boolean {
   return shown;
 }
 
-const movers = new WeakMap<Page, Promise<Mover>>();
-/** The page's mover, read once: the engine, and whether the page takes touch. */
-function moverOf(page: Page): Promise<Mover> {
-  const found =
-    movers.get(page) ??
-    (onRealDevice()
-      ? Promise.resolve<Mover>('touch')
-      : page
-          .evaluate(() => navigator.maxTouchPoints > 0)
-          .then((touch) =>
-            scrollMover({
-              realDevice: false,
-              engine: page.context().browser()?.browserType().name(),
-              touch,
-            }),
-          ));
-  movers.set(page, found);
-  return found;
+/**
+ * The page's mover: the engine, and whether the test's project gives the page
+ * touch. Read from the test's own configuration, never by script in the page,
+ * which a page with JavaScript blocked never runs.
+ */
+async function moverOf(page: Page): Promise<Mover> {
+  if (onRealDevice()) return 'touch';
+  // Imported here, at run time: only a running Playwright test has a project.
+  const { test } = await import('@playwright/test');
+  return scrollMover({
+    realDevice: false,
+    engine: page.context().browser()?.browserType().name(),
+    touch: test.info().project.use.hasTouch === true,
+  });
+}
+
+/** Readings this far apart, this many in a row the same, mean the page is at rest. */
+const OUTSIDE_STEP_MS = 16;
+const OUTSIDE_STILL = 6;
+const OUTSIDE_CEILING_MS = 3_000;
+
+/**
+ * Off the phone: the point and the view, read by protocol from the test side
+ * (`boundingBox`, `viewportSize`), so a page whose clock is paused or whose
+ * JavaScript is blocked is measured all the same (an in-page timer never
+ * fires there). Nothing is hit-tested here: Playwright's own click refuses a
+ * covered element.
+ */
+async function measureFromOutside(
+  target: Locator,
+  offset: { x: number; y: number } | undefined,
+): Promise<Prepared> {
+  const view = target.page().viewportSize();
+  const box = await target.boundingBox();
+  if (view === null || box === null)
+    throw new TapNotPossibleError(
+      `${String(target)} cannot be measured: ${view === null ? 'the page has no fixed view size' : 'it has no box (not rendered)'}`,
+    );
+  const point = {
+    x: box.x + (offset ? offset.x : box.width / 2),
+    y: box.y + (offset ? offset.y : box.height / 2),
+  };
+  return {
+    point,
+    viewTop: 0,
+    viewHeight: view.height,
+    viewWidth: view.width,
+    inView:
+      point.x >= 0 &&
+      point.x <= view.width &&
+      point.y >= 0 &&
+      point.y <= view.height,
+    hit: null,
+    keyboard: false,
+  };
+}
+
+/** Reads from outside until six readings in a row agree, at most 3 s. */
+async function settleFromOutside(
+  target: Locator,
+  offset: { x: number; y: number } | undefined,
+): Promise<Prepared> {
+  const started = Date.now();
+  let p = await measureFromOutside(target, offset);
+  let still = 0;
+  while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
+    await wait(OUTSIDE_STEP_MS);
+    const q = await measureFromOutside(target, offset);
+    still = q.point.x === p.point.x && q.point.y === p.point.y ? still + 1 : 0;
+    p = q;
+  }
+  return p;
 }
 
 /**
@@ -386,11 +440,17 @@ async function bringIntoView(
   const page = target.page();
   const selector = String(target);
   const mover = await moverOf(page);
-  let p = await prepare(target, offset);
+  const phone = onRealDevice();
+  // Off the phone, the first reading is not waited on: a point already clear
+  // is clicked at once, with no delay a timing-sensitive test would feel.
+  const read = () =>
+    phone ? prepare(target, offset) : settleFromOutside(target, offset);
+  let p = phone
+    ? await prepare(target, offset)
+    : await measureFromOutside(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
-  if (onRealDevice() && p.keyboard && closeKeyboard())
-    p = await prepare(target, offset);
+  if (phone && p.keyboard && closeKeyboard()) p = await read();
   const edge = options.centre ? CENTRE_SHARE : undefined;
   const moves = (q: Prepared) =>
     forATap ? mustMove(q, edge) : mustMove({ ...q, hit: null }, edge);
@@ -409,7 +469,7 @@ async function bringIntoView(
       );
       swipes++;
     }
-    p = await prepare(target, offset);
+    p = await read();
     if (Math.abs(p.point.y - before) < STILL_PX) break;
   }
   const why = whyNotTappable(
@@ -637,24 +697,19 @@ export async function scrollByOn(page: Page, dy: number): Promise<void> {
       left -= from.y - to.y;
     }
   }
-  // Comes to rest: six still frames of the scroll position, at most 3 s.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        let last = `${window.scrollX},${window.scrollY}`;
-        let still = 0;
-        const started = Date.now();
-        const settle = () => {
-          const now = `${window.scrollX},${window.scrollY}`;
-          still = now === last ? still + 1 : 0;
-          last = now;
-          if (still < 6 && Date.now() - started < 3000)
-            requestAnimationFrame(settle);
-          else resolve();
-        };
-        requestAnimationFrame(settle);
-      }),
-  );
+  // Comes to rest: six readings in a row of the same scroll position, read
+  // from the test side so a paused page clock cannot stall it; at most 3 s.
+  const where = () =>
+    page.evaluate(() => `${window.scrollX},${window.scrollY}`);
+  const started = Date.now();
+  let last = await where();
+  let still = 0;
+  while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
+    await wait(OUTSIDE_STEP_MS);
+    const now = await where();
+    still = now === last ? still + 1 : 0;
+    last = now;
+  }
 }
 
 /**
