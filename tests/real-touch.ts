@@ -17,7 +17,14 @@ import { onRealDevice } from './device/device-downloads';
  * (`tests/device/ios/interaction.ts`).
  *
  * Everywhere else (the five desktop engines and their emulated phones), a tap
- * is Playwright's real `click()`, as before (#1004 covers their scrolling).
+ * is Playwright's real `click()`, but the element is first brought into view
+ * the way a visitor would (#1004): by real finger drags on Chromium's
+ * emulated phone, and by the real mouse wheel everywhere else, so Playwright's
+ * own scroll-into-view before its click finds nothing left to do. WebKit's
+ * emulated iPhone turns the wheel too: Playwright has no touch drags there,
+ * so its wheel is a marked STAND-IN for a finger (Shyden 2026-11-05, #1004);
+ * the real iPhone run drags with a real finger. A point the wheel cannot
+ * bring in fails the test, naming why, as on the phone.
  */
 
 /** Drags allowed beyond the ones the distance itself needs. */
@@ -53,10 +60,17 @@ export interface Prepared {
   keyboard: boolean;
 }
 
-/** True while the point is out of view, too near an edge, or covered. */
-export function mustMove(p: Prepared): boolean {
+/** A point brought to the centre must sit this share of the view clear of each edge. */
+export const CENTRE_SHARE = 0.3;
+
+/**
+ * True while the point is out of view, too near an edge, or covered. The
+ * edge is a tenth of the view, or `edgeShare` of it (`CENTRE_SHARE` brings a
+ * point into the middle band, clear of a sticky header).
+ */
+export function mustMove(p: Prepared, edgeShare = EDGE_SHARE): boolean {
   if (!p.inView || p.hit !== null) return true;
-  const edge = p.viewHeight * EDGE_SHARE;
+  const edge = p.viewHeight * edgeShare;
   return (
     p.point.y < p.viewTop + edge || p.point.y > p.viewTop + p.viewHeight - edge
   );
@@ -92,20 +106,67 @@ export function planSwipe(p: Prepared): {
   };
 }
 
+/**
+ * The wheel turns, one burst, that move the point to the middle of the view:
+ * the whole distance, in steps of at most the reach a drag has, and never
+ * less than a drag's least (#1004). Positive turns scroll down the page.
+ */
+export function planWheel(p: Prepared): number[] {
+  const need = needOf(p);
+  const reach = reachOf(p);
+  const sign = need < 0 ? -1 : 1;
+  let left = Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need)));
+  const steps: number[] = [];
+  while (left > 0) {
+    const step = Math.min(left, reach);
+    steps.push(sign * step);
+    left -= step;
+  }
+  return steps;
+}
+
+/** How a page is moved: a finger's drags, or the mouse wheel. */
+export type Mover = 'touch' | 'wheel';
+
+/**
+ * Real finger drags on the phone and on Chromium's emulated phone (CDP touch
+ * input is Chromium's alone); the real wheel everywhere else, which on
+ * WebKit's emulated iPhone is a marked stand-in for a finger (#1004).
+ */
+export function scrollMover(where: {
+  realDevice: boolean;
+  engine: string | undefined;
+  touch: boolean;
+}): Mover {
+  if (where.realDevice) return 'touch';
+  return where.engine === 'chromium' && where.touch ? 'touch' : 'wheel';
+}
+
+const STEP_NAME: Record<Mover, string> = {
+  touch: 'swipe',
+  wheel: 'wheel step',
+};
+const POINTER_NAME: Record<Mover, string> = {
+  touch: 'a finger',
+  wheel: 'a pointer',
+};
+
 /** Why a tap cannot be made once the drags have stopped, or null when it can. */
 export function whyNotTappable(
   selector: string,
   p: Prepared,
   swipes: number,
   ceiling: number,
+  mover: Mover = 'touch',
 ): string | null {
   const where = `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+  const step = STEP_NAME[mover];
   if (!p.inView)
     return swipes >= ceiling
-      ? `${selector} did not come into view after ${ceiling} real swipes ${where}`
-      : `${selector} did not come into view: a real swipe no longer moves it ${where}`;
+      ? `${selector} did not come into view after ${ceiling} real ${step}s ${where}`
+      : `${selector} did not come into view: a real ${step} no longer moves it ${where}`;
   if (p.hit !== null)
-    return `${selector} is covered: a finger there would touch ${p.hit}`;
+    return `${selector} is covered: ${POINTER_NAME[mover]} there would touch ${p.hit}`;
   return null;
 }
 
@@ -271,32 +332,83 @@ function closeKeyboard(): boolean {
   return shown;
 }
 
-/** Drags the page with real touches until the point can be tapped, or fails naming why. */
+const movers = new WeakMap<Page, Promise<Mover>>();
+/** The page's mover, read once: the engine, and whether the page takes touch. */
+function moverOf(page: Page): Promise<Mover> {
+  const found =
+    movers.get(page) ??
+    (onRealDevice()
+      ? Promise.resolve<Mover>('touch')
+      : page
+          .evaluate(() => navigator.maxTouchPoints > 0)
+          .then((touch) =>
+            scrollMover({
+              realDevice: false,
+              engine: page.context().browser()?.browserType().name(),
+              touch,
+            }),
+          ));
+  movers.set(page, found);
+  return found;
+}
+
+/**
+ * One burst of real wheel turns with the pointer inside the view, over the
+ * point's own column, so the wheel reaches whatever scrolls the element.
+ */
+async function turnWheel(page: Page, p: Prepared): Promise<number> {
+  const steps = planWheel(p);
+  const x = Math.min(Math.max(p.point.x, 1), p.viewWidth - 2);
+  await page.mouse.move(
+    Math.round(x),
+    Math.round(p.viewTop + p.viewHeight / 2),
+  );
+  for (const step of steps) await page.mouse.wheel(0, step);
+  return steps.length;
+}
+
+export interface ScrollOptions {
+  /** Bring the point into the middle band of the view, clear of a sticky header. */
+  centre?: boolean;
+}
+
+/**
+ * Moves the page with real input (a finger's drags or the mouse wheel) until
+ * the point can be tapped, or fails naming why. Never a script or protocol
+ * scroll.
+ */
 async function bringIntoView(
   target: Locator,
   offset: { x: number; y: number } | undefined,
   forATap: boolean,
+  options: ScrollOptions = {},
 ): Promise<Prepared> {
   const page = target.page();
   const selector = String(target);
+  const mover = await moverOf(page);
   let p = await prepare(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
-  if (p.keyboard && closeKeyboard()) p = await prepare(target, offset);
+  if (onRealDevice() && p.keyboard && closeKeyboard())
+    p = await prepare(target, offset);
+  const edge = options.centre ? CENTRE_SHARE : undefined;
   const moves = (q: Prepared) =>
-    forATap ? mustMove(q) : mustMove({ ...q, hit: null });
+    forATap ? mustMove(q, edge) : mustMove({ ...q, hit: null }, edge);
   const ceiling = swipeCeiling(p);
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    const { from, to } = planSwipe(p);
-    await drag(
-      page,
-      from,
-      to,
-      Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
-    );
-    swipes++;
+    if (mover === 'wheel') swipes += await turnWheel(page, p);
+    else {
+      const { from, to } = planSwipe(p);
+      await drag(
+        page,
+        from,
+        to,
+        Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
+      );
+      swipes++;
+    }
     p = await prepare(target, offset);
     if (Math.abs(p.point.y - before) < STILL_PX) break;
   }
@@ -305,6 +417,7 @@ async function bringIntoView(
     forATap ? p : { ...p, hit: null },
     swipes,
     ceiling,
+    mover,
   );
   if (why !== null) throw new TapNotPossibleError(why);
   return p;
@@ -328,12 +441,17 @@ export interface TapOptions {
   position?: { x: number; y: number };
 }
 
-/** A real tap on the phone, a real click everywhere else. */
+/**
+ * A real tap on the phone; everywhere else the element is brought into view
+ * by real input, then Playwright's real click.
+ */
 export async function tapOn(
   target: Locator,
   options: TapOptions = {},
 ): Promise<void> {
   if (!onRealDevice()) {
+    await target.waitFor({ state: 'visible' });
+    await bringIntoView(target, options.position, true);
     await target.click(options);
     return;
   }
@@ -458,9 +576,14 @@ export async function tapAt(page: Page, x: number, y: number): Promise<void> {
   await touchAt(page, x, y);
 }
 
-/** Two real taps in a row on the phone, Playwright's real `dblclick()` everywhere else. */
+/**
+ * Two real taps in a row on the phone; everywhere else the element is brought
+ * into view by real input, then Playwright's real `dblclick()`.
+ */
 export async function doubleTapOn(target: Locator): Promise<void> {
   if (!onRealDevice()) {
+    await target.waitFor({ state: 'visible' });
+    await bringIntoView(target, undefined, true);
     await target.dblclick();
     return;
   }
@@ -469,16 +592,69 @@ export async function doubleTapOn(target: Locator): Promise<void> {
 }
 
 /**
- * Brings an element into view with no tap: real drags on the phone,
- * Playwright's `scrollIntoViewIfNeeded()` everywhere else.
+ * Brings an element into view with no tap, by real input: a finger's drags,
+ * or the mouse wheel (#1004). With `centre`, into the middle band of the view.
  */
-export async function scrollToOn(target: Locator): Promise<void> {
-  if (!onRealDevice()) {
-    await target.scrollIntoViewIfNeeded();
-    return;
-  }
+export async function scrollToOn(
+  target: Locator,
+  options: ScrollOptions = {},
+): Promise<void> {
   await target.waitFor({ state: 'visible' });
-  await bringIntoView(target, undefined, false);
+  await bringIntoView(target, undefined, false, options);
+}
+
+/**
+ * Scrolls the page down by `dy` CSS pixels (up when negative) with real
+ * input: the mouse wheel, or a finger's drags where the page takes touch.
+ * The page may not land on the exact pixel (a wheel step or a drag is not a
+ * script's `scrollTo`), so a caller reads where it came to rest.
+ */
+export async function scrollByOn(page: Page, dy: number): Promise<void> {
+  const mover = await moverOf(page);
+  const view = await page.evaluate(() => ({
+    width: window.visualViewport?.width ?? window.innerWidth,
+    height: window.visualViewport?.height ?? window.innerHeight,
+  }));
+  // A point `dy` below the view's middle: the plans below move it to the middle.
+  const p: Prepared = {
+    point: { x: view.width / 2, y: view.height / 2 + dy },
+    viewTop: 0,
+    viewHeight: view.height,
+    viewWidth: view.width,
+    inView: false,
+    hit: null,
+    keyboard: false,
+  };
+  if (mover === 'wheel') await turnWheel(page, p);
+  else {
+    let left = dy;
+    while (Math.abs(left) >= MIN_SWIPE_PX) {
+      const { from, to } = planSwipe({
+        ...p,
+        point: { ...p.point, y: view.height / 2 + left },
+      });
+      await drag(page, from, to);
+      left -= from.y - to.y;
+    }
+  }
+  // Comes to rest: six still frames of the scroll position, at most 3 s.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        let last = `${window.scrollX},${window.scrollY}`;
+        let still = 0;
+        const started = Date.now();
+        const settle = () => {
+          const now = `${window.scrollX},${window.scrollY}`;
+          still = now === last ? still + 1 : 0;
+          last = now;
+          if (still < 6 && Date.now() - started < 3000)
+            requestAnimationFrame(settle);
+          else resolve();
+        };
+        requestAnimationFrame(settle);
+      }),
+  );
 }
 
 /**
@@ -491,6 +667,8 @@ export async function setCheckedOn(
   checked = true,
 ): Promise<void> {
   if (!onRealDevice()) {
+    await target.waitFor({ state: 'visible' });
+    await bringIntoView(target, undefined, true);
     await target.setChecked(checked);
     return;
   }

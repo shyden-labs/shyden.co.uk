@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   mustMove,
   planSwipe,
+  planWheel,
+  scrollMover,
   type Prepared,
   SPARE_SWIPES,
   swipeCeiling,
@@ -98,5 +100,60 @@ describe('whyNotTappable', () => {
     expect(
       whyNotTappable('#go', at(400, { hit: 'span#mutant-cover' }), 0, 6),
     ).toBe('#go is covered: a finger there would touch span#mutant-cover');
+  });
+  it('names wheel steps and a pointer when the page is moved by the wheel (#1004)', () => {
+    expect(whyNotTappable('#go', at(3000), 11, 11, 'wheel')).toBe(
+      '#go did not come into view after 11 real wheel steps (the point is at y 3000, the view is 800 tall)',
+    );
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'wheel')).toMatch(
+      /^#go did not come into view: a real wheel step no longer moves it/,
+    );
+    expect(
+      whyNotTappable('#go', at(400, { hit: 'div.bar' }), 0, 6, 'wheel'),
+    ).toBe('#go is covered: a pointer there would touch div.bar');
+  });
+});
+
+describe('planWheel (#1004)', () => {
+  it('turns the wheel by exactly the distance to the middle when that is within reach', () => {
+    expect(planWheel(at(700))).toEqual([300]);
+    expect(planWheel(at(100))).toEqual([-300]);
+  });
+  it('spins a far point in steps of at most 60% of the view, summing to the distance', () => {
+    const steps = planWheel(at(2000));
+    expect(steps).toEqual([480, 480, 480, 160]);
+    expect(steps.reduce((a, b) => a + b, 0)).toBe(1600);
+    expect(planWheel(at(-1000))).toEqual([-480, -480, -440]);
+  });
+  it('never turns less than 40 px', () => {
+    expect(planWheel(at(410))).toEqual([40]);
+    expect(planWheel(at(390))).toEqual([-40]);
+  });
+});
+
+describe('scrollMover (#1004)', () => {
+  it('drags a finger on the real phone, whatever the engine says', () => {
+    expect(
+      scrollMover({ realDevice: true, engine: 'chromium', touch: true }),
+    ).toBe('touch');
+  });
+  it("drags a finger on Chromium's emulated phone, the one emulator that takes touch drags", () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'chromium', touch: true }),
+    ).toBe('touch');
+  });
+  it("turns the wheel on desktop engines, and on WebKit's emulated iPhone as a marked stand-in", () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'chromium', touch: false }),
+    ).toBe('wheel');
+    expect(
+      scrollMover({ realDevice: false, engine: 'firefox', touch: false }),
+    ).toBe('wheel');
+    expect(
+      scrollMover({ realDevice: false, engine: 'webkit', touch: false }),
+    ).toBe('wheel');
+    expect(
+      scrollMover({ realDevice: false, engine: 'webkit', touch: true }),
+    ).toBe('wheel');
   });
 });
