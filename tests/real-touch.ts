@@ -454,13 +454,21 @@ async function settleFromOutside(
   target: Locator,
   offset: { x: number; y: number } | undefined,
   fromY: number,
+  toRest = true,
 ): Promise<Prepared> {
   const started = Date.now();
   let p = await measureFromOutside(target, offset);
-  while (p.point.y === fromY && Date.now() - started < MOVE_START_MS) {
+  // Started means moved a real distance: WebKit's smooth scroll begins
+  // slowly, and a fraction of a pixel read as "moving, then still" ended the
+  // loop early (run 41905426210).
+  while (
+    Math.abs(p.point.y - fromY) < STILL_PX &&
+    Date.now() - started < MOVE_START_MS
+  ) {
     await wait(OUTSIDE_STEP_MS);
     p = await measureFromOutside(target, offset);
   }
+  if (!toRest) return p;
   let still = 0;
   while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
     await wait(OUTSIDE_STEP_MS);
@@ -480,8 +488,9 @@ const FIELDS =
   'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
 /**
- * The first column, at 90%, 50% or 10% of the view's width, where neither
- * end of the drag lands on a form field; 90% when none is clear.
+ * The first column, at 97%, 90%, 50%, 10% or 3% of the view's width, where
+ * neither end of the drag lands on a form field (a form's fields can span
+ * all but the margins); the planned column when none is clear.
  */
 async function clearColumn(
   page: Page,
@@ -492,7 +501,9 @@ async function clearColumn(
       const width = window.visualViewport?.width ?? window.innerWidth;
       const onField = (x: number, y: number) =>
         document.elementFromPoint(x, y)?.closest(fields) != null;
-      const columns = [0.9, 0.5, 0.1].map((share) => Math.round(width * share));
+      const columns = [0.97, 0.9, 0.5, 0.1, 0.03].map((share) =>
+        Math.round(width * share),
+      );
       return (
         columns.find((x) => !onField(x, from.y) && !onField(x, to.y)) ?? from.x
       );
@@ -538,8 +549,10 @@ async function bringIntoView(
   const phone = onRealDevice();
   // Off the phone, the first reading is not waited on: a point already clear
   // is clicked at once, with no delay a timing-sensitive test would feel.
-  const read = (fromY: number) =>
-    phone ? prepare(target, offset) : settleFromOutside(target, offset, fromY);
+  const read = (fromY: number, toRest = true) =>
+    phone
+      ? prepare(target, offset)
+      : settleFromOutside(target, offset, fromY, toRest);
   let p = phone
     ? await prepare(target, offset)
     : await measureFromOutside(target, offset);
@@ -578,7 +591,12 @@ async function bringIntoView(
       );
       swipes++;
     }
-    p = await read(before);
+    // Off the phone, a point still more than two views away is flicked at
+    // again as soon as the page has moved, as a visitor's thumb does, with no
+    // wait for the coast to end: a roster of 100 is about 22,000 px tall at
+    // phone width, and waiting out each coast took 19 s (run 41905426210).
+    const far = Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS;
+    p = await read(before, !far);
     if (Math.abs(p.point.y - before) < STILL_PX) break;
   }
   const why = whyNotTappable(
@@ -802,7 +820,10 @@ export async function scrollByOn(page: Page, dy: number): Promise<void> {
   const rest = async (from: number): Promise<number> => {
     const started = Date.now();
     let last = await scrolled();
-    while (last === from && Date.now() - started < MOVE_START_MS) {
+    while (
+      Math.abs(last - from) < STILL_PX &&
+      Date.now() - started < MOVE_START_MS
+    ) {
       await wait(OUTSIDE_STEP_MS);
       last = await scrolled();
     }
