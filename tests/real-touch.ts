@@ -192,9 +192,10 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function prepare(
   target: Locator,
   offset: { x: number; y: number } | undefined,
+  waitForRest = true,
 ): Promise<Prepared> {
   return target.evaluate(
-    (el, { offset }) =>
+    (el, { offset, waitForRest }) =>
       new Promise<Prepared>((resolve) => {
         const vv = window.visualViewport;
         const view = () => ({
@@ -230,7 +231,7 @@ async function prepare(
           const now = shape();
           still = now === last ? still + 1 : 0;
           last = now;
-          if (still < 6 && Date.now() - started < 3000) {
+          if (waitForRest && still < 6 && Date.now() - started < 3000) {
             requestAnimationFrame(settle);
             return;
           }
@@ -275,9 +276,13 @@ async function prepare(
             keyboard: typing,
           });
         };
-        requestAnimationFrame(settle);
+        // Off the phone the reading is taken at once, with no frame waited
+        // on: a page whose clock is paused or whose JavaScript is blocked
+        // never paints one. The test side polls for rest instead.
+        if (waitForRest) requestAnimationFrame(settle);
+        else settle();
       }),
-    { offset },
+    { offset, waitForRest },
   );
 }
 
@@ -356,40 +361,26 @@ const OUTSIDE_CEILING_MS = 3_000;
 const MOVE_START_MS = 500;
 
 /**
- * Off the phone: the point and the view, read by protocol from the test side
- * (`boundingBox`, `viewportSize`), so a page whose clock is paused or whose
- * JavaScript is blocked is measured all the same (an in-page timer never
- * fires there). Nothing is hit-tested here: Playwright's own click refuses a
- * covered element.
+ * Off the phone: the point, the view and what a pointer there would touch,
+ * read in the page at once, with no frame waited on (`prepare`'s fast form).
+ * The view is the page's own, not the configured size: a full-screen board
+ * is laid out at the screen's width (Firefox put Make Groups at x 1136 in a
+ * "320 px" view, run 41898281057).
  */
-async function measureFromOutside(
+const measureFromOutside = (
   target: Locator,
   offset: { x: number; y: number } | undefined,
-): Promise<Prepared> {
-  const view = target.page().viewportSize();
-  const box = await target.boundingBox();
-  if (view === null || box === null)
-    throw new TapNotPossibleError(
-      `${String(target)} cannot be measured: ${view === null ? 'the page has no fixed view size' : 'it has no box (not rendered)'}`,
-    );
-  const point = {
-    x: box.x + (offset ? offset.x : box.width / 2),
-    y: box.y + (offset ? offset.y : box.height / 2),
-  };
-  return {
-    point,
-    viewTop: 0,
-    viewHeight: view.height,
-    viewWidth: view.width,
-    inView:
-      point.x >= 0 &&
-      point.x <= view.width &&
-      point.y >= 0 &&
-      point.y <= view.height,
-    hit: null,
-    keyboard: false,
-  };
-}
+): Promise<Prepared> => prepare(target, offset, false);
+
+/** Where the page stands, for a failure off the phone to explain itself. */
+const pageState = (page: Page): Promise<string> =>
+  page
+    .evaluate(() => {
+      const vv = window.visualViewport;
+      const doc = document.scrollingElement ?? document.documentElement;
+      return `the page is scrolled to y ${Math.round(window.scrollY)} of ${Math.round(doc.scrollHeight)}, the window is ${window.innerHeight} tall, zoom ${vv ? vv.scale : 1}`;
+    })
+    .catch((error: unknown) => `the page could not be read: ${String(error)}`);
 
 /**
  * Reads from outside until six readings in a row agree, at most 3 s. A move
@@ -494,7 +485,10 @@ async function bringIntoView(
     ceiling,
     mover,
   );
-  if (why !== null) throw new TapNotPossibleError(why);
+  if (why !== null)
+    throw new TapNotPossibleError(
+      phone ? why : `${why}; ${await pageState(page)}`,
+    );
   return p;
 }
 
