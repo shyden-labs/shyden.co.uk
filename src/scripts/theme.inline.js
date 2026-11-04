@@ -1,4 +1,6 @@
 (() => {
+  // MUTANT (#1004 AC3, never merged): the wheel no longer scrolls the page.
+  addEventListener('wheel', (e) => e.preventDefault(), { passive: false, capture: true });
   const root = document.documentElement;
   const os = matchMedia('(prefers-color-scheme: dark)');
   const saved = () => {
