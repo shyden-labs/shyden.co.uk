@@ -159,7 +159,7 @@ export function whyNotTappable(
   ceiling: number,
   mover: Mover = 'touch',
 ): string | null {
-  const where = `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+  const where = `(the point is at x ${Math.round(p.point.x)}, y ${Math.round(p.point.y)}; the view is ${Math.round(p.viewWidth)} wide, ${Math.round(p.viewHeight)} tall)`;
   const step = STEP_NAME[mover];
   if (!p.inView)
     return swipes >= ceiling
@@ -352,6 +352,8 @@ async function moverOf(page: Page): Promise<Mover> {
 const OUTSIDE_STEP_MS = 16;
 const OUTSIDE_STILL = 6;
 const OUTSIDE_CEILING_MS = 3_000;
+/** How long a move is given to start before the page is taken as at rest. */
+const MOVE_START_MS = 500;
 
 /**
  * Off the phone: the point and the view, read by protocol from the test side
@@ -389,13 +391,22 @@ async function measureFromOutside(
   };
 }
 
-/** Reads from outside until six readings in a row agree, at most 3 s. */
+/**
+ * Reads from outside until six readings in a row agree, at most 3 s. A move
+ * is first given up to 500 ms to start (an engine may begin a wheel scroll
+ * late), so a page read before it moved is not taken as one that cannot.
+ */
 async function settleFromOutside(
   target: Locator,
   offset: { x: number; y: number } | undefined,
+  fromY: number,
 ): Promise<Prepared> {
   const started = Date.now();
   let p = await measureFromOutside(target, offset);
+  while (p.point.y === fromY && Date.now() - started < MOVE_START_MS) {
+    await wait(OUTSIDE_STEP_MS);
+    p = await measureFromOutside(target, offset);
+  }
   let still = 0;
   while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
     await wait(OUTSIDE_STEP_MS);
@@ -443,15 +454,19 @@ async function bringIntoView(
   const phone = onRealDevice();
   // Off the phone, the first reading is not waited on: a point already clear
   // is clicked at once, with no delay a timing-sensitive test would feel.
-  const read = () =>
-    phone ? prepare(target, offset) : settleFromOutside(target, offset);
+  const read = (fromY: number) =>
+    phone ? prepare(target, offset) : settleFromOutside(target, offset, fromY);
   let p = phone
     ? await prepare(target, offset)
     : await measureFromOutside(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
-  if (phone && p.keyboard && closeKeyboard()) p = await read();
-  const edge = options.centre ? CENTRE_SHARE : undefined;
+  if (phone && p.keyboard && closeKeyboard()) p = await read(p.point.y);
+  // The phone keeps a tap clear of the view's top and bottom tenth, where the
+  // browser's own bars sit. Off the phone the page moves only when the point
+  // is out of view: a control in a fixed bar near the top never moves, and
+  // turning the wheel at it only delays the click.
+  const edge = options.centre ? CENTRE_SHARE : phone ? undefined : 0;
   const moves = (q: Prepared) =>
     forATap ? mustMove(q, edge) : mustMove({ ...q, hit: null }, edge);
   const ceiling = swipeCeiling(p);
@@ -469,7 +484,7 @@ async function bringIntoView(
       );
       swipes++;
     }
-    p = await read();
+    p = await read(before);
     if (Math.abs(p.point.y - before) < STILL_PX) break;
   }
   const why = whyNotTappable(
@@ -663,11 +678,18 @@ export async function scrollToOn(
   await bringIntoView(target, undefined, false, options);
 }
 
+/** A page scroll this close to its goal has arrived. */
+const ARRIVED_PX = 2;
+
 /**
  * Scrolls the page down by `dy` CSS pixels (up when negative) with real
  * input: the mouse wheel, or a finger's drags where the page takes touch.
- * The page may not land on the exact pixel (a wheel step or a drag is not a
- * script's `scrollTo`), so a caller reads where it came to rest.
+ * An engine may move the page less than a wheel turn asks (desktop WebKit
+ * fell 36 px short, run 41894120627), so the page is read after each move
+ * and moved again toward the goal, until it arrives within 2 px, stops
+ * moving (its end), or has taken as many moves as the distance needs and
+ * six more. A finger cannot drag less than a tap's slop, so on touch the
+ * page may stop up to 40 px short; a caller reads where it came to rest.
  */
 export async function scrollByOn(page: Page, dy: number): Promise<void> {
   const mover = await moverOf(page);
@@ -675,40 +697,61 @@ export async function scrollByOn(page: Page, dy: number): Promise<void> {
     width: window.visualViewport?.width ?? window.innerWidth,
     height: window.visualViewport?.height ?? window.innerHeight,
   }));
-  // A point `dy` below the view's middle: the plans below move it to the middle.
-  const p: Prepared = {
-    point: { x: view.width / 2, y: view.height / 2 + dy },
+  const scrolled = () => page.evaluate(() => window.scrollY);
+  // Comes to rest: the move is given up to 500 ms to start (an engine may
+  // begin a wheel scroll late), then six readings in a row of the same
+  // position, read from the test side so a paused page clock cannot stall
+  // it; at most 3 s in all.
+  const rest = async (from: number): Promise<number> => {
+    const started = Date.now();
+    let last = await scrolled();
+    while (last === from && Date.now() - started < MOVE_START_MS) {
+      await wait(OUTSIDE_STEP_MS);
+      last = await scrolled();
+    }
+    let still = 0;
+    while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
+      await wait(OUTSIDE_STEP_MS);
+      const now = await scrolled();
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+    return last;
+  };
+  const middle = view.height / 2;
+  // A point `left` below the view's middle: the plans move it to the middle.
+  const toward = (left: number): Prepared => ({
+    point: { x: view.width / 2, y: middle + left },
     viewTop: 0,
     viewHeight: view.height,
     viewWidth: view.width,
     inView: false,
     hit: null,
     keyboard: false,
-  };
-  if (mover === 'wheel') await turnWheel(page, p);
-  else {
-    let left = dy;
-    while (Math.abs(left) >= MIN_SWIPE_PX) {
-      const { from, to } = planSwipe({
-        ...p,
-        point: { ...p.point, y: view.height / 2 + left },
-      });
+  });
+  let at = await scrolled();
+  const goal = at + dy;
+  const ceiling = swipeCeiling(toward(dy));
+  for (let moves = 0; moves < ceiling; moves++) {
+    const left = goal - at;
+    if (Math.abs(left) <= ARRIVED_PX) return;
+    if (mover === 'wheel') {
+      await page.mouse.move(Math.round(view.width / 2), Math.round(middle));
+      // The wheel turns exactly what is left, in steps of at most a drag's reach.
+      const reach = view.height * SWIPE_SHARE;
+      for (let owed = left; Math.abs(owed) > 0;) {
+        const step = Math.sign(owed) * Math.min(Math.abs(owed), reach);
+        await page.mouse.wheel(0, step);
+        owed -= step;
+      }
+    } else {
+      if (Math.abs(left) < MIN_SWIPE_PX) return;
+      const { from, to } = planSwipe(toward(left));
       await drag(page, from, to);
-      left -= from.y - to.y;
     }
-  }
-  // Comes to rest: six readings in a row of the same scroll position, read
-  // from the test side so a paused page clock cannot stall it; at most 3 s.
-  const where = () =>
-    page.evaluate(() => `${window.scrollX},${window.scrollY}`);
-  const started = Date.now();
-  let last = await where();
-  let still = 0;
-  while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
-    await wait(OUTSIDE_STEP_MS);
-    const now = await where();
-    still = now === last ? still + 1 : 0;
-    last = now;
+    const before = at;
+    at = await rest(before);
+    if (Math.abs(at - before) < 1) return; // the page's end: it no longer moves
   }
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CENTRE_SHARE,
   mustMove,
   planSwipe,
   planWheel,
@@ -45,6 +46,18 @@ describe('mustMove', () => {
   it('moves a covered point, wherever it is', () => {
     expect(mustMove(at(400, { hit: 'div.bar' }))).toBe(true);
   });
+  it('with no edge (off the phone), moves only a point out of view (#1004)', () => {
+    expect(mustMove(at(30), 0)).toBe(false);
+    expect(mustMove(at(790), 0)).toBe(false);
+    expect(mustMove(at(-1), 0)).toBe(true);
+    expect(mustMove(at(801), 0)).toBe(true);
+  });
+  it('with the centre band, moves a point within 30% of either edge (#1004)', () => {
+    expect(mustMove(at(239), CENTRE_SHARE)).toBe(true);
+    expect(mustMove(at(240), CENTRE_SHARE)).toBe(false);
+    expect(mustMove(at(560), CENTRE_SHARE)).toBe(false);
+    expect(mustMove(at(561), CENTRE_SHARE)).toBe(true);
+  });
   it('reads the edges from the visual viewport offset', () => {
     expect(mustMove(at(1100, { viewTop: 1000, inView: true }))).toBe(false);
   });
@@ -88,7 +101,7 @@ describe('whyNotTappable', () => {
   });
   it('names the element and the ceiling when it never came into view', () => {
     expect(whyNotTappable('#go', at(3000), 11, 11)).toBe(
-      '#go did not come into view after 11 real swipes (the point is at y 3000, the view is 800 tall)',
+      '#go did not come into view after 11 real swipes (the point is at x 200, y 3000; the view is 400 wide, 800 tall)',
     );
   });
   it('says the page stopped moving when a swipe no longer moves it', () => {
@@ -103,7 +116,7 @@ describe('whyNotTappable', () => {
   });
   it('names wheel steps and a pointer when the page is moved by the wheel (#1004)', () => {
     expect(whyNotTappable('#go', at(3000), 11, 11, 'wheel')).toBe(
-      '#go did not come into view after 11 real wheel steps (the point is at y 3000, the view is 800 tall)',
+      '#go did not come into view after 11 real wheel steps (the point is at x 200, y 3000; the view is 400 wide, 800 tall)',
     );
     expect(whyNotTappable('#go', at(3000), 2, 11, 'wheel')).toMatch(
       /^#go did not come into view: a real wheel step no longer moves it/,
