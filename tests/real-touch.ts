@@ -355,7 +355,9 @@ async function moverOf(page: Page): Promise<Mover> {
 
 /** Readings this far apart, this many in a row the same, mean the page is at rest. */
 const OUTSIDE_STEP_MS = 16;
-const OUTSIDE_STILL = 6;
+const OUTSIDE_STILL = 3;
+/** Readings this close count as the same (a fling's tail moves by fractions). */
+const STILL_OUTSIDE_PX = 0.5;
 const OUTSIDE_CEILING_MS = 3_000;
 /** How long a move is given to start before the page is taken as at rest. */
 const MOVE_START_MS = 500;
@@ -370,17 +372,78 @@ const MOVE_START_MS = 500;
 const measureFromOutside = (
   target: Locator,
   offset: { x: number; y: number } | undefined,
-): Promise<Prepared> => prepare(target, offset, false);
+): Promise<Prepared> =>
+  javaScriptOff(target.page())
+    ? measureByProtocol(target, offset)
+    : prepare(target, offset, false);
+
+/**
+ * Whether the test turned the page's JavaScript off (`test.use({
+ * javaScriptEnabled: false })`). Playwright offers no public way to read a
+ * context's options, so this reads its own record of them and fails loudly,
+ * naming itself, if a Playwright upgrade moves it: never a silent guess.
+ * Firefox never answers a reading taken in such a page (run 41901541848).
+ */
+function javaScriptOff(page: Page): boolean {
+  const options = (
+    page.context() as unknown as {
+      _options?: { javaScriptEnabled?: boolean };
+    }
+  )._options;
+  if (options === undefined)
+    throw new Error(
+      'tests/real-touch.ts cannot tell whether JavaScript is on: Playwright no longer keeps its context options in `_options` (#1004)',
+    );
+  return options.javaScriptEnabled === false;
+}
+
+/**
+ * With the page's JavaScript off: the point and the view by protocol
+ * (`boundingBox`, `viewportSize`). No hit test (no script can run in the
+ * page): Playwright's own click still refuses a covered element.
+ */
+async function measureByProtocol(
+  target: Locator,
+  offset: { x: number; y: number } | undefined,
+): Promise<Prepared> {
+  const view = target.page().viewportSize();
+  const box = await target.boundingBox();
+  if (view === null || box === null)
+    throw new TapNotPossibleError(
+      `${String(target)} cannot be measured: ${view === null ? 'the page has no fixed view size' : 'it has no box (not rendered)'}`,
+    );
+  const point = {
+    x: box.x + (offset ? offset.x : box.width / 2),
+    y: box.y + (offset ? offset.y : box.height / 2),
+  };
+  return {
+    point,
+    viewTop: 0,
+    viewHeight: view.height,
+    viewWidth: view.width,
+    inView:
+      point.x >= 0 &&
+      point.x <= view.width &&
+      point.y >= 0 &&
+      point.y <= view.height,
+    hit: null,
+    keyboard: false,
+  };
+}
 
 /** Where the page stands, for a failure off the phone to explain itself. */
 const pageState = (page: Page): Promise<string> =>
-  page
-    .evaluate(() => {
-      const vv = window.visualViewport;
-      const doc = document.scrollingElement ?? document.documentElement;
-      return `the page is scrolled to y ${Math.round(window.scrollY)} of ${Math.round(doc.scrollHeight)}, the window is ${window.innerHeight} tall, zoom ${vv ? vv.scale : 1}`;
-    })
-    .catch((error: unknown) => `the page could not be read: ${String(error)}`);
+  javaScriptOff(page)
+    ? Promise.resolve('the page has JavaScript off, so it cannot be read')
+    : page
+        .evaluate(() => {
+          const vv = window.visualViewport;
+          const doc = document.scrollingElement ?? document.documentElement;
+          return `the page is scrolled to y ${Math.round(window.scrollY)} of ${Math.round(doc.scrollHeight)}, the window is ${window.innerHeight} tall, zoom ${vv ? vv.scale : 1}`;
+        })
+        .catch(
+          (error: unknown) => `the page could not be read: ${String(error)}`,
+        );
 
 /**
  * Reads from outside until six readings in a row agree, at most 3 s. A move
@@ -402,10 +465,40 @@ async function settleFromOutside(
   while (still < OUTSIDE_STILL && Date.now() - started < OUTSIDE_CEILING_MS) {
     await wait(OUTSIDE_STEP_MS);
     const q = await measureFromOutside(target, offset);
-    still = q.point.x === p.point.x && q.point.y === p.point.y ? still + 1 : 0;
+    still =
+      Math.abs(q.point.x - p.point.x) <= STILL_OUTSIDE_PX &&
+      Math.abs(q.point.y - p.point.y) <= STILL_OUTSIDE_PX
+        ? still + 1
+        : 0;
     p = q;
   }
   return p;
+}
+
+/** Editable things a drag must not start on. */
+const FIELDS =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+
+/**
+ * The first column, at 90%, 50% or 10% of the view's width, where neither
+ * end of the drag lands on a form field; 90% when none is clear.
+ */
+async function clearColumn(
+  page: Page,
+  planned: { from: { x: number; y: number }; to: { x: number; y: number } },
+): Promise<number> {
+  return page.evaluate(
+    ({ from, to, fields }) => {
+      const width = window.visualViewport?.width ?? window.innerWidth;
+      const onField = (x: number, y: number) =>
+        document.elementFromPoint(x, y)?.closest(fields) != null;
+      const columns = [0.9, 0.5, 0.1].map((share) => Math.round(width * share));
+      return (
+        columns.find((x) => !onField(x, from.y) && !onField(x, to.y)) ?? from.x
+      );
+    },
+    { ...planned, fields: FIELDS },
+  );
 }
 
 /**
@@ -466,7 +559,17 @@ async function bringIntoView(
     const before = p.point.y;
     if (mover === 'wheel') swipes += await turnWheel(page, p);
     else {
-      const { from, to } = planSwipe(p);
+      const planned = planSwipe(p);
+      // On Chromium's emulated phone the drag starts where no form field is:
+      // a drag that starts on a focused field selects text instead of
+      // scrolling (not-found-report at 320 px, run 41901541848). The real
+      // phone's drags are the ones measured on it (#996), left as they are.
+      const x =
+        phone || javaScriptOff(page)
+          ? planned.from.x
+          : await clearColumn(page, planned);
+      const from = { ...planned.from, x };
+      const to = { ...planned.to, x };
       await drag(
         page,
         from,
