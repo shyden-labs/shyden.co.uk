@@ -691,6 +691,14 @@ async function bringIntoView(
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
   if (phone && p.keyboard && closeKeyboard()) p = await read(p.point.y);
+  // Off the phone, a point that must move is read again once the layout is
+  // still (three equal readings, about 50 ms): a click Playwright has just
+  // made can open a <details> after it returns, and a drag planned on the
+  // reading before that pushed the point down as fast as the page scrolled
+  // it up, so the point looked still (not-found-report at 320 px; the
+  // touches are logged on #1004, run 41939310612).
+  if (!phone && mustMove({ ...p, hit: null }, 0))
+    p = await read(Number.POSITIVE_INFINITY);
   // The phone keeps a tap clear of the view's top and bottom tenth, where the
   // browser's own bars sit. Off the phone the page moves only when the point
   // is out of view: a control in a fixed bar near the top never moves, and
