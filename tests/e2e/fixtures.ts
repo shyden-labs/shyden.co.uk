@@ -289,6 +289,11 @@ const realDeviceTest = base.extend<
 
     await servingYaweloMedia(context, () => use(context));
 
+    // A clock this test paused would stay paused for the next test on the shared context: that
+    // test's page then sees no time pass (measured on the phone: 0 ms in 1 s real, #1044). The
+    // clock cannot be removed (#854), but resumed it runs at real speed again.
+    if (installsAClock) await context.clock.resume();
+
     // Undo every init script THIS test added -- see the patch comment above. Order does not
     // matter: each disposal only ever removes its own script. A refusal fails the test once
     // the pages are closed, never in silence: a script left behind runs on every later page.
