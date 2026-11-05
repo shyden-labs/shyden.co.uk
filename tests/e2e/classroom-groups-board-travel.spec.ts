@@ -27,6 +27,8 @@ import {
 test.use(recorded);
 
 const COUNT = 12;
+/** The class the mid-deal Shuffle test deals: long enough for a real tap to land mid-deal (#1045). */
+const MID_DEAL_COUNT = 30;
 
 const bar = (page: Page) => page.locator('#cg-board-bar');
 const board = (page: Page) => page.locator('#cg-board');
@@ -298,10 +300,10 @@ const stopSampler = (page: Page): Promise<Samples> =>
   );
 
 /** The deal has ended: the list gone, every row seated, nothing moving. */
-const expectDealt = async (page: Page) => {
+const expectDealt = async (page: Page, count = COUNT) => {
   await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
   await expect(board(page).locator('#cg-waiting')).toBeHidden();
-  await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+  await expect(board(page).locator('.student.dealt')).toHaveCount(count);
   await page.waitForFunction(() => document.getAnimations().length === 0);
 };
 
@@ -559,7 +561,11 @@ test.describe('the board deals by moving students into their cards', () => {
   test('a board Shuffle mid-deal starts from the top, and the abandoned deal lands nobody', async ({
     page,
   }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
+    // A real tap on the phone takes about 1.2 s from call to touch, and a
+    // deal of COUNT lands its last student about 1 s after the third
+    // (measured, #1045): the press came after the deal. A class this size
+    // deals for about 3.3 s, so the press still falls mid-deal.
+    await openWaitingBoard(page, String(MID_DEAL_COUNT), '4');
     await press(page, 'Make Groups');
     await expectThirdLanding(page);
     const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
@@ -626,11 +632,14 @@ test.describe('the board deals by moving students into their cards', () => {
           }>,
       );
     // The press fell mid-deal: some of the old deal had yet to land.
-    expect(pressed.unlandedAtPress).toBeGreaterThan(0);
+    expect(
+      pressed.unlandedAtPress,
+      `the press must land mid-deal, but all ${MID_DEAL_COUNT} students had landed before it arrived: the press was slower than the deal`,
+    ).toBeGreaterThan(0);
     // From the top: nobody of the new deal is seated, everyone waits.
     expect(pressed.freshDealt).toBe(0);
-    expect(pressed.chipsWaiting).toBe(COUNT);
-    await expectDealt(page);
+    expect(pressed.chipsWaiting).toBe(MID_DEAL_COUNT);
+    await expectDealt(page, MID_DEAL_COUNT);
     // A row of the abandoned deal that gains `.dealt` after the press was
     // landed by it, and its land sound plays in the same callback
     // (`board-travel.ts`, the flight's `finished` handler).
