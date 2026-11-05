@@ -1976,9 +1976,10 @@ test.describe('a full roster at the narrow end', () => {
  * 807). The viewport tag's `interactive-widget=resizes-content` shrinks the
  * page above the keyboard instead (operator decision 2026-10-18).
  *
- * Only a device with an on-screen keyboard can answer this: the desktop
- * engines and the emulated phones open none, so the test asks the device
- * whether one opened and skips, saying so, when it did not.
+ * Only a device with an on-screen keyboard can cover the bar: the desktop
+ * engines and the emulated phones open none. The test runs on every target
+ * all the same and asserts the bar is in view whether or not a keyboard
+ * opened (Shyden, 2026-11-05, #1048).
  */
 test.describe('the on-screen keyboard', () => {
   test('leaves Make Groups on screen while a teacher types', async ({
@@ -1995,20 +1996,18 @@ test.describe('the on-screen keyboard', () => {
     await page.keyboard.type('3');
     // A keyboard rises a few hundred milliseconds after the field takes focus
     // (about 300 ms on the test phone); three seconds is the stated ceiling.
-    const keyboardOpened = await page
+    // Where none opens (a laptop, an emulated phone), nothing waits on it: the
+    // bar must be in view either way (Shyden, 2026-11-05, #1048).
+    await page
       .waitForFunction(
         (before) => (visualViewport?.height ?? innerHeight) < before,
         visibleBefore,
         { timeout: 3_000 },
       )
       .then(
-        () => true,
-        () => false,
+        () => 'a keyboard opened',
+        () => 'no keyboard opened',
       );
-    test.skip(
-      !keyboardOpened,
-      'no on-screen keyboard opened on this device, so nothing can cover the bar',
-    );
 
     await expect(page.locator('#cg-size')).toBeFocused();
     await expect
