@@ -60,7 +60,7 @@ describe('skipsIn', () => {
         parseSource(
           [
             "// test.skip('in a comment')",
-            "const note = \"test.fixme('in a string')\";",
+            'const note = "test.fixme(\'in a string\')";',
             "test('runs', async () => {});",
           ].join('\n'),
         ),
