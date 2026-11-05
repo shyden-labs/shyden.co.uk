@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { sectionState, type ToolState } from '../../src/lib/sections';
-import { en } from '../../src/lib/i18n/en';
-import { id } from '../../src/lib/i18n/id';
+import { getStrings } from '../../src/lib/i18n';
+
+// The catalogues as a page receives them: every message compiled into a
+// function of its named slots (#136). A raw catalogue holds templates.
+const en = getStrings('en');
+const id = getStrings('id');
 
 describe('section header states', () => {
   const empty: ToolState = {

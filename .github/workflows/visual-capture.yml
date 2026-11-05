@@ -1,0 +1,162 @@
+name: visual-capture
+
+# Captures the visual baselines on a scratch ref and hands the changed ones
+# back as an artifact (#654; pushes nothing since #889). Operator 2026-10-09
+# (global): visual runs are CI's, never the laptop's, so baselines change ONE
+# way: this workflow, dispatched by hand, on a commit not yet pushed:
+#
+#   git push origin HEAD:refs/visual/<branch>
+#   gh workflow run visual-capture.yml --ref develop -f ref=refs/visual/<branch>
+#   (wait for the run)
+#   gh run download <run-id> -n visual-capture -D <scratch-dir>
+#   cp -R <scratch-dir>/files/. .
+#   git commit --amend --no-edit
+#   git push origin <branch>
+#   git push origin --delete refs/visual/<branch>
+#
+# then look at every baseline the run's message.txt names: the gate compares
+# against them from then on. A CI bot never pushes to a branch (operator,
+# 2026-10-21), so the baselines come back as an artifact and are committed by
+# hand onto the commit the run measured (its sha.txt).
+#
+# `workflow_dispatch` ONLY: the gate (`ci.yml`'s `visual`) never passes
+# `--update-snapshots`, because a run that can rewrite the baseline it checks
+# against asserts nothing. This is never part of the gate and never required.
+# It is dispatched from the default branch (GitHub runs only a workflow that
+# exists there) and names the scratch ref in an input; any ref outside
+# `refs/visual/` is refused before anything is checked out, `develop` and
+# `main` included.
+#
+# Two jobs, and neither can write: the workflow's token is nothing, and each
+# job reads the repository and no more.
+#
+#   image    picks the pinned Playwright image, as ci.yml's `image` job does.
+#   capture  runs the visual suite with `--update-snapshots=all` in the visual
+#            gate's own container, then `scripts/visual-capture.mjs` reads
+#            `git status`: a rewritten baseline is handed back only when MORE
+#            THAN 60 PIXELS differ from the committed one at zero tolerance (or
+#            it is new, or its size changed), and any change that is not a
+#            baseline fails the job (a capture changes baselines and nothing
+#            else). `all`, never `changed`: `changed` leaves a stale-but-
+#            passing baseline in place (#134). The render is NOT byte-identical
+#            where nothing moved: run 38122176791 rewrote four pages its change
+#            never touched, by 1 to 17 pixels. The rule is the operator's
+#            (2026-10-11, #678), from every baseline rewrite on develop (294
+#            over 31 commits): untouched pages 1 to 17 pixels, every real
+#            change 210 or more. Neither the largest channel step nor the
+#            gate's own threshold separated them (#371's dot grid moved up to
+#            8,584 pixels and the gate saw none). The step summary names every
+#            page handed back and every page kept out, each with its count.
+#            The `visual-capture` artifact holds the baselines, their list,
+#            the commit message, the measured SHA and the ref, and is uploaded
+#            only when a baseline changed.
+#
+# `tests/guards/pipeline-wiring.test.ts` pins all of this.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The scratch ref to capture on, under refs/visual/ (never a branch)
+        required: true
+        type: string
+      grep:
+        description: Optional Playwright --grep, to capture only matching screenshots
+        required: false
+        default: ''
+        type: string
+
+# One capture per scratch ref at a time, queued and never cancelled, so two
+# captures of one commit never upload beside each other.
+concurrency:
+  group: visual-capture-${{ inputs.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - name: Refuse anything but a scratch ref
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          case "$REF" in
+            refs/visual/?*) ;;
+            *)
+              echo "::error::baselines are captured on a scratch ref under refs/visual/, never on $REF: push the unpushed commit there first"
+              exit 1
+              ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
+  capture:
+    needs: image
+    runs-on: ubuntu-26.04
+    # The visual gate's last green runs took at most 91 s (#431); a capture
+    # rewrites every baseline it renders, so it gets double the gate's bound.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # The visual gate's own container, so a baseline captured here is
+    # rendered exactly as the gate renders what it compares.
+    container:
+      image: ${{ needs.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # The commit the capture is made on, handed back with the baselines, so
+      # they are committed onto that commit and no other.
+      # The container runs as another user than the checkout's owner, which
+      # git refuses to read without being told the directory is safe.
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD > "$RUNNER_TEMP/sha.txt"
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - name: Capture the baselines
+        env:
+          VISUAL: '1'
+          GREP: ${{ inputs.grep }}
+        run: |
+          if [ -n "$GREP" ]; then
+            npx playwright test --project=visual --update-snapshots=all --grep "$GREP"
+          else
+            npx playwright test --project=visual --update-snapshots=all
+          fi
+      - id: diff
+        run: |
+          git status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/status.txt"
+          git log -1 --format=%B > "$RUNNER_TEMP/head-message.txt"
+          node scripts/visual-capture.mjs "$RUNNER_TEMP/status.txt" "$RUNNER_TEMP/head-message.txt" "$RUNNER_TEMP/message.txt" "$RUNNER_TEMP/baselines.txt"
+      - name: Keep the baselines for the session to fold
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          mkdir -p visual-capture/files
+          cp "$RUNNER_TEMP/message.txt" "$RUNNER_TEMP/baselines.txt" "$RUNNER_TEMP/sha.txt" visual-capture/
+          printf '%s\n' "$REF" > visual-capture/ref.txt
+          xargs -a "$RUNNER_TEMP/baselines.txt" cp --parents -t visual-capture/files
+      - if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-capture
+          path: visual-capture
+          retention-days: 7
+          if-no-files-found: error

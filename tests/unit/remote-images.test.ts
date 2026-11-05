@@ -1,0 +1,257 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  dependentsOf,
+  maxStaleBranch,
+  namesModule,
+  remoteImageAllowances,
+} from '../remote-images';
+import { searched } from '../source-files';
+
+/**
+ * #457, GHSA-ch52-4w7c-c8xp (Dependabot alert 13). `http-cache-semantics`
+ * serves a shared-cache entry it deliberately zeroed, another user's
+ * Set-Cookie, to a request with a large `max-stale`. No fix is coming:
+ * upstream closed the report as not planned (kornelski/http-cache-semantics#56),
+ * and 4.3.0 leaves that branch byte-identical. The operator's decision
+ * (2026-10-06): guard it, pin it, keep the alert open.
+ */
+
+const CONFIG = 'astro.config.mjs';
+const CACHE = 'node_modules/http-cache-semantics/index.js';
+
+/** The branch as 4.2.0 ships it (index.js, the stale path). */
+const UNGATED = `
+class CachePolicy {
+  satisfiesWithoutRevalidation(req) {
+    if (this.stale()) {
+      const allowsStaleWithoutRevalidation = 'max-stale' in requestCC &&
+        (true === requestCC['max-stale'] || requestCC['max-stale'] > this.age() - this.maxAge());
+      if (allowsStaleWithoutRevalidation) return hit;
+    }
+  }
+}`;
+
+/** The gate the upstream report proposes for that branch. */
+const GATED = UNGATED.replace(
+  "'max-stale' in requestCC &&",
+  "'max-stale' in requestCC &&\n        !(this._isShared && this._resHeaders['set-cookie'] && !this._rescc.public) &&",
+);
+
+describe('maxStaleBranch reads the advisory construct from the parse tree', () => {
+  it('reads the branch 4.2.0 ships as ungated', () => {
+    expect(maxStaleBranch(UNGATED)).toBe('ungated');
+  });
+
+  it('reads the gate the upstream report proposes as gated', () => {
+    expect(GATED).not.toBe(UNGATED);
+    expect(maxStaleBranch(GATED)).toBe('gated');
+  });
+
+  it.each([
+    ['whether the cache is shared', '!this._isShared &&'],
+    [
+      'whether the entry carries a Set-Cookie',
+      "!this._resHeaders['set-cookie'] &&",
+    ],
+  ])('reads a gate on %s alone as gated', (_signal, gate) => {
+    const gated = UNGATED.replace(
+      "'max-stale' in requestCC &&",
+      `'max-stale' in requestCC &&\n        ${gate}`,
+    );
+    expect(gated).not.toBe(UNGATED);
+    expect(maxStaleBranch(gated)).toBe('gated');
+  });
+
+  it('is not satisfied by a comment naming the gate', () => {
+    const commented = UNGATED.replace(
+      'if (allowsStaleWithoutRevalidation)',
+      "// gated: this._isShared && this._resHeaders['set-cookie']\n      if (allowsStaleWithoutRevalidation)",
+    );
+    expect(commented).not.toBe(UNGATED);
+    expect(maxStaleBranch(commented)).toBe('ungated');
+  });
+
+  it('refuses a source whose stale branch it cannot find', () => {
+    expect(() => maxStaleBranch('export const x = 1;')).toThrow(
+      'allowsStaleWithoutRevalidation',
+    );
+  });
+});
+
+describe('remoteImageAllowances reads what lets the build fetch a remote image', () => {
+  const config = (body: string) =>
+    `import { defineConfig } from 'astro/config';\nexport default defineConfig({\n  site: 'https://x.test',\n${body}\n});\n`;
+
+  it.each([
+    ['image.domains', "  image: { domains: ['cdn.x.test'] },", 'image.domains'],
+    [
+      'image.remotePatterns',
+      "  image: { remotePatterns: [{ protocol: 'https' }] },",
+      'image.remotePatterns',
+    ],
+    ['an image option it cannot read', '  image: imageOptions,', 'image'],
+    ['a spread into the config', '  ...shared,', '...'],
+  ])('finds %s', (_form, body, named) => {
+    const { findings } = remoteImageAllowances(config(body));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain(named);
+  });
+
+  it('finds nothing in a config that authorises no remote image', () => {
+    const { findings, properties } = remoteImageAllowances(
+      config(
+        "  image: { layout: 'constrained' },\n  build: { format: 'directory' },",
+      ),
+    );
+    expect(properties).toEqual([
+      'site',
+      'image',
+      'image.layout',
+      'build',
+      'build.format',
+    ]);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+  });
+
+  it('is not satisfied, nor refused, by a comment naming a domain', () => {
+    const { findings, properties } = remoteImageAllowances(
+      config("  // image: { domains: ['cdn.x.test'] },"),
+    );
+    expect(properties).toEqual(['site']);
+    expect(
+      searched(findings, { of: properties, what: 'config properties' }),
+    ).toEqual([]);
+  });
+
+  it('refuses a config with no defineConfig object to read', () => {
+    expect(() => remoteImageAllowances('export default {};')).toThrow(
+      'defineConfig',
+    );
+  });
+});
+
+describe('the build fetches no remote image while the cache is unfixed (#457)', () => {
+  it('astro.config.mjs authorises no remote image while max-stale is ungated', () => {
+    const cache = maxStaleBranch(readFileSync(CACHE, 'utf8'));
+    const { findings, properties } = remoteImageAllowances(
+      readFileSync(CONFIG, 'utf8'),
+    );
+    expect(
+      searched(cache === 'ungated' ? findings : [], {
+        of: properties,
+        what: `properties in ${CONFIG}`,
+      }),
+      `${CACHE} still serves max-stale ungated (GHSA-ch52-4w7c-c8xp, #457): ` +
+        'a remote image would put it in the build',
+    ).toEqual([]);
+  });
+
+  it('keeps http-cache-semantics pinned to 4.2.0, so a refresh cannot read as a fix', () => {
+    // 4.3.0 sits outside the advisory's <= 4.2.0 range with the same
+    // max-stale code, so pulling it would mark alert 13 fixed over an
+    // unchanged bug. A real fix, if one ships, lifts this pin in its own ticket.
+    const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      overrides?: Record<string, string>;
+    };
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as {
+      packages: Record<string, { version?: string }>;
+    };
+    expect(manifest.overrides?.['http-cache-semantics'], '#457').toBe('4.2.0');
+    expect(
+      lock.packages['node_modules/http-cache-semantics']?.version,
+      '#457',
+    ).toBe('4.2.0');
+    expect(maxStaleBranch(readFileSync(CACHE, 'utf8'))).toBe('ungated');
+  });
+});
+
+/**
+ * The config guard rests on how Astro reaches http-cache-semantics, read in
+ * astro 7.3.5 (2026-10-06, #457): the build loads a remote image
+ * (assets/build/generate.js -> loadRemoteImage in assets/build/remote.js, the
+ * library's only importer) only when isRemoteAllowed passes, which is true
+ * only for a URL matching image.domains or image.remotePatterns. Two facts are
+ * checked on every version; the third, that the gate still stands, needs a
+ * reader, so a new version fails here until someone has re-read it.
+ * Re-read on 7.3.6 (2026-10-10, Dependabot #656): generate.js, build/remote.js,
+ * utils/redirectValidation.js and the config schemas are byte-identical to
+ * 7.3.5's, and so is isRemoteAllowed in @astrojs/internal-helpers 0.12.0.
+ * Re-read on 7.4.4 (2026-11-03, Dependabot #1015), each file minified on
+ * both sides so only logic is compared: build/remote.js (still the
+ * library's only importer), utils/redirectValidation.js and the image
+ * domains/remotePatterns schema are unchanged; isRemoteAllowed in
+ * @astrojs/internal-helpers 0.13.0 is 0.12.0's. generate.js moved the
+ * static-image store from globalThis into its env; a remote image still
+ * reaches loadRemoteImage only as a static image, registered only when
+ * service.getURL rewrote it, which it does only when isRemoteAllowed passes
+ * (services/service.js). astro now asks for http-cache-semantics ^4.3.0; the
+ * override still holds it at 4.2.0 (the pin test above).
+ * Re-read on 7.4.5 (2026-11-03, the lock's resolution of ^7.4.4): generate.js,
+ * build/remote.js, utils/redirectValidation.js, internal.js,
+ * services/service.js and the config schema are 7.4.4's, minified on both
+ * sides, on the same internal-helpers 0.13.0.
+ */
+const ASTRO_READ = '7.4.5';
+
+describe('the path into http-cache-semantics is the one #457 read', () => {
+  it('only astro depends on http-cache-semantics', () => {
+    expect(
+      dependentsOf(
+        readFileSync('package-lock.json', 'utf8'),
+        'http-cache-semantics',
+      ),
+    ).toEqual(['node_modules/astro']);
+  });
+
+  // The walk of astro's whole dist that answers "who imports it" is a guard
+  // now (#718: a fresh checkout's cold disk took it past the 1 s unit limit
+  // at 153 ms of CPU): tests/guards/remote-images-importers.test.ts. What
+  // stays here is the reading each file of that walk gets.
+  it.each([
+    [
+      'a static import',
+      "import CachePolicy from 'http-cache-semantics';",
+      true,
+    ],
+    [
+      'a dynamic import',
+      'const p = await import("http-cache-semantics");',
+      true,
+    ],
+    [
+      'a require in backticks',
+      'const p = require(`http-cache-semantics`);',
+      true,
+    ],
+    [
+      'a longer name it begins',
+      "import x from 'http-cache-semantics-extra';",
+      false,
+    ],
+    [
+      'a longer name it ends',
+      "import x from 'not-http-cache-semantics';",
+      false,
+    ],
+    ['the name unquoted', 'const s = http.cache.semantics;', false],
+  ])('%s (%s) names the module: %s', (_form, source, names) => {
+    expect(namesModule(source, 'http-cache-semantics')).toBe(names);
+  });
+
+  it('fails on any Astro version whose remote-image path nobody has re-read', () => {
+    const { version } = JSON.parse(
+      readFileSync('node_modules/astro/package.json', 'utf8'),
+    ) as { version: string };
+    expect(
+      version,
+      `astro is ${version}, but its remote-image path was read on ${ASTRO_READ} (#457). ` +
+        'Before moving ASTRO_READ, re-read that the build still loads a remote image ' +
+        '(assets/build/generate.js, loadRemoteImage) only when isRemoteAllowed passes, ' +
+        'and that this is still true only for image.domains and image.remotePatterns. ' +
+        'If it is not, the config guard no longer covers the path: say so on #457.',
+    ).toBe(ASTRO_READ);
+  });
+});

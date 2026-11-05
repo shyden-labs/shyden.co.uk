@@ -1,12 +1,20 @@
+import { setCheckedOn, tapOn } from '../real-touch';
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import {
   withGroups,
   openPrintPanel,
   rosterWithAnAbsence,
   buildRoster,
+  buildRosterAtPath,
   giveEveryoneASex,
+  openRoster,
 } from './helpers';
 import { todayISO } from '../../src/lib/csv';
+import { searched } from '../source-files';
+import { recorded, shoot } from './evidence';
+
+test.use(recorded);
 
 /**
  * Every control assertion is scoped to the PANEL, never to the page.
@@ -21,6 +29,75 @@ import { todayISO } from '../../src/lib/csv';
  */
 const panel = (page: import('@playwright/test').Page) =>
   page.locator('#cg-print-panel');
+
+/**
+ * The four remembered choices, in each language the panel is tested in. Each
+ * moves off its default one way: the class-list radio is chosen (Both is the
+ * default), and each tick box, ticked by default, is cleared.
+ */
+const REMEMBERED = {
+  en: {
+    path: '/classroom-groups',
+    cancel: 'Cancel',
+    choices: [
+      { label: 'Class list', radio: true },
+      { label: 'Include avatars', radio: false },
+      { label: 'Show students who are absent', radio: false },
+      { label: 'Show sex and the together/apart letters', radio: false },
+    ],
+  },
+  id: {
+    path: '/id/classroom-groups',
+    cancel: 'Batal',
+    choices: [
+      { label: 'Daftar kelas', radio: true },
+      { label: 'Sertakan avatar', radio: false },
+      { label: 'Tampilkan siswa yang tidak hadir', radio: false },
+      {
+        label: 'Tampilkan jenis kelamin dan huruf bersama/terpisah',
+        radio: false,
+      },
+    ],
+  },
+} as const;
+
+/**
+ * Moves ONE remembered choice off its default, reloads, and reads all four
+ * back: the changed one survives and the three left alone keep their
+ * defaults (#426). The test it replaced changed three of the four, so the
+ * letters choice could go unstored and still pass, and its Indonesian twin
+ * changed two. One test per choice calls this, and "remembers nothing" and
+ * "stores every box as cleared" both fail it too.
+ *
+ * TWO students, not the default twelve: the roster only has to be big
+ * enough for the Print button to exist, and building twelve twice crashed
+ * WebKit on CI ("WebKit encountered an internal error" inside `page.goto`,
+ * before any assertion ran) while passing on the other four projects.
+ */
+const changeOneAndReload = async (
+  page: import('@playwright/test').Page,
+  language: (typeof REMEMBERED)[keyof typeof REMEMBERED],
+  changed: string,
+) => {
+  await withGroups(page, 2, language.path);
+  await openPrintPanel(page);
+  const choice = (label: string) => panel(page).getByLabel(label);
+  if (language.choices.find((c) => c.label === changed)!.radio)
+    await setCheckedOn(choice(changed));
+  else await setCheckedOn(choice(changed), false);
+  await tapOn(panel(page).getByRole('button', { name: language.cancel }));
+
+  await page.reload();
+  await withGroups(page, 2, language.path);
+  await openPrintPanel(page);
+  // Not a population: the four fixed choices of one panel, read back.
+  for (const { label, radio } of language.choices) {
+    const moved = label === changed;
+    await expect(choice(label), label).toBeChecked({
+      checked: radio ? moved : !moved,
+    });
+  }
+};
 
 /**
  * Stage 5, Task 1. The print panel and its four remembered choices.
@@ -55,41 +132,18 @@ test.describe('the print panel', () => {
     }
   });
 
-  test('all four choices survive a reload', async ({ page }) => {
-    // TWO students, not the default twelve. This test is about four
-    // checkbox states surviving a reload; the roster only has to be big
-    // enough for the Print button to exist. Building twelve, shuffling
-    // them, reloading and building twelve again is a great deal of DOM for
-    // an assertion that touches none of it -- and it crashed WebKit on CI
-    // ("WebKit encountered an internal error" inside `page.goto`, before
-    // any assertion ran) while passing on the other four projects.
-    await withGroups(page, 2);
-    await openPrintPanel(page);
-    await panel(page).getByLabel('Class list').check();
-    await panel(page).getByLabel('Include avatars').uncheck();
-    await panel(page).getByLabel('Show students who are absent').uncheck();
-    await panel(page).getByRole('button', { name: 'Cancel' }).click();
-
-    await page.reload();
-    await withGroups(page, 2);
-    await openPrintPanel(page);
-    await expect(panel(page).getByLabel('Class list')).toBeChecked();
-    await expect(panel(page).getByLabel('Include avatars')).not.toBeChecked();
-    await expect(
-      panel(page).getByLabel('Show students who are absent'),
-    ).not.toBeChecked();
-    // …and the one left alone is still on, so "remembers all four" is not
-    // satisfied by a wrapper that simply forgets everything.
-    await expect(
-      panel(page).getByLabel('Show sex and the together/apart letters'),
-    ).toBeChecked();
-  });
+  for (const { label } of REMEMBERED.en.choices)
+    test(`${label}: the choice survives a reload, and only it moves`, async ({
+      page,
+    }) => {
+      await changeOneAndReload(page, REMEMBERED.en, label);
+    });
 
   test('only preferences are stored — no class data', async ({ page }) => {
     await withGroups(page);
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openPrintPanel(page);
-    await panel(page).getByLabel('Class list').check();
+    await setCheckedOn(panel(page).getByLabel('Class list'));
     const stored = await page.evaluate(() =>
       JSON.stringify({ ...localStorage }),
     );
@@ -149,8 +203,8 @@ test.describe('the print panel', () => {
     });
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Group results').check();
-    await panel(page).getByRole('button', { name: 'Cancel' }).click();
+    await setCheckedOn(panel(page).getByLabel('Group results'));
+    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
 
     await page.reload();
     // No panel opened on this load at all.
@@ -163,8 +217,8 @@ test.describe('the print panel', () => {
   test('Cancel closes it and keeps the choices made', async ({ page }) => {
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Group results').check();
-    await panel(page).getByRole('button', { name: 'Cancel' }).click();
+    await setCheckedOn(panel(page).getByLabel('Group results'));
+    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
     await expect(page.locator('#cg-print-panel')).toBeHidden();
     await openPrintPanel(page);
     await expect(panel(page).getByLabel('Group results')).toBeChecked();
@@ -188,9 +242,9 @@ test.describe('the print panel', () => {
     });
     await withGroups(page);
     await openPrintPanel(page);
-    await panel(page).getByLabel('Class list').check();
-    await panel(page).getByLabel('Include avatars').uncheck();
-    await panel(page).getByRole('button', { name: 'Print' }).click();
+    await setCheckedOn(panel(page).getByLabel('Class list'));
+    await setCheckedOn(panel(page).getByLabel('Include avatars'), false);
+    await tapOn(panel(page).getByRole('button', { name: 'Print' }));
     const html = page.locator('html');
     await expect(html).toHaveAttribute('data-print-what', 'class-list');
     await expect(html).toHaveAttribute('data-print-avatars', 'off');
@@ -222,21 +276,12 @@ test.describe('the print panel — Indonesian', () => {
     }
   });
 
-  test('all four choices survive a reload', async ({ page }) => {
-    // Two students, for the reason given on the English case above -- this
-    // is the test that crashed WebKit on CI.
-    await withGroups(page, 2, '/id/classroom-groups');
-    await openPrintPanel(page);
-    await panel(page).getByLabel('Daftar kelas').check();
-    await panel(page).getByLabel('Sertakan avatar').uncheck();
-    await panel(page).getByRole('button', { name: 'Batal' }).click();
-
-    await page.reload();
-    await withGroups(page, 2, '/id/classroom-groups');
-    await openPrintPanel(page);
-    await expect(panel(page).getByLabel('Daftar kelas')).toBeChecked();
-    await expect(panel(page).getByLabel('Sertakan avatar')).not.toBeChecked();
-  });
+  for (const { label } of REMEMBERED.id.choices)
+    test(`${label}: the choice survives a reload, and only it moves`, async ({
+      page,
+    }) => {
+      await changeOneAndReload(page, REMEMBERED.id, label);
+    });
 });
 
 /**
@@ -256,15 +301,30 @@ const sheet = async (
   },
 ) => {
   await openPrintPanel(page);
-  await panel(page).getByLabel(opts.what).check();
-  await panel(page)
-    .getByLabel('Show students who are absent')
-    .setChecked(opts.absent);
-  await panel(page)
-    .getByLabel('Show sex and the together/apart letters')
-    .setChecked(opts.letters);
-  await panel(page).getByLabel('Include avatars').setChecked(opts.avatars);
-  await panel(page).getByRole('button', { name: 'Print' }).click();
+  await setCheckedOn(panel(page).getByLabel(opts.what));
+  await setCheckedOn(
+    panel(page).getByLabel('Show students who are absent'),
+    opts.absent,
+  );
+  await setCheckedOn(
+    panel(page).getByLabel('Show sex and the together/apart letters'),
+    opts.letters,
+  );
+  await setCheckedOn(panel(page).getByLabel('Include avatars'), opts.avatars);
+  // The Print button's last act is `window.print()`. Chromium headless makes
+  // that a no-op, so a describe block that forgets the stub passes here and
+  // hangs for 30s on Firefox, which opens a dialog Playwright cannot dismiss
+  // -- and the failure names the CLICK, not the missing stub. Asked once, in
+  // the one place that clicks, rather than trusted to a convention each new
+  // block has to remember.
+  const unstubbed = await page.evaluate(() =>
+    window.print.toString().includes('[native code]'),
+  );
+  expect(
+    unstubbed,
+    "window.print is not stubbed: add `await page.addInitScript(() => { window.print = () => {}; })` to this block's beforeEach",
+  ).toBe(false);
+  await tapOn(panel(page).getByRole('button', { name: 'Print' }));
   await page.emulateMedia({ media: 'print' });
 };
 
@@ -297,6 +357,14 @@ test.describe('the printed class list', () => {
       'Apart',
     ]);
     await expect(page.locator('.print-list tbody tr:visible')).toHaveCount(6);
+    // The ROW too, not only the header: a Remove cell that lost its name
+    // printed a column of buttons under a hidden heading (#390 PL5).
+    await expect(
+      page
+        .locator('.print-list tbody tr:visible')
+        .first()
+        .locator('td:visible'),
+    ).toHaveCount(6);
     await expect(page.locator('.print-foot')).toHaveText(
       '6 students · 5 here · 1 absent',
     );
@@ -392,8 +460,10 @@ test.describe('the printed class list', () => {
     // Nothing a teacher could press or type into is left anywhere on the
     // sheet -- a stronger claim than naming sections one at a time, and the
     // one that actually fails if a future control is added and forgotten.
+    // `[form="cg-form"]` is the form's own controls that live OUTSIDE it:
+    // #cg-go has since #384, and `#cg-form button` alone went blind to it.
     const interactive = page.locator(
-      '#cg-form input:visible, #cg-form select:visible, #cg-form button:visible, #cg-form textarea:visible',
+      '#cg-form input:visible, #cg-form select:visible, #cg-form button:visible, #cg-form textarea:visible, [form="cg-form"]:visible',
     );
     await expect(interactive).toHaveCount(0);
     // …and the class list is still there, which is the whole point of not
@@ -402,7 +472,7 @@ test.describe('the printed class list', () => {
   });
 
   test('the sheet carries the class name and a date', async ({ page }) => {
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -431,7 +501,7 @@ test.describe('the printed class list', () => {
   // section. Without this a sheet asked for one could quietly carry both.
   test('Class list prints the roster and not the groups', async ({ page }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -446,7 +516,7 @@ test.describe('the printed class list', () => {
     page,
   }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -459,7 +529,7 @@ test.describe('the printed class list', () => {
 
   test('Both prints both', async ({ page }) => {
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Both',
       absent: true,
@@ -486,7 +556,10 @@ test.describe('the printed class list', () => {
       'Ana',
     );
     await page.emulateMedia({ media: 'screen' });
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Annika');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Annika',
+    );
     await page.emulateMedia({ media: 'print' });
     await expect(page.locator('.print-list tbody tr').first()).toContainText(
       'Annika',
@@ -515,7 +588,7 @@ test.describe('the printed groups', () => {
   test('avatars on: faces print; off: names only', async ({ page }) => {
     await rosterWithAnAbsence(page);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -536,7 +609,7 @@ test.describe('the printed groups', () => {
   test('group results print minus absent students', async ({ page }) => {
     await rosterWithAnAbsence(page);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
       what: 'Group results',
       absent: true,
@@ -557,7 +630,11 @@ test.describe('the printed groups', () => {
       ['M', 'Dedi'],
     ]);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
+    // The groups arrived before anything is judged legible (#424). The class
+    // list prints these names too, so with the roster refused this read the
+    // class list alone and passed with no groups on the sheet at all.
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await sheet(page, {
       what: 'Both',
       absent: true,
@@ -591,27 +668,36 @@ test.describe('the printed sheet', () => {
   test('carries no controls', async ({ page }) => {
     await withGroups(page, 6);
     await page.emulateMedia({ media: 'print' });
-    const controls = await page.evaluate(() =>
-      [...document.querySelectorAll('button, a[href]')]
-        .filter((el) => {
-          const cs = getComputedStyle(el);
-          const r = el.getBoundingClientRect();
-          return (
-            cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0
-          );
-        })
-        .map((el) => (el.textContent || '').trim().slice(0, 24)),
-    );
+    // Every button and link on the page, and which of them print: the
+    // population the verdict is drawn from (#610).
+    const { candidates, controls } = await page.evaluate(() => {
+      const found = [...document.querySelectorAll('button, a[href]')];
+      const printed = found.filter((el) => {
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return (
+          cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0
+        );
+      });
+      const label = (el: Element) => (el.textContent || '').trim().slice(0, 24);
+      return { candidates: found.map(label), controls: printed.map(label) };
+    });
     // "Full screen" printed on every sheet: the print CSS named controls one
     // at a time and that button was never added to the list.
-    expect(controls, `printed controls: ${controls.join(' | ')}`).toEqual([]);
+    expect(
+      searched(controls, {
+        of: candidates,
+        what: 'buttons and links on the page',
+      }),
+      `printed controls: ${controls.join(' | ')}`,
+    ).toEqual([]);
   });
 
   test('carries the class name and the date however it was printed', async ({
     page,
   }) => {
     await withGroups(page, 6);
-    await page.locator('#cg-class').fill('Year 9 — Set 2');
+    await typeInto(page.locator('#cg-class'), 'Year 9 — Set 2');
     // Ctrl/Cmd+P, not the in-page Print button. `writePrintHead` used to run
     // only from the print panel's apply, so printing the way people actually
     // print produced a sheet with no class name and no date.
@@ -636,5 +722,415 @@ test.describe('the printed sheet', () => {
       return getComputedStyle(tf).display;
     });
     expect(foot).toBe('none');
+  });
+});
+
+/** The text edit both register blocks below make: it never re-renders. */
+const typeAName = async (row: import('@playwright/test').Locator) => {
+  await typeInto(row.getByLabel('Name'), 'Ana');
+};
+
+/**
+ * #253. `refreshPrintMirrors` wrote every roster row's print-only twin by
+ * DOCUMENT ORDER, against a `texts` array that still began at `number`. The
+ * row is built `tr.append(absentTd, numberTd, nameTd, ...)` -- Absent leads
+ * (operator, 2026-08-13) -- so every value landed one cell early: the pupil's
+ * number printed in the Absent column, their name in `#`, their sex in Name,
+ * and the absence box in Sex.
+ *
+ * It only showed after a TEXT edit. A select or a checkbox re-renders the row
+ * and `roster-ui.ts` rebuilds each mirror correctly from its own call site,
+ * which repaired the damage a keystroke away from where anyone would look. A
+ * text edit deliberately does not re-render -- that would steal focus and the
+ * caret mid-typing, which is the whole reason this function exists -- so the
+ * wrong write survived exactly in the case the function was written to serve.
+ *
+ * Nothing could see it. `.print-list` (the print PANEL's own table) is a
+ * different surface, and the roster's mirrors are `aria-hidden` and
+ * `display: none` on screen, so no screen assertion can reach them.
+ */
+test.describe('the printed register after an edit', () => {
+  const TICKED = '☑';
+  const UNTICKED = '☐';
+  const DASH = '—';
+
+  /** Absent, #, Name, Sex, Together, Apart, then Remove which has no twin. */
+  const untouchedSecondRow = [UNTICKED, '2', '', DASH, DASH, DASH, null];
+
+  const printedCells = (row: import('@playwright/test').Locator) =>
+    row.evaluate((el) =>
+      [...el.children].map(
+        (td) => td.querySelector('.cg-print-value')?.textContent ?? null,
+      ),
+    );
+
+  const useTheSelects = async (row: import('@playwright/test').Locator) => {
+    await row.getByLabel('Sex').selectOption('F');
+    await setCheckedOn(row.getByLabel('Absent'));
+  };
+
+  const CASES = [
+    {
+      what: 'a text edit alone',
+      edits: [typeAName],
+      expected: [UNTICKED, '1', 'Ana', DASH, DASH, DASH, null],
+    },
+    {
+      what: 'a select edit alone',
+      edits: [useTheSelects],
+      expected: [TICKED, '1', '', 'F', DASH, DASH, null],
+    },
+    {
+      what: 'a select edit then a text edit',
+      edits: [useTheSelects, typeAName],
+      expected: [TICKED, '1', 'Ana', 'F', DASH, DASH, null],
+    },
+    {
+      what: 'a text edit then a select edit',
+      edits: [typeAName, useTheSelects],
+      expected: [TICKED, '1', 'Ana', 'F', DASH, DASH, null],
+    },
+  ];
+
+  for (const { what, edits, expected } of CASES) {
+    test(`every cell prints its own column after ${what}`, async ({ page }) => {
+      await openRoster(page);
+      // A second row, because `refreshPrintMirrors` walks rows by index
+      // against the live roster and an off-by-one there would look identical
+      // to a correct single row.
+      await tapOn(page.getByRole('button', { name: 'Add student' }));
+      const row = page.locator('.cg-student').nth(0);
+      const second = page.locator('.cg-student').nth(1);
+
+      for (const edit of edits) await edit(row);
+      await page.emulateMedia({ media: 'print' });
+
+      expect(await printedCells(row)).toEqual(expected);
+      expect(await printedCells(second)).toEqual(untouchedSecondRow);
+    });
+  }
+});
+
+/**
+ * #249 gave the three roster dropdowns their column name as a placeholder, and
+ * this is the regression surface that change could have taken with it.
+ *
+ * `t.rosterUnset` (the em dash) had SIX consumers and only three of them were
+ * the selects. The other three are print mirrors -- `.cg-print-value` spans
+ * the roster row carries beside each control, built in `roster-ui.ts` and kept
+ * current by `refreshPrintMirrors` in `classroom-groups.ts`. A blanket edit to
+ * `rosterUnset` would have printed the word "Sex" in an empty cell on a
+ * teacher's class list, which nobody would have seen: print is a medium no
+ * guard renders by default, and this repo has already shipped a blank sheet
+ * once for exactly that reason.
+ *
+ * So: on screen the control names its column, and on paper the cell keeps its
+ * dash. The em dash is written here as a literal rather than read from the
+ * catalogue on purpose -- a value asserted against the constant it is computed
+ * from moves when that constant moves and pins nothing (#117).
+ */
+test.describe('an unset roster cell on paper', () => {
+  const PRINTED = ['Sex', 'Together', 'Apart'] as const;
+
+  test('keeps the em dash — the column name belongs on screen only', async ({
+    page,
+  }) => {
+    await openRoster(page);
+    const row = page.locator('.cg-student').first();
+
+    // On screen, the placeholder #249 added.
+    for (const column of PRINTED) {
+      await expect(row.getByLabel(column).locator('option:checked')).toHaveText(
+        column,
+      );
+    }
+
+    await page.emulateMedia({ media: 'print' });
+
+    for (const column of PRINTED) {
+      // Absence is a count AND a hidden state: `toBeHidden` alone passes for
+      // a control that does not exist at all (#188).
+      await expect(row.getByLabel(column)).toHaveCount(1);
+      await expect(row.getByLabel(column)).toBeHidden();
+
+      const mirror = row
+        .locator('td')
+        .filter({ has: page.locator(`select[aria-label="${column}"]`) })
+        .locator('.cg-print-value');
+      await expect(mirror).toBeVisible();
+      await expect(mirror).toHaveText('—');
+    }
+  });
+});
+
+/**
+ * #253 AC5 and AC2, the two halves the first fix left unasserted.
+ *
+ * AC5 is a REGRESSION guard over code that is already correct: `refreshPrintMirrors`
+ * writes `row.dataset.absent` on the same pass that writes the mirrors, and the
+ * column fix rewrote that pass. Nothing in `tests/` asserted the attribute --
+ * confirmed with a known-positive control, so the empty grep was a real absence
+ * and not a blind pattern (#183).
+ *
+ * It matters because `data-absent` is not bookkeeping: it is half of
+ * `[data-print-absent='off'] .cg-student[data-absent='true']`, the rule that
+ * takes absent pupils off a printed register. The other half, the toggle's own
+ * `data-print-absent`, WAS asserted. A rule is not proven by one of its operands.
+ */
+test.describe('the absent bookkeeping the printed register is built on', () => {
+  /** `data-absent` per row, in row order. */
+  const absentFlags = (page: import('@playwright/test').Page) =>
+    page
+      .locator('.cg-student')
+      .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-absent')));
+
+  const tickAbsent = async (row: import('@playwright/test').Locator) => {
+    await setCheckedOn(row.getByLabel('Absent'));
+  };
+
+  /**
+   * `roster-ui.ts` ALSO writes `data-absent`, on every re-render, so a select
+   * edit alone would read correct even with `refreshPrintMirrors`' own write
+   * deleted. Only ticking and THEN typing isolates it: a text edit deliberately
+   * never re-renders (it would steal the caret), which leaves
+   * `refreshPrintMirrors` the sole writer on that pass -- exactly the case
+   * that hid #253's column shift for as long as it did.
+   */
+  const CASES = [
+    {
+      what: 'a text edit alone',
+      edits: [typeAName],
+      expected: ['false', 'false'],
+    },
+    { what: 'a tick alone', edits: [tickAbsent], expected: ['true', 'false'] },
+    {
+      what: 'a tick then a text edit (no re-render follows)',
+      edits: [tickAbsent, typeAName],
+      expected: ['true', 'false'],
+    },
+    {
+      what: 'a text edit then a tick',
+      edits: [typeAName, tickAbsent],
+      expected: ['true', 'false'],
+    },
+  ];
+
+  for (const { what, edits, expected } of CASES) {
+    test(`every row still declares its own absence after ${what}`, async ({
+      page,
+    }) => {
+      await openRoster(page);
+      // A second row for the same reason the column guard above keeps one:
+      // `refreshPrintMirrors` walks rows by index against the live roster, and
+      // an off-by-one there is invisible with a single row.
+      await tapOn(page.getByRole('button', { name: 'Add student' }));
+      const row = page.locator('.cg-student').nth(0);
+
+      for (const edit of edits) await edit(row);
+
+      const flags = await absentFlags(page);
+      expect(
+        searched(flags, { of: flags, what: `roster rows after ${what}` }),
+      ).toEqual(expected);
+
+      // The register as it reaches paper, for the edit path that hid #253 for
+      // as long as it did. Whole page, not the table: what prints is the page.
+      await page.emulateMedia({ media: 'print' });
+      await shoot(page, `the printed register after ${what}`);
+      await page.emulateMedia({ media: 'screen' });
+    });
+  }
+});
+
+/**
+ * #253 AC2, the half the first fix did not reach.
+ *
+ * The mirrors are keyed by column now, but the rule that takes the Absent
+ * COLUMN off the sheet still names it by ordinal, and its own comment records
+ * that the ordinal was already wrong once: left at 4 it hid Sex and printed
+ * Absent, "a sheet that silently answered a different question than the tick
+ * box asked". AC2 asks that reordering the columns cannot reintroduce that.
+ *
+ * So this asks which NAMED columns reach paper, never which positions -- a
+ * guard written positionally would carry the very defect it is testing for.
+ * Visibility is `getClientRects().length`, not the element's own computed
+ * display: `display: none` on an ANCESTOR leaves a descendant's computed
+ * display untouched, so a per-element check reports hidden content as
+ * rendered (#17).
+ */
+test.describe('which columns reach paper is decided by name, not by position', () => {
+  const ALL_SIX = ['absent', 'number', 'name', 'sex', 'together', 'apart'];
+
+  // Same stub the printed-class-list block installs, for the same reason: the
+  // panel's Print button ends in `window.print()`.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.print = () => {};
+    });
+  });
+
+  /** The columns a PRESENT row actually paints, by name, in DOM order. */
+  const printedColumns = async (
+    page: import('@playwright/test').Page,
+    row: number,
+  ) =>
+    page
+      .locator('.cg-student')
+      .nth(row)
+      .locator('.cg-print-value')
+      .evaluateAll((els) =>
+        els
+          .filter((el) => el.getClientRects().length > 0)
+          .map((el) => (el as HTMLElement).dataset.col ?? '(unkeyed)'),
+      );
+
+  test('showing absent pupils prints every column, including Absent', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ana'],
+      ['F', 'Budi'],
+    ]);
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
+    await sheet(page, {
+      what: 'Class list',
+      absent: true,
+      letters: true,
+      avatars: true,
+    });
+
+    const columns = await printedColumns(page, 1);
+    expect(
+      [...searched(columns, { of: columns, what: 'printed columns' })].sort(),
+    ).toEqual([...ALL_SIX].sort());
+
+    await shoot(
+      page,
+      'absent pupils shown: the register prints all six columns, Absent first',
+    );
+  });
+
+  test('hiding absent pupils removes the Absent column and only that column', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ana'],
+      ['F', 'Budi'],
+    ]);
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
+    await sheet(page, {
+      what: 'Class list',
+      absent: false,
+      letters: true,
+      avatars: true,
+    });
+
+    // Budi is present, so Budi's row stays -- minus the Absent column. If the
+    // rule ever names the wrong column, THIS is the assertion that says which
+    // one went instead, by name, rather than reporting a count that moved.
+    const columns = await printedColumns(page, 1);
+    expect(
+      [...searched(columns, { of: columns, what: 'printed columns' })].sort(),
+    ).toEqual(ALL_SIX.filter((c) => c !== 'absent').sort());
+
+    await shoot(
+      page,
+      'absent pupils hidden: the Absent column is gone and Ana’s row with it',
+    );
+  });
+
+  // #390 F73, the letters box's half of #253 AC2. Its rule hid columns 4, 5
+  // and 6 by position, so reordering the row would have hidden whichever
+  // columns landed there and printed Sex. Compared as a SET of names, so a
+  // reorder that keeps the rule honest stays green and one that re-points
+  // it says which column went instead.
+  test('hiding the letters removes Sex, Together and Apart, and only those', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ana'],
+      ['F', 'Budi'],
+    ]);
+    await sheet(page, {
+      what: 'Class list',
+      absent: true,
+      letters: false,
+      avatars: true,
+    });
+
+    const columns = await printedColumns(page, 1);
+    expect(
+      [...searched(columns, { of: columns, what: 'printed columns' })].sort(),
+    ).toEqual(
+      ALL_SIX.filter((c) => !['sex', 'together', 'apart'].includes(c)).sort(),
+    );
+
+    await shoot(
+      page,
+      'letters hidden: Sex, Together and Apart are gone, Absent stays',
+    );
+  });
+
+  test('an absent pupil leaves the sheet entirely, a present one stays', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ana'],
+      ['F', 'Budi'],
+    ]);
+    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
+    await sheet(page, {
+      what: 'Class list',
+      absent: false,
+      letters: true,
+      avatars: true,
+    });
+
+    const rows = page.locator('.cg-student');
+    await expect(rows.nth(0)).toBeHidden();
+    await expect(rows.nth(1)).toBeVisible();
+  });
+});
+
+/**
+ * #261 AC5. The printed register in a language that is not English.
+ *
+ * The register was asserted in English only, and its headings are translated.
+ * A heading of one or two words is the class that once put `Tình dục` --
+ * *sexual intercourse* -- beside pupils' names on a roster (#114), while every
+ * surrounding SENTENCE translated correctly. No automated guard can see a
+ * string that is translated and wrong: identical-to-English guards catch
+ * untranslated, empty-copy guards catch blank, and this is neither. A picture
+ * an operator reads is the only instrument there is, which is why this test
+ * exists to be LOOKED at as much as to pass.
+ *
+ * No panel flow: `print-ui.ts` applies the remembered choices to `<html>` on
+ * load, so the defaults are already in place and `emulateMedia` is enough.
+ */
+test.describe('the printed register — Indonesian', () => {
+  test('every column heading reaches paper in Indonesian', async ({ page }) => {
+    await buildRosterAtPath(page, '/id/classroom-groups', [
+      ['M', 'Ana'],
+      ['F', 'Budi'],
+    ]);
+    await page.emulateMedia({ media: 'print' });
+
+    const headings = page.locator('#cg-roster thead th:visible');
+    // Visible AND worded: `toHaveText` alone reads `textContent`, which a
+    // heading the page forgot to show still carries (#188).
+    await expect(headings.first()).toBeVisible();
+    await expect(headings).toHaveText([
+      'Tidak hadir',
+      '#',
+      'Nama',
+      'Jenis kelamin',
+      'Bersama',
+      'Terpisah',
+    ]);
+
+    await shoot(
+      page,
+      'the Indonesian register on paper, every heading translated',
+    );
   });
 });

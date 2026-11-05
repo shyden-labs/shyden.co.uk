@@ -1,50 +1,63 @@
 ---
-import { localisePath, otherLocale, type Locale } from '../lib/i18n';
-import { siteEn, siteId } from '../lib/i18n/site';
+import LanguageSwitcher from './LanguageSwitcher.astro';
+import ThemeSwitch from './ThemeSwitch.astro';
+import { localisePath, type Locale, getSiteStrings } from '../lib/i18n';
 
 interface Props {
   lang: Locale;
+  /** False on an English-only page: no language switcher (#781). */
+  localised?: boolean;
 }
-const { lang } = Astro.props;
-const t = lang === 'id' ? siteId : siteEn;
+const { lang, localised = true } = Astro.props;
+const t = getSiteStrings(lang);
 
 // Root-relative (/#…) not bare (#…): the Header renders on every page via
 // BaseLayout, but these section anchors live only on the homepage — so bare
-// fragments would dead-link on /glory-points and /404. /#services scrolls in
+// fragments would dead-link on /yeetalk-calculators and /404. /#shytalk scrolls in
 // place on the homepage and navigates home-then-scrolls from any other page.
 //
 // The home path is locale-aware for the same reason: on /id/* pages a bare
-// `/#services` would silently throw the visitor back to the ENGLISH homepage,
+// `/#shytalk` would silently throw the visitor back to the ENGLISH homepage,
 // which looks like the site forgetting their language mid-visit.
 const home = localisePath('/', lang);
 const base = home === '/' ? '' : home.replace(/\/$/, '');
 const links = [
-  { href: `${base}/#services`, label: t.nav.services },
-  { href: `${base}/#work`, label: t.nav.work },
+  { href: `${base}/#shytalk`, label: t.nav.shytalk },
+  { href: `${base}/#yawelo-idle`, label: t.nav.yaweloIdle },
+  { href: `${base}/#tools`, label: t.nav.tools },
   { href: `${base}/#contact`, label: t.nav.contact },
 ];
-
-const other = otherLocale(lang);
-const otherHref = localisePath(Astro.url.pathname, other);
 ---
 
 <header>
   <div class="bar">
-    <a class="wordmark" href={home}>Shyden</a>
+    <a class="wordmark" href={home}>
+      Shyden
+    </a>
     <details class="menu">
-      <summary aria-label={t.menuLabel} aria-controls="primary-nav"
-        ><span class="bars"></span></summary
-      >
+      <summary aria-label={t.menuLabel} aria-controls="primary-nav">
+        <span class="bars"></span>
+      </summary>
     </details>
-    <a
-      class="lang"
-      href={otherHref}
-      hreflang={other}
-      lang={other}
-      rel="alternate">{t.language.switchTo}</a
-    >
+    {/* The theme switch and the language switcher are ONE item in the bar
+        (#142 §5). The bar spaces its items with `space-between`, so a fourth
+        separate item would float in the middle of the row on a wide screen
+        rather than sit beside the language switcher. Both live in the BAR,
+        not in <nav>, for two reasons, both learned from a failing test.
+        <nav> means "the site's sections" and is pinned to exactly those
+        links; these controls are a different kind of thing. And on
+        mobile <nav> collapses behind the menu button, which would hide them
+        from exactly the visitors most likely to want them. */}
+    <div class="controls">
+      <ThemeSwitch lang={lang} />
+      {localised && (
+        <LanguageSwitcher lang={lang} pathname={Astro.url.pathname} />
+      )}
+    </div>
     <nav id="primary-nav">
-      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+      {links.map((l) => (
+        <a href={l.href}>{l.label}</a>
+      ))}
     </nav>
   </div>
 </header>
@@ -52,6 +65,10 @@ const otherHref = localisePath(Astro.url.pathname, other);
   header {
     position: sticky;
     top: 0;
+    /* Above the language band, which is positioned with z-index 2 and passes
+       beneath this header as the page scrolls (#599). A sticky header with no
+       z-index painted UNDER it. */
+    z-index: 10;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
@@ -65,6 +82,12 @@ const otherHref = localisePath(Astro.url.pathname, other);
     justify-content: space-between;
   }
   .wordmark {
+    /* Never shrinks. `min-width: 44px` below is a touch-target floor, and an
+       explicit min-width replaces flex's automatic minimum (the text's own
+       width). So when the row ran out of room, flex could squeeze this box
+       to 60px while "Shyden" still needed 73.6px, and the word ran under the
+       menu button (#329). */
+    flex: none;
     display: inline-flex;
     align-items: center;
     min-width: 44px;
@@ -74,6 +97,14 @@ const otherHref = localisePath(Astro.url.pathname, other);
     font-size: 1.25rem;
     color: var(--ink);
     text-decoration: none;
+  }
+  /* No gap: the switch's 44px box already holds its 24px icon 10px clear of
+     the language switcher. At 320px the Thai row has 2.97px to spare on
+     Linux Firefox, whose Thai label is 10px wider than Chromium's, and a
+     0.25rem gap ran the label 1px outside the row (header-room.spec.ts). */
+  .controls {
+    display: flex;
+    align-items: center;
   }
   /* Mobile disclosure toggle (the hamburger). */
   .menu > summary {
@@ -147,25 +178,5 @@ const otherHref = localisePath(Astro.url.pathname, other);
       position: static;
       padding: 0;
     }
-  }
-  /* The language link lives in the BAR, not in <nav>.
-     Two reasons, both learned from a failing test:
-     1. <nav> means "the site's sections" and is pinned to exactly those three
-        links; a language control is a different kind of thing.
-     2. On mobile <nav> collapses behind the disclosure, which would have
-        hidden the switcher behind a hamburger — unreachable for exactly the
-        visitors most likely to want it. */
-  .lang {
-    margin-left: auto;
-    margin-right: 1rem;
-    min-height: 44px;
-    min-width: 44px;
-    display: inline-flex;
-    align-items: center;
-    color: var(--ink);
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
   }
 </style>

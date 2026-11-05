@@ -14,8 +14,9 @@
  * ignored. See https://developers.cloudflare.com/pages/functions/get-started/
  *
  * Adapted from ShyTalk's `functions/_lib/lockdown.js` — same behaviour,
- * only the hostname/strings differ, and the API-surface helpers are
- * dropped (this is a static site with no API).
+ * only the hostname/strings differ, and ShyTalk's API-surface helpers are
+ * dropped. The site's one API, `/api/report` (#97), sits behind the same
+ * gate as every other path on a non-prod host.
  */
 
 // Single canonical production hostname. One Functions codebase serves
@@ -28,13 +29,19 @@ export const PROD_HOSTNAME = 'shyden.co.uk';
  * Case-insensitive (DNS is), EXACT equality — not prefix / contains — so
  * a near-miss like `dev.shyden.co.uk` or a hostile
  * `shyden.co.uk.evil.com` cannot trip the prod (pass-through) gate.
+ *
+ *  @param {string} hostname
  */
 export function isProdHostname(hostname) {
   if (typeof hostname !== 'string' || hostname.length === 0) return false;
   return hostname.toLowerCase() === PROD_HOSTNAME;
 }
 
-/** Inverse convenience — any non-prod host (dev, Pages preview, localhost). */
+/**
+ *  Inverse convenience — any non-prod host (dev, Pages preview, localhost).
+ *
+ *  @param {string} hostname
+ */
 export function shouldServeBlockingRobots(hostname) {
   return !isProdHostname(hostname);
 }
@@ -48,11 +55,40 @@ export const WWW_HOSTNAME = `www.${PROD_HOSTNAME}`;
  * request is for the www host, else null (so the caller falls through to the
  * normal prod/dev logic). Case-insensitive on the host (DNS is). This runs
  * BEFORE the auth gate so www is publicly redirected, never challenged.
+ *
+ *  @param {URL} url
  */
 export function wwwRedirectLocation(url) {
   if (typeof url?.hostname !== 'string') return null;
   if (url.hostname.toLowerCase() !== WWW_HOSTNAME) return null;
   return `https://${PROD_HOSTNAME}${url.pathname}${url.search}`;
+}
+
+/**
+ * The locales whose pages sit under a path prefix (`/id/...`). Written out
+ * because this file runs as plain JS at the edge and cannot import
+ * `src/lib/i18n`; `tests/unit/lockdown.test.ts` asserts it equals
+ * `PREFIXED_LOCALES` (exact set and order).
+ */
+export const PREFIXED_LOCALE_CODES = ['id', 'zh', 'vi', 'th'];
+
+/**
+ * #635: the Glory Points page moved to /yeetalk-calculators. The old address
+ * redirects (301) to the calculator the bookmark was for, keeping the locale
+ * prefix and query string. Host is not consulted, so dev and prod behave the
+ * same. Returns a root-relative target, or null for any other path. Runs
+ * BEFORE the auth gate so the redirect is public.
+ *
+ *  @param {URL} url
+ */
+export function legacyPathRedirectLocation(url) {
+  if (typeof url?.pathname !== 'string') return null;
+  const match = new RegExp(
+    `^(?:/(${PREFIXED_LOCALE_CODES.join('|')}))?/glory-points/?$`,
+  ).exec(url.pathname);
+  if (!match) return null;
+  const prefix = match[1] ? `/${match[1]}` : '';
+  return `${prefix}/yeetalk-calculators${url.search}#glory-points`;
 }
 
 /**
@@ -86,6 +122,9 @@ export function noIndexHeaderValue() {
  * FAILS CLOSED: a missing header or empty/null `expectedPassword` always
  * returns false — a misconfigured deploy (DEV_PASSWORD unset) stays
  * locked, never wide open.
+ *
+ * @param {string | null} authorizationHeader
+ * @param {string | undefined} expectedPassword
  */
 export function basicAuthOk(authorizationHeader, expectedPassword) {
   if (!expectedPassword) return false;

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { adb } from '../../scripts/adb.mjs';
 
 /**
  * Chrome losing foreground mid-run: observed live, at least twice, independently, across this
@@ -19,12 +19,12 @@ import { execFileSync } from 'node:child_process';
  * re-usable check, called once per test by tests/e2e/fixtures.ts's `page` fixture, BEFORE that
  * test's own actions begin, with one bounded recovery attempt.
  *
- * Deliberately NOT merged into android-preflight.setup.ts's own precondition 3, which already
- * ships, is already reviewed, and already works from a cold start -- this is the same
- * mechanism (identical `am start` intent, identical `dumpsys window` substring check), kept as
- * a small, clearly cross-referenced duplicate rather than a refactor of already-proven code
- * that this triage task has no independent reason to touch. If `dumpsys window`'s own output
- * shape ever changes, both call sites need updating together.
+ * android-preflight.setup.ts's preconditions 3 and 4 read the same two signals and import them
+ * from here, so each check has one home. The focus check was once a cross-referenced duplicate
+ * in the preflight ("both call sites need updating together"); #307 was the change that needed
+ * both at once. On a cold launch Chrome takes the foreground about 200ms BEFORE its DevTools
+ * socket exists (measured 3 of 3), so waiting for focus is not waiting for a Chrome that CDP
+ * can reach, and both places that launch Chrome now wait for both.
  */
 
 export const CHROME_PACKAGE = 'com.android.chrome';
@@ -35,8 +35,7 @@ export const CHROME_PACKAGE = 'com.android.chrome';
  * match alone. Identical extraction to android-preflight.setup.ts's own precondition 3.
  */
 export function currentFocusLines(): string {
-  return execFileSync('adb', ['shell', 'dumpsys', 'window'])
-    .toString()
+  return adb(['shell', 'dumpsys', 'window'])
     .split('\n')
     .filter((line) => line.includes('mCurrentFocus='))
     .join('\n');
@@ -47,15 +46,44 @@ export function isChromeForeground(): boolean {
 }
 
 /**
- * Launches Chrome to about:blank and polls (condition-based, never a blind sleep) for it to
- * become the reported foreground app -- the identical intent android-preflight.setup.ts's own
- * precondition 3 already proves works from a cold launch. Throws, naming what was actually in
- * foreground instead, if Chrome does not reclaim it within `timeoutMs`.
+ * The abstract unix socket Chrome's DevTools server listens on; `adb forward` maps it to
+ * tcp:9222, which is where `chromium.connectOverCDP` attaches.
  */
-export async function relaunchChromeAndWaitForeground(
+export const DEVTOOLS_SOCKET = '@chrome_devtools_remote';
+
+/**
+ * The Chrome and WebView DevTools sockets listening on the device (`@chrome_devtools_remote`,
+ * `@webview_devtools_remote_<pid>`), read from `/proc/net/unix`, whose last field on each line
+ * is the socket's path. Returns the paths rather than a yes/no so that a failed wait prints what
+ * WAS listening, not the whole socket table.
+ *
+ * Only those two families: other apps open DevTools sockets of their own (measured on the test
+ * phone: a social app's JS engine, a messaging app's Stetho), and a failure message is no place
+ * to list which apps are installed on someone's phone. Callers compare the result exactly, never
+ * by substring, so a differently suffixed socket cannot stand in for Chrome's.
+ */
+export function devToolsSockets(): string[] {
+  return adb(['shell', 'cat', '/proc/net/unix'])
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).pop() ?? '')
+    .filter((path) => /^@(chrome|webview)_devtools_remote/.test(path));
+}
+
+export function hasDevToolsSocket(): boolean {
+  return devToolsSockets().includes(DEVTOOLS_SOCKET);
+}
+
+/**
+ * Launches Chrome to about:blank and polls (condition-based, never a blind sleep) until it is
+ * BOTH the reported foreground app AND listening on its DevTools socket. They are separate
+ * events: on a cold launch the socket appears about 200ms after focus (#307), so a Chrome that
+ * has only reclaimed the foreground is not yet one CDP can reach. Throws, naming which of the
+ * two never happened and what was observed instead, if both are not true within `timeoutMs`.
+ */
+export async function relaunchChromeAndWaitReady(
   timeoutMs = 5_000,
 ): Promise<void> {
-  execFileSync('adb', [
+  adb([
     'shell',
     'am',
     'start',
@@ -67,11 +95,16 @@ export async function relaunchChromeAndWaitForeground(
   ]);
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    if (isChromeForeground()) return;
+    const foreground = isChromeForeground();
+    if (foreground && hasDevToolsSocket()) return;
     if (Date.now() >= deadline) {
       throw new Error(
-        `Chrome did not reclaim the foreground within ${timeoutMs}ms of relaunching it -- ` +
-          `current \`dumpsys window\` mCurrentFocus line(s): ${currentFocusLines() || '(none at all)'}`,
+        foreground
+          ? `Chrome took the foreground but its DevTools socket ${DEVTOOLS_SOCKET} did not ` +
+              `appear within ${timeoutMs}ms of relaunching it -- DevTools sockets listening: ` +
+              `${devToolsSockets().join(', ') || '(none at all)'}`
+          : `Chrome did not reclaim the foreground within ${timeoutMs}ms of relaunching it -- ` +
+              `current \`dumpsys window\` mCurrentFocus line(s): ${currentFocusLines() || '(none at all)'}`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -118,9 +151,9 @@ export async function ensureChromeForegroundOrRecover(
       '\n\n',
   );
 
-  await relaunchChromeAndWaitForeground(5_000);
+  await relaunchChromeAndWaitReady(5_000);
 
   process.stderr.write(
-    `==> Recovered: Chrome is foreground again before "${testTitle}". Continuing.\n`,
+    `==> Recovered: Chrome is foreground and listening again before "${testTitle}". Continuing.\n`,
   );
 }

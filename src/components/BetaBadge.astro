@@ -1,0 +1,68 @@
+---
+import { BETA_BADGE, getSiteStrings, type Locale } from '../lib/i18n';
+
+interface Props {
+  /** The language of the PAGE -- what the accessible label is written in. */
+  lang: Locale;
+}
+const { lang } = Astro.props;
+const t = getSiteStrings(lang);
+
+/**
+ * The BETA marker shown beside every unverified language.
+ *
+ * Shyden has no native speaker for any language but English, so every
+ * other locale's copy is machine output that nobody has checked. This says so
+ * where the visitor chooses a language, rather than leaving them to discover
+ * it from a bad sentence.
+ *
+ * One component, used by the switcher's `<summary>` and by each entry in its
+ * list, so the two can never drift into saying different things.
+ *
+ * `BETA_BADGE` is deliberately untranslated -- it labels a LANGUAGE, and on an
+ * English page it marks Bahasa Indonesia, so the page's own word for "beta"
+ * would describe the wrong thing to the reader who most needs it. The label
+ * beside it IS translated, and is visually hidden: sighted readers get the
+ * badge, screen-reader users get "BETA -- terjemahan beta" rather than a bare
+ * four letters with no object.
+ */
+---
+
+<span class="beta" data-beta>
+  {BETA_BADGE}
+  {/* `lang` because the label is written in the PAGE's language, and inside
+      the switcher's list it sits in another language's entry, whose own
+      `lang` would otherwise hand these words to that language's voice. */}
+  <span
+    class="visually-hidden"
+    lang={lang}
+  >{` — ${t.language.betaLabel}`}</span>
+</span>
+
+<style>
+  .beta {
+    /* `position: relative` contains the visually-hidden span below: absolutely
+       positioned against the initial containing block it can land anywhere,
+       and at 320px "anywhere" means sideways scroll. */
+    position: relative;
+    display: inline-block;
+    flex: none;
+    margin-inline-start: 0.4em;
+    padding: 0.05em 0.4em;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    /* --accent-ink must clear the 4.5:1 AA floor for normal text on both grounds it sits on (the
+       header and the switcher's list), in both themes. No ratio is written here because the
+       palette moves (Aurora, then light mode, left a stale pair behind):
+       `the badge clears the WCAG AA floor` in tests/e2e/locale-beta.spec.ts
+       computes what the browser actually paints. */
+    color: var(--accent-ink);
+    font-family: var(--font-body);
+    font-size: 0.65em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+</style>

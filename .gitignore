@@ -10,6 +10,11 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Playwright's DEFAULT snapshot directory, written only by a config with no
+# `snapshotPathTemplate` (#194). Real baselines live in
+# tests/e2e/__screenshots__/ and stay committable.
+*.spec.ts-snapshots/
+
 # Dashboard state (scripts/dashboard.mjs) -- deliberately OUTSIDE test-results/:
 # Playwright's default outputDir behaviour recursively wipes that whole
 # directory at the start of EVERY invocation, and desktop + android are
@@ -31,3 +36,7 @@ dashboard-state/
 .vscode/
 .idea/
 .superpowers/
+.remember/
+
+# V8 coverage reports (#896)
+coverage/

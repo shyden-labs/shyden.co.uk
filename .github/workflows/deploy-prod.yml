@@ -1,0 +1,151 @@
+name: Deploy to prod (on merge to main, approval-gated)
+# PROD DEPLOYS FROM MAIN, AFTER THE MERGE. Fires on every push to `main` and
+# waits at the `prod` Environment approval gate, so nothing reaches
+# shyden.co.uk without a deliberate approval — and whatever is live is always a
+# commit that is on `main`.
+#
+# This replaced a deploy-BEFORE-merge pipeline. That one made production the
+# gate: a mistake first became real in front of teachers, and for the length of
+# a release `main` did not describe what was live. The merge gate is now
+# `dev-verified` (deploy-dev.yml).
+#
+# `workflow_dispatch` is kept for the case main is already correct and prod
+# needs re-deploying — a rollback that is forward rather than backward, and the
+# only way to re-run this without an empty commit.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One lock around everything that changes what prod serves, shared with
+# rollback.yml (#238). A deploy never cancels a run in it: pushed during a
+# rollback, it waits for the rollback, then stops at the approval as usual. A
+# rollback, in turn, cancels a deploy that holds the lock (see rollback.yml).
+concurrency:
+  group: shyden-prod-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-prod:
+    name: Deploy to Prod (needs approval)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment:
+      name: prod
+      url: https://shyden.co.uk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
+        run: npm run build
+      - name: Guard — fail if a [[placeholder]] leaked into shipped text
+        # -I: skip binary files. woff/woff2 fonts contain the bytes `[[`; a
+        # placeholder leak is a TEXT concern, so scanning binaries false-fails.
+        #
+        # Matches the placeholder SHAPE — `[[` … `]]` with no `]` between —
+        # rather than a bare `[[`. A bare `[[` is ordinary JavaScript: the
+        # minified bundle contains `new Map([[k,v],[k,v]])`, which blocked a
+        # release on 2026-08-05 with nothing wrong with the site. This is the
+        # second false positive of the same kind (see the `-I` note above), and
+        # both had the same cause — matching a fragment instead of the thing.
+        #
+        # It stays safe against that syntax because `[^]]` cannot cross the
+        # first `]`, so `[[k,v],` never completes the pattern. Verified against
+        # a real build: 0 matches, while an injected `[[companyNo]]` and an
+        # injected `[[reg office]]` are both caught.
+        run: |
+          if grep -rnIE '\[\[[^]]{1,60}\]\]' dist/; then
+            echo "::error::A [[…]] placeholder reached dist/ — refusing to ship to prod."
+            exit 1
+          fi
+          echo "No bracket placeholders in dist/ (text)."
+      - name: Deploy dist/ to Cloudflare Pages (prod project)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name shyden-site --branch main
+
+  # ---- Post-prod smoke + prod-verified -----------------------------------
+  # Smokes the PUBLIC production domain — the host real visitors get.
+  #
+  # This used to smoke the `shyden-site.pages.dev` deployment alias, which was
+  # cutover-independent and so worked before the apex DNS pointed at the
+  # project. The cutover has happened, and the alias is the wrong target now:
+  # it answers only behind Basic auth, so a DNS, certificate, or routing fault
+  # on the apex left the site dark for every visitor while this job went green.
+  #
+  # `prod-verified` is no longer what branch protection requires (that is
+  # `dev-verified` now, posted before the merge). It is kept because it is a
+  # per-commit RECORD of what actually reached production and passed a smoke —
+  # visible on the commit, queryable by the API, and the thing to look at when
+  # asking "was this SHA ever live?".
+  smoke-and-verify:
+    name: Post-prod smoke + prod-verified
+    needs: deploy-prod
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # The report health check is private on production (#782), and the Access
+    # service token that signs in for it lives in `prod`, behind Shyden's
+    # approval like every production credential: so this job asks for that
+    # approval too, a second click per release (his decision, 2026-10-15).
+    environment:
+      name: prod
+      url: https://shyden.co.uk
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      # ---- Gate: the smoke and a real browser, before the status ----------
+      #
+      # One Playwright run holds both. tests/prod/prod-smoke.spec.ts is the
+      # smoke, requested without a browser: every page answers, an unknown
+      # path gets the not-found page, and certain strings are among the
+      # bytes. That cannot prove a page RENDERS, and
+      # this repo shipped a bug for an entire release that no text assertion
+      # could see: `display: flex` ate authored whitespace while `textContent`
+      # still contained it. prod-sanity.spec.ts asserts what only rendering
+      # can: the stylesheet, the calculators' script, no sideways scroll.
+      #
+      # The smoke was a step of its own here until #390, where a fact in it
+      # went stale with nothing before a release able to see it. As a spec,
+      # each pull request's `sanity-on-build` runs it against that PR's own
+      # prod build. The public apex is not behind Basic auth, so the one
+      # credential here is the Access service token, sent only on the request
+      # to the private health check (#241, #782).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke and verify the live prod site
+        env:
+          WEB_BASE_URL: https://shyden.co.uk
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: npx playwright test --config=playwright.prod.config.ts
+
+      # Reached only if BOTH the smoke and the browser run passed: a failing
+      # step fails the job, so `prod-verified` is never posted for a release
+      # that did not render.
+      - name: Post prod-verified status on the released commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state=success \
+            -f context=prod-verified \
+            -f "description=Prod deployed + browser-verified (run ${{ github.run_id }})" \
+            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Posted prod-verified=success on ${{ github.sha }}"

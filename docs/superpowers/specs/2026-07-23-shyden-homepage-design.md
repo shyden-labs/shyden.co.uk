@@ -143,7 +143,7 @@ Glory points belong to **YeeTalk** — a global social chat app (video/voice/tex
 Given `gloryPoints` (a positive whole number):
 ```
 coinsNeeded    = ceil(gloryPoints * 1)          // 1 coin per point  → == gloryPoints
-beansNeeded    = ceil(coinsNeeded / 0.9)         // 0.9 beans per coin
+beansNeeded    = ceil(coinsNeeded / 0.9)         // 0.9 coins per bean
 totalGiftValue = ceil(beansNeeded / 0.40)        // gifts convert to beans at 40%
 ```
 All results formatted with thousands separators. Result copy mirrors the original's three lines (coins → beans → total gift value).

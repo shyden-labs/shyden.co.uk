@@ -49,7 +49,9 @@ This section is the honest boundary. It is not a to-do list; it is a statement o
 hardware permits.
 
 **Android — full parity.** Chrome for Android exposes CDP on the abstract unix socket
-`@chrome_devtools_remote` whenever USB debugging is on. `adb forward` plus
+`@chrome_devtools_remote` whenever USB debugging is on, once its DevTools server is listening. On
+a cold launch that is about 200ms after Chrome takes the foreground, so the preflight forces a
+cold launch and polls for the socket rather than reading it once (#307). `adb forward` plus
 `chromium.connectOverCDP()` yields a real Playwright `Browser`, so **the existing spec files run
 unchanged on real hardware.** Verified: happy path (12 students → 4 groups) and unhappy path
 (0 students → correct localised error) both pass, in both locales.

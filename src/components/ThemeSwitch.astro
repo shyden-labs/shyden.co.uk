@@ -1,0 +1,78 @@
+---
+import { getSiteStrings, type Locale } from '../lib/i18n';
+
+interface Props {
+  lang: Locale;
+}
+const { lang } = Astro.props;
+const t = getSiteStrings(lang);
+---
+
+{/* The theme switch (#142 §5): a toggle button whose name stays "Dark mode"
+     while only its pressed state changes, the WAI-ARIA pattern. The server
+     renders no aria-pressed; the theme script adds it once the page has
+     parsed and keeps it accurate, so the attribute exists only while something
+     maintains it. Hidden until that script has run (--switch-display in
+     tokens.css): with JavaScript off, the device's own setting applies and no
+     dead button is offered. The icons are decorative: a moon while light is
+     showing and a sun while dark is, each shown by a token, so an icon can
+     never disagree with the palette. They draw in currentColor, from --ink,
+     which also lets forced colours reach them. */}
+<button
+  type="button"
+  class="theme-switch"
+  data-theme-toggle
+  aria-label={t.themeDarkMode}
+>
+  <svg
+    class="moon"
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    aria-hidden="true"
+  >
+    <path
+      fill="currentColor"
+      d="M20.4 14.1A8.6 8.6 0 1 1 9.9 3.6a7.5 7.5 0 0 0 10.5 10.5Z"
+    />
+  </svg>
+  <svg
+    class="sun"
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    aria-hidden="true"
+  >
+    <circle fill="currentColor" cx="12" cy="12" r="4.5" />
+    <path
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"
+    />
+  </svg>
+</button>
+
+<style>
+  .theme-switch {
+    display: var(--switch-display);
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .moon {
+    display: var(--switch-moon);
+  }
+  .sun {
+    display: var(--switch-sun);
+  }
+</style>

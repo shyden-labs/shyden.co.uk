@@ -1,29 +1,34 @@
 ---
+import StatusBadge from './StatusBadge.astro';
+
 interface Props {
   title: string;
   href: string;
   external?: boolean;
-  variant?: 'default' | 'shytalk';
+  badge?: string;
+  cta?: string;
 }
-const { title, href, external = false, variant = 'default' } = Astro.props;
+const { title, href, external = false, badge, cta } = Astro.props;
 const rel = external ? 'noopener noreferrer' : undefined;
 const target = external ? '_blank' : undefined;
 ---
 
-<a
-  class:list={['work-card', variant !== 'default' && `work-card--${variant}`]}
-  href={href}
-  rel={rel}
-  target={target}
-  aria-label={title}
->
-  {
-    /* `logo` slot lets a card render a brand wordmark in place of the text
+<a class="work-card" href={href} rel={rel} target={target} aria-label={title}>
+  {/* `logo` slot lets a card render a brand wordmark in place of the text
       title; falls back to the plain title. aria-label keeps the accessible
-      name = title regardless of the visual treatment. */
-  }
-  <h3><slot name="logo">{title}</slot></h3>
-  <p><slot /></p>
+      name = title regardless of the visual treatment. */}
+  <h3>
+    <slot name="logo">{title}</slot>
+  </h3>
+  {badge && <StatusBadge label={badge} />}
+  <p>
+    <slot />
+  </p>
+  {cta && (
+    <p class="work-card-cta">
+      {cta} <span aria-hidden="true">&rarr;</span>
+    </p>
+  )}
 </a>
 <style>
   .work-card {
@@ -41,16 +46,9 @@ const target = external ? '_blank' : undefined;
   .work-card h3 {
     margin: 0 0 0.5rem;
   }
-  /* ShyTalk brand tile: renders the ShyTalk logo in its native context — the
-     dark background from shytalk.shyden.co.uk — so the wordmark reads as the
-     real logo, not a recoloured approximation. The wordmark's own colours are
-     set on .shytalk-wordmark in the consuming page (Astro slot scoping). */
-  .work-card--shytalk {
-    background: #0f0d15;
-    border-color: #2a2438;
-    color: #b8b0c8;
-  }
-  .work-card--shytalk:hover {
-    border-color: #d0bcff;
+  .work-card-cta {
+    margin: 0.75rem 0 0;
+    color: var(--accent);
+    font-weight: 600;
   }
 </style>

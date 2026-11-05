@@ -48,6 +48,13 @@ export interface GroupingInput {
   pinned: Student[][];
   /** Injected so results are reproducible in tests. */
   random: () => number;
+  /**
+   * The search's node budget per pass, injected like `random` so a unit test
+   * reaches the "gave up" path without spending the real budget (#714). The
+   * page never sets it: the default is `SEARCH_NODE_CAP`, and the real-budget
+   * runs live in `tests/simulation/`.
+   */
+  searchNodeCap?: number;
 }
 
 export const ERROR_CODES = {
@@ -652,7 +659,22 @@ function shuffled<T>(items: readonly T[], random: () => number): T[] {
   return out;
 }
 
-const anonymous = (number: number): Student => ({
+/**
+ * A new, unnamed, unlettered, present student — one home for what an empty
+ * field means.
+ *
+ * Takes the number rather than computing it, so the caller decides numbering:
+ * `classroom-groups.ts` already holds `nextNumber` for the first row of a
+ * batch, and a constructor that numbered itself would be a second opinion
+ * about identity in a tool where the number IS the identity.
+ *
+ * It was a private `anonymous` here and a character-identical, exported
+ * `anonymousStudent` in `src/scripts/roster-ui.ts` until #277, with a third
+ * copy inline in `numberSets.ts` and a fourth in the test factory. Four
+ * places to decide what a seventh field defaults to, and the typechecker
+ * cannot say they disagree — each one is valid on its own.
+ */
+export const anonymousStudent = (number: number): Student => ({
   number,
   name: null,
   sex: null,
@@ -665,7 +687,7 @@ function normaliseStudents(input: number | Student[]): Student[] {
   if (typeof input === 'number') {
     if (!Number.isFinite(input) || input < 1) return [];
     return Array.from({ length: Math.floor(input) }, (_, i) =>
-      anonymous(i + 1),
+      anonymousStudent(i + 1),
     );
   }
   // A record list is taken as given. Renumbering it would throw away the one
@@ -819,13 +841,13 @@ function buildConflicts(present: Student[], blocks: Block[]): Set<number>[] {
  * and this function is never used to draw it. So exhaustion costs precision,
  * never correctness: the caller simply falls through to the real search.
  */
-function largestMutualConflict(adj: Set<number>[]): number[] {
+function largestMutualConflict(adj: Set<number>[], nodeCap: number): number[] {
   let best: number[] = [];
   let nodes = 0;
   const n = adj.length;
 
   const extend = (clique: number[], candidates: number[]): void => {
-    if (++nodes > SEARCH_NODE_CAP) return;
+    if (++nodes > nodeCap) return;
     if (clique.length > best.length) best = clique.slice();
     // Bound: even taking every remaining candidate cannot beat the best found.
     if (clique.length + candidates.length <= best.length) return;
@@ -869,6 +891,7 @@ function assign(
   blocks: Block[],
   sizes: number[],
   adj: Set<number>[], // conflicts BETWEEN BLOCKS
+  nodeCap: number,
 ): { groups: number[][] | null; gaveUp: boolean } {
   const groups: number[][] = sizes.map(() => []); // holds block indices
   let nodes = 0;
@@ -877,7 +900,7 @@ function assign(
 
   const place = (idx: number): boolean => {
     if (idx === order.length) return true;
-    if (++nodes > SEARCH_NODE_CAP) {
+    if (++nodes > nodeCap) {
       // Not "no arrangement exists" — "I stopped looking". Collapsing the two
       // is how a tool ends up telling a teacher a falsehood with confidence.
       gaveUp = true;
@@ -1151,6 +1174,7 @@ function placeBlocks(
   random: () => number,
   present: Student[],
   sexMode: SexMode,
+  nodeCap: number,
 ): { groups: number[][] | null; gaveUp: boolean } {
   const shuffledOrder = shuffled(
     blocks.map((_, i) => i),
@@ -1161,13 +1185,13 @@ function placeBlocks(
       ? weaveBySex(blocks, present, shuffledOrder)
       : shuffledOrder;
 
-  const pass1 = assign(order, blocks, sizes, adj);
+  const pass1 = assign(order, blocks, sizes, adj, nodeCap);
   if (pass1.groups !== null || !pass1.gaveUp) return pass1;
 
   const ffdOrder = order
     .slice()
     .sort((a, b) => blocks[b].length - blocks[a].length);
-  return assign(ffdOrder, blocks, sizes, adj);
+  return assign(ffdOrder, blocks, sizes, adj, nodeCap);
 }
 
 /**
@@ -1435,6 +1459,7 @@ function placeSexSide(
   localAdj: Set<number>[],
   present: Student[],
   random: () => number,
+  nodeCap: number,
 ): { ok: true; groups: number[][] } | { ok: false; error: GroupingError } {
   const largestGroup = Math.max(...localSizes);
   for (const block of localBlocks) {
@@ -1453,7 +1478,7 @@ function placeSexSide(
 
   const apartInPlay = localAdj.some((conflicts) => conflicts.size > 0);
   if (apartInPlay) {
-    const clique = largestMutualConflict(localAdj);
+    const clique = largestMutualConflict(localAdj, nodeCap);
     if (clique.length > localSizes.length) {
       return {
         ok: false,
@@ -1478,6 +1503,7 @@ function placeSexSide(
     random,
     present,
     'separate',
+    nodeCap,
   );
 
   if (placed === null) {
@@ -1567,6 +1593,8 @@ function buildSeparateGroups(
   mode: Mode,
   leftovers: Leftovers,
   random: () => number,
+  nodeCap: number,
+  planOnly: boolean,
 ): GroupingOutcome {
   const sexOfBlock = (b: number): 'M' | 'F' =>
     present[blocks[b][0]].sex as 'M' | 'F';
@@ -1665,6 +1693,14 @@ function buildSeparateGroups(
       }
     }
 
+    // A plan stops here, with every size decided and nobody placed (#743).
+    if (planOnly) {
+      return {
+        ok: true,
+        groups: attempts.flatMap((a) => a.sizes.map((): Student[] => [])),
+        warnings,
+      };
+    }
     const resultGroups: Student[][] = [];
     for (const attempt of attempts) {
       const localBlocks = attempt.idx.map((b) => blocks[b]);
@@ -1675,6 +1711,7 @@ function buildSeparateGroups(
         localAdj,
         present,
         random,
+        nodeCap,
       );
       if (!outcome.ok) return { ok: false, error: outcome.error };
       for (const g of outcome.groups) {
@@ -1694,6 +1731,7 @@ function buildSeparateGroups(
     groups: Student[][];
     warnings: GroupingWarning[];
   }): GroupingOutcome => {
+    if (planOnly) return succeed(attempt.groups, attempt.warnings);
     const slots = shuffled(
       attempt.groups.map((_, i) => i),
       random,
@@ -1846,7 +1884,41 @@ function restoreWholeClassCount(
   }
 }
 
+/**
+ * The groups the deal will make from `input`, known before it runs (#743):
+ * each pinned group with its members, then one EMPTY group per group the
+ * deal would place, so the board can show a card for each while it waits for
+ * the first shuffle. `null` where the deal refuses before it places anyone.
+ * It is the deal's own code stopped at the placement boundary, so the count
+ * shown and the count dealt cannot disagree; a refusal only placing can find
+ * (a search that gives up, no arrangement that keeps the rules) is the
+ * deal's to report.
+ */
+export function plannedGroups(
+  input: Omit<GroupingInput, 'random' | 'searchNodeCap'>,
+): Student[][] | null {
+  const planned = deal(
+    {
+      ...input,
+      random: () => {
+        throw new Error('a plan never reaches placement');
+      },
+    },
+    true,
+  );
+  return planned.ok ? planned.result.groups : null;
+}
+
 export function buildGroups(input: GroupingInput): GroupingOutcome {
+  return deal(input, false);
+}
+
+/**
+ * The deal. With `planOnly` it stops where placement starts and returns the
+ * pinned groups followed by one EMPTY group per group it would place, having
+ * drawn nothing from `random` (#743).
+ */
+function deal(input: GroupingInput, planOnly: boolean): GroupingOutcome {
   // Counted before it is built. Past this line the roster exists in memory,
   // so this is the only place the size can still be refused cheaply.
   if (requestedSize(input.students) > MAX_STUDENTS) {
@@ -1959,6 +2031,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   }
 
   const { mode, leftovers, random } = input;
+  const nodeCap = input.searchNodeCap ?? SEARCH_NODE_CAP;
   if (
     mode.kind === 'perGroup' &&
     (!Number.isInteger(mode.size) || mode.size < 1)
@@ -2296,7 +2369,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   // attempt's own local adjacency and sizes -- see `placeSexSide`. (Task 9:
   // `poolSizes`, same reasoning as togetherUnitTooLarge above.)
   if (input.sexMode !== 'separate' && apartInPlay) {
-    const clique = largestMutualConflict(adj);
+    const clique = largestMutualConflict(adj, nodeCap);
     if (clique.length > poolSizes.length) {
       return fail({
         code: ERROR_CODES.keepApartImpossible,
@@ -2357,6 +2430,8 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
       poolMode,
       leftovers,
       random,
+      nodeCap,
+      planOnly,
     );
     if (!outcome.ok) {
       // Whole-branch review, C-1. See `restoreWholeClassCount`'s own doc
@@ -2378,6 +2453,13 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
   // Fix round 1's sort caused). `adj` is real now: a block-vs-block conflict
   // can and does turn away a placement that capacity alone would have
   // allowed, in both passes. (Task 9: pool and poolSizes, not present/sizes.)
+  if (planOnly) {
+    return succeed(
+      [...pinnedGroups, ...poolSizes.map((): Student[] => [])],
+      warnings,
+    );
+  }
+
   const { groups: placed, gaveUp } = placeBlocks(
     blocks,
     poolSizes,
@@ -2385,6 +2467,7 @@ export function buildGroups(input: GroupingInput): GroupingOutcome {
     random,
     pool,
     input.sexMode,
+    nodeCap,
   );
   if (placed === null) {
     // Two different failures, and the difference is everything. The search

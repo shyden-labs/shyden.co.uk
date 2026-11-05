@@ -1,0 +1,10 @@
+# Local only: the functions-runtime tests' D1 (#97). Never at the repository
+# root, where Pages would take it as both projects' source of truth and
+# displace their dashboard bindings (spec section 11, assumption 2).
+name = "shyden-site-functions-test"
+compatibility_date = "2026-09-30"
+
+[[d1_databases]]
+binding = "REPORTS"
+database_name = "reports-local"
+database_id = "00000000-0000-4000-8000-000000000097"

@@ -2,6 +2,7 @@ import type { Student } from './grouping';
 import type { Strings } from './i18n';
 import { MAX_ROSTER } from './roster';
 import { CSV_LOCALES, type Locale, type CsvColumn } from './csv-locale';
+import { LOCALES } from './i18n/locales';
 
 /**
  * The CSV format: writing it here, reading it in the parser below (Task 3).
@@ -177,12 +178,6 @@ export function safeFilePart(className: string): string {
   return className.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
 }
 
-/** The four filenames, per design spec section 9's own examples. */
-const FILE_KIND: Record<'class-list' | 'groups', Record<Locale, string>> = {
-  'class-list': { en: 'class-list', id: 'daftar-kelas' },
-  groups: { en: 'groups', id: 'kelompok' },
-};
-
 /**
  * `7B-class-list-2026-08-06.csv`, or `class-list-2026-08-06.csv` unnamed.
  *
@@ -196,7 +191,10 @@ export function fileName(
   locale: Locale,
 ): string {
   const safe = safeFilePart(className);
-  return [safe, FILE_KIND[kind][locale], on].filter(Boolean).join('-') + '.csv';
+  return (
+    [safe, CSV_LOCALES[locale].fileName[kind], on].filter(Boolean).join('-') +
+    '.csv'
+  );
 }
 
 /**
@@ -393,9 +391,21 @@ export function parseRoster(
     };
   }
 
-  /** Column index by our own key, via the locale's header word. */
-  const indexOf = (column: CsvColumn): number =>
-    header.indexOf(table.columns[column].toLowerCase());
+  /**
+   * Column index by our own key, via the locale's header word -- then via
+   * any word this locale used to write, so a file exported before a header
+   * was corrected still reads (#252). Current word wins, always.
+   */
+  const indexOf = (column: CsvColumn): number => {
+    for (const word of [
+      table.columns[column],
+      ...(table.supersededColumns?.[column] ?? []),
+    ]) {
+      const found = header.indexOf(word.toLowerCase());
+      if (found !== -1) return found;
+    }
+    return -1;
+  };
 
   const numberAt = indexOf('number');
   if (numberAt === -1) {
@@ -413,7 +423,10 @@ export function parseRoster(
       problems: [
         {
           row: null,
-          message: t.csvProblemTooMany(dataRows.length, MAX_ROSTER),
+          message: t.csvProblemTooMany({
+            found: dataRows.length,
+            max: MAX_ROSTER,
+          }),
         },
       ],
     };
@@ -436,14 +449,20 @@ export function parseRoster(
     const rawNumber = (cells[numberAt] ?? '').trim();
     let number: number | null = null;
     if (rawNumber === '') {
-      problem(t.csvProblemNumberBlank(rowNumber));
+      problem(t.csvProblemNumberBlank({ row: rowNumber }));
     } else if (!/^\d+$/.test(rawNumber)) {
-      problem(t.csvProblemNumberNotWhole(rowNumber, rawNumber));
+      problem(t.csvProblemNumberNotWhole({ row: rowNumber, value: rawNumber }));
     } else {
       number = Number(rawNumber);
       const first = claimedBy.get(number);
       if (first !== undefined) {
-        problem(t.csvProblemDuplicateNumber(rowNumber, number, first));
+        problem(
+          t.csvProblemDuplicateNumber({
+            row: rowNumber,
+            value: number,
+            firstRow: first,
+          }),
+        );
       } else {
         claimedBy.set(number, rowNumber);
       }
@@ -457,7 +476,11 @@ export function parseRoster(
       else if (upper === table.sex.F.toUpperCase()) sex = 'F';
       else
         problem(
-          t.csvProblemSex(rowNumber, rawSex, `${table.sex.M}, ${table.sex.F}`),
+          t.csvProblemSex({
+            row: rowNumber,
+            value: rawSex,
+            accepted: `${table.sex.M}, ${table.sex.F}`,
+          }),
         );
     }
 
@@ -469,11 +492,11 @@ export function parseRoster(
       else if (lower === table.absentNo.toLowerCase()) absent = false;
       else
         problem(
-          t.csvProblemAbsent(
-            rowNumber,
-            rawAbsent,
-            `${table.absentYes}, ${table.absentNo}`,
-          ),
+          t.csvProblemAbsent({
+            row: rowNumber,
+            value: rawAbsent,
+            accepted: `${table.absentYes}, ${table.absentNo}`,
+          }),
         );
     }
 
@@ -485,7 +508,13 @@ export function parseRoster(
       const raw = at(cells, column);
       if (raw === '') return null;
       if (!/^\p{L}$/u.test(raw)) {
-        problem(t.csvProblemLetter(rowNumber, table.columns[column], raw));
+        problem(
+          t.csvProblemLetter({
+            row: rowNumber,
+            column: table.columns[column],
+            value: raw,
+          }),
+        );
         return null;
       }
       return raw.toUpperCase();
@@ -512,10 +541,10 @@ export function parseRoster(
 
 /**
  * Which language a file is written in, from its headers alone — or `null`
- * when it is neither.
+ * when no one locale's words lead.
  *
- * This is only possible because of the invariant `csv-locale.ts` asserts:
- * the two tables share NO header word. That is why a design rule and not a
+ * This is only possible because of the invariant `csv.test.ts` asserts over
+ * every pair of locales: no two tables share a header word. That is why a design rule and not a
  * nicety, and it is why detection needs no guessing from content.
  *
  * The header row is the FIRST non-comment record, so a student called
@@ -548,8 +577,13 @@ export function detectLocale(text: string): Locale | null {
 
   const score = (locale: Locale): number => {
     const table = CSV_LOCALES[locale];
+    // Superseded words count too: a file is no less Indonesian for having
+    // been exported before one of its headers was corrected.
     const words = new Set(
-      Object.values(table.columns).map((w) => w.toLowerCase()),
+      [
+        ...Object.values(table.columns),
+        ...Object.values(table.supersededColumns ?? {}).flat(),
+      ].map((w) => w.toLowerCase()),
     );
     const fromHeader = (header ?? []).filter((h) => words.has(h)).length;
     const fromComment = comments.some((c) =>
@@ -560,10 +594,12 @@ export function detectLocale(text: string): Locale | null {
     return fromHeader + fromComment;
   };
 
-  const en = score('en');
-  const id = score('id');
-  if (en === id) return null;
-  return en > id ? 'en' : 'id';
+  // Every locale, derived: the detector once scored `en` and `id` by name,
+  // so a file in any locale added later came back `null` (#390).
+  const scores = LOCALES.map((locale) => ({ locale, score: score(locale) }));
+  const best = Math.max(...scores.map(({ score }) => score));
+  const leaders = scores.filter(({ score }) => score === best);
+  return best > 0 && leaders.length === 1 ? leaders[0].locale : null;
 }
 
 /**
@@ -597,10 +633,10 @@ export function importFile(
       problems: [
         {
           row: null,
-          message: t.csvWrongLanguage(
-            t.csvLanguageName[found],
-            t.csvLanguageVersion[found],
-          ),
+          message: t.csvWrongLanguage({
+            language: t.csvLanguageName[found],
+            version: t.csvLanguageVersion[found],
+          }),
         },
       ],
     };

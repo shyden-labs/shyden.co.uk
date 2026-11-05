@@ -1,0 +1,213 @@
+/*
+ * Swagger UI held to the site's bar (#781): the docs pages meet the same
+ * rules as every other page (operator decision 2026-10-15), in both themes.
+ *
+ * Every rule is scoped under `#swagger`, the mount point. One id outranks any
+ * chain of Swagger's own class selectors, so these rules win without
+ * `!important` and touch nothing outside the mount. Colours are the site's
+ * tokens only; a theme moves the tokens, so the dark theme needs no rule of
+ * its own here.
+ */
+
+/* Text and grounds: ink on the page's own surfaces, never Swagger's palette. */
+#swagger,
+#swagger * {
+  color: var(--ink);
+  font-family: var(--font-body);
+  border-color: var(--border-strong);
+}
+
+#swagger code,
+#swagger pre,
+#swagger .prop-format,
+#swagger .parameter__type,
+#swagger .parameter__in {
+  font-family: var(--font-mono);
+}
+
+#swagger .swagger-ui,
+#swagger .info,
+#swagger .scheme-container,
+#swagger .opblock,
+#swagger .opblock-section-header,
+#swagger .opblock-body,
+#swagger .responses-inner,
+#swagger .model-box,
+#swagger section.models,
+#swagger .wrapper {
+  background: transparent;
+  box-shadow: none;
+}
+
+#swagger .opblock {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+#swagger .opblock-section-header {
+  background: var(--glass);
+}
+
+/* The method badge: the site's accent pair, the one filled label here. */
+#swagger .opblock-summary-method {
+  background: var(--accent);
+  color: var(--on-accent);
+  min-width: 0;
+}
+
+/* Secondary text: the site's soft ink, which clears AA on every ground. */
+#swagger .parameter__in,
+#swagger .prop-format,
+#swagger .parameter__type,
+#swagger .opblock-summary-description,
+#swagger .response-col_links,
+#swagger .renderedMarkdown p {
+  color: var(--ink-soft);
+}
+
+#swagger .required,
+#swagger .parameter__name.required span,
+#swagger .parameter__name.required::after {
+  color: var(--danger);
+}
+
+/* The version badges: Swagger paints their wrapper, so the ground is reset there too. */
+#swagger .info .title small,
+#swagger .version,
+#swagger .version-stamp,
+#swagger pre.version {
+  background: var(--glass);
+  color: var(--ink);
+}
+
+#swagger a,
+#swagger .info a,
+#swagger .url {
+  color: var(--accent-ink);
+}
+
+/* Controls: the site's surface and border, and room for a finger. */
+#swagger input,
+#swagger select,
+#swagger textarea {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  min-height: 44px;
+  max-width: 100%;
+  /* Under 16px, focusing a field makes iOS Safari zoom the page. */
+  font-size: 1rem;
+}
+
+#swagger input[type='checkbox'] {
+  inline-size: 44px;
+  block-size: 44px;
+  min-height: 0;
+  accent-color: var(--accent);
+}
+
+#swagger button,
+#swagger .btn {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  min-height: 44px;
+  min-width: 44px;
+  box-shadow: none;
+}
+
+#swagger .btn.execute {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+
+#swagger .btn.cancel {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+#swagger .opblock-summary-control,
+#swagger .expand-operation,
+#swagger .opblock-control-arrow {
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+}
+
+#swagger svg {
+  fill: currentColor;
+}
+
+#swagger a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Width: nothing pushes the page sideways; wide things scroll in their box. */
+#swagger .swagger-ui .wrapper {
+  padding: 0;
+  max-width: 100%;
+}
+
+#swagger .opblock-summary {
+  flex-wrap: wrap;
+}
+
+#swagger .opblock-summary-path,
+#swagger .opblock-summary-description,
+#swagger .parameter__name,
+#swagger .renderedMarkdown {
+  overflow-wrap: anywhere;
+}
+
+#swagger table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+#swagger pre,
+#swagger .highlight-code,
+#swagger .microlight {
+  overflow-x: auto;
+  max-width: 100%;
+  background: var(--glass);
+  color: var(--ink);
+}
+
+/*
+ * Try it out's buttons get a full row of their own from the start, on one
+ * line. Swagger adds Reset beside Cancel the moment an edited field loses
+ * focus; when that wrapped onto a new line, Execute moved 30px down between
+ * press and release at 320px and the first tap on it did nothing (#781).
+ */
+#swagger .opblock-section-header {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#swagger .opblock-section-header .try-out {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+/*
+ * On paper a fill prints only when the reader turns background graphics on,
+ * so a label painted --on-accent over --accent would print white on white.
+ * The filled labels print as ink inside an outline instead, as the site's
+ * own filled controls do.
+ */
+@media print {
+  #swagger .opblock-summary-method,
+  #swagger .btn.execute {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+}

@@ -1,6 +1,7 @@
 dist/
 .astro/
 .superpowers/
+.remember/
 node_modules/
 package-lock.json
 public/

@@ -1,0 +1,231 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { type Locale, getSiteStrings } from '../../lib/i18n';
+
+interface Props {
+  lang: Locale;
+}
+const { lang } = Astro.props;
+const t = getSiteStrings(lang).calculators;
+const g = t.glory;
+const gift = t.gift;
+---
+
+<BaseLayout title={t.title} description={t.description} lang={lang}>
+  <section class="wrap">
+    <p class="for-yeetalk">
+      {/* Nominative attribution: text wordmark now; swap in YeeTalk's official
+           logo asset when sourced (spec §6/§11). Do not fabricate their mark. */}
+      <a
+        href="https://yeetalkapp.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {t.forYeetalk}
+      </a>
+    </p>
+    <h1>{t.heading}</h1>
+    <p class="lead">{t.lead}</p>
+    <p class="jump">
+      <a href="#glory-points">{g.heading}</a>
+      <a href="#gift-value">{gift.heading}</a>
+    </p>
+    <section id="glory-points" aria-labelledby="glory-heading">
+      <h2 id="glory-heading" class="section-heading">
+        {g.heading}
+      </h2>
+      <div class="how-to">
+        <h3 id="how-to-heading">{g.howToHeading}</h3>
+        <ol aria-labelledby="how-to-heading">
+          {g.howToSteps.map((step) => (
+            <li>{step}</li>
+          ))}
+        </ol>
+      </div>
+      <div class="card">
+        <label for="glory-input">{g.inputLabel}</label>
+        <input
+          id="glory-input"
+          name="glory"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          aria-describedby="glory-error"
+        />
+        <button id="glory-submit" type="button">
+          {g.calculate}
+        </button>
+        <p
+          id="glory-error"
+          class="error"
+          role="alert"
+          aria-live="assertive"
+        ></p>
+        <p id="glory-result" class="result" aria-live="polite"></p>
+        <noscript>
+          <p class="error">{t.needsJs}</p>
+        </noscript>
+      </div>
+      <p class="assumptions">{g.assumptions}</p>
+    </section>
+    <section id="gift-value" aria-labelledby="gift-heading">
+      <h2 id="gift-heading" class="section-heading">
+        {gift.heading}
+      </h2>
+      <div class="how-to">
+        <h3 id="gift-how-to-heading">{gift.howToHeading}</h3>
+        <ol aria-labelledby="gift-how-to-heading">
+          {gift.howToSteps.map((step) => (
+            <li>{step}</li>
+          ))}
+        </ol>
+      </div>
+      <div class="card">
+        <label for="gift-input">{gift.inputLabel}</label>
+        <input
+          id="gift-input"
+          name="gift"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          aria-describedby="gift-error"
+        />
+        <button id="gift-submit" type="button">
+          {gift.calculate}
+        </button>
+        <p id="gift-error" class="error" role="alert" aria-live="assertive"></p>
+        <p id="gift-result" class="result" aria-live="polite"></p>
+        <noscript>
+          <p class="error">{t.needsJs}</p>
+        </noscript>
+      </div>
+      <p class="assumptions">{gift.assumptions}</p>
+    </section>
+  </section>
+</BaseLayout>
+<script>
+  import '../../scripts/yeetalk-calculators.ts';
+</script>
+<style>
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 3rem var(--space);
+  }
+  .for-yeetalk {
+    margin: 0 0 0.5rem;
+  }
+  .for-yeetalk a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 44px;
+    padding: 0.15rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .for-yeetalk a:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  /* gap, never a space between the links: a flex container discards it. */
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.5rem;
+    margin: 0 0 1.5rem;
+  }
+  /* The second calculator sits below the first; the jump links land on each
+     section's own top, so the gap belongs to the section, not the card. */
+  section section + section {
+    margin-top: 2.5rem;
+  }
+  .jump a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+  }
+  .section-heading {
+    margin: 0 0 0.75rem;
+    font-size: 1.35rem;
+  }
+  .how-to {
+    margin: 0 0 1.5rem;
+  }
+  .how-to h3 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+  }
+  .how-to ol {
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--ink-soft);
+  }
+  /* Native list flow (no display override) keeps the ordered-list role and
+     numbered markers intact across engines; space the steps with margin so we
+     never blockify the <li> away from `list-item`. */
+  .how-to li {
+    line-height: 1.5;
+  }
+  .how-to li + li {
+    margin-top: 0.35rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+  label {
+    font-weight: 600;
+  }
+  /* The fill and the ink are set EXPLICITLY. Without them the UA's dark-mode
+     default applies — measured at rgb(59 59 59) on white, a light grey box on
+     a --surface card — while the same control on /classroom-groups sits on
+     --bg. A control that inherits its colour from the browser has no palette
+     at all; it just happened to look acceptable on the old light ground. */
+  input {
+    min-height: 44px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 1rem;
+  }
+  button {
+    min-height: 44px;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover {
+    background: var(--accent-ink);
+  }
+  .error {
+    color: var(--danger);
+    min-height: 1.5rem;
+    margin: 0;
+  }
+  .result {
+    font-size: 1.15rem;
+    font-weight: 600;
+    min-height: 1.5rem;
+    margin: 0;
+  }
+  .assumptions {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+</style>

@@ -1,0 +1,92 @@
+# The waiting-reports count (#349). Once a day, count the translation reports
+# waiting in production and, when there are any, say how many in one comment
+# on the notice issue, assigned to the operator. The comment carries the count
+# and nothing else: this repository, its issues and its logs are public.
+#
+# It reads its two secrets in `reports-count`, which accepts `main` alone and
+# holds nothing else: a D1 Read token and the account id. Only released code
+# reads production (#877, the operator's main-only rule for an unattended job):
+# the schedule fires on the default branch, `develop`, so the scheduled run
+# only starts the count on `main`, and the count runs on `main` alone. It runs
+# no npm package code, so no `npm ci`: the script uses Node's own `fetch`, and
+# imports only this repository's own modules. Runbook:
+# docs/runbooks/translation-reports.md.
+name: Waiting reports
+
+on:
+  # 01:17 UTC, 08:17 in WIB: off the hour, where GitHub's scheduler queues most.
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time. Two at once, a dispatch during the scheduled run, could
+# each find no count posted today and each post one. Queued, never cancelled,
+# so no run is cut off mid-count.
+concurrency:
+  group: waiting-reports
+  cancel-in-progress: false
+
+jobs:
+  # Holds no Cloudflare secret and names no environment: it only asks for a
+  # run on main, and says so when it cannot (#882). The count then never runs,
+  # and a count that never runs posts nothing; until the release puts this file
+  # on main, that is every scheduled run. Its failure steps post on the count's
+  # issue, with this run's link, as the count's do: saying the file is not on
+  # main when GitHub answers 404 for it there, and the ordinary notice if not.
+  dispatch:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    # The dispatch needs the first; checkout and the comment the other two.
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Start the count on main
+        run: gh workflow run waiting-reports.yml --ref main
+      - if: failure()
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: failure()
+        uses: ./.github/actions/setup-node
+      - name: Say the count could not be started
+        if: failure()
+        env:
+          NOTICE_ISSUE: '360'
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/waiting-reports.mjs report-failure
+
+  count:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: reports-count
+    # checkout needs the first, the comment the second.
+    permissions:
+      contents: read
+      issues: write
+    env:
+      NOTICE_ISSUE: '360'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Count the waiting reports, and post the count if there are any
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_READ_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+        run: node scripts/waiting-reports.mjs
+      # A job that keeps failing must be seen, not quietly stop notifying.
+      - name: Say the count could not be read
+        if: failure()
+        run: node scripts/waiting-reports.mjs report-failure

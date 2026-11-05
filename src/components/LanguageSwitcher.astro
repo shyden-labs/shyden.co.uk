@@ -1,0 +1,207 @@
+---
+import Flag from './Flag.astro';
+import BetaBadge from './BetaBadge.astro';
+import {
+  LOCALES,
+  localisePath,
+  isBetaLocale,
+  type Locale,
+  getSiteStrings,
+} from '../lib/i18n';
+import { metadataFor } from '../lib/i18n/metadata';
+
+interface Props {
+  lang: Locale;
+  pathname: string;
+}
+const { lang, pathname } = Astro.props;
+
+/**
+ * The language switcher: a flag and the language's own name, per alternative.
+ *
+ * This replaces a single `<a>` labelled `strings.language.switchTo` — one
+ * string meaning "the other language", which is only ever correct while there
+ * is exactly one other. Rendered over two alternatives it labelled both
+ * identically, so a visitor saw the same word twice and could not tell which
+ * was which. `tests/unit/locale-switcher.test.ts` failed on purpose to stop
+ * that shipping; this component is what retires that tripwire.
+ *
+ * No JavaScript of its own. A language switcher is exactly the control a
+ * visitor needs when something else has gone wrong, the theme script included
+ * (#142) — so it is a native `<details>`, the same disclosure the mobile nav
+ * already uses. It works with JS disabled and is keyboard-operable for free:
+ * Enter or Space on the summary opens and closes it. Escape does NOT close it
+ * (measured 2026-10-01 in Chromium, Firefox and WebKit, focus on the summary
+ * and on a link); that would take a script, which this control refuses.
+ *
+ * Each alternative carries `hreflang` and its own `lang`, so a screen reader
+ * announces 中文 in Chinese rather than spelling it out in English.
+ *
+ * Below 720px, where the header also carries the menu button, the summary
+ * shows the language's short code instead of its full name: "Bahasa
+ * Indonesia" ran the Shyden wordmark under the menu button at 320px (#329).
+ * The full name is never lost: the open list names every language, in ONE
+ * order on every page (`LOCALES` order), with the one being read ticked and
+ * marked `aria-current` in its own place. It used to be listed first, which
+ * reordered the list on every language (operator, 2026-09-30, #385). Both
+ * labels are in the markup and CSS picks one, so the switcher still needs no
+ * JavaScript. The summary's accessible name is its `aria-label` either way.
+ */
+const t = getSiteStrings(lang);
+const current = metadataFor(lang);
+const entries = LOCALES.map((code) => ({
+  code,
+  current: code === lang,
+  meta: metadataFor(code),
+  href: localisePath(pathname, code),
+  beta: isBetaLocale(code),
+}));
+---
+
+<details class="lang-switch">
+  <summary aria-label={t.language.label}>
+    <Flag code={current.flag} />
+    <span class="name full">{current.nativeName}</span>
+    <span class="name short">{current.shortName}</span>
+    {isBetaLocale(lang) && <BetaBadge lang={lang} />}
+    <span class="caret" aria-hidden="true"></span>
+  </summary>
+  <ul>
+    {entries.map(({ code, current, meta, href, beta }) =>
+      current ? (
+        <li aria-current="true">
+          <span class="entry">
+            <Flag code={meta.flag} />
+            <span class="name">{meta.nativeName}</span>
+            {beta && <BetaBadge lang={lang} />}
+            <span class="tick" aria-hidden="true"></span>
+          </span>
+        </li>
+      ) : (
+        <li>
+          <a
+            class="entry"
+            href={href}
+            hreflang={code}
+            lang={code}
+            rel="alternate"
+          >
+            <Flag code={meta.flag} />
+            <span class="name">{meta.nativeName}</span>
+            {beta && <BetaBadge lang={lang} />}
+          </a>
+        </li>
+      ),
+    )}
+  </ul>
+</details>
+
+<style>
+  .lang-switch {
+    position: relative;
+    font-size: 0.9rem;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    /* `gap`, never a literal space between inline children: a flex container
+       discards whitespace between items, which has silently eaten separators
+       in this repo before.
+       Half the desktop spacing below 720px. There the summary shares a 288px
+       row with the wordmark and the menu button, and #142's 44px theme
+       switch is to join them. 中文 and ไทย are their own short codes, so for
+       Chinese and Thai this spacing is the only saving: at 8px, Chinese ran
+       12px short of room for the switch; at 4px it has 8px spare (#329). */
+    gap: 0.25rem;
+    min-height: 44px;
+    padding: 0 0.25rem;
+    /* A label never wraps. Squeezed, 中文 breaks between its two characters,
+       and 中 stacked over 文 is not a label; it also fits a row that has no
+       room, so nothing overlaps and the squeeze goes unseen. Unwrapped, a
+       label that does not fit runs out of the row, where the header's
+       geometry guard sees it (#329, mutation M3). */
+    white-space: nowrap;
+    cursor: pointer;
+    list-style: none;
+    border-radius: 4px;
+  }
+  /* Mobile-first: the short code, then the full name from 720px -- the same
+     width at which Header.astro swaps the menu button for the nav. */
+  summary .full {
+    display: none;
+  }
+  @media (min-width: 720px) {
+    summary {
+      gap: 0.5rem;
+      padding: 0 0.5rem;
+    }
+    summary .full {
+      display: inline;
+    }
+    summary .short {
+      display: none;
+    }
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:hover,
+  summary:focus-visible {
+    background: var(--surface);
+  }
+  .caret {
+    width: 0;
+    height: 0;
+    border-left: 0.28em solid transparent;
+    border-right: 0.28em solid transparent;
+    border-top: 0.32em solid currentColor;
+  }
+  [open] > summary .caret {
+    transform: rotate(180deg);
+  }
+  ul {
+    position: absolute;
+    right: 0;
+    z-index: 20;
+    margin: 0.25rem 0 0;
+    padding: 0.25rem;
+    list-style: none;
+    min-width: max-content;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  }
+  .entry {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 0.75rem;
+    white-space: nowrap;
+    border-radius: 4px;
+  }
+  a.entry {
+    text-decoration: none;
+    color: inherit;
+  }
+  a.entry:hover,
+  a.entry:focus-visible {
+    background: var(--surface);
+  }
+  /* The language being read. Drawn, not typed: a check-mark glyph would fall
+     back to whatever font the visitor has, and the caret beside the summary
+     is drawn the same way. */
+  .tick {
+    flex: none;
+    width: 0.35em;
+    height: 0.65em;
+    margin-inline-start: auto;
+    border: solid var(--accent-ink);
+    border-width: 0 2px 2px 0;
+    transform: translateY(-0.1em) rotate(45deg);
+  }
+  .name {
+    line-height: 1;
+  }
+</style>

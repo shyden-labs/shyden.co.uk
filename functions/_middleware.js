@@ -23,12 +23,17 @@
 import {
   isProdHostname,
   wwwRedirectLocation,
+  legacyPathRedirectLocation,
   blockingRobotsBody,
   noIndexHeaderValue,
   basicAuthOk,
   basicAuthChallenge,
 } from './_lib/lockdown.js';
+import { accessOk, privatePath } from './_lib/access.js';
 
+/**
+ * @param {{ request: Request, env: Record<string, string | undefined>, next: () => Promise<Response> }} context
+ */
 export const onRequest = async ({ request, env, next }) => {
   const url = new URL(request.url);
   const hostname = url.hostname;
@@ -44,8 +49,25 @@ export const onRequest = async ({ request, env, next }) => {
     });
   }
 
-  // Prod = pass through untouched. The gate exists for dev / preview only.
+  // Moved page (#635): /glory-points answers 301 to /yeetalk-calculators on
+  // every host, before the auth gate, so an old bookmark never meets a 401.
+  const legacyTarget = legacyPathRedirectLocation(url);
+  if (legacyTarget) {
+    return new Response(null, {
+      status: 301,
+      headers: { Location: legacyTarget },
+    });
+  }
+
+  // Prod passes through, but for its private paths: those need a Cloudflare
+  // Access sign-in, checked here as well as at the edge (#781). Dev keeps its
+  // own gate below for every path.
   if (isProdHostname(hostname)) {
+    if (privatePath(url.pathname) && !(await accessOk(request, env)))
+      return new Response(null, {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     return next();
   }
 

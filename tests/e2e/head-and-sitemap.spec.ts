@@ -1,5 +1,23 @@
 import { test, expect } from './fixtures';
+import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
+import { LOCALES, localisePath } from '../../src/lib/i18n/index';
+import { filesUnder, searched } from '../source-files';
+import { PUBLISHED_ROUTES } from './published-paths';
+import { docsPaths } from '../site-pages';
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 
+/**
+ * The hreflang set every page in the sitemap must declare.
+ *
+ * Derived from `LOCALE_METADATA.ogLocale` (`en_GB` -> `en-GB`) rather than a
+ * second table: that table exists precisely because five separate places used
+ * to decide what a locale meant, and each was silently correct for two
+ * languages and wrong for the third.
+ */
+const EXPECTED_ALTERNATES = LOCALES.map((locale) =>
+  LOCALE_METADATA[locale].ogLocale.replace('_', '-'),
+).sort();
 test.describe('the sitemap', () => {
   test('lists every page and pairs the two languages', async ({ request }) => {
     // Nothing tested the sitemap's CONTENTS: seo.spec.ts only checked that
@@ -9,14 +27,27 @@ test.describe('the sitemap', () => {
       new URL(m[1]).pathname.replace(/\/$/, ''),
     );
 
-    expect(locs.sort()).toEqual([
-      '',
-      '/classroom-groups',
-      '/glory-points',
-      '/id',
-      '/id/classroom-groups',
-      '/id/glory-points',
-    ]);
+    // Every page the build wrote, not a list. The guards that visit "every
+    // published page" generate one test per entry of PUBLISHED_ROUTES, which
+    // rendered-text.spec.ts holds to this sitemap (#422), so this is the one
+    // check that the sitemap is complete; a hand-written
+    // list of three pages could only agree with itself, and a fourth page
+    // the sitemap left out would have been invisible to all of them (#390
+    // F126). The 404 and the API docs (#781) are the pages deliberately left
+    // out. Read here, not at module scope: the web server rebuilds dist/
+    // after this file loads.
+    const built = filesUnder('dist', (path) => /\.html$/.test(path))
+      .filter((path) => path !== 'dist/404.html')
+      .filter((path) => !path.startsWith('dist/api/docs/'))
+      .map((path) => path.replace(/^dist/, '').replace(/\/?index\.html$/, ''));
+    expect(locs.sort()).toEqual(built.sort());
+
+    // And every page in every locale is among them: a hand-written list of
+    // six was correct for two languages and silently wrong the moment #22
+    // added three more.
+    for (const locale of LOCALES)
+      for (const page of ['/', '/classroom-groups', '/yeetalk-calculators'])
+        expect(built).toContain(localisePath(page, locale).replace(/\/$/, ''));
   });
 
   test('declares the language relationships search engines need', async ({
@@ -28,8 +59,34 @@ test.describe('the sitemap', () => {
     // versions of a page looked like unrelated near-duplicates.
     const xml = await (await request.get('/sitemap-0.xml')).text();
     expect(xml).toContain('xhtml:link');
-    expect(xml).toContain('hreflang="en-GB"');
-    expect(xml).toContain('hreflang="id-ID"');
+
+    // Asserted PER <url>, against a set derived from LOCALE_METADATA.
+    //
+    // This read `toContain('hreflang="en-GB"')` and `id-ID` — two names
+    // written by hand, matched anywhere in the file, agreeing with a config
+    // that also named those two by hand. Two hand-written lists agreeing with
+    // each other is not a check: nine of fifteen URLs (`/zh/*`, `/vi/*`,
+    // `/th/*`) carried NO alternates at all and it passed. See #108, and #104
+    // for the same drift in the 404.
+    const blocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
+    expect(
+      blocks.length,
+      'no <url> blocks — the parse is broken',
+    ).toBeGreaterThan(0);
+    const short = (url: string) => url.replace('https://shyden.co.uk', '');
+    const wrong = blocks
+      .map((block) => ({
+        loc: short(/<loc>([^<]*)<\/loc>/.exec(block)?.[1] ?? '?'),
+        langs: [...block.matchAll(/hreflang="([^"]+)"/g)]
+          .map((m) => m[1])
+          .sort(),
+      }))
+      .filter((u) => u.langs.join() !== EXPECTED_ALTERNATES.join())
+      .map((u) => `${u.loc} -> ${u.langs.join(',') || 'NONE'}`);
+    expect(
+      searched(wrong, { of: blocks, what: 'sitemap <url> blocks' }),
+      `expected every page to declare ${EXPECTED_ALTERNATES.join(',')}`,
+    ).toEqual([]);
 
     // Each entry pairs with its own translation, not with the homepage.
     const groups = xml.split('<url>').slice(1);
@@ -39,6 +96,43 @@ test.describe('the sitemap', () => {
     expect(tool).toBeDefined();
     expect(tool).toContain('href="https://shyden.co.uk/id/classroom-groups/"');
   });
+});
+
+test.describe('the API docs head (#781)', () => {
+  for (const path of docsPaths())
+    test(`${path} asks not to be indexed, and claims no other language`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+        'content',
+        'noindex',
+      );
+      await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    });
+});
+
+test.describe('each API spec is served only inside its own page (#781)', () => {
+  // The private spec has no URL of its own: it reaches visitors only inside
+  // the page the middleware gates. A spec imported by a script would land in
+  // a public /_astro/ chunk instead, so every built file is read.
+  for (const [spec, page] of [
+    ['openapi/report.yaml', 'dist/api/docs/index.html'],
+    ['openapi/report-health.yaml', 'dist/api/docs/private/index.html'],
+  ] as const)
+    test(`${spec} appears in ${page} and nowhere else`, () => {
+      const said = (
+        parse(readFileSync(spec, 'utf8')) as { info: { description: string } }
+      ).info.description.slice(0, 40);
+      const built = filesUnder('dist', () => true);
+      const holding = built.filter((path) =>
+        readFileSync(path, 'latin1').includes(said),
+      );
+      // Equality with one page: a read that saw nothing fails as surely as a
+      // spec that leaked.
+      expect(holding).toEqual([page]);
+    });
 });
 
 test.describe('the 404 head', () => {
@@ -63,55 +157,46 @@ test.describe('the 404 head', () => {
     await page.goto('/classroom-groups');
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
     await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
-    await expect(page.locator('link[rel="alternate"]')).toHaveCount(3);
+    // One per locale plus `x-default`, derived: this read 3 while the site
+    // shipped two languages, and 3 is not a fact about the page — it is
+    // LOCALES.length + 1, and it was going to be wrong on the next language.
+    await expect(page.locator('link[rel="alternate"]')).toHaveCount(
+      LOCALES.length + 1,
+    );
   });
 });
 
-test.describe('skip link — WCAG 2.4.1', () => {
-  for (const [path, label] of [
-    ['/', 'Skip to content'],
-    ['/id/', 'Lewati ke konten'],
-    ['/classroom-groups', 'Skip to content'],
-    ['/id/classroom-groups', 'Lewati ke konten'],
-    ['/definitely-not-a-page', 'Skip to content'],
-  ] as const) {
-    test(`${path} offers it, in the page's language`, async ({ page }) => {
+/**
+ * The viewport every page has to declare, as `BaseLayout.astro` does.
+ *
+ * Without it a mobile browser lays the page out at a legacy desktop width
+ * (980px on the Android phone, measured on `about:blank`, which has no tag),
+ * and the visitor sees every page zoomed out. No test asserted it before #233.
+ *
+ * `interactive-widget=resizes-content` (#807, operator 2026-10-18): Android
+ * Chrome's keyboard otherwise covers the bottom of the page without shrinking
+ * it, and `/classroom-groups`' docked Make Groups bar sat hidden behind the
+ * keyboard while a teacher typed (bar at 703 px, 471 px left visible, measured
+ * on the phone). Safari ignores the key.
+ */
+const DEVICE_WIDTH =
+  'width=device-width, initial-scale=1, interactive-widget=resizes-content';
+
+test.describe('every published page', () => {
+  // One test per published page (#422); `the published routes are the
+  // sitemap's` in rendered-text.spec.ts holds the list to the build.
+  for (const path of PUBLISHED_ROUTES)
+    test(`${path}: declares exactly one viewport, at the device width`, async ({
+      page,
+    }) => {
       await page.goto(path);
-      await expect(page.locator('.skip-link')).toHaveText(label);
+      // `i`: HTML compares meta names without regard to case, so a second tag
+      // spelled `Viewport` is still a second viewport.
+      const contents = await page
+        .locator('meta[name="viewport" i]')
+        .evaluateAll((metas) =>
+          metas.map((meta) => meta.getAttribute('content')),
+        );
+      expect(contents).toEqual([DEVICE_WIDTH]);
     });
-  }
-
-  test('it is the FIRST thing a Tab reaches', async ({ page, browserName }) => {
-    test.skip(
-      browserName === 'webkit',
-      'Safari omits plain links from the Tab sequence unless the visitor opts ' +
-        'in, so a Tab walk here would assert a browser preference rather than ' +
-        'our markup. The link itself is asserted for WebKit in the test below.',
-    );
-    // The whole point of the link, on the page where it matters most:
-    // without it a keyboard user crosses the wordmark, the hamburger, the
-    // language switcher and three nav links before the first form field.
-    await page.goto('/classroom-groups');
-    await page.keyboard.press('Tab');
-    await expect(page.locator(':focus')).toHaveClass(/skip-link/);
-  });
-
-  test('it becomes visible when focused, and lands on the content', async ({
-    page,
-  }) => {
-    // Asserted on EVERY engine, WebKit included: focusability and the jump
-    // are our markup, and only the Tab ORDER is the browser's preference.
-    await page.goto('/classroom-groups');
-    const link = page.locator('.skip-link');
-
-    // Off-screen until focused, which is the only time it is any use — and
-    // `display: none` would have made it unfocusable, i.e. not a skip link.
-    await expect(link).not.toBeInViewport();
-    await link.focus();
-    await expect(link).toBeInViewport();
-
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/#main$/);
-    await expect(page.locator(':focus')).toHaveAttribute('id', 'main');
-  });
 });

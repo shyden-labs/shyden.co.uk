@@ -1,4 +1,37 @@
-import { expect, type Page } from '@playwright/test';
+import { setCheckedOn, tapOn } from '../real-touch';
+import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
+import {
+  expect,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from '@playwright/test';
+import { contrast, over, paintedGround, parseColour } from '../wcag';
+import {
+  deviceDownloadText,
+  emptyDeviceDownloads,
+  onRealDevice,
+} from '../device/device-downloads';
+import {
+  getStrings,
+  localeFromPath,
+  type Strings,
+} from '../../src/lib/i18n/index';
+import { chooseSpeed } from '../make-groups';
+
+/**
+ * The catalogue of the language the page is showing, read off its URL.
+ *
+ * The roster helpers named their controls by an English-or-Indonesian
+ * pattern (`/Sex|Jenis kelamin/`), written when those were the only two
+ * locales, so none of them could drive zh, vi or th, and a layout test on
+ * those pages could not even open the roster (#390 F113). Exact catalogue
+ * labels are stricter too: a substring pattern for "Add" also matches
+ * "+ Add student".
+ */
+const stringsOf = (page: Page): Strings =>
+  getStrings(localeFromPath(new URL(page.url()).pathname));
 
 /**
  * Fixtures for driving the roster into a starting state -- Stage 3, 4 and 5
@@ -22,8 +55,43 @@ import { expect, type Page } from '@playwright/test';
  */
 export const openRoster = async (page: Page, path = '/classroom-groups') => {
   await page.goto(path);
-  await page.locator('#cg-students-toggle').click();
-  await page.getByRole('button', { name: /Add student|Tambah siswa/ }).click();
+  await tapOn(page.locator('#cg-students-toggle'));
+  await tapOn(
+    page.getByRole('button', {
+      name: stringsOf(page).rosterAddStudent,
+      exact: true,
+    }),
+  );
+};
+
+/**
+ * The board put up before any shuffle (#743): `count` students by `size`,
+ * waiting with their empty cards. A helper, as `openRoster` is, so a spec
+ * that only captures the result (`visual.spec.ts`) acts through it.
+ */
+export const openWaitingBoard = async (
+  page: Page,
+  count: string,
+  size: string,
+  speed?: 'normal' | 'fast' | 'skip',
+) => {
+  await page.goto('/classroom-groups');
+  await typeInto(page.locator('#cg-count'), count);
+  await typeInto(page.locator('#cg-size'), size);
+  // #744: a board Shuffle travels unless the speed is Skip, so a test that
+  // presses it says which it means; left out, the page's default stands.
+  if (speed) await chooseSpeed(page, speed);
+  // Settled before anything acts on it, as a person would (#1007).
+  await openBoard(page);
+  await expect(page.locator('#cg-board .waiting-student')).toHaveCount(
+    Number(count),
+  );
+};
+
+/** Visible copy is both: `toHaveText` alone passes on a hidden element. */
+export const expectVisibleText = async (target: Locator, text: string) => {
+  await expect(target).toBeVisible();
+  await expect(target).toHaveText(text);
 };
 
 /**
@@ -41,19 +109,56 @@ export const openRoster = async (page: Page, path = '/classroom-groups') => {
 export const giveEveryoneASex = async (page: Page, sex: 'M' | 'F' = 'M') => {
   const rows = page.locator('#cg-roster tbody tr');
   for (let i = 0; i < (await rows.count()); i++) {
-    const select = rows.nth(i).getByLabel(/Sex|Jenis kelamin/);
+    const select = rows
+      .nth(i)
+      .getByLabel(stringsOf(page).rosterColSex, { exact: true });
     if ((await select.inputValue()) === '') await select.selectOption(sex);
   }
 };
 
 export const addSeveral = async (page: Page, howMany: number) => {
-  await page
-    .getByRole('button', { name: /Add several|Tambah beberapa/ })
-    .click();
-  await page
-    .getByLabel(/How many to add\?|Berapa yang ditambahkan\?/)
-    .fill(String(howMany));
-  await page.getByRole('button', { name: /^Add$|^Tambah$/ }).click();
+  const t = stringsOf(page);
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddSeveral, exact: true }),
+  );
+  await typeInto(
+    page.getByLabel(t.rosterHowMany, { exact: true }),
+    String(howMany),
+  );
+  await tapOn(
+    page.getByRole('button', { name: t.rosterAddConfirm, exact: true }),
+  );
+};
+
+/**
+ * Assert the Students box reports `expected`, in a way the markup alone
+ * cannot satisfy.
+ *
+ * `#cg-count` ships a build-time `value=`, so the box already holds a number
+ * before a line of script runs. Three assertions expected the very number it
+ * ships and passed with `updateStudentsBox`'s write removed (#193) -- guarded
+ * the whole time by a comment that named this exact hazard and then went
+ * stale when the shipped default moved onto the number they expected.
+ *
+ * So the control is not a second literal, which would rot the same way.
+ * Assigning `.value` sets the IDL property and never rewrites the content
+ * attribute, so the live page still carries its own shipped default and
+ * `getAttribute('value')` reads it back from the element under test. The
+ * control runs FIRST: an expectation that cannot distinguish a written value
+ * from an untouched one should say so, rather than be masked by whichever
+ * assertion happens to fail after it (#156).
+ */
+export const expectStudentsBoxReports = async (
+  box: Locator,
+  expected: number,
+) => {
+  const shipped = await box.getAttribute('value');
+  expect(
+    String(expected),
+    `the box ships value="${shipped}", so expecting ${expected} cannot tell a ` +
+      'value written from the roster from the untouched markup',
+  ).not.toBe(shipped);
+  await expect(box).toHaveValue(String(expected));
 };
 
 /**
@@ -68,16 +173,21 @@ export const addSeveral = async (page: Page, howMany: number) => {
  * consumer-to-be, not a hypothetical one, so the same rule that already
  * governs `openRoster`/`addSeveral` applies to this one too.
  */
-export const markAbsent = async (page: Page) => {
-  await openRoster(page);
-  await page.locator('.cg-student').first().getByLabel('Absent').check();
+export const markAbsent = async (page: Page, path = '/classroom-groups') => {
+  await openRoster(page, path);
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .first()
+      .getByLabel(stringsOf(page).rosterColAbsent),
+  );
 };
 
 export const setSex = async (page: Page, row: number, sex: 'M' | 'F') =>
   page
     .locator('.cg-student')
     .nth(row)
-    .getByLabel(/Sex|Jenis kelamin/)
+    .getByLabel(stringsOf(page).rosterColSex, { exact: true })
     .selectOption(sex);
 
 /** [sex, name] per student, in order. The one builder every later suite uses. */
@@ -90,8 +200,15 @@ export const buildRoster = async (
   if (students.length > 1) await addSeveral(page, students.length - 1);
   for (const [i, [sex, name]] of students.entries()) {
     const row = page.locator('.cg-student').nth(i);
-    if (name) await row.getByLabel(/Name|Nama/).fill(name);
-    if (sex) await row.getByLabel(/Sex|Jenis kelamin/).selectOption(sex);
+    if (name)
+      await typeInto(
+        row.getByLabel(stringsOf(page).rosterColName, { exact: true }),
+        name,
+      );
+    if (sex)
+      await row
+        .getByLabel(stringsOf(page).rosterColSex, { exact: true })
+        .selectOption(sex);
   }
   await expect(page.locator('.cg-student')).toHaveCount(students.length);
 };
@@ -123,19 +240,10 @@ export const withGroups = async (
   path = '/classroom-groups',
 ) => {
   await rosterOf(page, n, path);
-  // "Make Groups" / "Buat Kelompok" -- capital-for-capital (en.ts's own
-  // `makeGroups`/id.ts's own `makeGroups`). A case-SENSITIVE regex name
-  // (no `i` flag) is matched against the accessible name exactly as
-  // Playwright computes it -- `escapeRegexForSelector` in Playwright's own
-  // source passes a regex through unchanged, flags and all -- so the
-  // lowercase `groups`/`kelompok` this line used to carry could never match
-  // either button. Found by tracing that matching path, not assumed;
-  // confirmed directly against a real page before this fix. This helper had
-  // no call site anywhere in the suite yet (grep confirmed it: `withGroups(`
-  // -- zero hits outside its own definition), so the bug was latent, never
-  // exercised, and would have reddened the FIRST test to use it for a
-  // reason that had nothing to do with what that test was checking.
-  await page.getByRole('button', { name: /Make Groups|Buat Kelompok/ }).click();
+  // The page's own `makeGroups`, exactly, in whichever language it shows.
+  await tapOn(
+    page.getByRole('button', { name: stringsOf(page).makeGroups, exact: true }),
+  );
   await expect(page.locator('#cg-results .group').first()).toBeVisible();
 };
 
@@ -160,21 +268,39 @@ export { todayISO } from '../../src/lib/csv';
  * Stage 4's fixtures. ADDED to this file, never started as a second one --
  * see this file's own header for why two versions of a helper is a bug
  * waiting to be blamed on the wrong test.
+ *
+ * The file picker is opened by a real press, as a teacher opens it (#998):
+ * a tap on the phone, a click elsewhere. STAND-IN: the file is then handed
+ * to the chooser that press opened, because the operating system's file
+ * dialog is outside the browser and no test can drive it.
  */
 export const upload = async (page: Page, name: string, body: string) => {
-  await page.locator('#cg-import').setInputFiles({
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    tapOn(page.locator('#cg-import')),
+  ]);
+  await chooser.setFiles({
     name,
     mimeType: 'text/csv',
     buffer: Buffer.from(body, 'utf8'),
   });
 };
 
-/** The bytes a download actually contains, not the button that produced it. */
+/**
+ * The bytes a download actually contains, not the button that produced it.
+ *
+ * On the real phone the file is saved ON THE PHONE, where the Mac-side stream behind
+ * `createReadStream()` cannot reach it, so it is read back over adb instead (#308). The phone's
+ * download folder is emptied first, so the file read back is this download's and cannot be an
+ * earlier one under the same name.
+ */
 export const downloadText = async (page: Page, button: string | RegExp) => {
+  if (onRealDevice()) emptyDeviceDownloads();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
+  if (onRealDevice()) return deviceDownloadText(download);
   const stream = await download.createReadStream();
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
@@ -184,7 +310,7 @@ export const downloadText = async (page: Page, button: string | RegExp) => {
 export const downloadName = async (page: Page, button: string | RegExp) => {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: button }).click(),
+    tapOn(page.getByRole('button', { name: button })),
   ]);
   return download.suggestedFilename();
 };
@@ -229,11 +355,12 @@ export const rosterWithAnAbsence = async (page: Page) => {
     .nth(2)
     .getByLabel(/Apart/)
     .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(3)
-    .getByLabel(/Absent/)
-    .check();
+  await setCheckedOn(
+    page
+      .locator('.cg-student')
+      .nth(3)
+      .getByLabel(/Absent/),
+  );
 };
 
 /** Six boys and two girls — separate mode then cannot give the girls a group. */
@@ -248,9 +375,9 @@ export const rosterForSpillover = async (page: Page) => {
     ['F', 'Gita'],
     ['F', 'Hani'],
   ]);
-  await page.locator('#cg-grouping-toggle').click();
-  await page.getByLabel(/Keep boys and girls separate/).check();
-  await page.getByLabel(/Students in each group/).fill('4');
+  await tapOn(page.locator('#cg-grouping-toggle'));
+  await setCheckedOn(page.getByLabel(/Keep boys and girls separate/));
+  await typeInto(page.getByLabel(/Students in each group/), '4');
 };
 
 export const namesIn = (text: string): string[] =>
@@ -258,9 +385,342 @@ export const namesIn = (text: string): string[] =>
 
 /** Open the print panel from the results section. */
 export const openPrintPanel = async (page: Page) => {
-  await page
-    .getByRole('button', { name: /^(Print|Cetak)$/ })
-    .first()
-    .click();
+  await tapOn(
+    page
+      .getByRole('button', { name: stringsOf(page).printOpen, exact: true })
+      .first(),
+  );
   await expect(page.locator('#cg-print-panel')).toBeVisible();
+};
+
+/**
+ * Press a handover destination by the language's OWN name.
+ *
+ * #21 Stage 3 replaced the single "the other language" button with a
+ * disclosure of one button per language, so reaching a destination is two
+ * clicks: the summary opens the list, and the language's own button is the
+ * gesture that opens the tab.
+ *
+ * Returned as ONE promise deliberately. `window.open` has to run inside that
+ * second click, so every caller arms `waitForEvent('download')` /
+ * `context.waitForEvent('page')` AROUND the whole sequence — passing this
+ * straight into `Promise.all` keeps the waiters registered before the click,
+ * which a two-statement version would not.
+ */
+export const handoverTo = async (page: Page, language: string | RegExp) => {
+  await tapOn(page.locator('#cg-io-both-toggle'));
+  await tapOn(page.getByRole('button', { name: language }));
+};
+
+/**
+ * Refuse every fullscreen request, so the board opens as an overlay.
+ *
+ * The overlay is the board iOS Safari always gets, since it never grants
+ * fullscreen on an arbitrary element, and it is the same layer either way.
+ * A spec whose subject is not fullscreen itself takes this path, because a
+ * GRANTED fullscreen can be taken back by the browser, and the board rightly
+ * closes when that happens (`projector.ts`, `fullscreenchange`). Measured on
+ * macOS WebKit at two workers (#344): a board in a `handoverTo` popup lost
+ * its granted fullscreen in 12 of 81 runs, with no exit asked for by the
+ * page, and closed under the test.
+ *
+ * Takes a context as well as a page, because an init script added to a page
+ * never reaches the popup that page opens.
+ *
+ * A refusal is answered the way a browser answers one: a `fullscreenerror`
+ * on the document, then the rejection. Rejecting alone left `boardSettled`
+ * waiting for an answer that never came (#1007, measured on the Android).
+ */
+export const refuseFullscreen = (target: Page | BrowserContext) =>
+  target.addInitScript(() => {
+    Element.prototype.requestFullscreen = function (this: Element) {
+      return new Promise<void>((_, refuse) =>
+        queueMicrotask(() => {
+          this.dispatchEvent(
+            new Event('fullscreenerror', { bubbles: true, composed: true }),
+          );
+          refuse(new TypeError('Permissions check failed'));
+        }),
+      );
+    };
+  });
+
+/**
+ * Answer the first fullscreen request only once the second one is granted.
+ *
+ * The order a real Android phone gives (#231): the board is opened, left with
+ * Escape before its grant lands, and opened again, and only then do both
+ * grants arrive, the first one first. Measured on CPH2653 in 7 of 40 runs of
+ * the Escape test, where the document stayed out of fullscreen through the
+ * whole first showing.
+ *
+ * So the first request never reaches the browser: its promise is parked, and
+ * the second request's real grant settles it, first, and then the second's
+ * own. The page sees exactly the phone's order, on any engine that grants
+ * fullscreen. Asking the browser for both was tried first, and on the phone
+ * the first grant sometimes landed while the board was closed, with its
+ * answer still parked, so the page could not undo it and the document sat in
+ * fullscreen over a hidden board, swallowing every click: a state this helper
+ * made, not one the page can reach.
+ *
+ * `window.__fullscreenRace` counts what a test waits on instead of a clock:
+ * `answered` rises only after the page's own handler for that answer has
+ * run (registered a microtask after the page registers its own), and
+ * `exitsAsked` counts every `exitFullscreen` the page calls.
+ */
+export const holdFirstGrantUntilTheNext = (page: Page) =>
+  page.addInitScript(() => {
+    const race = { answered: 0, exitsAsked: 0 };
+    (window as unknown as { __fullscreenRace: typeof race }).__fullscreenRace =
+      race;
+    const realExit = Document.prototype.exitFullscreen;
+    Document.prototype.exitFullscreen = function () {
+      race.exitsAsked += 1;
+      return realExit.call(this);
+    };
+    const real = Element.prototype.requestFullscreen;
+    const counted = (answer: Promise<void>) => {
+      queueMicrotask(() => {
+        const done = () => {
+          race.answered += 1;
+        };
+        answer.then(done, done);
+      });
+      return answer;
+    };
+    let first: { grant: () => void; refuse: (error: unknown) => void } = {
+      grant: () => {},
+      refuse: () => {},
+    };
+    let calls = 0;
+    Element.prototype.requestFullscreen = function (options) {
+      calls += 1;
+      if (calls === 1) {
+        return counted(
+          new Promise<void>((grant, refuse) => {
+            first = { grant, refuse };
+          }),
+        );
+      }
+      const granted = real.call(this, options);
+      if (calls === 2) {
+        // Settled from the grant's own reaction, registered before the
+        // second answer's, so the first showing's handler runs first.
+        granted.then(first.grant, first.refuse);
+        return counted(granted.then(() => undefined));
+      }
+      return granted;
+    };
+  });
+
+/**
+ * Land the first fullscreen grant while the board is closed, and hold the
+ * page's own exit that undoes it.
+ *
+ * The neighbouring order to `holdFirstGrantUntilTheNext`'s: the board is
+ * opened and left with Escape before its grant lands, the grant then lands in
+ * the gap, and the page undoes it (`projector.ts`, the `!open` branch). Logged
+ * on CPH2653 in 6 of 105 runs, with that exit landing 11.7 to 33.4 ms after
+ * the call. While it is in flight the document is still in fullscreen, over a
+ * board that is hidden.
+ *
+ * The first request is parked until `landFirst()` passes it to the browser,
+ * inside the click's transient activation, so the grant is a real one. The
+ * first `exitFullscreen` the page asks for is parked until `releaseExit()`,
+ * so the in-flight window lasts as long as the test needs to act inside it.
+ * `window.__tidyUpRace` counts what a test waits on instead of a clock.
+ */
+export const holdTheTidyUpExit = (page: Page) =>
+  page.addInitScript(() => {
+    const race = { firstAnswered: false, exitsAsked: 0, exitHeld: false };
+    const controls = {
+      race,
+      landFirst: () => {},
+      releaseExit: () => {},
+    };
+    (window as unknown as { __tidyUpRace: typeof controls }).__tidyUpRace =
+      controls;
+    const realRequest = Element.prototype.requestFullscreen;
+    const realExit = Document.prototype.exitFullscreen;
+    let requests = 0;
+    Element.prototype.requestFullscreen = function (options) {
+      requests += 1;
+      if (requests !== 1) return realRequest.call(this, options);
+      return new Promise<void>((grant, refuse) => {
+        controls.landFirst = () => {
+          const answered = realRequest.call(this, options);
+          answered.then(grant, refuse);
+          // Counted from a reaction registered after the page's own, so a
+          // test waiting on it knows the page's handler has run.
+          answered.then(
+            () => queueMicrotask(() => (race.firstAnswered = true)),
+            () => queueMicrotask(() => (race.firstAnswered = true)),
+          );
+        };
+      });
+    };
+    Document.prototype.exitFullscreen = function () {
+      race.exitsAsked += 1;
+      if (race.exitsAsked !== 1) return realExit.call(this);
+      race.exitHeld = true;
+      return new Promise<void>((done, fail) => {
+        controls.releaseExit = () => {
+          race.exitHeld = false;
+          realExit.call(this).then(done, fail);
+        };
+      });
+    };
+  });
+
+/**
+ * The contrast ratio the browser actually PAINTS for an element's text.
+ *
+ * Not the token values: it resolves `opacity` and walks up for the first
+ * ancestor that actually sets a background, which is the composite the browser
+ * performs. A dimmed element whose colour token passes AA on paper can still
+ * fail once its own opacity is mixed against what is behind it -- that is the
+ * bug this was first written for, in classroom-groups.
+ *
+ * Here rather than copied into a second spec: two contrast computations that
+ * differ by one term would disagree about the same pixels, and the suite that
+ * got the lenient one would pass while the page failed a real audit.
+ */
+export const contrastRatio = async (target: Locator): Promise<number> => {
+  // The browser READS; the arithmetic happens in node, against the one copy
+  // of the WCAG formula this repo has (#277). A `page.evaluate` callback is
+  // serialised and cannot import, so a callback that did the maths itself
+  // was a copy by construction -- and three of them had accumulated, all
+  // linearising at a different constant from the two node-side copies.
+  const painted = await target.evaluate((el) => {
+    const style = getComputedStyle(el);
+    // Every background from the element itself -- it may paint its own --
+    // outward, nearest first. Not just the first: a translucent layer is
+    // composited over what is behind it, which `paintedGround` does (#390
+    // F127).
+    const grounds: string[] = [];
+    for (let at: Element | null = el; at; at = at.parentElement) {
+      const c = getComputedStyle(at).backgroundColor;
+      if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') grounds.push(c);
+    }
+    return { colour: style.color, grounds, opacity: Number(style.opacity) };
+  });
+
+  const ink = parseColour(painted.colour);
+  const layers = painted.grounds.map(parseColour);
+  if (ink === null || layers.some((layer) => layer === null))
+    throw new Error(
+      `unreadable computed colour: ${painted.colour} on ${painted.grounds.join(' over ')}`,
+    );
+  const ground = paintedGround(
+    layers.filter((layer): layer is NonNullable<typeof layer> => !!layer),
+  );
+  // The element's own opacity dims its text against what is behind it. A
+  // colour token that passes AA on paper can still fail once the browser has
+  // mixed it -- the bug this was first written for, in classroom-groups.
+  const mixed = over(
+    { rgb: ink.rgb, alpha: ink.alpha * painted.opacity },
+    ground,
+  );
+  return contrast(mixed, ground);
+};
+
+/**
+ * A CSS colour, or `var(--token)`, as the browser resolves it: a probe's
+ * computed `color`. An assertion then compares two colours the browser
+ * resolved, never the browser's rgb against a hex written by hand.
+ *
+ * An undefined token resolves to the ink the probe inherits, not to nothing,
+ * so a caller comparing a token against what a rule paints needs the rule's
+ * own colour on the other side.
+ */
+export const resolvedColour = (page: Page, value: string): Promise<string> =>
+  page.evaluate((value) => {
+    const probe = document.createElement('span');
+    probe.style.color = value;
+    document.body.append(probe);
+    const colour = getComputedStyle(probe).color;
+    probe.remove();
+    return colour;
+  }, value);
+
+/**
+ * Every place a browser could have kept a pupil's name, in one read (#277).
+ *
+ * Four probes had grown for the same claim, and they did not agree about
+ * where to look. `classroom-groups-privacy.spec.ts` had two -- an object of
+ * four fields, and a joined string of the same four -- `classroom-groups-
+ * io.spec.ts` had the joined string inline, and `classroom-groups-
+ * roster.spec.ts` read `localStorage` and `sessionStorage` ONLY. That last
+ * one asserts "a typed name never reaches storage" while looking at two of
+ * the four places a name could go: the address bar and the cookie jar were
+ * never checked, so the test most specifically about a typed name was the
+ * weakest of the four. Collapsing them is a coverage fix as much as a
+ * refactor.
+ *
+ * The cookie field's own reason, kept from the copy that had it: the plan's
+ * snippet checked the first three, and a cookie is the fourth place a name
+ * could be written to.
+ */
+export const everywhereItCouldHide = (page: Page) =>
+  page.evaluate(() => ({
+    local: JSON.stringify({ ...localStorage }),
+    session: JSON.stringify({ ...sessionStorage }),
+    url: location.href,
+    cookies: document.cookie,
+  }));
+
+/**
+ * Assert none of `names` appears anywhere the page could have persisted it.
+ *
+ * This is an absence assertion over a population read at runtime, so it
+ * carries its own liveness controls (#118): with no names there is nothing
+ * to look for, and a probe that quietly stopped reading one of the four
+ * places would pass every call here while covering less than its name says.
+ * Both are asserted rather than assumed -- an emptied probe and a clean page
+ * look identical from the outside.
+ */
+export const expectNothingStored = async (
+  page: Page,
+  when: string,
+  ...names: readonly string[]
+): Promise<void> => {
+  expect(names.length, `${when}: no name to look for`).toBeGreaterThan(0);
+  const stored = await everywhereItCouldHide(page);
+  expect(
+    Object.keys(stored),
+    `${when}: the probe stopped reading somewhere a name could hide`,
+  ).toEqual(['local', 'session', 'url', 'cookies']);
+  for (const [where, value] of Object.entries(stored))
+    for (const name of names)
+      expect(value, `${where} — ${when}`).not.toContain(name);
+};
+
+/**
+ * Every text a report form shows that falls under AA: its summary, every
+ * label and paragraph it renders, and its send button, read from the DOM.
+ * Naming the quote label and two hints passed a note label painted in
+ * --border, on the 404 and in the footer alike (#390 F138, F146). The
+ * honeypot's label sits in its own div, so `form > label` leaves it out.
+ * Returns what was read too, so the caller's absence assertion can count it.
+ */
+export const formTextsUnderAA = async (
+  details: Locator,
+  send: Locator,
+): Promise<{ failing: string[]; read: string[] }> => {
+  const words = details.locator('form > label, form > p');
+  await expect(words.first()).toBeVisible();
+  const failing: string[] = [];
+  const read: string[] = [];
+  // runtime population: the labels and paragraphs this form rendered.
+  for (const text of [
+    details.locator('summary'),
+    ...(await words.all()),
+    send,
+  ]) {
+    const said = await text.innerText();
+    read.push(said);
+    const ratio = await contrastRatio(text);
+    if (ratio < 4.5) failing.push(`'${said}' ${ratio.toFixed(2)}:1`);
+  }
+  return { failing, read };
 };

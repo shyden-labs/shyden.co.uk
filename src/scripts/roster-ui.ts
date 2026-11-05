@@ -29,6 +29,7 @@
  * (`classroom-groups.ts`'s own `render()`, `who.textContent = label(student)`).
  */
 import type { Student } from '../lib/grouping';
+import { button } from './dom';
 import {
   MAX_ROSTER,
   availableLetters,
@@ -93,20 +94,38 @@ export interface RosterHandlers {
   onClearAll: () => void;
 }
 
-/** A new, unnamed, unlettered, present student — the shape both `onAdd` and
- *  `onAddSeveral` (classroom-groups.ts) build one of per row; kept here too
- *  since a mobile-card empty-state test (a later task) may need the same
- *  shape client-side. Takes the number rather than computing it, so the
- *  caller (which already needs `nextNumber` for the FIRST row of a batch)
- *  is the one place that decides numbering, not this module. */
-export const anonymousStudent = (number: number): Student => ({
-  number,
-  name: null,
-  sex: null,
-  absent: false,
-  together: null,
-  apart: null,
-});
+/**
+ * Which column a print mirror belongs to, stamped onto the span so whatever
+ * refreshes it can find it BY COLUMN rather than by position.
+ *
+ * The row is built Absent-first (`tr.append` below, operator 2026-08-13)
+ * while the values were written number-first, and a positional mapping
+ * shifted all six by one cell: the printed register's Absent column was a
+ * list of numbers and its Name column was a column of M and F (#253).
+ */
+export type PrintColumn =
+  'number' | 'name' | 'sex' | 'absent' | 'together' | 'apart';
+
+/** Every column a roster row has: the six that print, and Remove, which never does. */
+type RosterColumn = PrintColumn | 'remove';
+
+/**
+ * A roster cell that carries the column it belongs to.
+ *
+ * The print rules that take a column off the sheet name it BY COLUMN, never
+ * by `nth-child`. The ordinal was already wrong once -- left at 4 it hid Sex
+ * and printed Absent, "a sheet that silently answered a different question
+ * than the tick box asked" -- and #253 then shipped the same defect class in
+ * the mirror mapping. A cell that declares its own identity cannot be
+ * re-pointed by reordering the row, which is what #253 AC2 asks for. #253
+ * named only the Absent rule; the letters box and Remove kept their ordinals
+ * until #390 F73.
+ */
+const columnCell = (column: RosterColumn): HTMLTableCellElement => {
+  const td = document.createElement('td');
+  td.dataset.col = column;
+  return td;
+};
 
 /**
  * The print-only text twin of a cell's control.
@@ -124,15 +143,18 @@ export const anonymousStudent = (number: number): Student => ({
  * focus and the caret), so a mirror that only updated on re-render would go
  * stale on every keystroke.
  */
-const printMirror = (value: string): HTMLSpanElement => {
+const printMirror = (value: string, column: PrintColumn): HTMLSpanElement => {
   const span = document.createElement('span');
   span.className = 'cg-print-value';
+  span.dataset.col = column;
   span.textContent = value;
   span.setAttribute('aria-hidden', 'true');
   return span;
 };
 
-/** M/F, or an em dash for unset — the same glyph the <select> shows. */
+/** M/F, or an em dash for unset. NOT the glyph the <select> shows: since #249
+ * the collapsed control names its own column instead, while paper keeps the
+ * dash for an empty cell. */
 const sexText = (student: Student, t: Strings): string =>
   student.sex === 'M'
     ? t.rosterSexMale
@@ -156,13 +178,13 @@ const patched = (
   fields: Partial<Student>,
 ): Student[] => roster.map((s, i) => (i === index ? { ...s, ...fields } : s));
 
-const button = (text: string, className: string): HTMLButtonElement => {
-  const b = document.createElement('button');
-  b.type = 'button'; // never 'submit' -- these live inside #cg-form
-  b.className = className;
-  b.textContent = text;
-  return b;
-};
+/**
+ * The id of the "roster is full" paragraph, so the two add buttons can name
+ * it from `aria-describedby` and `disabled-controls.spec.ts` can resolve it.
+ * One constant rather than three string literals: a typo in any one of them
+ * is a reference to nothing, and a reference to nothing is silent.
+ */
+export const ROSTER_LIMIT_MESSAGE_ID = 'cg-roster-limit';
 
 /**
  * "+ Add student" / "+ Add several…" — design spec section 4, "Changing the
@@ -311,12 +333,26 @@ function buildToolbar(
   // re-enables both controls the instant the roster drops back under the
   // limit, the same "comparison, not a one-way latch" shape this page's
   // other guards already keep (updateRosterValidation, classroom-groups.ts).
+  // Remove is never disabled here -- nothing about MAX_ROSTER stops a teacher
+  // removing a row, even at the ceiling; a class already full is exactly when
+  // removing one first matters most. (Recorded in ClassroomGroupsPage.astro's
+  // CSS until #250 replaced those per-component rules with one site-wide
+  // treatment in tokens.css, which is paint and had no business holding a
+  // decision about behaviour.)
   if (rosterAtLimit(getRoster())) {
     addButton.disabled = true;
     severalButton.disabled = true;
     const limitMessage = document.createElement('p');
     limitMessage.className = 'cg-roster-limit-message';
-    limitMessage.textContent = t.rosterAtLimitMessage(MAX_ROSTER);
+    // An id, so the paragraph a sighted teacher reads is the SAME node a
+    // screen reader is handed (#250 AC10). Without it the reason was on the
+    // page and unreachable from either button: `aria-describedby` can only
+    // name an id. Both buttons and the paragraph are rebuilt together by this
+    // function, so the reference cannot outlive what it points at.
+    limitMessage.id = ROSTER_LIMIT_MESSAGE_ID;
+    limitMessage.textContent = t.rosterAtLimitMessage({ max: MAX_ROSTER });
+    addButton.setAttribute('aria-describedby', ROSTER_LIMIT_MESSAGE_ID);
+    severalButton.setAttribute('aria-describedby', ROSTER_LIMIT_MESSAGE_ID);
     wrap.appendChild(limitMessage);
   }
 
@@ -362,7 +398,7 @@ function buildRow(
   // override them"); identity is the number everywhere else in this
   // engine, so this is the one field a later task's duplicate check
   // (rosterProblems, a later task) watches.
-  const numberTd = document.createElement('td');
+  const numberTd = columnCell('number');
   const numberInput = document.createElement('input');
   numberInput.type = 'number';
   numberInput.min = '1';
@@ -376,19 +412,19 @@ function buildRow(
     }
   });
   numberTd.appendChild(numberInput);
-  numberTd.appendChild(printMirror(String(student.number)));
+  numberTd.appendChild(printMirror(String(student.number), 'number'));
 
   // Name — optional. `placeholder` previews the SAME fallback label the
   // results grid and every error message already use for this student
   // (`t.studentNumber`, via `resolveStudent` in classroom-groups.ts) so a
   // teacher who never types a name can see, right here, what this row will
   // be called.
-  const nameTd = document.createElement('td');
+  const nameTd = columnCell('name');
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.className = 'cg-roster-name';
   nameInput.setAttribute('aria-label', t.rosterColName);
-  nameInput.placeholder = t.studentNumber(student.number);
+  nameInput.placeholder = t.studentNumber({ n: student.number });
   nameInput.value = student.name ?? '';
   nameInput.addEventListener('input', () => {
     // An emptied field is `null` (no name), never `''` — matches
@@ -398,16 +434,16 @@ function buildRow(
     handlers.onTextChange(patched(getRoster(), index, { name: value }));
   });
   nameTd.appendChild(nameInput);
-  nameTd.appendChild(printMirror(student.name ?? ''));
+  nameTd.appendChild(printMirror(student.name ?? '', 'name'));
 
   // Sex — blank (neutral) / M / F. The <option> VALUE is always the raw
   // 'M'/'F' the engine's Student.sex type uses, in both languages; only the
   // displayed text is localised (rosterSexMale/Female — see their own
   // comment in en.ts).
-  const sexTd = document.createElement('td');
+  const sexTd = columnCell('sex');
   const sexSelect = document.createElement('select');
   sexSelect.setAttribute('aria-label', t.rosterColSex);
-  const unsetOption = buildOption('', t.rosterUnset);
+  const unsetOption = buildOption('', t.rosterColSex);
   // Once a sex has been chosen there is no way back to "—" (operator,
   // 2026-08-13). The placeholder exists to say "not answered yet", not to be
   // an answer, and leaving it selectable let a teacher undo a required field
@@ -427,7 +463,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { sex: value }));
   });
   sexTd.appendChild(sexSelect);
-  sexTd.appendChild(printMirror(sexText(student, t)));
+  sexTd.appendChild(printMirror(sexText(student, t), 'sex'));
 
   // Absent — ticking it marks the student out of the shuffle (design spec
   // section 4). Nothing else in this row is ever disabled by it — a later
@@ -437,7 +473,7 @@ function buildRow(
   // existing `.switch input` convention); the `<label>` wrapping it is the
   // real 44px tap target, the same whole-row-is-the-target pattern that
   // convention already uses.
-  const absentTd = document.createElement('td');
+  const absentTd = columnCell('absent');
   const absentLabel = document.createElement('label');
   absentLabel.className = 'cg-roster-absent-label';
   const absentInput = document.createElement('input');
@@ -474,7 +510,9 @@ function buildRow(
   // A ticked BOX, not a word: design spec section 10's own "the `Absent`
   // column says it in no ink and no colour". \u2611/\u2610 read identically in
   // greyscale and need no legend.
-  absentTd.appendChild(printMirror(student.absent ? '\u2611' : '\u2610'));
+  absentTd.appendChild(
+    printMirror(student.absent ? '\u2611' : '\u2610', 'absent'),
+  );
 
   // Together / Apart — a letter each, from a dropdown that grows as needed
   // (design spec section 4; `availableLetters`, src/lib/roster.ts).
@@ -482,10 +520,10 @@ function buildRow(
   // WHOLE roster, and handed to every row — not recomputed per row, so a
   // letter that became available because ANOTHER student just used it
   // shows up here identically regardless of which row is being built.
-  const togetherTd = document.createElement('td');
+  const togetherTd = columnCell('together');
   const togetherSelect = document.createElement('select');
   togetherSelect.setAttribute('aria-label', t.rosterColTogether);
-  togetherSelect.appendChild(buildOption('', t.rosterUnset));
+  togetherSelect.appendChild(buildOption('', t.rosterColTogether));
   for (const letter of togetherLetters) {
     togetherSelect.appendChild(buildOption(letter, letter));
   }
@@ -495,12 +533,14 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { together: value }));
   });
   togetherTd.appendChild(togetherSelect);
-  togetherTd.appendChild(printMirror(student.together ?? t.rosterUnset));
+  togetherTd.appendChild(
+    printMirror(student.together ?? t.rosterUnset, 'together'),
+  );
 
-  const apartTd = document.createElement('td');
+  const apartTd = columnCell('apart');
   const apartSelect = document.createElement('select');
   apartSelect.setAttribute('aria-label', t.rosterColApart);
-  apartSelect.appendChild(buildOption('', t.rosterUnset));
+  apartSelect.appendChild(buildOption('', t.rosterColApart));
   for (const letter of apartLetters) {
     apartSelect.appendChild(buildOption(letter, letter));
   }
@@ -510,7 +550,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { apart: value }));
   });
   apartTd.appendChild(apartSelect);
-  apartTd.appendChild(printMirror(student.apart ?? t.rosterUnset));
+  apartTd.appendChild(printMirror(student.apart ?? t.rosterUnset, 'apart'));
 
   // Remove — design spec section 4: "Removing a row removes the student."
   // A SEVENTH cell, with a real (visually-hidden) header of its own — see
@@ -533,7 +573,7 @@ function buildRow(
   // uncommitted edit to a DIFFERENT row (a name or number mid-keystroke,
   // which never itself re-renders) must still be in the array this filter
   // runs against, or removing one row would silently discard it.
-  const removeTd = document.createElement('td');
+  const removeTd = columnCell('remove');
   const removeButton = button(t.rosterRemove, 'cg-remove-student');
   removeButton.addEventListener('click', () => {
     handlers.onRemove(getRoster().filter((_, i) => i !== index));
@@ -607,23 +647,31 @@ export function renderRoster(
   table.appendChild(colgroup);
 
   const thead = document.createElement('thead');
+  // Hidden in the card layout; the table breakpoint's `#cg-roster thead`
+  // rule (ClassroomGroupsPage.astro) undoes it, at an ID's specificity.
+  thead.className = 'visually-hidden';
   const headRow = document.createElement('tr');
   // Absent FIRST (operator, 2026-08-13). It is the column a teacher touches
   // at the start of a lesson, before anything else on the row matters, and it
   // was buried in the middle. Every positional rule that depends on this
-  // order — the card layout's `.cg-student > td:nth-child(1..7)`, the table's
-  // `col:nth-child(1..7)` widths, and the print letters rule — moves with it,
-  // in ClassroomGroupsPage.astro.
-  for (const heading of [
-    t.rosterColAbsent,
-    t.rosterColNumber,
-    t.rosterColName,
-    t.rosterColSex,
-    t.rosterColTogether,
-    t.rosterColApart,
-  ]) {
+  // order — the card layout's `.cg-student > td:nth-child(1..7)` and the
+  // table's `col:nth-child(1..7)` widths — moves with it, in
+  // ClassroomGroupsPage.astro. The print rules do not: they name each column
+  // by its `data-col` (#253, #390 F73).
+  const headings: readonly (readonly [PrintColumn, string])[] = [
+    ['absent', t.rosterColAbsent],
+    ['number', t.rosterColNumber],
+    ['name', t.rosterColName],
+    ['sex', t.rosterColSex],
+    ['together', t.rosterColTogether],
+    ['apart', t.rosterColApart],
+  ];
+  for (const [column, heading] of headings) {
     const th = document.createElement('th');
     th.scope = 'col';
+    // Same identity the cells carry, so a print rule can hide a column
+    // header and its cells by NAME (#253 AC2).
+    th.dataset.col = column;
     th.textContent = heading;
     headRow.appendChild(th);
   }
@@ -642,9 +690,9 @@ export function renderRoster(
   // defect class every other control on this page already refuses to
   // ship.
   //
-  // Visually hidden (`.cg-roster-remove-heading`, ClassroomGroupsPage.astro
-  // -- the SAME clip-based technique #cg-roster thead's own rule already
-  // uses, just applied to one cell's own content rather than a whole row,
+  // Visually hidden (`.visually-hidden`, tokens.css -- the SAME recipe
+  // the <thead> wears below the table breakpoint, just applied to one
+  // cell's own content rather than a whole row,
   // and UNCONDITIONALLY rather than only below the table breakpoint):
   // showing "Remove" as a visible heading above a column of seven
   // identical "Remove" buttons would only repeat what every row already
@@ -664,8 +712,9 @@ export function renderRoster(
   // loop just above).
   const removeTh = document.createElement('th');
   removeTh.scope = 'col';
+  removeTh.dataset.col = 'remove' satisfies RosterColumn;
   const removeHeading = document.createElement('span');
-  removeHeading.className = 'cg-roster-remove-heading';
+  removeHeading.className = 'cg-roster-remove-heading visually-hidden';
   removeHeading.textContent = t.rosterRemove;
   removeTh.appendChild(removeHeading);
   headRow.appendChild(removeTh);
@@ -795,12 +844,15 @@ export function renderRoster(
   const hereLine = document.createElement('p');
   hereLine.className = 'cg-roster-count-here print-foot-here';
   hereLine.setAttribute('aria-hidden', 'true');
-  hereLine.textContent = t.printHereToday(roster.length - absent, absent);
-
-  countLine.textContent = t.rosterCountLine(
-    roster.length,
-    roster.length - absent,
+  hereLine.textContent = t.printHereToday({
+    here: roster.length - absent,
     absent,
-  );
+  });
+
+  countLine.textContent = t.rosterCountLine({
+    total: roster.length,
+    here: roster.length - absent,
+    absent,
+  });
   container.append(countLine, hereLine);
 }

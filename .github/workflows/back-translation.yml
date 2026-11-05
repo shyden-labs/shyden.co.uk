@@ -1,0 +1,83 @@
+# The back-translation review (#95): every translated locale read back into
+# English by an engine that did not write it, scored against the English it
+# came from, and written to this run's summary worst first.
+#
+# ADVISORY by operator decision (2026-09-10): no score fails this job, and it
+# is deliberately NOT in develop's required contexts -- flag for review, never
+# block. It fails only when the run cannot be believed: no engine, an engine
+# that cannot read a locale, or a locale that compared nothing. A red check
+# here means "this review read nothing", never "the copy is bad".
+#
+# The engine is LibreTranslate, pinned in docker/libretranslate/Dockerfile
+# where Dependabot can bump it. The copy was drafted by DeepL, and a round
+# trip through the engine that wrote it would agree with itself.
+name: back-translation
+on:
+  pull_request:
+    # Everything the review reads, held by pipeline-wiring.test.ts against the
+    # script's own import closure, so a new input cannot go unwatched.
+    paths:
+      - 'src/lib/i18n/**'
+      - 'src/lib/catalogue-leaves.ts'
+      - 'src/lib/csv-locale.ts'
+      - 'scripts/i18n-back-translate.mjs'
+      - 'scripts/back-translate-client.mjs'
+      - 'scripts/errors.mjs'
+      - 'docker/libretranslate/**'
+      - '.github/workflows/back-translation.yml'
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: back-translation review
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      # No `npm ci`: the script imports only the catalogues and Node strips
+      # their types itself, so there is nothing to install.
+      - name: Build the engine
+        run: docker build --tag back-translation-engine docker/libretranslate
+      - name: Start the engine
+        run: docker run --detach --name engine --publish 5000:5000 back-translation-engine
+      # The models are in the image (#666): the build downloads them, checks
+      # all eight directions and translates once in each, so a start loads
+      # them from disk and downloads nothing. GET /languages answers once
+      # they are loaded, 6-9 s measured offline.
+      - name: Wait for the engine to load its models
+        timeout-minutes: 15
+        run: |
+          until curl --silent --fail --max-time 5 http://localhost:5000/languages > /dev/null; do
+            if [ "$(docker inspect --format '{{.State.Running}}' engine)" != "true" ]; then
+              echo "::error::the engine exited while loading"
+              docker logs engine 2>&1 | tail -50
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "engine ready after ${SECONDS}s"
+      - name: Read every locale back into English
+        env:
+          BACK_TRANSLATE_URL: http://localhost:5000
+          BACK_TRANSLATE_REPORT: back-translation.json
+        run: node scripts/i18n-back-translate.mjs
+      - name: Keep every comparison
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: back-translation
+          path: back-translation.json
+          # `warn`, not `ignore`: a run that wrote no report says so (#44).
+          if-no-files-found: warn
+      - name: Engine log
+        if: always()
+        run: docker logs engine 2>&1 | tail -100

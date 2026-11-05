@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { sexWhy, sexWhyReturning } from '../../src/lib/sexOptions';
-import { en } from '../../src/lib/i18n/en';
-import { id } from '../../src/lib/i18n/id';
 import { student } from './factories';
 import type { Student } from '../../src/lib/grouping';
+import { getStrings } from '../../src/lib/i18n';
+
+// The catalogues as a page receives them: every message compiled into a
+// function of its named slots (#136). A raw catalogue holds templates.
+const en = getStrings('en');
+const id = getStrings('id');
 
 describe('sexWhy — why the two sex switches are disabled', () => {
   it('says so with its own wording when there is no list at all', () => {
@@ -150,10 +154,10 @@ describe('sexWhy — why the two sex switches are disabled', () => {
   });
 
   // F-3 (review). The type says `sex: 'M' | 'F' | null` -- never
-  // `undefined` -- but nothing in this repo or in CI enforces that
-  // (CLAUDE.md: "no type checker anywhere"), and stage 3 builds this roster
-  // by reading the DOM, where a field the type promises is never missing
-  // can still arrive `undefined` in practice. The `student()` factory above
+  // `undefined` -- but `astro check` holds only the code to that, and stage
+  // 3 builds this roster by reading the DOM, where a field the type promises
+  // is never missing can still arrive `undefined` in practice. The
+  // `student()` factory above
   // cannot produce this shape (`Partial<Student>` still means "if given,
   // `sex` is `'M' | 'F' | null`"), so this is a hand-built object with a
   // cast, reaching past the type the same way a real DOM read could. A

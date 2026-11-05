@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { staleReason, type Snapshot } from '../../src/lib/staleness';
-import { en } from '../../src/lib/i18n/en';
-import { id } from '../../src/lib/i18n/id';
+import { getStrings } from '../../src/lib/i18n';
+
+// The catalogues as a page receives them: every message compiled into a
+// function of its named slots (#136). A raw catalogue holds templates.
+const en = getStrings('en');
+const id = getStrings('id');
 
 /**
  * Every assertion below compares against a LITERAL string, never against
@@ -185,9 +189,9 @@ describe('staleReason', () => {
     expect(en.staleRoster).not.toBe(id.staleRoster);
   });
 
-  // I-2 (review): every Snapshot field is TYPED as a string, but nothing in
-  // this repo checks that at compile time -- there is no type checker
-  // anywhere, in the editor or in CI (see CLAUDE.md). `mode` avoids the
+  // I-2 (review): every Snapshot field is TYPED as a string, and since #115
+  // `astro check` holds typed callers to it, but a snapshot built from the
+  // DOM or through a cast is not held to anything. `mode` avoids the
   // consequence by explicitly JSON.stringify-ing at its own call site
   // (classroom-groups.ts's `readMode`); `roster` now does the same
   // (`readRoster`). But a future call site that skips that and assigns an

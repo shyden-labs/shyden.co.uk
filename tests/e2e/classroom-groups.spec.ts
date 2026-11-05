@@ -1,13 +1,38 @@
+import { setCheckedOn, tapOn } from '../real-touch';
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
+import { chooseSpeed } from '../make-groups';
+import {
+  recordErrors,
+  recordRequests,
+  requestsEveryEngineMakes,
+  urlMatching,
+} from './recorders';
 import type { Page } from '@playwright/test';
-import { readdirSync } from 'node:fs';
+
 import { join, relative, sep, basename } from 'node:path';
+import { filesUnder, searched } from '../source-files';
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  getSiteStrings,
+  getStrings,
+  localisePath,
+} from '../../src/lib/i18n';
+import { recorded, shoot } from './evidence';
+import { THEMES } from '../palette';
+import { THEME_SCRIPT_SOURCE, emulateTheme } from '../themes';
+import { atLeast44, expectNoHorizontalScroll } from '../viewport';
+import { localePaths } from './locale-sampling';
 import {
   openRoster,
   addSeveral,
   buildRoster,
   giveEveryoneASex,
+  contrastRatio,
 } from './helpers';
+
+test.use(recorded);
 
 /**
  * Every assertion is web-first (auto-retrying). No fixed waits: the tool deals
@@ -25,26 +50,18 @@ const fill = async (
     speed?: 'normal' | 'fast' | 'skip';
   },
 ) => {
-  if (opts.count !== undefined) await page.fill('#cg-count', opts.count);
-  if (opts.size !== undefined) await page.fill('#cg-size', opts.size);
+  if (opts.count !== undefined)
+    await typeInto(page.locator('#cg-count'), opts.count);
+  if (opts.size !== undefined)
+    await typeInto(page.locator('#cg-size'), opts.size);
   if (opts.groups !== undefined) {
-    await page.check('input[name="mode"][value="groupCount"]');
-    await page.fill('#cg-groups', opts.groups);
-  }
-  // Stage 2, Task 7 folded Sound & animation into the tool's fourth
-  // collapsible section, the same treatment Task 4 already gave the
-  // leftovers radios -- #cg-speed now lives in #cg-sound-body, which starts
-  // collapsed, and Playwright's `selectOption` waits for a visible target
-  // rather than acting on a hidden one. Idempotent (checked, not clicked
-  // unconditionally): `fill()` runs more than once inside some tests, and a
-  // second click would close what the first one just opened.
-  const soundBody = page.locator('#cg-sound-body');
-  if (await soundBody.isHidden()) {
-    await page.locator('#cg-sound-toggle').click();
+    await setCheckedOn(page.locator('input[name="mode"][value="groupCount"]'));
+    await typeInto(page.locator('#cg-groups'), opts.groups);
   }
   // Default to skip so the tests assert the RESULT, not the show. The
-  // animation gets its own test below.
-  await page.selectOption('#cg-speed', opts.speed ?? 'skip');
+  // animation gets its own test below. Idempotent, so `fill()` may run
+  // more than once in a test (see chooseSpeed).
+  await chooseSpeed(page, opts.speed ?? 'skip');
 };
 
 /**
@@ -92,16 +109,9 @@ const AUDIO_URL_PATTERN = /\.m4a(?:\?|$)/;
  *  webServer produces before any test runs) and returns every `.m4a` file
  *  found, as full filesystem paths -- not hardcoded to `dist/_astro/`
  *  specifically, so this stays correct if Vite's own asset directory ever
- *  changes. Mirrors baseurl-guard.spec.ts's own recursive file-walk. */
-function listM4aFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listM4aFiles(full));
-    else if (entry.name.endsWith('.m4a')) out.push(full);
-  }
-  return out;
-}
+ *  changes. The recursion it once carried was one of nine private copies (#80). */
+const listM4aFiles = (dir: string): string[] =>
+  filesUnder(dir, (path) => path.endsWith('.m4a'));
 
 /** A filesystem path under `dist/` -> the URL path the built site actually
  *  serves it at, e.g. `dist/_astro/shuffle.AbC123.m4a` -> `/_astro/shuffle.
@@ -122,9 +132,9 @@ test.describe('classroom group creator', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
     // 12 students at the default group size (4) => 3 groups.
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   });
@@ -151,17 +161,196 @@ test.describe('classroom group creator', () => {
   //   and a later stage could silently re-break that
   //   (src/lib/i18n/index.ts:118).
 
+  // #188's own required journey, in a real browser: registration is taken,
+  // number 7 is away, and the lesson starts in two minutes. The teacher
+  // types the class size they know, says who is missing, and gets groups of
+  // the children actually in the room -- without opening Student details or
+  // hand-building a row per pupil.
+  //
+  // "Number of groups", not "students per group": 24 children in groups of
+  // five would be FOUR groups of six, since no group may be smaller than the
+  // size asked for. Five groups is what the teacher wants and what the
+  // ticket describes.
+  test('leaves a pupil typed absent out of the groups entirely', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await fill(page, { count: '25', groups: '5' });
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
+    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7');
+    await shoot(
+      page,
+      'number 7 typed into Student numbers',
+      page.locator('.number-fields'),
+    );
+    await tapOn(page.locator('#cg-go'));
+
+    const results = page.locator('#cg-results');
+    await expect(results.locator('.group')).toHaveCount(5);
+    await expect(results.locator('.student')).toHaveCount(24);
+
+    // The absence needs a positive control beside it. If the labels were
+    // malformed -- "Student NaN", or a renamed class -- then "no card says
+    // Student 7" would pass for a reason that has nothing to do with
+    // absence. Number 8 must be on the board, and 7 must not.
+    await expect(results.getByText('Student 8', { exact: true })).toHaveCount(
+      1,
+    );
+    await expect(results.getByText('Student 7', { exact: true })).toHaveCount(
+      0,
+    );
+
+    // And nobody was renumbered to close the gap: 25 is still the last
+    // number, not 24 (AC9).
+    await expect(results.getByText('Student 25', { exact: true })).toHaveCount(
+      1,
+    );
+    await shoot(
+      page,
+      'five groups of the 24 present, without number 7',
+      results,
+    );
+
+    // AC13: the teacher is told, never left to notice a missing child. The
+    // note is worded from what was really placed, so it cannot disagree with
+    // the board above it. Visible AND worded: `toHaveText` reads
+    // `textContent`, which a hidden note still carries.
+    const note = page.locator('#cg-grouped-note');
+    await expect(note).toBeVisible();
+    await expect(note).toHaveText('24 of 25 grouped — number 7 is absent.');
+    await shoot(page, 'the note names who is absent', note);
+  });
+
+  // #188, AC12: a bad number "re-validates immediately and refuses, rather
+  // than failing at Generate". The refusal SENTENCE was asserted in the
+  // announcements spec; the refusal ITSELF -- the shuffle being blocked --
+  // was not, which a mutation made obvious: `updateGoButton` could have
+  // ignored the number fields entirely and every test still passed.
+  //
+  // The gate has two sources and they live apart. Its roster half is in
+  // classroom-groups-roster.spec.ts ('a duplicate number is refused as it is
+  // typed', 'a together-and-apart clash is refused as it is typed'); this is
+  // the number-field half. They cannot be tested together -- a roster
+  // disables these fields outright (AC14) -- so a comment naming the other
+  // half is more honest than a describe pretending the fact has one home.
+  test('a refused number blocks the shuffle until it is corrected', async ({
+    page,
+  }) => {
+    const go = page.getByRole('button', { name: 'Make groups' });
+    await page.goto('/classroom-groups');
+
+    // Enabled FIRST. Disabled is not the default here, but asserting it
+    // anyway is what stops "it is disabled" passing against a page where the
+    // button never worked at all.
+    await expect(go).toBeEnabled();
+    await shoot(page, 'Make groups enabled before anything is typed', go);
+
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
+    await expect(page.locator('#cg-numbers-problem')).toBeVisible();
+    await shoot(
+      page,
+      'number 26 refused in a class of 25',
+      page.locator('.number-fields'),
+    );
+    await expect(go).toBeDisabled();
+    await shoot(page, 'Make groups disabled while the refusal stands', go);
+
+    // And the recovery direction, which is the one that proves the gate is
+    // not simply stuck shut once it has closed.
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
+    await expect(page.locator('#cg-numbers-problem')).toBeHidden();
+    await shoot(
+      page,
+      'corrected to 7, the refusal is gone',
+      page.locator('.number-fields'),
+    );
+    await expect(go).toBeEnabled();
+    await shoot(page, 'Make groups enabled again', go);
+  });
+
+  // #188, AC12, the direction the AC actually names. The guard above types a
+  // number the class cannot hold; the AC's subject is the COUNT moving --
+  // "lowering the count below a number already typed re-validates immediately
+  // and refuses, rather than failing at Generate". Those are different code
+  // paths. A refusal on the number field's own keystroke needs only a listener
+  // on that field; a refusal when the COUNT changes works solely because the
+  // form's `input` listener is delegated and takes no `event.target`
+  // (src/scripts/classroom-groups.ts:1098). Keyed to its target, or with
+  // `updateNumbersValidation()` dropped from it, the guard above stays green
+  // and a teacher learns only at "Make groups" that the number they typed no
+  // longer exists. Measured rather than assumed: M18.
+  test('lowering the count refuses a number that was valid when it was typed', async ({
+    page,
+  }) => {
+    const go = page.getByRole('button', { name: 'Make groups' });
+    const problem = page.locator('#cg-numbers-problem');
+    await page.goto('/classroom-groups');
+
+    // Clean FIRST, and by count as well as visibility: `toBeHidden` passes for
+    // an element that does not exist, so a renamed id would satisfy this line
+    // on its own and leave the refusal below as the only thing asserting.
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '20');
+    await expect(problem).toHaveCount(1);
+    await expect(problem).toBeHidden();
+    await expect(go).toBeEnabled();
+    await shoot(
+      page,
+      'number 20 absent from a class of 25, accepted',
+      page.locator('.number-fields'),
+    );
+
+    // The class shrinks underneath it. No click: the refusal has to arrive on
+    // the count's own keystroke, which is the whole of AC12.
+    await typeInto(page.locator('#cg-count'), '10');
+    await expect(problem).toBeVisible();
+    await expect(problem).toHaveText(
+      'There is no number 20. You have 10 students.',
+    );
+    await expect(go).toBeDisabled();
+    await shoot(
+      page,
+      'the class shrinks to 10 and number 20 is refused on the keystroke',
+      page.locator('.number-fields'),
+    );
+
+    // Raising it back clears the refusal, so the gate is not stuck shut once
+    // it has closed -- the recovery direction the guard above proves for the
+    // other path.
+    await typeInto(page.locator('#cg-count'), '25');
+    await expect(problem).toBeHidden();
+    await expect(go).toBeEnabled();
+    await shoot(
+      page,
+      'raised back to 25, the refusal is gone',
+      page.locator('.number-fields'),
+    );
+  });
+
   test('splits a class and shows every student exactly once', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '22', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     // 22 students in groups of 4 => 5 groups.
     await expect(page.locator('#cg-results .group')).toHaveCount(5);
     await expect(page.locator('#cg-results .student')).toHaveCount(22);
     await expect(page.locator('#cg-summary')).toContainText('22');
+    await shoot(
+      page,
+      'five groups holding all 22 students',
+      page.locator('#cg-results'),
+    );
+
+    // #188, AC13's other half: the note is shown ONLY when fewer were
+    // grouped than typed. Counted first, because `toBeHidden` also passes
+    // for an element that does not exist at all.
+    const note = page.locator('#cg-grouped-note');
+    await expect(note).toHaveCount(1);
+    await expect(note).toBeHidden();
   });
 
   test('never makes a group smaller than the size asked for', async ({
@@ -171,10 +360,15 @@ test.describe('classroom group creator', () => {
     // not 4 and 3.
     await page.goto('/classroom-groups');
     await fill(page, { count: '7', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-results .group')).toHaveCount(1);
     await expect(page.locator('#cg-results .student')).toHaveCount(7);
+    await shoot(
+      page,
+      'one group of 7, never a 4 and a 3',
+      page.locator('#cg-results'),
+    );
   });
 
   test('numbers students since there is no roster to name them from yet', async ({
@@ -196,7 +390,7 @@ test.describe('classroom group creator', () => {
     // pins each full sentence, not a fragment of one.
     await page.goto('/classroom-groups');
     await fill(page, { count: '4', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
     expect(labels.sort()).toEqual([
       'Student 1',
@@ -232,7 +426,7 @@ test.describe('classroom group creator', () => {
     // of whether anyone watched it being dealt.
     await page.goto('/classroom-groups');
     await fill(page, { count: '8', size: '4', speed: 'skip' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student')).toHaveCount(8);
     await expect(page.locator('#cg-results .student').first()).toBeVisible();
   });
@@ -240,7 +434,7 @@ test.describe('classroom group creator', () => {
   test('the animation deals every card and settles', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     // Auto-retries until the deal finishes — no timing bet.
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     await expect(page.locator('#cg-go')).toBeEnabled();
@@ -253,8 +447,8 @@ test.describe('classroom group creator', () => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     // Sound is ON by default (operator decision) -- mute it before the run.
-    await page.uncheck('#cg-sound-check');
-    await page.click('#cg-go');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     expect(await audioContextCount(page)).toBe(0);
   });
@@ -266,13 +460,13 @@ test.describe('classroom group creator', () => {
     await page.goto('/classroom-groups');
     // Sound stays ON (the default) for this one.
     await fill(page, { count: '4', size: '2', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(4);
     expect(await audioContextCount(page)).toBe(1);
 
     // Shuffle again -- a second effect run must REUSE the context that
     // already exists, not open a second one.
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(4);
     expect(await audioContextCount(page)).toBe(1);
   });
@@ -286,89 +480,101 @@ test.describe('classroom group creator', () => {
   // rather than assumed); sound-on requests really are ours, same-origin;
   // and the tool really keeps working when every one of those requests is
   // blocked -- the one that stands in for a browser that cannot decode AAC.
-  test('all six sound assets are reachable from the built site and appear in dist/', async ({
-    page,
-  }) => {
-    const files = listM4aFiles(join('dist'));
-    // A silent guard that found zero files would pass for the wrong reason
-    // -- prove the walk actually found the build output before trusting the
-    // loop below proves anything about it (same reasoning as
-    // baseurl-guard.spec.ts's own "found none, which means this guard's own
-    // file-walk is broken" check).
-    expect(
-      files.length,
-      'expected to find .m4a files under dist/ (a fresh build should always ' +
-        'produce them); found none, which means this walk is broken, not ' +
-        'that the six sound assets are missing',
-    ).toBeGreaterThan(0);
+  // Its own block, and its own fixture. This journey renders NOTHING: it
+  // reads bytes out of `dist/` and never navigates, so asking for `page`
+  // opened a browser context that recorded ~2 KB of blank frames -- a blank
+  // video on a PASSING journey, which a reviewer cannot tell from a capture
+  // that failed to start. `request` fetches over an API context and opens no
+  // page, so there is no recording to suppress. The block is what lets the
+  // evidence page say `not recorded by policy` rather than `recording
+  // missing`, since it derives that from the block's own results (#292).
+  //
+  // NOT `test.use({ video: 'off' })` here: Playwright refuses `video` in a
+  // describe outright -- "it forces a new worker" -- and no source-text
+  // guard can see that, so a green suite hid it until the spec was run.
+  test.describe('the sound assets on disk', () => {
+    test('all six sound assets are reachable from the built site and appear in dist/', async ({
+      request,
+    }) => {
+      const files = listM4aFiles(join('dist'));
 
-    for (const role of [
-      'shuffle',
-      'land-1',
-      'land-2',
-      'land-3',
-      'land-4',
-      'done',
-    ]) {
-      const pattern = new RegExp(`^${role}\\.[\\w-]+\\.m4a$`);
-      const matches = files.filter((f) => pattern.test(basename(f)));
-      expect(
-        matches,
-        `expected exactly one built asset for "${role}" in dist/, found: [${matches.join(', ')}]`,
-      ).toHaveLength(1);
+      for (const role of [
+        'shuffle',
+        'land-1',
+        'land-2',
+        'land-3',
+        'land-4',
+        'done',
+      ]) {
+        const pattern = new RegExp(`^${role}\\.[\\w-]+\\.m4a$`);
+        const matches = files.filter((f) => pattern.test(basename(f)));
+        expect(
+          matches,
+          `expected exactly one built asset for "${role}" in dist/, found: [${matches.join(', ')}]`,
+        ).toHaveLength(1);
 
-      const urlPath = distPathToUrlPath(matches[0]);
-      const response = await page.request.get(urlPath);
-      expect(
-        response.ok(),
-        `GET ${urlPath} was not reachable from the built site (status ${response.status()})`,
-      ).toBe(true);
-      expect((await response.body()).length).toBeGreaterThan(0);
-    }
+        const urlPath = distPathToUrlPath(matches[0]);
+        const response = await request.get(urlPath);
+        expect(
+          response.ok(),
+          `GET ${urlPath} was not reachable from the built site (status ${response.status()})`,
+        ).toBe(true);
+        expect((await response.body()).length).toBeGreaterThan(0);
+      }
+    });
   });
 
   test('with sound off, a full shuffle fetches no audio at all', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
-    await page.uncheck('#cg-sound-check');
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
 
-    const audioRequests: string[] = [];
-    page.on('request', (r) => {
-      if (AUDIO_URL_PATTERN.test(r.url())) audioRequests.push(r.url());
-    });
+    const seen = recordRequests(page);
 
     // The reload is what matters: classroom-groups.ts's own "sound asset
     // network prefetch" section reads the REMEMBERED preference at MODULE
     // LOAD time, which only a fresh load (not a same-page uncheck) can
     // exercise -- see that section's own doc comment.
     await page.reload();
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).not.toBeChecked();
 
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
-    expect(audioRequests).toEqual([]);
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect(
+      searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+        of: heard,
+        what: 'requests the page made',
+      }),
+      'sound off means the assets are never downloaded',
+    ).toEqual([]);
   });
 
   test('with sound on, the audio requests that happen are exactly ours and same-origin', async ({
     page,
   }) => {
-    const audioRequests: string[] = [];
-    page.on('request', (r) => {
-      if (AUDIO_URL_PATTERN.test(r.url())) audioRequests.push(r.url());
-    });
+    const seen = recordRequests(page);
 
     // Sound stays ON (the default) and speed stays 'normal' (not 'skip') --
     // the on-load prefetch trigger fires for all six purely from loading the
     // page, with no form interaction at all.
     await page.goto('/classroom-groups');
 
-    expect(audioRequests).toHaveLength(6);
+    // Polled, not read once. The six `fetch` calls are issued during module
+    // evaluation, but their request events reach Node asynchronously over the
+    // browser protocol -- reading the array the instant `goto` resolved is
+    // exactly what CI caught returning `[]` (run 34391533802). Polling to an
+    // exact 6 still fails on five or seven: it waits for the count, it does
+    // not accept whatever count has arrived.
+    await expect
+      .poll(() => seen.matching(urlMatching(AUDIO_URL_PATTERN)).length)
+      .toBe(6);
     const pageOrigin = new URL(page.url()).origin;
-    for (const url of audioRequests) {
+    for (const url of seen.matching(urlMatching(AUDIO_URL_PATTERN))) {
       // The CLAUDE.md/no-third-party-requests promise, asserted directly --
       // the origin, not just that six requests happened to fire.
       expect(new URL(url).origin).toBe(pageOrigin);
@@ -377,10 +583,7 @@ test.describe('classroom group creator', () => {
 
   test.describe('a reduced-motion visitor', () => {
     test('downloads no audio at all', async ({ page }) => {
-      const audioRequests: string[] = [];
-      page.on('request', (r) => {
-        if (AUDIO_URL_PATTERN.test(r.url())) audioRequests.push(r.url());
-      });
+      const seen = recordRequests(page);
 
       // `page.emulateMedia`, not `test.use({ reducedMotion: 'reduce' })`:
       // verified by hand that the declarative context option does not
@@ -397,10 +600,82 @@ test.describe('classroom group creator', () => {
       // a phone (see classroom-groups.ts's own "sound asset network
       // prefetch" section).
       await expect(page.locator('#cg-speed')).toHaveValue('skip');
-      await page.fill('#cg-count', '6');
-      await page.click('#cg-go');
+      await typeInto(page.locator('#cg-count'), '6');
+      await tapOn(page.locator('#cg-go'));
       await expect(page.locator('#cg-results .student')).toHaveCount(6);
-      expect(audioRequests).toEqual([]);
+      const heard = requestsEveryEngineMakes(seen.all);
+      expect(
+        searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+          of: heard,
+          what: 'requests the page made',
+        }),
+        'a reduced-motion visitor downloads no audio at all',
+      ).toEqual([]);
+    });
+
+    /**
+     * The longest duration in a computed `transition-duration` list, in whole
+     * microseconds. Engines write 0.01ms differently (`1e-05s`, `0.00001s`),
+     * so it is compared as a number, never as text.
+     */
+    const longestMicroseconds = (durations: string): number =>
+      Math.max(
+        ...durations.split(',').map((duration) => {
+          const time = /^\s*([\d.e+-]+)(ms|s)\s*$/.exec(duration);
+          if (time === null) throw new Error(`not a CSS time: ${duration}`);
+          return Math.round(Number(time[1]) * (time[2] === 's' ? 1e6 : 1e3));
+        }),
+      );
+
+    test('sees every dealt card at rest, with nothing left to move', async ({
+      page,
+    }) => {
+      // The mechanism that works, asserted as itself (#331): tokens.css's
+      // reset cuts every transition to 0.01ms, and the script's forced `skip`
+      // deals every card at once. The page's scoped <style> once carried a
+      // reduced-motion rule for the cards that matched none of them, because
+      // the script builds every card and none carries the component's scope.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto('/classroom-groups');
+      await typeInto(page.locator('#cg-count'), '6');
+      await tapOn(page.locator('#cg-go'));
+      const cards = page.locator('#cg-results .student');
+      await expect(cards).toHaveCount(6);
+      await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
+
+      const atRest = {
+        transition: 'at most 0.01ms',
+        transform: 'none',
+        opacity: '1',
+      };
+      await expect
+        .poll(async () =>
+          (
+            await cards.evaluateAll((elements) =>
+              elements.map((element) => {
+                const style = getComputedStyle(element);
+                return {
+                  duration: style.transitionDuration,
+                  transform: style.transform,
+                  opacity: style.opacity,
+                };
+              }),
+            )
+          ).map(({ duration, transform, opacity }) => ({
+            transition:
+              longestMicroseconds(duration) <= 10
+                ? atRest.transition
+                : duration,
+            transform,
+            opacity,
+          })),
+        )
+        .toEqual(Array.from({ length: 6 }, () => atRest));
+      await shoot(
+        page,
+        'every dealt card at rest for a reduced-motion visitor',
+        page.locator('#cg-results'),
+      );
     });
   });
 
@@ -414,19 +689,22 @@ test.describe('classroom group creator', () => {
     // mechanism both real-world causes fall back through.
     await page.route('**/*.m4a', (route) => route.abort());
 
-    const pageErrors: string[] = [];
-    page.on('pageerror', (err) => pageErrors.push(String(err)));
+    const reported = recordErrors(page);
 
     await page.goto('/classroom-groups');
     await fill(page, { count: '6', size: '3', speed: 'fast' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     // Same assertions "the animation deals every card and settles" already
     // makes for the unblocked case -- the point here is that blocking every
     // audio request changes nothing about this outcome.
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     await expect(page.locator('#cg-go')).toBeEnabled();
-    expect(pageErrors).toEqual([]);
+    // Uncaught only: this test aborts every `.m4a` on purpose, and a blocked
+    // request logs to the console by design. What must not happen is a crash.
+    await reported.expectNoUncaught(
+      'blocking every audio request must not surface as an uncaught error',
+    );
   });
 
   test('splits by number of groups, not just by group size', async ({
@@ -436,7 +714,7 @@ test.describe('classroom group creator', () => {
     // from the page, and until now asserted by nothing.
     await page.goto('/classroom-groups');
     await fill(page, { count: '20', groups: '3' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
     await expect(page.locator('#cg-results .student')).toHaveCount(20);
@@ -447,7 +725,7 @@ test.describe('classroom group creator', () => {
     // on a phone, taking the browser with it.
     await page.goto('/classroom-groups');
     await fill(page, { count: '100000000', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
 
     await expect(page.locator('#cg-error')).toHaveText(
       'That is more students than this tool will take. The most is 100.',
@@ -466,13 +744,13 @@ test.describe('classroom group creator', () => {
     // wrong way round.
     await page.goto('/classroom-groups');
     await fill(page, { count: '7', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-summary')).toHaveText(
       '1 group from 7 students.',
     );
 
     await fill(page, { count: '22', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-summary')).toHaveText(
       '5 groups from 22 students.',
     );
@@ -481,13 +759,13 @@ test.describe('classroom group creator', () => {
   test('the error clears the stale "Shuffle again" label', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-go')).toHaveText('Shuffle again');
 
     // Now a refusal. Offering to reshuffle results that are no longer on
     // screen is an offer the page cannot keep.
     await fill(page, { count: '0', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-error')).toBeVisible();
     await expect(page.locator('#cg-go')).toHaveText('Make Groups');
   });
@@ -499,12 +777,12 @@ test.describe('classroom group creator', () => {
     // section 11 names only the how-to state and a later print panel as
     // the UI preferences allowed to persist) -- so it has to be reopened
     // after the reload below too, not just before the first check.
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     // Sound is ON by default (operator decision).
     await expect(page.locator('#cg-sound-check')).toBeChecked();
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await page.reload();
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).not.toBeChecked();
   });
 });
@@ -514,7 +792,7 @@ test.describe('classroom group creator', () => {
 // nothing is blocked... It heads the results: `7B — your groups`... It is
 // not repeated on every group card."
 test.describe('class name and results heading', () => {
-  // Corrected from task-5-brief.md's own snippet, which located the
+  // Corrected from the uncommitted #9 task brief's own snippet, which located the
   // "not repeated on cards" check at `#cg-groups` -- that id belongs to the
   // "how many groups" NUMBER INPUT on this page, not the results container
   // (`#cg-tables`, where the script actually appends group cards) -- the
@@ -522,14 +800,14 @@ test.describe('class name and results heading', () => {
   // already record and correct.
   test('the class name heads the results, once', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
     await expect(page.locator('#cg-tables').getByText('7B')).toHaveCount(0);
   });
 
-  // task-5-brief.md's own count (9 students at the page's default group
+  // the uncommitted #9 task brief's own count (9 students at the page's default group
   // size, 4) predicted `#cg-groups .group` would have count 3. The engine's
   // own targetSizes (src/lib/grouping.ts) says otherwise: groupCount =
   // floor(9/4) = 2, not ceil -- the same "never smaller than the size you
@@ -550,7 +828,7 @@ test.describe('class name and results heading', () => {
   test('a blank class name blocks nothing', async ({ page }) => {
     await page.goto('/classroom-groups');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
     await expect(page.locator('#cg-results .group')).toHaveCount(2);
     await expect(page.locator('#cg-results .student')).toHaveCount(9);
@@ -566,13 +844,13 @@ test.describe('class name and results heading', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('   ');
+    await typeInto(page.getByLabel('Class (optional)'), '   ');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
   });
 
-  // Corrected from task-5-brief.md's own `#cg-groups .group h3` locator --
+  // Corrected from the uncommitted #9 task brief's own `#cg-groups .group h3` locator --
   // same mistake as above. Filling the class field first is what makes this
   // a real test of THIS task's own wiring rather than a pin of
   // stage-3-owned behaviour: a naive implementation that broke
@@ -586,9 +864,9 @@ test.describe('class name and results heading', () => {
   // numbered DEFAULT.
   test('groups stay numbered when a class name is set', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group h3').first()).toHaveText(
       'Group 1',
     );
@@ -613,12 +891,11 @@ test.describe('class name and results heading', () => {
       void d.dismiss();
     });
     const raw = '<img src=x onerror=alert(1)>7B & "Sons"';
-    await page.getByLabel('Class (optional)').fill(raw);
-    // #cg-speed sits inside #cg-sound-body since Stage 2, Task 7 (see
-    // the fill() helper's own comment above -- this test does not use it).
-    await page.locator('#cg-sound-toggle').click();
-    await page.selectOption('#cg-speed', 'skip');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Class (optional)'), raw);
+    // This test keeps the default class size, so it chooses the speed
+    // alone rather than going through fill().
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       `${raw} — your groups`,
     );
@@ -637,10 +914,9 @@ test.describe('class name and results heading', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.getByLabel('Class (optional)').fill('Year 7 / Set B');
-    await page.locator('#cg-sound-toggle').click();
-    await page.selectOption('#cg-speed', 'skip');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       'Year 7 / Set B — your groups',
     );
@@ -659,17 +935,11 @@ test.describe('class name and results heading', () => {
     async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 900 });
       await page.goto('/classroom-groups');
-      await page.getByLabel('Class (optional)').fill('x'.repeat(300));
-      await page.locator('#cg-sound-toggle').click();
-      await page.selectOption('#cg-speed', 'skip');
-      await page.click('#cg-go');
+      await typeInto(page.getByLabel('Class (optional)'), 'x'.repeat(300));
+      await chooseSpeed(page, 'skip');
+      await tapOn(page.locator('#cg-go'));
       await expect(page.locator('#cg-results-h')).toBeVisible();
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(0);
+      await expectNoHorizontalScroll(page);
     },
   );
 
@@ -685,13 +955,13 @@ test.describe('class name and results heading', () => {
   }) => {
     await page.goto('/classroom-groups');
     const classField = page.getByLabel('Class (optional)');
-    await classField.fill('7B');
+    await typeInto(classField, '7B');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
 
-    await classField.fill('8C');
-    await page.click('#cg-go');
+    await typeInto(classField, '8C');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('8C — your groups');
   });
 });
@@ -748,7 +1018,7 @@ test.describe('the Split by row names its own fields', () => {
       // groups" is chosen -- the same reveal 'splits by number of groups,
       // not just by group size' already exercises by CSS value, exercised
       // here by the radio's own accessible name instead.
-      await page.getByLabel(groupCountRadio, { exact: true }).check();
+      await setCheckedOn(page.getByLabel(groupCountRadio, { exact: true }));
       await expect(page.getByLabel(howMany, { exact: true })).toBeVisible();
     });
   }
@@ -768,7 +1038,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
     // also pass for a malformed "Siswa NaN".
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '4', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
     expect(labels.sort()).toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
     // groupLabel's Indonesian output ("Kelompok N") was only ever proven at
@@ -786,7 +1056,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   test('errors are shown in Indonesian, not English', async ({ page }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '0', size: '2' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     const error = page.locator('#cg-error');
     await expect(error).toBeVisible();
     await expect(error).toContainText('Tambahkan siswa');
@@ -812,24 +1082,24 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '8', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-go')).toHaveText('Acak lagi');
 
     await fill(page, { count: '0', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-error')).toBeVisible();
     await expect(page.locator('#cg-go')).toHaveText('Buat Kelompok');
   });
 
   // Mirrors the English 'class name and results heading' describe block
   // above -- "assert whole rendered sentences, in both locales" applies
-  // regardless of what task-5-brief.md's own snippet happened to show (it
+  // regardless of what the uncommitted #9 task brief's own snippet happened to show (it
   // was English-only).
   test('the class name heads the results, once', async ({ page }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Kelas (opsional)').fill('7B');
+    await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText(
       '7B — kelompok Anda',
     );
@@ -842,7 +1112,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
   test('a blank class name blocks nothing', async ({ page }) => {
     await page.goto('/id/classroom-groups');
     await fill(page, { count: '9', size: '4' });
-    await page.click('#cg-go');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toHaveText('Kelompok Anda');
     await expect(page.locator('#cg-results .group')).toHaveCount(2);
   });
@@ -869,8 +1139,8 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
 // match two elements.
 test.describe('out-of-date groups', () => {
   const shuffle = async (page: Page) => {
-    await page.getByLabel('Number of students').fill('12');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Number of students'), '12');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   };
 
@@ -879,7 +1149,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(
       page.getByText('These groups are out of date — the group size changed.'),
     ).toBeVisible();
@@ -890,8 +1160,8 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
     await expect(
       page.getByText(
         'These groups are out of date — the leftovers choice changed.',
@@ -916,7 +1186,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Number of students').fill('30');
+    await typeInto(page.getByLabel('Number of students'), '30');
     await expect(
       page.getByText('These groups are out of date — the class list changed.'),
     ).toBeVisible();
@@ -929,8 +1199,8 @@ test.describe('out-of-date groups', () => {
   test('undoing the count change clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Number of students').fill('30');
-    await page.getByLabel('Number of students').fill('12');
+    await typeInto(page.getByLabel('Number of students'), '30');
+    await typeInto(page.getByLabel('Number of students'), '12');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
@@ -947,30 +1217,30 @@ test.describe('out-of-date groups', () => {
   test('the class name does NOT mark them out of date', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Class (optional)').fill('7B');
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
   test('the old groups stay visible while stale', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   });
 
   test('shuffling clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Students in each group'), '3');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
   test('undoing the change clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await page.getByLabel('Students in each group').fill('4');
+    await typeInto(page.getByLabel('Students in each group'), '3');
+    await typeInto(page.getByLabel('Students in each group'), '4');
     await expect(page.getByText('out of date')).toHaveCount(0);
   });
 
@@ -990,20 +1260,21 @@ test.describe('out-of-date groups', () => {
     [
       'marking a student absent',
       (page: Page) =>
-        page.locator('.cg-student').first().getByLabel('Absent').check(),
+        setCheckedOn(page.locator('.cg-student').first().getByLabel('Absent')),
     ],
     [
       'adding a student',
-      (page: Page) => page.getByRole('button', { name: 'Add student' }).click(),
+      (page: Page) => tapOn(page.getByRole('button', { name: 'Add student' })),
     ],
     [
       'removing a student',
       (page: Page) =>
-        page
-          .locator('.cg-student')
-          .first()
-          .getByRole('button', { name: 'Remove' })
-          .click(),
+        tapOn(
+          page
+            .locator('.cg-student')
+            .first()
+            .getByRole('button', { name: 'Remove' }),
+        ),
     ],
     [
       'changing a letter',
@@ -1019,7 +1290,7 @@ test.describe('out-of-date groups', () => {
       await openRoster(page);
       await addSeveral(page, 11);
       await giveEveryoneASex(page);
-      await page.getByRole('button', { name: 'Make Groups' }).click();
+      await tapOn(page.getByRole('button', { name: 'Make Groups' }));
       await expect(page.locator('#cg-results .group').first()).toBeVisible();
       await edit(page);
       await expect(
@@ -1039,11 +1310,16 @@ test.describe('out-of-date groups', () => {
   }) => {
     await openRoster(page);
     await addSeveral(page, 11);
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('.cg-student').first().getByLabel('Absent').uncheck();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+      false,
+    );
     await expect(
       page.getByText('These groups are out of date — the class list changed.'),
     ).toBeVisible();
@@ -1068,10 +1344,10 @@ test.describe('out-of-date groups', () => {
       ['F'],
       ['F'],
     ]);
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
     await page
       .locator('.cg-student')
@@ -1104,10 +1380,10 @@ test.describe('out-of-date groups', () => {
       ['F'],
     ]);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Keep boys and girls separate').check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Keep boys and girls separate'));
     // The literal sentence, not `en.staleSexMode`: importing the locale
     // would make this pass against whatever the table happens to say,
     // including a wrong or untranslated value (CLAUDE.md -- "locale files
@@ -1129,9 +1405,12 @@ test.describe('out-of-date groups', () => {
     await openRoster(page);
     await addSeveral(page, 11);
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page.locator('.cg-student').first().getByLabel('Name').fill('Anna');
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Anna',
+    );
     await expect(page.getByText('out of date')).toHaveCount(0);
     // `#cg-results`, NOT `#cg-groups` -- that id belongs to the "number of
     // groups" number input. The same correction this suite has already had
@@ -1150,10 +1429,10 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
-    await page.getByLabel('Students in each group').fill('4'); // undoes ONLY the size change
+    await typeInto(page.getByLabel('Students in each group'), '3');
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
+    await typeInto(page.getByLabel('Students in each group'), '4'); // undoes ONLY the size change
     await expect(
       page.getByText(
         'These groups are out of date — the leftovers choice changed.',
@@ -1165,11 +1444,11 @@ test.describe('out-of-date groups', () => {
   test('when two things change, undoing both clears it', async ({ page }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await page.locator('#cg-grouping-toggle').click();
-    await page.getByLabel('Put them all in one group').check();
-    await page.getByLabel('Students in each group').fill('4');
-    await page.getByLabel('Share them out evenly').check();
+    await typeInto(page.getByLabel('Students in each group'), '3');
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(page.getByLabel('Put them all in one group'));
+    await typeInto(page.getByLabel('Students in each group'), '4');
+    await setCheckedOn(page.getByLabel('Share them out evenly'));
     await expect(page.getByText('out of date')).toHaveCount(0);
     await expect(page.locator('#cg-results')).not.toHaveClass(/stale/);
   });
@@ -1185,7 +1464,7 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'These groups are out of date — the group size changed.',
     );
@@ -1202,9 +1481,9 @@ test.describe('out-of-date groups', () => {
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-stale')).toBeVisible();
-    await page.locator('#cg-stale button').click();
+    await tapOn(page.locator('#cg-stale button'));
     await expect(page.locator('#cg-stale')).toBeHidden();
     // 12 students at the NEW size (3) => 4 groups. Proves a real reshuffle
     // happened, not merely that the notice hid itself.
@@ -1224,7 +1503,7 @@ test.describe('out-of-date groups', () => {
       .locator('#cg-results .group')
       .first()
       .evaluate((el) => getComputedStyle(el).opacity);
-    await page.getByLabel('Students in each group').fill('3');
+    await typeInto(page.getByLabel('Students in each group'), '3');
     await expect(page.locator('#cg-results')).toHaveClass(/stale/);
     const after = await page
       .locator('#cg-results .group')
@@ -1244,51 +1523,46 @@ test.describe('out-of-date groups', () => {
   // without anyone re-running a contrast checker by hand (tokens.css's own
   // "do NOT lighten past AA" on --accent is why that retuning is a real
   // risk on this page, not a hypothetical one).
-  test('the dim stays above the WCAG AA contrast floor for normal text', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await page.getByLabel('Students in each group').fill('3');
-    await expect(page.locator('#cg-results')).toHaveClass(/stale/);
-    const contrast = await page
-      .locator('#cg-results .group')
-      .first()
-      .evaluate((el) => {
-        const style = getComputedStyle(el);
-        const opacity = Number(style.opacity);
-        // `.group` paints no background of its own (see this page's own
-        // :global CSS comment on why the results area is styled that way)
-        // -- walk up for the first ancestor that actually sets one, the
-        // same resolution the browser performs when compositing.
-        let bgEl = el.parentElement;
-        let backgroundCss = 'rgba(0, 0, 0, 0)';
-        while (bgEl) {
-          const c = getComputedStyle(bgEl).backgroundColor;
-          if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') {
-            backgroundCss = c;
-            break;
-          }
-          bgEl = bgEl.parentElement;
-        }
-        const nums = (css: string) => css.match(/[\d.]+/g)!.map(Number);
-        const [ir, ig, ib] = nums(style.color);
-        const [br, bgn, bb] = nums(backgroundCss);
-        const mix = (i: number, b: number) => opacity * i + (1 - opacity) * b;
-        const lin = (c: number) => {
-          const s = c / 255;
-          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-        };
-        const luminance = (r: number, g: number, b: number) =>
-          0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-        const textLum = luminance(mix(ir, br), mix(ig, bgn), mix(ib, bb));
-        const bgLum = luminance(br, bgn, bb);
-        const lighter = Math.max(textLum, bgLum);
-        const darker = Math.min(textLum, bgLum);
-        return (lighter + 0.05) / (darker + 0.05);
-      });
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
-  });
+  // One test per theme (#419).
+  for (const theme of THEMES)
+    test(`${theme}: the dim stays above the WCAG AA contrast floor for normal text`, async ({
+      page,
+    }) => {
+      await page.goto('/classroom-groups');
+      await shuffle(page);
+      await typeInto(page.getByLabel('Students in each group'), '3');
+      await expect(page.locator('#cg-results')).toHaveClass(/stale/);
+      await emulateTheme(page, theme);
+      const contrast = await contrastRatio(
+        page.locator('#cg-results .group').first(),
+      );
+      expect(contrast).toBeGreaterThanOrEqual(4.5);
+    });
+
+  // #332. The notice paints its own cream ground (#fff6e3) but took its ink
+  // from --ink, which Aurora made near-white: 1.05:1, a sentence nobody could
+  // read. Scored the way the browser paints it, in the real state, so the
+  // ground is the one the sentence actually sits on rather than a token pair.
+  for (const theme of THEMES)
+    test(`${theme}: the out-of-date sentence meets the WCAG AA contrast floor`, async ({
+      page,
+    }) => {
+      await page.goto('/classroom-groups');
+      await shuffle(page);
+      await typeInto(page.getByLabel('Students in each group'), '3');
+      const sentence = page.locator('#cg-stale-text');
+      await expect(sentence).toBeVisible();
+      await expect(sentence).toHaveText(
+        'These groups are out of date — the group size changed.',
+      );
+      await emulateTheme(page, theme);
+      expect(await contrastRatio(sentence)).toBeGreaterThanOrEqual(4.5);
+      await shoot(
+        page,
+        `${theme}: the out-of-date sentence on its cream notice`,
+        page.locator('#cg-stale'),
+      );
+    });
 
   // CLAUDE.md's binding rules apply to anything this task adds: no
   // horizontal scroll at 320px in any state, and every interactive target
@@ -1296,25 +1570,29 @@ test.describe('out-of-date groups', () => {
   // the page is a later task's own (this task owns staleness, not the
   // no-scroll rule as a whole) -- this defends the one new element this
   // task is actually adding.
-  test(
-    'the notice fits at 320px with no horizontal scroll, and its button meets the touch-target minimum',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await page.goto('/classroom-groups');
-      await shuffle(page);
-      await page.getByLabel('Students in each group').fill('3');
-      await expect(page.locator('#cg-stale')).toBeVisible();
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(0);
-      const box = await page.locator('#cg-stale button').boundingBox();
-      expect(box?.height).toBeGreaterThanOrEqual(44);
-    },
-  );
+  //
+  // Every locale (#390 F135): the notice is a sentence naming the change, in
+  // each language's own words and widths, and this read English only. The
+  // fields go by id, since their labels are each language's own.
+  for (const path of localePaths('/classroom-groups'))
+    test(
+      `the notice fits at 320px with no horizontal scroll, and its button meets the touch-target minimum -- ${path}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 900 });
+        await page.goto(path);
+        await typeInto(page.locator('#cg-count'), '12');
+        await tapOn(page.locator('#cg-go'));
+        await expect(page.locator('#cg-results .group')).toHaveCount(3);
+        await typeInto(page.locator('#cg-size'), '3');
+        await expect(page.locator('#cg-stale')).toBeVisible();
+        await expectNoHorizontalScroll(page, `${path}: the stale notice`);
+        await atLeast44(
+          page.locator('#cg-stale button'),
+          `${path}: the stale notice button`,
+        );
+      },
+    );
 
   // "Assert whole rendered sentences, in both locales" (CLAUDE.md) -- every
   // test above is English-only, and the reason TEXT itself is
@@ -1326,10 +1604,10 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.getByLabel('Siswa dalam setiap kelompok').fill('3');
+    await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '3');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — ukuran kelompok berubah.',
     );
@@ -1351,13 +1629,13 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.locator('#cg-grouping-toggle').click();
-    await page
-      .getByLabel('Masukkan semuanya ke satu kelompok', { exact: true })
-      .check();
+    await tapOn(page.locator('#cg-grouping-toggle'));
+    await setCheckedOn(
+      page.getByLabel('Masukkan semuanya ke satu kelompok', { exact: true }),
+    );
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — pilihan siswa tersisa berubah.',
     );
@@ -1370,10 +1648,10 @@ test.describe('out-of-date groups', () => {
     page,
   }) => {
     await page.goto('/id/classroom-groups');
-    await page.getByLabel('Jumlah siswa').fill('12');
-    await page.click('#cg-go');
+    await typeInto(page.getByLabel('Jumlah siswa'), '12');
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await page.getByLabel('Jumlah siswa').fill('30');
+    await typeInto(page.getByLabel('Jumlah siswa'), '30');
     await expect(page.locator('#cg-stale-text')).toHaveText(
       'Kelompok ini sudah tidak berlaku lagi — daftar kelas berubah.',
     );
@@ -1385,21 +1663,39 @@ test.describe('site-wide language switching', () => {
     page,
   }) => {
     // The classic i18n bug is a switcher that dumps you on the homepage.
+    // Two steps since #21 Stage 2: the switcher is a <details> dropdown, so the
+    // summary opens it and the entry inside is the link.
+    const open = () =>
+      tapOn(page.locator('header details.lang-switch > summary'));
+    const choose = () =>
+      tapOn(page.locator('header details.lang-switch li a').first());
+
     await page.goto('/classroom-groups');
-    await page.click('header a.lang');
+    await open();
+    await choose();
     await expect(page).toHaveURL(/\/id\/classroom-groups\/?$/);
-    await page.click('header a.lang');
+    await open();
+    await choose();
     await expect(page).toHaveURL(/\/classroom-groups\/?$/);
   });
 
-  for (const [path, heading] of [
+  // The homepage heading comes from the catalogue, so a headline change
+  // (#370) moves this with it; what proves translation is that it is not the
+  // English one. The tool's heading is a name, pinned as written.
+  for (const [path, heading, english] of [
     [
       '/id/',
-      'Kami membangun perangkat lunak khusus — dipercepat AI, sepenuhnya milik Anda.',
+      getSiteStrings('id').home.heroHeading,
+      getSiteStrings('en').home.heroHeading,
     ],
-    ['/id/glory-points', 'Kalkulator Glory Points'],
+    [
+      '/id/yeetalk-calculators',
+      getSiteStrings('id').calculators.heading,
+      getSiteStrings('en').calculators.heading,
+    ],
   ] as const) {
     test(`${path} is translated`, async ({ page }) => {
+      expect(heading).not.toBe(english);
       await page.goto(path);
       await expect(page.locator('html')).toHaveAttribute('lang', 'id');
       await expect(page.locator('h1')).toHaveText(heading);
@@ -1410,33 +1706,23 @@ test.describe('site-wide language switching', () => {
     page,
   }) => {
     await page.goto('/id/');
-    await expect(page.locator('nav a[href="/id/#services"]')).toHaveCount(1);
+    await expect(page.locator('nav a[href="/id/#shytalk"]')).toHaveCount(1);
     // The hrefs were asserted; the WORDS were not. An entirely English nav
     // bar on every Indonesian page passed the whole suite.
     await expect(page.locator('nav a')).toHaveText([
-      'Layanan',
-      'Karya',
+      // "ShyTalk" and "Yawelo Idle" are proper nouns, identical in all five
+      // locales by design; 'Alat' and 'Kontak' are what prove this nav is
+      // Indonesian.
+      'ShyTalk',
+      'Yawelo Idle',
+      'Alat',
       'Kontak',
     ]);
   });
 
-  test('the Indonesian homepage links to the Indonesian tools', async ({
-    page,
-  }) => {
-    // localisePath's own doc comment calls this "the classic i18n bug", and
-    // nothing asserted it anywhere: an Indonesian visitor clicking a work
-    // card landed on the English page.
-    await page.goto('/id/');
-    await expect(
-      page.locator('#work a[href="/id/classroom-groups"]'),
-    ).toHaveCount(1);
-    await expect(page.locator('#work a[href="/id/glory-points"]')).toHaveCount(
-      1,
-    );
-    await expect(page.locator('#work a[href="/classroom-groups"]')).toHaveCount(
-      0,
-    );
-  });
+  // Where the homepage's tool cards link, in every locale, is held by
+  // 'exactly two tool cards, each badged and linked in-locale' in
+  // homepage.spec.ts (#390 F129).
 
   test.describe('what each page tells a search engine', () => {
     // Asserted by VALUE. Counting the tags cannot tell the difference between
@@ -1458,8 +1744,18 @@ test.describe('site-wide language switching', () => {
         '/classroom-groups/',
         'id_ID',
       ],
-      ['/glory-points', '/glory-points/', '/id/glory-points/', 'en_GB'],
-      ['/id/glory-points', '/id/glory-points/', '/glory-points/', 'id_ID'],
+      [
+        '/yeetalk-calculators',
+        '/yeetalk-calculators/',
+        '/id/yeetalk-calculators/',
+        'en_GB',
+      ],
+      [
+        '/id/yeetalk-calculators',
+        '/id/yeetalk-calculators/',
+        '/yeetalk-calculators/',
+        'id_ID',
+      ],
     ] as const) {
       test(`${path}`, async ({ page }) => {
         await page.goto(path);
@@ -1490,14 +1786,9 @@ test.describe('site-wide language switching', () => {
     }
   });
 
-  test('the 404 answers in both languages', async ({ page }) => {
-    // Cloudflare Pages serves this one file for any unknown path, including
-    // /id/*, so an Indonesian visitor must not be stranded in English.
-    const response = await page.goto('/definitely-not-a-page');
-    expect(response?.status()).toBe(404);
-    await expect(page.locator('body')).toContainText('Page not found');
-    await expect(page.locator('body')).toContainText('Halaman tidak ditemukan');
-  });
+  // The 404 answering in every language is held by not-found.spec.ts, and its
+  // status code by site-meta.spec.ts. An English-and-Indonesian copy titled
+  // "in both languages" stood here from before the page served five (#390 F132).
 });
 
 // Stage 2, Task 7. Design spec section 2: "The default, collapsed state must
@@ -1600,133 +1891,238 @@ test.describe('the no-scroll rule, measured', () => {
   // JavaScript enabled.)
   //
   // Measured #main-to-#cg-go, the collapsed landing state, honestly.
-  // RE-MEASURED after this stage's Task 8 deleted the naming/theme picker
-  // fieldset ("Name the groups") -- the numbers below are that second
-  // measurement, not the first, and not the arithmetic the paragraph after
-  // the old table predicted:
   //
-  //   width x height   #cg-go.bottom   budget    vs budget
-  //   320x568          1221px          568px     653px OVER
-  //   375x667          1191px          667px     524px OVER
-  //   768x1024          707px          1024px    317px to spare
-  //   1280x800          707px           800px     93px to spare
+  // RE-MEASURED FOR #32, by running the page -- not carried forward. Two of
+  // the four rows in the table this replaces were already stale when #32 was
+  // picked up: it claimed 707px at both 768 and 1280 where the page actually
+  // renders 761px, and "93px to spare" at 1280x800 where the real headroom
+  // is 39px. Verified by rebuilding this file's own `git HEAD` version and
+  // measuring that, so the difference is the old table's and not the fix's.
+  // It is the same failure #32 exists to close -- a hand-maintained table
+  // nobody re-executes -- which is why the seam test below re-checks the
+  // mechanism on every run instead of trusting prose.
   //
-  // Every width fell by exactly 174px (1395->1221, 1365->1191, 881->707 at
-  // both wide widths) -- one fixed-height box leaving the flow, the same
-  // saving regardless of viewport, which is what the pre-removal note
-  // predicted and what re-measuring confirmed to the pixel. Nothing else
-  // moved: the roster section this stage added is absent from the landing
-  // state until a roster exists, so it costs nothing here.
+  //   width x height   #cg-form   #cg-go.bottom      budget   vs budget
+  //   320x568           769px     1221px -> 556px     568px   653 OVER -> 12 spare
+  //   375x667           768px     1191px -> 655px     667px   524 OVER -> 12 spare
+  //   768x1024          488px      761px (unchanged) 1024px   263 to spare
+  //   1280x800          488px      761px (unchanged)  800px    39 to spare
   //
-  // 768px and 1280x800 both fit now, neither on a technicality (317px and
-  // 93px to spare). 1280x800 flips from `fixme` to a real `test` on this
-  // measurement -- it was `fits: false` because 881px genuinely sat 81px
-  // past an 800px fold, and it is `fits: true` now because the box that
-  // put it there is gone, not because the check was weakened.
+  // The `#cg-form` column is why this was never a matter of trimming the
+  // hero. At 320 the form ALONE measures 769px against a 568px budget, and
+  // at 375 it is 768px against 667px -- so deleting the site header, the h1,
+  // the lead paragraph and the privacy note outright would STILL have left
+  // the submit button below the fold at both phone sizes. Nothing above the
+  // form was ever the thing standing in the way.
   //
-  // 320px and 375px stay the furthest over by a wide margin, and stay
-  // `fixme`: measured, not guessed, not weakened, not deleted. The picker
-  // was the last always-visible bordered box available to delete; with it
-  // gone, only an operator decision to trim the hero copy (h1/lead/
-  // privacy), the collapsed section headers' own density, or the How to
-  // use copy itself (ruled unchanged, section 2) would move the phone
-  // numbers again. Nothing left in this stage's plan touches them.
+  // The fix is in ClassroomGroupsPage.astro, under `@media screen`:
+  // `.actions` becomes `position: sticky; bottom: 0`, so the submit button
+  // rests ON the fold and the form scrolls behind it. The 12px of clearance
+  // at both phone sizes is the bar's own bottom padding -- measured, so this
+  // is not passing on an exact tie.
+  //
+  // EVERY WIDTH since #188, not just below 600px. Read the table above
+  // again: 1280x800 had THIRTY-NINE pixels to spare, which was a measurement
+  // of how much room that size happened to have, never a design decision.
+  // #188's three number fields cost 116px, and `#cg-go`'s bottom measured
+  // 912 against a budget of 800 -- 112px under the fold. The operator's call
+  // (2026-09-16) was to pin the bar at every width rather than squeeze the
+  // fields, so one mechanism carries all four sizes instead of two that
+  // would have to be kept in step.
+  //
+  // WHAT THIS ASSERTS, AND WHAT IT DOES NOT. `#cg-go` is REACHABLE without
+  // scrolling at all four sizes, which is what the title says. At none of
+  // them does the whole tool necessarily fit: the form scrolls behind a
+  // pinned action row. A sticky bar makes the action reachable, it does not
+  // make the page short. The title changed WITH the fix rather than being
+  // left behind to describe a page that no longer exists -- and the "at 768
+  // and 1280 the whole tool fits as well" sentence that used to sit here
+  // went with it, for exactly the same reason.
   const VIEWPORTS = [
-    { width: 320, height: 568, fits: false }, // iPhone SE
-    { width: 375, height: 667, fits: false }, // iPhone 8
-    { width: 768, height: 1024, fits: true }, // iPad
-    { width: 1280, height: 800, fits: true }, // laptop -- see table above
+    { width: 320, height: 568 }, // iPhone SE
+    { width: 375, height: 667 }, // iPhone 8
+    { width: 768, height: 1024 }, // iPad
+    { width: 1280, height: 800 }, // laptop
   ];
 
-  const measureFit = async (page: Page) => {
-    await page.goto('/classroom-groups');
+  const measureFit = async (page: Page, path = '/classroom-groups') => {
+    await page.goto(path);
+    await page.evaluate(() => document.fonts.ready);
     const { bottom, budget } = await page.evaluate(() => ({
-      bottom: Math.round(
-        document.getElementById('cg-go')!.getBoundingClientRect().bottom,
-      ),
+      bottom: document.getElementById('cg-go')!.getBoundingClientRect().bottom,
       budget: window.innerHeight,
     }));
-    expect(bottom).toBeLessThanOrEqual(budget);
+    // Compared RAW and rounded only for the reader: rounding first let a
+    // button 0.4px under the fold read as above it (#371, #390 F114).
+    expect(
+      bottom,
+      `#cg-go's bottom at ${bottom.toFixed(1)}px against a ${budget}px fold`,
+    ).toBeLessThanOrEqual(budget);
   };
 
-  for (const { width, height, fits } of VIEWPORTS) {
-    // `test.fixme` for the three that still do not fit -- tracked, not
-    // hidden; `test` for the one that genuinely passes. Written as an
-    // explicit if/else, each branch opening with a literal `test(`/
-    // `test.fixme(` token immediately followed by its own inline title --
-    // rather than the earlier `const run = fits ? test : test.fixme;
-    // run(title, ...)` indirection -- so a source scanner that attributes a
-    // viewport call to its enclosing test by looking for exactly that
-    // literal shape (tests/unit/viewport-tagging.test.ts, and any reader
-    // grepping for `test(`) can find this declaration at all: neither an
-    // aliased callee nor a title passed by variable reference is visible to
-    // a scan like that -- tests/unit/viewport-tagging.test.ts's own
-    // "aliased callee" synthetic test proves what that scan sees instead
-    // (an actionable finding, not silence). `measureFit` above is the one
-    // body the passing and failing cases still share, so they cannot drift
-    // into checking two different things -- only the trivial two-line
-    // wrapper that resizes the page and picks which registration function
-    // to call is duplicated, and it carries no assertion of its own.
-    if (fits) {
+  // No `fits` flag and no if/else any more -- every viewport runs as `test`.
+  // The flag existed only to choose `test.fixme` for the sizes that failed,
+  // and #32 removed the last two of those; a flag with one possible value is
+  // dead weight, and the branch it fed is precisely what made "tracked, not
+  // hidden" assertable without being true. `test(` is still written
+  // literally, with its title inline as a template literal rather than
+  // hoisted to a variable, because tests/guards/viewport-tagging.test.ts scans
+  // source text for exactly that shape and is blind to a title passed by
+  // reference or reached through an aliased callee.
+  for (const { width, height } of VIEWPORTS) {
+    test(
+      `the primary action is reachable without scrolling at ${width}x${height}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await measureFit(page);
+      },
+    );
+  }
+
+  // EVERY LOCALE, since #384. The loop above only ever measured English, and
+  // copy length is exactly what moves the fold: on develop before #384,
+  // /id/ put `#cg-go` 27px and /vi/ 111px below the fold at 320x568 with
+  // every test green. Swapping the lead for the longer who-and-why paragraph
+  // then pushed English (+33px) and Thai (+55px) over too. Derived from
+  // LOCALES, so a sixth language is measured the day it is added.
+  for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE)) {
+    for (const { width, height } of VIEWPORTS) {
       test(
-        `the tool fits without scrolling at ${width}x${height}`,
+        `/${locale}/: the primary action is reachable without scrolling at ${width}x${height}`,
         { tag: '@emulated-viewport' },
         async ({ page }) => {
           await page.setViewportSize({ width, height });
-          await measureFit(page);
-        },
-      );
-    } else {
-      test.fixme(
-        `the tool fits without scrolling at ${width}x${height}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height });
-          await measureFit(page);
+          await measureFit(page, localisePath('/classroom-groups', locale));
         },
       );
     }
   }
 
-  // The table above, and the `fits` flags it feeds, are hand-maintained --
-  // written by re-measuring and pasting the numbers in, not computed by
-  // this file. `test.fixme` bodies never run, so if a later change (stage
-  // 3 removing the picker, or anything else) closes the gap at a viewport
-  // still marked `fits: false`, nothing above would notice: the row would
-  // stay silently skipped, describing a bug that is no longer there. A
-  // hand-maintained table nothing ever re-checks is exactly how a
-  // `test.fixme` row outlives the bug it was tracking. This companion test
-  // re-measures all four, unconditionally -- never `fixme`'d -- and fails
-  // the moment reality and the declared `fits` table disagree, in EITHER
-  // direction: a viewport that starts passing while still marked `false`,
-  // or one that starts failing while marked `true`. Either failure means
-  // the table above is stale and needs updating by hand, the same way it
-  // was written.
-  test(
-    'the declared fits table matches what the page actually does',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      const actual: Record<string, boolean> = {};
-      for (const { width, height } of VIEWPORTS) {
+  // ASSERT THE SEAM, not the sides. The four tests above measure PIXELS, and
+  // pixels cannot say which mechanism is keeping the button on screen: if the
+  // sticky rule were deleted, they would report a number that happens to be
+  // too large, never the rule that moved.
+  //
+  // The contract CHANGED in #188 (operator decision, 2026-09-16). It used to
+  // be "sticky below 600px, static above it", on the reasoning that 768 and
+  // 1280 fit unaided. Three number fields costing 116px ended that -- 1280x800
+  // measured 912 against a budget of 800 -- so the bar is now sticky at every
+  // width, by one mechanism rather than two kept in step. This test going red
+  // is exactly what it is for: the old expectation was a statement about how
+  // much room those sizes had, and the page outgrew it.
+  //
+  // Still asserted at all four sizes rather than one. A rule that quietly
+  // stopped applying somewhere in the middle -- a stray `min-width`, a
+  // specificity fight with a later block -- would leave the pixel tests
+  // passing wherever the page happened to fit anyway.
+  // One test per viewport (#419): this spelled the four sizes out by hand,
+  // and the two below looped them, under one budget.
+  for (const { width, height } of VIEWPORTS)
+    test(
+      `the action row is sticky at ${width}x${height}, so the primary action is never below the fold`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
         await page.setViewportSize({ width, height });
         await page.goto('/classroom-groups');
-        const { bottom, budget } = await page.evaluate(() => ({
-          bottom: Math.round(
-            document.getElementById('cg-go')!.getBoundingClientRect().bottom,
+        const position = await page.evaluate(
+          () =>
+            getComputedStyle(
+              document.getElementById('cg-go')!.closest('.actions')!,
+            ).position,
+        );
+        expect(position).toBe('sticky');
+        await shoot(page, `${width}x${height}, the action row is sticky`);
+      },
+    );
+
+  // The bar's COMPANION rule, which had no test at all until #188.
+  // `scroll-padding-bottom` on `html` exists for one reason: to stop the
+  // browser scrolling a tabbed-to field, an anchor or a `scrollIntoView`
+  // target to a position the pinned action row covers. Both rules were
+  // capped at `max-width: 599px`; the bar moved to every width and nothing
+  // in this suite would have noticed the padding staying behind, because
+  // nothing asserted the padding at all.
+  //
+  // Asserted as a SEAM, not as a number. What matters is that the padding
+  // clears the row as the row ACTUALLY measures, not that it reads `5rem`:
+  // pinning the literal would go on passing if the bar grew and the padding
+  // did not, which is the one failure this rule exists to prevent, and it
+  // would restate a value that already has a home in the stylesheet.
+  for (const { width, height } of VIEWPORTS)
+    test(
+      `the scroll padding clears the pinned action row at ${width}x${height}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.goto('/classroom-groups');
+        const { padding, bar } = await page.evaluate(() => ({
+          padding: parseFloat(
+            getComputedStyle(document.documentElement).scrollPaddingBottom,
           ),
-          budget: window.innerHeight,
+          bar: document
+            .getElementById('cg-go')!
+            .closest('.actions')!
+            .getBoundingClientRect().height,
         }));
-        actual[`${width}x${height}`] = bottom <= budget;
-      }
-      const declared = Object.fromEntries(
-        VIEWPORTS.map(({ width, height, fits }) => [
-          `${width}x${height}`,
-          fits,
-        ]),
-      );
-      expect(actual).toEqual(declared);
-    },
-  );
+        // Liveness: a renamed class or a missing row would measure 0, and
+        // every padding value would then clear it.
+        expect(
+          bar,
+          'the action row must have a height to clear',
+        ).toBeGreaterThan(0);
+        expect(
+          padding,
+          'scroll padding must clear the pinned bar',
+        ).toBeGreaterThanOrEqual(bar);
+      },
+    );
+
+  // #188, operator decision 2026-09-17. Pinned at every width, the row
+  // covers the edge of whatever sits above it before any scrolling -- at
+  // 1280x900, the bottom of "Sound and animation". A soft shadow cast UP over
+  // that edge makes it read as passing under a docked bar rather than as
+  // clipped. Asserted as the property that does that work -- visible, soft,
+  // offset upward -- because a pinned literal would go on passing with the
+  // offset flipped below the row, off the fold where nobody sees it.
+  for (const { width, height } of VIEWPORTS)
+    test(
+      `the pinned action row casts a soft shadow upward at ${width}x${height}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.goto('/classroom-groups');
+        const shadow = await page.evaluate(
+          () =>
+            getComputedStyle(
+              document.getElementById('cg-go')!.closest('.actions')!,
+            ).boxShadow,
+        );
+        // A computed shadow serialises colour first, then lengths:
+        // `rgba(0, 0, 0, 0.55) 0px -12px 24px -8px`.
+        const parts =
+          /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
+        expect(
+          parts,
+          `${width}x${height}: the pinned row has a shadow (computed: ${shadow})`,
+        ).not.toBeNull();
+        const [, colour, , offsetY, blur] = parts!;
+        expect(Number(offsetY), `${width}x${height}: cast upward`).toBeLessThan(
+          0,
+        );
+        expect(
+          Number(blur),
+          `${width}x${height}: soft, not a hard line`,
+        ).toBeGreaterThan(0);
+        expect(colour, `${width}x${height}: not transparent`).not.toMatch(
+          /, 0\)$/,
+        );
+        await shoot(
+          page,
+          `${width}x${height}, the row casts its shadow upward`,
+        );
+      },
+    );
 
   // L-08. The brief's own literal query measured only what page LOAD
   // already shows -- nothing inside any of the four sections is on screen
@@ -1771,38 +2167,60 @@ test.describe('the no-scroll rule, measured', () => {
   // on: the label for a radio/checkbox, the element itself for everything
   // else. It can still fail for real: any control whose min-height/padding
   // regresses below 44px, radio/checkbox label included, still shows up.
-  test(
-    'every interactive target is at least 44px, collapsed and with every section open',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await page.goto('/classroom-groups');
-      for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
-        await page.locator(`#${id}-toggle`).click();
-      }
-      const small = await page.evaluate(() =>
-        [
-          ...document.querySelectorAll(
-            'button, input, select, textarea, summary, a',
-          ),
-        ]
-          .map((el) => {
-            const isBoxControl =
-              el instanceof HTMLInputElement &&
-              (el.type === 'radio' || el.type === 'checkbox');
-            const target = isBoxControl ? (el.closest('label') ?? el) : el;
-            return {
-              tag: el.tagName,
-              id: el.id,
-              r: target.getBoundingClientRect(),
-            };
-          })
-          .filter(({ r }) => r.width > 0 && (r.height < 44 || r.width < 44))
-          .map(({ tag, id }) => `${tag}#${id}`),
-      );
-      expect(small).toEqual([]);
-    },
-  );
+  //
+  // Every locale (#423): every control on the page holds the page's own copy.
+  for (const path of localePaths('/classroom-groups'))
+    test(
+      `every interactive target is at least 44px, collapsed and with every section open -- ${path}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 900 });
+        await page.goto(path);
+        for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
+          await tapOn(page.locator(`#${id}-toggle`));
+        }
+        // Every target on screen is measured; the ones too small are the
+        // verdict, the ones measured are its population (#610).
+        const { measured, small } = await page.evaluate(() => {
+          const targets = [
+            ...document.querySelectorAll(
+              'button, input, select, textarea, summary, a',
+            ),
+          ]
+            // Not the report form's honeypot, which no person is meant to
+            // reach: it sits under `aria-hidden` with `tabindex="-1"`, the
+            // same exclusion tests/typed-fields.ts makes. It is in every
+            // locale but English, so only the per-locale cases met it (#423).
+            .filter((el) => !el.closest('[aria-hidden="true"]'))
+            .map((el) => {
+              const isBoxControl =
+                el instanceof HTMLInputElement &&
+                (el.type === 'radio' || el.type === 'checkbox');
+              const target = isBoxControl ? (el.closest('label') ?? el) : el;
+              return {
+                tag: el.tagName,
+                id: el.id,
+                r: target.getBoundingClientRect(),
+              };
+            })
+            .filter(({ r }) => r.width > 0);
+          const name = ({ tag, id }: { tag: string; id: string }) =>
+            `${tag}#${id}`;
+          return {
+            measured: targets.map(name),
+            small: targets
+              .filter(({ r }) => r.height < 44 || r.width < 44)
+              .map(name),
+          };
+        });
+        expect(
+          searched(small, {
+            of: measured,
+            what: 'interactive targets on screen with every section open',
+          }),
+        ).toEqual([]);
+      },
+    );
 
   // L-09. The accent colour is the AA floor by design ("never lighten
   // without re-checking contrast", CLAUDE.md) -- this computes the REAL
@@ -1815,41 +2233,146 @@ test.describe('the no-scroll rule, measured', () => {
   // AA. What would redden this: those custom properties moving closer
   // together, or `.actions button`'s own background/color rules drifting
   // from the variables entirely.
-  test('the accent colour still meets the WCAG AA contrast floor', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    const contrast = await page.locator('#cg-go').evaluate((el) => {
-      const style = getComputedStyle(el);
-      const nums = (css: string) => css.match(/[\d.]+/g)!.map(Number);
-      const [ir, ig, ib] = nums(style.color);
-      const [br, bg, bb] = nums(style.backgroundColor);
-      const lin = (c: number) => {
-        const s = c / 255;
-        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      };
-      const luminance = (r: number, g: number, b: number) =>
-        0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-      const textLum = luminance(ir, ig, ib);
-      const bgLum = luminance(br, bg, bb);
-      const lighter = Math.max(textLum, bgLum);
-      const darker = Math.min(textLum, bgLum);
-      return (lighter + 0.05) / (darker + 0.05);
+  for (const theme of THEMES)
+    test(`${theme}: the accent colour still meets the WCAG AA contrast floor`, async ({
+      page,
+    }) => {
+      await page.goto('/classroom-groups');
+      await emulateTheme(page, theme);
+      const contrast = await contrastRatio(page.locator('#cg-go'));
+      expect(contrast).toBeGreaterThanOrEqual(4.5);
     });
-    expect(contrast).toBeGreaterThanOrEqual(4.5);
-  });
 
   // M-11. The one test in this file that never touches /classroom-groups --
-  // CLAUDE.md's "homepage ships zero JS" is a site-wide promise this task's
-  // own work could put at risk only by accident (a shared layout partial, a
-  // global script tag), so it earns a direct check rather than an inference
-  // from the tool page's own tests passing.
-  test('the homepage still ships no JavaScript', async ({ page }) => {
-    const scripts: string[] = [];
-    page.on('request', (r) => {
-      if (r.resourceType() === 'script') scripts.push(r.url());
-    });
+  // CLAUDE.md's promise about what the homepage ships (one script, the theme
+  // script, since #142) is site-wide, and this task's own work could put it
+  // at risk only by accident (a shared layout partial, a global script tag),
+  // so it earns a direct check rather than an inference.
+  test('the homepage ships the theme script and nothing else', async ({
+    page,
+  }) => {
+    // Rewritten for #142. The promise was "the homepage ships zero JS"; it
+    // now ships exactly one script, the inline theme script, so this pins
+    // what may exist rather than counting to zero. Two measurements still,
+    // because a request recorder cannot see an inline script at all (#79):
+    // the DOM says what is on the page, and the recorder that nothing was
+    // fetched to run. theme-script.spec.ts pins the same on every page.
+    const seen = recordRequests(page);
     await page.goto('/');
-    expect(scripts).toEqual([]);
+    const scripts = await page.evaluate(() =>
+      [...document.scripts].map((script) => ({
+        src: script.getAttribute('src') ?? '',
+        text: script.textContent ?? '',
+      })),
+    );
+    expect(scripts, 'the homepage carries the theme script alone').toEqual([
+      { src: '', text: THEME_SCRIPT_SOURCE },
+    ]);
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect(
+      searched(
+        heard.filter(({ resourceType }) => resourceType === 'script'),
+        { of: heard, what: 'requests the homepage made' },
+      ),
+      'the homepage fetches no script',
+    ).toEqual([]);
   });
+});
+
+/**
+ * Every language the page is served in renders its OWN messages (#136).
+ *
+ * The ticket's defect, in the medium it was reported in: the 51 parameterised
+ * messages were English functions that zh, vi and th took by reference, so a
+ * Chinese page numbered its groups "Group 1". The unit guards hold each
+ * catalogue to English's structure; only a render proves the page reads the
+ * catalogue of the language it is served in. Derived from LOCALES, with every
+ * expectation taken from that locale's own table, so a sixth language is
+ * covered the day it is added. The Indonesian pins above stay: a pin catches a
+ * wrong catalogue value that this comparison would agree with.
+ *
+ * One of each shape a message takes: a slot (a student's number, a group's),
+ * a plural (the summary), a refusal carrying a value, and a list (the roster's
+ * missing-sex problem, joined by the site's own list joins, #1008).
+ */
+test.describe('every language renders its own messages', () => {
+  for (const locale of LOCALES) {
+    test(`${locale}: numbers, groups, a summary, a refusal and a list`, async ({
+      page,
+    }) => {
+      const t = getStrings(locale);
+      const english = getStrings(DEFAULT_LOCALE);
+      const path = localisePath('/classroom-groups', locale);
+      /** What English would have said in its place -- the fallback removed. */
+      const notEnglish = (own: string, inEnglish: string) => {
+        if (locale !== DEFAULT_LOCALE) expect(own).not.toBe(inEnglish);
+      };
+
+      await page.goto(path);
+      await fill(page, { count: '4', size: '2' });
+      await tapOn(page.locator('#cg-go'));
+      const labels = await page
+        .locator('#cg-results .student')
+        .allTextContents();
+      expect(labels.sort()).toEqual(
+        [1, 2, 3, 4].map((n) => t.studentNumber({ n })).sort(),
+      );
+      notEnglish(t.studentNumber({ n: 1 }), english.studentNumber({ n: 1 }));
+      await expect(page.locator('#cg-results .group h3').first()).toHaveText(
+        t.groupLabel({ n: 1 }),
+      );
+      notEnglish(t.groupLabel({ n: 1 }), english.groupLabel({ n: 1 }));
+      await shoot(
+        page,
+        'students and groups are numbered in the page language',
+        page.locator('#cg-results'),
+      );
+
+      const summary = t.resultsSummary({ groups: 2, students: 4 });
+      await expect(page.locator('#cg-summary')).toHaveText(summary);
+      notEnglish(summary, english.resultsSummary({ groups: 2, students: 4 }));
+      await shoot(
+        page,
+        'the summary counts in the page language',
+        page.locator('#cg-summary'),
+      );
+
+      await fill(page, { count: '100000000', size: '4' });
+      await tapOn(page.locator('#cg-go'));
+      const refusal = t.errors.TOO_MANY_STUDENTS({ max: 100 });
+      await expect(page.locator('#cg-error')).toHaveText(refusal);
+      notEnglish(refusal, english.errors.TOO_MANY_STUDENTS({ max: 100 }));
+      await shoot(
+        page,
+        'a refusal carries its value in the page language',
+        page.locator('#cg-error'),
+      );
+
+      await page.goto(path);
+      await tapOn(page.locator('#cg-students-toggle'));
+      const add = page.getByRole('button', {
+        name: t.rosterAddStudent.replace(/^[+\s]+/, ''),
+      });
+      await tapOn(add);
+      await tapOn(add);
+      await expect(page.locator('.cg-student')).toHaveCount(2);
+      const names = [t.studentNumber({ n: 1 }), t.studentNumber({ n: 2 })];
+      const problem = t.rosterNoSexMessage({ names });
+      await expect(page.locator('#cg-roster-problem')).toHaveText(problem);
+      notEnglish(
+        problem,
+        english.rosterNoSexMessage({
+          names: [
+            english.studentNumber({ n: 1 }),
+            english.studentNumber({ n: 2 }),
+          ],
+        }),
+      );
+      await shoot(
+        page,
+        'a list of students is joined in the page language',
+        page.locator('#cg-roster-problem'),
+      );
+    });
+  }
 });

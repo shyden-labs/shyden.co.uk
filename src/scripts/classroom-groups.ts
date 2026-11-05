@@ -10,7 +10,10 @@
  * the means of producing it.
  */
 import {
+  anonymousStudent,
   buildGroups,
+  plannedGroups,
+  type GroupingInput,
   type Student,
   type Mode,
   type Leftovers,
@@ -29,8 +32,8 @@ import {
 } from '../lib/roster';
 import {
   renderRoster,
-  anonymousStudent,
   type RosterHandlers,
+  type PrintColumn,
 } from './roster-ui';
 import {
   envelopeTotalS,
@@ -61,19 +64,29 @@ import {
   isLocale,
   renderError,
   renderWarning,
+  renderNumbersProblem,
   groupName,
   resultsHeadingText,
   type Locale,
   type Strings,
 } from '../lib/i18n';
+import {
+  parseNumberSets,
+  studentsForInput,
+  type NumberFields,
+  type NumberSetsProblem,
+} from '../lib/numberSets';
 import { sexWhy, sexWhyReturning } from '../lib/sexOptions';
 import { renderIo } from './io-ui';
 import { renderPrintPanel } from './print-ui';
 import { renderProjector } from './projector';
+import { travel } from './board-travel';
+import { travelOrder, travelSchedule } from '../lib/travel';
 import { todayISO } from '../lib/csv';
 import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
 import { avatarSymbolId } from '../lib/avatars';
+import { liftFor } from '../lib/keyboard-dock';
 import { landAssetIndex, SFX_ASSET_GAIN } from '../lib/sfxAssets';
 // Six real, mastered CC0 samples (src/assets/sfx/CREDITS.md has provenance
 // and licence) -- imported through Vite so a missing file fails the BUILD,
@@ -86,6 +99,8 @@ import land2AssetUrl from '../assets/sfx/land-2.m4a';
 import land3AssetUrl from '../assets/sfx/land-3.m4a';
 import land4AssetUrl from '../assets/sfx/land-4.m4a';
 import doneAssetUrl from '../assets/sfx/done.m4a';
+import { enhanceReportForm } from './report-form';
+import { absentNumbers, waitingRoll } from '../lib/absence';
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T | null;
@@ -349,10 +364,14 @@ if (form) {
   // could resolve the two differently.
   const rosterNames = new Map<number, string>();
   const resolveStudent = (n: number): string =>
-    rosterNames.get(n) ?? t.studentNumber(n);
+    rosterNames.get(n) ?? t.studentNumber({ n });
   const errorBox = $<HTMLParagraphElement>('cg-error')!;
   const results = $<HTMLElement>('cg-results')!;
   const resultsHeadingEl = $<HTMLHeadingElement>('cg-results-h')!;
+  // #188, AC13. Says how many were actually grouped when that differs from
+  // the number typed, so a teacher never has to notice a missing pupil by
+  // counting the cards.
+  const groupedNoteEl = $<HTMLParagraphElement>('cg-grouped-note')!;
   const classInput = $<HTMLInputElement>('cg-class')!;
   const summary = $<HTMLParagraphElement>('cg-summary')!;
   // Stage 3, Task 9. The <ul> a successful shuffle's own `warnings` render
@@ -371,6 +390,33 @@ if (form) {
   const soundText = $<HTMLSpanElement>('cg-sound-text')!;
   const speedSelect = $<HTMLSelectElement>('cg-speed')!;
   const goButton = $<HTMLButtonElement>('cg-go')!;
+
+  // Issue 853: Safari's on-screen keyboard shrinks only the visual viewport,
+  // so the Make Groups row, docked to the layout viewport's bottom, sat
+  // behind the keys while a teacher typed. The row's `bottom` reads
+  // `--keyboard-overlap` (ClassroomGroupsPage.astro), kept here at what the
+  // keyboard hides while a field that takes typing has focus; where the
+  // keyboard resizes the page instead (Android, issue 807) that is 0. A
+  // pinch zoom never moves it (Shyden, 2026-10-23), hence the focus.
+  const dockedRow = goButton.parentElement!;
+  const view = window.visualViewport;
+  if (view) {
+    let lift = 0;
+    const keepAboveKeyboard = () => {
+      lift = liftFor(
+        window.innerHeight,
+        view,
+        document.activeElement as HTMLElement | null,
+        lift,
+      );
+      dockedRow.style.setProperty('--keyboard-overlap', `${lift}px`);
+    };
+    view.addEventListener('resize', keepAboveKeyboard);
+    view.addEventListener('scroll', keepAboveKeyboard);
+    document.addEventListener('focusin', keepAboveKeyboard);
+    document.addEventListener('focusout', keepAboveKeyboard);
+    keepAboveKeyboard();
+  }
 
   // A localStorage KEY, not a DOM id -- deliberately left as the literal
   // 'cg-sound' rather than renamed alongside the checkbox above: a teacher
@@ -598,21 +644,19 @@ if (form) {
       ? serialiseForCompare(roster)
       : JSON.stringify({ count: readCount() });
 
-  // `leftovers` is the one `ToolState` field a teacher can actually change
-  // today: the radios now live inside `#cg-grouping-body` (Stage 2, Task 4
-  // rehomed them there, unchanged), and the header must not go on reporting
-  // "none" once one is chosen. This listener needed NO change for that
-  // move: it delegates on `#cg-form`'s own `change` event and
-  // `readRadio` queries `input[name="leftovers"]:checked` scoped to the
-  // whole form, neither of which cares how deep the radio sits inside it.
-  // Calls the SAME `sectionState` that produced the header's build-time
-  // text (see ClassroomGroupsPage.astro's own `initialToolState`) with
-  // every other field left at that same default -- no roster exists yet,
-  // and nothing can mark the roster dirty until a later stage gives it
-  // something to lose -- so the two can never disagree by computing the
-  // sentence two different ways. `sexMode` stays `'off'` here for the same
-  // reason `readSexMode` always returns `'off'` -- see that function's own
-  // comment, above, for the rest of the reasoning.
+  // The Grouping options header names the two choices made inside that
+  // section: the sex switches and the leftovers radios. It must never go on
+  // reporting "none" once either is chosen. The form's `change` handler
+  // (below) refreshes it for both. The switches carry no `name`, so they are
+  // matched by identity; until #390 only the radios were, and ticking "Mix
+  // boys and girls evenly" left the header saying "none" in every locale.
+  // `updateSexSwitches` refreshes it too, because a roster edit that
+  // disables the switches changes what `readSexMode` returns without any
+  // switch changing. Calls the SAME `sectionState` that produced the
+  // header's build-time text (see ClassroomGroupsPage.astro's own
+  // `initialToolState`), so the two can never disagree by computing the
+  // sentence two different ways; the roster fields it leaves at their
+  // defaults belong to the Student details header, not this one.
   const groupingStateEl = document.querySelector<HTMLElement>(
     '#cg-grouping .state',
   );
@@ -705,6 +749,152 @@ if (form) {
   const countInput = $<HTMLInputElement>('cg-count')!;
   const countHelpEl = $<HTMLParagraphElement>('cg-count-help')!;
   const countLockedEl = $<HTMLParagraphElement>('cg-count-locked')!;
+
+  // #188. The three number fields, cached the same way `countInput` above
+  // is, and for the same reason: each is read AND written on every pass.
+  const absentInput = $<HTMLInputElement>('cg-numbers-absent')!;
+  const togetherInput = $<HTMLInputElement>('cg-numbers-together')!;
+  const apartInput = $<HTMLInputElement>('cg-numbers-apart')!;
+  const numbersLockedEl = $<HTMLParagraphElement>('cg-numbers-locked')!;
+  const numbersProblemEl = $<HTMLParagraphElement>('cg-numbers-problem')!;
+  // Which help paragraph describes which field is read from the MARKUP's own
+  // `aria-describedby`, not from a second list here. A list would be a
+  // second place the pairing is written, and the two would drift the first
+  // time an id changed.
+  const numberFields = [absentInput, togetherInput, apartInput].map((input) => {
+    const helpId = input.getAttribute('aria-describedby')!;
+    return { input, helpId, help: $<HTMLParagraphElement>(helpId)! };
+  });
+
+  /**
+   * The three fields, parsed against whatever `#cg-count` holds right now.
+   *
+   * The FIRST problem wins, absent then together then apart, matching the
+   * order they appear on the page -- `updateRosterValidation` renders
+   * `problems[0]` for the identical reason: a teacher fixes one thing, then
+   * is told the next, rather than being handed a list to triage.
+   */
+  const readNumberFields = (): {
+    fields: NumberFields;
+    problem: NumberSetsProblem | null;
+  } => {
+    const count = readCount();
+    const absent = parseNumberSets(absentInput.value, {
+      count,
+      kind: 'absent',
+    });
+    const together = parseNumberSets(togetherInput.value, {
+      count,
+      kind: 'pairing',
+    });
+    const apart = parseNumberSets(apartInput.value, { count, kind: 'pairing' });
+    return {
+      fields: {
+        absent: absent.sets,
+        together: together.sets,
+        apart: apart.sets,
+      },
+      problem: absent.problem ?? together.problem ?? apart.problem,
+    };
+  };
+
+  /**
+   * The fields' problem, but only while a teacher can act on it.
+   *
+   * A list locks the fields (AC14) and then decides alone who is grouped, so
+   * whatever text the locked fields still hold refuses nothing: it neither
+   * holds the shuffle nor shows a refusal. Both readers ask HERE rather than
+   * checking the lock themselves (#390 F68): the button used to read the
+   * locked fields directly, and a number refused before the list existed
+   * kept it disabled with its stated reason hidden.
+   */
+  const standingNumbersProblem = (): NumberSetsProblem | null =>
+    studentsBoxLocked(getRoster()) ? null : readNumberFields().problem;
+
+  /**
+   * The ONE writer of `goButton.disabled`, reading BOTH things that can
+   * stand between a teacher and a shuffle.
+   *
+   * Two writers would be rivals: whichever ran last would win, so a clean
+   * number field could silently clear a roster problem that still stands.
+   * `updateRosterValidation` therefore hands the decision here rather than
+   * setting the property itself.
+   */
+  // Filled once the board exists (#743): its button follows this same fact,
+  // and `updateGoButton` first runs during set-up, before the board does.
+  let onShuffleReadinessChanged: (() => void) | null = null;
+  const updateGoButton = () => {
+    // Copied, not passed straight through: `getRoster()` hands back a
+    // `readonly Student[]` and `rosterProblems` takes a mutable one, which
+    // is the same reason `updateRosterValidation` below spreads it too.
+    const rosterStops = rosterProblems([...getRoster()], t).length > 0;
+    const numbersStop = standingNumbersProblem() !== null;
+    goButton.disabled = rosterStops || numbersStop;
+    // ...and the ONE writer of the reason too, for the reason it is the one
+    // writer of `disabled`: two writers would be rivals, and a button that
+    // says nothing about why it will not move is #250's whole subject. The
+    // ids name the very paragraphs `updateRosterValidation` and
+    // `updateNumbersValidation` fill, so the text a screen reader is handed
+    // and the text on the page are the same node (AC10), and the description
+    // names only the problems that are actually standing right now.
+    const describedBy = [
+      rosterStops ? 'cg-roster-problem' : null,
+      numbersStop ? 'cg-numbers-problem' : null,
+    ].filter((id) => id !== null);
+    if (describedBy.length > 0) {
+      goButton.setAttribute('aria-describedby', describedBy.join(' '));
+    } else {
+      goButton.removeAttribute('aria-describedby');
+    }
+    onShuffleReadinessChanged?.();
+  };
+
+  /**
+   * Hide/show the region, THEN write into it -- the same ordering
+   * `updateRosterValidation` keeps, so a live region is never announced as
+   * already-populated.
+   */
+  const updateNumbersValidation = () => {
+    const problem = standingNumbersProblem();
+    if (problem === null) {
+      numbersProblemEl.hidden = true;
+      numbersProblemEl.textContent = '';
+    } else {
+      numbersProblemEl.hidden = false;
+      const message = renderNumbersProblem(problem, readCount(), t);
+      if (numbersProblemEl.textContent !== message) {
+        numbersProblemEl.textContent = message;
+      }
+    }
+    updateGoButton();
+  };
+
+  /**
+   * AC14. The list and these fields are never both in charge, exactly as
+   * the list and `#cg-count` are never both in charge -- `studentsBoxLocked`
+   * is the same single fact behind both, which is why this asks it rather
+   * than deciding for itself.
+   *
+   * A locked field cannot be edited, so a refusal it was showing is about
+   * text nobody can change any more: `standingNumbersProblem` drops it,
+   * leaving the roster's own problems as the only thing that can hold the
+   * button. Unlocking re-validates the same way, so text the class can no
+   * longer hold is refused again with its reason on screen.
+   */
+  const updateNumberFields = () => {
+    const locked = studentsBoxLocked(getRoster());
+    for (const field of numberFields) {
+      field.input.disabled = locked;
+      field.input.setAttribute(
+        'aria-describedby',
+        locked ? 'cg-numbers-locked' : field.helpId,
+      );
+      field.help.hidden = locked;
+    }
+    numbersLockedEl.hidden = !locked;
+    updateNumbersValidation();
+  };
+
   const updateStudentsBox = () => {
     if (studentsBoxLocked(getRoster())) {
       // "Reports the list" -- overwritten to the roster's own length on
@@ -764,27 +954,11 @@ if (form) {
       sexWhyEl.hidden = why === null;
       sexWhyEl.textContent = why ?? '';
     }
+    // A disabled switch no longer counts (`readSexMode`), so the header
+    // that names it must drop it too.
+    updateGroupingHeader();
   };
 
-  /**
-   * A rename must reach the groups already on screen.
-   *
-   * `serialiseForCompare` (src/lib/roster.ts) deliberately excludes the
-   * name, so typing one onto a student who was already in the shuffle does
-   * NOT mark the groups out of date -- correctly: it changes nothing about
-   * who ended up with whom. But without this, the sheet then goes on saying
-   * "Student 1" with no notice inviting a reshuffle either, which is the
-   * worst of both: the teacher's edit appears to have done nothing at all.
-   *
-   * Re-labels in place from `resolveStudent`, the SAME lookup `render`'s
-   * own `label` uses, rather than re-rendering the cards: a re-render would
-   * rebuild every `<li>` and lose the `.dealt` class the deal animation
-   * sets, so a rename mid-deal would blank the board. The number lives on
-   * the element itself (`data-number`, written by `render`) because the
-   * `Student` objects the shuffle was built from are not kept anywhere
-   * after it finishes -- and re-deriving position from the roster would be
-   * wrong anyway, since the roster's order is not the groups' order.
-   */
   /**
    * Keep every roster row's print-only text twin in step with its control.
    *
@@ -807,27 +981,54 @@ if (form) {
       const student = current[i];
       if (!student) return;
       row.dataset.absent = String(student.absent);
-      const values = row.querySelectorAll<HTMLElement>('.cg-print-value');
-      const texts = [
-        String(student.number),
-        student.name ?? '',
-        student.sex === 'M'
-          ? t.rosterSexMale
-          : student.sex === 'F'
-            ? t.rosterSexFemale
-            : t.rosterUnset,
-        student.absent ? '\u2611' : '\u2610',
-        student.together ?? t.rosterUnset,
-        student.apart ?? t.rosterUnset,
-      ];
-      values.forEach((el, j) => {
-        if (texts[j] !== undefined && el.textContent !== texts[j]) {
-          el.textContent = texts[j];
+      // Keyed by COLUMN, never by position. The row is built Absent-first
+      // and these values are written number-first, so the positional mapping
+      // this replaced put every value one cell early -- see `PrintColumn`'s
+      // own comment in roster-ui.ts for what that printed (#253). A mirror
+      // carries the column it belongs to, so reordering the table can no
+      // longer re-point them without anyone noticing.
+      const texts: Record<PrintColumn, string> = {
+        number: String(student.number),
+        name: student.name ?? '',
+        sex:
+          student.sex === 'M'
+            ? t.rosterSexMale
+            : student.sex === 'F'
+              ? t.rosterSexFemale
+              : t.rosterUnset,
+        absent: student.absent ? '\u2611' : '\u2610',
+        together: student.together ?? t.rosterUnset,
+        apart: student.apart ?? t.rosterUnset,
+      };
+      row.querySelectorAll<HTMLElement>('.cg-print-value').forEach((el) => {
+        const column = el.dataset.col as PrintColumn | undefined;
+        const text = column === undefined ? undefined : texts[column];
+        if (text !== undefined && el.textContent !== text) {
+          el.textContent = text;
         }
       });
     });
   };
 
+  /**
+   * A rename must reach the groups already on screen.
+   *
+   * `serialiseForCompare` (src/lib/roster.ts) deliberately excludes the
+   * name, so typing one onto a student who was already in the shuffle does
+   * NOT mark the groups out of date -- correctly: it changes nothing about
+   * who ended up with whom. But without this, the sheet then goes on saying
+   * "Student 1" with no notice inviting a reshuffle either, which is the
+   * worst of both: the teacher's edit appears to have done nothing at all.
+   *
+   * Re-labels in place from `resolveStudent`, the SAME lookup `render`'s
+   * own `label` uses, rather than re-rendering the cards: a re-render would
+   * rebuild every `<li>` and lose the `.dealt` class the deal animation
+   * sets, so a rename mid-deal would blank the board. The number lives on
+   * the element itself (`data-number`, written by `render`) because the
+   * `Student` objects the shuffle was built from are not kept anywhere
+   * after it finishes -- and re-deriving position from the roster would be
+   * wrong anyway, since the roster's order is not the groups' order.
+   */
   const relabelResults = () => {
     for (const el of tables.querySelectorAll<HTMLElement>('.student')) {
       const number = Number(el.dataset.number);
@@ -835,6 +1036,24 @@ if (form) {
       if (!who || !Number.isFinite(number)) continue;
       const next = resolveStudent(number);
       if (who.textContent !== next) who.textContent = next;
+    }
+    // #999: the board's Absent row names a student only where the roster
+    // has a name, so a rename can add, change or take away the name.
+    for (const chip of document.querySelectorAll<HTMLElement>(
+      '#cg-absent-list .waiting-student',
+    )) {
+      const name = rosterNames.get(Number(chip.dataset.number));
+      let who = chip.querySelector<HTMLElement>('.who');
+      if (!name) {
+        who?.remove();
+        continue;
+      }
+      if (!who) {
+        who = document.createElement('span');
+        who.className = 'who';
+        chip.querySelector('.number')?.after(who);
+      }
+      if (who.textContent !== name) who.textContent = name; // set as TEXT
     }
   };
 
@@ -864,6 +1083,7 @@ if (form) {
     updateIoHeader();
     updateStudentsHeader();
     updateStudentsBox();
+    updateNumberFields();
     updateSexSwitches(previous);
     relabelResults();
     refreshPrintMirrors();
@@ -872,6 +1092,7 @@ if (form) {
   updateIoHeader();
   updateStudentsHeader();
   updateStudentsBox();
+  updateNumberFields();
   // The initial call passes the CURRENT roster as its own "previous": on
   // first paint nothing has changed yet, and `sexWhyReturning` comparing a
   // roster against itself finds nobody who came back, which is the truth.
@@ -899,8 +1120,9 @@ if (form) {
    * three predicates that write it: `updateStaleness` clears it, and
    * `updateStaleness` runs during setup -- a `const` declared later is in
    * its temporal dead zone at that moment and throws, which nothing in this
-   * repo would have caught before a visitor did (there is no type checker,
-   * and `astro build` strips types without checking them).
+   * repo would have caught before a visitor did (`astro check` cannot see
+   * the order a function is called in, and `astro build` strips types
+   * without checking them).
    *
    * ONE element for all three exits, because a teacher does one thing at a
    * time and three boxes would be three places to look.
@@ -961,7 +1183,12 @@ if (form) {
     finishDealNow();
     const target = e.target as HTMLInputElement;
     if (target.name === 'mode') showFor('mode', target.value);
-    if (target.name === 'leftovers') updateGroupingHeader();
+    if (
+      target.name === 'leftovers' ||
+      target === sexMix ||
+      target === sexSeparate
+    )
+      updateGroupingHeader();
     updateStaleness();
   });
   // The brief's own instruction: recompute on every `change` AND `input`
@@ -970,6 +1197,11 @@ if (form) {
   form.addEventListener('input', () => {
     finishDealNow();
     updateStaleness();
+    // #188, AC12. This listener is delegated across the WHOLE form, so it
+    // fires for `#cg-count` as well as for the three number fields:
+    // lowering the count below a number already typed re-validates the
+    // moment it happens, rather than waiting to fail at "Make groups".
+    updateNumbersValidation();
   });
 
   // ── student roster (Student details' table) ─────────────────────────────
@@ -1019,10 +1251,13 @@ if (form) {
         ? rosterOpenProblem(getRoster().length, readCount(), t)
         : null;
       if (problem) {
+        // Revealed, THEN written: a live region is never announced as
+        // already-populated (updateNumbersValidation's ordering). Written the
+        // other way round, a screen reader said nothing at all (#390 F108).
+        studentsLimitEl.hidden = false;
         if (studentsLimitEl.textContent !== problem) {
           studentsLimitEl.textContent = problem;
         }
-        studentsLimitEl.hidden = false;
         // The section's own open/closed state is untouched: "refuses to
         // open" means exactly that -- `studentsBody.hidden` and
         // `aria-expanded` both stay exactly as they were, so a teacher who
@@ -1091,7 +1326,9 @@ if (form) {
       }
     }
 
-    goButton.disabled = problems.length > 0;
+    // Handed to the ONE writer rather than set here -- see `updateGoButton`'s
+    // own doc comment for why two writers of this property would be rivals.
+    updateGoButton();
   };
 
   /** The one place a per-field roster edit becomes real. `setRoster`'s own
@@ -1259,7 +1496,7 @@ if (form) {
       printHead.appendChild(who);
     }
     const when = document.createElement('span');
-    when.textContent = t.printedOn(todayISO());
+    when.textContent = t.printedOn({ on: todayISO() });
     printHead.appendChild(when);
   };
 
@@ -1326,8 +1563,10 @@ if (form) {
     // never behave differently from one triggered on the page.
     onShuffle: () => form.requestSubmit(goButton),
     // The SAME fact the page's own deal button uses, read rather than
-    // duplicated: one shuffle at a time, whichever button asked for it.
-    busy: () => goButton.disabled,
+    // duplicated: `updateGoButton` disables it only when the roster cannot
+    // be dealt, never for a deal in progress. A second press mid-deal is
+    // superseded by `dealToken`, whichever button made it.
+    cannotDeal: () => goButton.disabled,
     refuseReason: () => refuse(t.staleRefuseBoard),
     // Design spec section 8: the reveal is animation, and the two ways a
     // teacher can already turn animation off both apply here. `#cg-speed`
@@ -1335,9 +1574,26 @@ if (form) {
     // it to `skip` -- one fact, read once, rather than two checks that
     // could disagree.
     animates: () => speedSelect.value !== 'skip',
+    // #743: opened before the first deal, the board waits with empty cards;
+    // closed without one, the page is left as it was (AC4).
+    onEnter: () => {
+      if (lastGroups === null) showWaiting();
+    },
+    onLeave: () => {
+      finishDealNow(); // #744: a deal still travelling lands at once
+      if (lastGroups !== null) return;
+      hideWaiting();
+      tables.textContent = '';
+      results.hidden = true;
+    },
   });
+  // #743 AC1: the board opens whenever the page's own Shuffle can run, to
+  // deal with the class watching, as well as once groups exist. It reads
+  // `goButton.disabled` itself, the fact `updateGoButton` alone writes.
   const refreshBoardAvailability = () =>
-    projector?.setAvailable(lastGroups !== null);
+    projector?.setAvailable(lastGroups !== null || !goButton.disabled);
+  onShuffleReadinessChanged = refreshBoardAvailability;
+  refreshBoardAvailability();
 
   const ioBody = $<HTMLElement>('cg-io-body');
   const io = ioBody
@@ -1414,7 +1670,7 @@ if (form) {
   let audio: AudioContext | null = null;
   let master: GainNode | null = null;
   let reverbConvolver: ConvolverNode | null = null;
-  let saturatorCurve: Float32Array | null = null;
+  let saturatorCurve: Float32Array<ArrayBuffer> | null = null;
   let variationRng: (() => number) | null = null;
 
   /** Seeded once, lazily, from `Math.random()` -- fine here, this is Web
@@ -1980,13 +2236,122 @@ if (form) {
   //
   // Neither disables the button. Pressing "Shuffle again" during a deal
   // starts a new one from the top, which is what the button says it does.
-  let dealToken = 0;
-  let dealSkip = false;
-  const finishDealNow = () => {
-    dealSkip = true;
+  // ── the waiting board (#743) ────────────────────────────────────────────
+  const waiting = $<HTMLElement>('cg-waiting')!;
+  const waitingList = $<HTMLUListElement>('cg-waiting-list')!;
+  const waitingError = $<HTMLParagraphElement>('cg-waiting-error')!;
+  const waitingAbsent = $<HTMLParagraphElement>('cg-waiting-absent')!;
+  // #999: under the groups after a deal, on the board, everyone absent.
+  const absentRow = $<HTMLElement>('cg-absent')!;
+  const absentList = $<HTMLUListElement>('cg-absent-list')!;
+  const showAbsentRow = (numbers: readonly number[]) => {
+    absentList.textContent = '';
+    for (const number of numbers)
+      absentList.appendChild(studentChip(number, true));
+    absentRow.hidden = numbers.length === 0;
   };
 
-  const animate = async (groups: Student[][], speed: string) => {
+  /**
+   * Everyone the deal will place who is not already seated (#743), and the
+   * absent ones beside them, marked (#999): the class sees every number.
+   */
+  const waitingPool = (input: ReturnType<typeof dealInput>): Student[] =>
+    waitingRoll(
+      input.students,
+      new Set(input.pinned.flat().map((s) => s.number)),
+    );
+
+  /**
+   * One student's chip: the number, the name where the roster has one, and
+   * for an absent student the word "absent" beside them, so colour is never
+   * the only signal (#999). Shared by the waiting list and the absent row.
+   */
+  const studentChip = (number: number, absent: boolean): HTMLLIElement => {
+    const li = document.createElement('li');
+    li.className = absent ? 'waiting-student absent' : 'waiting-student';
+    li.dataset.number = String(number);
+    const numberEl = document.createElement('span');
+    numberEl.className = 'number';
+    numberEl.textContent = String(number);
+    li.appendChild(numberEl);
+    const name = rosterNames.get(number);
+    if (name) {
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = name; // the untrusted value, set as TEXT
+      li.appendChild(who);
+    }
+    if (absent) {
+      const tag = document.createElement('span');
+      tag.className = 'absent-tag';
+      tag.textContent = t.rosterAbsentPill;
+      li.appendChild(tag);
+    }
+    return li;
+  };
+
+  /**
+   * The waiting list, shown: every student in `pool`, numbered (#743), the
+   * absent ones marked (#999). Before the first deal the board also says
+   * who is absent; once a deal has run, `groupedNote` says it instead, so
+   * `before` is false from the submit.
+   */
+  const showList = (pool: readonly Student[], before: boolean) => {
+    waitingList.textContent = '';
+    for (const student of pool)
+      waitingList.appendChild(studentChip(student.number, student.absent));
+    const absent = before ? absentNumbers(pool) : [];
+    waitingAbsent.hidden = absent.length === 0;
+    waitingAbsent.textContent =
+      absent.length === 0 ? '' : t.boardAbsentNote({ absent });
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+    waiting.hidden = false;
+  };
+
+  /**
+   * A board opened before the first deal: the heading, one card per group
+   * the deal will make (`plannedGroups`, the deal's own code, so the count
+   * cannot disagree), and every student the deal will place, numbered, with
+   * the name beside the number where the roster has one. Rendered into
+   * `#cg-results` through the same `render` a deal uses: one element, one
+   * render path (AC2).
+   */
+  const showWaiting = () => {
+    const input = dealInput();
+    resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
+    render(plannedGroups(input) ?? []);
+    // A pinned member is already in place: nothing deals it in.
+    tables
+      .querySelectorAll('.student')
+      .forEach((c) => c.classList.add('dealt'));
+    showList(waitingPool(input), true);
+    showAbsentRow([]);
+    results.hidden = false;
+    projector?.setShuffleLabel(t.makeGroups);
+  };
+
+  /** The waiting board is gone: by a deal, or by leaving without one. */
+  const hideWaiting = () => {
+    waiting.hidden = true;
+    waitingList.textContent = '';
+    waitingAbsent.hidden = true;
+    waitingAbsent.textContent = '';
+    waitingError.hidden = true;
+    waitingError.textContent = '';
+  };
+
+  let dealToken = 0;
+  let dealSkip = false;
+  // #744: the travelling deal's way out. `finish` lands everyone now (a
+  // detail changed, or the board closed); `superseded` is a newer deal.
+  let travelling: AbortController | null = null;
+  const finishDealNow = () => {
+    dealSkip = true;
+    travelling?.abort('finish');
+  };
+
+  const animate = async (speed: string) => {
     const myDeal = ++dealToken;
     dealSkip = false;
     const cards = Array.from(tables.querySelectorAll<HTMLElement>('.student'));
@@ -2020,31 +2385,101 @@ if (form) {
     sfx.done();
   };
 
+  /**
+   * What the deal is asked to group, read from the form: the ONE reading,
+   * shared by the deal and by the waiting board's plan (#743), so the cards
+   * shown before a shuffle are the cards the shuffle fills.
+   */
+  const dealInput = (): Omit<GroupingInput, 'random' | 'searchNodeCap'> => {
+    const count = readCount();
+    // The roster takes over the moment it is non-empty; `count` is the
+    // fallback for the case where a teacher never opens Student details at
+    // all. `roster` here is the SAME module-scope array getRoster/setRoster
+    // manage -- see their own doc comment above -- so this can never read a
+    // different roster than the one a later stage's table renders or exports.
+    //
+    // #188. A roster still wins outright. Otherwise the three number fields
+    // decide, and `studentsForInput` hands back the bare `count` while all
+    // three are empty (AC7), so a teacher who never touches them takes
+    // exactly the path they always did.
+    //
+    // Held in a const rather than built inline, because AC13's note below has
+    // to compare what went IN against what came out. Re-reading the fields
+    // down there could disagree with what was actually grouped.
+    const students =
+      roster.length > 0
+        ? roster
+        : studentsForInput(count, readNumberFields().fields);
+    return {
+      students,
+      mode: readMode(),
+      leftovers: readLeftovers(),
+      sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
+      pinned: [], // a later stage wires the pins
+    };
+  };
+
+  /** The board's travelling deal (#744): order, schedule, then the flights. */
+  const travelDeal = async (
+    groups: Student[][],
+    input: ReturnType<typeof dealInput>,
+  ) => {
+    ++dealToken; // a page deal still running stops, as a newer deal says
+    const pinned = new Set(input.pinned.flat().map((s) => s.number));
+    for (const row of tables.querySelectorAll<HTMLElement>('.student'))
+      if (pinned.has(Number(row.dataset.number))) row.classList.add('dealt');
+    const order = travelOrder(groups, pinned);
+    const schedule = travelSchedule(
+      order.length,
+      speedSelect.value === 'fast' ? 'fast' : 'normal',
+    );
+    if (!schedule) {
+      tables
+        .querySelectorAll('.student')
+        .forEach((c) => c.classList.add('dealt'));
+      hideWaiting();
+      projector?.refit();
+      return;
+    }
+    const controller = new AbortController();
+    travelling = controller;
+    sfx.shuffle();
+    const outcome = await travel({
+      list: waitingList,
+      tables,
+      order,
+      schedule,
+      signal: controller.signal,
+      hideList: hideWaiting,
+      refit: () => projector?.refit(),
+      onLand: (i) => sfx.land(i),
+    });
+    if (travelling === controller) travelling = null;
+    if (outcome === 'dealt') sfx.done();
+  };
+
   // ── submit ──────────────────────────────────────────────────────────────
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorBox.hidden = true;
 
-    const mode = readMode();
-
-    const count = readCount();
-    const outcome = buildGroups({
-      // The roster takes over the moment it is non-empty; `count` is the
-      // fallback for the (still common, this stage) case where a teacher
-      // never opens Student details at all. `roster` here is the SAME
-      // module-scope array getRoster/setRoster manage -- see their own
-      // doc comment above -- so this can never read a different roster
-      // than the one a later stage's table renders or exports.
-      students: roster.length > 0 ? roster : count,
-      mode,
-      leftovers: readLeftovers(),
-      sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
-      pinned: [], // a later stage wires the pins
-      random: Math.random,
-    });
+    const input = dealInput();
+    const { students } = input;
+    const outcome = buildGroups({ ...input, random: Math.random });
 
     if (!outcome.ok) {
-      results.hidden = true;
+      // From the waiting board the cards and the list stay up, and the
+      // reason is said there as well as on the page (#743 AC5).
+      if (waiting.hidden) {
+        results.hidden = true;
+      } else {
+        waitingError.hidden = false;
+        waitingError.textContent = renderError(
+          outcome.error,
+          t,
+          resolveStudent,
+        );
+      }
       // The sheet is gone, so "Export groups" must go with it -- otherwise
       // it stays offering the arrangement from before the refusal, which is
       // not on screen any more.
@@ -2070,6 +2505,16 @@ if (form) {
     }
 
     const { groups, warnings } = outcome.result;
+    // #744: on the board with animation on, the deal travels from the list,
+    // so the list is (re)shown for it; ruling 2 brings everyone back to it
+    // on a second Shuffle too. Anywhere else the list goes, as before.
+    const travels =
+      (projector?.isOpen() ?? false) && speedSelect.value !== 'skip';
+    travelling?.abort('superseded');
+    travelling = null;
+    if (travels) showList(waitingPool(input), false);
+    else hideWaiting();
+    projector?.setShuffleLabel(t.boardShuffle);
     // What the sheet is showing, for "Export groups" -- see `lastGroups`'s
     // own comment where it is declared.
     lastGroups = groups;
@@ -2092,6 +2537,7 @@ if (form) {
     resultsHeadingEl.textContent = resultsHeadingText(classInput.value, t);
     // Text first, animation second — see the note at the top of this file.
     render(groups);
+    showAbsentRow(absentNumbers(students));
     // Same ordering rule as the error path: the region joins the tree, and
     // only then is the sentence written into it.
     results.hidden = false;
@@ -2102,9 +2548,12 @@ if (form) {
     // the old one loses its bottom group off the board with no scrollbar,
     // in front of a class. It was called before `render` until this fix.
     projector?.refit();
-    summary.textContent = t.resultsSummary(groups.length, groups.flat().length);
+    summary.textContent = t.resultsSummary({
+      groups: groups.length,
+      students: groups.flat().length,
+    });
 
-    // A success can still carry `warnings` -- "Gita, Sari have joined a
+    // A success can still carry `warnings` -- "Gita and Sari have joined a
     // group of boys because there were not enough girls…" -- see
     // grouping.ts's own module doc. RENDERED as of Stage 3, Task 9 (G-11):
     // `sexMode` above is live now, so this array can finally be non-empty,
@@ -2131,6 +2580,38 @@ if (form) {
       warningsList.appendChild(li);
     }
 
+    // #188, AC13. How many were actually grouped, shown only when that
+    // differs from how many went in -- "a teacher must never be left to
+    // notice a missing pupil by counting".
+    //
+    // DERIVED by subtracting what came out from what went in, rather than
+    // re-reading the three number fields: one rule then covers a roster with
+    // absences ticked in Student details exactly as well as typed numbers,
+    // and it cannot disagree with what was really grouped.
+    //
+    // Cleared, then hidden or shown, then written -- the same three steps in
+    // the same order the warnings above take, and for the same reason: a
+    // `role="status"` region only announces a mutation to something already
+    // in the accessibility tree.
+    const placed = groups.flat();
+    const placedNumbers = new Set(placed.map((s) => s.number));
+    const typed = typeof students === 'number' ? students : students.length;
+    const missing =
+      typeof students === 'number'
+        ? []
+        : students
+            .map((s) => s.number)
+            .filter((number) => !placedNumbers.has(number));
+    groupedNoteEl.textContent = '';
+    groupedNoteEl.hidden = missing.length === 0;
+    if (missing.length > 0) {
+      groupedNoteEl.textContent = t.groupedNote({
+        grouped: placed.length,
+        typed,
+        absent: missing,
+      });
+    }
+
     goButton.textContent = t.again;
     // A fresh shuffle is, by definition, made from exactly what the form
     // says right now -- comparing that against itself returns null, which
@@ -2141,7 +2622,8 @@ if (form) {
     updateStaleness();
 
     try {
-      await animate(groups, speedSelect.value);
+      if (travels) await travelDeal(groups, input);
+      else await animate(speedSelect.value);
     } finally {
       // The deal no longer disables this button at all (see `animate`), so
       // this is not an "undo the disable" step — it re-derives the button's
@@ -2154,3 +2636,8 @@ if (form) {
     }
   });
 }
+
+// The footer's report form exists only in beta locales (#97).
+const reportForm =
+  document.querySelector<HTMLFormElement>('[data-report-form]');
+if (reportForm) enhanceReportForm(reportForm);

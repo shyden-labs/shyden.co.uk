@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Refuses a commit message that puts a closing keyword next to an issue
+# number, in ANY form.
+#
+# The rule itself lives in `scripts/closing-keywords.mjs`, not here. It has
+# two media to cover -- a commit message and a pull request body -- and a
+# pattern copied into both drifts. The copy that drifts is the one nobody
+# watched fail (#227, #278).
+#
+# This hook is the WIRING: it hands git's message file to that rule and lets
+# its exit status fail the commit. The refusal an author reads comes from
+# there, because that is the only place the rule is taught.
+#
+# The script is resolved from this file's own directory rather than from the
+# working directory, so the hook does not depend on where git ran it.
+#
+# Installed by `scripts/install-hooks.mjs` via `prepare`, which points
+# core.hooksPath at this directory. See #35.
+set -u
+
+fail() {
+  echo "commit-msg: $1" >&2
+  exit 1
+}
+
+message_file="${1:-}"
+[ -n "$message_file" ] || fail 'no message file given (git passes it as $1)'
+[ -r "$message_file" ] || fail "cannot read $message_file"
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || fail 'cannot locate the hook directory'
+
+exec node "${here}/../scripts/closing-keywords.mjs" "$message_file" "this commit message"

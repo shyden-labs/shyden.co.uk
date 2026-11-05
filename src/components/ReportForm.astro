@@ -1,0 +1,185 @@
+---
+import { getSiteStrings, isBetaLocale, type Locale } from '../lib/i18n';
+import {
+  MAX_FIELD_UNITS,
+  reportIdStem,
+  reportOptions,
+  type Outcome,
+  type PageId,
+} from '../lib/report';
+
+/**
+ * The report form (#97), the one home of its markup and styles: the footer
+ * renders it once per page, and the 404 once per translated block (#350,
+ * spec 14). It decides whether to draw itself, through `isBetaLocale`, so
+ * English never shows it and no caller keeps a list of locales.
+ *
+ * The disclosure and each status carry `lang` (the fields inherit it),
+ * because on the 404 the document's own `lang` is English. The status
+ * paragraphs sit outside the `<details>`, because a closed one renders
+ * nothing and a status must show either way.
+ */
+interface Props {
+  lang: Locale;
+  page: PageId;
+}
+const { lang, page } = Astro.props;
+const t = getSiteStrings(lang).report;
+const id = (part: string) => `${reportIdStem(page, lang)}-${part}`;
+const statuses: ReadonlyArray<[Outcome, string]> = [
+  ['sent', t.sent],
+  ['not-found', t.notFound],
+  ['rejected', t.rejected],
+  ['failed', t.failed],
+  ['form-full', t.formFull],
+  ['connection-full', t.connectionFull],
+];
+---
+
+{isBetaLocale(lang) && (
+  <Fragment>
+    <details class="report" data-report lang={lang}>
+      <summary>{t.open}</summary>
+      <form method="post" action="/api/report" data-report-form>
+        <p>{t.intro}</p>
+        <input type="hidden" name="locale" value={lang} />
+        <input type="hidden" name="page" value={page} />
+        <label for={id('quote')}>{t.quoteLabel}</label>
+        <input
+          id={id('quote')}
+          name="quote"
+          type="text"
+          list={id('strings')}
+          required
+          maxlength={MAX_FIELD_UNITS}
+          autocomplete="off"
+          aria-describedby={id('quote-hint')}
+        />
+        <p id={id('quote-hint')} class="hint">
+          {t.quoteHint}
+        </p>
+        <datalist id={id('strings')} data-report-strings>
+          {reportOptions(page, lang).map((option) => (
+            <option value={option} />
+          ))}
+        </datalist>
+        <p id={id('personal-details-hint')} class="hint">
+          {t.personalDetailsHint}
+        </p>
+        <label for={id('suggestion')}>{t.suggestionLabel}</label>
+        <textarea
+          id={id('suggestion')}
+          name="suggestion"
+          maxlength={MAX_FIELD_UNITS}
+          aria-describedby={id('personal-details-hint')}
+        ></textarea>
+        <label for={id('note')}>{t.noteLabel}</label>
+        <textarea
+          id={id('note')}
+          name="note"
+          maxlength={MAX_FIELD_UNITS}
+          aria-describedby={id('personal-details-hint')}
+        ></textarea>
+        <div class="visually-hidden" aria-hidden="true">
+          <label for={id('website')}>{t.honeypotLabel}</label>
+          <input
+            id={id('website')}
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+          />
+        </div>
+        <button type="submit">{t.send}</button>
+      </form>
+    </details>
+    {statuses.map(([result, text]) => (
+      <p
+        id={id(result)}
+        class="report-status"
+        role="status"
+        tabindex="-1"
+        lang={lang}
+        data-report-status={result}
+      >
+        {text}
+      </p>
+    ))}
+  </Fragment>
+)}
+<style>
+  /* The report form (#97). Tokens only, so the computed-style contrast
+     guards apply; every control 44px; inputs take their width from the
+     column, because an input's intrinsic width once pinned #cg-form wide at
+     320px. */
+  .report summary {
+    min-height: 44px;
+    padding-block: 0.6rem;
+    cursor: pointer;
+    color: var(--accent);
+  }
+  .report form {
+    /* Contains the honeypot, which wears `.visually-hidden` (tokens.css):
+       never `display: none`, which some bots skip, and positioned against
+       this form, never the page, so it cannot make sideways scroll. */
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  .report input,
+  .report textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0.5rem;
+    font: inherit;
+    /* After the shorthand, which inherits the footer's 0.9rem: iOS Safari
+       zooms the whole page when a field under 16px is focused (#352). */
+    font-size: 1rem;
+    color: var(--ink);
+    background: var(--bg);
+    /* --border-strong, never --border: a control's only boundary must reach
+       3:1 (WCAG 1.4.11), and --border is decorative (#133). */
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+  }
+  .report textarea {
+    min-height: 5rem;
+  }
+  .report button {
+    justify-self: start;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    font: inherit;
+    color: var(--on-accent);
+    background: var(--accent);
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  /* A status shows when it is the fragment's target (the homepage, after its
+     303) or when the tool-page script marks it. Outside the <details>, which
+     renders nothing while closed. */
+  .report-status {
+    display: none;
+    color: var(--ink);
+  }
+  .report-status:target,
+  .report-status[data-report-state='shown'] {
+    display: block;
+  }
+  /* A tool page reached by the plain POST's 303 (a click before its script
+     loaded) keeps that status as its :target. The script supersedes it when
+     it shows a newer one, so exactly one is ever visible. Last, so it wins
+     over :target at equal specificity. */
+  .report-status[data-report-state='superseded'] {
+    display: none;
+  }
+  @media print {
+    .report,
+    .report-status {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,29 @@
+/**
+ * Throwaway pairing material for the iPhone inspector's unit tests (#811).
+ * Made by openssl on 2026-10-24 when the fixtures were recorded, never the
+ * phone's: the certificates are self-signed for a day and their keys were
+ * discarded; the private key below is a placeholder, not a key.
+ * tests/guards/ios-inspector-fixtures.test.ts refuses any other PEM block or
+ * pairing identifier in this directory.
+ */
+export const THROWAWAY_PAIR = {
+  hostCertificatePem: Buffer.from(
+    '-----BEGIN CERTIFICATE-----\nMIICrjCCAZYCCQCXYRgUFTBgbzANBgkqhkiG9w0BAQsFADAZMRcwFQYDVQQDDA50\naHJvd2F3YXktaG9zdDAeFw0yNjEwMjQxMjE4MTlaFw0yNjEwMjUxMjE4MTlaMBkx\nFzAVBgNVBAMMDnRocm93YXdheS1ob3N0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\nMIIBCgKCAQEA0Yvmo46IpXtp+XkN054Bb1reoueTYmxEnR94CTCcLqZ85YkWRZDb\nTfgBNfdr0mS/4e4K9OP2aw9eo1AfeAjpgfbWlHam/zHiWOVwd4WWISgjDIdWk9tr\nY/aaU/+NIUmzdS80fePCTfozt8WCXTy4R6aPAFWgxrx+/H5Htzd3dyU6gCxKn72z\n4q4tASm8Lxuwm2pkSznpDdRg2ADnL9rrJ/9Y6aC/0MLCQiA6bnWWXyCSnW7PTpFD\nrfs+kfG6WGzHhknazxONmMAYTgO+eqYlwHgIQ8hye7WX8+RmZNFkWcv7Ka25j4Rt\nnBCbom9qlr+rmTFku05wgdly1j4v3NbLhQIDAQABMA0GCSqGSIb3DQEBCwUAA4IB\nAQCuawlFvKgVoX0HB8xjzgJEKCEVVglCLo2rABSkiZ/snhoxzG7b8s4tq4GH/mkV\nS9ZnqIWCWXWZGrPlPM2HhIye1pfX+U/aUBZNOdYfqcgloGtVOCcgH3vdI2Fr0gUG\nKtIDbv8v7mdoyNMu80QnDevlY7mhAtUhxD0Sf6n6HBvdT+oPdt/FVsRPVlOZQFiz\nyK1kRa62b6aWuOcoORCPirRgYQMEjh1Np93sxoWsBGWKtWvMg73k1wd1oX6sL0ns\nbSQSEQN40AMULzaPDjNX+6GPCPix2xu3rcZZpoz5AL87cbrRnDQoFs6YrvSCFc35\nzGJZfJY0reVkDhDrGiVYGQYI\n-----END CERTIFICATE-----\n',
+  ),
+  hostKeyPem: Buffer.from(
+    '-----BEGIN PRIVATE KEY-----\nTk9ULUEtS0VZLXRocm93YXdheS1wbGFjZWhvbGRlcg==\n-----END PRIVATE KEY-----\n',
+  ),
+  deviceCertificatePem: Buffer.from(
+    '-----BEGIN CERTIFICATE-----\nMIICsjCCAZoCCQDMkJLCsGq9czANBgkqhkiG9w0BAQsFADAbMRkwFwYDVQQDDBB0\naHJvd2F3YXktZGV2aWNlMB4XDTI2MTAyNDEyMTgxOVoXDTI2MTAyNTEyMTgxOVow\nGzEZMBcGA1UEAwwQdGhyb3dhd2F5LWRldmljZTCCASIwDQYJKoZIhvcNAQEBBQAD\nggEPADCCAQoCggEBAOUVrjlroUd9pBJen8YzT9vxj7KtM2k/1E38AEEreDZfcj2H\nYjMjkhfedJNkEfqqqQ/oqFVCB1l/bsciOK5hN9DuxNmOmaqtrk+TJcJP53UIZaey\nmP1O23eqlFTsjiCXAhC0ltAYazR/79JAF+rTV9gK55Y0nYd6ovTMeI+HuV6CsWie\nbQ7J0HhxlnNzAM2sPl8MljCh59z9UQGPg5f/57SJsgP5sCGFTf3w7rz0Zgui0V8v\n9E78EgoS5hKtUe9LvNCsf1NwfbH7nCcxU/EJsox4PPRe3ZynbsToL3eN+mWhdqjJ\nOQ1Fj2zknidiCG7hN54snyoM0ECPQVKrSPXA9msCAwEAATANBgkqhkiG9w0BAQsF\nAAOCAQEApstlIUXt68lvRcS+UP8esGCKu+Qx90jTJzAaUWrwn9KHrOAeuvga6DP5\nhhrdzesuYkEDLe8DFgJ3PARnMa9IH2OMrCiI0ITw7y/WzPyh8Sph7oCtwDfWWFNm\nHF/gnax+UofB5h5oONK5yCJlyBeHzcY/v5ZFovdd9wQXx3Y0WU4/bNpK8keGVPSQ\nfGSPE2cAgZT2Yslnt+3SzT4RHR6V9S4bgdVNgbN0ssCzQbR1lpGQ4JdCuV64aS7K\n+FaPr/NwsNFAG+5D97GrNV/T0jYP+ZZikyhWJZTrwAS+/P0GnTuk2FvJb+Gk/xsv\nR11A1y2VNjD9RkHDp1PKA+sxEzVvzQ==\n-----END CERTIFICATE-----\n',
+  ),
+  deviceCertificateDer: Buffer.from(
+    'MIICsjCCAZoCCQDMkJLCsGq9czANBgkqhkiG9w0BAQsFADAbMRkwFwYDVQQDDBB0aHJvd2F3YXktZGV2aWNlMB4XDTI2MTAyNDEyMTgxOVoXDTI2MTAyNTEyMTgxOVowGzEZMBcGA1UEAwwQdGhyb3dhd2F5LWRldmljZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOUVrjlroUd9pBJen8YzT9vxj7KtM2k/1E38AEEreDZfcj2HYjMjkhfedJNkEfqqqQ/oqFVCB1l/bsciOK5hN9DuxNmOmaqtrk+TJcJP53UIZaeymP1O23eqlFTsjiCXAhC0ltAYazR/79JAF+rTV9gK55Y0nYd6ovTMeI+HuV6CsWiebQ7J0HhxlnNzAM2sPl8MljCh59z9UQGPg5f/57SJsgP5sCGFTf3w7rz0Zgui0V8v9E78EgoS5hKtUe9LvNCsf1NwfbH7nCcxU/EJsox4PPRe3ZynbsToL3eN+mWhdqjJOQ1Fj2zknidiCG7hN54snyoM0ECPQVKrSPXA9msCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEApstlIUXt68lvRcS+UP8esGCKu+Qx90jTJzAaUWrwn9KHrOAeuvga6DP5hhrdzesuYkEDLe8DFgJ3PARnMa9IH2OMrCiI0ITw7y/WzPyh8Sph7oCtwDfWWFNmHF/gnax+UofB5h5oONK5yCJlyBeHzcY/v5ZFovdd9wQXx3Y0WU4/bNpK8keGVPSQfGSPE2cAgZT2Yslnt+3SzT4RHR6V9S4bgdVNgbN0ssCzQbR1lpGQ4JdCuV64aS7K+FaPr/NwsNFAG+5D97GrNV/T0jYP+ZZikyhWJZTrwAS+/P0GnTuk2FvJb+Gk/xsvR11A1y2VNjD9RkHDp1PKA+sxEzVvzQ==',
+    'base64',
+  ),
+  rootCertificatePem: Buffer.from(
+    '-----BEGIN CERTIFICATE-----\nMIICrjCCAZYCCQCjOPo2Q9kr1jANBgkqhkiG9w0BAQsFADAZMRcwFQYDVQQDDA50\naHJvd2F3YXktcm9vdDAeFw0yNjEwMjQxMjE4MTlaFw0yNjEwMjUxMjE4MTlaMBkx\nFzAVBgNVBAMMDnRocm93YXdheS1yb290MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\nMIIBCgKCAQEAuoJW45cg65BvRNy3/y1s0W8ZlcG5uTXs80qQW1xesA1IlG9hd89Y\n69ApMR2rwN616sNyasYweMgILitZqKcp36OFX3vH8aHsiWS/pHg8LOISP6kb/N1z\nIXyM4trck0CLxyStIZR8t1H8NhZw2Vt4XwfG/n9tjzHPHRxsPaI27fdu6qH6Om2o\nOLwa8vcfvOHrwH5VJLWubrQwZqJqZwdNPgzoiKmJuJa+4Q2Jsbv2aOjEiVHHdDaf\nv5bhXukXfGUfclxBwcrZd5/AIXNx7026K84vfv++NpaNJNJt+KogV44XtjlhwRZf\nSJbFdXzfjp5NhzE1fRkLV+lAzKmuweOgOwIDAQABMA0GCSqGSIb3DQEBCwUAA4IB\nAQBkGM2MAKk8XImtdiKsgbi022w3wL/lUH55LeOexxURtdvHl0X+qLP26OItrHQo\nl42ehDjD3Bd7TNeE3JofnysIXKNoQjR1VKq+d6sjOR2JPT8UmEhlkKyb44KsGi57\nOAOak8ZNi3c7fc9KQ0RgT/scQIyKIHI3cnc4qvL/AaCkkPqSMwhFF+YsVchyLAwp\nta0sxiZf4cLtzcTHPwowpsTQ6R6nxJOI/xIGwgj344jULDHIGbknfZaH4HFxWHFM\n2R/CJJbzUc4HBXG8o6LnbFt/1FSxz6/IzmiBw7KUvWpf853agJidYLbfsZ5DGjSz\nxV24Pu0tQedkqozQ+wWJatfr\n-----END CERTIFICATE-----\n',
+  ),
+  hostId: 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA',
+  systemBuid: 'BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB',
+  udid: '00000000-0000000000000000',
+} as const;

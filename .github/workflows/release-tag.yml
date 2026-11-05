@@ -1,9 +1,12 @@
 name: Release tag + notes (on merge to main)
-# AUTO-RELEASE. Every merge to main (a verified release, since branch protection
-# requires prod-verified) gets a versioned git tag + GitHub Release with notes
-# generated from the conventional commits since the last tag. Versioning is
-# release metadata only (a static site serves no version), so we create the tag
-# + Release directly — no package.json commit, no branch-protection bypass.
+# AUTO-RELEASE. Every merge to main (a verified release: branch protection
+# requires build-and-test and dev-verified, and prod-verified is posted after
+# the deploy, not before the merge) gets a versioned git tag + GitHub Release
+# with notes generated from the commits since the last tag. They are grouped
+# where conventional, which this repo's sentence-style subjects no longer are,
+# so every release is a patch bump. Versioning is release metadata only (a
+# static site serves no version), so we create the tag + Release directly — no
+# package.json commit, no branch-protection bypass.
 
 on:
   push:
@@ -19,11 +22,12 @@ permissions:
 jobs:
   tag-and-release:
     name: Tag + Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # need all tags + history for version + notes
       - name: Compute next version + notes
         id: rel

@@ -1,0 +1,75 @@
+---
+import { parse } from 'yaml';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import 'swagger-ui-dist/swagger-ui.css';
+import '../../styles/swagger.css';
+import { version as swaggerVersion } from 'swagger-ui-dist/package.json';
+import licence from 'swagger-ui-dist/LICENSE?raw';
+import notice from 'swagger-ui-dist/NOTICE?raw';
+import bundledLicences from 'swagger-ui-dist/swagger-ui-bundle.js.LICENSE.txt?raw';
+
+/**
+ * One API docs page (#781): Swagger UI drawn from a spec in `openapi/`,
+ * English only, kept out of search engines. The spec is inlined at build
+ * time, so the page and the contract tests read one file, and a private
+ * spec exists only inside its own, gated page.
+ */
+interface Props {
+  title: string;
+  heading: string;
+  description: string;
+  /** The spec's YAML text, as `?raw` hands it over. */
+  specText: string;
+}
+const { title, heading, description, specText } = Astro.props;
+const spec = JSON.stringify(parse(specText));
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  lang="en"
+  noIndex
+  localised={false}
+>
+  <section class="wrap">
+    <h1>{heading}</h1>
+    <div id="swagger" data-spec={spec}></div>
+    {/* Apache-2.0 asks for its licence and the NOTICE beside the code we serve. */}
+    <h2>Swagger UI {swaggerVersion}</h2>
+    <details>
+      <summary>Notice</summary>
+      <pre>{notice}</pre>
+    </details>
+    <details>
+      <summary>Apache License 2.0</summary>
+      <pre>{licence}</pre>
+    </details>
+    <details>
+      <summary>Licences of the code it bundles</summary>
+      <pre>{bundledLicences}</pre>
+    </details>
+  </section>
+</BaseLayout>
+<script>
+  import '../../scripts/api-docs.ts';
+</script>
+<style>
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 3rem var(--space);
+  }
+  summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+</style>

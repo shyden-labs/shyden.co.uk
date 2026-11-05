@@ -34,10 +34,10 @@ import type { Strings } from './i18n';
  * equal to itself across two calls -- the notice would stick permanently,
  * and no revert could ever clear it, since no revert can make two
  * different objects the same object. `staleReason` enforces this at
- * runtime (`assertComparable`, below) because nothing else in this repo
- * does: there is no type checker anywhere, in the editor or in CI (see
- * CLAUDE.md), so `roster: string` on its own is a promise this interface
- * makes and nothing checks.
+ * runtime (`assertComparable`, below) as well as in the type: `astro check`
+ * (CI, since #115) holds typed callers to `roster: string`, but a snapshot
+ * assembled from the DOM or through a cast reaches it unchecked, and the
+ * failure is silent -- a notice no revert can clear.
  */
 export interface Snapshot {
   mode: string;

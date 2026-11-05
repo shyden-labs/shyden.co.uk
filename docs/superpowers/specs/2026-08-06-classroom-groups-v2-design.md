@@ -95,6 +95,11 @@ stage 3 owns removing it. It is the last always-visible bordered box below the t
 form, because it is the page's summary and description rather than part of the feature. It is
 **one section holding two parts**, and both collapse together under a single header:
 
+> **Placement changed (operator, 2026-09-30, #384):** the who-and-why paragraph described in part 1
+> below is now the page's **lead**, under the heading, so it is read before anything is opened. Part 1
+> of How to use now carries the what-it-does sentence that used to be the lead ("Tell it how big your
+> class is..."). Every locale swaps its own pair.
+
 1. **What this is** — what the tool does, **why it was built, and who it is for**. The operator was
    explicit about the last two: a visitor should be able to tell, without asking, why this exists
    and whose problem it solves. So part 1 covers, in this order:

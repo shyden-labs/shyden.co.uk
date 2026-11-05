@@ -1,11 +1,25 @@
+import { setCheckedOn, tapOn } from '../real-touch';
+import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
+import { makeGroups } from '../make-groups';
+import { LOCALES, getStrings, localisePath } from '../../src/lib/i18n';
+import { searched } from '../source-files';
+import { recorded, shoot } from './evidence';
+import { recordErrors } from './recorders';
 import {
   buildRoster,
   buildRosterAtPath,
+  expectNothingStored,
   upload,
   downloadName,
   giveEveryoneASex,
+  handoverTo,
 } from './helpers';
+
+test.use(recorded);
+
+/** The two pupils every probe in this file looks for. */
+const ROSTER_NAMES = ['Ana', 'Budi'] as const;
 
 /**
  * The page makes a promise in both languages: "No class list ever leaves this
@@ -35,8 +49,101 @@ import {
  */
 const NON_PERSONAL_NAMES = ['mode', 'leftovers'];
 
+// #188, AC19. Absence is a per-day fact: number 7 being away today says
+// nothing about tomorrow, so remembering it would quietly group a present
+// child out of the lesson. The decision was session-only (operator,
+// 2026-09-16), and this is that decision written down.
+test.describe('privacy — the number fields are forgotten on reload', () => {
+  test('nothing a teacher types into the three fields survives a reload', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '7, 12');
+    await typeInto(page.locator('#cg-numbers-together'), '3,9');
+    await typeInto(page.locator('#cg-numbers-apart'), '2,5');
+
+    // THE POSITIVE CONTROL, and the whole reason this test means anything.
+    // Empty is the DEFAULT state of these fields, so "reload, then find them
+    // empty" passes just as well against a page that never stored anything
+    // AND against one where the fill silently failed -- the same vacuity the
+    // controls spec calls out for "collapse it, reload, still collapsed".
+    // Proving they held the values immediately before the reload is what
+    // makes the emptiness afterwards a fact about persistence.
+    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
+    await expect(page.locator('#cg-numbers-together')).toHaveValue('3,9');
+    await expect(page.locator('#cg-numbers-apart')).toHaveValue('2,5');
+    await shoot(
+      page,
+      'all three fields hold what was typed',
+      page.locator('.number-fields'),
+    );
+
+    await page.reload();
+
+    await expect(page.locator('#cg-numbers-absent')).toHaveValue('');
+    await expect(page.locator('#cg-numbers-together')).toHaveValue('');
+    await expect(page.locator('#cg-numbers-apart')).toHaveValue('');
+    await shoot(
+      page,
+      'all three fields empty after a reload',
+      page.locator('.number-fields'),
+    );
+  });
+
+  test('and nothing about them is written to storage', async ({ page }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '7, 12');
+    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
+
+    // The positive control has to CREATE something first. This page writes
+    // exactly ONE key, and only when the sound toggle changes, so on a fresh
+    // load both stores are empty -- and "nothing mentions what was typed"
+    // would then pass for the emptiest possible reason, against a page whose
+    // script never ran at all. The first version of this test named
+    // `cg-sound` as its control in a comment and never asserted it: a
+    // comment is not a control.
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
+
+    // The WHOLE of both stores, not a probe for a key name this test
+    // invented: a guessed key would pass against any implementation that
+    // chose a different one.
+    const stored = await page.evaluate(() => {
+      const dump = (store: Storage) =>
+        Object.keys(store).map((key) => `${key}=${store.getItem(key) ?? ''}`);
+      return [...dump(localStorage), ...dump(sessionStorage)];
+    });
+    expect(
+      stored.filter((entry) => entry.startsWith('cg-sound=')),
+    ).toHaveLength(1);
+
+    // The population sits INSIDE the assertion (#118), so an empty `stored`
+    // cannot make this pass by leaving nothing to search. `absence-liveness`
+    // cannot see this site at all -- a value derived from `page.evaluate` is
+    // the blind spot #185 is open about -- so the idiom is here by choice,
+    // not because a guard insisted.
+    // `12` on its own rather than the text as typed: a page that parsed the
+    // field and stored `[7,12]` leaks exactly what one storing `7, 12` does,
+    // and every serialisation of that absence contains it.
+    const leaked = stored.filter((entry) => entry.includes('12'));
+    expect(
+      searched(leaked, { of: stored, what: 'browser storage entries' }),
+    ).toEqual([]);
+  });
+});
+
 test.describe('privacy — the class list cannot leave the page', () => {
-  for (const path of ['/classroom-groups', '/id/classroom-groups']) {
+  // Derived from LOCALES, not written out. This was `en` and `id` — correct
+  // when those were the only two locales, and silently wrong from #22, which
+  // shipped five. The page's own header says the promise is made "in both
+  // languages"; it is made in five, and each is a separately generated page
+  // off the `[locale]` route, so a template divergence in one is exactly the
+  // failure #49 proved can go unnoticed (#73).
+  for (const path of LOCALES.map((locale) =>
+    localisePath('/classroom-groups', locale),
+  )) {
     test(`${path}: no control holding typed text is submittable`, async ({
       page,
     }) => {
@@ -50,12 +157,17 @@ test.describe('privacy — the class list cannot leave the page', () => {
         })),
       );
 
-      expect(named.length).toBeGreaterThan(0); // the radios are still there
-
       // A `name` on anything but a radio is a leak waiting for a broken
       // script. This fails the moment someone adds one back.
+      //
+      // The separate `named.length > 0` this replaces was the convention #84
+      // moved away from: a control a call site can forget. The population now
+      // sits in the assertion, and `radioNames` below independently fails on
+      // an empty form.
       const leaky = named.filter((c) => c.type !== 'radio');
-      expect(leaky).toEqual([]);
+      expect(
+        searched(leaky, { of: named, what: 'named form controls' }),
+      ).toEqual([]);
 
       const radioNames = [...new Set(named.map((c) => c.name))].sort();
       expect(radioNames).toEqual([...NON_PERSONAL_NAMES].sort());
@@ -91,23 +203,30 @@ test.describe('privacy — with JavaScript blocked', () => {
   // has the full reasoning). `javaScriptEnabled: false` on this describe
   // block means that script never runs, so the raw markup below is exactly
   // what a real script-disabled visitor gets — not a proxy for it.
-  for (const [path, whoAndWhy] of [
-    [
-      '/classroom-groups',
-      'Built for teachers, by Shyden. Splitting a class fairly takes time you do not have, and doing it by hand invites an argument about favourites. This does it in one press — free, with no sign-up, and with nothing about your class ever leaving your browser.',
-    ],
-    [
-      '/id/classroom-groups',
-      'Dibuat untuk para guru, oleh Shyden. Membagi kelas dengan adil memakan waktu yang tidak Anda miliki, dan melakukannya secara manual mengundang perdebatan soal pilih kasih. Ini melakukannya dalam satu tekan — gratis, tanpa perlu mendaftar, dan tidak ada data kelas Anda yang pernah meninggalkan peramban Anda.',
-    ],
-  ] as const) {
+  //
+  // Every locale, derived (#73): each is a separately generated page, and the
+  // en/id pair this once listed left zh, vi and th unread from #22 (#390
+  // F111). The words come from the catalogue the page renders; the approved
+  // wording is pinned where copy is pinned (classroom-groups-controls.spec.ts
+  // and classroom-groups-placement.test.ts).
+  for (const locale of LOCALES) {
+    const path = localisePath('/classroom-groups', locale);
+    const t = getStrings(locale);
     test(
-      `${path}: the who-and-why copy is reachable without JavaScript`,
+      `${path}: the lead and How to use part 1 are reachable without JavaScript`,
       { tag: '@requires-isolated-context' },
       async ({ page }) => {
         await page.goto(path);
         await expect(page.locator('#cg-howto-body')).toBeVisible();
-        await expect(page.locator('#cg-howto-body > p')).toHaveText(whoAndWhy);
+        // Since #384 the who-and-why paragraph is the lead, and part 1 of
+        // How to use says what the tool does. Both must survive no script,
+        // and be SEEN: `toHaveText` reads a hidden element's text too (#188).
+        const lead = page.locator('.lead');
+        await expect(lead).toBeVisible();
+        await expect(lead).toHaveText(t.lead);
+        const whatItDoes = page.locator('#cg-howto-body > p');
+        await expect(whatItDoes).toBeVisible();
+        await expect(whatItDoes).toHaveText(t.howToWhat);
       },
     );
   }
@@ -154,14 +273,25 @@ test.describe('privacy — with JavaScript blocked', () => {
       // control cannot be serialised into a form GET at all. Filled here
       // anyway, with a value distinctive enough to be unmistakable, so the
       // proof is concrete rather than resting on that guarantee alone.
-      await page.fill('#cg-count', '24');
-      await page.fill('#cg-class', 'PrivacyProbeClassName7B');
-      await page.click('#cg-go');
+      await typeInto(page.locator('#cg-count'), '24');
+      await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B');
+      await tapOn(page.locator('#cg-go'));
+      // WebKit schedules the form's GET after the click has returned, so the
+      // click's own wait for navigations can end before it starts, and the URL
+      // read next was the old one (#449, run 37026039545). Wait for the
+      // submission's URL itself: no submit at all fails here, by timing out.
+      await page.waitForURL((submitted) => submitted.search !== '');
 
+      // Over the keys the submit actually wrote (#424): with no submit at all
+      // the URL is empty, and an empty URL passed this as a clean one.
       const url = new URL(page.url());
-      for (const key of url.searchParams.keys()) {
-        expect(NON_PERSONAL_NAMES).toContain(key);
-      }
+      const keys = [...url.searchParams.keys()];
+      expect(
+        searched(
+          keys.filter((key) => !NON_PERSONAL_NAMES.includes(key)),
+          { of: keys, what: 'query keys a native submit wrote' },
+        ),
+      ).toEqual([]);
       expect(url.search).not.toContain('PrivacyProbeClassName7B');
     },
   );
@@ -191,9 +321,38 @@ test.describe('privacy — when the script dies half-way', () => {
   test('a mid-module failure still cannot leak the class list', async ({
     page,
   }) => {
+    // Every matchMedia failure the page raised. Counted, not located: the
+    // theme script in <head> calls it too, and WebKit reports the module's
+    // failure with no frame from the module in its stack.
+    const reported = recordErrors(page);
+    const failures = () =>
+      reported.uncaught.filter((error) =>
+        error.includes('matchMedia unavailable'),
+      ).length;
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '8');
-    await page.click('#cg-go');
+    // The module really did die half-way (#424): one failure from the theme
+    // script, one from the module. Had the module stopped calling matchMedia,
+    // the tool would work, its own handler would keep the URL clean, and this
+    // would pass without any failure having happened.
+    await expect.poll(failures).toBe(2);
+    await typeInto(page.locator('#cg-count'), '8');
+    // Whether the submit was CANCELLED, read from the event itself (#449). The
+    // URL alone cannot say: WebKit starts a native submit's navigation after
+    // the click returns, so an unchanged URL read straight away passed even
+    // when nothing stopped the submit. A listener on window runs after the
+    // form's own, so it sees the guard's preventDefault.
+    await page.evaluate(() => {
+      window.addEventListener('submit', (event) => {
+        document.documentElement.dataset.submitPrevented = String(
+          event.defaultPrevented,
+        );
+      });
+    });
+    await tapOn(page.locator('#cg-go'));
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-submit-prevented',
+      'true',
+    );
 
     // No native submit happened, so no query string exists at all — not even
     // the harmless radio values. That is the unconditional guard registered
@@ -224,12 +383,7 @@ test.describe('privacy — when storage is unavailable', () => {
 
   test('the tool still makes groups', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.fill('#cg-count', '8');
-    await page.fill('#cg-size', '4');
-    // #cg-speed sits inside #cg-sound-body since Stage 2, Task 7.
-    await page.locator('#cg-sound-toggle').click();
-    await page.selectOption('#cg-speed', 'skip');
-    await page.click('#cg-go');
+    await makeGroups(page, '8', '4');
 
     await expect(page.locator('#cg-results .student')).toHaveCount(8);
   });
@@ -238,9 +392,9 @@ test.describe('privacy — when storage is unavailable', () => {
     page,
   }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-sound-toggle').click();
+    await tapOn(page.locator('#cg-sound-toggle'));
     await expect(page.locator('#cg-sound-check')).toBeChecked();
-    await page.uncheck('#cg-sound-check');
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     // The label still tracks the control — the write failed, silently and
     // correctly, without breaking the widget.
     await expect(page.locator('#cg-sound-text')).toHaveText('Sound off');
@@ -293,29 +447,6 @@ test.describe('privacy — when storage is unavailable', () => {
  * would pass a single check at the end and still have leaked.
  */
 test.describe('privacy — the roster never leaves memory', () => {
-  /** Storage, session storage and the address bar, in one read. */
-  const everywhereItCouldHide = (page: import('@playwright/test').Page) =>
-    page.evaluate(() => ({
-      local: JSON.stringify({ ...localStorage }),
-      session: JSON.stringify({ ...sessionStorage }),
-      url: location.href,
-      // Cookies too -- the plan's own snippet checked the first three, but
-      // a cookie is the fourth place a name could be written to and the
-      // one nothing else in this suite looks at.
-      cookies: document.cookie,
-    }));
-
-  const expectNothingStored = async (
-    page: import('@playwright/test').Page,
-    when: string,
-  ) => {
-    const stored = await everywhereItCouldHide(page);
-    for (const [where, value] of Object.entries(stored)) {
-      expect(value, `${where} — ${when}`).not.toContain('Ana');
-      expect(value, `${where} — ${when}`).not.toContain('Budi');
-    }
-  };
-
   test('nothing about the class is stored, after every operation', async ({
     page,
   }) => {
@@ -326,15 +457,25 @@ test.describe('privacy — the roster never leaves memory', () => {
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await expectNothingStored(page, 'after building the roster');
+    await expectNothingStored(
+      page,
+      'after building the roster',
+      ...ROSTER_NAMES,
+    );
 
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await expectNothingStored(page, 'after marking a student absent');
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await expectNothingStored(
+      page,
+      'after marking a student absent',
+      ...ROSTER_NAMES,
+    );
 
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await expectNothingStored(page, 'after shuffling');
+    await expectNothingStored(page, 'after shuffling', ...ROSTER_NAMES);
 
     // POSITIVE CONTROL. Everything above passes trivially if storage is
     // simply unreadable in this context, or if `everywhereItCouldHide` is
@@ -346,18 +487,22 @@ test.describe('privacy — the roster never leaves memory', () => {
     // under a fixed key, with a value from a fixed set. That is the whole
     // of what this tool is permitted to persist, and it is why the
     // assertions above can be as blunt as "the word Ana is nowhere".
-    await page.locator('#cg-sound-toggle').click();
-    await page.uncheck('#cg-sound-check');
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('cg-sound')))
       .toBe('off');
-    await expectNothingStored(page, 'after a preference was written');
+    await expectNothingStored(
+      page,
+      'after a preference was written',
+      ...ROSTER_NAMES,
+    );
   });
 
   test('a reload loses the roster', async ({ page }) => {
     await buildRoster(page, [['F', 'Ana']]);
     await page.reload();
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(page.locator('.cg-student')).toHaveCount(0);
   });
 
@@ -401,10 +546,10 @@ test.describe('privacy — the roster never leaves memory', () => {
       .nth(2)
       .getByLabel('Apart')
       .selectOption('A');
-    await page.getByLabel('Number of groups').check();
-    await page.getByLabel('How many groups').fill('2');
+    await setCheckedOn(page.getByLabel('Number of groups'));
+    await typeInto(page.getByLabel('How many groups'), '2');
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
 
     // Both Anas are on the sheet. Under a name-matching engine the second
@@ -447,28 +592,12 @@ test.describe('privacy — the roster never leaves memory', () => {
  * the end.
  */
 test.describe('privacy — the roster still never persists, after the new paths', () => {
-  const nowhere = async (
-    page: import('@playwright/test').Page,
-    when: string,
-  ) => {
-    const seen = await page.evaluate(() =>
-      [
-        JSON.stringify({ ...localStorage }),
-        JSON.stringify({ ...sessionStorage }),
-        location.href,
-        document.cookie,
-      ].join(' '),
-    );
-    expect(seen, when).not.toContain('Ana');
-    expect(seen, when).not.toContain('Budi');
-  };
-
   test('an import writes nothing', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
     await expect(page.getByText('Imported 2 students.')).toBeVisible();
-    await nowhere(page, 'after an import');
+    await expectNothingStored(page, 'after an import', ...ROSTER_NAMES);
   });
 
   test('an export writes nothing, and leaves no object URL behind', async ({
@@ -478,9 +607,9 @@ test.describe('privacy — the roster still never persists, after the new paths'
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await downloadName(page, 'Export class list');
-    await nowhere(page, 'after an export');
+    await expectNothingStored(page, 'after an export', ...ROSTER_NAMES);
     // The blob URL is revoked the moment the click is dispatched, so no
     // <a> holding the file's bytes is left in the document -- see
     // io-ui.ts's own `download` for why that matters here.
@@ -499,26 +628,34 @@ test.describe('privacy — the roster still never persists, after the new paths'
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
-      page.getByRole('button', { name: /other language/ }).click(),
+      handoverTo(page, 'Bahasa Indonesia'),
     ]);
     await newPage.waitForLoadState();
-    await newPage.locator('#cg-students-toggle').click();
+    await tapOn(newPage.locator('#cg-students-toggle'));
     await expect(newPage.locator('.cg-student')).toHaveCount(2);
-    await nowhere(page, 'source tab after the handover');
-    await nowhere(newPage, 'receiving tab after the handover');
+    await expectNothingStored(
+      page,
+      'source tab after the handover',
+      ...ROSTER_NAMES,
+    );
+    await expectNothingStored(
+      newPage,
+      'receiving tab after the handover',
+      ...ROSTER_NAMES,
+    );
   });
 
   test('a reload after an import still loses the roster', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
     await expect(page.getByText('Imported 1 student.')).toBeVisible();
     await page.reload();
-    await page.locator('#cg-students-toggle').click();
+    await tapOn(page.locator('#cg-students-toggle'));
     await expect(page.locator('.cg-student')).toHaveCount(0);
   });
 });

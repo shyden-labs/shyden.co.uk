@@ -1,5 +1,11 @@
-import { execFileSync } from 'node:child_process';
+import { adb, androidAbsence } from '../../scripts/adb.mjs';
 import { test, expect } from '@playwright/test';
+import {
+  CHROME_PACKAGE,
+  DEVTOOLS_SOCKET,
+  currentFocusLines,
+  devToolsSockets,
+} from './chrome-foreground';
 
 /**
  * Runs before the `android-chrome` project (wired via `dependencies` in
@@ -21,27 +27,18 @@ import { test, expect } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 test.describe('android device preflight', () => {
-  test('1. adb sees exactly one device, ready', () => {
-    const raw = execFileSync('adb', ['devices']).toString();
-    const devices = raw
-      .split('\n')
-      .slice(1) // drop the "List of devices attached" header line
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [serial, state] = line.split(/\s+/);
-        return { serial, state };
-      });
-
+  // The same decision the runner made before starting this project, from the
+  // same function: one ready phone, or the one ANDROID_SERIAL names among
+  // several. adb itself targets ANDROID_SERIAL for every later call here.
+  test('1. adb sees exactly one device to drive, ready', () => {
     expect(
-      devices,
-      `expected \`adb devices\` to list exactly one device in state 'device' (unplugged, ` +
-        `offline, or unauthorized otherwise); got: ${JSON.stringify(devices)}`,
-    ).toEqual([expect.objectContaining({ state: 'device' })]);
+      androidAbsence(adb(['devices']), process.env.ANDROID_SERIAL),
+      'why no Android phone can be driven',
+    ).toBeNull();
   });
 
   test('2. the screen is awake and unlocked', () => {
-    const power = execFileSync('adb', ['shell', 'dumpsys', 'power']).toString();
+    const power = adb(['shell', 'dumpsys', 'power']);
     expect(
       power,
       "expected `dumpsys power` to report mWakefulness=Awake -- the phone's screen is " +
@@ -51,12 +48,7 @@ test.describe('android device preflight', () => {
     // KeyguardStateMonitor.mIsShowing is Android's own signal for "the lock screen is
     // currently showing". Confirmed present exactly once in `dumpsys window policy` on this
     // device, so a plain substring match is unambiguous.
-    const policy = execFileSync('adb', [
-      'shell',
-      'dumpsys',
-      'window',
-      'policy',
-    ]).toString();
+    const policy = adb(['shell', 'dumpsys', 'window', 'policy']);
     expect(
       policy,
       'expected KeyguardStateMonitor.mIsShowing=false in `dumpsys window policy` -- the ' +
@@ -69,8 +61,30 @@ test.describe('android device preflight', () => {
     // measurement (rendering freezes in a backgrounded app; Playwright's actionability check
     // waits for a stable bounding box and never gets one). Force-stop it before launching
     // Chrome so this precondition cannot pass by accident.
-    execFileSync('adb', ['shell', 'am', 'force-stop', 'com.brave.browser']);
-    execFileSync('adb', [
+    adb(['shell', 'am', 'force-stop', 'com.brave.browser']);
+
+    // Chrome is force-stopped too, so every run launches it COLD (#307). Whether Chrome
+    // happened to be running used to decide precondition 4: a warm Chrome already had its
+    // DevTools socket, a cold one opens it about 200ms after taking the foreground, and a
+    // single read missed it 3 times in 3. With the cold path the only path, precondition 4's
+    // wait is exercised on every run, and a regression to a single read fails every run
+    // rather than only on the days the phone had reclaimed Chrome.
+    adb(['shell', 'am', 'force-stop', CHROME_PACKAGE]);
+
+    // Proven, not assumed: the stopped Chrome's socket must be gone before the launch, or
+    // precondition 4 could be satisfied by it. This absence check cannot pass on a reader
+    // that sees nothing at all, because precondition 4 must find the socket through the SAME
+    // reader moments later.
+    await expect
+      .poll(devToolsSockets, {
+        message:
+          `expected ${DEVTOOLS_SOCKET} to be gone within 5s of force-stopping Chrome -- ` +
+          'without that, the launch below is not a cold one',
+        timeout: 5_000,
+      })
+      .not.toContain(DEVTOOLS_SOCKET);
+
+    adb([
       'shell',
       'am',
       'start',
@@ -78,15 +92,8 @@ test.describe('android device preflight', () => {
       'android.intent.action.VIEW',
       '-d',
       'about:blank',
-      'com.android.chrome',
+      CHROME_PACKAGE,
     ]);
-
-    const currentFocusLines = () =>
-      execFileSync('adb', ['shell', 'dumpsys', 'window'])
-        .toString()
-        .split('\n')
-        .filter((line) => line.includes('mCurrentFocus='))
-        .join('\n');
 
     // `dumpsys window` prints more than one mCurrentFocus line (one is routinely `null`), so
     // this polls the whole set rather than trusting the first match. Condition-based wait, not
@@ -95,38 +102,36 @@ test.describe('android device preflight', () => {
       .poll(currentFocusLines, {
         message:
           'expected one of the mCurrentFocus lines in `dumpsys window` to name ' +
-          'com.android.chrome within 5s of `am start` -- Chrome did not become the ' +
+          `${CHROME_PACKAGE} within 5s of \`am start\` -- Chrome did not become the ` +
           'foreground app, which is the single most expensive failure mode this preflight ' +
           'exists to catch (it otherwise presents as a bare 30s click timeout)',
         timeout: 5_000,
       })
-      .toContain('com.android.chrome');
+      .toContain(CHROME_PACKAGE);
   });
 
-  test('4. the Chrome DevTools abstract socket exists', () => {
-    const unixSockets = execFileSync('adb', [
-      'shell',
-      'cat',
-      '/proc/net/unix',
-    ]).toString();
-    expect(
-      unixSockets,
-      'expected /proc/net/unix to list @chrome_devtools_remote -- Chrome only creates this ' +
-        'socket once it is running with USB debugging enabled; the previous precondition ' +
-        'launched Chrome, so its absence here means that launch did not take',
-    ).toContain('@chrome_devtools_remote');
+  test('4. the Chrome DevTools abstract socket exists', async () => {
+    // Polled, never read once (#307): Chrome takes the foreground BEFORE its DevTools server
+    // listens -- about 200ms before, on the cold launch precondition 3 forces every run -- so
+    // a single read straight after precondition 3 misses the socket on every cold start.
+    await expect
+      .poll(devToolsSockets, {
+        message:
+          `expected ${DEVTOOLS_SOCKET} among the DevTools sockets in /proc/net/unix within 10s ` +
+          'of Chrome taking the foreground -- Chrome opens it once its DevTools server is ' +
+          'listening, and only while USB debugging is enabled. The received list is every ' +
+          'DevTools socket that WAS listening; empty means none at all',
+        timeout: 10_000,
+      })
+      .toContain(DEVTOOLS_SOCKET);
   });
 
   test('5. adb forward and reverse tunnels are mapped', () => {
-    execFileSync('adb', [
-      'forward',
-      'tcp:9222',
-      'localabstract:chrome_devtools_remote',
-    ]);
-    execFileSync('adb', ['reverse', 'tcp:4321', 'tcp:4321']);
+    adb(['forward', 'tcp:9222', 'localabstract:chrome_devtools_remote']);
+    adb(['reverse', 'tcp:4321', 'tcp:4321']);
 
-    const forwardList = execFileSync('adb', ['forward', '--list']).toString();
-    const reverseList = execFileSync('adb', ['reverse', '--list']).toString();
+    const forwardList = adb(['forward', '--list']);
+    const reverseList = adb(['reverse', '--list']);
 
     expect(
       forwardList,

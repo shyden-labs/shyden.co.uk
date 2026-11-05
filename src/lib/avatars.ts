@@ -28,9 +28,10 @@
  * SECURITY: exactly like the `AVATAR_SVG` constant this replaces, nothing a
  * teacher types is ever able to reach this template. `sex` is normalised to
  * one of three fixed keys (`normalise`, below) before anything is read from
- * a lookup table, so even a caller that ignores the TypeScript type — this
- * repo runs no type checker, in CI or anywhere else — cannot make this
- * function emit anything other than one of the three fixed strings below.
+ * a lookup table, so even a caller that ignores the TypeScript type — a
+ * value read from the page or from storage, which `astro check` never sees —
+ * cannot make this function emit anything other than one of the three fixed
+ * strings below.
  * See `avatars.test.ts`'s own "cannot be hijacked" test, which calls this
  * with a value the type forbids and checks the result is unchanged.
  */

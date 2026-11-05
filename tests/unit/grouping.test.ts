@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { searched } from '../source-files';
 import {
+  anonymousStudent,
   buildGroups,
   ERROR_CODES,
   WARNING_CODES,
@@ -9,7 +11,15 @@ import {
   type Student,
 } from '../../src/lib/grouping';
 import * as grouping from '../../src/lib/grouping';
-import { student, shape, groupOf, seeded } from './factories';
+import {
+  student,
+  shape,
+  groupOf,
+  seeded,
+  fifteenBuddyPairs,
+  eightBoysFifteenGirlsFiveApart,
+} from './factories';
+import { apartSweep } from '../apart-sweep';
 // Fix round 1, F-2: closing the reviewer's named gap -- nothing in this
 // file, before this fix, ever piped a `separate`-mode failure through
 // `renderError`, so a structurally-correct error code with a wrong-number
@@ -18,9 +28,12 @@ import { student, shape, groupOf, seeded } from './factories';
 // WARNINGS -- the pinned describe block and the sex-both-too-small fixture
 // below never rendered one at all before this fix, which is exactly why
 // I-2's contradiction survived per-task review.
-import { renderError, renderWarning } from '../../src/lib/i18n';
-import { en } from '../../src/lib/i18n/en';
-import { id } from '../../src/lib/i18n/id';
+import { renderError, renderWarning, getStrings } from '../../src/lib/i18n';
+
+// The catalogues as a page receives them: every message compiled into a
+// function of its named slots (#136). A raw catalogue holds templates.
+const en = getStrings('en');
+const id = getStrings('id');
 
 const base = (over: Partial<GroupingInput> = {}): GroupingInput => ({
   students: 22,
@@ -31,6 +44,15 @@ const base = (over: Partial<GroupingInput> = {}): GroupingInput => ({
   random: seeded(1),
   ...over,
 });
+
+/**
+ * The node budget a unit test that must exhaust the search passes instead of
+ * the real one (#714). The real budget is 200,000 nodes per pass, and the
+ * gave-up tests below spent 124-145 ms of own CPU exhausting it, over the
+ * 0.1 s rule; at this budget the same rosters give up the same way, and their
+ * real-budget runs are in tests/simulation/grouping-gave-up.test.ts.
+ */
+const GAVE_UP_TEST_NODE_CAP = 2_000;
 
 const ok = (input: GroupingInput) => {
   const out = buildGroups(input);
@@ -71,7 +93,17 @@ describe('the module surface', () => {
         'ERROR_CODES',
         'MAX_STUDENTS',
         'WARNING_CODES',
+        // The blank record, reached by `roster-ui.ts` (a teacher adding a
+        // row), `numberSets.ts` (the number-set builder) and the test
+        // factory. It was a private `anonymous` here and an exported
+        // `anonymousStudent` in roster-ui.ts, character-identical, until
+        // #277 — a second definition of what an empty field means.
+        'anonymousStudent',
         'buildGroups',
+        // The deal's own groups before it runs, reached by the page script's
+        // waiting board, which shows one empty card per group before the
+        // first shuffle (#743).
+        'plannedGroups',
         // Exported ONLY so 'weaveBySex never drops a block, whatever `sex`
         // holds' below can call it directly. `buildGroups`'s own public
         // surface cannot exercise this guarantee with bad data: the
@@ -327,16 +359,40 @@ describe('buildGroups — students with and without names', () => {
     ]);
   });
 
-  it('a bare count produces a fully-defaulted record, matching the factory field-for-field', () => {
-    // anonymous() here and student() in factories.ts are two independent
-    // definitions of "a student with nothing set". A per-field assertion
-    // only guards fields both sides remember to check; a whole-object
-    // comparison also catches a field added to (or dropped from) one side
-    // and not the other, which per-field checks cannot. Fix round 1, F-2.
+  it('a bare count produces a fully-defaulted record, field for field', () => {
+    // A LITERAL, not a comparison against `student()` in factories.ts.
+    //
+    // This assertion used to compare the two, because they were independent
+    // definitions of "a student with nothing set" and a whole-object
+    // comparison catches a field one side gains and the other misses (Fix
+    // round 1, F-2). #277 gave the blank record one home —
+    // `anonymousStudent` below — which both now build on, and a value
+    // compared against the thing it is computed from is green at any value
+    // (#117). The independence that made the old form work is gone, so the
+    // pin has to come from outside the code: these six fields, spelled out,
+    // are what a record with no teacher behind it means.
     const { groups } = ok(
       base({ students: 1, mode: { kind: 'perGroup', size: 1 } }),
     );
-    expect(groups.flat()[0]).toEqual(student({ number: 1 }));
+    expect(groups.flat()[0]).toEqual({
+      number: 1,
+      name: null,
+      sex: null,
+      absent: false,
+      together: null,
+      apart: null,
+    });
+  });
+
+  it('builds that record through the one home every other caller uses', () => {
+    // The seam the literal above protects: `roster-ui.ts`, `numberSets.ts`
+    // and the test factory all reach this constructor, so a seventh field
+    // added to `Student` is defaulted once and the typechecker names the one
+    // place that has to decide what it defaults to.
+    const { groups } = ok(
+      base({ students: 1, mode: { kind: 'perGroup', size: 1 } }),
+    );
+    expect(groups.flat()[0]).toEqual(anonymousStudent(1));
   });
 
   it('keeps every student, including two who share a name, because identity is the number', () => {
@@ -564,6 +620,11 @@ describe('buildGroups — refusals', () => {
       base({ students: 4, mode: { kind: 'groupCount', count: 9 } }),
     );
     if (out.ok) throw new Error('expected refusal');
+    // Asserting the code is what makes `maxGroups` reachable on the union,
+    // and it is also the assertion this test was missing: it checked the
+    // number without ever checking WHICH refusal carried it.
+    expect(out.error.code).toBe(ERROR_CODES.tooManyGroups);
+    if (out.error.code !== ERROR_CODES.tooManyGroups) return;
     expect(out.error.maxGroups).toBe(4);
   });
 });
@@ -574,6 +635,7 @@ describe('buildGroups — no input may hang or crash the browser tab', () => {
     const out = buildGroups(base({ students: 100_000_000 }));
     if (out.ok) throw new Error('expected refusal');
     expect(out.error.code).toBe(ERROR_CODES.tooManyStudents);
+    if (out.error.code !== ERROR_CODES.tooManyStudents) return;
     expect(out.error.maxStudents).toBe(MAX_STUDENTS);
   });
 
@@ -1050,14 +1112,15 @@ describe('together letters', () => {
     // an already-exhausted search a second time -- measured at 17-23ms
     // across repeated runs, roughly double the single-pass number above,
     // as two equal exhaustions predict.
-    const pairs = Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)), // A,A,B,B,...,O,O
-      }),
-    );
+    const pairs = fifteenBuddyPairs(); // A,A,B,B,...,O,O
     const out = buildGroups(
-      base({ students: pairs, mode: { kind: 'groupCount', count: 10 } }),
+      base({
+        students: pairs,
+        mode: { kind: 'groupCount', count: 10 },
+        // The real budget's run of this roster: tests/simulation/ (#714:
+        // heaviest 68 ms of own CPU over 8 runs, 2 ms from the cut line).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -1378,63 +1441,44 @@ describe('apart letters', () => {
 // invariant re-checked directly against the raw `apart` field (never via
 // buildConflicts or any other engine internal, so this cannot pass merely
 // because the test and the implementation share a bug).
-describe('apart letters — the guarantee holds broadly, not just on hand-picked rosters (debt a)', () => {
-  it('holds across a spread of class sizes, group-count and per-group modes, and seeds', () => {
-    const sizesToTry = [4, 6, 9, 12, 16, 20, 25, 30];
-    const letters = ['X', 'Y', 'Z'];
-    let successes = 0;
-    let attempts = 0;
-
-    for (const n of sizesToTry) {
-      const students = Array.from({ length: n }, (_, i) =>
-        student({ number: i + 1, apart: letters[i % letters.length] }),
-      );
-      // Cyclic assignment balances each letter's membership to
-      // ceil(n/3) at most, so this is the largest clique the search can
-      // ever meet for this roster -- used to keep every mode comfortably
-      // feasible (a few groups of slack) rather than accidentally
-      // constructing a SECOND pathological-search fixture here; that is
-      // debt (b)'s job, deliberately, in its own dedicated test below.
-      const largestLetterGroup = Math.ceil(n / letters.length);
-      const modes: Mode[] = [
-        { kind: 'groupCount', count: largestLetterGroup + 2 },
-        { kind: 'groupCount', count: largestLetterGroup + 4 },
-        {
-          kind: 'perGroup',
-          size: Math.max(2, Math.floor(n / (largestLetterGroup + 3))),
-        },
-      ];
-      for (const mode of modes) {
-        if (mode.kind === 'groupCount' && mode.count > n) continue;
-        for (let seed = 1; seed <= 8; seed++) {
-          attempts++;
-          const out = buildGroups(
-            base({ students, mode, random: seeded(seed * 97 + n) }),
-          );
-          if (!out.ok) continue;
-          successes++;
-          // The invariant, re-derived from `apart` directly rather than
-          // trusting any engine internal: no group holds two present
-          // students who share a non-null apart letter.
-          for (const g of out.result.groups) {
-            for (const letter of letters) {
-              expect(
-                g.filter((s) => s.apart === letter).length,
-              ).toBeLessThanOrEqual(1);
-            }
-          }
-        }
-      }
-    }
-    // The invariant must actually be exercised on real successes, not hold
-    // vacuously because every attempt in the sweep happened to fail.
-    // Measured (see
-    // docs/superpowers/notes/2026-08-06-classroom-groups-v2-engine-measurements.md,
-    // "The guarantee holds broadly: two sweeps"): 184 attempts, 179
-    // successes.
-    expect(attempts).toBeGreaterThan(100);
-    expect(successes).toBeGreaterThan(80);
-  });
+describe('apart letters — a stand-in for the broad sweep, which runs in the simulation suite (debt a, #650)', () => {
+  // The real sweep (every size, eight seeds for each of three modes) is
+  // `tests/simulation/grouping-apart-sweep.test.ts`; its logic is
+  // `tests/apart-sweep.ts`, shared. It cannot fit here for two sizes: measured
+  // on 2026-10-09 the seeds that fail at 25 (from the fourth) and at 30 (from
+  // the third) run the search to its budget, 110 ms and 85 ms of own CPU for
+  // the size, against 0 to 3 ms for every seed that succeeds. This stand-in
+  // runs the same logic with the seeds that succeed: eight for every size up
+  // to 20, three for 25 and two for 30, every case under 0.1 s of own CPU.
+  // One test per class size (the one-test-per-case rule). Measured (attempts,
+  // successes): 4: 16, 16; 6, 9, 12, 16 and 20: 24, 24 each; 25: 9, 9; 30:
+  // 6, 6. Each size's whole result is pinned in one verdict, the attempts and
+  // successes beside the empty breach list, so none can pass on an empty run.
+  const apartStandInSizes: [
+    n: number,
+    seeds: number,
+    attempts: number,
+    successes: number,
+  ][] = [
+    [4, 8, 16, 16],
+    [6, 8, 24, 24],
+    [9, 8, 24, 24],
+    [12, 8, 24, 24],
+    [16, 8, 24, 24],
+    [20, 8, 24, 24],
+    [25, 3, 9, 9],
+    [30, 2, 6, 6],
+  ];
+  it.each(apartStandInSizes)(
+    'holds across group-count and per-group modes for a class of %i, over the seeds the unit limit affords',
+    (n, seeds, attempts, successes) => {
+      expect(apartSweep(n, seeds)).toEqual({
+        attempts,
+        successes,
+        breaches: [],
+      });
+    },
+  );
 
   it('holds even when together-letters merge students into multi-student blocks', () => {
     // A pure apart-only sweep cannot see a block-index/student-index
@@ -1560,7 +1604,12 @@ describe('apart letters — exhausting the search budget is never reported as "n
     expect(students).toHaveLength(100);
 
     const out = buildGroups(
-      base({ students, mode: { kind: 'groupCount', count: 20 } }),
+      base({
+        students,
+        mode: { kind: 'groupCount', count: 20 },
+        // The real budget's run of this roster: tests/simulation/ (#714).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
 
     expect(out.ok).toBe(false);
@@ -1778,15 +1827,15 @@ describe('apart and together letters both in play — the failure names both rul
     // assumed from that argument alone: this exact roster reproducibly
     // returns BOTH_RULES_SEARCH_GAVE_UP, deterministically, on repeated
     // runs.
-    const pairs = Array.from({ length: 30 }, (_, i) =>
-      student({
-        number: i + 1,
-        together: String.fromCharCode(65 + Math.floor(i / 2)), // A,A,B,B,...,O,O
-        apart: i === 0 || i === 16 ? 'X' : null, // student 1 (pair A) vs student 17 (pair I)
-      }),
-    );
+    // Student 1 (pair A) vs student 17 (pair I).
+    const pairs = fifteenBuddyPairs({ apartAcross: true });
     const out = buildGroups(
-      base({ students: pairs, mode: { kind: 'groupCount', count: 10 } }),
+      base({
+        students: pairs,
+        mode: { kind: 'groupCount', count: 10 },
+        // The real budget's run of this roster: tests/simulation/ (#794).
+        searchNodeCap: GAVE_UP_TEST_NODE_CAP,
+      }),
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -1925,7 +1974,7 @@ describe('sex mode: mix', () => {
         (g) => g.filter((s) => s.sex === 'F').length === 2,
       );
     });
-    expect(bothTogether).toEqual([]);
+    expect(searched(bothTogether, { of: seeds, what: 'seeds' })).toEqual([]);
   });
 
   // Correction 2: the dedicated variety regression guard the together-letters
@@ -2436,9 +2485,10 @@ describe('the warnings channel', () => {
     (sexMode) => {
       const M = (number: number) => student({ number, sex: 'M' });
       const F = (number: number) => student({ number, sex: 'F' });
+      const students = [M(1), M(2), F(3), F(4)];
       const out = buildGroups(
         base({
-          students: [M(1), M(2), F(3), F(4)],
+          students,
           mode: { kind: 'groupCount', count: 2 },
           sexMode,
         }),
@@ -2446,10 +2496,13 @@ describe('the warnings channel', () => {
       expect(out.ok).toBe(true);
       if (!out.ok) return;
       // The exact shape, not just an empty array wherever a caller happened
-      // to look -- a stray extra key on `result` has no type checker to
-      // catch it in this repo (see the module doc), so it is checked here.
+      // to look -- a stray extra key on `result` is not something the type
+      // check promises to catch (excess keys are flagged only on some object
+      // literals), so it is checked here.
       expect(Object.keys(out.result).sort()).toEqual(['groups', 'warnings']);
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
     },
   );
 });
@@ -2527,9 +2580,10 @@ describe('sex mode: separate', () => {
 
   describe('perGroup: each sex forms its own groups of the requested size', () => {
     it('makes single-sex groups when the numbers divide', () => {
+      const students = [M(1), M(2), M(3), M(4), F(5), F(6), F(7), F(8)];
       const out = buildGroups(
         base({
-          students: [M(1), M(2), M(3), M(4), F(5), F(6), F(7), F(8)],
+          students,
           mode: { kind: 'perGroup', size: 4 },
           sexMode: 'separate',
         }),
@@ -2539,7 +2593,9 @@ describe('sex mode: separate', () => {
       for (const g of out.result.groups) {
         expect(new Set(g.map((s) => s.sex)).size).toBe(1);
       }
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
     });
 
     // Six boys and two girls into groups of 4: the boys make one group and
@@ -2584,9 +2640,10 @@ describe('sex mode: separate', () => {
     // the feature works. It is kept as the regression guard the comment
     // above describes.
     it('a roster that is entirely one sex places with no warning', () => {
+      const students = [M(1), M(2), M(3), M(4)];
       const out = buildGroups(
         base({
-          students: [M(1), M(2), M(3), M(4)],
+          students,
           mode: { kind: 'perGroup', size: 2 },
           sexMode: 'separate',
         }),
@@ -2594,7 +2651,9 @@ describe('sex mode: separate', () => {
       expect(out.ok).toBe(true);
       if (!out.ok) return;
       expect(out.result.groups).toHaveLength(2);
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
     });
   });
 
@@ -2620,7 +2679,9 @@ describe('sex mode: separate', () => {
       );
       expect(out.ok).toBe(true);
       if (!out.ok) return;
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
       expect(shape(out.result.groups)).toEqual([6, 6, 4, 4]);
       for (const g of out.result.groups) {
         expect(new Set(g.map((s) => s.sex)).size).toBe(1);
@@ -2778,7 +2839,9 @@ describe('sex mode: separate', () => {
       );
       expect(out.ok).toBe(true);
       if (!out.ok) return;
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
       expect(shape(out.result.groups)).toEqual([8, 4, 4, 4]);
       const girlUnit = groupOf(out.result.groups, 13);
       for (const n of [13, 14, 15, 16, 17]) {
@@ -2883,29 +2946,16 @@ describe('sex mode: separate', () => {
   // like this file's other SEARCH_GAVE_UP tests do (see "says it gave up,
   // not that no arrangement exists" above).
   describe('when at least one allocation candidate gives up rather than proving impossibility: reports sexSeparateSearchGaveUp, not the proof code (Fix round 2)', () => {
-    const eightBoysFifteenGirlsFiveApart = [
-      ...Array.from({ length: 8 }, (_, i) => M(i + 1)),
-      ...Array.from({ length: 5 }, (_, i) =>
-        student({ number: i + 9, sex: 'F' as const, apart: 'X' }),
-      ),
-      F(14),
-      F(15),
-      F(16),
-      F(17),
-      F(18),
-      F(19),
-      F(20),
-      F(21),
-      F(22),
-      F(23),
-    ];
+    const eightBoysFifteenGirls = eightBoysFifteenGirlsFiveApart();
 
     it('reports the gave-up code, not sexSeparateImpossible, when the search never fully explored every candidate', () => {
       const out = buildGroups(
         base({
-          students: eightBoysFifteenGirlsFiveApart,
+          students: eightBoysFifteenGirls,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -2920,9 +2970,11 @@ describe('sex mode: separate', () => {
     it('renders the exact sentence claiming nothing about possibility, offering fewer letters or the mode switch, in both languages', () => {
       const out = buildGroups(
         base({
-          students: eightBoysFifteenGirlsFiveApart,
+          students: eightBoysFifteenGirls,
           mode: { kind: 'groupCount', count: 6 },
           sexMode: 'separate',
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -2992,22 +3044,22 @@ describe('sex mode: separate', () => {
       // this fixture at all). One sentence now, in both languages, naming
       // the whole roster via the default numbered resolver.
       const names = Array.from({ length: 12 }, (_, i) =>
-        en.studentNumber(i + 1),
+        en.studentNumber({ n: i + 1 }),
       );
       expect(renderWarning(out.result.warnings[0], en)).toBe(
-        'Student 1, Student 2, Student 3, Student 4, Student 5, Student 6, Student 7, Student 8, Student 9, Student 10, Student 11, Student 12 were placed in one combined group because there were not enough of either sex to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
+        'Student 1, Student 2, Student 3, Student 4, Student 5, Student 6, Student 7, Student 8, Student 9, Student 10, Student 11 and Student 12 were placed in one combined group because there were not enough of either sex to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
       );
       expect(renderWarning(out.result.warnings[0], en)).toBe(
-        en.warnings.SEX_BOTH_TOO_SMALL(names),
+        en.warnings.SEX_BOTH_TOO_SMALL({ names }),
       );
       const idNames = Array.from({ length: 12 }, (_, i) =>
-        id.studentNumber(i + 1),
+        id.studentNumber({ n: i + 1 }),
       );
       expect(renderWarning(out.result.warnings[0], id)).toBe(
-        'Siswa 1, Siswa 2, Siswa 3, Siswa 4, Siswa 5, Siswa 6, Siswa 7, Siswa 8, Siswa 9, Siswa 10, Siswa 11, Siswa 12 digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
+        'Siswa 1, Siswa 2, Siswa 3, Siswa 4, Siswa 5, Siswa 6, Siswa 7, Siswa 8, Siswa 9, Siswa 10, Siswa 11, dan Siswa 12 digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(renderWarning(out.result.warnings[0], id)).toBe(
-        id.warnings.SEX_BOTH_TOO_SMALL(idNames),
+        id.warnings.SEX_BOTH_TOO_SMALL({ names: idNames }),
       );
     });
 
@@ -3025,9 +3077,10 @@ describe('sex mode: separate', () => {
     // without also requiring both sexes to have members, would have
     // wrongly warned a same-sex roster about a sex that is not there).
     it('a lone sex too small for the requested size places with no warning -- there is no other sex to have joined', () => {
+      const students = [M(1), M(2), M(3)];
       const out = buildGroups(
         base({
-          students: [M(1), M(2), M(3)],
+          students,
           mode: { kind: 'perGroup', size: 10 },
           sexMode: 'separate',
         }),
@@ -3038,7 +3091,9 @@ describe('sex mode: separate', () => {
       expect(
         out.result.groups[0].map((s) => s.number).sort((a, b) => a - b),
       ).toEqual([1, 2, 3]);
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: students, what: 'students' }),
+      ).toEqual([]);
     });
   });
 
@@ -3208,10 +3263,10 @@ describe('sex mode: separate', () => {
       expect(out.ok).toBe(false);
       if (out.ok) return;
       expect(renderError(out.error, en)).toBe(
-        'Student 1, Student 2 are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1, Siswa 2 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
     });
 
@@ -3240,11 +3295,11 @@ describe('sex mode: separate', () => {
       if (out.ok) return;
       const enMsg = renderError(out.error, en);
       expect(enMsg).toBe(
-        'Student 1, Student 5 all need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
+        'Student 1 and Student 5 both need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
       );
       const idMsg = renderError(out.error, id);
       expect(idMsg).toBe(
-        'Siswa 1, Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 2 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+        'Siswa 1 dan Siswa 5 keduanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 2 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
       );
     });
   });
@@ -3604,8 +3659,9 @@ describe('pinned groups', () => {
     // implementation (today `pinned` is ignored, so there is trivially no
     // warning either way); kept as a scoping regression guard, not a
     // feature pin -- see the report for the explicit RED-count judgment.
-    it('needs no warning outside separate mode', () => {
-      for (const sexMode of ['off', 'mix'] as const) {
+    it.each(['off', 'mix'] as const)(
+      'needs no warning outside separate mode (sexMode: %s)',
+      (sexMode) => {
         const out = buildGroups(
           base({
             students: mixedPinRoster,
@@ -3615,10 +3671,16 @@ describe('pinned groups', () => {
           }),
         );
         expect(out.ok, sexMode).toBe(true);
-        if (!out.ok) continue;
-        expect(out.result.warnings, sexMode).toEqual([]);
-      }
-    });
+        if (!out.ok) return;
+        expect(
+          searched(out.result.warnings, {
+            of: mixedPinRoster,
+            what: 'students',
+          }),
+          sexMode,
+        ).toEqual([]);
+      },
+    );
   });
 
   // Correction 3, interaction 2 (decision -- flagged for the operator).
@@ -3818,7 +3880,9 @@ describe('pinned groups', () => {
       expect(out.ok).toBe(true);
       if (!out.ok) return;
       expect(out.result.groups).toHaveLength(3); // not clamped to 2
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: roster, what: 'students' }),
+      ).toEqual([]);
       expect(
         out.result.groups.map((g) =>
           g.map((s) => s.number).sort((a, b) => a - b),
@@ -3988,7 +4052,9 @@ describe('pinned groups', () => {
       expect(out.ok).toBe(true);
       if (!out.ok) return;
       expect(out.result.groups).toHaveLength(3);
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: sepRoster, what: 'students' }),
+      ).toEqual([]);
       const pinnedResult = groupOf(out.result.groups, 1);
       expect(pinnedResult?.map((s) => s.number).sort((a, b) => a - b)).toEqual([
         1, 2,
@@ -4104,15 +4170,15 @@ describe('pinned groups', () => {
         students: [1, 7],
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 1, Student 7 are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
+        'Student 1 and Student 7 are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1, Siswa 7 ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.',
+        'Siswa 1 dan Siswa 7 ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.',
       );
       expect(
         renderError(out.error, en, (n) => (n === 1 ? 'Wayan' : 'Made')),
       ).toBe(
-        'Wayan, Made are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
+        'Wayan and Made are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
       );
     };
 
@@ -4134,15 +4200,15 @@ describe('pinned groups', () => {
         students: [1, 2],
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 1, Student 2 are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
+        'Student 1 and Student 2 are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1, Siswa 2 ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.',
+        'Siswa 1 dan Siswa 2 ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.',
       );
       expect(
         renderError(out.error, en, (n) => (n === 1 ? 'Ana' : 'Budi')),
       ).toBe(
-        'Ana, Budi are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
+        'Ana and Budi are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
       );
     };
 
@@ -4285,15 +4351,15 @@ describe('pinned groups', () => {
       ]);
       const [warning] = out.result.warnings;
       expect(renderWarning(warning, en)).toBe(
-        'Student 1, Student 4 are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Student 1 and Student 4 are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
       expect(renderWarning(warning, id)).toBe(
-        'Siswa 1, Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
+        'Siswa 1 dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(
         renderWarning(warning, en, (n) => (n === 1 ? 'Dewi' : 'Eko')),
       ).toBe(
-        'Dewi, Eko are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Dewi and Eko are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
     };
 
@@ -4334,10 +4400,10 @@ describe('pinned groups', () => {
         groupsNeeded: 4,
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 3, Student 4, Student 5 all need to be kept apart from each other, so you would need at least 4 groups. Either make more groups or remove one of the rules.',
+        'Student 3, Student 4 and Student 5 all need to be kept apart from each other, so you would need at least 4 groups. Either make more groups or remove one of the rules.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 3, Siswa 4, Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 4 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+        'Siswa 3, Siswa 4, dan Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 4 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
       );
       expect(
         renderError(
@@ -4346,7 +4412,7 @@ describe('pinned groups', () => {
           (n) => ({ 3: 'Fitri', 4: 'Gita', 5: 'Hani' })[n] ?? `#${n}`,
         ),
       ).toBe(
-        'Fitri, Gita, Hani all need to be kept apart from each other, so you would need at least 4 groups. Either make more groups or remove one of the rules.',
+        'Fitri, Gita and Hani all need to be kept apart from each other, so you would need at least 4 groups. Either make more groups or remove one of the rules.',
       );
     };
 
@@ -4520,12 +4586,7 @@ describe('pinned groups', () => {
     // the pool, per that doc comment). --------------------------------
 
     const testTogetherSearchGaveUpPinned = () => {
-      const pairs = Array.from({ length: 30 }, (_, i) =>
-        student({
-          number: i + 1,
-          together: String.fromCharCode(65 + Math.floor(i / 2)),
-        }),
-      );
+      const pairs = fifteenBuddyPairs();
       // The pinned pair must be REAL roster members, not just numbers handed
       // to `pinned` -- a pin resolves by matching `presentByNumber` (see
       // buildGroups's own comment on `pinnedGroups`), so a number with no
@@ -4540,6 +4601,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4574,6 +4637,8 @@ describe('pinned groups', () => {
           students: [...students, ...pinnedPair],
           mode: { kind: 'groupCount', count: 21 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#714).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4588,13 +4653,7 @@ describe('pinned groups', () => {
     };
 
     const testBothRulesSearchGaveUpPinned = () => {
-      const pairs = Array.from({ length: 30 }, (_, i) =>
-        student({
-          number: i + 1,
-          together: String.fromCharCode(65 + Math.floor(i / 2)),
-          apart: i === 0 || i === 16 ? 'X' : null,
-        }),
-      );
+      const pairs = fifteenBuddyPairs({ apartAcross: true });
       // See testTogetherSearchGaveUpPinned's comment.
       const pinnedPair = [student({ number: 31 }), student({ number: 32 })];
       const out = buildGroups(
@@ -4602,6 +4661,8 @@ describe('pinned groups', () => {
           students: [...pairs, ...pinnedPair],
           mode: { kind: 'groupCount', count: 11 },
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4616,22 +4677,7 @@ describe('pinned groups', () => {
     };
 
     const testSexSeparateSearchGaveUpPinned = () => {
-      const students = [
-        ...Array.from({ length: 8 }, (_, i) => M(i + 1)),
-        ...Array.from({ length: 5 }, (_, i) =>
-          student({ number: i + 9, sex: 'F' as const, apart: 'X' }),
-        ),
-        F(14),
-        F(15),
-        F(16),
-        F(17),
-        F(18),
-        F(19),
-        F(20),
-        F(21),
-        F(22),
-        F(23),
-      ];
+      const students = eightBoysFifteenGirlsFiveApart();
       // See testTogetherSearchGaveUpPinned's comment. `sexMode: 'separate'`
       // additionally requires every PRESENT student to have a sex set (the
       // unset-sex guard runs on `present`, before pins are even resolved),
@@ -4643,6 +4689,8 @@ describe('pinned groups', () => {
           mode: { kind: 'groupCount', count: 7 },
           sexMode: 'separate',
           pinned: [pinnedPair],
+          // The real budget's run of this roster: tests/simulation/ (#794).
+          searchNodeCap: GAVE_UP_TEST_NODE_CAP,
         }),
       );
       expect(out.ok).toBe(false);
@@ -4718,15 +4766,15 @@ describe('pinned groups', () => {
         students: [1, 2],
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 1, Student 2 are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1, Siswa 2 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
       expect(
         renderError(out.error, en, (n) => (n === 1 ? 'Ika' : 'Joko')),
       ).toBe(
-        'Ika, Joko are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Ika and Joko are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
     };
 
@@ -4753,15 +4801,15 @@ describe('pinned groups', () => {
         students: [1, 2],
       });
       expect(renderError(out.error, en)).toBe(
-        'Student 1, Student 2 are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
+        'Student 1 and Student 2 are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
       );
       expect(renderError(out.error, id)).toBe(
-        'Siswa 1, Siswa 2 ditandai untuk disatukan sekaligus dipisahkan satu sama lain. Hapus huruf yang menyatukan mereka, atau huruf yang memisahkan mereka.',
+        'Siswa 1 dan Siswa 2 ditandai untuk disatukan sekaligus dipisahkan satu sama lain. Hapus huruf yang menyatukan mereka, atau huruf yang memisahkan mereka.',
       );
       expect(
         renderError(out.error, en, (n) => (n === 1 ? 'Kadek' : 'Luh')),
       ).toBe(
-        'Kadek, Luh are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
+        'Kadek and Luh are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
       );
     };
 
@@ -5132,7 +5180,9 @@ describe('leftovers, against the new constraints', () => {
       );
       expect(out.ok).toBe(true);
       if (!out.ok) return;
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: roster, what: 'students' }),
+      ).toEqual([]);
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       const girlsGroups = out.result.groups.filter((g) => g[0].sex === 'F');
       expect(shape(boysGroups)).toEqual([6, 4, 4]);
@@ -5246,7 +5296,9 @@ describe('leftovers, against the new constraints', () => {
       );
       expect(out.ok).toBe(true);
       if (!out.ok) return;
-      expect(out.result.warnings).toEqual([]);
+      expect(
+        searched(out.result.warnings, { of: roster, what: 'students' }),
+      ).toEqual([]);
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       expect(boysGroups).toHaveLength(3);
       expect(shape(boysGroups)).toEqual([6, 4, 4]);
@@ -5266,5 +5318,102 @@ describe('leftovers, against the new constraints', () => {
       const boysGroups = out.result.groups.filter((g) => g[0].sex === 'M');
       expect(shape(boysGroups)).toEqual([5, 5, 4]);
     });
+  });
+});
+
+describe('the search budget is injected, so a unit test reaches "gave up" without spending the real one (#714)', () => {
+  // Twelve students under three keep-apart letters, four groups of three:
+  // the real budget places them, so a one-node budget giving up on the same
+  // roster proves the budget the search reads is the one passed in. The
+  // gave-up tests above lean on this: they pass a small budget, and their
+  // real-budget versions run in tests/simulation/.
+  const roster = Array.from({ length: 12 }, (_, i) =>
+    student({ number: i + 1, apart: ['X', 'Y', 'Z'][i % 3] }),
+  );
+  const input = base({ students: roster, mode: { kind: 'perGroup', size: 3 } });
+
+  it('places the roster under the real budget', () => {
+    expect(shape(ok(input).groups)).toEqual([3, 3, 3, 3]);
+  });
+
+  it('gives up on the same roster under a one-node budget, and says so', () => {
+    const out = buildGroups({ ...input, searchNodeCap: 1 });
+    expect(out.ok ? 'placed' : out.error.code).toBe(
+      ERROR_CODES.keepApartSearchGaveUp,
+    );
+  });
+});
+
+// #505 (F176): a message about exactly two students reads "both" / "the same
+// sex"; three or more keep "all". Each case is its own test.
+describe('a message about two students, or three, agrees with how many it names (#505)', () => {
+  const enMsg = getStrings('en');
+  const idMsg = getStrings('id');
+  const apart = (students: number[]) => ({
+    code: ERROR_CODES.keepApartImpossible,
+    students,
+    groupsNeeded: 3,
+  });
+  const splits = (students: number[]) => ({
+    code: ERROR_CODES.sexSeparateSplitsUnit,
+    students,
+  });
+  const pinned = (students: number[]) => ({
+    code: WARNING_CODES.pinnedMixedSex,
+    students,
+  });
+
+  it('keep-apart: two students read "both"', () => {
+    expect(renderError(apart([1, 5]), enMsg)).toBe(
+      'Student 1 and Student 5 both need to be kept apart from each other, so you would need at least 3 groups. Either make more groups or remove one of the rules.',
+    );
+    expect(renderError(apart([1, 5]), idMsg)).toBe(
+      'Siswa 1 dan Siswa 5 keduanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 3 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+    );
+  });
+
+  it('keep-apart: three students keep "all"', () => {
+    expect(renderError(apart([3, 4, 5]), enMsg)).toBe(
+      'Student 3, Student 4 and Student 5 all need to be kept apart from each other, so you would need at least 3 groups. Either make more groups or remove one of the rules.',
+    );
+    expect(renderError(apart([3, 4, 5]), idMsg)).toBe(
+      'Siswa 3, Siswa 4, dan Siswa 5 semuanya harus dipisahkan satu sama lain, sehingga Anda membutuhkan minimal 3 kelompok. Tambah jumlah kelompok atau hapus salah satu aturannya.',
+    );
+  });
+
+  it('split-by-sex unit: two students are "not the same sex"', () => {
+    expect(renderError(splits([1, 2]), enMsg)).toContain(
+      'Student 1 and Student 2 are marked to stay together, but are not the same sex, so they cannot form',
+    );
+    expect(renderError(splits([1, 2]), idMsg)).toContain(
+      'Siswa 1 dan Siswa 2 ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga',
+    );
+  });
+
+  it('split-by-sex unit: three students keep "not all the same sex"', () => {
+    expect(renderError(splits([1, 2, 3]), enMsg)).toContain(
+      'Student 1, Student 2 and Student 3 are marked to stay together, but are not all the same sex, so they cannot form',
+    );
+    expect(renderError(splits([1, 2, 3]), idMsg)).toContain(
+      'Siswa 1, Siswa 2, dan Siswa 3 ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga',
+    );
+  });
+
+  it('pinned mixed sex: two students are "not the same sex"', () => {
+    expect(renderWarning(pinned([1, 4]), enMsg)).toContain(
+      'Student 1 and Student 4 are pinned together as one group, but are not the same sex, so this group',
+    );
+    expect(renderWarning(pinned([1, 4]), idMsg)).toContain(
+      'Siswa 1 dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama,',
+    );
+  });
+
+  it('pinned mixed sex: three students keep "not all the same sex"', () => {
+    expect(renderWarning(pinned([1, 2, 4]), enMsg)).toContain(
+      'Student 1, Student 2 and Student 4 are pinned together as one group, but are not all the same sex, so this group',
+    );
+    expect(renderWarning(pinned([1, 2, 4]), idMsg)).toContain(
+      'Siswa 1, Siswa 2, dan Siswa 4 dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama,',
+    );
   });
 });

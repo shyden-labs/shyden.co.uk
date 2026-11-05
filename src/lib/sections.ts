@@ -44,15 +44,15 @@ export function sectionState(state: ToolState, t: Strings) {
   const parts: string[] = [];
   if (state.rosterSize === 0) parts.push(t.stateNoneAdded);
   else {
-    if (state.named > 0) parts.push(t.stateNamed(state.named));
-    if (state.absent > 0) parts.push(t.stateAbsent(state.absent));
-    if (state.together > 0) parts.push(t.stateTogether(state.together));
-    if (state.apart > 0) parts.push(t.stateApart(state.apart));
+    if (state.named > 0) parts.push(t.stateNamed({ n: state.named }));
+    if (state.absent > 0) parts.push(t.stateAbsent({ n: state.absent }));
+    if (state.together > 0) parts.push(t.stateTogether({ n: state.together }));
+    if (state.apart > 0) parts.push(t.stateApart({ n: state.apart }));
     // Every one of named/absent/together/apart is 0: there IS a roster, but
     // nothing about it is worth calling out yet -- everyone is present,
     // unnamed, and unlettered. Falls back to a plain count rather than
     // leaving the header blank.
-    if (parts.length === 0) parts.push(t.stateAdded(state.rosterSize));
+    if (parts.length === 0) parts.push(t.stateAdded({ n: state.rosterSize }));
   }
 
   const opts: string[] = [];

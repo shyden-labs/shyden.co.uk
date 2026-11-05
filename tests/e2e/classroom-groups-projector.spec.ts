@@ -1,4 +1,9 @@
+import { setCheckedOn, tapAt, tapOn } from '../real-touch';
+import { onRealDevice } from '../device/device-downloads';
+import { typeInto } from '../real-typing';
+import { openBoard } from '../board-settled';
 import { test, expect } from './fixtures';
+import { chooseSpeed, makeGroups } from '../make-groups';
 import {
   withGroups,
   rosterForSpillover,
@@ -6,7 +11,19 @@ import {
   namesIn,
   buildRoster,
   giveEveryoneASex,
+  refuseFullscreen,
+  holdFirstGrantUntilTheNext,
+  holdTheTidyUpExit,
+  openWaitingBoard,
+  contrastRatio,
 } from './helpers';
+import { searched } from '../source-files';
+import { FLOOR_PX } from '../../src/scripts/projector';
+import { measureBoard, measureCover } from '../board-geometry';
+import { coverGaps } from '../device-pixels';
+import { recorded, shoot } from './evidence';
+
+test.use(recorded);
 
 /**
  * Stage 5, Task 5. The projector view. Z-01…Z-06, Z-10…Z-20, Z-24.
@@ -71,40 +88,56 @@ const clickable = async (
 };
 
 test.describe('the projector view', () => {
-  test('the button appears only once groups exist', async ({ page }) => {
+  // #743 AC1: the board can be put up before a shuffle, to deal with the
+  // class watching, so its button follows the page's own Shuffle -- the
+  // same fact, both ways -- rather than waiting for groups to exist.
+  test('the button is there whenever the page Shuffle can run, and not otherwise', async ({
+    page,
+  }) => {
+    const open = page.getByRole('button', { name: 'Full screen', exact: true });
+    // getByRole leaves hidden elements out, so a hidden button can never
+    // count 1 through `open`; the absence checks read the page's own button
+    // by id. A name match with includeHidden also finds the closed board's
+    // "Exit full screen", since names match by substring unless exact.
+    const openEvenHidden = page.locator('#cg-board-open');
+    const go = page.locator('#cg-go');
     await page.goto('/classroom-groups');
-    await expect(
-      page.getByRole('button', { name: 'Full screen' }),
-    ).toBeHidden();
-    await withGroups(page);
-    await expect(
-      page.getByRole('button', { name: 'Full screen' }),
-    ).toBeVisible();
+    await expect(go).toBeEnabled();
+    await expect(open).toBeVisible();
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(page.locator('#cg-numbers-absent'), '26');
+    await expect(go).toBeDisabled();
+    await expect(openEvenHidden).toHaveCount(1);
+    await expect(openEvenHidden).toBeHidden();
+    await typeInto(page.locator('#cg-numbers-absent'), '7');
+    await expect(go).toBeEnabled();
+    await expect(open).toBeVisible();
   });
 
   test('a refused requestFullscreen lands in the overlay, not in nothing', async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      Element.prototype.requestFullscreen = () =>
-        Promise.reject(new Error('refused'));
-    });
+    await refuseFullscreen(page);
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     // The viewport is read from the PAGE, not from `page.viewportSize()`.
     // On a real device over CDP there is no emulated viewport and that
     // returns `null` -- found on the real Android gauntlet, where this was
-    // the only failure in 339. `window.innerWidth/innerHeight` is the real
-    // viewport on every target, which is what this assertion was always
-    // about; asking Playwright was asking the wrong thing.
-    const box = (await page.locator('#cg-board').boundingBox())!;
-    const vp = await page.evaluate(() => ({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }));
-    expect(box.width).toBeCloseTo(vp.width, 0);
-    expect(box.height).toBeCloseTo(vp.height, 0);
+    // the only failure in 339. And it is judged in device pixels, not
+    // against `innerHeight` to half a CSS pixel: `innerHeight` is the
+    // window's height FLOORED, so the real phone's 1084 device pixels
+    // (309.714 CSS px at a ratio of 3.5) read as 309 and failed a board that
+    // covered the screen exactly (#837).
+    const cover = await page.evaluate(measureCover);
+    const { checked, gaps } = coverGaps(cover);
+    expect(
+      searched(gaps, {
+        of: checked,
+        what: 'checks of the board against the window',
+      }),
+      JSON.stringify(cover),
+    ).toEqual([]);
     // …and the groups are actually ON it, which is the point of falling
     // back rather than merely showing an empty layer.
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
@@ -112,7 +145,7 @@ test.describe('the projector view', () => {
 
   test('no form or site chrome on the board', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     // The board covers the page rather than hiding its parts one at a time,
     // so this asserts what a teacher can SEE and reach: nothing behind the
     // overlay is visible at the board's own coordinates, and the page
@@ -133,15 +166,19 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expectFaded(page); // condition, not a sleep
     // Two moves: a move to where the pointer already is dispatches no
     // event at all, and the pointer starts at (0,0).
-    await page.mouse.move(200, 300);
-    await page.mouse.move(220, 320);
-    await expect(bar(page)).not.toHaveClass(/faded/);
-    await expectFaded(page);
-    await page.locator('#cg-board').click({ position: { x: 50, y: 300 } });
+    // A phone has no mouse pointer: the pointer half runs on the desktop
+    // engines, and the phone checks the tap and the key (#996).
+    if (!onRealDevice()) {
+      await page.mouse.move(200, 300);
+      await page.mouse.move(220, 320);
+      await expect(bar(page)).not.toHaveClass(/faded/);
+      await expectFaded(page);
+    }
+    await tapOn(page.locator('#cg-board'), { position: { x: 50, y: 300 } });
     await expect(bar(page)).not.toHaveClass(/faded/);
     await expectFaded(page);
     await page.keyboard.press('a');
@@ -152,7 +189,7 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await bar(page).getByRole('button', { name: 'Shuffle again' }).focus();
     await expect(bar(page)).not.toHaveClass(/faded/);
     // …and it STAYS that way. A keyboard user must not lose the control
@@ -172,7 +209,7 @@ test.describe('the projector view', () => {
   // keyboard user mid-Tab with no visible way out.
   test('a faded bar can still be reached by keyboard', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expectFaded(page);
     await bar(page).getByRole('button', { name: 'Exit full screen' }).focus();
     await expect(bar(page)).not.toHaveClass(/faded/);
@@ -190,13 +227,13 @@ test.describe('the projector view', () => {
     page,
   }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     // Out immediately, while the grant is still in flight.
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     await clickable(page, '#cg-board-open');
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     // …and it STAYS open. The stray event arrives after the fact, so a
     // single assertion the instant it opens would pass either way. Waited
@@ -213,32 +250,179 @@ test.describe('the projector view', () => {
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
   });
 
+  // #231. The other order of the same race, and the one a real Android phone
+  // gives: the first showing's grant lands only once the board is up again,
+  // just ahead of the second showing's own. The fullscreen it brings is the
+  // one the board on screen asked for, so the open showing keeps it: undoing
+  // it as a leftover took the document out of fullscreen under the second
+  // board, and the page's own `fullscreenchange` handler then closed that
+  // board with nobody asking. Measured on CPH2653: 7 of 40 runs of the
+  // Escape test below.
+  test('a grant that lands during the next showing leaves that showing open', async ({
+    page,
+  }) => {
+    // An iPhone has no element fullscreen at all, and neither has
+    // Playwright's mobile-safari: no `Element.prototype.requestFullscreen`
+    // (run 39066325735), so there is no grant to race and its board is the
+    // overlay. Asked of the engine, not of a project name, so an engine that
+    // has the call and refuses it still runs this and fails below.
+    test.skip(
+      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
+      'no element fullscreen on this engine (iPhone Safari): no grant to race',
+    );
+    await holdFirstGrantUntilTheNext(page);
+    await withGroups(page);
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board')).toBeHidden();
+    await clickable(page, '#cg-board-open');
+    const race = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __fullscreenRace: { answered: number; exitsAsked: number };
+            }
+          ).__fullscreenRace,
+      );
+    const { exitsAsked: exitsBefore } = await race();
+
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    // Both answers delivered, and the page's handler for each has run.
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { __fullscreenRace: { answered: number } })
+          .__fullscreenRace.answered === 2,
+    );
+    // The page asked for no exit while its board was up, so nothing is left
+    // in flight to close it: checked here because the close it caused came
+    // one frame after the answers, where a visibility check alone could pass
+    // before it landed.
+    expect((await race()).exitsAsked).toBe(exitsBefore);
+    await expect(page.locator('#cg-board')).toBeVisible();
+    await expect(page.locator('#cg-board #cg-results')).toBeVisible();
+    // …and it is still FULLSCREEN, which is what the teacher asked for. On
+    // an engine that refused both requests the lines above would pass with
+    // nothing raced, so this is also the proof that the race was run.
+    expect(
+      await page.evaluate(() => document.fullscreenElement?.id ?? null),
+    ).toBe('cg-board');
+  });
+
+  // The neighbouring order: the first showing's grant lands in the gap,
+  // while the board is closed, and the page undoes it. Were the board
+  // reopened while that exit is in flight, with the second grant settled
+  // first, the exit's `fullscreenchange` would find a showing that got
+  // fullscreen and close it. The window is the in-flight exit, and for all
+  // of it the document is in fullscreen over a hidden board, so the question
+  // is whether a teacher's click can reach the Full screen button there.
+  test('a reopen cannot reach the page while the last showing is still being undone', async ({
+    page,
+  }) => {
+    test.skip(
+      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
+      'no element fullscreen on this engine (iPhone Safari): no grant to race',
+    );
+    await holdTheTidyUpExit(page);
+    await withGroups(page);
+    const open = page.getByRole('button', { name: 'Full screen' });
+    await tapOn(open);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board')).toBeHidden();
+    // Read here, not before the click: on a phone the click scrolls the button
+    // into view, and a box read before it points off the screen afterwards.
+    const box = (await open.boundingBox())!;
+
+    type Race = {
+      firstAnswered: boolean;
+      exitsAsked: number;
+      exitHeld: boolean;
+    };
+    const race = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __tidyUpRace: { race: Race } }).__tidyUpRace
+            .race,
+      );
+    await page.evaluate(() =>
+      (
+        window as unknown as { __tidyUpRace: { landFirst: () => void } }
+      ).__tidyUpRace.landFirst(),
+    );
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { __tidyUpRace: { race: Race } }).__tidyUpRace
+          .race.firstAnswered,
+    );
+    // The order is reached: a real grant, on the closed board, with the page's
+    // exit for it asked for and still in flight.
+    expect(await race()).toEqual({
+      firstAnswered: true,
+      exitsAsked: 1,
+      exitHeld: true,
+    });
+    expect(
+      await page.evaluate(() => document.fullscreenElement?.id ?? null),
+    ).toBe('cg-board');
+
+    const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const hit = await page.evaluate(({ x, y }) => {
+      const top = document.elementFromPoint(x, y);
+      return top === null ? null : top.id || top.tagName;
+    }, centre);
+    test
+      .info()
+      .annotations.push({ type: 'hit-in-flight', description: String(hit) });
+    // A teacher's click, where the button was: a raw pointer, with no
+    // actionability wait, which would hold it until the window had closed.
+    await tapAt(page, centre.x, centre.y);
+    const reopened = await page.evaluate(
+      () => !document.getElementById('cg-board')!.hidden,
+    );
+    test.info().annotations.push({
+      type: 'reopened-in-flight',
+      description: String(reopened),
+    });
+
+    await page.evaluate(() =>
+      (
+        window as unknown as { __tidyUpRace: { releaseExit: () => void } }
+      ).__tidyUpRace.releaseExit(),
+    );
+    await page.waitForFunction(() => document.fullscreenElement === null);
+    test.info().annotations.push({
+      type: 'open-after-exit',
+      description: String(
+        await page.evaluate(() => !document.getElementById('cg-board')!.hidden),
+      ),
+    });
+    expect(hit).toBe('HTML');
+    expect(reopened).toBe(false);
+    await expect(page.locator('#cg-board')).toBeHidden();
+  });
+
   // The claim is ESCAPE EXITS, twice over: straight away, and again after
-  // the board has been sitting there. The bar's own fading is proven by the
-  // fade tests above and is deliberately NOT a precondition here -- it did
-  // not fire on a second showing on a real Android phone, and requiring it
-  // made this test fail for a reason that has nothing to do with Escape.
+  // the board has been sitting there.
   test('Escape exits, on a fresh board and on a settled one', async ({
     page,
   }) => {
     await withGroups(page);
     for (const settle of [false, true]) {
-      await page.getByRole('button', { name: 'Full screen' }).click();
+      await openBoard(page);
       await expect(page.locator('#cg-board')).toBeVisible();
       if (settle) {
-        // "Settled" means the board has ARRIVED and painted -- its content
-        // is on it and a frame has gone by. Deliberately NOT "the reveal
-        // finished": on a real Android phone the last group's `revealed`
-        // does not reliably land on a SECOND showing, and requiring it made
-        // this test fail for a reason with nothing to do with Escape. The
-        // reveal has its own tests, and they pass on that phone.
+        // "Settled" means the reveal has finished and the bar has faded.
+        // Both were once dropped from here because neither landed on a
+        // SECOND showing on a real Android phone. The cause was #231: the
+        // first showing's late grant was undone under the second board,
+        // which then closed itself, and a closed board neither finishes a
+        // reveal nor fades its bar. With that fixed, both returned and
+        // passed 20 of 20 on that phone.
         await expect(page.locator('#cg-board #cg-results')).toBeVisible();
-        await page.evaluate(
-          () =>
-            new Promise((resolve) =>
-              requestAnimationFrame(() => resolve(null)),
-            ),
+        await expect(page.locator('#cg-board .group').last()).toHaveClass(
+          /revealed/,
         );
+        await expectFaded(page);
       }
       await page.keyboard.press('Escape');
       await expect(page.locator('#cg-board')).toBeHidden();
@@ -248,7 +432,7 @@ test.describe('the projector view', () => {
 
   test('leaving puts the results back on the page', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
@@ -261,14 +445,20 @@ test.describe('the projector view', () => {
   }) => {
     await withGroups(page);
     const before = await page.locator('#cg-results').innerText();
-    await page.getByRole('button', { name: 'Full screen' }).click();
-    // The board's Shuffle shares the page's own one-at-a-time guard, so it
-    // does nothing while the previous deal is still running -- which is
-    // what a teacher pressing it twice should get, and what this test was
-    // unknowingly doing. Wait for the deal to finish first: condition-based
-    // on the deal button's own enabled state, never a sleep.
+    await openBoard(page);
+    // The board's Shuffle refuses only a roster the page cannot deal: the
+    // deal button's enabled state, which a deal in progress never changes.
+    // A press mid-deal starts a new deal from the top, so this test does
+    // not need the first deal to have finished.
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
+    await tapOn(bar(page).getByRole('button', { name: 'Shuffle again' }));
+    // #744: a board Shuffle deals by travelling from the waiting list, which
+    // it shows again first; read the board once that list has folded away,
+    // or its heading is among the names.
+    const listOnBoard = page.locator('#cg-board #cg-waiting');
+    await expect(listOnBoard).toBeVisible();
+    await expect(listOnBoard).toHaveCount(1);
+    await expect(listOnBoard).toBeHidden();
     // `#cg-board #cg-results`, not the whole board: `namesIn` matches any
     // Capitalised word, and the bar's own "Exit full screen" contributes
     // "Exit". Reading the results element compares like with like.
@@ -286,10 +476,10 @@ test.describe('the projector view', () => {
   }) => {
     await rosterForSpillover(page); // six boys, two girls, separate, groups of 4
     await giveEveryoneASex(page);
-    await page.getByRole('button', { name: 'Make Groups' }).click();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await bar(page).getByRole('button', { name: 'Shuffle again' }).click();
+    await tapOn(bar(page).getByRole('button', { name: 'Shuffle again' }));
     await expect(page.locator('#cg-board')).toContainText(
       'have joined a group of boys',
     );
@@ -300,13 +490,154 @@ test.describe('the projector view', () => {
     await expect(
       page.getByRole('button', { name: 'Layar penuh' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Layar penuh' }).click();
+    await tapOn(page.getByRole('button', { name: 'Layar penuh' }));
     await expect(
       bar(page).getByRole('button', { name: 'Acak lagi' }),
     ).toBeVisible();
     await expect(
       bar(page).getByRole('button', { name: 'Keluar dari layar penuh' }),
     ).toBeVisible();
+  });
+});
+
+/**
+ * #743. The board put up BEFORE the first shuffle: the results heading, one
+ * empty card per group the deal will make, and every student waiting, so
+ * the class watches the shuffle. Inside `#cg-results`, the one element the
+ * board ever shows.
+ */
+test.describe('the board before a shuffle (#743)', () => {
+  const board = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board #cg-results');
+
+  test('a named roster waits: empty cards, and every student by number and name', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+      ['M', 'Eli'],
+      ['F', 'Fay'],
+    ]);
+    await typeInto(page.locator('#cg-size'), '3');
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await expect(board(page)).toBeVisible();
+    await expect(board(page).locator('#cg-results-h')).toHaveText(
+      'Your groups',
+    );
+    await expect(board(page).locator('.group h3')).toHaveText([
+      'Group 1',
+      'Group 2',
+    ]);
+    await expect(board(page).locator('.group .student')).toHaveCount(0);
+    await expect(
+      board(page).getByRole('heading', { name: 'Waiting to be grouped' }),
+    ).toBeVisible();
+    const waiting = board(page).locator('.waiting-student');
+    await expect(waiting.locator('.number')).toHaveText([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    await expect(waiting.locator('.who')).toHaveText([
+      'Ada',
+      'Ben',
+      'Cleo',
+      'Dev',
+      'Eli',
+      'Fay',
+    ]);
+    // The number and the name sit apart on screen, not only in the text: a
+    // flex row discards a space between its children (the page's CLAUDE.md).
+    const [number, who] = await Promise.all([
+      waiting.first().locator('.number').boundingBox(),
+      waiting.first().locator('.who').boundingBox(),
+    ]);
+    expect(who!.x).toBeGreaterThan(number!.x + number!.width);
+  });
+
+  test('a bare count waits by number alone', async ({ page }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await expect(board(page).locator('.group h3')).toHaveText([
+      'Group 1',
+      'Group 2',
+    ]);
+    const waiting = board(page).locator('.waiting-student');
+    await expect(waiting.locator('.number')).toHaveText(
+      Array.from({ length: 10 }, (_, i) => String(i + 1)),
+    );
+    await expect(waiting.locator('.who')).toHaveCount(0);
+  });
+
+  test('the board Shuffle fills the waiting cards, and the page shows them on exit', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '4');
+    await chooseSpeed(page, 'skip');
+    await openBoard(page);
+    // Nothing has been shuffled yet, so the board's button says what the
+    // page's does, not "again".
+    await tapOn(bar(page).getByRole('button', { name: 'Make Groups' }));
+    await expect(board(page).locator('.group')).toHaveCount(2);
+    await expect(board(page).locator('.group .student.dealt')).toHaveCount(10);
+    await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
+    await expect(board(page).locator('#cg-waiting')).toBeHidden();
+    await expect(
+      bar(page).getByRole('button', { name: 'Shuffle again' }),
+    ).toBeVisible();
+    const onBoard = await board(page).innerText();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-results')).toBeVisible();
+    expect(await page.locator('#cg-results').innerText()).toBe(onBoard);
+  });
+
+  test('leaving without a shuffle leaves the page as it was', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '10');
+    const settleMs = await openBoard(page);
+    test.info().annotations.push({
+      type: 'board-settle-ms',
+      description: settleMs.toFixed(0),
+    });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    await expect(page.locator('#cg-results')).toHaveCount(1);
+    await expect(page.locator('#cg-results')).toBeHidden();
+    await expect(page.locator('#cg-results .group')).toHaveCount(0);
+    await expect(page.locator('#cg-waiting-list li')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Full screen' }),
+    ).toBeVisible();
+  });
+
+  test('a refused deal keeps the waiting board up and says why on it', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '0');
+    await typeInto(page.locator('#cg-size'), '4');
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
+    await tapOn(bar(page).getByRole('button', { name: 'Make Groups' }));
+    const said = board(page).locator('#cg-waiting-error');
+    await expect(said).toBeVisible();
+    await expect(said).toHaveText(
+      (await page.locator('#cg-error').textContent()) ?? '',
+    );
+    await expect(said).not.toHaveText('');
+    await expect(board(page).locator('#cg-waiting')).toBeVisible();
   });
 });
 
@@ -321,7 +652,7 @@ test.describe('the reveal', () => {
   // reveal finish -- which is every other test in this block.
   test('leaving mid-reveal cancels the rest of it', async ({ page }) => {
     await withGroups(page, 24);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board .group').first()).toHaveClass(
       /revealing/,
     );
@@ -346,7 +677,7 @@ test.describe('the reveal', () => {
 
   test('the reveal plays on the board', async ({ page }) => {
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).toHaveClass(
       /revealing/,
     );
@@ -361,11 +692,10 @@ test.describe('the reveal', () => {
     // is thrown away by that navigation. The plan's own snippet set it
     // first and would have passed only if suppression never worked.
     await withGroups(page);
-    await page.locator('#cg-sound-toggle').click();
     // A <select>, not a checkbox — the plan's snippet used `.check()` on a
     // label that is an <option>. The real control is `#cg-speed`.
-    await page.selectOption('#cg-speed', 'skip');
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).not.toHaveClass(
       /revealing/,
     );
@@ -381,7 +711,7 @@ test.describe('the reveal', () => {
   test('prefers-reduced-motion suppresses it', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await withGroups(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board .group').first()).not.toHaveClass(
       /revealing/,
     );
@@ -397,15 +727,17 @@ test.describe('the reveal', () => {
 test.describe('all three refuse while the groups are out of date', () => {
   const goStale = async (page: import('@playwright/test').Page) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
     await expect(page.getByText(/These groups are out of date/)).toBeVisible();
   };
 
   test('Export groups refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.locator('#cg-io-toggle').click();
-    await page.getByRole('button', { name: 'Export groups' }).click();
+    await tapOn(page.locator('#cg-io-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Export groups' }));
     await expect(
       page.getByText(
         'These groups are out of date. Shuffle again before saving them.',
@@ -415,7 +747,7 @@ test.describe('all three refuse while the groups are out of date', () => {
 
   test('Print refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeHidden();
     await expect(
       page.getByText(
@@ -426,7 +758,7 @@ test.describe('all three refuse while the groups are out of date', () => {
 
   test('Full screen refuses, and says why', async ({ page }) => {
     await goStale(page);
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeHidden();
     await expect(
       page.getByText(
@@ -443,21 +775,20 @@ test.describe('all three refuse while the groups are out of date', () => {
     // `#cg-go`, by id. After a successful shuffle its LABEL becomes
     // "Shuffle again" (classroom-groups.ts sets `goButton.textContent =
     // t.again`), so asking for it by the name it had at load finds nothing.
-    await page.locator('#cg-go').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(page.getByText(/These groups are out of date/)).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await openBoard(page);
     await expect(page.locator('#cg-board')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#cg-board')).toBeHidden();
     await clickable(page, '#cg-print-open');
 
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeVisible();
-    await page
-      .locator('#cg-print-panel')
-      .getByRole('button', { name: 'Cancel' })
-      .click();
+    await tapOn(
+      page.locator('#cg-print-panel').getByRole('button', { name: 'Cancel' }),
+    );
   });
 });
 
@@ -474,9 +805,11 @@ test.describe('review findings', () => {
     page,
   }) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(
       page.getByText(
         'These groups are out of date. Shuffle again before printing them.',
@@ -485,7 +818,10 @@ test.describe('review findings', () => {
 
     // UNDO, rather than reshuffle: the staleness goes away by itself, and
     // nothing else on the page is touched.
-    await page.locator('.cg-student').first().getByLabel('Absent').uncheck();
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+      false,
+    );
     await expect(
       page.getByText(/Shuffle again before printing them/),
     ).toHaveCount(0);
@@ -493,14 +829,16 @@ test.describe('review findings', () => {
 
   test('and it clears on a reshuffle too', async ({ page }) => {
     await rosterOf(page, 12);
-    await page.locator('#cg-go').click();
-    await page.locator('.cg-student').first().getByLabel('Absent').check();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.locator('#cg-go'));
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel('Absent'),
+    );
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(
       page.getByText(/Shuffle again before showing them/),
     ).toBeVisible();
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await page.locator('#cg-go').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(
       page.getByText(/Shuffle again before showing them/),
     ).toHaveCount(0);
@@ -524,13 +862,13 @@ test.describe('review findings', () => {
   }) => {
     await withGroups(page);
     await expect(page.locator('#cg-go')).toBeEnabled();
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
-    await shuffle.click();
+    await tapOn(shuffle);
     // Mid-deal the button stays usable — that is the change.
     await expect(page.locator('#cg-go')).toBeEnabled();
     // …and a second press is ACCEPTED rather than swallowed.
-    await shuffle.click();
+    await tapOn(shuffle);
     await expect(page.locator('#cg-go')).toBeEnabled();
     // One arrangement, every student once, nothing dealt twice.
     await expect(page.locator('#cg-board .student')).toHaveCount(12);
@@ -549,19 +887,21 @@ test.describe('the projector board holds a real name', () => {
   }) => {
     // Every student carries a sex: "Make Groups" does not enable until they
     // all do (operator, 2026-08-13). This test is about how a long NAME wraps
-    // on the board, so the sex is just the price of reaching the board.
+    // on the board, so the sex is just the price of reaching the board. The
+    // board opens as the overlay: a granted fullscreen resizes Firefox's
+    // window after it opens, mid-measurement (#758).
+    await refuseFullscreen(page);
     await buildRoster(page, [
       ['M', 'Christopher Wetherington-Smythe'],
       ['M', 'Bob'],
       ['F', 'Dewi'],
       ['M', 'Eko'],
     ]);
-    await page.locator('#cg-form button[type="submit"]').click();
+    await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page
-      .getByRole('button', { name: /Full screen|Layar penuh/ })
-      .first()
-      .click();
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
     await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
 
     const board = await page.evaluate(() => {
@@ -590,4 +930,645 @@ test.describe('the projector board holds a real name', () => {
       'a board name may only break a word as a last resort',
     ).toBe('break-word');
   });
+});
+// ─────────────────────────── #189: nothing on the board may be clipped ───────────────────────────
+
+/**
+ * The shapes, DERIVED into cases rather than checked one at a time.
+ *
+ * A hand-written list of things to check will miss the one that breaks --
+ * this repo has the scar: the no-horizontal-scroll tests opened every
+ * disclosure except `#cg-io-toggle`, the only one holding a native file
+ * input, and that was the one that broke.
+ *
+ * Split in two because driving the viewport is something a real phone cannot
+ * do, and `@emulated-viewport` is how the device projects skip what they
+ * cannot honour. Tagging the whole table would skip the four shapes that
+ * never touch the viewport on exactly the device this ticket has to be
+ * proved on.
+ */
+const BOARD_SHAPES = [
+  { what: 'five groups wrapping onto a second row', count: '25', size: '5' },
+  { what: 'twelve groups wrapping onto a third row', count: '60', size: '5' },
+  {
+    what: 'a last group far smaller than its siblings',
+    count: '26',
+    size: '5',
+  },
+  // DERIVED, not picked. A sweep of ten shapes found this is the ONLY one
+  // that reaches the correction at all: every other shape either fits at full
+  // size or lands straight on the readable floor, where there is nothing left
+  // to shrink. Without it the correction is a branch no test ever enters, and
+  // a branch that has never matched anything is itself vacuous (#118).
+  {
+    what: 'a small class in pairs, the only shape that is corrected',
+    count: '8',
+    size: '2',
+  },
+] as const;
+
+/** The same question, on a board too short to be generous. */
+const SHORT_BOARDS = [
+  {
+    what: 'a landscape phone',
+    count: '25',
+    size: '5',
+    viewport: { width: 740, height: 360 },
+  },
+  {
+    what: 'a 720p projector',
+    count: '25',
+    size: '5',
+    viewport: { width: 1280, height: 720 },
+  },
+] as const;
+
+/**
+ * Open the board on the anonymous count/size path.
+ *
+ * Deliberately NOT the roster: 25 named students is 25 form interactions per
+ * case per engine, and what is asserted below is geometry, which does not
+ * care whose name is in the card. The long name has its own test above.
+ *
+ * Animation off, so nothing is read mid-transition. A revealing card carries
+ * `opacity: 0` and a `translateY`, and while neither affects layout, a test
+ * about geometry should not have to depend on that being true.
+ */
+const boardOf = async (
+  page: import('@playwright/test').Page,
+  count: string,
+  size: string,
+) => {
+  // Geometry, not fullscreen, is the subject, so the board opens as the
+  // overlay (`refuseFullscreen`): granted, Firefox grows the window to the
+  // runner's screen after the board has opened, and a reading taken in that
+  // gap describes neither layout (#758). The granted path keeps its own
+  // test, which waits for the grant to settle.
+  await refuseFullscreen(page);
+  await page.goto('/classroom-groups');
+  await makeGroups(page, count, size);
+  await expect(page.locator('#cg-results .group').first()).toBeVisible();
+  await tapOn(
+    page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+  );
+  await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+};
+
+/**
+ * What the board is actually showing, measured.
+ *
+ * Visibility is judged by `getClientRects().length`, never by an element's
+ * own computed `display`: `display: none` on an ANCESTOR leaves a
+ * descendant's computed display untouched, so a per-element check reports
+ * hidden content as rendered -- a bug in the guard that reads exactly like a
+ * bug in the page.
+ *
+ * "Clipped" is not the same question as "outside the box". Content below the
+ * fold of a stage that SCROLLS is reachable, and the board is allowed to
+ * scroll once it has shrunk to the readable floor. What may never happen is
+ * content that is outside the box AND cannot be scrolled to.
+ */
+const boardGeometry = async (page: import('@playwright/test').Page) =>
+  page.evaluate(measureBoard);
+
+/**
+ * THE INVARIANT. Asserted FIRST, and derived rather than proxied.
+ *
+ * An assertion ordered after a brittle proxy is only ever evaluated while the
+ * proxy holds (#156), so the question that matters -- can a teacher see every
+ * name -- runs before anything about counts or rows.
+ */
+const expectNothingOutOfReach = async (
+  page: import('@playwright/test').Page,
+  what: string,
+  named?: { width: number; height: number },
+) => {
+  // A reading means what it says only at the viewport the test names (#758).
+  // Granted fullscreen, Firefox grows the window to the runner's whole screen
+  // (1366x768 on CI, from a 740x360 phone), asynchronously, and no context
+  // option holds it: measured in every engine on run 38376192900. The size
+  // is handed in by a test that set it, never read from `page.viewportSize()`,
+  // which is null on a real phone (`viewport-tagging.test.ts`).
+  if (named) {
+    const at = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
+    expect(
+      at,
+      `${what}: measured at ${at.width}x${at.height}, not the viewport the test names`,
+    ).toEqual(named);
+  }
+  const seen = await boardGeometry(page);
+  const where =
+    `${seen.rows} row(s) at ${seen.font}: a ${seen.scrollHeight}px sheet ` +
+    `in a ${seen.clientHeight}px stage with overflow-y: ${seen.overflowY}`;
+  expect(searched(seen.unreachable, { of: seen.cards, what }), where).toEqual(
+    [],
+  );
+  await shoot(
+    page,
+    `nothing below the fold -- ${seen.rows} row(s) at ${seen.font}`,
+    page.locator('#cg-board'),
+  );
+  // ...and the property behind it: either the sheet fits, or the stage
+  // genuinely scrolls. Never how many things there are.
+  expect(
+    seen.scrollHeight <= seen.clientHeight || seen.scrollable,
+    `${where} -- content nobody can reach`,
+  ).toBe(true);
+  await shoot(
+    page,
+    `reachable -- a ${seen.scrollHeight}px sheet in a ${seen.clientHeight}px stage, overflow-y: ${seen.overflowY}`,
+    page.locator('#cg-board'),
+  );
+
+  // ...and the CONVERSE, which is what makes the verdict honest rather than
+  // merely safe. `.scrolls` used to be PREDICTED before the layout it
+  // describes; a prediction that errs towards scrolling hides nothing, so
+  // every assertion above stays green while the board offers a scrollbar it
+  // does not need. Measured on ten shapes, the predicted and measured
+  // verdicts disagree on five of them.
+  if (seen.scrollHeight <= seen.clientHeight) {
+    expect(
+      seen.scrollable,
+      `${where} -- the sheet fits, so the stage must not be scrollable`,
+    ).toBe(false);
+    await shoot(
+      page,
+      `the sheet fits at ${seen.font} and the stage does not scroll`,
+      page.locator('#cg-board'),
+    );
+  }
+
+  // ...and the property that says the shrinking actually happened: a board
+  // may scroll ONLY once it has come down to the readable floor. Anything
+  // above the floor that still does not fit had somewhere left to go.
+  //
+  // This is the assertion the mutation sweep was missing. Deleting the
+  // correction step left every test above GREEN, because a board that
+  // scrolls is a board whose content is still reachable -- true, and not the
+  // whole contract. One pixel of tolerance because the correction solves to
+  // a fractional font, not because the floor is negotiable.
+  if (seen.scrollHeight > seen.clientHeight) {
+    expect(
+      parseFloat(seen.font),
+      `${where} -- scrolling at ${seen.font}, above the ${FLOOR_PX}px floor: ` +
+        'it had further to shrink before scrolling was the honest answer',
+    ).toBeLessThanOrEqual(FLOOR_PX + 1);
+    await shoot(
+      page,
+      `scrolling only at the readable floor -- ${seen.font}`,
+      page.locator('#cg-board'),
+    );
+  }
+};
+
+test.describe('the projector board never hides a name', () => {
+  // #743 AC6: the waiting list and its empty cards are read from the back of
+  // the room too, through the same fit as the dealt board.
+  for (const shape of BOARD_SHAPES) {
+    test(`nothing waiting is out of reach -- ${shape.what}`, async ({
+      page,
+    }) => {
+      await refuseFullscreen(page);
+      await openWaitingBoard(page, shape.count, shape.size);
+      await expectNothingOutOfReach(page, 'the waiting board');
+    });
+  }
+
+  for (const shape of SHORT_BOARDS) {
+    test(
+      `nothing waiting is out of reach on ${shape.what}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize(shape.viewport);
+        await refuseFullscreen(page);
+        await openWaitingBoard(page, shape.count, shape.size);
+        await expectNothingOutOfReach(
+          page,
+          'the waiting board, short',
+          shape.viewport,
+        );
+      },
+    );
+  }
+
+  test(
+    'the waiting board does not scroll sideways at 320px',
+    { tag: '@emulated-viewport' },
+    async ({ page }) => {
+      const narrow = { width: 320, height: 568 };
+      await page.setViewportSize(narrow);
+      await refuseFullscreen(page);
+      await openWaitingBoard(page, '25', '5');
+      const stage = page.locator('#cg-board-stage');
+      const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(clientWidth).toBeGreaterThan(0);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+      await expectNothingOutOfReach(page, 'the waiting board at 320px', narrow);
+    },
+  );
+
+  for (const shape of BOARD_SHAPES) {
+    test(`nothing is out of reach -- ${shape.what}`, async ({ page }) => {
+      await boardOf(page, shape.count, shape.size);
+      await expectNothingOutOfReach(page, 'group cards on the board');
+    });
+  }
+
+  for (const shape of SHORT_BOARDS) {
+    test(
+      `nothing is out of reach on ${shape.what}`,
+      { tag: '@emulated-viewport' },
+      async ({ page }) => {
+        await page.setViewportSize(shape.viewport);
+        await boardOf(page, shape.count, shape.size);
+        await expectNothingOutOfReach(
+          page,
+          'group cards on a short board',
+          shape.viewport,
+        );
+      },
+    );
+  }
+
+  test('the stage scrolls exactly when its sheet overflows, before and after the fonts land', async ({
+    page,
+  }) => {
+    // #674. Measured on CI (firefox, 8 students in pairs, fonts not yet
+    // landed): a 705px sheet in a 705px stage with `.scrolls` ON at
+    // 37.6875px. `refit` took its verdict while the stage was still
+    // `overflow: hidden`, where Firefox read the exact fit as overflowing.
+    // The invariant holds for any shape in any engine: the class is on
+    // exactly when the stage, as rendered, has more sheet than box. The font
+    // files are held back until the board is open and measured, so the first
+    // reading is of the fallback face by construction.
+    let held = 0;
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/*.woff2', async (route) => {
+      held += 1;
+      await released;
+      await route.continue();
+    });
+    // The overlay, so both readings are of the viewport the test sets and
+    // not of a window Firefox is still growing into fullscreen (#758).
+    await refuseFullscreen(page);
+    await page.goto('/classroom-groups', { waitUntil: 'domcontentloaded' });
+    await makeGroups(page, '8', '2');
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
+    await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+
+    // Liveness: the first reading really is taken with fonts outstanding.
+    expect(held, 'no font request was held back').toBeGreaterThan(0);
+    expect(
+      await page.evaluate(() => document.fonts.status),
+      'the fonts had already loaded when the board opened',
+    ).toBe('loading');
+
+    const where = (seen: Awaited<ReturnType<typeof boardGeometry>>) =>
+      `${seen.rows} row(s) at ${seen.font}: a ${seen.scrollHeight}px sheet ` +
+      `in a ${seen.clientHeight}px stage with overflow-y: ${seen.overflowY}`;
+
+    const fallback = await boardGeometry(page);
+    expect(
+      fallback.scrollable,
+      `${where(fallback)} -- fonts held back; the stage scrolls only if the sheet overflows`,
+    ).toBe(fallback.scrollHeight > fallback.clientHeight);
+
+    release();
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    const landed = await boardGeometry(page);
+    expect(
+      landed.scrollable,
+      `${where(landed)} -- fonts landed; the stage scrolls only if the sheet overflows`,
+    ).toBe(landed.scrollHeight > landed.clientHeight);
+    await shoot(
+      page,
+      `the stage scrolls only when the sheet overflows: ${landed.font} after the fonts landed`,
+      page.locator('#cg-board'),
+    );
+  });
+
+  test('nothing is out of reach when the fullscreen grant is refused', async ({
+    page,
+  }) => {
+    // iOS Safari never grants fullscreen on an arbitrary element, and the
+    // board is the same layer either way -- so a fix proved on only one path
+    // is proved on neither.
+    await refuseFullscreen(page);
+    await boardOf(page, '25', '5');
+    await expectNothingOutOfReach(
+      page,
+      'group cards on the refused-grant board',
+    );
+  });
+
+  test('a granted fullscreen settles with nothing out of reach and no needless scrollbar', async ({
+    page,
+  }) => {
+    // #758. Granted, Firefox grows the window to the runner's screen
+    // (740x360 -> 1366x768 on CI) AFTER the board has opened: its
+    // `fullscreenchange` arrives with the old `scrolls`, and the `resize`
+    // that refits the board comes ~30 ms later (run 38376192900). The
+    // reading is therefore taken once the grant has resolved AND, if the
+    // window changed size, once a resize has followed -- a condition of the
+    // race itself, never a delay. A refused or unavailable grant (iOS) is
+    // settled at once: that board is the overlay.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __grant?: string; __resized?: boolean };
+      addEventListener('resize', () => (w.__resized = true));
+      const real = Element.prototype.requestFullscreen;
+      if (!real) {
+        w.__grant = 'unavailable';
+        return;
+      }
+      Element.prototype.requestFullscreen = function (
+        this: Element,
+        ...args: Parameters<Element['requestFullscreen']>
+      ) {
+        w.__grant = 'pending';
+        const asked = real.apply(this, args);
+        asked.then(
+          () => (w.__grant = 'granted'),
+          () => (w.__grant = 'refused'),
+        );
+        return asked;
+      };
+    });
+    await page.goto('/classroom-groups');
+    await makeGroups(page, '25', '5');
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    const before = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
+    await tapOn(
+      page.getByRole('button', { name: /Full screen|Layar penuh/ }).first(),
+    );
+    await expect(page.locator('#cg-board')).not.toHaveAttribute('hidden', /.*/);
+    const grant = await page.waitForFunction(({ width, height }) => {
+      const w = window as unknown as { __grant?: string; __resized?: boolean };
+      if (w.__grant === 'refused' || w.__grant === 'unavailable')
+        return w.__grant;
+      if (w.__grant !== 'granted') return false;
+      const sameSize = innerWidth === width && innerHeight === height;
+      return sameSize || w.__resized === true ? w.__grant : false;
+    }, before);
+    // Two frames, so the refit the last resize ran has been laid out.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+
+    const seen = await boardGeometry(page);
+    const where =
+      `${await grant.jsonValue()} grant, ${seen.rows} row(s) at ${seen.font}: ` +
+      `a ${seen.scrollHeight}px sheet in a ${seen.clientHeight}px stage, overflow-y: ${seen.overflowY}`;
+    expect(
+      searched(seen.unreachable, { of: seen.cards, what: 'group cards' }),
+      where,
+    ).toEqual([]);
+    expect(
+      seen.scrollable,
+      `${where} -- the stage scrolls exactly when its sheet overflows`,
+    ).toBe(seen.scrollHeight > seen.clientHeight);
+    await shoot(
+      page,
+      `a settled ${await grant.jsonValue()} board: nothing out of reach, scrolls only if it overflows`,
+      page.locator('#cg-board'),
+    );
+  });
+});
+
+/**
+ * #999. Every number on the board, the absent ones in amber with the word
+ * "absent" beside them; before the first shuffle a sentence says who is
+ * absent, and after it a row under the groups lists them. Real clicks and
+ * key presses throughout (global rule, 2026-10-31).
+ */
+test.describe('absent students on the board (#999)', () => {
+  const board = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board #cg-results');
+
+  const absentClass = async (
+    page: import('@playwright/test').Page,
+    path = '/classroom-groups',
+  ) => {
+    await page.goto(path);
+    await typeInto(page.locator('#cg-count'), '12');
+    await typeInto(page.locator('#cg-size'), '4');
+    await typeInto(page.locator('#cg-numbers-absent'), '3, 7');
+  };
+
+  test('before the shuffle, every number waits and the absent ones are marked', async ({
+    page,
+  }) => {
+    await absentClass(page);
+    await tapOn(page.locator('#cg-board-open'));
+    const waiting = board(page).locator('#cg-waiting-list .waiting-student');
+    await expect(waiting.locator('.number')).toHaveText(
+      Array.from({ length: 12 }, (_, i) => String(i + 1)),
+    );
+    const absent = board(page).locator('#cg-waiting-list .absent');
+    await expect(absent.locator('.number')).toHaveText(['3', '7']);
+    await expect(absent.locator('.absent-tag')).toHaveText([
+      'absent',
+      'absent',
+    ]);
+    await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+      'Numbers 3 and 7 are absent.',
+    );
+    // The word sits apart from the number on screen, not only in the text:
+    // a flex row discards a space between its children (the page's CLAUDE.md).
+    const [number, tag] = await Promise.all([
+      absent.first().locator('.number').boundingBox(),
+      absent.first().locator('.absent-tag').boundingBox(),
+    ]);
+    expect(tag!.x).toBeGreaterThan(number!.x + number!.width);
+  });
+
+  test('one absentee from the roster tick reads in the singular', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+    ]);
+    await tapOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
+    await typeInto(page.locator('#cg-size'), '2');
+    await tapOn(page.locator('#cg-board-open'));
+    await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+      'Number 2 is absent.',
+    );
+    const absent = board(page).locator('#cg-waiting-list .absent');
+    await expect(absent.locator('.number')).toHaveText(['2']);
+    await expect(absent.locator('.who')).toHaveText(['Ben']);
+  });
+
+  test('nobody absent: no sentence and no marked number', async ({ page }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '10');
+    await typeInto(page.locator('#cg-size'), '5');
+    await tapOn(page.locator('#cg-board-open'));
+    await expect(board(page).locator('.waiting-student')).toHaveCount(10);
+    await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
+    await expect(board(page).locator('.waiting-student.absent')).toHaveCount(0);
+  });
+
+  test('after the shuffle an Absent row under the groups lists them', async ({
+    page,
+  }) => {
+    await absentClass(page);
+    await chooseSpeed(page, 'skip');
+    await openBoard(page, page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
+    await expect(board(page).locator('.group .student')).toHaveCount(10);
+    const row = board(page).locator('#cg-absent');
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('heading', { name: 'Absent' })).toBeVisible();
+    await expect(row.locator('.number')).toHaveText(['3', '7']);
+    await expect(row.locator('.absent-tag')).toHaveText(['absent', 'absent']);
+    // Under the groups, as ruled.
+    const [lastGroup, rowBox] = await Promise.all([
+      board(page).locator('.group').last().boundingBox(),
+      row.boundingBox(),
+    ]);
+    expect(rowBox!.y).toBeGreaterThanOrEqual(lastGroup!.y + lastGroup!.height);
+    // The grouped note takes over from the waiting sentence.
+    await expect(board(page).locator('#cg-waiting-absent')).toBeHidden();
+    await expect(board(page).locator('#cg-grouped-note')).toHaveText(
+      '10 of 12 grouped — numbers 3 and 7 are absent.',
+    );
+    // The row is the board's: back on the page it is not shown.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await expect(page.locator('#cg-absent')).toBeHidden();
+  });
+
+  test('a rename after the shuffle reaches the Absent row', async ({
+    page,
+  }) => {
+    await buildRoster(page, [
+      ['M', 'Ada'],
+      ['F', 'Ben'],
+      ['M', 'Cleo'],
+      ['F', 'Dev'],
+    ]);
+    await tapOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
+    await typeInto(page.locator('#cg-size'), '2');
+    await chooseSpeed(page, 'skip');
+    await openBoard(page, page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
+    const row = board(page).locator('#cg-absent');
+    await expect(row.locator('.who')).toHaveText(['Ben']);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#cg-board #cg-results')).toHaveCount(0);
+    const name = page
+      .locator('.cg-student')
+      .nth(1)
+      .getByLabel('Name', { exact: true });
+    await typeInto(name, 'Bea');
+    await tapOn(page.locator('#cg-board-open'));
+    await expect(row.locator('.who')).toHaveText(['Bea']);
+  });
+
+  test('after a shuffle with nobody absent there is no Absent row', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-count'), '8');
+    await typeInto(page.locator('#cg-size'), '4');
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.locator('#cg-board-open'));
+    await tapOn(
+      page
+        .locator('#cg-board-bar')
+        .getByRole('button', { name: 'Make groups' }),
+    );
+    await expect(board(page).locator('.group .student')).toHaveCount(8);
+    await expect(board(page).locator('#cg-absent')).toBeHidden();
+  });
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`an absent chip clears AA in the ${scheme} theme`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await absentClass(page);
+      await tapOn(page.locator('#cg-board-open'));
+      const chip = board(page).locator('#cg-waiting-list .absent').first();
+      await expect(chip).toBeVisible();
+      expect(
+        await contrastRatio(chip.locator('.number')),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        await contrastRatio(chip.locator('.absent-tag')),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  test(
+    'at 320px the marked board does not scroll sideways',
+    { tag: '@emulated-viewport' },
+    async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await absentClass(page);
+      await tapOn(page.locator('#cg-board-open'));
+      await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+      // Containment, not only the page: every chip inside the board's stage.
+      const stage = await page.locator('#cg-board-stage').boundingBox();
+      for (const box of await board(page)
+        .locator('#cg-waiting-list .waiting-student')
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
+        expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
+    },
+  );
+
+  const sentences = {
+    en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
+    id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
+    zh: ['/zh/classroom-groups', '3和7 号缺席。'],
+    vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],
+    th: ['/th/classroom-groups', 'หมายเลข 3 และ 7 ขาดเรียน'],
+  } as const;
+  for (const [locale, [path, sentence]] of Object.entries(sentences)) {
+    test(`the board says who is absent in ${locale}`, async ({ page }) => {
+      await absentClass(page, path);
+      await tapOn(page.locator('#cg-board-open'));
+      await expect(board(page).locator('#cg-waiting-absent')).toHaveText(
+        sentence,
+      );
+    });
+  }
 });

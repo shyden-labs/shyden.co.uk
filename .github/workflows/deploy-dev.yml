@@ -1,0 +1,252 @@
+name: Deploy to dev (deploy + verify, gates what may reach main)
+# THE GATE BEFORE MAIN. Fires on every push to `develop`. Proves the merged tree
+# is the tree that passed on its PR (a dispatched branch runs the full suite
+# instead), deploys to dev, then VERIFIES the deployed dev site and posts a
+# `dev-verified` commit status on the SHA.
+#
+# Why dev and not prod is the gate: a pipeline that deploys to production
+# before the code is on `main` makes production the place a mistake first
+# becomes real — in front of teachers. It also means `main` briefly does not
+# describe what is live. Verifying in dev inverts both: a bad build stops at a
+# site nobody but us can reach, and prod only ever runs a commit that is
+# already on `main`.
+#
+# Automatic on every push to `develop`, and still dispatchable by hand.
+#
+# The old trigger was dispatch-ONLY, for a real reason: dev is a single shared
+# environment, and every PR branch deploying to it would mean the last push
+# wins, with `dev-verified` describing whichever branch happened to land last.
+#
+# An integration branch removes that competition by construction rather than by
+# discipline. Exactly one branch deploys to dev, so "last push wins" stops being
+# ambiguous — dev always shows develop's head, which is what dev should show.
+# The dev deploy also stops being a step anyone can forget, which is what made
+# the merge gate skippable.
+#
+# `workflow_dispatch` stays as an escape hatch for putting an arbitrary branch
+# on dev. The status step below is guarded so that hatch cannot become a bypass.
+#
+# concurrency below keeps `cancel-in-progress: false`: rapid merges must QUEUE,
+# never cancel a half-finished deploy.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev-shyden
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- Gate 1a (push): the tree being deployed already passed -------------
+  # A merge into `develop` arrives with its suite already run — on the PR, not
+  # on this commit. `ci.yml` never runs on a push (pull_request and this
+  # file's own workflow_call are its only triggers), so there is no status
+  # here to read; what there IS, because `develop` sets `strict: true`,
+  # is a tested head whose TREE is identical to this one: a merge commit's
+  # second parent, or the head of the pull request a squash landed (#892).
+  # `deploy-gate.mjs` proves that equality and reads the check-runs from that
+  # head, refusing on anything ambiguous. See scripts/deploy-gate.mjs for why every doubtful case
+  # refuses: the only dangerous failure here is a false green (#157).
+  gate:
+    name: Gate — this tree already passed on its PR
+    if: github.event_name == 'push'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: read
+      # A squash's pull request, read off `/commits/{sha}/pulls` (#892).
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The gate reads parents and trees, so a shallow clone would make it
+          # refuse for want of objects rather than for want of evidence.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node
+      - name: Refuse unless the deployed tree is the tree that passed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/deploy-gate.mjs
+
+  # ---- Gate 1b (dispatch): no tested parent, so run the suite -------------
+  # `workflow_dispatch` exists to put an ARBITRARY branch on dev, and an
+  # arbitrary branch has no second parent and no PR checks — nothing for the
+  # gate above to verify. That path therefore still runs everything. Dropping
+  # it would quietly remove a documented capability rather than speed it up.
+  #
+  # It CALLS ci.yml rather than keeping a copy of its steps (#163). A push
+  # deploys because ci.yml's build-and-test passed on the tree, so a dispatched
+  # branch must be judged by that same suite; a copy was held equal to it by a
+  # test until the suite was split into shards, when a copy became three jobs
+  # that could each drift. Called, it is the same file: the same checks, the
+  # same shards, and build-and-test's verdict over them.
+  #
+  # No `runs-on` and no `timeout-minutes`: GitHub refuses both on a calling
+  # job, and every job it calls carries its own. A called workflow's token can
+  # only be narrowed, so this job grants what ci.yml's jobs ask for -- `issues:
+  # read` for the dependabot-label check -- and
+  # tests/guards/pipeline-wiring.test.ts fails if they part.
+  test:
+    name: Comprehensive web tests
+    if: github.event_name != 'push'
+    permissions:
+      contents: read
+      issues: read
+    uses: ./.github/workflows/ci.yml
+
+  # ---- Dev deploy --------------------------------------------------------
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [gate, test]
+    # Exactly one of the two gates runs, so the other is always `skipped` — and
+    # a skipped `needs` would skip this job too without an explicit condition.
+    # Written so that a SKIP of both cannot deploy: one of them must have
+    # actually SUCCEEDED. `!failure() && !cancelled()` alone would let a
+    # both-skipped run through, which is the absent-evidence-reads-as-pass
+    # shape this whole ticket is about (#146, #157).
+    if: >-
+      !failure() && !cancelled() &&
+      (needs.gate.result == 'success' || needs.test.result == 'success')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment:
+      name: dev
+      url: https://dev.shyden.co.uk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - name: Build (dev — outbound ShyTalk and Yawelo Idle links → DEV, never prod)
+        env:
+          PUBLIC_SHYTALK_URL: https://dev.shytalk.shyden.co.uk
+          PUBLIC_YAWELO_IDLE_URL: https://dev.yawelo-idle.shyden.co.uk
+        run: npm run build
+      # Before anything is deployed, the dev token proves it reaches the dev
+      # account and nothing else (#415): a token that could reach production
+      # never deploys. One request, no retry; any answer but exactly the dev
+      # account stops the job here.
+      - name: The dev token reaches the dev account alone
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/token-reach.mjs
+      - name: Deploy dist/ to Cloudflare Pages (dev project)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dist --project-name shyden-site-dev --branch main
+
+  # ---- Verify the DEPLOYED dev site, then post dev-verified --------------
+  # This job is the point of the whole file. Before it existed, "deployed to
+  # dev" meant only that `wrangler` did not error: tests/dev/dev-sanity.spec.ts
+  # and playwright.dev.config.ts were both written for exactly this and were
+  # referenced by NOTHING in CI, so a dev deploy serving a blank page would
+  # have gone green and gated nothing.
+  verify-dev:
+    name: Verify dev + dev-verified
+    needs: deploy-dev
+    # One of the two gates above skips on every event, by design, and a job
+    # with no condition carries an implicit `success()` the runner judges over
+    # EVERY upstream job — so without this, verify skipped on every run: 866bc23
+    # deployed, verified nothing and posted no `dev-verified`, in a run that
+    # still concluded `success` (run 34742940098). `!cancelled()` replaces that
+    # check; the `needs` half keeps a skipped or failed deploy from being
+    # "verified". Both halves measured on the runner (run 34743720266). Folded,
+    # because a plain scalar starting with `!` is a YAML tag (#157).
+    if: >-
+      !cancelled() && needs.deploy-dev.result == 'success'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    # It reads DEV_BASIC_AUTH_PASSWORD, so it names `dev`, the environment
+    # holding it: the repository holds no secrets (read 2026-10-04, #390
+    # F163), and a repository secret would reach a workflow on any branch
+    # (#241). The url repeats deploy-dev's, because the environment links to
+    # its latest deployment, and that is this job's.
+    environment:
+      name: dev
+      url: https://dev.shyden.co.uk
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Sanity-check the live dev site
+        env:
+          # The dev site is behind Basic auth; the username half is ignored by
+          # the gate. playwright.dev.config.ts reads this and sets
+          # httpCredentials from it.
+          DEV_BASIC_AUTH_PASSWORD: ${{ secrets.DEV_BASIC_AUTH_PASSWORD }}
+          WEB_BASE_URL: https://dev.shyden.co.uk
+        run: npx playwright test --config=playwright.dev.config.ts
+      - name: Post dev-verified status on the deployed commit
+        # Deploy and verify whatever ref a dispatch points at, but publish the
+        # STATUS only for develop. `dev-verified` is what branch protection on
+        # `main` requires, so an unguarded dispatch would let any feature branch
+        # earn it and then be cut and released into `main` — skipping develop
+        # and the integration it exists to force.
+        if: github.ref_name == 'develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state=success \
+            -f context=dev-verified \
+            -f "description=Dev deployed + verified (run ${{ github.run_id }})" \
+            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Posted dev-verified=success on ${{ github.sha }}"
+
+  # ---- Tell the operator when a develop deploy failed (#725) --------------
+  # Run 38219259063 failed on Cloudflare's own 524 and nothing said so: dev
+  # sat behind develop with `dev-verified` merely absent. This job runs after
+  # every other one, WHATEVER they did, and its script opens one issue
+  # assigned to the operator (or comments on the one still open) when any of
+  # them failed on develop. A dispatched branch's failure is its dispatcher's
+  # to read, so the script sends nothing for one.
+  #
+  # It must run because a need FAILED, so it cannot ask for success the way
+  # every other downstream job here does. It is therefore written as an
+  # aggregate (tests/workflow-jobs.ts `isAggregate`): `if: always()`, and a
+  # step handed every need's result, which judges them in the script.
+  #
+  # No environment: it reads no secret but its own token, which may read the
+  # run's jobs and logs and write issues, nothing else. It runs no npm
+  # package code, so no `npm ci`.
+  report-failure:
+    name: Report a failed deploy
+    needs: [gate, test, deploy-dev, verify-dev]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Open or comment on the failed-deploy issue, if a job failed
+        if: always()
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/deploy-failure.mjs

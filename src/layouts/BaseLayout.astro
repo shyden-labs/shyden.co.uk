@@ -1,5 +1,6 @@
 ---
 import '../styles/tokens.css';
+import themeScript from '../scripts/theme.inline.js?raw';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import {
@@ -7,8 +8,9 @@ import {
   localisePath,
   localeFromPath,
   type Locale,
+  getSiteStrings,
 } from '../lib/i18n';
-import { siteEn, siteId } from '../lib/i18n/site';
+import { metadataFor } from '../lib/i18n/metadata';
 
 interface Props {
   title: string;
@@ -22,6 +24,12 @@ interface Props {
    * therefore has no address of its own to be canonical about.
    */
   noIndex?: boolean;
+  /**
+   * False for a page served in English only (the API docs, #781): the header
+   * then offers no language switcher, whose links would lead to pages that do
+   * not exist.
+   */
+  localised?: boolean;
 }
 const {
   title,
@@ -29,8 +37,9 @@ const {
   ogImage = '/og-default.png',
   lang = localeFromPath(Astro.url.pathname),
   noIndex = false,
+  localised = true,
 } = Astro.props;
-const site = lang === 'id' ? siteId : siteEn;
+const site = getSiteStrings(lang);
 const siteOrigin = Astro.site ?? Astro.url;
 const canonical = new URL(Astro.url.pathname, siteOrigin).href;
 
@@ -49,7 +58,33 @@ const xDefault = new URL(localisePath(Astro.url.pathname, 'en'), siteOrigin)
 <html lang={lang}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* resizes-content: Android Chrome's keyboard shrinks the page instead of
+         covering it, so /classroom-groups' docked Make Groups bar stays above
+         the keyboard while a teacher types (#807). Safari ignores the key. */}
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    {/* The theme script (#142 §5). Inline, classic and HERE, straight after
+         the viewport meta and before every stylesheet, because it stamps a
+         saved choice on <html> before the first paint: a visitor who chose
+         light never sees a frame of dark, or the reverse. A module, `defer`
+         or a later place in the document would all run after that frame.
+         It also reveals the switch, which exists only for a page whose script
+         ran, and handles its presses by delegation, since the switch does
+         not exist yet when a head script runs.
+
+         Its explanation lives here, where the build strips it, and not in the
+         shipped file, which every page carries exactly as written. The site
+         sends no Content-Security-Policy; one added later must allow this
+         script by its hash, which changes only when the file does, and
+         theme-script.spec.ts pins the content. The choice is one
+         localStorage word, written only when the switch is pressed: no
+         cookie, and nothing sent anywhere. Where storage is refused, the save
+         is skipped in silence and the page still switches; the choice is
+         simply not remembered (§5), which is what the script's one empty
+         catch is for. */}
+    <script is:inline set:html={themeScript}></script>
     <title>{title}</title>
     <meta name="description" content={description} />
     {
@@ -73,29 +108,29 @@ const xDefault = new URL(localisePath(Astro.url.pathname, 'en'), siteOrigin)
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    {
-      /* Same reasoning as the canonical: a page served for every unknown path
-        has no og:url to give, and /404/ is not one. */
-    }
+    {/* Same reasoning as the canonical: a page served for every unknown path
+        has no og:url to give, and /404/ is not one. */}
     {!noIndex && <meta property="og:url" content={canonical} />}
     <meta property="og:image" content={new URL(ogImage, siteOrigin).href} />
-    <meta property="og:locale" content={lang === 'id' ? 'id_ID' : 'en_GB'} />
+    <meta property="og:locale" content={metadataFor(lang).ogLocale} />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <slot name="head" />
   </head>
   <body>
-    {
-      /* WCAG 2.4.1. The copy for this existed in both languages from the
+    {/* WCAG 2.4.1. The copy for this existed in both languages from the
         start while no page had the link, which made the repo look like it
         had met the criterion. It bites hardest on /classroom-groups, the
         most control-dense page here: without it a keyboard user crosses the
         wordmark, the hamburger, the language switcher and three nav links
-        before reaching the first form field, on every single page load. */
-    }
-    <a class="skip-link" href="#main">{site.skipToContent}</a>
-    <Header lang={lang} />
-    <main id="main" tabindex="-1"><slot /></main>
+        before reaching the first form field, on every single page load. */}
+    <a class="skip-link" href="#main">
+      {site.skipToContent}
+    </a>
+    <Header lang={lang} localised={localised} />
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
     <Footer lang={lang} />
   </body>
 </html>

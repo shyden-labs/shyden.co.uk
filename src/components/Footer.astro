@@ -1,47 +1,53 @@
 ---
-import { type Locale } from '../lib/i18n';
-import { siteEn, siteId } from '../lib/i18n/site';
+import {
+  type Locale,
+  BETA_BADGE,
+  getSiteStrings,
+  isBetaLocale,
+} from '../lib/i18n';
+import { pageIdFromPath } from '../lib/report';
+import ReportForm from './ReportForm.astro';
 
 interface Props {
   lang: Locale;
 }
 const { lang } = Astro.props;
-const t = lang === 'id' ? siteId : siteEn;
+const t = getSiteStrings(lang);
 
-// Legal values from Companies House (SHYDEN LTD, company 17110487, active,
-// incorporated 23 Mar 2026). Registered office is the exact CH address.
+// Assembled in the frontmatter, not the template: written inline as two
+// expressions with a newline between them, JSX drops the space and this
+// renders as "BETATranslations may not be accurate." Building it here makes
+// the rendered sentence independent of how the markup wraps.
 //
-// The entity name, number and address are legal FACTS and stay verbatim in
-// every language — only the wording around them is translated.
-const companyNo = '17110487';
-const regOffice =
-  '71-75 Shelton Street, Covent Garden, London, United Kingdom, WC2H 9JQ';
-const year = new Date().getFullYear();
+// The footer names no company (#370): Shyden Ltd is dissolved, and its
+// registration, number and office left every page with it.
+//
+// Null on English, which is the one locale Shyden can confirm verified --
+// a notice on every page would say nothing, and would make the marker
+// meaningless where it matters.
+const betaNotice = isBetaLocale(lang)
+  ? `${BETA_BADGE} — ${t.language.betaNotice}`
+  : null;
 
-// Assembled HERE rather than in the template below, because JSX drops the
-// whitespace between two expressions whenever a newline falls between them.
-// Written inline, this sentence rendered as "Company No.17110487" and
-// "Registered office:71-75 …" in BOTH languages — introduced not by an edit but
-// by a formatter re-wrapping one long line into several. Building the string in
-// the frontmatter makes the rendered output independent of how the markup is
-// wrapped, so a future `prettier --write` cannot silently change what the legal
-// disclosure says.
-//
-// The joins are plain spaces: both languages this site ships (en, id) are
-// space-separated. A language that is not — Chinese, Thai, Japanese — would
-// need the separator to come from the locale rather than from here.
-const disclosure = [
-  `© ${year} Shyden Ltd.`,
-  t.footer.registered,
-  `${t.footer.companyNo} ${companyNo}.`,
-  `${t.footer.regOffice} ${regOffice}.`,
-].join(' ');
+// The report form (#97): the page comes from the route, so no page has to
+// remember a prop, and ReportForm decides through isBetaLocale whether to
+// draw. A path the table does not know renders no form, and the presence
+// check in report-presence.spec.ts fails on it rather than letting it go
+// quietly.
+const reportPage = pageIdFromPath(Astro.url.pathname);
 ---
 
 <footer id="contact-legal">
   <div class="inner">
-    <p class="disclosure">{disclosure}</p>
-    <p><a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a></p>
+    {betaNotice && (
+      <p class="beta-notice" data-beta-notice>
+        {betaNotice}
+      </p>
+    )}
+    {reportPage && <ReportForm lang={lang} page={reportPage} />}
+    <p>
+      <a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a>
+    </p>
   </div>
 </footer>
 <style>

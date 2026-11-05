@@ -3,28 +3,72 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^24.16.0 || >=26.3.0"
+  },
   "scripts": {
-    "dev": "astro dev",
+    "dev": "ASTRO_DEV_BACKGROUND=1 astro dev",
     "build": "astro build",
-    "preview": "astro preview",
-    "test:unit": "vitest run",
-    "test:e2e": "playwright test",
-    "test:ios": "vitest run --config vitest.ios.config.ts --reporter=verbose",
+    "preview": "ASTRO_PREVIEW_BACKGROUND=1 astro preview",
+    "typecheck": "astro check --minimumFailingSeverity hint",
+    "test:unit": "vitest run --configLoader native",
+    "test:coverage": "vitest run --configLoader native --coverage",
+    "test:guards": "vitest run --configLoader native --config vitest.guards.config.ts --testTimeout=25000",
+    "test:simulation": "vitest run --configLoader native --config vitest.simulation.config.ts --testTimeout=700",
+    "test:integration": "vitest run --configLoader native --config vitest.integration.config.ts --testTimeout=30000",
+    "test:logs": "vitest run --configLoader native --config vitest.logs.config.ts --testTimeout=1000",
+    "ceilings:record": "node scripts/record-ios-ceilings.mjs",
+    "test:e2e": "node scripts/test-e2e.mjs",
+    "test:functions": "playwright test --config=playwright.functions.config.ts",
+    "test:sanity": "SANITY_ON_BUILD=1 playwright test -c playwright.dev.config.ts && SANITY_ON_BUILD=1 playwright test -c playwright.prod.config.ts",
+    "test:visual": "node scripts/visual.mjs",
+    "test:visual:update": "node scripts/visual.mjs --update",
+    "test:ios": "vitest run --configLoader native --config vitest.ios.config.ts --reporter=verbose",
     "test:devices": "node scripts/test-devices.mjs",
+    "i18n:translate": "node scripts/i18n-translate.mjs",
+    "i18n:back-translate": "node scripts/i18n-back-translate.mjs",
+    "i18n:google-read-back": "node scripts/i18n-google-read-back.mjs",
+    "i18n:read-back-verdicts": "node scripts/i18n-read-back-verdicts.mjs",
+    "i18n:second-read": "node scripts/i18n-second-read.mjs",
+    "reports:review": "node scripts/reports-review.mjs",
     "dashboard": "node scripts/dashboard.mjs",
-    "test": "npm run test:unit && npm run test:e2e",
-    "format": "prettier --check ."
+    "test": "npm run format && npm run typecheck && npm run test:unit",
+    "format": "prettier --check .",
+    "i18n:scaffold": "node scripts/i18n-scaffold.mjs",
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.3",
-    "@fontsource/inter": "^5.3.0",
-    "@fontsource/space-grotesk": "^5.3.0",
-    "astro": "^7.1.3"
+    "@astrojs/sitemap": "^3.7.4",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
+    "astro": "^7.4.4",
+    "swagger-ui-dist": "5.34.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^0.14.1",
-    "vitest": "^4.1.10"
+    "@astrojs/check": "^0.9.12",
+    "@playwright/test": "1.64.1",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "5.0.5",
+    "ast-v8-to-istanbul": "1.0.7",
+    "prettier": "3.9.10",
+    "prettier-plugin-astro": "1.1.2",
+    "typescript": "^6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "wrangler": "4.156.0",
+    "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "http-cache-semantics": "4.2.0"
+  },
+  "allowScripts": {
+    "@scarf/scarf@1.4.0": false,
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true,
+    "workerd@1.20261023.1": true
+  },
+  "scarfSettings": {
+    "enabled": false
   }
 }

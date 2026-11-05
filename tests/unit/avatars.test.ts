@@ -66,7 +66,7 @@ describe('avatarSvg', () => {
     expect(avatarSvg(null)).toBe(avatarSvg(null));
   });
 
-  it('cannot be hijacked by a value outside the real type -- this repo runs no type checker, in CI or anywhere else, so a caller CAN pass anything at runtime', () => {
+  it('cannot be hijacked by a value outside the real type -- a value read from the page reaches it unchecked, so a caller CAN pass anything at runtime', () => {
     const hostile = '"></symbol><script>alert(1)</script>';
     const svg = avatarSvg(hostile as unknown as Sex);
     expect(svg).not.toContain('script');

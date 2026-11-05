@@ -34,7 +34,6 @@
  * the rest of the run rather than spamming a failure on every subsequent
  * test.
  */
-import { appendFileSync, writeFileSync } from 'node:fs';
 import type {
   FullResult,
   Reporter,
@@ -42,85 +41,26 @@ import type {
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
-
-type DashboardStatus = 'passed' | 'failed' | 'skipped';
-
-/**
- * `result.status` distinguishes `timedOut`/`interrupted` from a plain
- * `failed` -- real, useful distinctions for a human reading Playwright's
- * own output, but the dashboard's contract (task brief step 1) is a flat
- * passed/failed/skipped, matching `summarizePlaywrightGroup` in
- * `scripts/test-devices.mjs`, which already folds every non-zero, non-skip
- * outcome into one "failed" bucket for its own counts. A skipped test is
- * never counted as passed here, in either direction -- the project has
- * shipped that confusion before.
- */
-function toDashboardStatus(status: TestResult['status']): DashboardStatus {
-  if (status === 'passed') return 'passed';
-  if (status === 'skipped') return 'skipped';
-  return 'failed'; // 'failed' | 'timedOut' | 'interrupted'
-}
+import { projectNameOf } from './test-identity';
+import { DashboardLog, toDashboardStatus } from './dashboard-jsonl';
 
 /**
- * Suite hierarchy is documented (testReporter.d.ts, `Suite.type`) as
- * root -> project -> file -> describe -> ...describe -> test. Walking up to
- * the first `project`-typed suite and reading its title (documented as
- * "Project name for project suite") is more direct than indexing into
- * `test.titlePath()`, which would silently misattribute the project name if
- * the hierarchy ever gained or lost a level.
+ * Playwright's verdict on one attempt, not how its body ended (#390 F158).
+ * A test declared to fail with `test.fail()` and failing is expected, a pass
+ * to the run; one that passes instead fails the run. Read from `status`
+ * alone, the dashboard showed the first as failed and the second as passed.
  */
-function projectNameOf(test: TestCase): string {
-  let suite: Suite | undefined = test.parent;
-  while (suite && suite.type !== 'project') suite = suite.parent;
-  return suite?.title || 'unknown-project';
-}
+const verdictOf = (test: TestCase, result: TestResult): string => {
+  if (result.status === 'skipped') return 'skipped';
+  return result.status === test.expectedStatus ? 'passed' : 'failed';
+};
 
 export default class JsonlReporter implements Reporter {
-  private readonly file: string | undefined;
-  private readonly group: string;
-  private writeFailed = false;
-
-  constructor() {
-    this.file = process.env.DASHBOARD_JSONL_FILE;
-    this.group = process.env.DASHBOARD_GROUP || 'unknown-group';
-  }
-
-  private append(event: Record<string, unknown>): void {
-    if (!this.file || this.writeFailed) return;
-    try {
-      appendFileSync(
-        this.file,
-        JSON.stringify({ group: this.group, ...event }) + '\n',
-      );
-    } catch (error) {
-      this.writeFailed = true;
-      // eslint-disable-next-line no-console -- deliberate, one-time, visible failure notice; see module doc
-      console.error(
-        `[jsonl-reporter] failed to write to ${this.file} -- the live dashboard will stop updating for ` +
-          `the "${this.group}" group, but the test run itself is unaffected: ${(error as Error).message}`,
-      );
-    }
-  }
+  private readonly log = new DashboardLog('jsonl-reporter');
 
   onBegin(_config: unknown, suite: Suite): void {
-    if (!this.file) return;
-    try {
-      // Fresh file per invocation -- an old run's lines must never bleed
-      // into this run's dashboard the way an append-only file would if
-      // never reset. Truncate-or-create, same "this run overwrites, never
-      // accumulates across invocations" contract PLAYWRIGHT_JSON_OUTPUT_NAME
-      // already gives the `json` reporter's own output file.
-      writeFileSync(this.file, '');
-    } catch (error) {
-      this.writeFailed = true;
-      // eslint-disable-next-line no-console -- deliberate, one-time, visible failure notice; see module doc
-      console.error(
-        `[jsonl-reporter] failed to create/truncate ${this.file} -- the live dashboard will not see the ` +
-          `"${this.group}" group this run, but the test run itself is unaffected: ${(error as Error).message}`,
-      );
-      return;
-    }
-    this.append({
+    if (!this.log.start()) return;
+    this.log.append({
       event: 'begin',
       total: suite.allTests().length,
       at: Date.now(),
@@ -128,7 +68,7 @@ export default class JsonlReporter implements Reporter {
   }
 
   onTestBegin(test: TestCase): void {
-    this.append({
+    this.log.append({
       event: 'test-start',
       id: test.id,
       title: test.title,
@@ -138,19 +78,19 @@ export default class JsonlReporter implements Reporter {
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    this.append({
+    this.log.append({
       event: 'test',
       id: test.id,
       title: test.title,
       project: projectNameOf(test),
-      status: toDashboardStatus(result.status),
+      status: toDashboardStatus(verdictOf(test, result)),
       durationMs: result.duration,
       at: Date.now(),
     });
   }
 
   onEnd(_result: FullResult): void {
-    this.append({ event: 'end', at: Date.now() });
+    this.log.append({ event: 'end', at: Date.now() });
   }
 
   printsToStdio(): boolean {

@@ -1,0 +1,107 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import { ROOM_CAPTURE, ROOM_CAPTURE_PIXELS } from '../lib/shytalk-showcase';
+import type { Locale } from '../lib/i18n';
+
+interface Props {
+  lang: Locale;
+  alt: string;
+}
+const { lang, alt } = Astro.props;
+
+/**
+ * The captures are DERIVED from the filesystem, not listed here. A hand-written
+ * map is the "enumerate, don't derive" defect that #24, #49, #60 and #65 all
+ * turned out to be: adding a sixth site locale would leave the map silently
+ * short and the new page would fall back to English.
+ *
+ * `eager` because Astro must resolve every import at build time to emit the
+ * optimised asset; a lazy glob yields promises the build cannot inline.
+ */
+const shots = import.meta.glob<{ default: ImageMetadata }>(
+  '../assets/shytalk/room-*.png',
+  { eager: true },
+);
+
+const shot = Object.entries(shots).find(([path]) =>
+  path.endsWith(`/room-${lang}.png`),
+)?.[1].default;
+
+// Fail the BUILD, never the page. A missing capture that renders as an empty
+// frame is a silent hole on the marketing homepage; tests/unit/shytalk-showcase
+// asserts the files exist, and this is the same contract at the point of use.
+if (!shot) {
+  throw new Error(
+    `PhoneFrame: no ShyTalk room capture for locale "${lang}". ` +
+      `Expected src/assets/shytalk/room-${lang}.png — ` +
+      `found ${Object.keys(shots).length} capture(s).`,
+  );
+}
+---
+
+<div class="frame" role="presentation">
+  <Image
+    src={shot}
+    alt={alt}
+    width={ROOM_CAPTURE_PIXELS.width}
+    height={ROOM_CAPTURE_PIXELS.height}
+    densities={[1, 2]}
+    loading="lazy"
+    decoding="async"
+  />
+</div>
+
+<style
+  define:vars={{
+    frameWidth: `${ROOM_CAPTURE.CSS_WIDTH}px`,
+    frameRatio: `${ROOM_CAPTURE.CSS_WIDTH} / ${ROOM_CAPTURE.CSS_HEIGHT}`,
+  }}
+>
+  /* A minimal bezel: a rounded border and nothing else. No notch, no speaker
+     grille, no home button -- the skeuomorphic phone is what dates a device
+     mockup. The signal we want is only "this is an app you install", and a
+     thin rounded edge carries that on its own. */
+  .frame {
+    width: var(--frameWidth);
+    max-width: 100%;
+    /* --border: the bezel is decorative, and the token is the site's own
+       hairline in both themes. It read `var(--line)` until #390 F62, a
+       property defined nowhere, so the declaration was invalid and the
+       border computed to none: the bezel was never drawn. */
+    border: 2px solid var(--border);
+    border-radius: 28px;
+    padding: 6px;
+    background: var(--surface);
+    /* `clip`, not `hidden`: hidden creates a scroll container and breaks
+       position:sticky in or below it. A component owns its own overflow
+       rather than relying on where it is used (#17, the Marquee). */
+    overflow: clip;
+    /* Lifts the frame off the atmosphere without a hard shadow edge. */
+    box-shadow: 0 24px 60px -20px var(--lift-shadow);
+    justify-self: center;
+  }
+
+  .frame :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* Unitless: aspect-ratio takes numbers, and `280px / 616px` is refused
+       outright, so the shape used to come from the width and height
+       attributes alone (#390 F62). */
+    aspect-ratio: var(--frameRatio);
+    border-radius: 22px;
+  }
+
+  /* Paper is white whatever the page declares, and browsers leave "Background
+     graphics" OFF by default -- so the bezel's fill would not print while its
+     border would. Print the frame as a plain outline and let the <img>, which
+     is content rather than a background, carry itself (#17). */
+  @media print {
+    .frame {
+      border-color: #000;
+      background: transparent;
+      box-shadow: none;
+    }
+  }
+</style>

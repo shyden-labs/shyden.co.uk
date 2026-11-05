@@ -1,0 +1,33 @@
+---
+import ClassroomGroupsPage from '../../components/pages/ClassroomGroupsPage.astro';
+import { PREFIXED_LOCALES } from '../../lib/i18n';
+
+/**
+ * The Classroom Group Creator for every locale that carries a prefix.
+ *
+ * One route, not a file per language. This used to be
+ * `src/pages/id/classroom-groups.astro`, a two-line wrapper that had to be copied for
+ * every new locale — and forgetting one 404s that page in that language with
+ * nothing in the suite to say so. #21 Stage 4 replaced the directory with
+ * this, so adding `zh` to LOCALES adds the route.
+ *
+ * The default locale is served WITHOUT a prefix and keeps its own route at
+ * `src/pages/classroom-groups.astro`; `PREFIXED_LOCALES` is LOCALES minus that one, so
+ * the two can never both claim the same URL.
+ *
+ * The locale rides on `props` as well as `params`: `Astro.params` is
+ * `string | undefined`, which would need a cast to reach a `Locale`, and a
+ * cast is exactly where a typo stops being a compile error. Through props it
+ * arrives as the `Locale` `getStaticPaths` put there.
+ */
+export function getStaticPaths() {
+  return PREFIXED_LOCALES.map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+---
+
+<ClassroomGroupsPage lang={locale} />

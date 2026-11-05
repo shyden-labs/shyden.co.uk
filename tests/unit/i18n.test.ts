@@ -1,15 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { en } from '../../src/lib/i18n/en';
-import { id } from '../../src/lib/i18n/id';
+import { nonEmpty, searched } from '../source-files';
+import { catalogueLeaves, stringLeaves } from '../../src/lib/catalogue-leaves';
+import { en as enCatalogue } from '../../src/lib/i18n/en';
+import { id as idCatalogue } from '../../src/lib/i18n/id';
 import {
   LOCALES,
+  DEFAULT_LOCALE,
   getStrings,
   renderError,
   renderWarning,
+  renderNumbersProblem,
   localisePath,
   localeFromPath,
   toolPath,
-  otherLocale,
+  otherLocales,
   isLocale,
   groupName,
   resultsHeadingText,
@@ -17,86 +21,63 @@ import {
 import {
   ERROR_CODES,
   WARNING_CODES,
+  MAX_STUDENTS,
   type GroupingError,
   type GroupingWarning,
 } from '../../src/lib/grouping';
-import { siteEn, siteId } from '../../src/lib/i18n/site';
+import {
+  NUMBER_SETS_PROBLEM_KINDS,
+  type NumberSetsProblem,
+} from '../../src/lib/numberSets';
+import {
+  siteEn,
+  siteId,
+  siteZh,
+  siteVi,
+  siteTh,
+} from '../../src/lib/i18n/site';
+import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
+import { isMessageTemplate } from '../../src/lib/i18n/message';
 
+/**
+ * The catalogues as written. Since #136 every parameterised message in them
+ * is a template string, so the structural checks walk these and reach the
+ * messages like any other copy.
+ */
+const catalogues = [
+  ['en', enCatalogue],
+  ['id', idCatalogue],
+] as const;
+
+/**
+ * The tables a page receives from `getStrings`, where every message is a
+ * function of its named slots. Everything that renders uses these.
+ */
+const en = getStrings('en');
+const id = getStrings('id');
 const locales = [
   ['en', en],
   ['id', id],
 ] as const;
 
 /**
- * Every leaf in a locale, addressed by path — `errors.NO_STUDENTS`,
- * `themes.animals[3]`, `howToSteps[1]`.
+ * Every string in a catalogue, PROVED non-empty before a guard reads it.
  *
- * The old checks read `Object.entries` at the TOP level only and skipped
- * anything that was not a string, which left `errors.*`, `themes.*`,
- * `themeNames.*` and every `howToSteps` entry — roughly 45 keys — unchecked.
- * An empty `id.errors.NO_STUDENTS` passed. So did a `howToSteps` with two
- * entries where English has three, which would silently show an Indonesian
- * teacher fewer instructions.
- */
-const deepKeys = (value: unknown, path = ''): string[] => {
-  if (Array.isArray(value))
-    return value.flatMap((v, i) => deepKeys(v, `${path}[${i}]`));
-  if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([k, v]) =>
-      deepKeys(v, path ? `${path}.${k}` : k),
-    );
-  return [path];
-};
-
-const deepStrings = (value: unknown, path = ''): Array<[string, string]> => {
-  if (typeof value === 'string') return [[path, value]];
-  if (Array.isArray(value))
-    return value.flatMap((v, i) => deepStrings(v, `${path}[${i}]`));
-  if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([k, v]) =>
-      deepStrings(v, path ? `${path}.${k}` : k),
-    );
-  // A function contributes NOTHING here -- not a key, not a value, not a
-  // string to compare. `deepFunctions` below is the walk that actually
-  // reaches these (most of `errors`/`warnings`, and the three top-level
-  // formatters); "the rendered-sentence tests below" cover only that they
-  // produce SOME sentence-shaped string, never that the Indonesian one
-  // differs from the English one -- see Task 11's "every parameterised
-  // message is actually translated" test for the check that closes that
-  // gap. This function is named for what it collects, not for what covers
-  // the rest, so this comment used to overclaim; it no longer does.
-  return [];
-};
-
-/**
- * Every function-valued leaf, addressed by the same dotted path `deepKeys`
- * and `deepStrings` use — `errors.KEEP_APART_NO_ARRANGEMENT`, `groupLabel`,
- * and so on.
+ * Three guards below assert absence over the result of filtering this --
+ * nothing blank, nothing left as English. A walker that returned `[]` would
+ * satisfy all three at once while reading nothing, which is #84's lesson in
+ * a second medium: the file walk already refuses an empty result inside
+ * `filesUnder`, and a catalogue walk is the same shape.
  *
- * `deepStrings` only collects `typeof value === 'string'`, so a function —
- * most of `errors`/`warnings` (every message with a number, a name list or
- * a letter substituted in — the ones carrying the most detail, and the
- * majority of the table by count) plus `resultsSummary`/`groupLabel`/
- * `studentNumber` — is invisible to it: no key, no value, nothing to
- * compare. Paste `en`'s own `KEEP_APART_NO_ARRANGEMENT` function into
- * `id.ts` verbatim and every `deepStrings`-based check above stays green,
- * because there is no STRING there to catch it. This walk exists so the
- * "genuinely translated" promise reaches these too.
+ * A plain `throw` via `nonEmpty`, not an `expect`: the refusal belongs to
+ * the derivation, where a call site cannot forget it.
+ *
+ * Strings alone: a table from `getStrings` holds each message as a function,
+ * which is not copy, so a check that must see the messages walks
+ * `catalogues`, never `locales`.
  */
-const deepFunctions = (
-  value: unknown,
-  path = '',
-): Array<[string, (...args: never[]) => unknown]> => {
-  if (typeof value === 'function')
-    return [[path, value as (...args: never[]) => unknown]];
-  if (Array.isArray(value))
-    return value.flatMap((v, i) => deepFunctions(v, `${path}[${i}]`));
-  if (value && typeof value === 'object')
-    return Object.entries(value).flatMap(([k, v]) =>
-      deepFunctions(v, path ? `${path}.${k}` : k),
-    );
-  return [];
-};
+const deepStrings = (value: unknown): Array<[string, string]> =>
+  nonEmpty(stringLeaves(value), 'catalogue strings');
 
 /**
  * Strings that are legitimately the same in both languages. Measured, not
@@ -112,131 +93,53 @@ const ALLOWED_IDENTICAL = new Set([
 ]);
 
 /**
- * One representative call per parameterised (function-valued) locale entry,
- * keyed by the same dotted path `deepFunctions` reports.
- *
- * Different functions take different argument shapes (a name list, a single
- * number, three numbers, a sex literal — `Strings` has no one signature), so
- * there is no generic way to invoke "the next function found"; each entry
- * here is deliberate, matching the codebase's existing SAMPLES-table
- * convention below rather than a clever generic guess. `names` arguments use
- * plain resolved-looking strings ('Student 1', not a raw number) because
- * that is what these functions actually receive at runtime — `renderError`/
- * `renderWarning` resolve every number through `resolveStudent` before the
- * locale function ever sees it (see index.ts) — and a probe should call the
- * function with the same SHAPE of argument its real caller does.
- *
- * A path with no entry here is reported by the test below, not silently
- * skipped — see its own comment for why "no probe" must fail loudly rather
- * than pass by omission.
+ * Site keys that are legitimately identical to English in every locale, each
+ * with the decision behind it. ONE set for every locale's test (#602); a
+ * stale entry is refused by name.
  */
-const FUNCTION_PROBES: Record<string, unknown[]> = {
-  resultsSummary: [3, 7],
-  groupLabel: [2],
-  studentNumber: [4],
-  // Stage 2, Task 5. `resultsHeadingNamed` -- resultsHeadingText's sole
-  // caller for a non-blank class name (src/lib/i18n/index.ts).
-  resultsHeadingNamed: ['7B'],
-  'errors.TOO_MANY_STUDENTS': [500],
-  'errors.DUPLICATE_NUMBER': [5],
-  'errors.TOO_MANY_GROUPS': [4],
-  'errors.TOGETHER_APART_CLASH': [['Student 1', 'Student 2']],
-  'errors.TOGETHER_UNIT_TOO_LARGE': ['Q', 6, 4],
-  'errors.TOGETHER_NO_ARRANGEMENT': [3],
-  'errors.KEEP_APART_IMPOSSIBLE': [['Student 1', 'Student 2'], 2],
-  'errors.KEEP_APART_NO_ARRANGEMENT': [3],
-  'errors.BOTH_RULES_NO_ARRANGEMENT': [2],
-  'errors.SEX_NEEDS_ALL_SET': [['Student 3']],
-  'errors.SEX_SEPARATE_SPLITS_UNIT': [['Student 1', 'Student 2']],
-  'errors.SEX_SEPARATE_IMPOSSIBLE': [3],
-  'errors.PINNED_SPLITS_UNIT': [['Student 1', 'Student 7']],
-  'errors.PINNED_APART_CLASH': [['Student 1', 'Student 2']],
-  'errors.PINNED_IN_TWO_GROUPS': ['Student 1'],
-  'errors.PINNED_TOO_MANY_GROUPS': [4, 1, 2],
-  'warnings.SEX_SPILLOVER': [['Student 7', 'Student 8'], 'M'],
-  'warnings.PINNED_MIXED_SEX': [['Student 1', 'Student 4']],
-  'warnings.SEX_BOTH_TOO_SMALL': [['Student 1', 'Student 7']],
-  // Stage 2, Task 3. The Student details header's counted state fragments --
-  // see sections.ts's own sectionState, the sole caller of all five.
-  stateNamed: [24],
-  stateAbsent: [2],
-  stateTogether: [2],
-  stateApart: [1],
-  stateAdded: [24],
-  // Stage 2, Task 4. src/lib/sexOptions.ts's `sexWhy`, its sole caller.
-  // (3, 22) matches design spec section 6's own approved copy verbatim.
-  sexWhyUnset: [3, 22],
-  // Stage 3, Task 9. src/lib/sexOptions.ts's `sexWhyReturning`, its sole
-  // caller, which hands it an ALREADY-LABELLED student -- a name the
-  // teacher typed, or `studentNumber(n)` when they typed none -- so the
-  // probe is a bare name and neither locale has to know that fallback rule.
-  // 'Dewi' matches design spec section 13's own approved example verbatim.
-  sexWhyReturning: ['Dewi'],
-  // Stage 4, Task 3. src/lib/csv.ts's `parseRoster`, their sole caller.
-  //
-  // The accepted-token argument is passed IN from CSV_LOCALES rather than
-  // written by each locale, so the probe supplies the value the ENGLISH
-  // table would give. That is deliberate and it is what makes the
-  // untranslated-copy half of this test meaningful: with the same tokens on
-  // both sides, any difference in the produced sentence has to come from
-  // the translated wording around them, not from the tokens.
-  csvProblemNumberBlank: [7],
-  csvProblemNumberNotWhole: [7, 'abc'],
-  csvProblemDuplicateNumber: [12, 5, 5],
-  csvProblemSex: [7, 'Male', 'M, F'],
-  csvProblemAbsent: [7, 'maybe', 'yes, no'],
-  csvProblemLetter: [7, 'together', 'AB'],
-  csvProblemTooMany: [101, 100],
-  // Stage 4, Task 4. Probed with the English page's own names for the
-  // Indonesian language, which is the argument pair `importFile` supplies
-  // when an Indonesian file is dropped on the English page -- design spec
-  // section 9's own approved example.
-  csvWrongLanguage: ['Bahasa Indonesia', 'Indonesian'],
-  // Stage 4, Task 5. src/scripts/io-ui.ts's `renderIo`, their sole caller.
-  // (3, 2) exercises the English plural branch on the first argument while
-  // the second is deliberately different, so a mutant tying both counts to
-  // one number cannot pass.
-  ioReplaceWarning: [3, 2],
-  ioImported: [2],
-  // Stage 5, Task 2. The printed sheet's date line and its
-  // absent-students-dropped footer. (5, 1) exercises the English plural
-  // branch with two different numbers, so a mutant tying both to one count
-  // cannot pass.
-  printedOn: ['2026-08-06'],
-  printHereToday: [5, 1],
-  // Stage 3, Task 4. renderRoster's own live count line (roster-ui.ts),
-  // rendered under the table. (24, 22, 2) matches design spec section 4's
-  // own literal example verbatim, the same example
-  // classroom-groups-roster.spec.ts's own "the count line reads students,
-  // here and absent" test pins.
-  rosterCountLine: [24, 22, 2],
-  // Stage 3, Task 5. rosterProblems/rosterWarnings' own sole callers
-  // (src/lib/roster.ts) -- (5, 'Eko') matches task-5-brief.md's own
-  // approved example verbatim.
-  rosterDuplicateMessage: [5, 'Eko'],
-  rosterNoSexMessage: [['Eko', 'Dewi']],
-  rosterClashMessage: [['Ana', 'Budi']],
-  rosterGapWarning: [[4, 6, 7]],
-  // Stage 3, Task 6. rosterOpenProblem/rosterAtLimit's own sole callers
-  // (src/lib/roster.ts, roster-ui.ts) -- always called with MAX_ROSTER
-  // itself, so 100 is the only argument either is ever probed with.
-  rosterOpenRefusedMessage: [100],
-  rosterAtLimitMessage: [100],
-  rosterRoomMessage: [10],
-};
+const SITE_ALLOWED_IDENTICAL: ReadonlyMap<string, string> = new Map([
+  // "Glory points" is YeeTalk's in-app currency, a product name, not English
+  // prose. Listed explicitly rather than loosening the check: the guard's
+  // value is that every exception is a decision someone made on purpose.
+  ['calculators.glory.inputLabel', 'product name: the in-app currency'],
+  // "ShyTalk" is the product's name. A nav item that translated it would be
+  // naming a different product. Identical in all five by design.
+  ['nav.shytalk', 'product name'],
+  // "Yawelo Idle" likewise, the game's name, never translated (#403).
+  ['nav.yaweloIdle', 'product name'],
+]);
+const siteEnMap = new Map(stringLeaves(siteEn));
+const identicalToEnglish = (table: typeof siteEn): string[] =>
+  stringLeaves(table)
+    .filter(([k, v]) => siteEnMap.get(k) === v)
+    .map(([k]) => k)
+    .filter((k) => !SITE_ALLOWED_IDENTICAL.has(k));
 
 describe('locales are complete', () => {
   it('Indonesian defines every key English defines, at every depth', () => {
-    // Includes array positions, so a themes list or a howToSteps that lost an
-    // entry is a failure rather than a shorter page.
-    expect(deepKeys(id).sort()).toEqual(deepKeys(en).sort());
+    // Every leaf, array positions included, so a themes list or a howToSteps
+    // that lost an entry is a failure rather than a shorter page. The first
+    // version read `Object.entries` at the top level only and skipped anything
+    // that was not a string, which left roughly 45 keys -- `errors.*`,
+    // `themes.*`, `themeNames.*`, every `howToSteps` entry -- unchecked.
+    const paths = (table: unknown): string[] =>
+      catalogueLeaves(table)
+        .map(([path]) => path)
+        .sort();
+    expect(paths(idCatalogue)).toEqual(
+      nonEmpty(paths(enCatalogue), 'English leaf paths'),
+    );
   });
 
-  it.each(locales)('%s has no blank string anywhere', (_name, strings) => {
-    const blank = deepStrings(strings)
-      .filter(([, v]) => v.trim() === '')
-      .map(([k]) => k);
-    expect(blank).toEqual([]);
+  it.each([
+    ['en', enCatalogue],
+    ['id', idCatalogue],
+  ] as const)('%s has no blank string anywhere', (_name, catalogue) => {
+    const strings = deepStrings(catalogue);
+    const blank = strings.filter(([, v]) => v.trim() === '').map(([k]) => k);
+    expect(searched(blank, { of: strings, what: 'catalogue strings' })).toEqual(
+      [],
+    );
   });
 
   it('Indonesian is actually translated, not copied English', () => {
@@ -244,70 +147,40 @@ describe('locales are complete', () => {
     // locale passes a same-keys check perfectly, and five samples cannot see
     // the section somebody forgot.
     //
+    // Since #136 that includes every parameterised message: each is a
+    // template string now, so one left in English is caught here like any
+    // other copy. Until then a separate probe had to call both locales'
+    // functions with the same arguments, because a function has no text.
+    //
     // Exceptions are listed by name, so each one is a decision rather than a
     // loosened rule.
-    const enMap = new Map(deepStrings(en));
-    const identical = deepStrings(id)
+    const enMap = new Map(deepStrings(enCatalogue));
+    const idStrings = deepStrings(idCatalogue);
+    const identical = idStrings
       .filter(([k, v]) => enMap.get(k) === v)
       .map(([k]) => k);
 
-    expect(identical.filter((k) => !ALLOWED_IDENTICAL.has(k))).toEqual([]);
-  });
-
-  // Task 11, the final sweep. Logged in progress.md against Task 6's own
-  // report: this walk skips every function-valued entry (see
-  // `deepStrings`'s own comment above), and most of `errors`/`warnings` —
-  // the parameterised messages, which carry the most detail of anything in
-  // either locale — are functions. Closes that gap the same way the test
-  // above closes it for plain strings: call both locales' copy of the SAME
-  // function with the SAME arguments, and require the output to differ.
-  it('every parameterised message is actually translated, not copied English, when called with the same arguments', () => {
-    const idByPath = new Map(deepFunctions(id));
-    const missingProbe: string[] = [];
-    const identical: string[] = [];
-
-    for (const [path, enFn] of deepFunctions(en)) {
-      const args = FUNCTION_PROBES[path];
-      // A function this repo added with no entry in FUNCTION_PROBES above
-      // is UNTESTED by this check, not exempt from it -- failing here, not
-      // silently skipping, is what makes that visible. Fix: add one
-      // representative call for the new path to FUNCTION_PROBES, using
-      // arguments shaped like what `renderError`/`renderWarning` actually
-      // pass (see that table's own comment).
-      if (!args) {
-        missingProbe.push(path);
-        continue;
-      }
-      const idFn = idByPath.get(path);
-      // idFn's absence would mean `id` is missing a key `en` has -- already
-      // caught by "Indonesian defines every key English defines" above, so
-      // this only needs to not crash; the `!idFn` branch keeps `identical`
-      // honestly reporting a real difference, not a thrown TypeError, if
-      // that other test's own failure is what brought you here.
-      const enOut = enFn(...(args as never[]));
-      const idOut = idFn ? idFn(...(args as never[])) : undefined;
-      if (enOut === idOut) identical.push(path);
-    }
-
-    // A function silently skipped is a translation nobody checked -- same
-    // failure mode `deepStrings` already had, now caught instead of hidden.
-    expect(missingProbe).toEqual([]);
-    // English text called with Indonesian's own function and getting back
-    // the SAME string means id.ts's copy was never actually written --
-    // fix by translating that path's function body in id.ts, the same
-    // remedy as the plain-string check above.
-    expect(identical).toEqual([]);
+    expect(
+      searched(
+        identical.filter((k) => !ALLOWED_IDENTICAL.has(k)),
+        { of: idStrings, what: 'Indonesian catalogue strings' },
+      ),
+    ).toEqual([]);
   });
 
   it('and the list of exceptions has no dead entries', () => {
     // An allow-list that outlives its reason quietly stops guarding anything.
     // If a translation lands for one of these, this fails and the entry goes.
-    const enMap = new Map(deepStrings(en));
-    const stillIdentical = deepStrings(id)
+    const enMap = new Map(deepStrings(enCatalogue));
+    const stillIdentical = deepStrings(idCatalogue)
       .filter(([k, v]) => enMap.get(k) === v)
       .map(([k]) => k);
+    const allowed = [...ALLOWED_IDENTICAL];
     expect(
-      [...ALLOWED_IDENTICAL].filter((k) => !stillIdentical.includes(k)).sort(),
+      searched(allowed.filter((k) => !stillIdentical.includes(k)).sort(), {
+        of: allowed,
+        what: 'allowed-identical entries',
+      }),
     ).toEqual([]);
   });
 });
@@ -462,6 +335,19 @@ describe('every engine error can be rendered in every language', () => {
     expect(msg).toContain('5');
   });
 
+  it('the too-many and duplicate messages print the numbers the engine gave', () => {
+    // The sentence check above passes with any number in the slot, so the
+    // limit and the repeated number went unobserved (#390, RE9 RE10).
+    expect(
+      renderError({ code: ERROR_CODES.tooManyStudents, maxStudents: 500 }, en),
+    ).toBe('That is more students than this tool will take. The most is 500.');
+    expect(
+      renderError({ code: ERROR_CODES.duplicateNumber, number: 5 }, en),
+    ).toBe(
+      'Student number 5 is used twice. Give each student their own number.',
+    );
+  });
+
   describe('resolving a student number to a label', () => {
     // KEEP_APART_IMPOSSIBLE carries numbers (Student.number is the identity;
     // see grouping.ts), never names -- the engine has no roster to resolve
@@ -483,21 +369,25 @@ describe('every engine error can be rendered in every language', () => {
         // a resolver that fires but formats wrongly would still pass a
         // weaker check.
         expect(msg).toBe(
-          strings.errors.KEEP_APART_IMPOSSIBLE(
-            [strings.studentNumber(1), strings.studentNumber(2)],
-            2,
-          ),
+          strings.errors.KEEP_APART_IMPOSSIBLE({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 2 }),
+            ],
+            howMany: 'two',
+            groupsNeeded: 2,
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(2));
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 2 }));
         // Digits alone, with no word around them, is exactly the bug this
-        // default exists to prevent -- "1, 2 all need to be kept apart" reads
-        // as nonsense to a teacher.
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        // default exists to prevent -- "1 and 2 all need to be kept apart"
+        // reads as nonsense to a teacher.
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
-    it('English default reads "Student 1, Student 2 …", not bare digits', () => {
+    it('English default reads "Student 1 and Student 2 …", not bare digits', () => {
       const msg = renderError(
         {
           code: ERROR_CODES.keepApartImpossible,
@@ -506,10 +396,10 @@ describe('every engine error can be rendered in every language', () => {
         },
         en,
       );
-      expect(msg).toContain('Student 1, Student 2');
+      expect(msg).toContain('Student 1 and Student 2');
     });
 
-    it('Indonesian default reads "Siswa 1, Siswa 2 …", not bare digits', () => {
+    it('Indonesian default reads "Siswa 1 dan Siswa 2 …", not bare digits', () => {
       const msg = renderError(
         {
           code: ERROR_CODES.keepApartImpossible,
@@ -518,7 +408,7 @@ describe('every engine error can be rendered in every language', () => {
         },
         id,
       );
-      expect(msg).toContain('Siswa 1, Siswa 2');
+      expect(msg).toContain('Siswa 1 dan Siswa 2');
     });
 
     it('a supplied resolver is used in place of the default, for every number', () => {
@@ -533,7 +423,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi all need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
+        'Ana and Budi both need to be kept apart from each other, so you would need at least 2 groups. Either make more groups or remove one of the rules.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -542,8 +432,8 @@ describe('every engine error can be rendered in every language', () => {
   describe('together-apart clash resolves student numbers to names', () => {
     // Correction 1: TOGETHER_APART_CLASH carries `students: number[]`,
     // exactly like KEEP_APART_IMPOSSIBLE above, and must go through the same
-    // resolver -- a teacher reading "1, 2 are marked..." instead of
-    // "Ana, Budi are marked..." is exactly the regression the resolver
+    // resolver -- a teacher reading "1 and 2 are marked..." instead of
+    // "Ana and Budi are marked..." is exactly the regression the resolver
     // parameter exists to prevent.
     it.each(locales)(
       'falls back to the numbered label when no resolver is supplied (%s)',
@@ -553,33 +443,35 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.TOGETHER_APART_CLASH([
-            strings.studentNumber(1),
-            strings.studentNumber(2),
-          ]),
+          strings.errors.TOGETHER_APART_CLASH({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 2 }),
+            ],
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(2));
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 2 }));
         // Digits alone, with no word around them, is exactly the bug this
         // default exists to prevent.
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
-    it('English default reads "Student 1, Student 2 …", not bare digits', () => {
+    it('English default reads "Student 1 and Student 2 …", not bare digits', () => {
       const msg = renderError(
         { code: ERROR_CODES.togetherApartClash, students: [1, 2] },
         en,
       );
-      expect(msg).toContain('Student 1, Student 2');
+      expect(msg).toContain('Student 1 and Student 2');
     });
 
-    it('Indonesian default reads "Siswa 1, Siswa 2 …", not bare digits', () => {
+    it('Indonesian default reads "Siswa 1 dan Siswa 2 …", not bare digits', () => {
       const msg = renderError(
         { code: ERROR_CODES.togetherApartClash, students: [1, 2] },
         id,
       );
-      expect(msg).toContain('Siswa 1, Siswa 2');
+      expect(msg).toContain('Siswa 1 dan Siswa 2');
     });
 
     it('English: a supplied resolver is used in place of the default, for every number', () => {
@@ -590,7 +482,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
+        'Ana and Budi are marked to stay together and to be kept apart from each other at the same time. Remove the together letter or the apart letter from one of them.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -603,7 +495,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi ditandai untuk disatukan sekaligus dipisahkan satu sama lain. Hapus huruf yang menyatukan mereka, atau huruf yang memisahkan mereka.',
+        'Ana dan Budi ditandai untuk disatukan sekaligus dipisahkan satu sama lain. Hapus huruf yang menyatukan mereka, atau huruf yang memisahkan mereka.',
       );
       expect(msg).not.toContain('Siswa');
     });
@@ -623,9 +515,11 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.SEX_NEEDS_ALL_SET([strings.studentNumber(3)]),
+          strings.errors.SEX_NEEDS_ALL_SET({
+            names: [strings.studentNumber({ n: 3 })],
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(3));
+        expect(msg).toContain(strings.studentNumber({ n: 3 }));
         // A bare digit with no word around it is exactly the bug this
         // default exists to prevent.
         expect(msg).not.toMatch(/^\d+ /);
@@ -683,7 +577,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana, Budi have no sex set, so this mode cannot run until every student does. Set a sex for each of them, or turn it off.',
+        'Ana and Budi have no sex set, so this mode cannot run until every student does. Set a sex for each of them, or turn it off.',
       );
     });
 
@@ -694,7 +588,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana, Budi belum memiliki jenis kelamin, jadi mode ini tidak bisa dijalankan sampai jenis kelamin semua siswa terisi. Isi jenis kelamin untuk mereka, atau matikan mode ini.',
+        'Ana dan Budi belum memiliki jenis kelamin, jadi mode ini tidak bisa dijalankan sampai jenis kelamin semua siswa terisi. Isi jenis kelamin untuk mereka, atau matikan mode ini.',
       );
     });
   });
@@ -702,9 +596,9 @@ describe('every engine error can be rendered in every language', () => {
   describe('sex-separate-splits-unit resolves student numbers to names', () => {
     // Task 8b. Carries `students: number[]`, exactly like
     // TOGETHER_APART_CLASH above, and must go through the same resolver --
-    // a teacher reading "1, 2 are marked..." instead of "Ana, Budi are
-    // marked..." is the same regression the resolver parameter exists to
-    // prevent there.
+    // a teacher reading "1 and 2 are marked..." instead of "Ana and Budi
+    // are marked..." is the same regression the resolver parameter exists
+    // to prevent there.
     it.each(locales)(
       'falls back to the numbered label when no resolver is supplied (%s)',
       (_name, strings) => {
@@ -713,31 +607,34 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.SEX_SEPARATE_SPLITS_UNIT([
-            strings.studentNumber(1),
-            strings.studentNumber(2),
-          ]),
+          strings.errors.SEX_SEPARATE_SPLITS_UNIT({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 2 }),
+            ],
+            howMany: 'two',
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(2));
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 2 }));
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
-    it('English default reads "Student 1, Student 2 …", not bare digits', () => {
+    it('English default reads "Student 1 and Student 2 …", not bare digits', () => {
       const msg = renderError(
         { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 2] },
         en,
       );
-      expect(msg).toContain('Student 1, Student 2');
+      expect(msg).toContain('Student 1 and Student 2');
     });
 
-    it('Indonesian default reads "Siswa 1, Siswa 2 …", not bare digits', () => {
+    it('Indonesian default reads "Siswa 1 dan Siswa 2 …", not bare digits', () => {
       const msg = renderError(
         { code: ERROR_CODES.sexSeparateSplitsUnit, students: [1, 2] },
         id,
       );
-      expect(msg).toContain('Siswa 1, Siswa 2');
+      expect(msg).toContain('Siswa 1 dan Siswa 2');
     });
 
     it('English: a supplied resolver is used in place of the default, names the pair and both remedies', () => {
@@ -748,7 +645,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi are marked to stay together, but are not all the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
+        'Ana and Budi are marked to stay together, but are not the same sex, so they cannot form a single-sex group. Remove the together letter from one of them, or turn this mode off.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -761,7 +658,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi ditandai untuk disatukan, tetapi tidak semuanya berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
+        'Ana dan Budi ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.',
       );
       expect(msg).not.toContain('Siswa');
     });
@@ -806,9 +703,15 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toContain('3');
-        expect(msg).not.toBe(strings.errors.TOGETHER_NO_ARRANGEMENT(3));
-        expect(msg).not.toBe(strings.errors.KEEP_APART_NO_ARRANGEMENT(3));
-        expect(msg).not.toBe(strings.errors.BOTH_RULES_NO_ARRANGEMENT(3));
+        expect(msg).not.toBe(
+          strings.errors.TOGETHER_NO_ARRANGEMENT({ groupsTried: 3 }),
+        );
+        expect(msg).not.toBe(
+          strings.errors.KEEP_APART_NO_ARRANGEMENT({ groupsTried: 3 }),
+        );
+        expect(msg).not.toBe(
+          strings.errors.BOTH_RULES_NO_ARRANGEMENT({ groupsTried: 3 }),
+        );
       },
     );
   });
@@ -893,8 +796,12 @@ describe('every engine error can be rendered in every language', () => {
         // told a collapse-to-one-rule bug from the real thing. This can:
         // the two single-rule messages are distinct copy this must never
         // equal.
-        expect(msg).not.toBe(strings.errors.TOGETHER_NO_ARRANGEMENT(3));
-        expect(msg).not.toBe(strings.errors.KEEP_APART_NO_ARRANGEMENT(3));
+        expect(msg).not.toBe(
+          strings.errors.TOGETHER_NO_ARRANGEMENT({ groupsTried: 3 }),
+        );
+        expect(msg).not.toBe(
+          strings.errors.KEEP_APART_NO_ARRANGEMENT({ groupsTried: 3 }),
+        );
       },
     );
 
@@ -1030,14 +937,16 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.PINNED_SPLITS_UNIT([
-            strings.studentNumber(1),
-            strings.studentNumber(7),
-          ]),
+          strings.errors.PINNED_SPLITS_UNIT({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 7 }),
+            ],
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(7));
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 7 }));
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
@@ -1049,7 +958,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Gita are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
+        'Ana and Gita are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -1062,7 +971,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Gita ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.',
+        'Ana dan Gita ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.',
       );
       expect(msg).not.toContain('Siswa');
     });
@@ -1079,14 +988,16 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.PINNED_APART_CLASH([
-            strings.studentNumber(1),
-            strings.studentNumber(2),
-          ]),
+          strings.errors.PINNED_APART_CLASH({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 2 }),
+            ],
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(2));
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 2 }));
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
@@ -1098,7 +1009,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
+        'Ana and Budi are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.',
       );
       expect(msg).not.toContain('Student');
     });
@@ -1111,7 +1022,7 @@ describe('every engine error can be rendered in every language', () => {
         (n) => byNumber[n],
       );
       expect(msg).toBe(
-        'Ana, Budi ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.',
+        'Ana dan Budi ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.',
       );
       expect(msg).not.toContain('Siswa');
     });
@@ -1131,9 +1042,11 @@ describe('every engine error can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.errors.PINNED_IN_TWO_GROUPS(strings.studentNumber(5)),
+          strings.errors.PINNED_IN_TWO_GROUPS({
+            name: strings.studentNumber({ n: 5 }),
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(5));
+        expect(msg).toContain(strings.studentNumber({ n: 5 }));
         // A bare digit with no word around it is exactly the bug this
         // default exists to prevent.
         expect(msg).not.toMatch(/^\d+ /);
@@ -1250,7 +1163,7 @@ describe('every engine error can be rendered in every language', () => {
         },
         en,
       );
-      expect(pinned).not.toBe(en.errors.TOO_MANY_GROUPS(1));
+      expect(pinned).not.toBe(en.errors.TOO_MANY_GROUPS({ max: 1 }));
     });
 
     it('English: singular "group" when only one was requested, in both places it appears', () => {
@@ -1364,8 +1277,8 @@ describe('every engine warning can be rendered in every language', () => {
   describe('sex-spillover resolves student numbers to names', () => {
     // Task 8a. Carries `students: number[]`, exactly like the error codes
     // above, and must go through the same resolver -- a teacher reading
-    // "7, 8 have joined..." instead of "Gita, Hani have joined..." is the
-    // same regression the resolver parameter exists to prevent there.
+    // "7 and 8 have joined..." instead of "Gita and Hani have joined..." is
+    // the same regression the resolver parameter exists to prevent there.
     it.each(locales)(
       'falls back to the numbered label when no resolver is supplied (%s)',
       (_name, strings) => {
@@ -1374,33 +1287,36 @@ describe('every engine warning can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.warnings.SEX_SPILLOVER(
-            [strings.studentNumber(7), strings.studentNumber(8)],
-            'F',
-          ),
+          strings.warnings.SEX_SPILLOVER({
+            names: [
+              strings.studentNumber({ n: 7 }),
+              strings.studentNumber({ n: 8 }),
+            ],
+            sex: 'F',
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(7));
-        expect(msg).toContain(strings.studentNumber(8));
+        expect(msg).toContain(strings.studentNumber({ n: 7 }));
+        expect(msg).toContain(strings.studentNumber({ n: 8 }));
         // A bare digit with no word around it is exactly the bug this
         // default exists to prevent.
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
-    it('English default reads "Student 7, Student 8 …", not bare digits', () => {
+    it('English default reads "Student 7 and Student 8 …", not bare digits', () => {
       const msg = renderWarning(
         { code: WARNING_CODES.sexSpillover, students: [7, 8], sex: 'F' },
         en,
       );
-      expect(msg).toContain('Student 7, Student 8');
+      expect(msg).toContain('Student 7 and Student 8');
     });
 
-    it('Indonesian default reads "Siswa 7, Siswa 8 …", not bare digits', () => {
+    it('Indonesian default reads "Siswa 7 dan Siswa 8 …", not bare digits', () => {
       const msg = renderWarning(
         { code: WARNING_CODES.sexSpillover, students: [7, 8], sex: 'F' },
         id,
       );
-      expect(msg).toContain('Siswa 7, Siswa 8');
+      expect(msg).toContain('Siswa 7 dan Siswa 8');
     });
 
     // Girls short: sex: 'F' names the spilled students, so the message must
@@ -1414,7 +1330,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 7 ? 'Gita' : 'Hani'),
       );
       expect(msg).toBe(
-        'Gita, Hani have joined a group of boys because there were not enough girls to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
+        'Gita and Hani have joined a group of boys because there were not enough girls to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
       );
       expect(msg).not.toContain('Student');
       expect(msg).toContain('not a mistake');
@@ -1427,7 +1343,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 7 ? 'Gita' : 'Hani'),
       );
       expect(msg).toBe(
-        'Gita, Hani bergabung dengan kelompok laki-laki karena jumlah perempuan tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
+        'Gita dan Hani bergabung dengan kelompok laki-laki karena jumlah perempuan tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(msg).not.toContain('Siswa');
       expect(msg).toContain('bukan kesalahan');
@@ -1470,14 +1386,17 @@ describe('every engine warning can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.warnings.PINNED_MIXED_SEX([
-            strings.studentNumber(1),
-            strings.studentNumber(4),
-          ]),
+          strings.warnings.PINNED_MIXED_SEX({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 4 }),
+            ],
+            howMany: 'two',
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(4));
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 4 }));
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
@@ -1488,7 +1407,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana, Budi are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
+        'Ana and Budi are pinned together as one group, but are not the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.',
       );
       expect(msg).not.toContain('Student');
       expect(msg).toContain('not a mistake');
@@ -1501,7 +1420,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Budi'),
       );
       expect(msg).toBe(
-        'Ana, Budi dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
+        'Ana dan Budi dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(msg).not.toContain('Siswa');
       expect(msg).toContain('bukan kesalahan');
@@ -1522,14 +1441,16 @@ describe('every engine warning can be rendered in every language', () => {
           strings,
         );
         expect(msg).toBe(
-          strings.warnings.SEX_BOTH_TOO_SMALL([
-            strings.studentNumber(1),
-            strings.studentNumber(7),
-          ]),
+          strings.warnings.SEX_BOTH_TOO_SMALL({
+            names: [
+              strings.studentNumber({ n: 1 }),
+              strings.studentNumber({ n: 7 }),
+            ],
+          }),
         );
-        expect(msg).toContain(strings.studentNumber(1));
-        expect(msg).toContain(strings.studentNumber(7));
-        expect(msg).not.toMatch(/^\d+, \d+ /);
+        expect(msg).toContain(strings.studentNumber({ n: 1 }));
+        expect(msg).toContain(strings.studentNumber({ n: 7 }));
+        expect(msg).not.toMatch(/^\d/);
       },
     );
 
@@ -1545,7 +1466,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Gita'),
       );
       expect(msg).toBe(
-        'Ana, Gita were placed in one combined group because there were not enough of either sex to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
+        'Ana and Gita were placed in one combined group because there were not enough of either sex to make a group of their own. That is simply how the numbers divided, not a mistake to fix.',
       );
       expect(msg).not.toContain('Student');
       expect(msg).toContain('not a mistake');
@@ -1562,7 +1483,7 @@ describe('every engine warning can be rendered in every language', () => {
         (n) => (n === 1 ? 'Ana' : 'Gita'),
       );
       expect(msg).toBe(
-        'Ana, Gita digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
+        'Ana dan Gita digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.',
       );
       expect(msg).not.toContain('Siswa');
       expect(msg).toContain('bukan kesalahan');
@@ -1590,67 +1511,197 @@ describe('every engine warning can be rendered in every language', () => {
   });
 });
 
-describe('site-wide copy is fully translated', () => {
-  const walk = (obj: unknown, path = ''): Array<[string, string]> => {
-    if (typeof obj === 'string') return [[path, obj]];
-    if (obj && typeof obj === 'object') {
-      return Object.entries(obj).flatMap(([k, v]) =>
-        walk(v, path ? `${path}.${k}` : k),
-      );
-    }
-    return [];
-  };
+// #188. The three number fields refuse in the page's own language, and the
+// refusal names the text a teacher actually typed. This is the ONE place a
+// problem kind becomes a sentence -- the same reason `renderError` and
+// `resultsHeadingText` live in this module rather than at their call sites.
+describe('a refused number field says what is wrong in every language', () => {
+  const en = getStrings('en');
+  const problem = (
+    kind: NumberSetsProblem['kind'],
+    text = '',
+  ): NumberSetsProblem => ({ kind, text });
 
-  it('every English site key exists in Indonesian', () => {
-    expect(
-      walk(siteId)
-        .map(([k]) => k)
-        .sort(),
-    ).toEqual(
-      walk(siteEn)
-        .map(([k]) => k)
-        .sort(),
+  // A literal pin against the design, deliberately NOT derived from the
+  // array it checks: an assertion that compares a list to itself passes at
+  // any size, so it would never notice a kind being dropped.
+  it('has exactly seven kinds to render', () => {
+    expect(NUMBER_SETS_PROBLEM_KINDS).toHaveLength(7);
+  });
+
+  it('names the offending text and the class size for something that is not a number', () => {
+    const sentence = renderNumbersProblem(
+      problem('notAWholeNumber', 'abc'),
+      25,
+      en,
+    );
+    expect(sentence).toContain('abc');
+    expect(sentence).toContain('25');
+  });
+
+  it('names the class size when a number is above it', () => {
+    const sentence = renderNumbersProblem(problem('aboveCount', '26'), 25, en);
+    expect(sentence).toContain('26');
+    expect(sentence).toContain('25');
+  });
+
+  // A different remedy from the one above, which is why it is a different
+  // sentence: this one cannot be solved by changing the Students box.
+  it("names the page's own ceiling rather than the class size", () => {
+    const sentence = renderNumbersProblem(
+      problem('aboveMaximum', String(MAX_STUDENTS + 1)),
+      MAX_STUDENTS + 50,
+      en,
+    );
+    expect(sentence).toContain(String(MAX_STUDENTS + 1));
+    expect(sentence).toContain(String(MAX_STUDENTS));
+  });
+
+  it('names the repeated number', () => {
+    expect(renderNumbersProblem(problem('duplicate', '7'), 25, en)).toContain(
+      '7',
     );
   });
 
+  it('names the set that holds only one number', () => {
+    expect(renderNumbersProblem(problem('lonelySet', '3'), 25, en)).toContain(
+      '3',
+    );
+  });
+
+  it('names the set that has no letter left', () => {
+    expect(
+      renderNumbersProblem(problem('tooManySets', '53,54'), 60, en),
+    ).toContain('53,54');
+  });
+
+  // The count box is at fault here, not anything in these fields, so the
+  // sentence must point at the box -- and must never leak the `NaN` an
+  // empty number input actually produces.
+  it('points at the count box when the count cannot be read', () => {
+    const sentence = renderNumbersProblem(problem('noCount'), Number.NaN, en);
+    expect(sentence).toContain('number of students');
+    expect(sentence).not.toContain('NaN');
+  });
+
+  // Derived from the kinds themselves, so a kind added later and left
+  // unhandled turns this red -- rather than passing because nobody
+  // remembered to extend a hand-written list. Mirrors `renderError`'s own
+  // promise never to show a teacher a raw code.
+  for (const locale of LOCALES) {
+    it(`renders every kind as a sentence in ${locale}`, () => {
+      const strings = getStrings(locale);
+      for (const kind of NUMBER_SETS_PROBLEM_KINDS) {
+        const sentence = renderNumbersProblem(problem(kind, '7'), 25, strings);
+        expect(sentence.trim()).not.toBe('');
+        expect(sentence).not.toContain(kind);
+      }
+    });
+  }
+});
+
+describe('site-wide copy is fully translated', () => {
+  it('every English site key exists in Indonesian', () => {
+    const keys = (table: unknown): string[] =>
+      stringLeaves(table)
+        .map(([key]) => key)
+        .sort();
+    expect(keys(siteId)).toEqual(nonEmpty(keys(siteEn), 'English site keys'));
+  });
+
   it('no site string is blank in either language', () => {
-    for (const [, value] of [...walk(siteEn), ...walk(siteId)]) {
-      expect(value.trim()).not.toBe('');
-    }
+    const strings = [...deepStrings(siteEn), ...deepStrings(siteId)];
+    const blank = strings
+      .filter(([, value]) => value.trim() === '')
+      .map(([key]) => key);
+    expect(searched(blank, { of: strings, what: 'site strings' })).toEqual([]);
   });
 
   it('the visible prose is genuinely translated, not copied English', () => {
     // Walks EVERY string rather than a hand-picked sample, so a section that
     // was forgotten during translation cannot hide behind the ones that were
-    // done. Proper nouns and the language switcher label are legitimately
-    // identical across locales, so they are excluded by name.
-    const allowedIdentical = new Set([
-      'language.switchTo', // literally the other language's own name
-      'language.label',
-      'footer.companyNo', // "No. Perusahaan" vs "Company No." differ, but keep the guard honest
-      // "Glory points" is YeeTalk's in-app currency — a product name, not
-      // English prose, so it is correctly identical in both locales. Listed
-      // explicitly rather than loosening the check: the guard's value is that
-      // every exception is a decision someone made on purpose.
-      'glory.inputLabel',
-    ]);
-    const enMap = new Map(walk(siteEn));
-    const identical = walk(siteId)
-      .filter(([k, v]) => enMap.get(k) === v)
-      .map(([k]) => k)
-      .filter((k) => !allowedIdentical.has(k));
-    expect(identical).toEqual([]);
+    // done. Proper nouns are legitimately identical across locales, so they
+    // are excluded by name (SITE_ALLOWED_IDENTICAL, shared by every locale).
+    const idLeaves = stringLeaves(siteId);
+    const identical = identicalToEnglish(siteId);
+    expect(
+      searched(identical, { of: idLeaves, what: 'Indonesian site strings' }),
+    ).toEqual([]);
+  });
+
+  // #602: the same walk for the other machine-seeded site locales. One test
+  // per locale, generated, never a loop of locales inside a body.
+  const SITE_BY_LOCALE = { zh: siteZh, vi: siteVi, th: siteTh } as const;
+  for (const locale of ['zh', 'vi', 'th'] as const) {
+    it(`${locale}: no site string is English left untranslated`, () => {
+      const leaves = stringLeaves(SITE_BY_LOCALE[locale]);
+      const identical = identicalToEnglish(SITE_BY_LOCALE[locale]);
+      expect(
+        searched(identical, { of: leaves, what: `${locale} site strings` }),
+      ).toEqual([]);
+    });
+  }
+
+  it('every allowed-identical site key is identical to English in some locale', () => {
+    // A stale allowance is a hole: it would excuse English copy the day the
+    // key is next left untranslated (#422's class).
+    const allowedKeys = [...SITE_ALLOWED_IDENTICAL.keys()];
+    const tables = [siteId, siteZh, siteVi, siteTh];
+    const needed = new Set(
+      tables.flatMap((table) =>
+        stringLeaves(table)
+          .filter(([k, v]) => siteEnMap.get(k) === v)
+          .map(([k]) => k),
+      ),
+    );
+    const stale = allowedKeys.filter((k) => !needed.has(k));
+    expect(
+      searched(stale, { of: allowedKeys, what: 'allowed-identical site keys' }),
+    ).toEqual([]);
   });
 });
 
 describe('locale lookup', () => {
-  it('exposes exactly the two supported locales, English first', () => {
-    expect(LOCALES).toEqual(['en', 'id']);
+  // #21 Stage 4. This used to be `expect(LOCALES).toEqual(['en', 'id'])` — a
+  // tripwire wearing an assertion's clothes. It stated the CONFIGURATION, so
+  // adding a locale failed it, and the only way past was to edit the literal
+  // — which is not review, it is bookkeeping. What actually has to hold is
+  // below, and it keeps holding at five locales without an edit.
+  it('lists the default locale first, once each', () => {
+    expect(LOCALES[0]).toBe(DEFAULT_LOCALE);
+    expect(new Set(LOCALES).size, 'a locale is listed twice').toBe(
+      LOCALES.length,
+    );
   });
 
-  it.each(locales)('getStrings("%s") returns that locale', (name, strings) => {
-    expect(getStrings(name)).toBe(strings);
+  it('gives every locale a strings table and its own metadata', () => {
+    // The half that a list of names cannot state: a locale in LOCALES with no
+    // catalogue behind it routes to a page rendered in English, and one with
+    // no metadata gets `og:locale` and its number formatting from whatever
+    // the lookup falls back to.
+    for (const locale of LOCALES) {
+      expect(getStrings(locale), `${locale} has no strings table`).toBeTruthy();
+      expect(
+        LOCALE_METADATA[locale]?.nativeName,
+        `${locale} has no native name — the switcher would label it blank`,
+      ).toBeTruthy();
+    }
   });
+
+  it.each(catalogues)(
+    'getStrings("%s") returns that locale',
+    (name, catalogue) => {
+      // A page's table is compiled from its catalogue: plain copy carried over
+      // as written, and only the messages turned into functions (#136). A
+      // lookup that went to the wrong locale would carry the wrong copy.
+      const plain = deepStrings(catalogue).filter(
+        ([, text]) => !isMessageTemplate(text),
+      );
+      expect(Object.fromEntries(deepStrings(getStrings(name)))).toEqual(
+        Object.fromEntries(plain),
+      );
+    },
+  );
 
   it('falls back to English for anything unrecognised', () => {
     expect(getStrings('fr')).toBe(en);
@@ -1658,9 +1709,9 @@ describe('locale lookup', () => {
   });
 
   it('renders anonymous students using the locale word for "Student"', () => {
-    expect(en.studentNumber(7)).toContain('7');
-    expect(id.studentNumber(7)).toContain('7');
-    expect(en.studentNumber(7)).not.toBe(id.studentNumber(7));
+    expect(en.studentNumber({ n: 7 })).toContain('7');
+    expect(id.studentNumber({ n: 7 })).toContain('7');
+    expect(en.studentNumber({ n: 7 })).not.toBe(id.studentNumber({ n: 7 }));
   });
 });
 
@@ -1674,11 +1725,15 @@ describe('the locale-aware paths', () => {
     ['/', 'id', '/id/'],
     ['/id/', 'en', '/'],
     ['/id/', 'id', '/id/'],
+    // A prefix with no slash after it is that language's homepage too.
+    ['/id', 'en', '/'],
+    ['/id', 'id', '/id/'],
+    ['/zh', 'vi', '/vi/'],
     ['/classroom-groups', 'id', '/id/classroom-groups'],
     ['/classroom-groups/', 'id', '/id/classroom-groups/'],
     ['/id/classroom-groups', 'en', '/classroom-groups'],
     ['/id/classroom-groups/', 'en', '/classroom-groups/'],
-    ['/glory-points', 'en', '/glory-points'],
+    ['/yeetalk-calculators', 'en', '/yeetalk-calculators'],
     // The anchoring that matters: /identity is not the Indonesian homepage.
     ['/identity', 'id', '/id/identity'],
     ['/identity', 'en', '/identity'],
@@ -1690,12 +1745,12 @@ describe('the locale-aware paths', () => {
 
   it.each([
     ['/', 'en'],
-    ['/glory-points', 'en'],
+    ['/yeetalk-calculators', 'en'],
     ['/identity', 'en'], // must NOT be read as the /id prefix
     ['/ideas', 'en'],
     ['/id', 'id'],
     ['/id/', 'id'],
-    ['/id/glory-points', 'id'],
+    ['/id/yeetalk-calculators', 'id'],
   ] as const)('localeFromPath(%s) -> %s', (path, locale) => {
     expect(localeFromPath(path)).toBe(locale);
   });
@@ -1703,7 +1758,7 @@ describe('the locale-aware paths', () => {
   it('a round trip through the other language returns to the same page', () => {
     for (const path of [
       '/',
-      '/glory-points',
+      '/yeetalk-calculators',
       '/classroom-groups',
       '/identity',
     ]) {
@@ -1719,10 +1774,16 @@ describe('the locale-aware paths', () => {
     expect(toolPath(locale)).toBe(expected);
   });
 
-  it('otherLocale is its own inverse', () => {
-    expect(otherLocale('en')).toBe('id');
-    expect(otherLocale('id')).toBe('en');
-    expect(otherLocale(otherLocale('en'))).toBe('en');
+  it('otherLocales lists every locale except the one given', () => {
+    expect(otherLocales('en')).toEqual(['id', 'zh', 'vi', 'th']);
+    expect(otherLocales('id')).toEqual(['en', 'zh', 'vi', 'th']);
+    expect(otherLocales('th')).toEqual(['en', 'id', 'zh', 'vi']);
+    // Derived as well as spelled out, so this keeps holding as LOCALES grows
+    // rather than becoming another two-locale assumption to find later.
+    for (const locale of LOCALES) {
+      expect(otherLocales(locale)).not.toContain(locale);
+      expect(otherLocales(locale)).toHaveLength(LOCALES.length - 1);
+    }
   });
 
   it.each([
@@ -1770,7 +1831,9 @@ describe('group names', () => {
   it('matches groupLabel directly -- groupName is a thin, one-based wrapper around it', () => {
     for (const strings of [en, id]) {
       for (const index of [0, 1, 24]) {
-        expect(groupName(index, strings)).toBe(strings.groupLabel(index + 1));
+        expect(groupName(index, strings)).toBe(
+          strings.groupLabel({ n: index + 1 }),
+        );
       }
     }
   });
@@ -1820,13 +1883,13 @@ describe('the results heading names the class once, or leaves it out entirely', 
   // this heading too, so a NON-blank name keeps its own incidental
   // leading/trailing whitespace -- `.trim()` only decides blankness above,
   // it never edits what is actually shown. Deliberately corrects
-  // task-5-brief.md's own snippet, which threaded `className.trim()`
+  // the uncommitted #9 task brief's own snippet, which threaded `className.trim()`
   // through to the named branch as well.
   it.each(locales)(
     'a non-blank name keeps its own whitespace, untrimmed (%s)',
     (_name, strings) => {
       const msg = resultsHeadingText(' 7B ', strings);
-      expect(msg).toBe(strings.resultsHeadingNamed(' 7B '));
+      expect(msg).toBe(strings.resultsHeadingNamed({ className: ' 7B ' }));
       expect(msg.startsWith(' 7B ')).toBe(true);
     },
   );
@@ -1843,7 +1906,7 @@ describe('the results heading names the class once, or leaves it out entirely', 
     (_name, strings) => {
       const weird = '<b>7"B</b> & Co / Ltd';
       expect(resultsHeadingText(weird, strings)).toBe(
-        strings.resultsHeadingNamed(weird),
+        strings.resultsHeadingNamed({ className: weird }),
       );
       expect(resultsHeadingText(weird, strings)).toContain(weird);
     },
@@ -1863,18 +1926,20 @@ describe('the sentences a teacher reads at the end', () => {
     [1, 1, '1 group from 1 student.'],
     [2, 2, '2 groups from 2 students.'],
   ])('English %i/%i', (groups, students, sentence) => {
-    expect(en.resultsSummary(groups, students)).toBe(sentence);
+    expect(en.resultsSummary({ groups, students })).toBe(sentence);
   });
 
   it.each([
     [5, 22, '5 kelompok dari 22 siswa.'],
     [1, 7, '1 kelompok dari 7 siswa.'],
   ])('Indonesian %i/%i — no inflection, correct as written', (g, s, out) => {
-    expect(id.resultsSummary(g, s)).toBe(out);
+    expect(id.resultsSummary({ groups: g, students: s })).toBe(out);
   });
 
   it('cannot pass with its arguments swapped', () => {
     // The property the old assertion lacked.
-    expect(en.resultsSummary(5, 22)).not.toBe(en.resultsSummary(22, 5));
+    expect(en.resultsSummary({ groups: 5, students: 22 })).not.toBe(
+      en.resultsSummary({ groups: 22, students: 5 }),
+    );
   });
 });

@@ -1,35 +1,90 @@
 ---
-// BILINGUAL on purpose, and it is the only page that is.
-//
-// Cloudflare Pages serves this one file for ANY unknown path, including
-// /id/something — so a localised /id/404 route would never actually be
-// reached, and an Indonesian visitor who mistyped a URL would be answered in
-// English. Showing both languages here is the only thing that is correct
-// regardless of how the host resolves the miss, and it needs no JavaScript.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { siteEn, siteId } from '../lib/i18n/site';
+import {
+  LOCALES,
+  DEFAULT_LOCALE,
+  getSiteStrings,
+  localisePath,
+} from '../lib/i18n';
+import { metadataFor } from '../lib/i18n/metadata';
+import ReportForm from '../components/ReportForm.astro';
+
+/**
+ * MULTILINGUAL on purpose, and it is the only page that is.
+ *
+ * Cloudflare Pages serves this one file for ANY unknown path, including
+ * `/id/something` — so a localised `/id/404` route would never actually be
+ * reached, and a visitor who mistyped a URL would be answered in a language
+ * they may not read. Answering in every language the site serves is the only
+ * thing that is correct regardless of how the host resolves the miss, and it
+ * needs no JavaScript.
+ *
+ * DERIVED FROM `LOCALES`, which is the whole point of this revision. The page
+ * was written when LOCALES was en+id and listed both by hand. #22 added zh, vi
+ * and th and nothing connected the two, so for weeks a Chinese, Vietnamese or
+ * Thai visitor who mistyped a URL was answered in English and Indonesian only,
+ * while their translated copy sat in `site.ts` reaching nobody. That drift was
+ * invisible because `dead-copy.test.ts` asks whether a key is REFERENCED, and
+ * these keys were — by the locales that DID appear here (#99, #104).
+ *
+ * `title` and `description` come from the default locale because a document
+ * has one of each. That is why the guard excuses those two keys, and only
+ * those two, for the other languages.
+ *
+ * Each block carries the report form (#350, spec 14) in its own language,
+ * posting its own locale, because the path names none. ReportForm draws
+ * nothing in English, so the default block has none, as on every English page.
+ */
+const primary = getSiteStrings(DEFAULT_LOCALE).notFound;
+// Each language's own gap and full stop (#390 F65): the sentence is assembled
+// around the link, so its punctuation cannot come whole from the catalogue.
+const { sentenceGap: primaryGap, fullStop: primaryStop } =
+  metadataFor(DEFAULT_LOCALE);
+const others = LOCALES.filter((locale) => locale !== DEFAULT_LOCALE).map(
+  (locale) => ({
+    locale,
+    copy: getSiteStrings(locale).notFound,
+    home: localisePath('/', locale),
+    gap: metadataFor(locale).sentenceGap,
+    stop: metadataFor(locale).fullStop,
+  }),
+);
 ---
 
 <BaseLayout
-  title={siteEn.notFound.title}
-  description={siteEn.notFound.description}
-  lang="en"
+  title={primary.title}
+  description={primary.description}
+  lang={DEFAULT_LOCALE}
   noIndex
 >
   <section class="wrap">
-    <h1>{siteEn.notFound.heading}</h1>
-    {/* {' '} is load-bearing: a newline glues sentence to link. */}
+    <h1>{primary.heading}</h1>
+    {/* The gap and the stop are expressions, never literal text: a newline
+        between JSX nodes is dropped, so the sentence would glue to its link,
+        and each language punctuates its own way (#390 F65). */}
     <p>
-      {siteEn.notFound.body}{' '}<a href="/">{siteEn.notFound.backHome}</a>.
+      {primary.body}
+      {primaryGap}
+      <a href="/">{primary.backHome}</a>
+      {primaryStop}
     </p>
+    <ReportForm lang={DEFAULT_LOCALE} page="not-found" />
 
-    <hr />
-
-    <h2 lang="id">{siteId.notFound.heading}</h2>
-    <p lang="id">
-      {siteId.notFound.body}{' '}
-      <a href="/id/">{siteId.notFound.backHome}</a>.
-    </p>
+    {others.map(({ locale, copy, home, gap, stop }) => (
+      <Fragment>
+        <hr />
+        <h2 lang={locale}>{copy.heading}</h2>
+        <p lang={locale}>
+          {copy.body}
+          {gap}
+          <a href={home} hreflang={locale} lang={locale}>
+            {copy.backHome}
+          </a>
+          {stop}
+        </p>
+        <ReportForm lang={locale} page="not-found" />
+      </Fragment>
+    ))}
   </section>
 </BaseLayout>
 <style>

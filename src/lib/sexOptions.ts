@@ -43,8 +43,8 @@ export const sexWhy = (roster: Student[] | null, t: Strings): string | null => {
   if (roster === null || roster.length === 0) return t.sexWhyNoList;
   const grouped = roster.filter((s) => !s.absent);
   // `!s.sex`, not `s.sex === null`: the type says `'M' | 'F' | null`, but
-  // there is no type checker anywhere in this repo or in CI (CLAUDE.md), and
-  // stage 3 builds this roster by reading the DOM -- a field the type
+  // stage 3 builds this roster by reading the DOM, and `astro check` checks
+  // code, never the values the DOM hands it -- a field the type
   // promises is never missing can still arrive `undefined` in practice (a
   // student row rendered without its sex control wired yet, a form field
   // read before its listener attaches). A strict `=== null` treats that
@@ -57,7 +57,7 @@ export const sexWhy = (roster: Student[] | null, t: Strings): string | null => {
   // already uses for the identical question elsewhere in this codebase.
   const unset = grouped.filter((s) => !s.sex);
   if (unset.length === 0) return null;
-  return t.sexWhyUnset(unset.length, grouped.length);
+  return t.sexWhyUnset({ unset: unset.length, grouped: grouped.length });
 };
 
 /**
@@ -96,7 +96,7 @@ export const sexWhy = (roster: Student[] | null, t: Strings): string | null => {
  *
  * `!s.sex` rather than `s.sex === null`, for the identical fail-closed
  * reason `sexWhy` above gives at length: this roster is built by reading
- * the DOM, and there is no type checker anywhere in this repo or in CI.
+ * the DOM, whose values no type check sees.
  */
 export const sexWhyReturning = (
   previous: Student[],
@@ -112,5 +112,7 @@ export const sexWhyReturning = (
   if (returned.length !== 1) return null;
   const [who] = returned;
   if (who.sex) return null;
-  return t.sexWhyReturning(who.name ? who.name : t.studentNumber(who.number));
+  return t.sexWhyReturning({
+    who: who.name ? who.name : t.studentNumber({ n: who.number }),
+  });
 };

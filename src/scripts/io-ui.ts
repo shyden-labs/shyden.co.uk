@@ -18,9 +18,12 @@
  * operation.
  */
 import type { Student } from '../lib/grouping';
+import { button } from './dom';
 import type { Strings } from '../lib/i18n';
 import type { Locale } from '../lib/csv-locale';
-import { otherLocale, toolPath } from '../lib/i18n';
+import { otherLocales, toolPath } from '../lib/i18n';
+import { metadataFor } from '../lib/i18n/metadata';
+import { FLAG_VIEWBOX, flagSymbolId } from '../lib/i18n/flags';
 import {
   importFile,
   serialiseRoster,
@@ -60,17 +63,6 @@ export interface IoHandlers {
    */
   refuseExport?: () => string | null;
 }
-
-const button = (text: string, className: string): HTMLButtonElement => {
-  const el = document.createElement('button');
-  // `type="button"` matters: this section's controls sit inside #cg-form,
-  // and a button with no type is a SUBMIT button — clicking "Download
-  // template" would shuffle the class.
-  el.type = 'button';
-  el.className = className;
-  el.textContent = text;
-  return el;
-};
 
 /**
  * Hand a file to the browser without it ever becoming a URL a teacher could
@@ -253,8 +245,63 @@ export function renderIo(
   const exportRoster = button(t.ioExportClassList, 'cg-io-export');
   const exportGroups = button(t.ioExportGroups, 'cg-io-export-groups');
   const template = button(t.ioDownloadTemplate, 'cg-io-template');
-  const bothLanguages = button(t.ioBothLanguages, 'cg-io-both');
-  buttons.append(exportRoster, exportGroups, template, bothLanguages);
+  buttons.append(exportRoster, exportGroups, template);
+
+  // ── the handover picker ─────────────────────────────────────────────────
+  //
+  // One button per other language, behind a native `<details>` — the same
+  // disclosure the header's own language switcher is, so the two controls
+  // read as one idea rather than two.
+  //
+  // A BUTTON EACH, deliberately, and not "press Handover, then choose".
+  // `window.open` must run inside the click that asked for it or the browser
+  // blocks the tab (`ioHandoverBlocked` exists because that path is real), so
+  // the press on a language IS the gesture that opens it. There is no stored
+  // choice to read back outside a gesture, which is what a two-step design
+  // would have needed.
+  //
+  // It replaces `otherLocales(locale)[0]` — the first alternative, taken
+  // without asking. Correct while there was exactly one; a silent decision on
+  // the teacher's behalf the moment there are two.
+  const bothLanguages = document.createElement('details');
+  bothLanguages.className = 'cg-io-both';
+  const bothSummary = document.createElement('summary');
+  bothSummary.id = 'cg-io-both-toggle';
+  bothSummary.textContent = t.ioBothLanguages;
+  const bothList = document.createElement('ul');
+  bothList.className = 'cg-io-both-list';
+  bothLanguages.append(bothSummary, bothList);
+  buttons.appendChild(bothLanguages);
+
+  const destinations = otherLocales(locale).map((code) => {
+    const { nativeName, flag } = metadataFor(code);
+    // No text: this one's label is a flag and a `<span class="name">`, built
+    // below. It still comes from `button` so the `type` rule has ONE home --
+    // the failure it prevents (a submit inside #cg-form) is the same failure
+    // here, and a control built by hand beside a helper is the copy that
+    // stops being updated.
+    const choice = button('', 'cg-io-both-target');
+    // Its own `lang`, so a screen reader announces 中文 in Chinese instead of
+    // spelling it out in English — the header switcher's rule, kept here.
+    choice.lang = code;
+    // `.innerHTML` then `.appendChild`, exactly as classroom-groups.ts renders
+    // a student's avatar: the flag is a `<use>` against the sprite
+    // ClassroomGroupsPage.astro builds at build time, and `flagSymbolId`
+    // returns one of five fixed, developer-authored strings — never anything
+    // shaped by what a teacher typed. The NAME right after it is a label and
+    // is set as TEXT, like every other string this file renders.
+    choice.innerHTML =
+      `<svg class="flag" viewBox="${FLAG_VIEWBOX}" aria-hidden="true" ` +
+      `focusable="false"><use href="#${flagSymbolId(flag)}"></use></svg>`;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = nativeName;
+    choice.appendChild(name);
+    const item = document.createElement('li');
+    item.appendChild(choice);
+    bothList.appendChild(item);
+    return { code, nativeName, choice };
+  });
 
   // Design spec section 9, step 1: the teacher "is told what will happen"
   // BEFORE choosing, not after. Rendered beside the button rather than as
@@ -264,7 +311,7 @@ export function renderIo(
   bothHint.className = 'cg-io-both-hint';
   bothHint.id = 'cg-io-both-hint';
   bothHint.textContent = t.ioBothLanguagesHint;
-  bothLanguages.setAttribute('aria-describedby', 'cg-io-both-hint');
+  bothSummary.setAttribute('aria-describedby', 'cg-io-both-hint');
 
   const handover = document.createElement('p');
   handover.className = 'cg-io-handover';
@@ -284,14 +331,28 @@ export function renderIo(
 
   // ── behaviour ───────────────────────────────────────────────────────────
 
+  // Each alert below is revealed, THEN written: a live region only reports
+  // mutations to something already in the accessibility tree, the ordering
+  // `applyImport` and `say` follow. Both were written first and revealed
+  // after, so a refused file or the replace warning could go unannounced
+  // (#390 F109).
   const showProblems = (found: CsvProblem[]) => {
+    problems.hidden = found.length === 0;
     problemsList.textContent = '';
     for (const p of found) {
       const li = document.createElement('li');
       li.textContent = p.message;
       problemsList.appendChild(li);
     }
-    problems.hidden = found.length === 0;
+  };
+
+  /** The warning before an import replaces `current`, a roster with work in it. */
+  const askToReplace = (current: readonly Student[]) => {
+    confirm.hidden = false;
+    confirmText.textContent = t.ioReplaceWarning({
+      total: current.length,
+      named: current.filter((s) => s.name).length,
+    });
   };
 
   /**
@@ -318,7 +379,7 @@ export function renderIo(
     // mutations to something already in the accessibility tree, the same
     // ordering #cg-summary and #cg-error on this page already follow.
     imported.hidden = false;
-    imported.textContent = t.ioImported(roster.length);
+    imported.textContent = t.ioImported({ total: roster.length });
   };
 
   importInput.addEventListener('change', async () => {
@@ -364,11 +425,7 @@ export function renderIo(
       applyImport(outcome.roster, outcome.className);
       return;
     }
-    confirmText.textContent = t.ioReplaceWarning(
-      current.length,
-      current.filter((s) => s.name).length,
-    );
-    confirm.hidden = false;
+    askToReplace(current);
     confirmYes.onclick = () => applyImport(outcome.roster, outcome.className);
     confirmNo.onclick = () => clearPanels();
   });
@@ -425,8 +482,16 @@ export function renderIo(
     handover.textContent = message;
   };
 
-  /** The sender: export here, open the other page, answer its one question. */
-  bothLanguages.addEventListener('click', () => {
+  /**
+   * The sender: export here, open the language that was pressed, answer its
+   * one question.
+   *
+   * Takes the destination and its NATIVE NAME. The name is not looked up again
+   * from `destination` — it is the exact label on the button the teacher just
+   * pressed, so the confirmation cannot name a different language from the one
+   * they chose.
+   */
+  const sendTo = (destination: Locale, languageName: string) => {
     handover.hidden = true;
     handover.textContent = '';
 
@@ -441,15 +506,43 @@ export function renderIo(
     );
     handlers.onExported();
 
-    const target = `${toolPath(otherLocale(locale))}#${HANDOVER_HASH}`;
+    // Focus back onto the control that opened the list, BEFORE the tab opens.
+    //
+    // Closing the list takes the pressed button out of the focus order, and a
+    // browser then drops focus to `<body>` -- a teacher tabbing through this
+    // section would restart at the top of the page (WCAG 2.4.3). It has to
+    // happen here rather than beside the close: Firefox ignores `.focus()` on
+    // a document that is no longer the active one, and this document stops
+    // being active the moment `window.open` succeeds. Doing it first also
+    // means the blocked path below needs no second branch -- the summary is
+    // on screen either way.
+    bothSummary.focus();
+
+    // The language the teacher pressed, not `otherLocales(locale)[0]`. That
+    // took the first alternative without asking, which was unambiguous with
+    // one alternative and a silent choice with two (#21 Stage 3).
+    //
+    // Called SYNCHRONOUSLY inside the click. Moving it behind anything
+    // awaited — a fetch, a second screen, a stored preference read back later
+    // — loses the user activation and every handover lands on the blocked
+    // path below.
+    const target = `${toolPath(destination)}#${HANDOVER_HASH}`;
     const opened = window.open(target, '_blank');
     if (!opened) {
       // Design spec section 9: "If the tab is blocked ... say so plainly and
       // keep the roster where it is." The roster is untouched above; only
       // the handover failed.
       say(t.ioHandoverBlocked);
+      // The list stays OPEN here, on purpose: "allow pop-ups and try again"
+      // asks for a second press, and closing it would hide the button that
+      // sentence is about.
       return;
     }
+
+    // Chosen and acted on, so the menu has done its job. The button that was
+    // just pressed goes out of the focus order with it -- focus was moved off
+    // it BEFORE the tab opened, see above.
+    bothLanguages.open = false;
 
     let settled = false;
     const finish = (message: string) => {
@@ -484,7 +577,8 @@ export function renderIo(
         );
         return;
       }
-      if (data.kind === 'cg-ack') finish(t.ioHandoverSent);
+      if (data.kind === 'cg-ack')
+        finish(t.ioHandoverSent({ language: languageName }));
     };
     window.addEventListener('message', onMessage);
 
@@ -492,7 +586,11 @@ export function renderIo(
       () => finish(t.ioHandoverTimedOut),
       HANDOVER_TIMEOUT_MS,
     );
-  });
+  };
+
+  destinations.forEach(({ code, nativeName, choice }) =>
+    choice.addEventListener('click', () => sendTo(code, nativeName)),
+  );
 
   // The receiver. Runs on EVERY page load, but asks only when the hash says
   // a handover is expected AND there is an opener to ask -- a page opened
@@ -526,7 +624,7 @@ export function renderIo(
 
       const applyAndAck = () => {
         handlers.onImport(incoming, incomingName);
-        say(t.ioImported(incoming.length));
+        say(t.ioImported({ total: incoming.length }));
         // The acknowledgement the sender waits for. Sent AFTER the roster
         // is applied, never before: an ack that arrived first would let the
         // sender report success for a handover that then failed to render.
@@ -544,11 +642,7 @@ export function renderIo(
         applyAndAck();
         return;
       }
-      confirmText.textContent = t.ioReplaceWarning(
-        current.length,
-        current.filter((s) => s.name).length,
-      );
-      confirm.hidden = false;
+      askToReplace(current);
       confirmYes.onclick = () => {
         clearPanels();
         applyAndAck();

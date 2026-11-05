@@ -1,0 +1,59 @@
+---
+import type { FlagCode } from '../lib/i18n/metadata';
+import { FLAG_VIEWBOX, flagBody } from '../lib/i18n/flags';
+
+interface Props {
+  code: FlagCode;
+  /** Decorative by default: the native name beside it carries the meaning. */
+  title?: string;
+}
+const { code, title } = Astro.props;
+
+/**
+ * One flag, drawn inline, not fetched.
+ *
+ * The repo self-hosts its fonts and sound effects and makes no third-party
+ * requests; an icon CDN would break that for five small shapes. Inlining also
+ * costs zero requests and lets the flags inherit the switcher's sizing.
+ *
+ * Emoji flags were rejected deliberately: they do not render on Windows, where
+ * Chrome and Edge show the bare regional-indicator letters — a switcher that
+ * reads `CN` / `ID` to a large share of visitors.
+ *
+ * The SHAPES are not here. They live in `src/lib/i18n/flags.ts`, because Stage
+ * 3's handover picker needs the same five flags from `src/scripts/io-ui.ts`,
+ * which builds DOM at runtime and cannot import an `.astro` file. Two copies
+ * would have meant correcting a flag in one place and not the other, with
+ * nothing failing; `tests/unit/flags.test.ts` now fails if geometry reappears
+ * in this file.
+ *
+ * `set:html` injects that body raw and unescaped — safe for the same reason
+ * `ClassroomGroupsPage.astro`'s avatar sprite is: `flagBody` interpolates
+ * nothing, and is selected by a five-member union rather than free text (see
+ * that module's own SECURITY note).
+ */
+---
+
+<svg
+  class="flag"
+  viewBox={FLAG_VIEWBOX}
+  role={title ? 'img' : 'presentation'}
+  aria-hidden={title ? undefined : 'true'}
+  focusable="false"
+>
+  {title && <title>{title}</title>}
+  <Fragment set:html={flagBody(code)} />
+</svg>
+
+<style>
+  .flag {
+    display: block;
+    width: 1.5em;
+    height: 1em;
+    flex: none;
+    border-radius: 1px;
+    /* The Indonesian and Thai flags end in white, which vanishes on a white
+       header. A hairline keeps every flag a distinct object. */
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18);
+  }
+</style>

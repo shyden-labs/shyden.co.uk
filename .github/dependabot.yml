@@ -1,0 +1,143 @@
+version: 2
+
+# Keeps this repo's dependencies and its CI supply chain current.
+#
+# Two ecosystems, and the second is the one that is easy to forget: the
+# actions that RUN ci are themselves dependencies, pinned to immutable commit
+# SHAs (see tests/guards/supply-chain.test.ts). A SHA cannot be repointed under
+# us, which is the point — but it also cannot pick up a security fix on its
+# own, so without Dependabot watching "github-actions" the pins silently rot.
+# This repo sat three majors behind on both of its actions before this file
+# existed.
+#
+# EVERY ecosystem targets `develop`, never `main`. This repo adopted a
+# develop-based model in #13: `main` is release-only and protected behind
+# `dev-verified`, so a PR opened against `main` would either be unmergeable or
+# would bypass the dev gate entirely. Pinned by the "opens every PR against
+# develop" test.
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'npm'
+    open-pull-requests-limit: 5
+    # TypeScript is held at 6 (#177). Two reasons, both measured 2026-09-15:
+    # @astrojs/check, which `astro check` runs on, peers typescript
+    # "^5.0.0 || ^6.0.0", so 7 cannot install; and TypeScript 7 moved its
+    # compiler API to `typescript/unstable/*`, while six files under tests/
+    # call it through the plain `typescript` import. Majors only, so 6.x
+    # patches and minors still arrive. supply-chain.test.ts goes red the day
+    # @astrojs/check accepts 7: port those files, then delete this rule.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
+      # @types/node follows the pinned Node's major (.github/node/Dockerfile),
+      # not the newest Node (#646): every Node major ships its types the day it
+      # ships, so without this the types would describe a Node CI does not run.
+      # The major moves by hand, with the pin (node-contract.test.ts pins that
+      # the two agree).
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
+    groups:
+      # vitest and its coverage provider in one pull request (#896): the
+      # provider peers on its own vitest release, so apart they cannot install.
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+      patch-updates:
+        update-types:
+          - 'patch'
+        exclude-patterns:
+          - 'vitest'
+          - '@vitest/*'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    open-pull-requests-limit: 5
+    # NOTE for whoever adds an action with sub-paths (actions/cache/restore,
+    # github/codeql-action/init, ...): Dependabot treats each sub-path as a
+    # SEPARATE dependency, so ungrouped they arrive as separate PRs, each
+    # moving one sub-path's SHA while its siblings lag. ShyTalk shipped that
+    # bug (SHY-0226) and it failed every queued PR. Add a group keyed on the
+    # repo — `patterns: ["actions/cache*"]` — BEFORE patch-updates, since
+    # Dependabot assigns to the FIRST matching group and then stops looking:
+    # a group placed below the catch-all never sees the bump. Two tests hold
+    # this — "used at more than one sub-path" fails until the group exists,
+    # and "declared before the catch-all" fails until it is ordered above
+    # patch-updates. Both read this file with comments stripped, so this note
+    # cannot satisfy them on its own.
+    groups:
+      patch-updates:
+        update-types:
+          - 'patch'
+
+  # The back-translation engine (#95). Its digest lives in a Dockerfile
+  # because Dependabot reads no image out of a workflow file; this entry is
+  # what keeps that pin from rotting. supply-chain.test.ts fails for any
+  # directory holding a Dockerfile that no `docker` entry watches.
+  - package-ecosystem: 'docker'
+    directory: '/docker/libretranslate'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'docker'
+    open-pull-requests-limit: 5
+  # The Playwright image CI's browser jobs run in (#454). The npm bump and this
+  # one land as separate pull requests; scripts/playwright-image.mjs runs the
+  # installed version's image while either leads, so neither is red.
+  - package-ecosystem: 'docker'
+    directory: '/docker/playwright'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'docker'
+    open-pull-requests-limit: 5
+
+  # The exact Node CI runs (#990, shyden-labs/repo-template#143): one pull
+  # request per Node release, read by .github/actions/setup-node. A new major
+  # is chosen by hand, with @types/node.
+  - package-ecosystem: 'docker'
+    directory: '/.github/node'
+    target-branch: 'develop'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'docker'
+    ignore:
+      - dependency-name: 'node'
+        update-types:
+          - 'version-update:semver-major'
+    open-pull-requests-limit: 5

@@ -2,11 +2,19 @@
 interface Props {
   href: string;
   variant?: 'primary' | 'secondary';
+  external?: boolean;
 }
-const { href, variant = 'primary' } = Astro.props;
+const { href, variant = 'primary', external = false } = Astro.props;
+
+// Mirrors WorkCard: `noopener` denies the opened page a window.opener handle
+// back to ours, `noreferrer` withholds the referrer. Both, or neither.
+const rel = external ? 'noopener noreferrer' : undefined;
+const target = external ? '_blank' : undefined;
 ---
 
-<a class={`btn ${variant}`} href={href}><slot /></a>
+<a class={`btn ${variant}`} href={href} rel={rel} target={target}>
+  <slot />
+</a>
 <style>
   .btn {
     display: inline-flex;
@@ -20,14 +28,14 @@ const { href, variant = 'primary' } = Astro.props;
   }
   .primary {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .primary:hover {
     background: var(--accent-ink);
-    color: #fff;
+    color: var(--on-accent);
   }
   .secondary {
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     color: var(--ink);
   }
 </style>

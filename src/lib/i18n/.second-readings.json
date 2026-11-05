@@ -1,0 +1,817 @@
+{
+  "readings": {
+    "zh": {
+      "行 {row} — 缺席 '{value}' 无法识别。请使用 {accepted}，或留空。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "line {row} – absent '{value}'is not recognized. please use {accepted}, or leave empty。"
+        }
+      },
+      "行 {row} — 编号处为空。每位学生都需要一个。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "line {row} — empty at numbering. each student needs one。"
+        }
+      },
+      "{names} 都需要彼此分开，因此你至少需要 {groupsNeeded} 个组。要么增加组数，要么删除其中一条规则。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "{names} Both need to be separated, so you need at least {groupsNeed} groups. Either add clusters or delete one of them。"
+        }
+      },
+      "您固定的组已占满您要求的 {requestedGroups} 个组中的 {pinnedGroupCount} 个，剩下的 {remainingStudents} 名学生已无组可去。请取消固定一个组，或者增加组数。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "One of your fixed group {requestedGroups} has completed your requirements, and the remaining {remainingStudents} students are no longer available. Please unset a group or add a group number。"
+        }
+      },
+      "组数": { "writers": ["DeepL"], "by": { "LibreTranslate": "Group" } },
+      "显示缺席的学生": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Show absent students" }
+      },
+      "{className} — 您的分组": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "{className} — Your grouping" }
+      },
+      "“学生详情”最多可显示 {max} 名学生。若要单独列出该班级，请降低该数值。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "“student details” can be displayed at most for students. if you want the class listed separately, lower the value。"
+        }
+      },
+      "{n} 缺席": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "absence" }
+      },
+      "{n} 已添加": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "added" }
+      },
+      "{n} 已命名": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "named" }
+      },
+      "{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "{names} are stuck together in the same group, but they're not all of the same sex, so this group is not broken down by gender as other groups. this is precisely what is required by the fixed grouping and is not an error that needs to be corrected。"
+        }
+      },
+      "没有 {text} 号。本页面最多支持 {max} 名学生。": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "No {text} . This page supports up to {max} students."
+        }
+      },
+      "第 {n} 组": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Group {n}" }
+      },
+      "{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{names} are grouped together in the same group, but they are not of the same gender, so this group is not divided by gender like other groups. This is exactly what fixed grouping requires, not an error that needs to be corrected."
+        }
+      },
+      "联系": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Contact" }
+      },
+      "有人管理、按年龄分区，为友善而设计": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Managed by staff, organised by age, designed for friendliness"
+        }
+      },
+      "YeeTalk 计算器": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk calculator" }
+      },
+      "YeeTalk 计算器 — Shyden": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
+      }
+    },
+    "th": {
+      "แถว {row} — {column} '{value}' ไม่ใช่ตัวอักษรเดียว": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{row} row — {column} '{value}' is not a single letter."
+        }
+      },
+      "ไม่มีวิธีใดที่จะจัดนักเรียนในชั้นของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงทำตามตัวอักษร \"ด้วยกัน\" และตัวอักษร \"แยก\" ทั้งหมดในเวลาเดียวกัน การค้นหาไม่สามารถระบุได้ว่ากฎประเภทใดเป็นปัญหา ดังนั้นลองใช้วิธีแก้ไขอย่างใดอย่างหนึ่งต่อไปนี้: ขยายขนาดกลุ่มให้ใหญ่ขึ้น หรือให้ตัวอักษร \"ด้วยกัน\" กับนักเรียนจำนวนน้อยลง หรือสร้างกลุ่มเพิ่มเติม หรือยกเลิกกฎ \"แยก\" หนึ่งข้อ": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "There's no way to put students in your class into {groupsTried} groups while still following all the \"together\" and \"separate\" letters at the same time. The search can't determine which type of rule is the problem. So try one of the following solutions: Expand the group size, or give fewer students \"together\" letters, or create more groups, or cancel one \"separate\" rule."
+        }
+      },
+      "ไม่มีทางที่จะจัดชั้นเรียนของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงแยกทุกคนที่ต้องแยกกันให้อยู่คนละกลุ่ม ดังนั้น คุณต้องเพิ่มจำนวนกลุ่มให้มากขึ้น หรือยกเลิกกฎข้อใดข้อหนึ่ง": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "There's no way to fit your class into {groupsTried} groups while still isolating everyone who needs to be in a separate group, so you'll need to increase the number of groups or remove one of the rules."
+        }
+      },
+      "{names} ถูกทำเครื่องหมายให้แยกกัน แต่กลุ่มที่ปักหมุดไว้ทำให้พวกเขาอยู่ในกลุ่มเดียวกัน ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร \"แยก\" ออกจากนักเรียนคนใดคนหนึ่ง": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} is marked as separate, but the pinned group puts them in the same group, unpin the group, or remove the letter \"separate\" from a particular student."
+        }
+      },
+      "{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่มีเพียงบางคนเท่านั้นที่อยู่ในกลุ่มที่ปักหมุดไว้ ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร \"ด้วยกัน\" ออกจากนักเรียนที่อยู่นอกกลุ่ม": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} is marked as together, but only some people are in the pinned group, unpin the group, or remove the letters \"together\" from students outside the group."
+        }
+      },
+      "กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ ทำให้นักเรียนที่เหลือ {remainingStudents} คนไม่มีกลุ่มให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The group you've pinned is full {pinnedGroupCount} from the {requestedGroups} group you requested, leaving the remaining {remainingStudents} students with no group to join."
+        }
+      },
+      "กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ เหลือนักเรียนเพียง {remainingStudents} คน — ไม่พอสำหรับ {poolGroupsNeeded} กลุ่มที่ยังต้องจัด โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอลดจำนวนกลุ่มลง": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The group you've pinned is full {pinnedGroupCount} from {requestedGroups} The group you requested is only {remainingStudents} left — not enough for {poolGroupsNeeded} groups that still need to be organized."
+        }
+      },
+      "กลุ่มที่คุณปักหมุดไว้ใช้ไปแล้ว {pinnedGroupCount} กลุ่ม — มากกว่า {requestedGroups} กลุ่มที่คุณขอ — ซึ่งทำให้นักเรียน {remainingStudents} คนไม่มีกลุ่มเหลือให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The group you've pinned has already used {pinnedGroupCount} groups — more than {requestedGroups} groups you requested — which leaves {remainingStudents} students with no groups left to join."
+        }
+      },
+      "ไม่สามารถแบ่งเด็กชายและเด็กหญิงเป็นกลุ่มแยกกันใน {groupsRequested} กลุ่มได้ พร้อมทั้งปฏิบัติตามกฎอื่นๆ ของคุณด้วย ระบบค้นหาไม่สามารถระบุได้ว่ากฎใดเป็นปัญหา ดังนั้นลองใช้วิธีแก้ไขใดวิธีหนึ่งต่อไปนี้: กำหนดจำนวนกลุ่มที่ต่างออกไป หรือปิดโหมดนี้": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Boys and girls can't be divided into separate groups in {groupsRequested} groups, and you can follow any other rules. The search system can't determine which rule is the problem. So try one of the following solutions: Set a different number of groups, or turn this mode off."
+        }
+      },
+      "{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่ทั้งหมดเป็นเพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร \"ด้วยกัน\" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} are marked as together, but not all of them are of the same gender. Therefore, they cannot be grouped into single-gender groups. Please remove the letters \"together\" from a student, or turn this mode off."
+        }
+      },
+      "{names} ถูกทำเครื่องหมายให้อยู่ด้วยกันและให้แยกกันในเวลาเดียวกัน ให้ลบตัวอักษร \"อยู่ด้วยกัน\" หรือ \"แยกกัน\" ออกจากหนึ่งในนั้น": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} is marked as together and separated at the same time, remove the letters \"together\" or \"separate\" from one of them."
+        }
+      },
+      "ไม่มีวิธีใดที่จะจัดชั้นเรียนของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงให้ทุกคนที่จำเป็นต้องอยู่ด้วยกันอยู่ด้วยกันได้ ให้ขยายขนาดกลุ่มให้ใหญ่ขึ้น หรือให้ตัวอักษรแต่ละตัวกับนักเรียนจำนวนน้อยลง": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "There's no way to fit your class into a {groupsTried} group while keeping everyone who needs to be together. Give the group a larger size, or give each character to a smaller number of students."
+        }
+      },
+      "จำนวนนักเรียนไม่เพียงพอสำหรับกลุ่มจำนวนมากขนาดนั้น จำนวนกลุ่มสูงสุดที่สามารถจัดได้คือ {max}": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The number of students is not enough for that many groups. The maximum number of groups that can be organized is {max}."
+        }
+      },
+      "จำนวนนักเรียนนั้นมากกว่าที่เครื่องมือนี้สามารถรับได้ จำนวนสูงสุดคือ {max}": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The number of students is more than this tool can receive. The maximum number is {max}."
+        }
+      },
+      "ข้อมูลนี้จะแทนที่รายชื่อนักเรียนปัจจุบันของคุณ — นักเรียน {total} คน มีชื่อแล้ว {named} คน": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "This will replace your current list of students — {total} students, already {named} students."
+        }
+      },
+      "พิมพ์อะไร": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "What to print" }
+      },
+      "ทุกอย่างเกิดขึ้นในเบราว์เซอร์ของคุณเท่านั้น รายชื่อชั้นเรียนจะไม่ถูกส่งออกจากหน้านี้เลย": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Everything happens only in your browser. Class lists are never exported from this page."
+        }
+      },
+      "{className} — กลุ่มของคุณ": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "{className} — Your group" }
+      },
+      "{groups} กลุ่ม จาก {students} นักเรียน": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "{groups} groups from {students} students" }
+      },
+      "เพิ่ม": { "writers": ["DeepL"], "by": { "Azure Translator": "Add" } },
+      "รายชื่อนักเรียนของคุณดูเหมือนไม่ครบถ้วน มีหมายเลข {missing} ที่ขาดไป หากนักเรียนเหล่านั้นได้ลาออกแล้ว ก็ไม่เป็นปัญหา — เปิดหน้ารายละเอียดนักเรียนเพื่อตรวจสอบ": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Your list of students doesn't seem complete. There is a {missing} number that is missing. If those students have already dropped out, that's not a problem — open the student details page to check."
+        }
+      },
+      "{names} ยังต้องระบุเพศ (ชายหรือหญิง) ทุกนักเรียนต้องมีข้อมูลนี้ก่อนที่คุณจะสามารถจัดกลุ่มได้": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} also needs to specify the gender (male or female). All students must have this information before you can group them."
+        }
+      },
+      "ยังมีที่ว่างสำหรับ {room} นักเรียนเพิ่มเติม": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "There is still room for additional student {room}."
+        }
+      },
+      "{who} ได้กลับมาแล้ว แต่ยังไม่ได้กำหนดเพศ ตัวเลือกเหล่านี้จำเป็นต้องมีค่าสำหรับนักเรียนทุกคนที่ถูกจัดกลุ่ม": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{who} has returned, but gender has not yet been determined."
+        }
+      },
+      "กรุณาป้อนตัวเลขเต็ม": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Please enter the full number." }
+      },
+      "เปิด": { "writers": ["DeepL"], "by": { "Azure Translator": "Open" } },
+      "{n} ได้เพิ่มแล้ว": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "{n} has been added." }
+      },
+      "{n} ชื่อ": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "{n} Name" }
+      },
+      "กำหนดตามรายชื่อของคุณ เพิ่มหรือลบนักเรียนในส่วน \"รายละเอียดนักเรียน\" เพื่อปรับเปลี่ยน": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Customize by your list. Add or remove students in the \"Student details\" section to make adjustments."
+        }
+      },
+      "{names} ได้เข้าร่วมกลุ่มเด็กชาย เนื่องจากไม่มีเด็กหญิงเพียงพอที่จะจัดกลุ่มของตัวเองได้ นั่นเป็นเพียงการแบ่งกลุ่มตามจำนวนเท่านั้น ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} has joined the boys' group, as there aren't enough girls to organize their own groups. That's just a number-based grouping. It's not a mistake that needs to be fixed."
+        }
+      },
+      "จุลภาคเชื่อมหนึ่งคู่ อัฒภาคเริ่มคู่ใหม่ — 3,9; 14,15": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Comma connects one pair, semicolon starts a new pair — 3,9;"
+        }
+      },
+      "สุ่มใหม่": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "New Random" }
+      },
+      "แทนที่": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Replace" }
+      },
+      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนพิมพ์": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "These groups are outdated, please re-randomise them before printing."
+        }
+      },
+      "กลุ่มเหล่านี้ล้าสมัยแล้ว โปรดสุ่มใหม่ก่อนที่จะแสดงออกมา": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "These groups are outdated, please re-randomise them before they are displayed."
+        }
+      },
+      "{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่ไม่ใช่เพศเดียวกัน จึงไม่สามารถจัดเป็นกลุ่มที่มีเพศเดียวได้ โปรดลบตัวอักษร \"ด้วยกัน\" ออกจากนักเรียนคนใดคนหนึ่ง หรือปิดโหมดนี้": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{names} are marked as cohabiting, but not of the same gender, so they cannot be classified as monosexual groups. Please remove the letter \"Together\" from a student, or turn off this mode."
+        }
+      },
+      "{names} ได้เข้าร่วมกลุ่มเด็กหญิง เนื่องจากไม่มีเด็กชายเพียงพอที่จะจัดกลุ่มของตัวเองได้ นั่นเป็นเพียงการแบ่งกลุ่มตามจำนวนเท่านั้น ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{names} joined a girls' group, as there were not enough boys to form their own group. That's just a segmentation by number. Not a mistake to fix."
+        }
+      },
+      "เร็วๆ นี้": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Coming soon" }
+      },
+      "ขอที่นั่ง หรือจะฟังไปก่อนจนกว่าคุณจะพร้อม": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Ask for a seat, or listen until you're ready."
+        }
+      },
+      "มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Content is moderated, divided by age range, and always made to be friendly."
+        }
+      },
+      "เครื่องคำนวณ YeeTalk": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator" }
+      },
+      "เปิดเครื่องคำนวณ": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Open the calculator." }
+      },
+      "หน้าเว็บที่คุณกำลังค้นหาไม่มีอยู่": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The page you're looking for doesn't exist."
+        }
+      },
+      "เครื่องคำนวณ YeeTalk — Shyden": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
+      },
+      "คำนวณจำนวนเหรียญ จำนวน bean และมูลค่าของขวัญที่อยู่เบื้องหลังเป้าหมาย glory points ของ YeeTalk หรือสิ่งที่ได้จากของขวัญชิ้นหนึ่งเมื่อได้รับแล้ว": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Calculate the number of coins, the number of beans, and the value of the gift behind YeeTalk's glory points goal, or what you get from a gift once earned."
+        }
+      }
+    },
+    "id": {
+      "Baris {row} — tidak hadir '{value}' tidak dikenali. Gunakan {accepted}, atau kosongkan.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Row {row} — '{value}' is not present and is not recognised. Use {accepted}, or leave it blank."
+        }
+      },
+      "Ini sepertinya daftar kelas {language}. Buka halaman ini versi {version} untuk mengimpornya.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "This appears to be a list of {language} classes. Open the {version} version of this page to import it."
+        }
+      },
+      "{names} ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are marked to be separated from one another, but the group lock keeps them together. Unlock the group, or remove the separator character from one of those pupils."
+        }
+      },
+      "{name} dikunci ke dalam dua kelompok berbeda sekaligus. Satu siswa hanya bisa dikunci ke dalam satu kelompok. Keluarkan dari salah satu kelompok tersebut.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{name} has been assigned to two different groups at the same time. A student can only be assigned to one group. Remove them from one of those groups."
+        }
+      },
+      "{names} ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are marked for merging, but only some of them are in the locked group. Unlock that group, or remove the merge markers from those outside the group."
+        }
+      },
+      "Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Your key has already been assigned to {pinnedGroupCount} of the {requestedGroups} groups you requested, leaving only {remainingStudents} students without a group. Unassign one of the groups, or request more groups."
+        }
+      },
+      "Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa — tidak cukup untuk {poolGroupsNeeded} kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Your key has already used {pinnedGroupCount} of the {requestedGroups} groups you requested, leaving only {remainingStudents} students — not enough for the {poolGroupsNeeded} groups still required. Unpin one of the groups, or request fewer groups."
+        }
+      },
+      "Kunci Anda sudah memakai {pinnedGroupCount} kelompok — lebih banyak daripada {requestedGroups} kelompok yang Anda minta — sehingga tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Your key has already assigned {pinnedGroupCount} groups — more than the {requestedGroups} groups you requested — leaving {remainingStudents} students without a group. Unassign one of the groups, or request more groups."
+        }
+      },
+      "Laki-laki dan perempuan tidak bisa tetap berada di kelompok terpisah dalam {groupsRequested} kelompok sekaligus memenuhi aturan Anda yang lain. Pencarian ini tidak bisa memastikan aturan mana yang jadi masalah, jadi coba salah satu perbaikan ini: minta jumlah kelompok yang berbeda, atau matikan mode ini.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Men and women cannot remain in separate groups within {groupsRequested} groups whilst complying with your other rules. This search cannot determine which rule is causing the issue, so please try one of the following solutions: request a different number of groups, or disable this mode."
+        }
+      },
+      "{names} ditandai untuk disatukan, tetapi tidak berjenis kelamin sama, sehingga tidak bisa membentuk kelompok satu jenis kelamin. Hapus huruf yang menyatukan mereka, atau matikan mode ini.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are marked for grouping, but are not of the same gender, so they cannot form a single-gender group. Remove the character that groups them, or disable this mode."
+        }
+      },
+      "{names} ditandai untuk disatukan sekaligus dipisahkan satu sama lain. Hapus huruf yang menyatukan mereka, atau huruf yang memisahkan mereka.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are marked to be joined together whilst remaining separate from one another. Remove the letters that join them, or the letters that separate them."
+        }
+      },
+      "Ditentukan oleh daftar Anda. Tandai ketidakhadiran dan pasangan di Detail siswa untuk mengubahnya.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "This is determined by your list. Tick the ‘Absent’ and ‘Partner’ boxes in the Student Details section to change this."
+        }
+      },
+      "\"{text}\" bukan bilangan bulat. Ketik nomor absen dari 1 sampai {count}.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "\"{text}\" is not an integer. Please enter a roll number between 1 and {count}."
+        }
+      },
+      "{className} — kelompok Anda": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "{className} — your group" }
+      },
+      "{groups} kelompok dari {students} siswa.": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "{groups} groups of {students} pupils." }
+      },
+      "{names} sudah ditandai untuk disatukan, jadi tidak bisa sekaligus dipisahkan.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} have been marked for merging, so they cannot be separated all at once."
+        }
+      },
+      "Detail siswa menampung hingga {max} siswa. Turunkan angkanya untuk mendaftar kelas ini satu per satu.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "This course can accommodate up to {max} students. Reduce this number to enrol in this course one by one."
+        }
+      },
+      "Masih ada ruang untuk {room} siswa lagi.": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "There is still space for more students." }
+      },
+      "{unset} dari {grouped} siswa yang dikelompokkan belum memiliki jenis kelamin. Buka Detail siswa dan atur L atau P untuk mereka agar bisa memakai opsi ini.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{unset} of the {grouped} students in this group do not yet have a gender assigned. Open the student’s details and set their gender to M or F so that they can use this option."
+        }
+      },
+      "Mengasumsikan 1 koin per poin, 0,9 koin per bean, dan hadiah dikonversi ke bean sebesar 40%.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "Assuming 1 coin per point, 0.9 coins per bean, and that rewards are converted to beans at a rate of 40 per cent."
+        }
+      },
+      "Sambil menunggu, coba ini.": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "Whilst you’re waiting, why not give this a go?" }
+      },
+      "Ulangi sebuah kata dan kata itu makin kuat": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "Repeat a word and it becomes more powerful" }
+      },
+      "Alat": { "writers": ["no DeepL draft"], "by": { "DeepL": "Equipment" } },
+      "{n} disatukan": {
+        "writers": ["no DeepL draft"],
+        "by": { "DeepL": "{n} are combined" }
+      },
+      "{names} dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are grouped together, but they are not all of the same gender, so this group is not separated by gender in the same way as the other groups. This is in accordance with the group’s key requirements; it is not an error that needs to be corrected."
+        }
+      },
+      "{names} dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} are grouped together, but they are not of the same gender, so this group is not separated by gender like the other groups. This is in accordance with the group’s key requirements; it is not an error that needs to be corrected."
+        }
+      },
+      "{names} digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.": {
+        "writers": ["no DeepL draft"],
+        "by": {
+          "DeepL": "{names} have been combined into a single group because there were not enough men or women to form separate groups. This is purely a matter of numbers; it is not an error that needs to be corrected."
+        }
+      },
+      "kelompok": { "writers": ["DeepL"], "by": { "LibreTranslate": "group" } },
+      "Pilih cara membaginya.": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Pick a way to split it." }
+      },
+      "Batal": { "writers": ["DeepL"], "by": { "LibreTranslate": "Cancel" } },
+      "Kelompok": { "writers": ["DeepL"], "by": { "LibreTranslate": "Group" } },
+      "Hapus": { "writers": ["DeepL"], "by": { "LibreTranslate": "Delete" } },
+      "Hitung": { "writers": ["DeepL"], "by": { "LibreTranslate": "Count" } },
+      "Bagi berdasarkan": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Divide by" }
+      },
+      "Suara aktif": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Active sound" }
+      },
+      "Berapa yang ditambahkan?": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "How much is added?" }
+      },
+      "Tambah": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Add" }
+      },
+      "Buat Kelompok": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Create a Group" }
+      },
+      "Acak lagi": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Random again" }
+      },
+      "Kelompok ini sudah tidak berlaku lagi — ukuran kelompok berubah.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid — the size of the group is changing."
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi — pilihan siswa tersisa berubah.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid — the remaining students' choices change."
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi — cara pengelompokan berdasarkan jenis kelamin berubah.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer the case — the way it is grouped by gender has changed."
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi — daftar kelas berubah.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid — the class list changes."
+        }
+      },
+      "Tidak ada daftar kelas yang diterima. Kembali ke tab satunya lalu coba lagi.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "No class lists are accepted. Go back to the other tab and try again."
+        }
+      },
+      "Tampilkan jenis kelamin dan huruf bersama/terpisah": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Show gender and letters together/separately"
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi. Acak lagi sebelum menyimpannya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid. Shuffle again before saving it."
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi. Acak lagi sebelum mencetaknya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid. Shuffle again before printing it."
+        }
+      },
+      "Kelompok ini sudah tidak berlaku lagi. Acak lagi sebelum menampilkannya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "This group is no longer valid. Shuffle again before displaying it."
+        }
+      },
+      "Huruf yang harus disatukan di sini terlalu banyak untuk dihitung. Coba gunakan lebih sedikit huruf, atau perbesar kelompoknya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The letters that have to be put together here are too many to count. Try using fewer letters, or enlarge the group."
+        }
+      },
+      "Aturan pemisahan di sini terlalu banyak untuk dihitung. Coba hapus sebagian aturannya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The separation rules here are too many to count. Try removing some of the rules."
+        }
+      },
+      "Huruf yang harus disatukan dan aturan pemisahan di sini terlalu banyak untuk dihitung sekaligus. Coba gunakan lebih sedikit huruf dari kedua jenis itu, atau perbesar kelompoknya.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The letters that must be put together and the separation rules here are too many to count at once. Try using fewer letters of both types, or enlarge the group."
+        }
+      },
+      "Huruf yang harus disatukan dan aturan pemisahan di sini terlalu banyak untuk dihitung sekaligus, sambil juga menjaga laki-laki dan perempuan di kelompok terpisah. Coba gunakan lebih sedikit huruf, atau matikan mode ini.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The letters that must be put together and the separation rules here are too many to count at once, while also keeping the males and females in separate groups. Try using fewer letters, or turn this mode off."
+        }
+      },
+      "Kalkulator YeeTalk": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator" }
+      },
+      "Hitung koin, bean, dan nilai hadiah di balik target glory points YeeTalk, atau apa yang diberikan sebuah hadiah setelah diterima.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Calculate the coins, beans, and reward value behind YeeTalk's glory points target, or what a reward gives after being received."
+        }
+      },
+      "Kalkulator YeeTalk — Shyden": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
+      },
+      "Hitung glory points, koin, bean, dan nilai hadiah YeeTalk — seketika, di peramban Anda.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Calculate YeeTalk's glory points, coins, beans, and reward value — instantly, in your browser."
+        }
+      },
+      "Dua alat pendamping untuk fitur hadiah di dalam aplikasi YeeTalk, buatan Shyden. Hitung apa yang diperlukan untuk mencapai target glory points, atau berapa nilai sebuah hadiah setelah diterima.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Two companion tools for the reward feature in the YeeTalk app, made by Shyden. Calculate what it takes to reach the target glory points, or how much a reward is worth after receiving it."
+        }
+      },
+      "Baca jumlah persis koin, bean, dan total nilai hadiah yang diperlukan untuk mencapai target itu.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Read the exact number of coins, beans, and the total value of the rewards needed to reach that goal."
+        }
+      }
+    },
+    "vi": {
+      "Trộn lại": { "writers": ["DeepL"], "by": { "LibreTranslate": "Mix" } },
+      "không": { "writers": ["DeepL"], "by": { "LibreTranslate": "none" } },
+      "nhóm": { "writers": ["DeepL"], "by": { "LibreTranslate": "group" } },
+      "Dòng {row} — vắng mặt '{value}' không được nhận diện. Hãy sử dụng {accepted} hoặc để trống.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "Line (16row): — absent 'Favalue}' unrecognised. Use (\"Diccepted\") or leave blank."
+        }
+      },
+      "Dòng {row} — số {value} đã được dòng {firstRow} sử dụng.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "The line (Bubrow): — The number MHvalue} has been used by the MHfirstRow line."
+        }
+      },
+      "Bạn cần có ít nhất 1 nhóm.": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "You need at least one group." }
+      },
+      "Không thể chia các em trai và em gái thành các nhóm riêng biệt trong {groupsRequested} nhóm mà vẫn đảm bảo tuân thủ các quy tắc khác của bạn. Hệ thống tìm kiếm không thể xác định được quy tắc nào là nguyên nhân gây ra vấn đề, vì vậy hãy thử một trong hai cách khắc phục sau: yêu cầu số lượng nhóm khác hoặc tắt chế độ này.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "You can't divide your brothers and sisters into separate groups in the OccessRequested Group that still ensure to adhere to your other rules. The search system cannot determine which rules are the cause of the problem, so try one of the following two remedys: require a number of other groups or disable this mode."
+        }
+      },
+      "Cũng xuất sang ngôn ngữ khác": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Also Export to Other Languages" }
+      },
+      "Danh sách lớp học của bạn hiện đã được mở tại {language}.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "Your class list is currently open at Málanguage."
+        }
+      },
+      "Đã nhập {total} học sinh.": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Entered Khtotal} student." }
+      },
+      "Nếu vẫn còn học sinh": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "If there are still students" }
+      },
+      "Tạo nhóm": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Create Group" }
+      },
+      "{groups} nhóm từ {students} học sinh.": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "groups : group from mstudents } student." }
+      },
+      "Thêm": { "writers": ["DeepL"], "by": { "LibreTranslate": "Add" } },
+      "Thêm bao nhiêu?": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "How much more?" }
+      },
+      "Thông tin học sinh có thể chứa tối đa {max} học sinh. Hãy giảm con số này để hiển thị lớp học này dưới dạng danh sách riêng lẻ.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "Students' information can contain maximum xmm} students. Reduce this number to display this class in separate lists."
+        }
+      },
+      "Xóa": { "writers": ["DeepL"], "by": { "LibreTranslate": "Delete" } },
+      "Vẫn còn chỗ cho {room} học sinh nữa.": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "There's still room for students." }
+      },
+      "Phân chia nam và nữ một cách cân bằng": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Balanced male and female division" }
+      },
+      "Máy tính Glory Points": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "Glory Points Computer" }
+      },
+      "Các nhóm này đã lỗi thời. Hãy trộn lại trước khi hiển thị chúng.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "These groups are obsolete. Mix them up before you show them."
+        }
+      },
+      "Các nhóm này đã lỗi thời. Hãy trộn lại trước khi lưu chúng.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "These groups are obsolete. Mix them before you save them."
+        }
+      },
+      "{n} đã được thêm vào": {
+        "writers": ["DeepL"],
+        "by": { "LibreTranslate": "the added" }
+      },
+      "{names} đã được xếp vào một nhóm chung vì số lượng của cả hai giới đều không đủ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia theo số lượng, chứ không phải là một sai sót cần sửa chữa.": {
+        "writers": ["DeepL"],
+        "by": {
+          "LibreTranslate": "FMnames} has been arranged into a joint group because the number of both sexes is not enough to form a single group. It's simply a way of dividing by numbers, not a mistake to fix."
+        }
+      },
+      "Được thiết lập theo danh sách của bạn. Để thay đổi danh sách này, hãy thêm hoặc xóa học sinh trong phần “Thông tin học sinh”.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Set up according to your list. To change this list, add or remove students in the \"Student Information\" section."
+        }
+      },
+      "{grouped} trong số {typed} học sinh đã được chia nhóm — số {absent} vắng mặt.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{grouped} of {typed} students were grouped— {absent} were absent."
+        }
+      },
+      "Dòng {row} — {column} '{value}' không phải là một ký tự duy nhất.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "The {row} line — {column} '{value}' is not a single character."
+        }
+      },
+      "Các nhóm này đã lỗi thời. Hãy trộn lại trước khi in chúng.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "These groups are outdated. Mix them up again before printing them."
+        }
+      },
+      "{names} đều cần được tách biệt với nhau, do đó bạn sẽ cần ít nhất {groupsNeeded} nhóm. Hãy tạo thêm nhóm hoặc loại bỏ một trong các quy tắc.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "{names} all need to be separated from each other, so you'll need at least {groupsNeeded} group. Create more groups or remove one of the rules."
+        }
+      },
+      "{names} được đánh dấu để ở cùng nhau, nhưng không cùng giới tính, nên họ không thể tạo thành một nhóm cùng giới. Hãy gỡ bỏ chữ “cùng nhau” khỏi một trong số họ, hoặc tắt chế độ này đi.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{names} are marked to be together, but not of the same sex, so they cannot form a same-sex group. Remove the word \"together\" from one of them, or turn it off."
+        }
+      },
+      "{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "{names} are pinned together as a group, but not of the same gender, so this group is not divided by gender like other groups. That's exactly what you ask for when you pin a group, not a mistake to fix."
+        }
+      },
+      "mở": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Open" }
+      },
+      "Phòng âm thanh trực tuyến với tối đa tám chỗ ngồi": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Online sound room with up to eight seats" }
+      },
+      "Xin một chỗ ngồi, hoặc cứ nghe cho đến khi bạn sẵn sàng": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Ask for a seat, or just listen until you're ready"
+        }
+      },
+      "Không có quảng cáo, không có bộ hẹn giờ năng lượng, không có tiến trình phải trả phí": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "No ads, no energy timers, no paid progress"
+        }
+      },
+      "Bỏ lỡ một ngày cũng chẳng mất mát gì. Không ai bị ép buộc phải học cả.": {
+        "writers": ["DeepL"],
+        "by": {
+          "Azure Translator": "Missing a day doesn't lose anything. No one is forced to learn."
+        }
+      },
+      "Máy tính YeeTalk": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator" }
+      },
+      "Máy tính YeeTalk — Shyden": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "YeeTalk Calculator — Shyden" }
+      },
+      "Giả định mỗi điểm tương ứng với 1 xu, mỗi bean tương ứng với 0,9 xu, và quà tặng được quy đổi thành bean theo tỷ lệ 40%.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Assuming each point corresponds to 1 coin, each bean corresponds to 0.9 coins, and the gift is converted into beans at a rate of 40%."
+        }
+      },
+      "có": { "writers": ["DeepL"], "by": { "Azure Translator": "Yes" } },
+      "Có người điều hành, phân tách theo độ tuổi, và được xây dựng để luôn thân thiện": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "Moderated, age-segregated, and built to be friendly"
+        }
+      },
+      "Mở các công cụ tính": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Open the calculator" }
+      }
+    }
+  }
+}

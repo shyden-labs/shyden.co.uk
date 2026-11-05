@@ -7,22 +7,39 @@ import sitemap from '@astrojs/sitemap';
 // reflow flakiness in E2E measurements and never ships to production.
 export default defineConfig({
   site: 'https://shyden.co.uk',
-  // English stays unprefixed (/) and Indonesian lives under /id/. Both are
-  // real built pages so both are indexed and both land in the sitemap —
-  // a client-side text swap would leave the Indonesian version invisible to
-  // search and impossible to link to directly.
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'id'],
-    routing: { prefixDefaultLocale: false },
-  },
-  // @astrojs/sitemap reads its OWN i18n option and does not inherit the
-  // routing config above, so without this the sitemap listed six <loc>
-  // entries and zero xhtml:link alternates — declaring no relationship
-  // between the English and Indonesian versions of the same page.
+  // Every locale is a real built page (English unprefixed, the rest under
+  // /<locale>/), so each is indexed and can be linked to directly; the site
+  // routes them itself (localisePath). Astro's own `i18n` routing option is
+  // NOT set: it listed en and id long after five shipped, nothing read it,
+  // and the build is byte-identical without it (61 files, #390).
+  //
+  // @astrojs/sitemap needs its OWN i18n option, so without this the sitemap
+  // listed its <loc> entries with zero xhtml:link alternates — declaring no
+  // relationship between the language versions of the same page.
+  //
+  // WRITTEN OUT because this file runs under plain Node and cannot import
+  // src/lib/i18n. That duplication is the whole hazard: it said en+id for
+  // weeks after #22 shipped five languages, so nine of fifteen URLs declared
+  // NO alternates at all while the guard — which also named en and id by hand
+  // — passed. Two hand-written lists agreeing with each other is not a check.
+  // The values are LOCALE_METADATA's `ogLocale` with `_` as `-`, and
+  // tests/unit/sitemap-config.test.ts asserts this map against that table, so
+  // the seam is checked even though the import cannot be. See #108.
   integrations: [
     sitemap({
-      i18n: { defaultLocale: 'en', locales: { en: 'en-GB', id: 'id-ID' } },
+      // The API docs (#781) are developer pages in English only, kept out of
+      // search engines with noindex, so they stay out of the sitemap too.
+      filter: (page) => !new URL(page).pathname.startsWith('/api/docs/'),
+      i18n: {
+        defaultLocale: 'en',
+        locales: {
+          en: 'en-GB',
+          id: 'id-ID',
+          zh: 'zh-CN',
+          vi: 'vi-VN',
+          th: 'th-TH',
+        },
+      },
     }),
   ],
   devToolbar: { enabled: false },

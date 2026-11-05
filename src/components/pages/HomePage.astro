@@ -1,16 +1,18 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Button from '../Button.astro';
-import ServiceCard from '../ServiceCard.astro';
+import Marquee from '../Marquee.astro';
 import WorkCard from '../WorkCard.astro';
-import { localisePath, type Locale } from '../../lib/i18n';
-import { siteEn, siteId } from '../../lib/i18n/site';
+import PhoneFrame from '../PhoneFrame.astro';
+import StatusBadge from '../StatusBadge.astro';
+import { localisePath, type Locale, getSiteStrings } from '../../lib/i18n';
+import { SHYTALK_MARK, asRgba } from '../../lib/shytalk-brand';
 
 interface Props {
   lang: Locale;
 }
 const { lang } = Astro.props;
-const t = (lang === 'id' ? siteId : siteEn).home;
+const t = getSiteStrings(lang).home;
 
 // Env-derived so we never cross environments: the DEV site must link to DEV
 // ShyTalk, prod to prod. Defaults to prod; deploy-dev.yml sets
@@ -18,99 +20,393 @@ const t = (lang === 'id' ? siteId : siteEn).home;
 const shytalkUrl =
   import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.shyden.co.uk';
 
+// The same rule for Yawelo Idle (#403): deploy-dev.yml sets
+// PUBLIC_YAWELO_IDLE_URL=https://dev.yawelo-idle.shyden.co.uk before the dev build.
+// The production host had no DNS record when this shipped; the operator chose
+// to link it from release day anyway (2026-10-04).
+const yaweloIdleUrl =
+  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yawelo-idle.shyden.co.uk';
+
+// The preview video (#835) is published by the Yawelo Idle project to the
+// shared media host (Cloudflare R2, yawelo-idle#713), never copied here. One
+// host for every build, unlike the link above: it answers byte ranges, which
+// Safari asks for, and its `same-site` resource policy admits dev.shyden.co.uk
+// as well as shyden.co.uk. MP4 first (Shyden, 2026-10-20): with WebM first
+// the real iPhone stuck on the poster. Each type names its codecs, so an
+// engine that cannot play one moves to the next.
+const yaweloIdlePromo = 'https://media.shyden.co.uk/yawelo-idle-promo';
+const promoSources = [
+  {
+    src: `${yaweloIdlePromo}.mp4`,
+    type: 'video/mp4; codecs="avc1.64001F, mp4a.40.2"',
+  },
+  { src: `${yaweloIdlePromo}.webm`, type: 'video/webm; codecs="vp9, opus"' },
+];
+
+// The hero offers both products with equal weight, ShyTalk then Yawelo Idle.
+// Each button carries its own "opens <host>" line so the visitor knows the
+// link leaves the site, and WHERE to. The host is derived from the URL, so it
+// cannot name the wrong one.
+const heroLinks = [
+  { href: shytalkUrl, label: t.exploreShytalk },
+  { href: yaweloIdleUrl, label: t.exploreYaweloIdle },
+].map((link) => ({ ...link, host: new URL(link.href).host }));
+
 // Internal links stay inside the visitor's language.
-const glory = localisePath('/glory-points', lang);
+const glory = localisePath('/yeetalk-calculators', lang);
 const classroom = localisePath('/classroom-groups', lang);
+
+const features = [
+  t.shytalkFeature1,
+  t.shytalkFeature2,
+  t.shytalkFeature3,
+  t.shytalkFeature4,
+];
+const yaweloIdleFeatures = [
+  t.yaweloIdleFeature1,
+  t.yaweloIdleFeature2,
+  t.yaweloIdleFeature3,
+  t.yaweloIdleFeature4,
+];
 ---
 
 <BaseLayout title={t.title} description={t.description} lang={lang}>
+  <!-- First under the header, in normal flow and not pinned (#599). -->
+  <Marquee pauseLabel={t.pauseMotion} />
+
   <section class="hero wrap">
     <h1>{t.heroHeading}</h1>
     <p class="lead">{t.heroLead}</p>
-    <p class="cta">
-      <Button href="mailto:support@shyden.co.uk">{t.getInTouch}</Button>
-      <Button href="#work" variant="secondary">{t.seeOurWork}</Button>
-    </p>
-  </section>
-
-  <section id="services" class="wrap">
-    <h2>{t.servicesHeading}</h2>
-    <div class="grid-2">
-      <ServiceCard title={t.serviceBuildTitle}>{t.serviceBuildBody}</ServiceCard
-      >
-      <ServiceCard title={t.serviceHireTitle}>{t.serviceHireBody}</ServiceCard>
+    <div class="cta">
+      {heroLinks.map((link) => (
+        <p class="cta-item">
+          <Button href={link.href} external>
+            {link.label}
+          </Button>
+          <span class="opens">
+            {t.opensAt} {link.host}
+          </span>
+        </p>
+      ))}
     </div>
   </section>
 
-  <section id="work" class="wrap">
-    <h2>{t.workHeading}</h2>
+  <section id="shytalk" class="wrap showcase">
+    <div class="showcase-copy">
+      <p class="kicker">{t.shytalkKicker}</p>
+      <div class="showcase-head">
+        <h2>
+          <span class="shytalk-wordmark">
+            Shy<span>Talk</span>
+          </span>
+        </h2>
+        <StatusBadge label={t.comingSoon} />
+      </div>
+      <p class="lead">{t.shytalkBody}</p>
+      <ul class="features">
+        {features.map((feature) => (
+          <li>{feature}</li>
+        ))}
+      </ul>
+      <p>
+        <Button href={shytalkUrl} variant="secondary" external>
+          {t.visitShytalk}
+        </Button>
+      </p>
+    </div>
+    <PhoneFrame lang={lang} alt={t.shytalkShotAlt} />
+  </section>
+
+  {/* Yawelo Idle is pre-alpha: its one picture is its own preview video, and
+      its name is set as text, never translated. */}
+  <section id="yawelo-idle" class="wrap showcase">
+    <div class="showcase-copy">
+      <p class="kicker">{t.yaweloIdleKicker}</p>
+      <div class="showcase-head">
+        <h2 class="product-name">Yawelo Idle</h2>
+        <StatusBadge label={t.comingSoon} />
+      </div>
+      <p class="lead">{t.yaweloIdleBody}</p>
+      <ul class="features">
+        {yaweloIdleFeatures.map((feature) => (
+          <li>{feature}</li>
+        ))}
+      </ul>
+      <p>
+        <Button href={yaweloIdleUrl} variant="secondary" external>
+          {t.visitYaweloIdle}
+        </Button>
+      </p>
+    </div>
+    {/* Tap to play, poster first, no script (ruled 2026-10-16): nothing of
+        the video downloads until it is played, and the width and height
+        hold its 16:9 box before a byte arrives. */}
+    <figure class="promo">
+      <video
+        controls
+        preload="none"
+        playsinline
+        width="1280"
+        height="720"
+        poster={`${yaweloIdlePromo}-poster.jpg`}
+        aria-label={t.yaweloIdleVideoName}
+        aria-describedby="yawelo-idle-video-shows"
+      >
+        {promoSources.map((source) => (
+          <source {...source} />
+        ))}
+      </video>
+      {/* Music and no speech, so a description rather than captions. */}
+      <details class="promo-shows">
+        <summary>{t.yaweloIdleVideoShows}</summary>
+        <p id="yawelo-idle-video-shows">{t.yaweloIdleVideoDescription}</p>
+      </details>
+    </figure>
+  </section>
+
+  <section id="tools" class="wrap">
+    <h2>{t.toolsHeading}</h2>
+    <p class="lead">{t.toolsLead}</p>
     <div class="grid-2">
-      <WorkCard title="ShyTalk" href={shytalkUrl} external variant="shytalk">
-        <span slot="logo" class="shytalk-wordmark">Shy<span>Talk</span></span>
-        {t.workShytalkBody}
+      <WorkCard
+        title={t.workCalculatorsTitle}
+        href={glory}
+        badge={t.toolBadge}
+        cta={t.openCalculators}
+      >
+        {t.workCalculatorsBody}
       </WorkCard>
-      <WorkCard title={t.workClassroomTitle} href={classroom}
-        >{t.workClassroomBody}</WorkCard
+      <WorkCard
+        title={t.workClassroomTitle}
+        href={classroom}
+        badge={t.toolBadge}
+        cta={t.openClassroom}
       >
-      <WorkCard title={t.workGloryTitle} href={glory}
-        >{t.workGloryBody}</WorkCard
-      >
+        {t.workClassroomBody}
+      </WorkCard>
     </div>
   </section>
 
-  <section id="contact" class="wrap">
-    <h2>{t.contactHeading}</h2>
+  <section id="contact" class="wrap contact">
     <p>
-      {/* {' '} is load-bearing: a newline here would glue the two together. */}
-      {t.contactBody}{' '}
-      <a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a>
+      <Button href="mailto:support@shyden.co.uk">{t.getInTouch}</Button>
     </p>
-    <p><Button href="mailto:support@shyden.co.uk">{t.emailUs}</Button></p>
   </section>
 </BaseLayout>
-<style>
+<style
+  define:vars={{
+    shytalkShy: SHYTALK_MARK.shy,
+    shytalkTalk: SHYTALK_MARK.talk,
+    shytalkGlow: asRgba(SHYTALK_MARK.talk, 0.3),
+  }}
+>
   .wrap {
     max-width: var(--maxw);
     margin: 0 auto;
     padding: 3rem var(--space);
   }
+  /* The band now sits above the hero (#599) and brings its own bottom
+     margin, so the hero no longer needs 4.5rem of its own above the heading. */
+  .hero {
+    padding-top: 2rem;
+  }
+  /* Monospace, tracked-out, small: a section's kicker. Drawn in --accent;
+     tests/guards/contrast.test.ts scores every token pair the site paints. The
+     hero's label went with the company it named (#370). */
+  .kicker {
+    margin: 0 0 0.75rem;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
   .hero h1 {
-    font-size: clamp(2rem, 1.2rem + 4vw, 3.25rem);
+    font-size: clamp(2.25rem, 1.2rem + 5vw, 4rem);
     max-width: var(--measure);
+  }
+  /* The tight display line-height, everywhere EXCEPT Thai.
+     Thai stacks up to two marks above the base glyph and one below, so its ink
+     box is far deeper than the Latin box 1.05 is tuned for — tokens.css sets
+     `:lang(th) h1 { line-height: 1.5 }` from #22's measurements. Astro scopes
+     this component's rules with a [data-astro-cid-*] attribute, which outranks
+     that (0,1,1) global, so a bare `.hero h1` here silently undid it and the
+     /th/ hero collided with itself at 320, 375, 768 and 1280px.
+     `:not(:lang(th))` rather than restating 1.5: the measured value keeps one
+     home, and this rule simply stops applying where that one governs. */
+  .hero h1:not(:lang(th)) {
+    line-height: 1.05;
   }
   .lead {
     font-size: 1.15rem;
     color: var(--ink-soft);
     max-width: var(--measure);
   }
+  /* The two products side by side where they fit, stacked where they do
+     not; each button keeps its own host line beneath it. */
   .cta {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 1.25rem 2rem;
+    margin: 1rem 0;
+  }
+  .cta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+  }
+  /* Not a link, so it needs no focus treatment — it annotates the button it
+     sits beside. --ink-soft on --bg clears AA at this size. */
+  .opens {
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .showcase {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    align-items: center;
+  }
+  .features {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .features li {
+    position: relative;
+    padding-left: 1.6rem;
+    color: var(--ink-soft);
+  }
+  /* Decorative dot: the text beside it carries the meaning, so it is a
+     pseudo-element rather than a character a screen reader would announce. */
+  .features li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.45em;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  /* A product's name with its status beside it, wrapping under it where the
+     row runs out. The badge's own bottom margin spaces it inside a card; here
+     the row's gap does, so the badge centres on the name. */
+  .showcase-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+  .showcase-head h2 {
+    margin: 0;
+  }
+  .showcase-head > :global(.status-badge) {
+    margin: 0;
+  }
+  /* Yawelo Idle's name, set as text at the wordmark's size and weight so the
+     two products carry equal weight (#403). */
+  .product-name {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+  /* The preview fills its column on a phone and sits beside the copy from
+     880px, where ShyTalk's phone frame sits. min-width: 0 lets the grid track
+     shrink below the video's 1280px intrinsic width. */
+  .promo {
+    margin: 0;
+    min-width: 0;
+  }
+  .promo video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 14px;
+  }
+  .promo-shows {
+    margin-top: 0.75rem;
+    color: var(--ink-soft);
+  }
+  /* A 44px touch target, as a block: a flex summary would eat the space
+     between the marker and the words. */
+  .promo-shows summary {
+    min-height: 44px;
+    padding-block: 0.6rem;
+    box-sizing: border-box;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .promo-shows p {
+    margin: 0.25rem 0 0;
   }
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+  /* The closing band. Its own rule rather than a Footer concern: the footer
+     carries the support address on every page, this carries the homepage's
+     invitation. (It named the registration details until #370 removed them
+     with the dissolved company.) */
+  .contact {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding-block: 2.5rem;
+  }
   @media (min-width: 720px) {
     .grid-2 {
       grid-template-columns: 1fr 1fr;
     }
   }
+  /* The showcase gets its own, wider breakpoint. The frame is a fixed 280px,
+     so splitting at .grid-2's 720px would leave the copy column under 340px
+     and the feature list would wrap on every line. */
+  @media (min-width: 880px) {
+    .showcase {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 4rem;
+    }
+    .promo {
+      width: 24rem;
+    }
+  }
   /* ShyTalk brand wordmark — the exact two-tone mark from shytalk.shyden.co.uk:
-     light "Shy" + light-purple glowing "Talk", bold with tight tracking. Sits
-     on the dark .work-card--shytalk tile so it reads as the real logo. Colours
-     taken from the live logo (#e8e0f0 / #d0bcff). */
+     light "Shy" + light-purple glowing "Talk", bold with tight tracking.
+     Colours taken from the live logo; values live in src/lib/shytalk-brand.ts,
+     and the tile's theme token in tokens.css (#142 §3.4). */
   .shytalk-wordmark {
     display: inline-block;
-    font-size: 1.9rem;
+    background: var(--wordmark-tile);
+    padding: var(--wordmark-pad);
+    border-radius: 14px;
+    font-size: 2.6rem;
     font-weight: 700;
     letter-spacing: -0.03em;
-    color: #e8e0f0;
+    color: var(--shytalkShy);
   }
   .shytalk-wordmark span {
-    color: #d0bcff;
-    text-shadow: 0 0 24px rgba(208, 188, 255, 0.3);
+    color: var(--shytalkTalk);
+    text-shadow: 0 0 24px var(--shytalkGlow);
+  }
+  /* On paper the two-tone mark cannot be reproduced: both tones are designed
+     for a dark ground and measure 1.28:1 and 1.70:1 on white. It prints as
+     the page's own ink — which @media print in tokens.css has already made
+     black — rather than as a ghost of a logo. No !important needed: the
+     define:vars above sets custom PROPERTIES, not `color`, so a later rule
+     at equal specificity wins. */
+  @media print {
+    .shytalk-wordmark,
+    .shytalk-wordmark span {
+      color: var(--ink);
+      text-shadow: none;
+    }
   }
 </style>

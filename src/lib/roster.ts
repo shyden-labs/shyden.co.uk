@@ -61,7 +61,7 @@ export const nextNumber = (roster: Student[]): number =>
  * same as one that was never set (`null`) — only a name with real
  * characters in it counts.
  */
-export const rosterCounts = (roster: Student[]) => ({
+export const rosterCounts = (roster: readonly Student[]) => ({
   named: roster.filter((s) => s.name !== null && s.name !== '').length,
   absent: roster.filter((s) => s.absent).length,
   together: roster.filter((s) => s.together !== null).length,
@@ -94,6 +94,21 @@ export const serialiseForCompare = (roster: Student[]): string =>
     .join('|');
 
 /**
+ * A to Z -- every letter a together-block or an apart-set may be called, and
+ * the ONE home for that alphabet.
+ *
+ * `availableLetters` below hands a teacher a growing PREFIX of it. #188's
+ * number fields letter their sets from the same list, which is what lets a
+ * 27th set be refused rather than silently reusing `A` and merging two units
+ * a teacher meant to keep separate. Generated rather than typed out, so the
+ * two facts a caller needs -- what the letters are, and that there are 26 --
+ * cannot drift apart.
+ */
+export const LETTERS: readonly string[] = Array.from({ length: 26 }, (_, i) =>
+  String.fromCharCode(65 + i),
+);
+
+/**
  * Which letters a together/apart `<select>` should offer — design spec
  * section 4: "chosen from a dropdown that grows as needed (A, then B once A
  * is used, and so on)." Always starts at `['A']`, even on an empty roster,
@@ -120,8 +135,7 @@ export const availableLetters = (
     const code = letter.toUpperCase().charCodeAt(0) - 64;
     if (code > highest) highest = code;
   }
-  const count = Math.min(26, highest + 1);
-  return Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i));
+  return LETTERS.slice(0, Math.min(LETTERS.length, highest + 1));
 };
 
 /**
@@ -157,7 +171,7 @@ export interface Problem {
  * through to the numbered label.
  */
 const label = (student: Student, t: Strings): string =>
-  student.name ? student.name : t.studentNumber(student.number);
+  student.name ? student.name : t.studentNumber({ n: student.number });
 
 /**
  * Every duplicate number and together/apart clash currently in the roster
@@ -198,7 +212,10 @@ export function rosterProblems(roster: Student[], t: Strings): Problem[] {
     problems.push({
       kind: 'duplicate',
       students: [s.number],
-      message: t.rosterDuplicateMessage(s.number, label(holder, t)),
+      message: t.rosterDuplicateMessage({
+        number: s.number,
+        name: label(holder, t),
+      }),
     });
   }
 
@@ -223,7 +240,9 @@ export function rosterProblems(roster: Student[], t: Strings): Problem[] {
       problems.push({
         kind: 'clash',
         students: clashers.map((s) => s.number),
-        message: t.rosterClashMessage(clashers.map((s) => label(s, t))),
+        message: t.rosterClashMessage({
+          names: clashers.map((s) => label(s, t)),
+        }),
       });
     }
   }
@@ -248,7 +267,7 @@ export function rosterProblems(roster: Student[], t: Strings): Problem[] {
     problems.push({
       kind: 'no-sex',
       students: noSex.map((s) => s.number),
-      message: t.rosterNoSexMessage(noSex.map((s) => label(s, t))),
+      message: t.rosterNoSexMessage({ names: noSex.map((s) => label(s, t)) }),
     });
   }
 
@@ -296,7 +315,7 @@ export function rosterWarnings(roster: Student[], t: Strings): string[] {
   for (let n = min; n <= max; n++) {
     if (!present.has(n)) missing.push(n);
   }
-  return missing.length === 0 ? [] : [t.rosterGapWarning(missing)];
+  return missing.length === 0 ? [] : [t.rosterGapWarning({ missing })];
 }
 
 /**
@@ -338,7 +357,7 @@ export function rosterRoomProblem(
   t: Strings,
 ): string | null {
   const room = Math.max(0, MAX_ROSTER - roster.length);
-  return count <= room ? null : t.rosterRoomMessage(room);
+  return count <= room ? null : t.rosterRoomMessage({ room });
 }
 
 /**
@@ -364,7 +383,7 @@ export function rosterOpenProblem(
   t: Strings,
 ): string | null {
   return rosterLength === 0 && count > MAX_ROSTER
-    ? t.rosterOpenRefusedMessage(MAX_ROSTER)
+    ? t.rosterOpenRefusedMessage({ max: MAX_ROSTER })
     : null;
 }
 
@@ -383,6 +402,14 @@ export function rosterOpenProblem(
  * the letter of X-08 asks for -- a box that cannot be typed into AT ALL
  * can never disagree with a list that exists, at any size, so there is
  * nothing left to check "past MAX_ROSTER" specifically.
+ *
+ * FOUR controls now, not one (#188). `#cg-count` and the three number fields
+ * beside it -- absent numbers, keep together, keep apart -- all lock on this
+ * same single fact, because all four are ways of saying who is in the class
+ * and the list is authoritative over every one of them. Documented here
+ * rather than beside each control: a rule written for one control and
+ * applied to four is how three of them end up agreeing while the fourth
+ * quietly drifts.
  */
 export const studentsBoxLocked = (roster: readonly Student[]): boolean =>
   roster.length > 0;

@@ -20,7 +20,6 @@
  * does `new (await import(path)).default(options)` for any CLI-supplied
  * reporter path.
  */
-import { appendFileSync, writeFileSync } from 'node:fs';
 import type {
   Reporter,
   TestCase,
@@ -28,26 +27,10 @@ import type {
   TestResult,
   TestSpecification,
 } from 'vitest/node';
-
-type DashboardStatus = 'passed' | 'failed' | 'skipped';
-
-/**
- * `TestResult['state']` at the point `onTestCaseResult` fires is documented
- * as never `'pending'` ("the test and its hooks are finished running...
- * cannot be pending"). Mapped defensively anyway rather than asserted: an
- * unexpected value here becomes `'failed'`, never silently `'passed'` --
- * this project's own rule against a guard that succeeds by doing nothing.
- */
-function toDashboardStatus(state: TestResult['state']): DashboardStatus {
-  if (state === 'passed') return 'passed';
-  if (state === 'skipped') return 'skipped';
-  return 'failed'; // 'failed', or a genuinely unexpected value
-}
+import { DashboardLog, toDashboardStatus } from './dashboard-jsonl';
 
 export default class JsonlVitestReporter implements Reporter {
-  private readonly file: string | undefined;
-  private readonly group: string;
-  private writeFailed = false;
+  private readonly log = new DashboardLog('jsonl-vitest');
 
   // Collection happens per-file and (per vitest.ios.config.ts's own
   // `fileParallelism: false`) never concurrently, but this reporter counts
@@ -63,45 +46,8 @@ export default class JsonlVitestReporter implements Reporter {
   private totalTests = 0;
   private begun = false;
 
-  constructor() {
-    this.file = process.env.DASHBOARD_JSONL_FILE;
-    this.group = process.env.DASHBOARD_GROUP || 'unknown-group';
-  }
-
-  private append(event: Record<string, unknown>): void {
-    if (!this.file || this.writeFailed) return;
-    try {
-      appendFileSync(
-        this.file,
-        JSON.stringify({ group: this.group, ...event }) + '\n',
-      );
-    } catch (error) {
-      this.writeFailed = true;
-      // eslint-disable-next-line no-console -- deliberate, one-time, visible failure notice; see module doc
-      console.error(
-        `[jsonl-vitest] failed to write to ${this.file} -- the live dashboard will stop updating for ` +
-          `the "${this.group}" group, but the test run itself is unaffected: ${(error as Error).message}`,
-      );
-    }
-  }
-
   onTestRunStart(specifications: ReadonlyArray<TestSpecification>): void {
-    if (!this.file) return;
-    try {
-      // Same "this run overwrites, never accumulates across invocations"
-      // contract as the Playwright reporter and as vitest's own
-      // `--outputFile.json` -- an old run's lines must never bleed into a
-      // fresh tail.
-      writeFileSync(this.file, '');
-    } catch (error) {
-      this.writeFailed = true;
-      // eslint-disable-next-line no-console -- deliberate, one-time, visible failure notice; see module doc
-      console.error(
-        `[jsonl-vitest] failed to create/truncate ${this.file} -- the live dashboard will not see the ` +
-          `"${this.group}" group this run, but the test run itself is unaffected: ${(error as Error).message}`,
-      );
-      return;
-    }
+    if (!this.log.start()) return;
     this.expectedModules = specifications.length;
     this.collectedModules = 0;
     this.totalTests = 0;
@@ -109,17 +55,21 @@ export default class JsonlVitestReporter implements Reporter {
   }
 
   onTestModuleCollected(testModule: TestModule): void {
-    if (!this.file || this.writeFailed) return;
+    if (!this.log.live) return;
     this.collectedModules += 1;
     this.totalTests += Array.from(testModule.children.allTests()).length;
     if (!this.begun && this.collectedModules >= this.expectedModules) {
       this.begun = true;
-      this.append({ event: 'begin', total: this.totalTests, at: Date.now() });
+      this.log.append({
+        event: 'begin',
+        total: this.totalTests,
+        at: Date.now(),
+      });
     }
   }
 
   onTestCaseReady(testCase: TestCase): void {
-    this.append({
+    this.log.append({
       event: 'test-start',
       id: testCase.id,
       // `fullName` (not the leaf `name`) deliberately: journeys.journey.ts
@@ -134,8 +84,12 @@ export default class JsonlVitestReporter implements Reporter {
   }
 
   onTestCaseResult(testCase: TestCase): void {
-    const result = testCase.result();
-    this.append({
+    // Annotated rather than inferred. `toDashboardStatus` takes a `string`,
+    // so this module would import neither framework's union -- and that is
+    // exactly the check this line puts back: what reaches it is vitest's own
+    // `TestResult['state']`, not any string that happens to be to hand.
+    const result: TestResult = testCase.result();
+    this.log.append({
       event: 'test',
       id: testCase.id,
       title: testCase.fullName,
@@ -147,6 +101,6 @@ export default class JsonlVitestReporter implements Reporter {
   }
 
   onTestRunEnd(): void {
-    this.append({ event: 'end', at: Date.now() });
+    this.log.append({ event: 'end', at: Date.now() });
   }
 }

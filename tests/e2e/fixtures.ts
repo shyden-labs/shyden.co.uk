@@ -1,12 +1,27 @@
+import { refuseMouseOnPhone } from '../device/no-mouse-on-phone';
 import {
   test as base,
   expect,
   chromium,
   type BrowserContext,
+  type Download,
   type Page,
   type APIRequestContext,
 } from '@playwright/test';
 import { ensureChromeForegroundOrRecover } from '../device/chrome-foreground';
+import { openTabsAsAVisitor } from '../device/visitor-tab';
+import {
+  DEVICE_DOWNLOAD_BEHAVIOUR,
+  emptyDeviceDownloads,
+  onRealDevice,
+} from '../device/device-downloads';
+import type { BaseUrlAwareApi } from '../base-url-calls';
+import {
+  disposeAll,
+  type InitScriptDisposable,
+} from '../device/init-script-disposals';
+import { refuseUndeclaredClock } from '../device/clock-declaration';
+import { servingYaweloMedia } from './yawelo-media';
 
 const CDP_URL = process.env.ANDROID_CDP_URL ?? 'http://127.0.0.1:9222';
 
@@ -21,45 +36,6 @@ const REQUEST_METHODS = [
   'fetch',
 ] as const;
 
-// Matches a literal's opening content that `new URL(literal, base)` -- the mechanism every API
-// below actually resolves through (`resolveBaseURL` in playwright-core's coreBundle.js) --
-// treats as *already absolute*: a URL scheme (`https:`, `about:`, ...) or a protocol-relative
-// `//`. Anything else, including a bare word with no leading slash at all, is relative and
-// resolves against baseURL identically to a leading-slash path -- `'login'` and `'/login'` are
-// the same case to `new URL()`. An earlier version of this pattern checked for a leading `/` or
-// `.` instead, which is the wrong test: it would have missed exactly the bare-word shape it
-// exists to catch.
-const ABSOLUTE_URL_LOOKAHEAD = '(?:[a-zA-Z][a-zA-Z\\d+.-]*:|//)';
-
-function relativeLiteralCallPattern(
-  apiPath: string,
-  extraAbsolutePrefix?: string,
-): RegExp {
-  // Matches `<apiPath>(`, then a string/template-literal delimiter, with no whitespace
-  // tolerated between the call and the delimiter (that would read as a different call shape),
-  // asserting via lookahead that what follows is NOT absolute. A regex-literal argument (e.g.
-  // `toHaveURL(/foo/)`) never opens with a quote character, so the mandatory delimiter capture
-  // cannot mistake it for a URL string.
-  const escaped = apiPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const absolute = extraAbsolutePrefix
-    ? `(?:${ABSOLUTE_URL_LOOKAHEAD}|${extraAbsolutePrefix})`
-    : ABSOLUTE_URL_LOOKAHEAD;
-  return new RegExp(`\\b${escaped}\\(\\s*(['"\`])(?!${absolute})`, 'g');
-}
-
-function bareIdentifierCallPattern(identifier: string, method: string): RegExp {
-  // For the bare `request` fixture: unlike relativeLiteralCallPattern, this must NOT match a
-  // property-access chain ending in the same identifier -- `page.request.get(` and
-  // `context.request.get(` are already their own rows below and must not double-count here.
-  // The negative lookbehind requires `identifier` not be immediately preceded by a dot, i.e.
-  // it must appear as the bare fixture parameter, not a property of something else.
-  const escapedMethod = method.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(
-    `(?<!\\.)\\b${identifier}\\.${escapedMethod}\\(\\s*(['"\`])(?!${ABSOLUTE_URL_LOOKAHEAD})`,
-    'g',
-  );
-}
-
 /**
  * Every Playwright API this suite reaches for whose behaviour depends on `baseURL` -- confirmed
  * by reading Playwright's own source, not assumed: `page.goto`, `page.request.*`,
@@ -71,38 +47,32 @@ function bareIdentifierCallPattern(identifier: string, method: string): RegExp {
  * `browser`/`context` override, so it does not automatically share the adopted context's gap;
  * see its own row for the mechanism and the on-device measurement that confirmed it.
  *
- * `resolved: true` means a relative literal is safe on-device, whether because the fixtures
+ * `resolved: true` means a relative URL is safe on-device, whether because the fixtures
  * below patch it or because it was measured to already work through its own mechanism.
- * `resolved: false` means `tests/e2e/baseurl-guard.spec.ts` fails on a relative literal, naming
- * this row's `api`, rather than the gap surfacing later as a confusing device-only failure with
- * no signpost. This is the single source of truth for the patches and the guard together: add a
+ * `resolved: false` means `tests/e2e/baseurl-guard.spec.ts` fails on a relative URL -- or on one
+ * it cannot resolve, and says which -- naming this row's callee, rather than the gap surfacing
+ * later as a confusing device-only failure with no signpost. A row is matched by the SHAPE of a
+ * call and its URL judged by what it resolves to (`tests/base-url-calls.ts`), so a constant, a
+ * comment or a line break cannot fool it (#215). This is the single source of truth for the patches and the guard together: add a
  * row here whenever this suite starts calling a new baseURL-aware API, and the two cannot drift
  * apart -- an unlisted API is invisible to both.
  */
-export const BASE_URL_AWARE_APIS: ReadonlyArray<{
-  readonly api: string;
-  readonly pattern: RegExp;
-  readonly resolved: boolean;
-  readonly reason: string;
-}> = [
+export const BASE_URL_AWARE_APIS: readonly BaseUrlAwareApi[] = [
   {
-    api: 'page.goto',
-    pattern: relativeLiteralCallPattern('page.goto'),
+    callee: 'page.goto',
     resolved: true,
     reason:
       'the page fixture resolves the URL against baseURL before calling the real goto',
   },
   ...REQUEST_METHODS.map((method) => ({
-    api: `page.request.${method}`,
-    pattern: relativeLiteralCallPattern(`page.request.${method}`),
+    callee: `page.request.${method}`,
     resolved: true,
     reason:
       'the page fixture resolves string URL arguments against baseURL before calling the ' +
       'real method',
   })),
   ...REQUEST_METHODS.map((method) => ({
-    api: `context.request.${method}`,
-    pattern: relativeLiteralCallPattern(`context.request.${method}`),
+    callee: `context.request.${method}`,
     resolved: true,
     reason:
       "page.request and context.request are the same APIRequestContext instance (Playwright's " +
@@ -110,8 +80,8 @@ export const BASE_URL_AWARE_APIS: ReadonlyArray<{
       'patching page.request resolves this call shape too',
   })),
   ...REQUEST_METHODS.map((method) => ({
-    api: `request.${method} (bare fixture)`,
-    pattern: bareIdentifierCallPattern('request', method),
+    callee: `request.${method}`,
+    bare: true,
     resolved: true,
     reason:
       "measured directly on the physical device (tests/device/real-device.spec.ts's " +
@@ -121,43 +91,39 @@ export const BASE_URL_AWARE_APIS: ReadonlyArray<{
       'relative literal correctly with no patch from this file',
   })),
   {
-    api: 'page.route',
-    pattern: relativeLiteralCallPattern('page.route', '\\*'),
+    callee: 'page.route',
+    glob: true,
     resolved: false,
     reason:
-      'not patched -- a glob starting with `*` (the one existing call site starts `**`) skips ' +
-      'baseURL resolution entirely (`resolveGlobBase`\'s own `!match.startsWith("*")` check in ' +
-      'coreBundle.js), which is why this pattern exempts that shape too; a glob NOT starting ' +
-      'with `*` goes through the same resolveBaseURL joining as goto and would not resolve',
+      'not patched -- a glob starting with `*` skips baseURL resolution entirely ' +
+      '(`resolveGlobBase`\'s own `!match.startsWith("*")` check in coreBundle.js), which is ' +
+      'why `glob` exempts that shape; a glob NOT starting with `*` goes through the same ' +
+      'resolveBaseURL joining as goto and would not resolve',
   },
   {
-    api: 'context.route',
-    pattern: relativeLiteralCallPattern('context.route', '\\*'),
+    callee: 'context.route',
+    glob: true,
     resolved: false,
     reason: 'not patched, same gap and same `*`-prefix exemption as page.route',
   },
   {
-    api: 'page.waitForURL',
-    pattern: relativeLiteralCallPattern('page.waitForURL'),
+    callee: 'page.waitForURL',
     resolved: false,
     reason:
       'not patched -- no current call site, but reads context baseURL the same way goto does',
   },
   {
-    api: 'page.waitForRequest',
-    pattern: relativeLiteralCallPattern('page.waitForRequest'),
+    callee: 'page.waitForRequest',
     resolved: false,
     reason: 'not patched -- no current call site',
   },
   {
-    api: 'page.waitForResponse',
-    pattern: relativeLiteralCallPattern('page.waitForResponse'),
+    callee: 'page.waitForResponse',
     resolved: false,
     reason: 'not patched -- no current call site',
   },
   {
-    api: 'toHaveURL',
-    pattern: relativeLiteralCallPattern('toHaveURL'),
+    callee: 'toHaveURL',
     resolved: false,
     reason:
       'not patched -- existing call sites all pass a regex, which never consults baseURL, so ' +
@@ -172,15 +138,6 @@ export const BASE_URL_AWARE_APIS: ReadonlyArray<{
 // would wrap the previous test's wrapper again, nesting deeper each time.
 const REQUEST_PATCHED = Symbol('shyden-baseurl-request-patch');
 
-// Structural subset of Playwright's own `Disposable` (playwright-core/types/types.d.ts) --
-// returned by `context.addInitScript`/`page.addInitScript`. Declared locally rather than
-// imported: `@playwright/test`'s re-export chain (-> `playwright/test` -> `playwright-core`)
-// does not surface the type under that name at the package's own top level, and the two-method
-// shape this file actually uses is not worth chasing an import path for.
-interface InitScriptDisposable {
-  dispose(): Promise<void>;
-}
-
 /** Guards the one-time `context.addInitScript` patch below, same role and same reasoning as REQUEST_PATCHED. */
 const INIT_SCRIPT_PATCHED = Symbol('shyden-context-addinitscript-patch');
 
@@ -194,6 +151,13 @@ const INIT_SCRIPT_PATCHED = Symbol('shyden-context-addinitscript-patch');
  * one shared context, one localStorage origin"), so exactly one test's array is ever live.
  */
 let currentTestInitScriptDisposals: InitScriptDisposable[] = [];
+
+/**
+ * Whether the running test declares the clock it installs (`installsAClock`, #854), set at the
+ * top of every test's `context` fixture and read by the clock guard installed once on the
+ * shared context. Plain module state for the same reason as the array above.
+ */
+let currentTestDeclaresClock = false;
 
 /**
  * Every fixture below that needs `baseURL` calls this instead of trusting it -- a bare `!`
@@ -220,25 +184,50 @@ function requireBaseURL(baseURL: string | undefined): string {
  * is made once, at module load, rather than per test. Desktop keeps `base` verbatim: an
  * override that merely *reproduced* the defaults would be one refactor away from dropping
  * the emulation options that the mobile-chrome and mobile-safari projects depend on.
+ *
+ * `installsAClock` (#854) is set only by the phone's `android-chrome-clock` project
+ * (playwright.device.config.ts), which runs the tests tagged `@installs-a-clock` in a worker
+ * of their own. Playwright cannot take a clock back out of the phone's one context, so that
+ * worker's CDP connection ends, and the clock with it, before any other test runs
+ * (tests/device/clock-declaration.ts).
  */
-const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
+const realDeviceTest = base.extend<
+  { context: BrowserContext; page: Page },
+  { installsAClock: boolean }
+>({
+  installsAClock: [false, { scope: 'worker', option: true }],
   browser: [
     async ({}, use) => {
       const browser = await chromium.connectOverCDP(CDP_URL);
+      // Attached over plain CDP, Playwright points the phone's downloads at a folder on the
+      // Mac, and every one of them ends `canceled` (#308). This points them at the phone's
+      // own folder. Chrome keeps the download PATH per browser context but download EVENTS
+      // per session, so Playwright's own session still sees every download; this session
+      // stays open for the worker's life, because detaching may put the behaviour back.
+      const downloads = await browser.newBrowserCDPSession();
+      await downloads.send(
+        'Browser.setDownloadBehavior',
+        DEVICE_DOWNLOAD_BEHAVIOUR,
+      );
+      emptyDeviceDownloads();
       await use(browser);
+      emptyDeviceDownloads();
       // Disconnects the client. It does not close Chrome on the phone.
       await browser.close();
     },
     { scope: 'worker' },
   ],
 
-  context: async ({ browser, baseURL }, use) => {
+  context: async ({ browser, baseURL, installsAClock }, use) => {
     // The phone has exactly one context and newContext() is unsupported, so every test
     // shares it -- which means state does not clear itself between tests the way it does
     // for a fresh desktop context.
     const context = browser.contexts()[0];
     if (!context)
       throw new Error('Real device exposed no browser context over CDP.');
+    // Every tab below, and any a test opens, is one Chrome made for a VIEW intent: a tab
+    // made over DevTools crashes Chrome when a <datalist> shows its suggestions (#807).
+    openTabsAsAVisitor(context);
 
     const resolvedBaseURL = requireBaseURL(baseURL);
     const scratch = await context.newPage();
@@ -254,6 +243,10 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     // Fresh bucket for THIS test -- see currentTestInitScriptDisposals's own comment for why
     // plain module state is safe here.
     currentTestInitScriptDisposals = [];
+    // A clock installed on this context can never be removed (#854), so only a test that
+    // declares one may install it; the guard is installed once and reads this per call.
+    currentTestDeclaresClock = installsAClock;
+    refuseUndeclaredClock(context.clock, () => currentTestDeclaresClock);
     const patchable = context as BrowserContext & {
       [INIT_SCRIPT_PATCHED]?: true;
     };
@@ -294,19 +287,20 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
       patchable[INIT_SCRIPT_PATCHED] = true;
     }
 
-    await use(context);
+    await servingYaweloMedia(context, () => use(context));
 
     // Undo every init script THIS test added -- see the patch comment above. Order does not
-    // matter: each disposal only ever removes its own script.
-    for (const disposable of currentTestInitScriptDisposals.splice(0)) {
-      await disposable.dispose().catch(() => {});
+    // matter: each disposal only ever removes its own script. A refusal fails the test once
+    // the pages are closed, never in silence: a script left behind runs on every later page.
+    try {
+      await disposeAll(currentTestInitScriptDisposals.splice(0));
+    } finally {
+      // Leave the context open -- it belongs to the device, not to the test.
+      for (const page of context.pages()) await page.close().catch(() => {});
     }
-
-    // Leave the context open -- it belongs to the device, not to the test.
-    for (const page of context.pages()) await page.close().catch(() => {});
   },
 
-  page: async ({ context, baseURL }, use, testInfo) => {
+  page: async ({ context, baseURL, colorScheme }, use, testInfo) => {
     // Chrome losing foreground mid-run is a real, observed failure mode (147 failed / 62
     // failed in otherwise-clean runs -- see tests/device/chrome-foreground.ts's own module
     // comment for the evidence and the design doc for the full trail).
@@ -318,6 +312,19 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     await ensureChromeForegroundOrRecover(testInfo.title);
 
     const page = await context.newPage();
+    // The theme is pinned per test (#142 §6.2). The phone's context was made
+    // by Chrome, not by Playwright, so the `colorScheme` option never reaches
+    // it by itself, and a run would follow the phone's own appearance setting.
+    // Emulating it on each page applies the project's scheme, or a test's own
+    // `test.use({ colorScheme })`, over CDP (Emulation.setEmulatedMedia).
+    await page.emulateMedia({ colorScheme });
+    // A tap on the phone is a touch and a scroll a finger drag (#996).
+    refuseMouseOnPhone(page);
+    // Every download a test causes must COMPLETE on the phone (#308). A test that checks only a
+    // filename would otherwise pass over a download that never saved, which is how every export
+    // in the phone run failed, `canceled` with 0 bytes, while its tests stayed green.
+    const downloads: Download[] = [];
+    page.on('download', (download) => downloads.push(download));
     const resolvedBaseURL = requireBaseURL(baseURL);
 
     // This context was never created via `newContext({ baseURL })` -- Chrome made it, not
@@ -346,8 +353,8 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     // BASE_URL_AWARE_APIS documents every other baseURL-aware API this suite could reach for
     // (the bare `request` fixture, `page.route`, `waitForURL`/`waitForRequest`/
     // `waitForResponse`, `toHaveURL`). Some are proven safe by their own mechanism, some are
-    // not patched here and not currently called with a relative literal either (verified: see
-    // BASE_URL_AWARE_APIS's `reason` fields) -- so a relative literal reaching any row marked
+    // not patched here and not currently called with a relative URL either (verified: see
+    // BASE_URL_AWARE_APIS's `reason` fields) -- so a relative URL reaching any row marked
     // `resolved: false` would misbehave on-device exactly as goto did before this fixture
     // existed. tests/e2e/baseurl-guard.spec.ts fails the build the moment one is added, rather
     // than leaving it to be found as a confusing device-only failure.
@@ -377,9 +384,33 @@ const realDeviceTest = base.extend<{ context: BrowserContext; page: Page }>({
     }
 
     await use(page);
+    const unfinished = (
+      await Promise.all(
+        downloads.map(async (download) => ({
+          name: download.suggestedFilename(),
+          failure: await download.failure(),
+        })),
+      )
+    ).filter(({ failure }) => failure !== null);
     await page.close().catch(() => {});
+    if (unfinished.length > 0)
+      throw new Error(
+        `${unfinished.length} download(s) this test caused did not complete on the phone: ` +
+          unfinished
+            .map(({ name, failure }) => `"${name}" (${failure})`)
+            .join(', '),
+      );
   },
 });
 
-export const test = process.env.PW_REAL_DEVICE === '1' ? realDeviceTest : base;
+/**
+ * The desktop engines' fixtures are Playwright's own, with one addition: the
+ * media host is answered from the stand-ins (see yawelo-media.ts).
+ */
+const desktopTest = base.extend<{ context: BrowserContext }>({
+  context: async ({ context }, use) =>
+    servingYaweloMedia(context, () => use(context)),
+});
+
+export const test = onRealDevice() ? realDeviceTest : desktopTest;
 export { expect };
