@@ -8,6 +8,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { argv, exit } from 'node:process';
+import { nonEmpty } from './errors.mjs';
 
 // The placeholder SHAPE: `[[` … `]]` with no `]` between, so a JavaScript
 // array of pairs (`[[k,v],[k,v]]`) never completes it.
@@ -34,13 +35,18 @@ export const placeholderFindings = (files) =>
       [...text.matchAll(PLACEHOLDER)].map((m) => `${path}: ${m[0]}`),
     );
 
-/** @param {string} dir @returns {string[]} */
+/**
+ * Every text file under `dir`. Node's own recursive read, so no hand-written
+ * walk (one-home.test.ts), and `nonEmpty` refuses an empty directory.
+ * @param {string} dir @returns {string[]}
+ */
 const textFilesUnder = (dir) =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return textFilesUnder(path);
-    return TEXT.test(entry.name) ? [path] : [];
-  });
+  nonEmpty(
+    readdirSync(dir, { recursive: true, withFileTypes: true }),
+    `files under ${dir}`,
+  )
+    .filter((entry) => entry.isFile() && TEXT.test(entry.name))
+    .map((entry) => join(entry.parentPath, entry.name));
 
 const main = () => {
   const [dir] = argv.slice(2);
