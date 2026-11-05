@@ -258,6 +258,20 @@ async function drag(
 }
 
 /**
+ * A real finger drag that starts on `target` and moves `dy` px (negative is
+ * up the screen, which scrolls the page down), on a Chromium phone: the
+ * emulated Android project or the real Android over CDP (#1048). Mobile
+ * WebKit has no touch drags; `scrollInput` says so before this is reached.
+ */
+export async function swipeOver(target: Locator, dy: number): Promise<void> {
+  const box = await target.boundingBox();
+  if (box === null)
+    throw new TapNotPossibleError(`${String(target)} has no box to swipe on`);
+  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await drag(target.page(), from, { x: from.x, y: from.y + dy });
+}
+
+/**
  * Closes the on-screen keyboard the way a visitor does, with the phone's
  * Back key, sent only once Android itself says the keyboard is shown (Back
  * with no keyboard up would leave the page).
