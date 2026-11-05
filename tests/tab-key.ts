@@ -8,4 +8,4 @@ export const tabKey = (
   browserName: string,
   direction: 'forwards' | 'backwards' = 'forwards',
 ): string =>
-  `${browserName === 'webkit' ? 'Alt+' : ''}${direction === 'backwards' ? 'Shift+' : ''}Tab`;
+  `${browserName === 'never' ? 'Alt+' : ''}${direction === 'backwards' ? 'Shift+' : ''}Tab`;
