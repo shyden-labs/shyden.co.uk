@@ -9,6 +9,7 @@ import {
   type Prepared,
   SPARE_SWIPES,
   swipeCeiling,
+  whyKeysCannotScroll,
   whyNotTappable,
 } from '../real-touch';
 
@@ -185,23 +186,39 @@ describe('scrollMover (#1004)', () => {
 });
 
 describe('planKeys (#1036)', () => {
-  it('presses arrows for a near point when nothing focused takes them', () => {
+  it('presses arrows for a near point', () => {
     // 300 px to the middle, at WebKit's 40 px a line: 8 presses (320 px).
-    expect(planKeys(at(700), 1, true)).toEqual(Array(8).fill('ArrowDown'));
-    expect(planKeys(at(100), 1, true)).toEqual(Array(8).fill('ArrowUp'));
+    expect(planKeys(at(700), 1)).toEqual(Array(8).fill('ArrowDown'));
+    expect(planKeys(at(100), 1)).toEqual(Array(8).fill('ArrowUp'));
   });
   it('presses one page key for a point more than a page away', () => {
-    expect(planKeys(at(2000), 1, true)).toEqual(['PageDown']);
-    expect(planKeys(at(-1000), 1, true)).toEqual(['PageUp']);
-  });
-  it('presses page keys alone when the focus would take arrows (a radio, a field)', () => {
-    expect(planKeys(at(700), 1, false)).toEqual(['PageDown']);
-    expect(planKeys(at(100), 1, false)).toEqual(['PageUp']);
+    expect(planKeys(at(2000), 1)).toEqual(['PageDown']);
+    expect(planKeys(at(-1000), 1)).toEqual(['PageUp']);
   });
   it('presses a share of the arrows after an overshoot, never none', () => {
-    expect(planKeys(at(700), 0.5, true)).toEqual(Array(4).fill('ArrowDown'));
-    expect(planKeys(at(410), 0.25, true)).toEqual(['ArrowDown']);
-    expect(planKeys(at(390), 1, true)).toEqual(['ArrowUp']);
+    expect(planKeys(at(700), 0.5)).toEqual(Array(4).fill('ArrowDown'));
+    expect(planKeys(at(410), 0.25)).toEqual(['ArrowDown']);
+    expect(planKeys(at(390), 1)).toEqual(['ArrowUp']);
+  });
+});
+
+describe('whyKeysCannotScroll (#1036: keys are pressed with nothing focused)', () => {
+  it('lets the keys go once a tap on blank space has left nothing focused', () => {
+    expect(whyKeysCannotScroll('input#name', { x: 12, y: 400 }, null)).toBe(
+      null,
+    );
+  });
+  it('fails naming the focus when the view has no blank space to tap', () => {
+    expect(whyKeysCannotScroll('input#name', null, null)).toBe(
+      'the keys would go to input#name, and the view has no blank space to tap it away',
+    );
+  });
+  it('fails naming the focus when the tap on blank space left it focused', () => {
+    expect(
+      whyKeysCannotScroll('input#name', { x: 12, y: 400 }, 'input#name'),
+    ).toBe(
+      'the keys would go to input#name: a real tap on blank space at (12, 400) left it focused',
+    );
   });
 });
 

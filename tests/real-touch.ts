@@ -137,21 +137,33 @@ const PAGE_KEY_SHARE = 0.8;
 
 /**
  * The key presses, one burst, that move the point toward the middle of the
- * view (#1036): arrows for a near point, one page key for a far one, and page
- * keys alone when the focused element would take the arrows itself (a radio
- * group changes its choice, a field moves its caret).
+ * view (#1036): arrows for a near point, one page key for a far one. They are
+ * pressed with nothing focused (`clearFocus`), so they reach the page itself.
  */
-export function planKeys(
-  p: Prepared,
-  gain: number,
-  arrowsScroll: boolean,
-): string[] {
+export function planKeys(p: Prepared, gain: number): string[] {
   const need = needOf(p);
   const down = need > 0;
-  if (!arrowsScroll || Math.abs(need) > p.viewHeight * PAGE_KEY_SHARE)
+  if (Math.abs(need) > p.viewHeight * PAGE_KEY_SHARE)
     return [down ? 'PageDown' : 'PageUp'];
   const presses = Math.max(1, Math.ceil((Math.abs(need) * gain) / ARROW_PX));
   return Array<string>(presses).fill(down ? 'ArrowDown' : 'ArrowUp');
+}
+
+/**
+ * Why the keys cannot be pressed with nothing focused, or null when they can:
+ * `focused` is what held the focus, `spot` the blank space tapped to clear it
+ * (null when the view has none), `stillFocused` what holds it after the tap.
+ */
+export function whyKeysCannotScroll(
+  focused: string,
+  spot: { x: number; y: number } | null,
+  stillFocused: string | null,
+): string | null {
+  if (spot === null)
+    return `the keys would go to ${focused}, and the view has no blank space to tap it away`;
+  if (stillFocused !== null)
+    return `the keys would go to ${stillFocused}: a real tap on blank space at (${spot.x}, ${spot.y}) left it focused`;
+  return null;
 }
 
 /** How a page is moved: a finger's drags, the mouse wheel, or key presses. */
@@ -571,30 +583,79 @@ async function turnWheel(page: Page, p: Prepared, gain = 1): Promise<number> {
   return steps.length;
 }
 
-/** Focused things that take arrow keys themselves instead of scrolling. */
-const TAKES_ARROWS = `${FIELDS}, [role="radiogroup"], [role="radio"], [role="slider"], [role="listbox"], [role="tablist"], [role="menu"]`;
+/** What a tap must not land on, to clear the focus and do nothing else. */
+const NOT_BLANK =
+  'a[href], button, input, select, textarea, label, summary, details, dialog, iframe, video, audio, [tabindex], [contenteditable], [role], [data-theme-toggle]';
 
 /**
- * Whether an arrow press would scroll the page: true unless the focus is on
- * something that takes arrows itself. A page with JavaScript off cannot be
- * asked, so it is given page keys alone.
+ * What holds the focus (null when nothing but the page does) and, when
+ * something does, a point of blank space in the view to tap it away.
  */
-async function arrowsScroll(page: Page): Promise<boolean> {
-  if (javaScriptOff(page)) return false;
-  return page.evaluate(
-    (takes) => !document.activeElement?.closest(takes),
-    TAKES_ARROWS,
+const readFocus = (page: Page) =>
+  page.evaluate((notBlank) => {
+    const active = document.activeElement;
+    if (
+      !active ||
+      active === document.body ||
+      active === document.documentElement
+    )
+      return null;
+    const name = `${active.tagName.toLowerCase()}${active.id ? `#${active.id}` : ''}`;
+    const width = window.visualViewport?.width ?? window.innerWidth;
+    const height = window.visualViewport?.height ?? window.innerHeight;
+    for (const ys of [0.5, 0.3, 0.7, 0.15, 0.85])
+      for (const xs of [0.02, 0.98, 0.5]) {
+        const x = Math.round(width * xs);
+        const y = Math.round(height * ys);
+        const hit = document.elementFromPoint(x, y);
+        if (hit && !hit.closest(notBlank)) return { name, spot: { x, y } };
+      }
+    return { name, spot: null };
+  }, NOT_BLANK);
+
+/**
+ * Leaves nothing focused before a key is pressed, as the ruling says (#1036):
+ * keys pressed into a field move its caret, and into a radio group, a select
+ * or a slider change its value. A focused element is tapped away with a real
+ * tap on blank space, as a visitor would; one that cannot be fails the test,
+ * naming it. A page with JavaScript off cannot be searched for blank space,
+ * so there a focused element fails at once.
+ */
+async function clearFocus(page: Page): Promise<void> {
+  if (javaScriptOff(page)) {
+    const focused = page.locator(':focus');
+    if ((await focused.count()) === 0) return;
+    const id = await focused.first().getAttribute('id');
+    throw new TapNotPossibleError(
+      whyKeysCannotScroll(
+        `the focused element${id ? ` #${id}` : ''} (JavaScript is off, so no blank space can be found)`,
+        null,
+        null,
+      ) as string,
+    );
+  }
+  const before = await readFocus(page);
+  if (before === null) return;
+  if (before.spot !== null)
+    await page.touchscreen.tap(before.spot.x, before.spot.y);
+  const after = before.spot === null ? null : await readFocus(page);
+  const why = whyKeysCannotScroll(
+    before.name,
+    before.spot,
+    after?.name ?? null,
   );
+  if (why !== null) throw new TapNotPossibleError(why);
 }
 
 /**
- * One burst of real key presses toward the point (#1036): WebKit's emulated
- * iPhone, where Playwright refuses the wheel. A marked STAND-IN for a finger
- * (a phone has no keyboard); the real iPhone run drags with a real finger.
+ * One burst of real key presses toward the point, with nothing focused
+ * (#1036): WebKit's emulated iPhone, where Playwright refuses the wheel. A
+ * marked STAND-IN for a finger (a phone has no keyboard); the real iPhone
+ * run drags with a real finger.
  */
 async function pressKeys(page: Page, p: Prepared, gain = 1): Promise<number> {
-  for (const key of planKeys(p, gain, await arrowsScroll(page)))
-    await page.keyboard.press(key);
+  await clearFocus(page);
+  for (const key of planKeys(p, gain)) await page.keyboard.press(key);
   return 1;
 }
 
