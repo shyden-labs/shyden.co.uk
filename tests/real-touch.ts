@@ -120,102 +120,141 @@ function session(page: Page): Promise<CDPSession> {
   return found;
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * Waits for the element AND the page to come to rest (six still frames, at
- * most 3 s: a sticky element holds still while the page behind it still
- * coasts, and a tap then only stops the scroll), then measures the point to
- * tap and what a finger there would touch.
+ * The clock the helper waits on: the test process's own, never the page's.
+ * A test that installs Playwright's clock freezes the page's
+ * `requestAnimationFrame` and `Date.now()`, so a wait timed inside the page
+ * never ends there (#1044).
+ */
+export interface WaitClock {
+  now(): number;
+  sleep(ms: number): Promise<void>;
+}
+const ownClock: WaitClock = { now: () => Date.now(), sleep: wait };
+
+/** Samples in a row that must match for the element and page to be at rest. */
+export const STILL_SAMPLES = 6;
+/** Time between two samples: about one frame. */
+export const STILL_GAP_MS = 16;
+/** How long the element and page may take to come to rest. */
+export const STILL_CEILING_MS = 3_000;
+
+/**
+ * Samples a shape until it matches itself STILL_SAMPLES times in a row, or the
+ * ceiling passes on the given clock.
+ */
+export async function waitUntilStill(
+  sample: () => Promise<string>,
+  {
+    gapMs,
+    ceilingMs,
+    clock,
+  }: { gapMs: number; ceilingMs: number; clock: WaitClock },
+): Promise<{ still: boolean; waitedMs: number }> {
+  const started = clock.now();
+  let last = await sample();
+  let still = 0;
+  for (;;) {
+    await clock.sleep(gapMs);
+    const now = await sample();
+    still = now === last ? still + 1 : 0;
+    last = now;
+    const waitedMs = clock.now() - started;
+    if (still >= STILL_SAMPLES) return { still: true, waitedMs };
+    if (waitedMs >= ceilingMs) return { still: false, waitedMs };
+  }
+}
+
+/**
+ * Waits for the element AND the page to come to rest (a sticky element holds
+ * still while the page behind it still coasts, and a tap then only stops the
+ * scroll), then measures the point to tap and what a finger there would touch.
+ * Fails at STILL_CEILING_MS, naming the wait, when they never come to rest.
  */
 async function prepare(
   target: Locator,
   offset: { x: number; y: number } | undefined,
 ): Promise<Prepared> {
-  return target.evaluate(
-    (el, { offset }) =>
-      new Promise<Prepared>((resolve) => {
+  const { still, waitedMs } = await waitUntilStill(
+    () =>
+      target.evaluate((el) => {
         const vv = window.visualViewport;
-        const view = () => ({
-          top: vv ? vv.offsetTop : 0,
-          left: vv ? vv.offsetLeft : 0,
-          height: vv ? vv.height : window.innerHeight,
-          width: vv ? vv.width : window.innerWidth,
-        });
-        const describe = (node: Element) =>
-          node.tagName.toLowerCase() +
-          (node.id ? `#${node.id}` : '') +
-          (typeof node.className === 'string' && node.className.trim()
-            ? `.${node.className.trim().split(/\s+/).join('.')}`
-            : '');
-        const shape = () => {
-          const b = el.getBoundingClientRect();
-          const v = view();
-          return [
-            b.x,
-            b.y,
-            b.width,
-            b.height,
-            v.top,
-            v.height,
-            window.scrollX,
-            window.scrollY,
-          ].join(',');
-        };
-        let last = shape();
-        let still = 0;
-        const started = Date.now();
-        const settle = () => {
-          const now = shape();
-          still = now === last ? still + 1 : 0;
-          last = now;
-          if (still < 6 && Date.now() - started < 3000) {
-            requestAnimationFrame(settle);
-            return;
-          }
-          const r = el.getBoundingClientRect();
-          const v = view();
-          const point = {
-            x: r.x + (offset ? offset.x : r.width / 2),
-            y: r.y + (offset ? offset.y : r.height / 2),
-          };
-          const inView =
-            point.x >= v.left &&
-            point.x <= v.left + v.width &&
-            point.y >= v.top &&
-            point.y <= v.top + v.height;
-          let hit: string | null = null;
-          if (inView) {
-            const top = document.elementFromPoint(point.x, point.y);
-            const labels =
-              'labels' in el
-                ? Array.from((el as HTMLInputElement).labels ?? [])
-                : [];
-            if (top === null) hit = 'nothing (the point is outside the page)';
-            else if (
-              top !== el &&
-              !el.contains(top) &&
-              !labels.some((l) => l === top || l.contains(top))
-            )
-              hit = describe(top);
-          }
-          const active = document.activeElement;
-          const typing =
-            active instanceof HTMLInputElement ||
-            active instanceof HTMLTextAreaElement ||
-            (active instanceof HTMLElement && active.isContentEditable);
-          resolve({
-            point,
-            viewTop: v.top,
-            viewHeight: v.height,
-            viewWidth: v.width,
-            inView,
-            hit,
-            keyboard: typing,
-          });
-        };
-        requestAnimationFrame(settle);
+        const b = el.getBoundingClientRect();
+        return [
+          b.x,
+          b.y,
+          b.width,
+          b.height,
+          vv ? vv.offsetTop : 0,
+          vv ? vv.height : window.innerHeight,
+          window.scrollX,
+          window.scrollY,
+        ].join(',');
       }),
+    { gapMs: STILL_GAP_MS, ceilingMs: STILL_CEILING_MS, clock: ownClock },
+  );
+  if (!still)
+    throw new TapNotPossibleError(
+      `${String(target)} and the page did not come to rest: ${STILL_SAMPLES} matching samples ${STILL_GAP_MS} ms apart were not seen within ${waitedMs} ms`,
+    );
+  return target.evaluate(
+    (el, { offset }) => {
+      const vv = window.visualViewport;
+      const v = {
+        top: vv ? vv.offsetTop : 0,
+        left: vv ? vv.offsetLeft : 0,
+        height: vv ? vv.height : window.innerHeight,
+        width: vv ? vv.width : window.innerWidth,
+      };
+      const describe = (node: Element) =>
+        node.tagName.toLowerCase() +
+        (node.id ? `#${node.id}` : '') +
+        (typeof node.className === 'string' && node.className.trim()
+          ? `.${node.className.trim().split(/\s+/).join('.')}`
+          : '');
+      const r = el.getBoundingClientRect();
+      const point = {
+        x: r.x + (offset ? offset.x : r.width / 2),
+        y: r.y + (offset ? offset.y : r.height / 2),
+      };
+      const inView =
+        point.x >= v.left &&
+        point.x <= v.left + v.width &&
+        point.y >= v.top &&
+        point.y <= v.top + v.height;
+      let hit: string | null = null;
+      if (inView) {
+        const top = document.elementFromPoint(point.x, point.y);
+        const labels =
+          'labels' in el
+            ? Array.from((el as HTMLInputElement).labels ?? [])
+            : [];
+        if (top === null) hit = 'nothing (the point is outside the page)';
+        else if (
+          top !== el &&
+          !el.contains(top) &&
+          !labels.some((l) => l === top || l.contains(top))
+        )
+          hit = describe(top);
+      }
+      const active = document.activeElement;
+      const typing =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+      return {
+        point,
+        viewTop: v.top,
+        viewHeight: v.height,
+        viewWidth: v.width,
+        inView,
+        hit,
+        keyboard: typing,
+      };
+    },
     { offset },
   );
 }
@@ -405,36 +444,21 @@ async function armLanding(target: Locator): Promise<void> {
  * navigates, so a page torn down before the read counts as landed.
  */
 async function landed(page: Page): Promise<string | null> {
+  const started = ownClock.now();
   try {
-    return await page.evaluate(
-      (ceiling) =>
-        new Promise<string | null>((resolve) => {
-          const started = Date.now();
-          const look = () => {
-            const r = (
-              window as unknown as {
-                __realTouch?: {
-                  at: string | null;
-                  stray: string | null;
-                  clicked: boolean;
-                };
-              }
-            ).__realTouch;
-            if (r?.clicked) return resolve(null);
-            if (r?.stray)
-              return resolve(`the touch reached ${r.stray} instead`);
-            if (Date.now() - started > ceiling)
-              return resolve(
-                r?.at === 'ok'
-                  ? `the touch reached it but no click followed within ${ceiling / 1000} s (Chrome may have taken it as stopping a scroll)`
-                  : `no touch reached it within ${ceiling / 1000} s`,
-              );
-            requestAnimationFrame(look);
-          };
-          look();
-        }),
-      LANDING_CEILING_MS,
-    );
+    for (;;) {
+      const record = await page.evaluate(
+        () =>
+          (window as unknown as { __realTouch?: LandingRecord }).__realTouch,
+      );
+      const verdict = landingVerdict(
+        record,
+        ownClock.now() - started,
+        LANDING_CEILING_MS,
+      );
+      if (verdict !== 'wait') return verdict;
+      await ownClock.sleep(STILL_GAP_MS);
+    }
   } catch (error) {
     if (
       /context was destroyed|navigation|Target page.*closed/i.test(
@@ -444,6 +468,30 @@ async function landed(page: Page): Promise<string | null> {
       return null;
     throw error;
   }
+}
+
+/** What the armed listeners saw of the coming touch. */
+export interface LandingRecord {
+  at: string | null;
+  stray: string | null;
+  clicked: boolean;
+}
+
+/**
+ * Null once a trusted click reached the element, why not once that is known,
+ * or 'wait' while nothing has arrived inside the ceiling.
+ */
+export function landingVerdict(
+  record: LandingRecord | undefined,
+  elapsedMs: number,
+  ceilingMs: number,
+): string | null | 'wait' {
+  if (record?.clicked) return null;
+  if (record?.stray) return `the touch reached ${record.stray} instead`;
+  if (elapsedMs <= ceilingMs) return 'wait';
+  return record?.at === 'ok'
+    ? `the touch reached it but no click followed within ${ceilingMs / 1000} s (Chrome may have taken it as stopping a scroll)`
+    : `no touch reached it within ${ceilingMs / 1000} s`;
 }
 
 /**

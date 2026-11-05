@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  landingVerdict,
   mustMove,
   planSwipe,
   type Prepared,
   SPARE_SWIPES,
   swipeCeiling,
+  waitUntilStill,
   whyNotTappable,
 } from '../real-touch';
 
@@ -98,5 +100,93 @@ describe('whyNotTappable', () => {
     expect(
       whyNotTappable('#go', at(400, { hit: 'span#mutant-cover' }), 0, 6),
     ).toBe('#go is covered: a finger there would touch span#mutant-cover');
+  });
+});
+
+/** A clock the test owns: sleep moves it, nothing else does (#1044). */
+const testClock = () => {
+  let t = 0;
+  return {
+    now: () => t,
+    sleep: async (ms: number) => {
+      t += ms;
+    },
+  };
+};
+
+describe('waitUntilStill', () => {
+  it('is still once six samples in a row match the one before', async () => {
+    const shapes = ['a', 'b', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'x'];
+    let read = 0;
+    const result = await waitUntilStill(async () => shapes[read++]!, {
+      gapMs: 16,
+      ceilingMs: 3_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: true, waitedMs: 8 * 16 });
+    expect(read).toBe(9);
+  });
+
+  it('starts the count again when the shape moves', async () => {
+    const shapes = ['a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b'];
+    let read = 0;
+    const result = await waitUntilStill(async () => shapes[read++]!, {
+      gapMs: 10,
+      ceilingMs: 3_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: true, waitedMs: 11 * 10 });
+  });
+
+  it('gives up at the ceiling, on its own clock, when the shape never settles', async () => {
+    let read = 0;
+    const result = await waitUntilStill(async () => String(read++), {
+      gapMs: 16,
+      ceilingMs: 100,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: false, waitedMs: 112 });
+  });
+});
+
+describe('landingVerdict', () => {
+  it('has landed once a trusted click reached the element', () => {
+    expect(
+      landingVerdict({ at: 'ok', stray: null, clicked: true }, 0, 2_000),
+    ).toBeNull();
+  });
+
+  it('names a stray touch at once', () => {
+    expect(
+      landingVerdict(
+        { at: null, stray: 'div#x (touch, trusted true)', clicked: false },
+        10,
+        2_000,
+      ),
+    ).toBe('the touch reached div#x (touch, trusted true) instead');
+  });
+
+  it('keeps waiting while nothing has arrived inside the ceiling', () => {
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 1_999, 2_000),
+    ).toBe('wait');
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 2_000, 2_000),
+    ).toBe('wait');
+    expect(landingVerdict(undefined, 0, 2_000)).toBe('wait');
+  });
+
+  it('says a touch with no click past the ceiling may have stopped a scroll', () => {
+    expect(
+      landingVerdict({ at: 'ok', stray: null, clicked: false }, 2_001, 2_000),
+    ).toBe(
+      'the touch reached it but no click followed within 2 s (Chrome may have taken it as stopping a scroll)',
+    );
+  });
+
+  it('says nothing reached it past the ceiling', () => {
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 2_001, 2_000),
+    ).toBe('no touch reached it within 2 s');
   });
 });
