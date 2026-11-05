@@ -5,6 +5,8 @@ import type { Page } from '@playwright/test';
  * scrolls by protocol is refused (shyden-labs/shyden.co.uk#996): a tap there
  * is a touch (`tapOn`, `tapAt`, `setCheckedOn`, `doubleTapOn`) and a scroll
  * is a real finger drag (`scrollToOn`), all in `tests/real-touch.ts`. A
+ * dropdown is chosen with `chooseOption` (`tests/real-select.ts`, #1027), never
+ * `selectOption`, which sets the option in a script. A
  * bare `click()` that reaches the phone fails its test, naming the helper to
  * use, rather than passing on input no finger makes.
  */
@@ -19,6 +21,7 @@ const LOCATOR = [
   'hover',
   'dragTo',
   'scrollIntoViewIfNeeded',
+  'selectOption',
 ] as const;
 const PAGE = [
   'click',
@@ -29,6 +32,7 @@ const PAGE = [
   'tap',
   'hover',
   'dragAndDrop',
+  'selectOption',
 ] as const;
 const MOUSE = ['click', 'dblclick', 'down', 'up', 'move', 'wheel'] as const;
 
@@ -49,7 +53,7 @@ export function refuse(
   for (const name of names)
     marked[name] = () => {
       throw new MouseOnPhoneError(
-        `${owner}.${name}() on the phone sends mouse input or scrolls by protocol (#996): tap with tapOn, tapAt, setCheckedOn or doubleTapOn, and scroll with scrollToOn (tests/real-touch.ts)`,
+        `${owner}.${name}() on the phone sends mouse input or scrolls by protocol (#996): tap with tapOn, tapAt, setCheckedOn or doubleTapOn, scroll with scrollToOn (tests/real-touch.ts), and choose a dropdown with chooseOption (tests/real-select.ts)`,
       );
     };
   Object.defineProperty(target, REFUSED, { value: true });
