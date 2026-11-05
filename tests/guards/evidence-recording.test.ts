@@ -58,12 +58,14 @@ const ACTIONS = [
   'scrollTo(',
   'scrollBy(',
   // The real-input helpers (tests/real-touch.ts, tests/real-typing.ts):
-  // a real touch, drag or key press, every engine (#996, #998).
+  // a real touch, drag, wheel turn or key press, every engine (#996, #998,
+  // #1004).
   'tapOn(',
   'doubleTapOn(',
   'tapAt(',
   'setCheckedOn(',
   'scrollToOn(',
+  'scrollByOn(',
   'typeInto(',
 ] as const;
 

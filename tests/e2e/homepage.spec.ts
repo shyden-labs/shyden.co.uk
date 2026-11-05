@@ -1,4 +1,10 @@
-import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
+import {
+  scrollByOn,
+  scrollToOn,
+  setCheckedOn,
+  tapAt,
+  tapOn,
+} from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -617,22 +623,24 @@ test.describe('the language band sits under the header (#599)', () => {
       async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        const hit = await page.evaluate(async () => {
+        // The band's top edge halfway up under the header, scrolled there by
+        // real input, the wheel or a finger (#1004). It may not land on the
+        // exact pixel; the overlap's own liveness check below reads where it
+        // came to rest.
+        const distance = await page.evaluate(() => {
           const header = document.querySelector('header');
           const clip = document.querySelector('.marquee-clip');
           if (!header || !clip) throw new Error('header or band missing');
-          const headerHeight = header.getBoundingClientRect().height;
-          // The band's top edge halfway up under the header.
-          window.scrollTo(
-            0,
-            clip.getBoundingClientRect().top +
-              window.scrollY -
-              headerHeight / 2,
+          return (
+            clip.getBoundingClientRect().top -
+            header.getBoundingClientRect().height / 2
           );
-          const frame = () =>
-            new Promise((done) => requestAnimationFrame(done));
-          await frame();
-          await frame();
+        });
+        await scrollByOn(page, distance);
+        const hit = await page.evaluate(() => {
+          const header = document.querySelector('header');
+          const clip = document.querySelector('.marquee-clip');
+          if (!header || !clip) throw new Error('header or band missing');
           const h = header.getBoundingClientRect();
           const c = clip.getBoundingClientRect();
           const top = Math.max(h.top, c.top);
@@ -675,16 +683,16 @@ test.describe('the language band sits under the header (#599)', () => {
     page,
   }) => {
     await page.goto('/');
-    const bottom = await page.evaluate(async () => {
-      const clip = document.querySelector('.marquee-clip');
-      if (!clip) throw new Error('band missing');
-      window.scrollTo(
-        0,
-        clip.getBoundingClientRect().bottom + window.scrollY + 1,
-      );
-      await new Promise((done) => requestAnimationFrame(done));
-      return clip.getBoundingClientRect().bottom;
-    });
+    const band = page.locator('.marquee-clip');
+    const below = await band.evaluate(
+      (clip) => clip.getBoundingClientRect().bottom,
+    );
+    // Past it by real input, the wheel or a finger (#1004), with room to spare
+    // for a scroll that does not land on the exact pixel.
+    await scrollByOn(page, below + 50);
+    const bottom = await band.evaluate(
+      (clip) => clip.getBoundingClientRect().bottom,
+    );
     expect(
       bottom,
       'the band is still on screen after scrolling past it',

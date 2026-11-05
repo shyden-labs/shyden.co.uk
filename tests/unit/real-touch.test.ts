@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CENTRE_SHARE,
   mustMove,
   planSwipe,
+  planKeys,
+  planWheel,
+  scrollMover,
   type Prepared,
   SPARE_SWIPES,
   swipeCeiling,
+  whyKeysCannotScroll,
   whyNotTappable,
 } from '../real-touch';
 
@@ -42,6 +47,18 @@ describe('mustMove', () => {
   });
   it('moves a covered point, wherever it is', () => {
     expect(mustMove(at(400, { hit: 'div.bar' }))).toBe(true);
+  });
+  it('with no edge (off the phone), moves only a point out of view (#1004)', () => {
+    expect(mustMove(at(30), 0)).toBe(false);
+    expect(mustMove(at(790), 0)).toBe(false);
+    expect(mustMove(at(-1), 0)).toBe(true);
+    expect(mustMove(at(801), 0)).toBe(true);
+  });
+  it('with the centre band, moves a point within 30% of either edge (#1004)', () => {
+    expect(mustMove(at(239), CENTRE_SHARE)).toBe(true);
+    expect(mustMove(at(240), CENTRE_SHARE)).toBe(false);
+    expect(mustMove(at(560), CENTRE_SHARE)).toBe(false);
+    expect(mustMove(at(561), CENTRE_SHARE)).toBe(true);
   });
   it('reads the edges from the visual viewport offset', () => {
     expect(mustMove(at(1100, { viewTop: 1000, inView: true }))).toBe(false);
@@ -86,7 +103,7 @@ describe('whyNotTappable', () => {
   });
   it('names the element and the ceiling when it never came into view', () => {
     expect(whyNotTappable('#go', at(3000), 11, 11)).toBe(
-      '#go did not come into view after 11 real swipes (the point is at y 3000, the view is 800 tall)',
+      '#go did not come into view after 11 real swipes (the point is at x 200, y 3000; the view is 400 wide, 800 tall)',
     );
   });
   it('says the page stopped moving when a swipe no longer moves it', () => {
@@ -98,5 +115,120 @@ describe('whyNotTappable', () => {
     expect(
       whyNotTappable('#go', at(400, { hit: 'span#mutant-cover' }), 0, 6),
     ).toBe('#go is covered: a finger there would touch span#mutant-cover');
+  });
+  it('names wheel steps and a pointer when the page is moved by the wheel (#1004)', () => {
+    expect(whyNotTappable('#go', at(3000), 11, 11, 'wheel')).toBe(
+      '#go did not come into view after 11 real wheel steps (the point is at x 200, y 3000; the view is 400 wide, 800 tall)',
+    );
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'wheel')).toMatch(
+      /^#go did not come into view: a real wheel step no longer moves it/,
+    );
+    expect(
+      whyNotTappable('#go', at(400, { hit: 'div.bar' }), 0, 6, 'wheel'),
+    ).toBe('#go is covered: a pointer there would touch div.bar');
+  });
+});
+
+describe('planWheel (#1004)', () => {
+  it('turns the wheel by exactly the distance to the middle when that is within reach', () => {
+    expect(planWheel(at(700))).toEqual([300]);
+    expect(planWheel(at(100))).toEqual([-300]);
+  });
+  it('spins a far point in steps of at most 60% of the view, summing to the distance', () => {
+    const steps = planWheel(at(2000));
+    expect(steps).toEqual([480, 480, 480, 160]);
+    expect(steps.reduce((a, b) => a + b, 0)).toBe(1600);
+    expect(planWheel(at(-1000))).toEqual([-480, -480, -440]);
+  });
+  it('turns a share of the distance after an overshoot, never under 40 px', () => {
+    expect(planWheel(at(700), 0.5)).toEqual([150]);
+    expect(planWheel(at(2000), 0.25)).toEqual([400]);
+    expect(planWheel(at(450), 0.5)).toEqual([40]);
+  });
+  it('never turns less than 40 px', () => {
+    expect(planWheel(at(410))).toEqual([40]);
+    expect(planWheel(at(390))).toEqual([-40]);
+  });
+});
+
+describe('scrollMover (#1004)', () => {
+  it('drags a finger on the real phone, whatever the engine says', () => {
+    expect(
+      scrollMover({ realDevice: true, engine: 'chromium', touch: true }),
+    ).toBe('touch');
+  });
+  it("drags a finger on Chromium's emulated phone, the one emulator that takes touch drags", () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'chromium', touch: true }),
+    ).toBe('touch');
+  });
+  it('turns the wheel on the desktop engines', () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'chromium', touch: false }),
+    ).toBe('wheel');
+    expect(
+      scrollMover({ realDevice: false, engine: 'firefox', touch: false }),
+    ).toBe('wheel');
+    expect(
+      scrollMover({ realDevice: false, engine: 'webkit', touch: false }),
+    ).toBe('wheel');
+  });
+  it("presses keys on WebKit's emulated iPhone, a marked stand-in: Playwright refuses its wheel (#1036)", () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'webkit', touch: true }),
+    ).toBe('keys');
+  });
+  it('turns the wheel on any other engine given touch, which has no mobile refusal', () => {
+    expect(
+      scrollMover({ realDevice: false, engine: 'firefox', touch: true }),
+    ).toBe('wheel');
+  });
+});
+
+describe('planKeys (#1036)', () => {
+  it('presses arrows for a near point', () => {
+    // 300 px to the middle, at WebKit's 40 px a line: 8 presses (320 px).
+    expect(planKeys(at(700), 1)).toEqual(Array(8).fill('ArrowDown'));
+    expect(planKeys(at(100), 1)).toEqual(Array(8).fill('ArrowUp'));
+  });
+  it('presses one page key for a point more than a page away', () => {
+    expect(planKeys(at(2000), 1)).toEqual(['PageDown']);
+    expect(planKeys(at(-1000), 1)).toEqual(['PageUp']);
+  });
+  it('presses a share of the arrows after an overshoot, never none', () => {
+    expect(planKeys(at(700), 0.5)).toEqual(Array(4).fill('ArrowDown'));
+    expect(planKeys(at(410), 0.25)).toEqual(['ArrowDown']);
+    expect(planKeys(at(390), 1)).toEqual(['ArrowUp']);
+  });
+});
+
+describe('whyKeysCannotScroll (#1036: keys are pressed with nothing focused)', () => {
+  it('lets the keys go once a tap on blank space has left nothing focused', () => {
+    expect(whyKeysCannotScroll('input#name', { x: 12, y: 400 }, null)).toBe(
+      null,
+    );
+  });
+  it('fails naming the focus when the view has no blank space to tap', () => {
+    expect(whyKeysCannotScroll('input#name', null, null)).toBe(
+      'the keys would go to input#name, and the view has no blank space to tap it away',
+    );
+  });
+  it('fails naming the focus when the tap on blank space left it focused', () => {
+    expect(
+      whyKeysCannotScroll('input#name', { x: 12, y: 400 }, 'input#name'),
+    ).toBe(
+      'the keys would go to input#name: a real tap on blank space at (12, 400) left it focused',
+    );
+  });
+});
+
+describe('whyNotTappable names key presses (#1036)', () => {
+  it('names key presses and a pointer when the page is moved by keys', () => {
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'keys')).toMatch(
+      /^#go did not come into view: a real key press no longer moves it/,
+    );
+    expect(
+      whyNotTappable('#go', at(400, { hit: 'div.bar' }), 0, 6, 'keys'),
+    ).toBe('#go is covered: a pointer there would touch div.bar');
   });
 });
