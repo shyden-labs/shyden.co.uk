@@ -1414,16 +1414,10 @@ test.describe('the Yawelo Idle preview video', () => {
 
   test('nothing of the video downloads before it is played', async ({
     page,
-    browserName,
   }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+    // Runs on every engine (Shyden, 2026-11-05, #1048): an engine that
+    // fetches a rendition before play, or never advances the clock after it,
+    // fails here. CI's Linux WebKit did both when measured on 2026-10-20.
     const seen = recordRequests(page);
     await page.goto('/');
     // Liveness: the recorder heard the poster, which loads with the page.
@@ -1457,15 +1451,10 @@ test.describe('the Yawelo Idle preview video', () => {
     );
   });
 
-  test('pressing play plays the preview', async ({ page, browserName }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+  test('pressing play plays the preview', async ({ page }) => {
+    // Runs on every engine (Shyden, 2026-11-05, #1048): an engine that
+    // fetches a rendition before play, or never advances the clock after it,
+    // fails here. CI's Linux WebKit did both when measured on 2026-10-20.
     await page.goto('/');
     const video = page.locator('#yawelo-idle video');
     await expect(video).toBeVisible();
