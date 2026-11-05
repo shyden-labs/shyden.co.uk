@@ -48,26 +48,11 @@ jobs:
       - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
         run: npm run build
       - name: Guard — fail if a [[placeholder]] leaked into shipped text
-        # -I: skip binary files. woff/woff2 fonts contain the bytes `[[`; a
-        # placeholder leak is a TEXT concern, so scanning binaries false-fails.
-        #
-        # Matches the placeholder SHAPE — `[[` … `]]` with no `]` between —
-        # rather than a bare `[[`. A bare `[[` is ordinary JavaScript: the
-        # minified bundle contains `new Map([[k,v],[k,v]])`, which blocked a
-        # release on 2026-08-05 with nothing wrong with the site. This is the
-        # second false positive of the same kind (see the `-I` note above), and
-        # both had the same cause — matching a fragment instead of the thing.
-        #
-        # It stays safe against that syntax because `[^]]` cannot cross the
-        # first `]`, so `[[k,v],` never completes the pattern. Verified against
-        # a real build: 0 matches, while an injected `[[companyNo]]` and an
-        # injected `[[reg office]]` are both caught.
-        run: |
-          if grep -rnIE '\[\[[^]]{1,60}\]\]' dist/; then
-            echo "::error::A [[…]] placeholder reached dist/ — refusing to ship to prod."
-            exit 1
-          fi
-          echo "No bracket placeholders in dist/ (text)."
+        # scripts/placeholders.mjs (#1040): the `[[…]]` shape in every text
+        # file under dist/, skipping binaries and vendored Swagger UI, whose
+        # minified arrays (`[[e,r]]`) stopped the 2026-11-05 release. Its unit
+        # test pins both what it catches and what it passes.
+        run: node scripts/placeholders.mjs dist
       - name: Deploy dist/ to Cloudflare Pages (prod project)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

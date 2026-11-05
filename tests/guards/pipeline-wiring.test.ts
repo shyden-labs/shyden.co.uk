@@ -428,13 +428,13 @@ describe('the deploy pipeline runs what it claims to', () => {
     expect(deploys).toEqual(['deploy-prod.yml deploy-prod in prod']);
   });
 
-  // The placeholder guard cost two false-failed releases before it matched the
-  // placeholder SHAPE rather than a bare `[[`, and before it skipped binaries.
-  // Both fixes live in one line, and losing either is a release blocked for
-  // nothing.
-  it('the prod placeholder guard still skips binaries and matches a shape', () => {
+  // The placeholder guard cost three false-failed releases: a bare `[[`, then
+  // binaries, then vendored Swagger UI (#1040). Its rules now live in
+  // scripts/placeholders.mjs, pinned by tests/unit/placeholders.test.ts; this
+  // holds the deploy to running it on dist/.
+  it('the prod deploy runs the placeholder scan on dist/', () => {
     const prod = workflowSteps('deploy-prod.yml');
-    expect(prod).toContain("grep -rnIE '\\[\\[[^]]{1,60}\\]\\]' dist/");
+    expect(prod).toContain('node scripts/placeholders.mjs dist');
   });
 
   // Every page, every locale, and before a release as well as after one. The

@@ -23,6 +23,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
+  // Without a directory to scan it prints its usage and refuses (#1040).
+  'placeholders.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/placeholders.mjs',
+  },
   // Without its three paths it prints its usage and refuses.
   'build-evidence-page.mjs': {
     args: [],
