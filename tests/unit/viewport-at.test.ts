@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Page } from '@playwright/test';
-import { atViewport } from '../viewport-at';
+import { atViewport, measuredViewport } from '../viewport-at';
 
 /**
  * #1046: a target with a screen of its own (a real phone) cannot be resized, so a
@@ -95,5 +95,36 @@ describe('atViewport', () => {
       width: 411,
       height: 759,
     });
+  });
+});
+
+describe('measuredViewport', () => {
+  it('on an emulated target, reports the size the test set, never re-setting it', async () => {
+    // A Firefox window grown under fullscreen (#758) must not be read as the
+    // size the test named: the set size is Playwright's own record.
+    const calls: unknown[] = [];
+    const page = {
+      viewportSize: () => ({ width: 740, height: 360 }),
+      setViewportSize: async (size: unknown) => {
+        calls.push(size);
+      },
+      evaluate: async () => ({ vvWidth: 1366, vvHeight: 768, vvScale: 1 }),
+    } as unknown as Page;
+    expect(await measuredViewport(page)).toEqual({ width: 740, height: 360 });
+    expect(calls).toEqual([]);
+  });
+
+  it('on a real phone, measures the screen as it is now', async () => {
+    // The OPPO with the board open, 2026-11-07: Chrome hid its address bar.
+    const page = {
+      viewportSize: () => null,
+      setViewportSize: async () => {},
+      evaluate: async () => ({
+        vvWidth: 411.4285583496094,
+        vvHeight: 815.4285888671875,
+        vvScale: 1,
+      }),
+    } as unknown as Page;
+    expect(await measuredViewport(page)).toEqual({ width: 411, height: 815 });
   });
 });

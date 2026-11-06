@@ -22,7 +22,7 @@ import { FLOOR_PX } from '../../src/scripts/projector';
 import { measureBoard, measureCover } from '../board-geometry';
 import { coverGaps } from '../device-pixels';
 import { recorded, shoot } from './evidence';
-import { atViewport } from '../viewport-at';
+import { atViewport, measuredViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -1040,15 +1040,17 @@ const boardGeometry = async (page: import('@playwright/test').Page) =>
 const expectNothingOutOfReach = async (
   page: import('@playwright/test').Page,
   what: string,
-  named?: { width: number; height: number },
+  sized = false,
 ) => {
   // A reading means what it says only at the viewport the test names (#758).
   // Granted fullscreen, Firefox grows the window to the runner's whole screen
   // (1366x768 on CI, from a 740x360 phone), asynchronously, and no context
-  // option holds it: measured in every engine on run 38376192900. The size
-  // is handed in by a test that set it, never read from `page.viewportSize()`,
-  // which is null on a real phone (`viewport-tagging.test.ts`).
-  if (named) {
+  // option holds it: measured in every engine on run 38376192900.
+  // Read once the board is open (Shyden, 2026-11-07, #1046): on a real
+  // phone the open board hides Chrome's address bar, so the screen really
+  // grows; an emulated target still answers with the size the test set.
+  if (sized) {
+    const named = await measuredViewport(page);
     const at = await page.evaluate(() => ({
       width: innerWidth,
       height: innerHeight,
@@ -1140,10 +1142,10 @@ test.describe('the projector board never hides a name', () => {
     test(`nothing waiting is out of reach on ${shape.what}`, async ({
       page,
     }) => {
-      const took = await atViewport(page, shape.viewport);
+      await atViewport(page, shape.viewport);
       await refuseFullscreen(page);
       await openWaitingBoard(page, shape.count, shape.size);
-      await expectNothingOutOfReach(page, 'the waiting board, short', took);
+      await expectNothingOutOfReach(page, 'the waiting board, short', true);
     });
   }
 
@@ -1163,7 +1165,7 @@ test.describe('the projector board never hides a name', () => {
     await expectNothingOutOfReach(
       page,
       `the waiting board at ${narrow.width}px`,
-      narrow,
+      true,
     );
   });
 
@@ -1176,9 +1178,9 @@ test.describe('the projector board never hides a name', () => {
 
   for (const shape of SHORT_BOARDS) {
     test(`nothing is out of reach on ${shape.what}`, async ({ page }) => {
-      const took = await atViewport(page, shape.viewport);
+      await atViewport(page, shape.viewport);
       await boardOf(page, shape.count, shape.size);
-      await expectNothingOutOfReach(page, 'group cards on a short board', took);
+      await expectNothingOutOfReach(page, 'group cards on a short board', true);
     });
   }
 
