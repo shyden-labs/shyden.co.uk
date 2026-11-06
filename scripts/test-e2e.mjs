@@ -35,6 +35,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { messageOf } from './errors.mjs';
+import { countByProject } from './even-totals.mjs';
 import {
   appendFileSync,
   mkdirSync,
@@ -572,6 +573,8 @@ function main() {
     let executed = null;
     /** @type {Record<string, number> | null} */
     let ranUnits = null;
+    /** @type {Record<string, { passed: number, failed: number, skipped: number }> | undefined} */
+    let projectCounts;
     let parsed = null;
     /** @type {unknown} */
     let unreadable = null;
@@ -579,6 +582,7 @@ function main() {
       parsed = JSON.parse(readFileSync(reportPath, 'utf8'));
       executed = countExecuted(parsed.stats);
       ranUnits = ranByUnit(parsed);
+      projectCounts = countByProject(parsed);
     } catch (cause) {
       unreadable = cause;
     }
@@ -596,6 +600,7 @@ function main() {
       seconds,
       listedUnits: listedByUnit(listing.stdout ?? ''),
       ranUnits,
+      projectCounts,
     });
     const accountDir = process.env.E2E_ACCOUNT_DIR;
     if (recorded && accountDir) {

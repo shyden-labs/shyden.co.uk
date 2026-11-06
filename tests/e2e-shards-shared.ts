@@ -35,6 +35,10 @@ export interface Account {
   seconds: number | null;
   listedUnits: Record<string, number> | null;
   ranUnits: Record<string, number> | null;
+  projectCounts?: Record<
+    string,
+    { passed: number; failed: number; skipped: number }
+  >;
 }
 
 export const SUITE = 2210;
