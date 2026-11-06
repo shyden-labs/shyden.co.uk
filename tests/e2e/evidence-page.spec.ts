@@ -15,6 +15,7 @@ import { test as base, expect } from './fixtures';
 import { contrastRatio } from './helpers';
 import { recordErrors } from './recorders';
 import { recorded, shoot } from './evidence';
+import { tabKey } from '../tab-key';
 
 /**
  * The evidence page's sign-off ticks, driven through the page's OWN rendered
@@ -1409,12 +1410,6 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     page,
     browserName,
   }, testInfo) => {
-    test.skip(
-      browserName === 'webkit',
-      'Safari omits plain links from the Tab sequence unless the visitor opts in, ' +
-        'so a Tab walk here would assert a browser preference, not our markup. ' +
-        'The link takes focus on every engine in the test above.',
-    );
     await openEvidencePage(page, testInfo, {
       order: 'resolve-then-confirm',
       html: HTML_WITH_ADDED,
@@ -1426,7 +1421,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     });
     await expect(link).toBeVisible();
     await approveButton(page).focus();
-    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press(tabKey(browserName, 'backwards'));
     await expect(
       link,
       'the notice sits just before the verdict buttons in the Tab order',

@@ -1,4 +1,5 @@
-import { setCheckedOn, tapOn } from '../real-touch';
+import { setCheckedOn, swipeOver, tapOn } from '../real-touch';
+import { scrollInput } from '../scroll-input';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
@@ -1789,12 +1790,14 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   // scrolling the page silently rewrites the class size. CSS cannot reach it.
   test('scrolling the page does not change a focused number field', async ({
     page,
+    browserName,
     isMobile,
   }) => {
-    // A touch device has no wheel to guard against, and WebKit's mobile
-    // emulation rejects mouse.wheel outright. The behaviour under test only
-    // exists where a wheel does.
-    test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
+    // Each target scrolls with its own real input (#1048): the wheel where
+    // there is a mouse, a finger on a Chromium phone. Mobile WebKit has
+    // neither, so the test fails there naming why (Shyden 2026-11-06, #1036).
+    const input = scrollInput(browserName, !!isMobile || onRealDevice());
+    if (input.kind === 'none') throw new Error(input.why);
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
     await count.focus();
@@ -1806,10 +1809,23 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     // value that was never read.
     const before = await count.inputValue();
     expect(before).not.toBe('');
-    await count.hover();
-    await page.mouse.wheel(0, 240);
+    if (input.kind === 'wheel') {
+      await count.hover();
+      await page.mouse.wheel(0, 240);
+      await expect(count).toHaveValue(before);
+      await page.mouse.wheel(0, -240);
+      await expect(count).toHaveValue(before);
+      return;
+    }
+    // The swipe must really move the page, or the value staying put proves
+    // nothing about scrolling.
+    const top = await page.evaluate(() => window.scrollY);
+    await swipeOver(count, -200);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(top);
     await expect(count).toHaveValue(before);
-    await page.mouse.wheel(0, -240);
+    await swipeOver(count, 200);
     await expect(count).toHaveValue(before);
   });
 });
@@ -1976,9 +1992,10 @@ test.describe('a full roster at the narrow end', () => {
  * 807). The viewport tag's `interactive-widget=resizes-content` shrinks the
  * page above the keyboard instead (operator decision 2026-10-18).
  *
- * Only a device with an on-screen keyboard can answer this: the desktop
- * engines and the emulated phones open none, so the test asks the device
- * whether one opened and skips, saying so, when it did not.
+ * Only a device with an on-screen keyboard can cover the bar: the desktop
+ * engines and the emulated phones open none. The test runs on every target
+ * all the same and asserts the bar is in view whether or not a keyboard
+ * opened (Shyden, 2026-11-05, #1048).
  */
 test.describe('the on-screen keyboard', () => {
   test('leaves Make Groups on screen while a teacher types', async ({
@@ -1995,20 +2012,18 @@ test.describe('the on-screen keyboard', () => {
     await page.keyboard.type('3');
     // A keyboard rises a few hundred milliseconds after the field takes focus
     // (about 300 ms on the test phone); three seconds is the stated ceiling.
-    const keyboardOpened = await page
+    // Where none opens (a laptop, an emulated phone), nothing waits on it: the
+    // bar must be in view either way (Shyden, 2026-11-05, #1048).
+    await page
       .waitForFunction(
         (before) => (visualViewport?.height ?? innerHeight) < before,
         visibleBefore,
         { timeout: 3_000 },
       )
       .then(
-        () => true,
-        () => false,
+        () => 'a keyboard opened',
+        () => 'no keyboard opened',
       );
-    test.skip(
-      !keyboardOpened,
-      'no on-screen keyboard opened on this device, so nothing can cover the bar',
-    );
 
     await expect(page.locator('#cg-size')).toBeFocused();
     await expect

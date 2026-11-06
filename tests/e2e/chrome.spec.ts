@@ -5,6 +5,7 @@ import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { searched } from '../source-files';
+import { tabKey } from '../tab-key';
 
 test.use(recorded);
 
@@ -158,21 +159,15 @@ test.describe('header + footer', () => {
   // genuinely disagree about one of them and agree about the other.
   //
   // Safari, by default, does not put plain links in the Tab sequence at all —
-  // the visitor opts in with "Press Tab to highlight each item". That is the
-  // VISITOR's setting to make, so the Tab-sequence test below runs only where
-  // links are tabbed, and the contract that must hold everywhere — that each
-  // control can take focus and none is removed from the tab order — is
-  // asserted separately, on every engine.
+  // the visitor opts in with "Press Tab to highlight each item", or holds
+  // Option, which reaches every link. The Tab-sequence test below walks with
+  // Option+Tab on WebKit (`tabKey`, #1048) and runs on every engine; the
+  // contract that each control can take focus and none is removed from the tab
+  // order is asserted separately, on every engine.
   test(
     'desktop: the header is keyboard-reachable in order (WCAG 2.1.1)',
     { tag: '@emulated-viewport' },
     async ({ page, browserName }) => {
-      test.skip(
-        browserName === 'webkit',
-        'Safari omits plain links from the Tab sequence unless the visitor opts in, ' +
-          'so a Tab walk here would assert a browser preference, not our markup. ' +
-          'Focusability and order are asserted for WebKit in the tests below.',
-      );
       await page.setViewportSize({ width: 1280, height: 800 });
       await page.goto('/');
       // Anchor on the language switcher's summary — the last focusable thing
@@ -186,13 +181,13 @@ test.describe('header + footer', () => {
       // (#142 §5). Reached by Shift+Tab, never focused directly, so a switch
       // taken out of the Tab order (tabindex="-1") is stepped over and this
       // fails where a direct focus() would still succeed.
-      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press(tabKey(browserName, 'backwards'));
       await expect(page.locator('header [data-theme-toggle]')).toBeFocused();
-      await page.keyboard.press('Tab');
+      await page.keyboard.press(tabKey(browserName));
       await expect(languages).toBeFocused();
 
       for (const label of ['ShyTalk', 'Yawelo Idle', 'Tools', 'Contact']) {
-        await page.keyboard.press('Tab');
+        await page.keyboard.press(tabKey(browserName));
         await expect(
           page.locator('header nav a', { hasText: label }),
         ).toBeFocused();

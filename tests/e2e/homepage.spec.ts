@@ -1351,6 +1351,10 @@ const PROMO_SOURCES = [
 ];
 const PROMO_WIDTHS = [320, 375, 768, 1280] as const;
 
+// Shyden's ruling (#1048, 2026-11-06): these stay red on Linux WebKit, naming why.
+const WEBKIT_MEDIA =
+  " (CI's Linux WebKit fetches before play and never plays: real Safari in CI is shyden-labs/shyden.co.uk#1036)";
+
 test.describe('the Yawelo Idle preview video', () => {
   for (const locale of LOCALES)
     test(`${locale}: the preview is a native player with its poster, sized before it loads`, async ({
@@ -1414,16 +1418,10 @@ test.describe('the Yawelo Idle preview video', () => {
 
   test('nothing of the video downloads before it is played', async ({
     page,
-    browserName,
   }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+    // Runs on every engine (Shyden, 2026-11-05, #1048): an engine that
+    // fetches a rendition before play, or never advances the clock after it,
+    // fails here. CI's Linux WebKit did both when measured on 2026-10-20.
     const seen = recordRequests(page);
     await page.goto('/');
     // Liveness: the recorder heard the poster, which loads with the page.
@@ -1436,7 +1434,8 @@ test.describe('the Yawelo Idle preview video', () => {
         of: heard,
         what: 'requests the homepage made',
       }),
-      'preload="none": no rendition is fetched until the visitor plays it',
+      'preload="none": no rendition is fetched until the visitor plays it' +
+        WEBKIT_MEDIA,
     ).toEqual([]);
   });
 
@@ -1457,15 +1456,10 @@ test.describe('the Yawelo Idle preview video', () => {
     );
   });
 
-  test('pressing play plays the preview', async ({ page, browserName }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+  test('pressing play plays the preview', async ({ page }) => {
+    // Runs on every engine (Shyden, 2026-11-05, #1048): an engine that
+    // fetches a rendition before play, or never advances the clock after it,
+    // fails here. CI's Linux WebKit did both when measured on 2026-10-20.
     await page.goto('/');
     const video = page.locator('#yawelo-idle video');
     await expect(video).toBeVisible();
@@ -1476,7 +1470,9 @@ test.describe('the Yawelo Idle preview video', () => {
       return v.play();
     });
     await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+        message: 'the clock moves once the preview plays' + WEBKIT_MEDIA,
+      })
       .toBeGreaterThan(0.2);
     const chosen = await video.evaluate((v: HTMLVideoElement) => v.currentSrc);
     test
