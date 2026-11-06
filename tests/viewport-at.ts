@@ -30,19 +30,18 @@ export async function atViewport(
     return want;
   }
   // A real phone is measured. Before a test opens its page, the tab may hold
-  // a blank one with no viewport meta, laid out at Chrome's 980px default
-  // (2026-11-06 phone run: 980x1809 on a 411px-wide screen). The screen's own
-  // width says what a page with `width=device-width` will have, and the
-  // height scales with it.
-  const { innerWidth, innerHeight, screenWidth } = await page.evaluate(() => ({
-    innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight,
-    screenWidth: window.screen.width,
-  }));
-  if (innerWidth <= screenWidth)
-    return { width: innerWidth, height: innerHeight };
+  // a blank one with no viewport meta: a 980px layout zoomed to fit the
+  // screen (measured on the OPPO, 2026-11-07: 980 at scale 0.4198, then
+  // 411x759 once the page loaded). The visual viewport times its scale is the
+  // screen in CSS pixels either way, and the page's own innerWidth is that
+  // rounded down. screen.width rounds it instead (412), one pixel off.
+  const { vvWidth, vvHeight, vvScale } = await page.evaluate(() => {
+    const vv = window.visualViewport;
+    if (vv === null) throw new Error('this browser has no visualViewport');
+    return { vvWidth: vv.width, vvHeight: vv.height, vvScale: vv.scale };
+  });
   return {
-    width: screenWidth,
-    height: Math.round((innerHeight * screenWidth) / innerWidth),
+    width: Math.floor(vvWidth * vvScale),
+    height: Math.floor(vvHeight * vvScale),
   };
 }
