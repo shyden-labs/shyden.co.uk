@@ -12,6 +12,7 @@ import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { sitePaths } from '../site-pages';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -106,15 +107,15 @@ test.describe('language switcher', () => {
   // Both sides of the edge, and both ends of the range (#329).
   for (const locale of LOCALES)
     for (const width of [320, COMPACT_BELOW - 1, COMPACT_BELOW, 1280])
-      test(
-        `${locale} at ${width}px: shows the short code below 720px and the full name from 720px`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 720 });
-          await page.goto(localisePath('/', locale));
-          await expectLabel(page, locale, width);
-        },
-      );
+      test(`${locale} at ${width}px: shows the short code below 720px and the full name from 720px`, async ({
+        page,
+      }) => {
+        // The label follows the width the page really has: a phone takes none of
+        // the widths asked for, so it is checked at its own (#1046).
+        const took = await atViewport(page, { width, height: 720 });
+        await page.goto(localisePath('/', locale));
+        await expectLabel(page, locale, took.width);
+      });
 
   for (const locale of LOCALES)
     test(`${locale}: lists every language in one fixed order, the current one ticked in place, every other a link`, async ({
@@ -246,44 +247,36 @@ test.describe('language switcher', () => {
   // test most needed to see. One test per locale (#420): the loop that once
   // lived inside this test shared one budget across all five.
   for (const locale of LOCALES)
-    test(
-      `${locale}: adds no horizontal scroll at 320px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        const path = localisePath('/', locale);
-        await page.setViewportSize({ width: 320, height: 720 });
-        await page.goto(path);
-        // Not vacuous: a switcher hidden at 320px would satisfy "no overflow"
-        // trivially, and would also be the wrong fix.
-        await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
-        await expectNoHorizontalScroll(
-          page,
-          `${path} scrolls sideways at 320px`,
-        );
-      },
-    );
+    test(`${locale}: adds no horizontal scroll at 320px`, async ({ page }) => {
+      const path = localisePath('/', locale);
+      await atViewport(page, { width: 320, height: 720 });
+      await page.goto(path);
+      // Not vacuous: a switcher hidden at 320px would satisfy "no overflow"
+      // trivially, and would also be the wrong fix.
+      await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
+      await expectNoHorizontalScroll(page, `${path} scrolls sideways at 320px`);
+    });
 
   // Every language (#390 F131): the panel hangs off a summary whose width is
   // each language's own, so this is a fit test, and it read English only.
   for (const locale of LOCALES)
-    test(
-      `${locale}: the open dropdown stays inside the viewport at 320px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        // Page-level scrollWidth is not containment: a panel can escape its
-        // own container and still produce zero document scroll.
-        await page.setViewportSize({ width: 320, height: 720 });
-        await page.goto(localisePath('/', locale));
-        await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
-        await tapOn(page.locator(`${SWITCHER} > summary`));
-        const box = (await page.locator(`${SWITCHER} ul`).boundingBox())!;
-        expect(box.x, 'dropdown escapes the left edge').toBeGreaterThanOrEqual(
-          0,
-        );
-        expect(
-          box.x + box.width,
-          'dropdown escapes the right edge',
-        ).toBeLessThanOrEqual(320);
-      },
-    );
+    test(`${locale}: the open dropdown stays inside the viewport at 320px`, async ({
+      page,
+    }) => {
+      // Page-level scrollWidth is not containment: a panel can escape its
+      // own container and still produce zero document scroll.
+      const { width: viewportWidth } = await atViewport(page, {
+        width: 320,
+        height: 720,
+      });
+      await page.goto(localisePath('/', locale));
+      await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
+      await tapOn(page.locator(`${SWITCHER} > summary`));
+      const box = (await page.locator(`${SWITCHER} ul`).boundingBox())!;
+      expect(box.x, 'dropdown escapes the left edge').toBeGreaterThanOrEqual(0);
+      expect(
+        box.x + box.width,
+        'dropdown escapes the right edge',
+      ).toBeLessThanOrEqual(viewportWidth);
+    });
 });
