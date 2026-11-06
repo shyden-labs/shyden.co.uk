@@ -27,6 +27,7 @@
  *   NEEDS_JSON='${{ toJSON(needs) }}' node scripts/e2e-shards.mjs \
  *     <e2e account files> --capture <capture account files>
  */
+import { totalLine } from './even-totals.mjs';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { messageOf } from './errors.mjs';
 import { isRecord } from '../src/lib/is-record.ts';
@@ -46,6 +47,7 @@ import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
  *   seconds: number | null,
  *   listedUnits: Record<string, number> | null,
  *   ranUnits: Record<string, number> | null,
+ *   projectCounts?: Record<string, { passed: number, failed: number, skipped: number }>,
  * }} ShardAccount
  */
 
@@ -165,6 +167,7 @@ export function accountFileName({ index, total }) {
  *   seconds: number | null,
  *   listedUnits: Record<string, number> | null,
  *   ranUnits: Record<string, number> | null,
+ *   projectCounts?: Record<string, { passed: number, failed: number, skipped: number }>,
  * }} run
  * @returns {{ file: string, account: ShardAccount } | null}
  */
@@ -177,6 +180,7 @@ export function shardAccount({
   seconds,
   listedUnits,
   ranUnits,
+  projectCounts,
 }) {
   const shard = shardOf(argv);
   if (shard === null) return null;
@@ -191,6 +195,7 @@ export function shardAccount({
       seconds,
       listedUnits,
       ranUnits,
+      projectCounts,
     },
   };
 }
@@ -658,6 +663,35 @@ function loadAccount(file) {
 
 const RULE = '='.repeat(72);
 
+/**
+ * Each browser's own total across the shards, one line each (#1049). Printed
+ * only: CI does not fail on an uneven total until #1056. `content` is not a
+ * browser and is left out.
+ *
+ * @param {readonly unknown[]} accounts
+ * @returns {string[]}
+ */
+export function projectTotals(accounts) {
+  /** @type {Map<string, { passed: number, failed: number, skipped: number }>} */
+  const sums = new Map();
+  for (const value of accounts) {
+    const counts = isRecord(value) ? value.projectCounts : undefined;
+    if (!isRecord(counts)) continue;
+    for (const [name, each] of Object.entries(counts)) {
+      if (name === 'content' || !isRecord(each)) continue;
+      const sum = sums.get(name) ?? { passed: 0, failed: 0, skipped: 0 };
+      sum.passed += Number(each.passed);
+      sum.failed += Number(each.failed);
+      sum.skipped += Number(each.skipped);
+      sums.set(name, sum);
+    }
+  }
+  if (sums.size === 0) return ['no shard recorded per-browser totals'];
+  return [...sums]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([target, counts]) => totalLine({ target, ...counts }));
+}
+
 function main() {
   // The FILES, never a directory to list: the workflow hands over its shell
   // glob's expansion. A glob that matched nothing arrives as the pattern
@@ -736,6 +770,15 @@ function main() {
   if (!docsOnly && present.length > 0) {
     const times = shardTimes(present.map((file) => loadAccount(file)));
     console.log(`\n${RULE}\n  E2E SHARD TIMES\n${RULE}\n${times}\n`);
+    const totals = projectTotals(present.map((file) => loadAccount(file)));
+    console.log(
+      `\n${RULE}\n  E2E TOTALS PER BROWSER (printed, not judged: #1056)\n${RULE}\n${totals.join('\n')}\n`,
+    );
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `\n### e2e totals per browser\n\n${totals.map((line) => `- ${line}`).join('\n')}\n`,
+      );
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY,

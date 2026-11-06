@@ -7,6 +7,7 @@ import {
   getSiteStrings,
   localisePath,
 } from '../../src/lib/i18n/index';
+import { atViewport } from '../viewport-at';
 
 /**
  * The 404, as a visitor who mistyped a URL actually meets it.
@@ -88,22 +89,26 @@ test.describe('the 404 answers everyone', () => {
     }
   });
 
-  test(
-    'five stacked languages add no horizontal scroll at 320px',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 720 });
-      await page.goto(NOT_FOUND);
-      // Not vacuous: a 404 whose content were hidden at 320px would satisfy
-      // "no overflow" trivially, and hiding it is also the wrong fix.
-      await expect(
-        page.getByRole('heading', {
-          level: 2,
-          name: getSiteStrings(LOCALES[LOCALES.length - 1]).notFound.heading,
-        }),
-      ).toBeVisible();
-      const overflow = await expectNoHorizontalScroll(page, 'the 404 at 320px');
-      await shoot(page, `320px: last language visible, overflow ${overflow}px`);
-    },
-  );
+  test('five stacked languages add no horizontal scroll at 320px', async ({
+    page,
+  }) => {
+    const took = await atViewport(page, { width: 320, height: 720 });
+    await page.goto(NOT_FOUND);
+    // Not vacuous: a 404 whose content were hidden at 320px would satisfy
+    // "no overflow" trivially, and hiding it is also the wrong fix.
+    await expect(
+      page.getByRole('heading', {
+        level: 2,
+        name: getSiteStrings(LOCALES[LOCALES.length - 1]).notFound.heading,
+      }),
+    ).toBeVisible();
+    const overflow = await expectNoHorizontalScroll(
+      page,
+      `the 404 at ${took.width}px`,
+    );
+    await shoot(
+      page,
+      `${took.width}px: last language visible, overflow ${overflow}px`,
+    );
+  });
 });

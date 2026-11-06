@@ -11,6 +11,7 @@ import { readsAsLineWidth } from '../device-pixels';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -557,54 +558,50 @@ test.describe('nothing moves when the theme changes (#386)', () => {
   // every locale, the 404 and its own switch never changed theme (TG1).
   for (const path of PUBLISHED_ROUTES) {
     for (const width of [390, 1280]) {
-      test(
-        `${path} at ${width}px: no element moves between dark and light`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(path);
-          await page.addStyleTag({
-            content:
-              '*, *::before, *::after { animation: none !important; transition: none !important; }',
-          });
-          await page.evaluate(() => document.fonts.ready);
-          await emulateTheme(page, 'dark');
-          const dark = await boxes(page);
-          await tapOn(toggle(page));
-          await expectTheme(page, 'light');
-          const light = await boxes(page);
-          await tapOn(toggle(page));
-          await expectTheme(page, 'dark');
-          const darkAgain = await boxes(page);
+      test(`${path} at ${width}px: no element moves between dark and light`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        await page.addStyleTag({
+          content:
+            '*, *::before, *::after { animation: none !important; transition: none !important; }',
+        });
+        await page.evaluate(() => document.fonts.ready);
+        await emulateTheme(page, 'dark');
+        const dark = await boxes(page);
+        await tapOn(toggle(page));
+        await expectTheme(page, 'light');
+        const light = await boxes(page);
+        await tapOn(toggle(page));
+        await expectTheme(page, 'dark');
+        const darkAgain = await boxes(page);
 
-          const compared = dark.filter((d) => d.rendered && !d.inSwitch);
-          for (const [label, other] of [
-            ['light', light],
-            ['saved dark', darkAgain],
-          ] as const) {
-            expect(other, 'the document changed between passes').toHaveLength(
-              dark.length,
-            );
-            const moved = dark
-              .map((d, i) => ({ d, o: other[i] }))
-              .filter(
-                ({ d, o }) =>
-                  !d.inSwitch &&
-                  (d.rendered !== o.rendered ||
-                    d.box.some((v, k) => Math.abs(v - o.box[k]) > 0.5)),
-              )
-              .map(
-                ({ d, o }) => `${d.what} dark ${d.box} -> ${label} ${o.box}`,
-              );
-            expect(
-              searched(moved, {
-                of: compared,
-                what: 'rendered elements',
-              }),
-            ).toEqual([]);
-          }
-        },
-      );
+        const compared = dark.filter((d) => d.rendered && !d.inSwitch);
+        for (const [label, other] of [
+          ['light', light],
+          ['saved dark', darkAgain],
+        ] as const) {
+          expect(other, 'the document changed between passes').toHaveLength(
+            dark.length,
+          );
+          const moved = dark
+            .map((d, i) => ({ d, o: other[i] }))
+            .filter(
+              ({ d, o }) =>
+                !d.inSwitch &&
+                (d.rendered !== o.rendered ||
+                  d.box.some((v, k) => Math.abs(v - o.box[k]) > 0.5)),
+            )
+            .map(({ d, o }) => `${d.what} dark ${d.box} -> ${label} ${o.box}`);
+          expect(
+            searched(moved, {
+              of: compared,
+              what: 'rendered elements',
+            }),
+          ).toEqual([]);
+        }
+      });
     }
   }
 });

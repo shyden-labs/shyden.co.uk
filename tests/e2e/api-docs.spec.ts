@@ -9,6 +9,7 @@ import { docsSpecFile, requiredTextFields } from '../api-docs-pages';
 import { recorded, shoot } from './evidence';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../typed-fields';
 import { offPalette, readPalette } from './palette-readings';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -146,76 +147,74 @@ test.describe('the API docs meet the site bar (#781)', () => {
   for (const path of docsPaths())
     for (const theme of THEMES)
       for (const width of WIDTHS)
-        test(
-          `${path} in the ${theme} theme at ${width}px`,
-          { tag: '@emulated-viewport' },
-          async ({ page }) => {
-            await page.emulateMedia({ colorScheme: theme });
-            await page.setViewportSize({ width, height: 900 });
-            await page.goto(path);
-            await openEverything(page, path);
-            const floors = FLOORS[path];
-            if (!floors) throw new Error(`${path} has no floors in FLOORS`);
+        test(`${path} in the ${theme} theme at ${width}px`, async ({
+          page,
+        }) => {
+          await page.emulateMedia({ colorScheme: theme });
+          const took = await atViewport(page, { width, height: 900 });
+          await page.goto(path);
+          await openEverything(page, path);
+          const floors = FLOORS[path];
+          if (!floors) throw new Error(`${path} has no floors in FLOORS`);
 
-            const box = await page.evaluate(() => {
-              const mount = document.querySelector('#swagger');
-              const root = document.documentElement;
-              return {
-                page: root.scrollWidth - root.clientWidth,
-                mount: mount ? mount.scrollWidth - mount.clientWidth : -1,
-              };
-            });
-            expect(
-              box,
-              'nothing pushes the page or the mount sideways',
-            ).toEqual({ page: 0, mount: 0 });
+          const box = await page.evaluate(() => {
+            const mount = document.querySelector('#swagger');
+            const root = document.documentElement;
+            return {
+              page: root.scrollWidth - root.clientWidth,
+              mount: mount ? mount.scrollWidth - mount.clientWidth : -1,
+            };
+          });
+          expect(box, 'nothing pushes the page or the mount sideways').toEqual({
+            page: 0,
+            mount: 0,
+          });
 
-            const probes = await textsToRead(page);
-            const dim: string[] = [];
-            // runtime population: the text Swagger UI drew in this state.
-            for (const probe of probes) {
-              const ratio = await contrastRatio(
-                page.locator(`[data-docs-probe="${probe.index}"]`),
-              );
-              if (ratio < probe.need)
-                dim.push(
-                  `'${probe.said}' ${ratio.toFixed(2)}:1 < ${probe.need}`,
-                );
-            }
-            expect(
-              searched(dim, { of: probes, what: `${path} text elements` }),
-            ).toEqual([]);
+          const probes = await textsToRead(page);
+          const dim: string[] = [];
+          // runtime population: the text Swagger UI drew in this state.
+          for (const probe of probes) {
+            const ratio = await contrastRatio(
+              page.locator(`[data-docs-probe="${probe.index}"]`),
+            );
+            if (ratio < probe.need)
+              dim.push(`'${probe.said}' ${ratio.toFixed(2)}:1 < ${probe.need}`);
+          }
+          expect(
+            searched(dim, { of: probes, what: `${path} text elements` }),
+          ).toEqual([]);
 
-            const controls = await controlSizes(page);
-            const small = controls
-              .filter((c) => c.width < 44 || c.height < 44)
-              .map(
-                (c) =>
-                  `${c.name} ${Math.round(c.width)}x${Math.round(c.height)}`,
-              );
-            expect(
-              searched(small, { of: controls, what: `${path} controls` }),
-            ).toEqual([]);
+          const controls = await controlSizes(page);
+          const small = controls
+            .filter((c) => c.width < 44 || c.height < 44)
+            .map(
+              (c) => `${c.name} ${Math.round(c.width)}x${Math.round(c.height)}`,
+            );
+          expect(
+            searched(small, { of: controls, what: `${path} controls` }),
+          ).toEqual([]);
 
-            // The two page-wide sweeps that read pages as they load hand the
-            // docs over to this, the state with every field drawn.
-            const typed = await page.evaluate(measureTypedFields);
-            const zooming = typed
-              .filter(({ fontSize }) => fontSize < IOS_ZOOM_FLOOR_PX)
-              .map(({ field, fontSize }) => `${field} ${fontSize}px`);
-            expect(
-              searched(zooming, { of: typed, what: `${path} typed fields` }),
-            ).toEqual([]);
+          // The two page-wide sweeps that read pages as they load hand the
+          // docs over to this, the state with every field drawn.
+          const typed = await page.evaluate(measureTypedFields);
+          const zooming = typed
+            .filter(({ fontSize }) => fontSize < IOS_ZOOM_FLOOR_PX)
+            .map(({ field, fontSize }) => `${field} ${fontSize}px`);
+          expect(
+            searched(zooming, { of: typed, what: `${path} typed fields` }),
+          ).toEqual([]);
 
-            const { allowed, readings } = await readPalette(page);
-            expect(
-              searched(offPalette(readings, allowed), {
-                of: readings,
-                what: `${path} painted controls`,
-              }),
-            ).toEqual([]);
+          const { allowed, readings } = await readPalette(page);
+          expect(
+            searched(offPalette(readings, allowed), {
+              of: readings,
+              what: `${path} painted controls`,
+            }),
+          ).toEqual([]);
 
-            await shoot(page, `${path}, ${theme}, ${width}px, everything open`);
-          },
-        );
+          await shoot(
+            page,
+            `${path}, ${theme}, ${took.width}px, everything open`,
+          );
+        });
 });

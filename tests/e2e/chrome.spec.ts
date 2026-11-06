@@ -5,6 +5,7 @@ import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../dissolved-company';
 import { searched } from '../source-files';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -107,28 +108,26 @@ test.describe('header + footer', () => {
       );
     });
 
-  test(
-    'mobile menu: zero-JS disclosure reveals and hides the nav',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 375, height: 800 });
-      await page.goto('/');
-      const details = page.locator('header details.menu');
-      const firstLink = page.locator('header nav a').first();
-      // Closed by default: the nav is hidden.
-      await expect(details).toHaveJSProperty('open', false);
-      await expect(firstLink).toBeHidden();
-      // Click the summary to open: the nav is revealed (no JS involved).
-      await tapOn(page.locator('header details.menu > summary'));
-      await expect(details).toHaveJSProperty('open', true);
-      await expect(firstLink).toBeVisible();
-      // Keyboard: native <summary> activation toggles the disclosure on Enter.
-      await page.locator('header details.menu > summary').focus();
-      await page.keyboard.press('Enter');
-      await expect(details).toHaveJSProperty('open', false);
-      await expect(firstLink).toBeHidden();
-    },
-  );
+  test('mobile menu: zero-JS disclosure reveals and hides the nav', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 375, height: 800 });
+    await page.goto('/');
+    const details = page.locator('header details.menu');
+    const firstLink = page.locator('header nav a').first();
+    // Closed by default: the nav is hidden.
+    await expect(details).toHaveJSProperty('open', false);
+    await expect(firstLink).toBeHidden();
+    // Click the summary to open: the nav is revealed (no JS involved).
+    await tapOn(page.locator('header details.menu > summary'));
+    await expect(details).toHaveJSProperty('open', true);
+    await expect(firstLink).toBeVisible();
+    // Keyboard: native <summary> activation toggles the disclosure on Enter.
+    await page.locator('header details.menu > summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(details).toHaveJSProperty('open', false);
+    await expect(firstLink).toBeHidden();
+  });
 
   // Every locale (#423): the last link's right edge is set by the nav's
   // localised labels. `${locale} desktop` below reads each locale at 1280px,
@@ -265,51 +264,48 @@ test.describe('header + footer', () => {
 // each has its own budget, and a failure names its language in the title.
 test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
   for (const locale of LOCALES) {
-    test(
-      `${locale} mobile: wordmark, menu button, nav links and footer email are ≥44px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 375, height: 800 });
-        await page.goto(localisePath('/', locale));
-        await atLeast44(page.locator('.wordmark'), 'the wordmark');
-        // Derived, not named: the header gained a second disclosure (the
-        // language switcher) after this test was written, and a hand-written
-        // list would have kept passing while missing it. The selector was then
-        // narrowed to `details.menu`, which measured the menu alone under this
-        // same comment (#390 F107), so the count is held to every disclosure.
-        const summaries = page.locator('header details > summary');
-        const howMany = await summaries.count();
-        expect(
-          howMany,
-          'no header disclosures found to measure',
-        ).toBeGreaterThan(0);
-        expect(howMany, 'a header disclosure left unmeasured').toBe(
-          await page.locator('header details').count(),
-        );
-        for (let i = 0; i < howMany; i += 1)
-          await atLeast44(summaries.nth(i), `header disclosure ${i}`);
-        await tapOn(page.locator('header details.menu > summary')); // open the nav
-        const links = page.locator('header nav a');
-        // `.all()` resolves to [] when nothing matches -- it neither waits nor
-        // fails -- so without this count the loop below iterates zero times and
-        // the test goes green having checked none of the links its own title
-        // claims to check. Proven, not assumed: pointing this locator at a
-        // non-existent class left the test passing. The desktop case alongside
-        // has always guarded this; the mobile one did not.
-        // Counted from the locale's own nav labels, then read in order: a
-        // literal 3 went stale when #403 added a fourth link, and failed
-        // before measuring it.
-        const labels = Object.values(getSiteStrings(locale).nav);
-        await expect(links).toHaveCount(labels.length);
-        await expect(links).toHaveText(labels);
-        for (const a of await links.all())
-          await atLeast44(a, `"${await a.textContent()}"`);
-        await atLeast44(
-          page.locator('footer a[href="mailto:support@shyden.co.uk"]'),
-          'the footer email',
-        );
-      },
-    );
+    test(`${locale} mobile: wordmark, menu button, nav links and footer email are ≥44px`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 375, height: 800 });
+      await page.goto(localisePath('/', locale));
+      await atLeast44(page.locator('.wordmark'), 'the wordmark');
+      // Derived, not named: the header gained a second disclosure (the
+      // language switcher) after this test was written, and a hand-written
+      // list would have kept passing while missing it. The selector was then
+      // narrowed to `details.menu`, which measured the menu alone under this
+      // same comment (#390 F107), so the count is held to every disclosure.
+      const summaries = page.locator('header details > summary');
+      const howMany = await summaries.count();
+      expect(howMany, 'no header disclosures found to measure').toBeGreaterThan(
+        0,
+      );
+      expect(howMany, 'a header disclosure left unmeasured').toBe(
+        await page.locator('header details').count(),
+      );
+      for (let i = 0; i < howMany; i += 1)
+        await atLeast44(summaries.nth(i), `header disclosure ${i}`);
+      await tapOn(page.locator('header details.menu > summary')); // open the nav
+      const links = page.locator('header nav a');
+      // `.all()` resolves to [] when nothing matches -- it neither waits nor
+      // fails -- so without this count the loop below iterates zero times and
+      // the test goes green having checked none of the links its own title
+      // claims to check. Proven, not assumed: pointing this locator at a
+      // non-existent class left the test passing. The desktop case alongside
+      // has always guarded this; the mobile one did not.
+      // Counted from the locale's own nav labels, then read in order: a
+      // literal 3 went stale when #403 added a fourth link, and failed
+      // before measuring it.
+      const labels = Object.values(getSiteStrings(locale).nav);
+      await expect(links).toHaveCount(labels.length);
+      await expect(links).toHaveText(labels);
+      for (const a of await links.all())
+        await atLeast44(a, `"${await a.textContent()}"`);
+      await atLeast44(
+        page.locator('footer a[href="mailto:support@shyden.co.uk"]'),
+        'the footer email',
+      );
+    });
 
     test(
       `${locale} desktop: nav links are visible, on-screen and ≥44px including width`,
@@ -340,17 +336,15 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
 
 test.describe('mobile layout: no horizontal overflow', () => {
   for (const locale of LOCALES)
-    test(
-      `${locale}: no horizontal scroll at 320px with the menu open`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 800 });
-        await page.goto(localisePath('/', locale));
-        await tapOn(page.locator('header details.menu > summary'));
-        await expectNoHorizontalScroll(
-          page,
-          `${locale}: sideways scroll at 320px with the menu open`,
-        );
-      },
-    );
+    test(`${locale}: no horizontal scroll at 320px with the menu open`, async ({
+      page,
+    }) => {
+      const took = await atViewport(page, { width: 320, height: 800 });
+      await page.goto(localisePath('/', locale));
+      await tapOn(page.locator('header details.menu > summary'));
+      await expectNoHorizontalScroll(
+        page,
+        `${locale}: sideways scroll at ${took.width}px with the menu open`,
+      );
+    });
 });

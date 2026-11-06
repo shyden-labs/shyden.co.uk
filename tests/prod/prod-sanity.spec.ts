@@ -9,6 +9,7 @@ import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
 import { accessServiceHeaders } from '../access-service-token';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
+import { atViewport } from '../viewport-at';
 
 /**
  * Every route the site serves, derived. #49.
@@ -114,15 +115,11 @@ test('the Classroom Group Creator forms groups', async ({ page }) => {
 // 320px because that is the narrowest viewport the working agreement supports.
 test.describe('no page scrolls sideways at 320px', () => {
   for (const { path } of ROUTES) {
-    test(
-      `${path} fits a 320px viewport`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 720 });
-        await page.goto(path);
-        await expectNoHorizontalScroll(page, path);
-      },
-    );
+    test(`${path} fits a 320px viewport`, async ({ page }) => {
+      await atViewport(page, { width: 320, height: 720 });
+      await page.goto(path);
+      await expectNoHorizontalScroll(page, path);
+    });
   }
 });
 

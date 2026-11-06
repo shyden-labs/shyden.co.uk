@@ -23,6 +23,7 @@ import {
   markAbsent,
   openRoster,
 } from './helpers';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -138,19 +139,17 @@ test.describe('the roster table', () => {
       expect(b.width).toBeCloseTo(a.width, 0);
     });
 
-  test(
-    'a long name does not push the letters out of view',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 900 });
-      await openRoster(page);
-      await typeInto(
-        page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
-        'Maria Anastasia Wijayanti',
-      );
-      await expectNoHorizontalScroll(page);
-    },
-  );
+  test('a long name does not push the letters out of view', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 1280, height: 900 });
+    await openRoster(page);
+    await typeInto(
+      page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
+      'Maria Anastasia Wijayanti',
+    );
+    await expectNoHorizontalScroll(page);
+  });
 
   // Run at each project's own default viewport (desktop for
   // chromium/firefox/webkit, a phone's own default for
@@ -325,12 +324,9 @@ test.describe('absence', () => {
  *  - The count-line test replaces the brief's own three inline clicks with
  *    `addSeveral`, the established correction this file's own Task 3
  *    section already made once for the identical reason.
- *  - Every test that resizes the viewport carries `@emulated-viewport`
- *    (global-constraints.md; tests/guards/viewport-tagging.test.ts is a hard
- *    guard on it), which the brief's own snippet does not carry on any of
- *    its tests -- none of the brief's own six actually resize the
- *    viewport, so none needed it; the tag only appears below on the tests
- *    THIS task adds beyond the brief.
+ *  - Every test that resizes the viewport goes through `atViewport` (#1046),
+ *    which the brief's own snippet does not; none of the brief's own six
+ *    actually resize the viewport.
  *
  * Three tests below are not in the brief at all, added because the parent
  * task explicitly named the risk they cover:
@@ -441,26 +437,24 @@ test.describe('an absent student', () => {
     { name: 'table', width: 1280 },
   ] as const)
     for (const theme of THEMES) {
-      test(
-        `${name}, ${theme}: absence carries the tint, the stripe and the pill -- same element as the table`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await markAbsent(page);
-          const row = page.locator('.cg-student').first();
-          await emulateTheme(page, theme);
-          await expect(row).toHaveCSS('background-color', 'rgb(255, 246, 227)');
-          await expect(row.locator('.cg-absent-pill')).toHaveText('absent');
-          const cards = await page
-            .locator('#cg-roster')
-            .evaluate((el) => getComputedStyle(el).display !== 'table');
-          const stripeTarget = cards ? row : row.locator('td').first();
-          const boxShadow = await stripeTarget.evaluate(
-            (el) => getComputedStyle(el).boxShadow,
-          );
-          expect(boxShadow, `${name} stripe`).not.toBe('none');
-        },
-      );
+      test(`${name}, ${theme}: absence carries the tint, the stripe and the pill -- same element as the table`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await markAbsent(page);
+        const row = page.locator('.cg-student').first();
+        await emulateTheme(page, theme);
+        await expect(row).toHaveCSS('background-color', 'rgb(255, 246, 227)');
+        await expect(row.locator('.cg-absent-pill')).toHaveText('absent');
+        const cards = await page
+          .locator('#cg-roster')
+          .evaluate((el) => getComputedStyle(el).display !== 'table');
+        const stripeTarget = cards ? row : row.locator('td').first();
+        const boxShadow = await stripeTarget.evaluate(
+          (el) => getComputedStyle(el).boxShadow,
+        );
+        expect(boxShadow, `${name} stripe`).not.toBe('none');
+      });
     }
 
   // L-09-shaped, mirroring classroom-groups.spec.ts's own "the accent
@@ -483,15 +477,13 @@ test.describe('an absent student', () => {
 
   // Every locale (#423): the absent state shows the page's own copy.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await markAbsent(page, path);
-        await expectNoHorizontalScroll(page);
-      },
-    );
+    test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 900 });
+      await markAbsent(page, path);
+      await expectNoHorizontalScroll(page);
+    });
 });
 
 // T-06 -- claimed by no task's own traceability line (checked: it appears
@@ -1637,13 +1629,9 @@ test.describe('Indonesian', () => {
  *
  * task-3-brief.md's own Step 1 snippet is reproduced below with two
  * corrections, not verbatim:
- *  - Every test that calls `page.setViewportSize` is tagged
- *    `@emulated-viewport`, per this stage's own global-constraints.md
- *    ("Any test that resizes the viewport must be tagged") -- the brief's
- *    literal code has no tag, which `tests/guards/viewport-tagging.test.ts`
- *    (a hard guard, not a style preference) would fail on: a real phone
- *    cannot resize itself, so an untagged resize test would run, and fail
- *    for a false reason, on `android-chrome`/`ios-safari`.
+ *  - Every test that wants a width asks for it through `atViewport`, which a
+ *    real phone (it cannot resize itself) leaves alone, so the test is
+ *    measured at the width the phone really has (#1046).
  *  - The "no horizontal scroll" test calls the existing `addSeveral` helper
  *    (already imported above, already every other test in this file's own
  *    way of driving "+ Add several…") instead of reproducing its three
@@ -1655,51 +1643,45 @@ const LAYOUTS = [
 ] as const;
 
 for (const { name, width } of LAYOUTS) {
-  test(
-    `${name}: every control is present with the same value`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await openRoster(page);
-      const row = page.locator('.cg-student').first();
-      // Read off the row, then compared with the six columns as a set (#390
-      // F133): a hand list of five never named the number field, so either
-      // layout could lose it and pass.
-      const controls = row.locator('input, select');
-      await expect(controls).toHaveCount(6);
-      const names = await controls.evaluateAll((all) =>
-        all.map((c) => c.getAttribute('aria-label')),
-      );
-      expect(names.sort()).toEqual(
-        ['#', 'Name', 'Sex', 'Absent', 'Together', 'Apart'].sort(),
-      );
-      for (const control of await controls.all())
-        await expect(control).toBeVisible();
-    },
-  );
+  test(`${name}: every control is present with the same value`, async ({
+    page,
+  }) => {
+    await atViewport(page, { width, height: 900 });
+    await openRoster(page);
+    const row = page.locator('.cg-student').first();
+    // Read off the row, then compared with the six columns as a set (#390
+    // F133): a hand list of five never named the number field, so either
+    // layout could lose it and pass.
+    const controls = row.locator('input, select');
+    await expect(controls).toHaveCount(6);
+    const names = await controls.evaluateAll((all) =>
+      all.map((c) => c.getAttribute('aria-label')),
+    );
+    expect(names.sort()).toEqual(
+      ['#', 'Name', 'Sex', 'Absent', 'Together', 'Apart'].sort(),
+    );
+    for (const control of await controls.all())
+      await expect(control).toBeVisible();
+  });
 
-  test(
-    `${name}: editing every field works`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await openRoster(page);
-      const row = page.locator('.cg-student').first();
-      // All six (#390 F133): this edited four, never the number or Apart.
-      await typeInto(row.getByLabel('#', { exact: true }), '7');
-      await typeInto(row.getByLabel('Name'), 'Ana');
-      await row.getByLabel('Sex').selectOption('F');
-      await row.getByLabel('Together').selectOption('A');
-      await row.getByLabel('Apart').selectOption('A');
-      await setCheckedOn(row.getByLabel('Absent'));
-      await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
-      await expect(row.getByLabel('Name')).toHaveValue('Ana');
-      await expect(row.getByLabel('Sex')).toHaveValue('F');
-      await expect(row.getByLabel('Together')).toHaveValue('A');
-      await expect(row.getByLabel('Apart')).toHaveValue('A');
-      await expect(row.getByLabel('Absent')).toBeChecked();
-    },
-  );
+  test(`${name}: editing every field works`, async ({ page }) => {
+    await atViewport(page, { width, height: 900 });
+    await openRoster(page);
+    const row = page.locator('.cg-student').first();
+    // All six (#390 F133): this edited four, never the number or Apart.
+    await typeInto(row.getByLabel('#', { exact: true }), '7');
+    await typeInto(row.getByLabel('Name'), 'Ana');
+    await row.getByLabel('Sex').selectOption('F');
+    await row.getByLabel('Together').selectOption('A');
+    await row.getByLabel('Apart').selectOption('A');
+    await setCheckedOn(row.getByLabel('Absent'));
+    await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
+    await expect(row.getByLabel('Name')).toHaveValue('Ana');
+    await expect(row.getByLabel('Sex')).toHaveValue('F');
+    await expect(row.getByLabel('Together')).toHaveValue('A');
+    await expect(row.getByLabel('Apart')).toHaveValue('A');
+    await expect(row.getByLabel('Absent')).toBeChecked();
+  });
 }
 
 // A second, related defect found via the SAME investigation as the loop
@@ -1729,37 +1711,33 @@ test('editing two different rows by text, neither of which re-renders on its own
 // Every locale (#423): the card's other controls carry localised
 // placeholders, and they share the row with the name field.
 for (const path of localePaths('/classroom-groups'))
-  test(
-    `cards: the name field takes the full remaining width -- ${path}`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await openRoster(page, path);
-      const { rosterColName } = getStrings(localeFromPath(path));
-      const card = (await page.locator('.cg-student').first().boundingBox())!;
-      const name = (await page
-        .locator('.cg-student')
-        .first()
-        .getByLabel(rosterColName, { exact: true })
-        .boundingBox())!;
-      expect(name.width).toBeGreaterThan(card.width * 0.6);
-    },
-  );
+  test(`cards: the name field takes the full remaining width -- ${path}`, async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 900 });
+    await openRoster(page, path);
+    const { rosterColName } = getStrings(localeFromPath(path));
+    const card = (await page.locator('.cg-student').first().boundingBox())!;
+    const name = (await page
+      .locator('.cg-student')
+      .first()
+      .getByLabel(rosterColName, { exact: true })
+      .boundingBox())!;
+    expect(name.width).toBeGreaterThan(card.width * 0.6);
+  });
 
 // L-06, re-homed from stage 2: that stage could not open Student details
 // because it had no body, so the row was untestable there. Every locale
 // (#423): each row's controls and the count carry the page's own copy.
 for (const path of localePaths('/classroom-groups'))
-  test(
-    `cards: no horizontal scroll at 320px with 100 students -- ${path}`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await openRoster(page, path);
-      await addSeveral(page, 99);
-      await expectNoHorizontalScroll(page);
-    },
-  );
+  test(`cards: no horizontal scroll at 320px with 100 students -- ${path}`, async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 900 });
+    await openRoster(page, path);
+    await addSeveral(page, 99);
+    await expectNoHorizontalScroll(page);
+  });
 
 /**
  * #249. The three roster dropdowns each carried a correct `aria-label` and
@@ -1862,52 +1840,50 @@ test.describe('an unset roster dropdown says which column it is for', () => {
   const TRUNCATION_WIDTHS = [320, 375, 390, 430, 600, 768, 1024, 1280];
   for (const path of localePaths('/classroom-groups'))
     for (const width of TRUNCATION_WIDTHS)
-      test(
-        `no dropdown ever truncates its own column name -- ${path} at ${width}px`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await openRoster(page, path);
-          const row = page.locator('.cg-student').first();
-          const boxes = await row.evaluate((el) =>
-            [...el.querySelectorAll('select')].map((select) => {
-              const style = getComputedStyle(select);
-              const probe = document.createElement('span');
-              probe.style.cssText =
-                'position:absolute;visibility:hidden;white-space:pre';
-              probe.style.font = style.font;
-              probe.textContent = select.selectedOptions[0]?.textContent ?? '';
-              document.body.appendChild(probe);
-              const textWidth = probe.getBoundingClientRect().width;
-              probe.remove();
-              const chrome =
-                parseFloat(style.paddingLeft) +
-                parseFloat(style.paddingRight) +
-                parseFloat(style.borderLeftWidth) +
-                parseFloat(style.borderRightWidth);
-              return {
-                label: select.getAttribute('aria-label') ?? '(unlabelled)',
-                shows: select.selectedOptions[0]?.textContent ?? '',
-                box: Math.round(select.getBoundingClientRect().width),
-                needs: Math.round(textWidth + chrome),
-              };
-            }),
-          );
+      test(`no dropdown ever truncates its own column name -- ${path} at ${width}px`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await openRoster(page, path);
+        const row = page.locator('.cg-student').first();
+        const boxes = await row.evaluate((el) =>
+          [...el.querySelectorAll('select')].map((select) => {
+            const style = getComputedStyle(select);
+            const probe = document.createElement('span');
+            probe.style.cssText =
+              'position:absolute;visibility:hidden;white-space:pre';
+            probe.style.font = style.font;
+            probe.textContent = select.selectedOptions[0]?.textContent ?? '';
+            document.body.appendChild(probe);
+            const textWidth = probe.getBoundingClientRect().width;
+            probe.remove();
+            const chrome =
+              parseFloat(style.paddingLeft) +
+              parseFloat(style.paddingRight) +
+              parseFloat(style.borderLeftWidth) +
+              parseFloat(style.borderRightWidth);
+            return {
+              label: select.getAttribute('aria-label') ?? '(unlabelled)',
+              shows: select.selectedOptions[0]?.textContent ?? '',
+              box: Math.round(select.getBoundingClientRect().width),
+              needs: Math.round(textWidth + chrome),
+            };
+          }),
+        );
 
-          const findings = boxes
-            .filter((box) => box.needs > box.box)
-            .map(
-              (box) =>
-                `${box.label}: shows "${box.shows}" in ${box.box}px, needs ${box.needs}px`,
-            );
-          expect(
-            searched(findings, {
-              of: boxes.map((box) => box.label),
-              what: 'roster dropdowns measured',
-            }),
-          ).toEqual([]);
-        },
-      );
+        const findings = boxes
+          .filter((box) => box.needs > box.box)
+          .map(
+            (box) =>
+              `${box.label}: shows "${box.shows}" in ${box.box}px, needs ${box.needs}px`,
+          );
+        expect(
+          searched(findings, {
+            of: boxes.map((box) => box.label),
+            what: 'roster dropdowns measured',
+          }),
+        ).toEqual([]);
+      });
 
   test("the empty option keeps each column's own behaviour", async ({
     page,
@@ -1939,67 +1915,65 @@ test.describe('the roster dropdowns are still reachable by thumb (#249)', () => 
   // Every locale (#423): the placeholders ARE the localised copy, and each
   // language's column names differ in width.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `every roster control meets the 44px touch target with a placeholder showing -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        // #249 put a WORD where a dash used to be, and a `<select>` sizes
-        // itself to its widest option. The existing 44px sweep
-        // ('every control meets the 44px touch target',
-        // classroom-groups-controls.spec.ts) measures `#cg-form` only, and runs
-        // before any roster exists -- so nothing had ever measured these three.
-        //
-        // Measured with the placeholder SHOWING, which is the state this ticket
-        // created: a chosen value is one or two characters, the placeholder is
-        // a whole column name, and only the wider one can push a row.
-        await page.setViewportSize({ width: 375, height: 900 });
-        await openRoster(page, path);
-        await addSeveral(page, 3);
+    test(`every roster control meets the 44px touch target with a placeholder showing -- ${path}`, async ({
+      page,
+    }) => {
+      // #249 put a WORD where a dash used to be, and a `<select>` sizes
+      // itself to its widest option. The existing 44px sweep
+      // ('every control meets the 44px touch target',
+      // classroom-groups-controls.spec.ts) measures `#cg-form` only, and runs
+      // before any roster exists -- so nothing had ever measured these three.
+      //
+      // Measured with the placeholder SHOWING, which is the state this ticket
+      // created: a chosen value is one or two characters, the placeholder is
+      // a whole column name, and only the wider one can push a row.
+      await atViewport(page, { width: 375, height: 900 });
+      await openRoster(page, path);
+      await addSeveral(page, 3);
 
-        const controls = page.locator(
-          '#cg-roster tbody tr select, #cg-roster tbody tr input',
-        );
-        // Liveness is the controls MEASURED, which is the rendered ones. A
-        // `controls.count()` beside it counted every match, hidden ones too,
-        // so a roster whose controls all stopped rendering measured nothing
-        // and passed (#446). Three rows carry controls, so an empty set here
-        // is a broken selector or a page that hides them.
-        const measured = await controls.evaluateAll((els) =>
-          els
-            // `getClientRects()`, never the element's own computed display: a
-            // `display: none` ANCESTOR leaves a descendant's computed display
-            // untouched, so a per-element check reports hidden content as
-            // rendered.
-            .filter((el) => el.getClientRects().length > 0)
-            .map((el) => {
-              // A checkbox is deliberately small: the LABEL around it is the
-              // tap target, the same convention as `.switch` and every radio
-              // on this page ('the two sex switches meet the 44px touch
-              // target once open', classroom-groups-controls.spec.ts).
-              // Measuring the raw input reports a defect the page does not
-              // have -- it read 20.8px here before this was written.
-              const target =
-                el instanceof HTMLInputElement && el.type === 'checkbox'
-                  ? (el.closest('label') ?? el)
-                  : el;
-              return {
-                what: `${el.tagName.toLowerCase()}[${
-                  el.getAttribute('aria-label') ?? el.id ?? '?'
-                }]`,
-                height:
-                  Math.round(target.getBoundingClientRect().height * 10) / 10,
-              };
-            }),
-        );
-        const small = measured.filter((c) => c.height < 44);
-
-        expect(
-          searched(small, {
-            of: measured,
-            what: 'rendered roster controls',
+      const controls = page.locator(
+        '#cg-roster tbody tr select, #cg-roster tbody tr input',
+      );
+      // Liveness is the controls MEASURED, which is the rendered ones. A
+      // `controls.count()` beside it counted every match, hidden ones too,
+      // so a roster whose controls all stopped rendering measured nothing
+      // and passed (#446). Three rows carry controls, so an empty set here
+      // is a broken selector or a page that hides them.
+      const measured = await controls.evaluateAll((els) =>
+        els
+          // `getClientRects()`, never the element's own computed display: a
+          // `display: none` ANCESTOR leaves a descendant's computed display
+          // untouched, so a per-element check reports hidden content as
+          // rendered.
+          .filter((el) => el.getClientRects().length > 0)
+          .map((el) => {
+            // A checkbox is deliberately small: the LABEL around it is the
+            // tap target, the same convention as `.switch` and every radio
+            // on this page ('the two sex switches meet the 44px touch
+            // target once open', classroom-groups-controls.spec.ts).
+            // Measuring the raw input reports a defect the page does not
+            // have -- it read 20.8px here before this was written.
+            const target =
+              el instanceof HTMLInputElement && el.type === 'checkbox'
+                ? (el.closest('label') ?? el)
+                : el;
+            return {
+              what: `${el.tagName.toLowerCase()}[${
+                el.getAttribute('aria-label') ?? el.id ?? '?'
+              }]`,
+              height:
+                Math.round(target.getBoundingClientRect().height * 10) / 10,
+            };
           }),
-          small.map((c) => `${c.what} is ${c.height}px`).join('\n'),
-        ).toEqual([]);
-      },
-    );
+      );
+      const small = measured.filter((c) => c.height < 44);
+
+      expect(
+        searched(small, {
+          of: measured,
+          what: 'rendered roster controls',
+        }),
+        small.map((c) => `${c.what} is ${c.height}px`).join('\n'),
+      ).toEqual([]);
+    });
 });

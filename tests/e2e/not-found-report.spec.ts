@@ -18,6 +18,7 @@ import {
   reportIdStem,
   reportOptions,
 } from '../../src/lib/report';
+import { atViewport } from '../viewport-at';
 
 /**
  * The 404's report route (#350, spec 14). One form per translated block,
@@ -184,17 +185,13 @@ for (const theme of THEMES)
       });
   });
 
-test(
-  'no sideways scroll at 320px with every form open',
-  { tag: '@emulated-viewport' },
-  async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto(NOT_FOUND);
-    for (const locale of BETA)
-      await tapOn(block(page, locale).locator('summary'));
-    await expectNoHorizontalScroll(page);
-  },
-);
+test('no sideways scroll at 320px with every form open', async ({ page }) => {
+  await atViewport(page, { width: 320, height: 800 });
+  await page.goto(NOT_FOUND);
+  for (const locale of BETA)
+    await tapOn(block(page, locale).locator('summary'));
+  await expectNoHorizontalScroll(page);
+});
 
 test('no form reaches paper', async ({ page }) => {
   await page.goto(NOT_FOUND);

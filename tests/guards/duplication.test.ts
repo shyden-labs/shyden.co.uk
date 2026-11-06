@@ -115,10 +115,6 @@ const SEPARATE: ReadonlyMap<string, string> = new Map([
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
   [
-    'tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)  <->  tests/prod/prod-sanity.spec.ts:test(`${path} fits a 320px viewport`)',
-    TEST_BODY_STAYS_IN_THE_SPEC,
-  ],
-  [
     'tests/e2e/site-meta.spec.ts:test(`no horizontal scroll at ${width}px`)  <->  tests/e2e/yeetalk-calculators.spec.ts:test(`no horizontal scroll at ${width}px -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],

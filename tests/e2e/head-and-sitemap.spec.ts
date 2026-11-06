@@ -200,3 +200,20 @@ test.describe('every published page', () => {
       expect(contents).toEqual([DEVICE_WIDTH]);
     });
 });
+
+test('the bare request fixture resolves a relative URL against baseURL', async ({
+  request,
+}) => {
+  // Moved from tests/device/real-device.spec.ts (#1049): the fixture is built apart from the
+  // `browser`/`context` overrides, so every target measures that it still resolves `baseURL`.
+  const res = await request.get('/sitemap-0.xml');
+  expect(
+    res.ok(),
+    `expected the bare \`request\` fixture to resolve '/sitemap-0.xml' against baseURL and ` +
+      `return 2xx -- got HTTP ${res.status()}`,
+  ).toBe(true);
+  expect(
+    await res.text(),
+    'expected a <loc> entry for a known page in the sitemap body, not an empty or unrelated response',
+  ).toContain('<loc>https://shyden.co.uk/classroom-groups/</loc>');
+});
