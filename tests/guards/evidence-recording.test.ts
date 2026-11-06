@@ -359,6 +359,12 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
         { of: ACTIONS, what: 'action constructs' },
       ),
     ).toEqual([]);
+    // #1046: the resize helper is the same set, so two in one test are a change.
+    expect(
+      actionsIn(
+        "test('x', async () => { await atViewport(page, a); await atViewport(page, b); })",
+      ),
+    ).toEqual([VIEWPORT]);
   });
 
   it('some specs really do act, and some really do not', () => {

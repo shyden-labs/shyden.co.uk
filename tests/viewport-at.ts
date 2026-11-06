@@ -22,7 +22,13 @@ export async function atViewport(
   page: Page,
   want: ViewportSize,
 ): Promise<ViewportSize> {
-  if (page.viewportSize() !== null) await page.setViewportSize(want);
+  // An emulated target takes the size it is given. Its innerWidth is no
+  // witness: a mobile project reports its 980px layout viewport right after
+  // a resize (CI run 42243143607).
+  if (page.viewportSize() !== null) {
+    await page.setViewportSize(want);
+    return want;
+  }
   return page.evaluate(() => ({
     width: window.innerWidth,
     height: window.innerHeight,

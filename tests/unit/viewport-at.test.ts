@@ -38,6 +38,18 @@ describe('atViewport', () => {
     expect(got).toEqual({ width: 320, height: 900 });
   });
 
+  it('reports the size it set, not a mobile layout viewport the page reports', async () => {
+    // CI run 42243143607: on mobile-chrome and mobile-safari, innerWidth read
+    // straight after a resize said 980x477 (the layout viewport) for 320 asked.
+    const page = {
+      viewportSize: () => ({ width: 390, height: 664 }),
+      setViewportSize: async () => {},
+      evaluate: async () => ({ width: 980, height: 477 }),
+    } as unknown as Page;
+    const got = await atViewport(page, { width: 320, height: 900 });
+    expect(got).toEqual({ width: 320, height: 900 });
+  });
+
   it('leaves a target with one fixed screen alone and reports that screen', async () => {
     const { page, calls } = fakePage(null, { width: 411, height: 800 });
     const got = await atViewport(page, { width: 320, height: 900 });
