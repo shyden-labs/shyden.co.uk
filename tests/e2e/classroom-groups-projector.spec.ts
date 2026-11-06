@@ -1160,7 +1160,11 @@ test.describe('the projector board never hides a name', () => {
     }));
     expect(clientWidth).toBeGreaterThan(0);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-    await expectNothingOutOfReach(page, 'the waiting board at 320px', narrow);
+    await expectNothingOutOfReach(
+      page,
+      `the waiting board at ${narrow.width}px`,
+      narrow,
+    );
   });
 
   for (const shape of BOARD_SHAPES) {

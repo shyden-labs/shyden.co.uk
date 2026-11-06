@@ -259,10 +259,10 @@ test.describe('the header row has room for everything in it (#329)', () => {
       // The release evidence cites every page here, so every page takes it
       // (#774: a cited case that captured nothing is fixed, never dropped).
       await header.open(page, path);
-      await atViewport(page, { width: 320, height: 800 });
+      const took = await atViewport(page, { width: 320, height: 800 });
       await shoot(
         page,
-        `${path} at 320px: the header row`,
+        `${path} at ${took.width}px: the header row`,
         page.locator('header'),
       );
     });

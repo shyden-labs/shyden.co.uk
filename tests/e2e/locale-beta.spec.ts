@@ -208,7 +208,7 @@ test.describe('every unverified language is marked BETA', () => {
   for (const locale of LOCALES)
     test(`${locale}: adds no horizontal scroll at 320px`, async ({ page }) => {
       const path = localisePath('/', locale);
-      await atViewport(page, { width: 320, height: 720 });
+      const took = await atViewport(page, { width: 320, height: 720 });
       await page.goto(path);
       // Not vacuous: a badge hidden at 320px would satisfy "no overflow"
       // trivially, and hiding it is also the wrong fix.
@@ -221,11 +221,11 @@ test.describe('every unverified language is marked BETA', () => {
       );
       const overflow = await expectNoHorizontalScroll(
         page,
-        `${path} scrolls sideways at 320px with the BETA marker`,
+        `${path} scrolls sideways at ${took.width}px with the BETA marker`,
       );
       await shoot(
         page,
-        `${locale} at 320px: badge visible, overflow ${overflow}px`,
+        `${locale} at ${took.width}px: badge visible, overflow ${overflow}px`,
       );
     });
 });

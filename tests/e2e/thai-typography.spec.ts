@@ -60,7 +60,7 @@ test.describe('Thai typography', () => {
         test(`no Thai glyph draws beyond its line box -- ${route} at ${width}px, ${theme}`, async ({
           page,
         }) => {
-          await atViewport(page, { width, height: 900 });
+          const took = await atViewport(page, { width, height: 900 });
           const response = await page.goto(route);
 
           // Assert the SEAM: that this route served at all. The site's own
@@ -69,7 +69,7 @@ test.describe('Thai typography', () => {
           // page with no `/th` twin slipped through before #68.
           expect(
             response?.status(),
-            `${route} at ${width}px: route did not serve`,
+            `${route} at ${took.width}px: route did not serve`,
           ).toBe(status);
           await emulateTheme(page, theme);
           const { offenders, examined } = await page.evaluate(() => {
@@ -122,15 +122,15 @@ test.describe('Thai typography', () => {
           // list (#68) makes the second case reachable, so measure it.
           expect(
             examined,
-            `${route} at ${width}px, ${theme}: no Thai text was measured — the route is missing or untranslated`,
+            `${route} at ${took.width}px, ${theme}: no Thai text was measured — the route is missing or untranslated`,
           ).toBeGreaterThan(0);
 
           expect(
             searched(offenders, {
               of: examined,
-              what: `Thai headings measured at ${route} ${width}px, ${theme}`,
+              what: `Thai headings measured at ${route} ${took.width}px, ${theme}`,
             }),
-            `${route} at ${width}px, ${theme}: Thai marks would collide with the line above`,
+            `${route} at ${took.width}px, ${theme}: Thai marks would collide with the line above`,
           ).toEqual([]);
           // Thai stacks up to two marks above the base glyph and one below, so
           // the collision is visible in the image itself, not only the numbers.
@@ -139,7 +139,7 @@ test.describe('Thai typography', () => {
           // reader cannot judge a mark against the line above anyway.
           await shoot(
             page,
-            `${route} at ${width}px, ${theme}: ${examined} Thai runs clear of the line above`,
+            `${route} at ${took.width}px, ${theme}: ${examined} Thai runs clear of the line above`,
             page.locator('h1').first(),
           );
         });

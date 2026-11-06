@@ -556,7 +556,7 @@ test.describe('a disabled control affords that it is disabled', () => {
     test(`at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${path}`, async ({
       page,
     }) => {
-      await atViewport(page, { width: 320, height: 900 });
+      const took = await atViewport(page, { width: 320, height: 900 });
       await openRoster(page, path);
       await addSeveral(page, MAX_ROSTER - 1);
       await openEveryDisclosure(page);
@@ -580,7 +580,7 @@ test.describe('a disabled control affords that it is disabled', () => {
       expect(
         searched(small, {
           of: measured.map((a) => a.label),
-          what: 'disabled controls at 320px',
+          what: `disabled controls at ${took.width}px`,
         }),
       ).toEqual([]);
 

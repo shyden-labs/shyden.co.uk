@@ -563,7 +563,7 @@ test.describe('classroom groups — mobile-first layout', () => {
         page,
       }) => {
         const failures: string[] = [];
-        await atViewport(page, { width, height: 900 });
+        const took = await atViewport(page, { width, height: 900 });
         await page.goto(path);
         const ids = await page
           .locator('button[aria-expanded][aria-controls]')
@@ -583,7 +583,7 @@ test.describe('classroom groups — mobile-first layout', () => {
           const overflow = await horizontalOverflow(page);
           if (overflow > 0)
             failures.push(
-              `${path} @${width}px with #${id} open: ${overflow}px`,
+              `${path} @${took.width}px with #${id} open: ${overflow}px`,
             );
         }
         // …and every section open at once, which no earlier test did.
@@ -591,7 +591,7 @@ test.describe('classroom groups — mobile-first layout', () => {
         for (const id of ids) await tapOn(page.locator(`#${id}`));
         const all = await horizontalOverflow(page);
         if (all > 0)
-          failures.push(`${path} @${width}px with ALL open: ${all}px`);
+          failures.push(`${path} @${took.width}px with ALL open: ${all}px`);
         expect(
           searched(failures, { of: ids, what: 'disclosure sections' }),
           failures.join('\n'),
@@ -1666,7 +1666,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     test(`a student number has room to be drawn, not just a value, at ${width}px`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 950 });
+      const took = await atViewport(page, { width, height: 950 });
       await openRoster(page);
       await tapOn(page.locator('.cg-add-student'));
       await expect(page.locator('.cg-roster-number').first()).toHaveValue('1');
@@ -1686,7 +1686,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
       // Two digits at this font need ~16px; a class of 30 has two.
       expect(
         box,
-        `@${width}px the # input has ${box.toFixed(1)}px of content box`,
+        `@${took.width}px the # input has ${box.toFixed(1)}px of content box`,
       ).toBeGreaterThan(16);
     });
 
@@ -1719,7 +1719,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
       test(`nothing in the roster escapes its card at ${width}px -- ${path}`, async ({
         page,
       }) => {
-        await atViewport(page, { width, height: 950 });
+        const took = await atViewport(page, { width, height: 950 });
         await openRoster(page, path);
         // openRoster already adds one, so three more makes four — enough rows
         // that a wrapping or spilling control shows up.
@@ -1729,7 +1729,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
         const worst = await spillPastCard(page, 'cg-students');
         expect(
           worst.over,
-          `${path} @${width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
+          `${path} @${took.width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
         ).toBeLessThanOrEqual(0.5);
       });
     }

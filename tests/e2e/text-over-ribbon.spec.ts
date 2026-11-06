@@ -204,7 +204,7 @@ for (const theme of THEMES)
       test(`${theme} at ${width}px: every text run over the ribbon clears AA -- ${path}`, async ({
         page,
       }) => {
-        await atViewport(page, { width, height: 900 });
+        const took = await atViewport(page, { width, height: 900 });
         // The ribbon exists and paints its tokens, or there is nothing here
         // to measure and a clean result would mean nothing.
         expect(ribbonLayers(tokensCss()).length).toBe(3);
@@ -241,5 +241,8 @@ for (const theme of THEMES)
         await page.goto(path);
         await emulateTheme(page, theme);
         await expect(page.locator('h1').first()).toBeVisible();
-        await shoot(page, `${theme} at ${width}px: ${path} under the ribbon`);
+        await shoot(
+          page,
+          `${theme} at ${took.width}px: ${path} under the ribbon`,
+        );
       });

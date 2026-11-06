@@ -339,12 +339,12 @@ test.describe('mobile layout: no horizontal overflow', () => {
     test(`${locale}: no horizontal scroll at 320px with the menu open`, async ({
       page,
     }) => {
-      await atViewport(page, { width: 320, height: 800 });
+      const took = await atViewport(page, { width: 320, height: 800 });
       await page.goto(localisePath('/', locale));
       await tapOn(page.locator('header details.menu > summary'));
       await expectNoHorizontalScroll(
         page,
-        `${locale}: sideways scroll at 320px with the menu open`,
+        `${locale}: sideways scroll at ${took.width}px with the menu open`,
       );
     });
 });

@@ -151,7 +151,7 @@ test.describe('the API docs meet the site bar (#781)', () => {
           page,
         }) => {
           await page.emulateMedia({ colorScheme: theme });
-          await atViewport(page, { width, height: 900 });
+          const took = await atViewport(page, { width, height: 900 });
           await page.goto(path);
           await openEverything(page, path);
           const floors = FLOORS[path];
@@ -212,6 +212,9 @@ test.describe('the API docs meet the site bar (#781)', () => {
             }),
           ).toEqual([]);
 
-          await shoot(page, `${path}, ${theme}, ${width}px, everything open`);
+          await shoot(
+            page,
+            `${path}, ${theme}, ${took.width}px, everything open`,
+          );
         });
 });

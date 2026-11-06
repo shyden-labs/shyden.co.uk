@@ -2015,7 +2015,7 @@ test.describe('the no-scroll rule, measured', () => {
     test(`the action row is sticky at ${width}x${height}, so the primary action is never below the fold`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height });
+      const took = await atViewport(page, { width, height });
       await page.goto('/classroom-groups');
       const position = await page.evaluate(
         () =>
@@ -2024,7 +2024,10 @@ test.describe('the no-scroll rule, measured', () => {
           ).position,
       );
       expect(position).toBe('sticky');
-      await shoot(page, `${width}x${height}, the action row is sticky`);
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the action row is sticky`,
+      );
     });
 
   // The bar's COMPANION rule, which had no test at all until #188.
@@ -2077,7 +2080,7 @@ test.describe('the no-scroll rule, measured', () => {
     test(`the pinned action row casts a soft shadow upward at ${width}x${height}`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height });
+      const took = await atViewport(page, { width, height });
       await page.goto('/classroom-groups');
       const shadow = await page.evaluate(
         () =>
@@ -2091,20 +2094,25 @@ test.describe('the no-scroll rule, measured', () => {
         /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
       expect(
         parts,
-        `${width}x${height}: the pinned row has a shadow (computed: ${shadow})`,
+        `${took.width}x${took.height}: the pinned row has a shadow (computed: ${shadow})`,
       ).not.toBeNull();
       const [, colour, , offsetY, blur] = parts!;
-      expect(Number(offsetY), `${width}x${height}: cast upward`).toBeLessThan(
-        0,
-      );
+      expect(
+        Number(offsetY),
+        `${took.width}x${took.height}: cast upward`,
+      ).toBeLessThan(0);
       expect(
         Number(blur),
-        `${width}x${height}: soft, not a hard line`,
+        `${took.width}x${took.height}: soft, not a hard line`,
       ).toBeGreaterThan(0);
-      expect(colour, `${width}x${height}: not transparent`).not.toMatch(
-        /, 0\)$/,
+      expect(
+        colour,
+        `${took.width}x${took.height}: not transparent`,
+      ).not.toMatch(/, 0\)$/);
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the row casts its shadow upward`,
       );
-      await shoot(page, `${width}x${height}, the row casts its shadow upward`);
     });
 
   // L-08. The brief's own literal query measured only what page LOAD

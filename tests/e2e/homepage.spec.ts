@@ -393,7 +393,7 @@ test.describe('homepage content', () => {
   test('call-to-action buttons meet the 44×44px touch target', async ({
     page,
   }) => {
-    await atViewport(page, { width: 375, height: 800 });
+    const took = await atViewport(page, { width: 375, height: 800 });
     await page.goto('/');
     const btns = page.locator('.btn');
     await expect(btns.first()).toBeVisible();
@@ -408,7 +408,10 @@ test.describe('homepage content', () => {
       expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
       expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
     }
-    await shoot(page, `375px: all ${await btns.count()} buttons clear 44x44px`);
+    await shoot(
+      page,
+      `${took.width}px: all ${await btns.count()} buttons clear 44x44px`,
+    );
   });
 });
 
@@ -587,7 +590,7 @@ test.describe('the language band sits under the header (#599)', () => {
     test(`at ${width}px the band and the header do not intersect at load`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 900 });
+      const took = await atViewport(page, { width, height: 900 });
       await page.goto('/');
       const { header, clip } = await readBand(page);
       expect(
@@ -596,7 +599,7 @@ test.describe('the language band sits under the header (#599)', () => {
       ).toBeGreaterThanOrEqual(header.bottom);
       await shoot(
         page,
-        `${width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
+        `${took.width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
       );
     });
 
@@ -608,7 +611,7 @@ test.describe('the language band sits under the header (#599)', () => {
     test(`at ${width}px the header paints above the band as it scrolls beneath`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 900 });
+      const took = await atViewport(page, { width, height: 900 });
       await page.goto('/');
       const hit = await page.evaluate(async () => {
         const header = document.querySelector('header');
@@ -655,7 +658,7 @@ test.describe('the language band sits under the header (#599)', () => {
       expect(hit.samples).toHaveLength(3);
       await shoot(
         page,
-        `${width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
+        `${took.width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
       );
     });
 
@@ -693,7 +696,7 @@ test.describe('mobile-first layout', () => {
       test(`${locale}: no horizontal scroll at ${width}px`, async ({
         page,
       }) => {
-        await atViewport(page, { width, height: 900 });
+        const took = await atViewport(page, { width, height: 900 });
         await page.goto(localisePath('/', locale));
         const overflow = await expectNoHorizontalScroll(page);
         // This is the guard the marquee tripped: a rotated-and-scaled element
@@ -701,7 +704,7 @@ test.describe('mobile-first layout', () => {
         // sideways scroll at every width. 1217 unit tests could not see it.
         await shoot(
           page,
-          `${locale} ${width}px: horizontal overflow is ${overflow}px`,
+          `${locale} ${took.width}px: horizontal overflow is ${overflow}px`,
         );
       });
   }
@@ -1016,7 +1019,7 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
     test(`at ${width}px no row sits between the header and the strip`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 900 });
+      const took = await atViewport(page, { width, height: 900 });
       await page.goto('/');
       const facts = await page.evaluate(() => {
         const header = document.querySelector('header');
@@ -1039,7 +1042,7 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
       expect(facts.margin, "the strip's own top margin").toBeGreaterThan(0);
       expect(
         facts.gap,
-        `${width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
+        `${took.width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
       ).toBeLessThanOrEqual(facts.margin + 1);
       expect(
         facts.targetMid,
@@ -1051,7 +1054,7 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
     test(`at ${width}px the disc is at most 28px, on the strip's tilted middle, and its 44px target takes a click at every edge`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 900 });
+      const took = await atViewport(page, { width, height: 900 });
       await page.goto('/');
       const control = page.getByRole('checkbox', {
         name: getSiteStrings('en').home.pauseMotion,
@@ -1117,11 +1120,11 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
       ).toBeGreaterThanOrEqual(44);
       expect(
         at.across,
-        `${width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
+        `${took.width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
       ).toBeLessThanOrEqual(1.5);
       expect(
         at.across,
-        `${width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
+        `${took.width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
       ).toBeLessThanOrEqual(at.room);
       expect(at.hitsAtCentre, 'a click at the centre misses the control').toBe(
         true,
@@ -1470,7 +1473,7 @@ test.describe('the Yawelo Idle preview video', () => {
     test(`at ${width}px the preview and its description stay inside the card`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height: 900 });
+      const took = await atViewport(page, { width, height: 900 });
       await page.goto('/');
       await tapOn(page.locator('#yawelo-idle summary'));
       await expect(page.locator('#yawelo-idle details p')).toBeVisible();
@@ -1510,10 +1513,10 @@ test.describe('the Yawelo Idle preview video', () => {
       expect(box).not.toBeNull();
       expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
       expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-      await expectNoHorizontalScroll(page, `${width}px`);
+      await expectNoHorizontalScroll(page, `${took.width}px`);
       await shoot(
         page,
-        `${width}px: the Yawelo Idle preview in its card`,
+        `${took.width}px: the Yawelo Idle preview in its card`,
         page.locator('#yawelo-idle'),
       );
     });

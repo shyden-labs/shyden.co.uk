@@ -249,12 +249,15 @@ test.describe('language switcher', () => {
   for (const locale of LOCALES)
     test(`${locale}: adds no horizontal scroll at 320px`, async ({ page }) => {
       const path = localisePath('/', locale);
-      await atViewport(page, { width: 320, height: 720 });
+      const took = await atViewport(page, { width: 320, height: 720 });
       await page.goto(path);
       // Not vacuous: a switcher hidden at 320px would satisfy "no overflow"
       // trivially, and would also be the wrong fix.
       await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
-      await expectNoHorizontalScroll(page, `${path} scrolls sideways at 320px`);
+      await expectNoHorizontalScroll(
+        page,
+        `${path} scrolls sideways at ${took.width}px`,
+      );
     });
 
   // Every language (#390 F131): the panel hangs off a summary whose width is

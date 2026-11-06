@@ -32,11 +32,11 @@ for (const theme of THEMES) {
         test(`${path} at ${width}px: renders the theme, with no sideways scroll`, async ({
           page,
         }) => {
-          await atViewport(page, { width, height: 900 });
+          const took = await atViewport(page, { width, height: 900 });
           await page.goto(path);
           await expectTheme(page, theme);
           await expectNoHorizontalScroll(page);
-          await shoot(page, `${path}, ${theme}, ${width}px`);
+          await shoot(page, `${path}, ${theme}, ${took.width}px`);
         });
 
     test.describe('interactive states', () => {
