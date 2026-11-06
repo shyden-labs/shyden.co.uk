@@ -23,10 +23,12 @@ import { nodeDialer, openInspector, type Inspector } from './inspector/connect';
 import { COMMAND_CEILING_MS } from './inspector/protocol';
 import {
   describeInteractionMode,
-  DomDispatchInteraction,
+  RealTapInteraction,
+  runTapCanary,
   type Interaction,
   type InteractionMode,
 } from './interaction';
+import { httpFor, WdaSession } from './wda';
 import { PageDriver, waitFor, type PageElement } from './page-driver';
 import { themeColour } from '../../palette';
 import {
@@ -295,9 +297,8 @@ export interface DeviceSession {
   readonly baseUrl: string;
   readonly device: IosDevice;
   /**
-   * How input reaches the page. `dom-dispatch` until #838 brings
-   * WebDriverAgent's real taps; named in the run's output so a DOM-dispatch
-   * run is never reported as taps.
+   * How input reaches the page: `real-tap`, WebDriverAgent's real touches
+   * and keyboard (#838), named in the run's output.
    */
   readonly mode: InteractionMode;
   /** click/type/clear -- see interaction.ts. Journeys call only this, never `driver` directly for input. */
@@ -328,8 +329,23 @@ async function attachToSafari(device: IosDevice): Promise<Inspector> {
   return inspector;
 }
 
+/**
+ * Where WebDriverAgent answers, as the runner handed it on. Without it the
+ * session refuses to start: the iPhone run has no input but real taps.
+ */
+export function wdaUrlFrom(env: NodeJS.ProcessEnv): string {
+  const url = env.WDA_URL;
+  if (url === undefined || url === '')
+    throw new Error(
+      'WDA_URL is not set: WebDriverAgent is started by scripts/test-devices.mjs (npm run test:devices), ' +
+        'which hands its address on; the iPhone run has no input but real taps, so it does not start without it',
+    );
+  return url;
+}
+
 /** Runs every precondition in order, cheapest first, and returns a session ready for journeys. */
 export async function startIosSession(): Promise<DeviceSession> {
+  const wdaUrl = wdaUrlFrom(process.env);
   const device = findIosDevice();
   const inspector = await attachToSafari(device);
   const driver = new PageDriver(inspector.page);
@@ -342,13 +358,35 @@ export async function startIosSession(): Promise<DeviceSession> {
     throw error;
   }
 
-  const mode: InteractionMode = 'dom-dispatch';
+  // WDA attaches to the Safari our inspector already holds, never
+  // relaunching it; the canary's real tap, on the page the journeys use,
+  // measures where that page sits on screen and stops the run if a real
+  // touch does not reach it.
+  let wda: WdaSession;
+  let interaction: RealTapInteraction;
+  try {
+    wda = await WdaSession.open(httpFor(wdaUrl));
+  } catch (error) {
+    inspector.close();
+    throw error;
+  }
+  try {
+    const screen = await wda.windowRect();
+    await driver.navigate(`${resolved.baseUrl}/`);
+    const calibration = await runTapCanary(driver, wda, screen);
+    interaction = new RealTapInteraction(driver, wda, calibration, screen);
+  } catch (error) {
+    await wda.close().catch(() => undefined);
+    inspector.close();
+    throw error;
+  }
+
+  const mode: InteractionMode = interaction.mode;
   console.log(
     `\n${'='.repeat(70)}\n${describeInteractionMode(mode)}\n` +
       `[iOS reachable via] ${resolved.interfaceName} (${resolved.address})\n${'='.repeat(70)}\n`,
   );
   writeModeArtifact(mode, device);
-  const interaction = new DomDispatchInteraction();
   const { baseUrl } = resolved;
 
   return {
@@ -397,7 +435,11 @@ export async function startIosSession(): Promise<DeviceSession> {
     },
 
     async teardown(): Promise<void> {
-      inspector.close();
+      try {
+        await wda.close();
+      } finally {
+        inspector.close();
+      }
     },
   };
 }

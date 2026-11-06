@@ -19,17 +19,10 @@ const SUITES = [
   'tests/functions',
   'tests/device',
 ];
-// The iPhone driver's typing is shyden-labs/shyden.co.uk#838's (real taps and
-// the phone's own keyboard through WebDriverAgent); it joins this guard when
-// that lands.
-const IPHONE_DRIVER = 'tests/device/ios/';
+// The iPhone driver (tests/device/ios/) is read too: it types on the phone's
+// own keyboard through WebDriverAgent (shyden-labs/shyden.co.uk#838).
 const files = [
-  ...SUITES.flatMap((dir) =>
-    filesUnder(
-      dir,
-      (path) => /\.ts$/.test(path) && !path.startsWith(IPHONE_DRIVER),
-    ),
-  ),
+  ...SUITES.flatMap((dir) => filesUnder(dir, (path) => /\.ts$/.test(path))),
   'tests/make-groups.ts',
 ].map((path) => ({
   path,
