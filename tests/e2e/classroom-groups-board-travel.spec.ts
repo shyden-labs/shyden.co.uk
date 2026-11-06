@@ -16,6 +16,7 @@ import {
   FOLD_MS,
   travelSchedule,
 } from '../../src/lib/travel';
+import { atViewport } from '../viewport-at';
 
 /**
  * The board deals by moving each student from the waiting list into their
@@ -746,26 +747,24 @@ test.describe('the board deals by moving students into their cards', () => {
     ).toEqual([]);
   });
 
-  test(
-    'at 320px nothing scrolls sideways while students travel',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 640 });
-      await openWaitingBoard(page, String(COUNT), '4');
-      await startSampler(page);
-      await press(page, 'Make Groups');
-      await expectDealt(page);
-      const { flights } = await stopSampler(page);
-      const { travelled, during } = judgedPerStudent(
-        flights,
-        (f) => f.overflow > 0,
-      );
-      expect(
-        searched(during, { of: travelled, what: 'students seen travelling' }),
-        'students during whose flight the board scrolled sideways',
-      ).toEqual([]);
-    },
-  );
+  test('at 320px nothing scrolls sideways while students travel', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 640 });
+    await openWaitingBoard(page, String(COUNT), '4');
+    await startSampler(page);
+    await press(page, 'Make Groups');
+    await expectDealt(page);
+    const { flights } = await stopSampler(page);
+    const { travelled, during } = judgedPerStudent(
+      flights,
+      (f) => f.overflow > 0,
+    );
+    expect(
+      searched(during, { of: travelled, what: 'students seen travelling' }),
+      'students during whose flight the board scrolled sideways',
+    ).toEqual([]);
+  });
 
   test('the fit after the fold is the fit a fresh board gets', async ({
     page,

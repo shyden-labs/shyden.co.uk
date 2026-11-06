@@ -6,6 +6,7 @@ import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { getSiteStrings } from '../../src/lib/i18n/index';
 import { expectVisibleText } from './helpers';
 import { localePaths } from './locale-sampling';
+import { atViewport } from '../viewport-at';
 
 const en = getSiteStrings('en').calculators;
 const id = getSiteStrings('id').calculators;
@@ -127,17 +128,15 @@ test.describe('gift value — jump link', () => {
 
 test.describe('gift value — touch targets ≥ 44×44px', () => {
   for (const path of localePaths('/yeetalk-calculators'))
-    test(
-      `mobile: input, submit button and jump link are ≥44px -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 375, height: 800 });
-        await page.goto(path);
-        await atLeast44(page.locator('#gift-input'));
-        await atLeast44(page.locator('#gift-submit'));
-        await atLeast44(page.locator('a[href="#gift-value"]'));
-      },
-    );
+    test(`mobile: input, submit button and jump link are ≥44px -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 375, height: 800 });
+      await page.goto(path);
+      await atLeast44(page.locator('#gift-input'));
+      await atLeast44(page.locator('#gift-submit'));
+      await atLeast44(page.locator('a[href="#gift-value"]'));
+    });
 });
 
 // Page-level scrollWidth is not containment (CLAUDE.md): a card's content can
@@ -146,49 +145,44 @@ test.describe('gift value — touch targets ≥ 44×44px', () => {
 test.describe('gift value — mobile-first layout', () => {
   for (const width of [320, 375, 768, 1280]) {
     for (const path of localePaths('/yeetalk-calculators'))
-      test(
-        `no horizontal scroll, and nothing escapes the card, at ${width}px with the longest result -- ${path}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(path);
-          await typeInto(page.locator('#gift-input'), '1000000000');
-          await tapOn(page.locator('#gift-submit'));
-          await expect(page.locator('#gift-result')).not.toBeEmpty();
-          await expectNoHorizontalScroll(page);
-          // The worst overshoot past the card's edge, and how many boxes were
-          // measured: a card that held nothing would report an overshoot of 0
-          // for free, so the count is asserted alive beside it.
-          const worst = await page.evaluate(() => {
-            const card = document
-              .querySelector('#gift-input')
-              ?.closest('.card');
-            if (!card) return { over: 0, who: 'no card', measured: 0 };
-            const box = card.getBoundingClientRect();
-            const rendered = [...card.querySelectorAll('*')].filter(
-              (el) => el.getClientRects().length > 0,
-            );
-            let over = 0;
-            let who = '';
-            for (const el of rendered) {
-              const r = el.getBoundingClientRect();
-              const past = Math.max(box.left - r.left, r.right - box.right);
-              if (past > over) {
-                over = past;
-                who = el.id || el.tagName;
-              }
+      test(`no horizontal scroll, and nothing escapes the card, at ${width}px with the longest result -- ${path}`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        await typeInto(page.locator('#gift-input'), '1000000000');
+        await tapOn(page.locator('#gift-submit'));
+        await expect(page.locator('#gift-result')).not.toBeEmpty();
+        await expectNoHorizontalScroll(page);
+        // The worst overshoot past the card's edge, and how many boxes were
+        // measured: a card that held nothing would report an overshoot of 0
+        // for free, so the count is asserted alive beside it.
+        const worst = await page.evaluate(() => {
+          const card = document.querySelector('#gift-input')?.closest('.card');
+          if (!card) return { over: 0, who: 'no card', measured: 0 };
+          const box = card.getBoundingClientRect();
+          const rendered = [...card.querySelectorAll('*')].filter(
+            (el) => el.getClientRects().length > 0,
+          );
+          let over = 0;
+          let who = '';
+          for (const el of rendered) {
+            const r = el.getBoundingClientRect();
+            const past = Math.max(box.left - r.left, r.right - box.right);
+            if (past > over) {
+              over = past;
+              who = el.id || el.tagName;
             }
-            return { over, who, measured: rendered.length };
-          });
-          expect(
-            worst.measured,
-            'the card held boxes to measure',
-          ).toBeGreaterThan(0);
-          expect(
-            worst.over,
-            `${worst.who} escapes the card`,
-          ).toBeLessThanOrEqual(0.5);
-        },
-      );
+          }
+          return { over, who, measured: rendered.length };
+        });
+        expect(
+          worst.measured,
+          'the card held boxes to measure',
+        ).toBeGreaterThan(0);
+        expect(worst.over, `${worst.who} escapes the card`).toBeLessThanOrEqual(
+          0.5,
+        );
+      });
   }
 });

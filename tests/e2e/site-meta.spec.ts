@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { expectNoHorizontalScroll } from '../viewport';
+import { atViewport } from '../viewport-at';
 test('custom 404 renders branded not-found copy', async ({ page }) => {
   const res = await page.goto('/no-such-page-xyz');
   expect(res?.status()).toBe(404);
@@ -23,14 +24,10 @@ test('robots.txt references the sitemap', async ({ request }) => {
 // scroll guarantee as every other page (cf. homepage.spec.ts / yeetalk-calculators.spec.ts).
 test.describe('404 page — mobile-first layout', () => {
   for (const width of [320, 375, 768, 1280]) {
-    test(
-      `no horizontal scroll at ${width}px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/no-such-page-xyz');
-        await expectNoHorizontalScroll(page);
-      },
-    );
+    test(`no horizontal scroll at ${width}px`, async ({ page }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/no-such-page-xyz');
+      await expectNoHorizontalScroll(page);
+    });
   }
 });

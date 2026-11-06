@@ -35,6 +35,7 @@ export const EMULATED_VIEWPORT_TAG = '@emulated-viewport';
 export const ENGINE_DEPENDENT_NAMES: ReadonlySet<string> = new Set([
   // Drives the viewport.
   'setViewportSize',
+  'atViewport',
   'viewport',
   'isMobile',
   'hasTouch',

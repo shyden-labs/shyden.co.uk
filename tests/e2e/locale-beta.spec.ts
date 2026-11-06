@@ -17,6 +17,7 @@ import {
   getSiteStrings,
   BETA_BADGE,
 } from '../../src/lib/i18n/index';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -205,30 +206,26 @@ test.describe('every unverified language is marked BETA', () => {
     });
 
   for (const locale of LOCALES)
-    test(
-      `${locale}: adds no horizontal scroll at 320px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        const path = localisePath('/', locale);
-        await page.setViewportSize({ width: 320, height: 720 });
-        await page.goto(path);
-        // Not vacuous: a badge hidden at 320px would satisfy "no overflow"
-        // trivially, and hiding it is also the wrong fix.
-        if (isBetaLocale(locale))
-          await expect(
-            page.locator(`${SWITCHER} > summary ${BADGE}`),
-          ).toBeVisible();
-        await expect(page.locator(NOTICE)).toHaveCount(
-          isBetaLocale(locale) ? 1 : 0,
-        );
-        const overflow = await expectNoHorizontalScroll(
-          page,
-          `${path} scrolls sideways at 320px with the BETA marker`,
-        );
-        await shoot(
-          page,
-          `${locale} at 320px: badge visible, overflow ${overflow}px`,
-        );
-      },
-    );
+    test(`${locale}: adds no horizontal scroll at 320px`, async ({ page }) => {
+      const path = localisePath('/', locale);
+      const took = await atViewport(page, { width: 320, height: 720 });
+      await page.goto(path);
+      // Not vacuous: a badge hidden at 320px would satisfy "no overflow"
+      // trivially, and hiding it is also the wrong fix.
+      if (isBetaLocale(locale))
+        await expect(
+          page.locator(`${SWITCHER} > summary ${BADGE}`),
+        ).toBeVisible();
+      await expect(page.locator(NOTICE)).toHaveCount(
+        isBetaLocale(locale) ? 1 : 0,
+      );
+      const overflow = await expectNoHorizontalScroll(
+        page,
+        `${path} scrolls sideways at ${took.width}px with the BETA marker`,
+      );
+      await shoot(
+        page,
+        `${locale} at ${took.width}px: badge visible, overflow ${overflow}px`,
+      );
+    });
 });
