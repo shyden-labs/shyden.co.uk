@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
-import { parseFile, parseSource } from './ast';
+import { parseFile, parseSource } from '../unit/ast';
 import { callsIn, lineOf } from '../playwright-declarations';
 import { specFilesUnder } from '../source-files';
 
