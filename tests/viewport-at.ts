@@ -29,8 +29,20 @@ export async function atViewport(
     await page.setViewportSize(want);
     return want;
   }
-  return page.evaluate(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
+  // A real phone is measured. Before a test opens its page, the tab may hold
+  // a blank one with no viewport meta, laid out at Chrome's 980px default
+  // (2026-11-06 phone run: 980x1809 on a 411px-wide screen). The screen's own
+  // width says what a page with `width=device-width` will have, and the
+  // height scales with it.
+  const { innerWidth, innerHeight, screenWidth } = await page.evaluate(() => ({
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    screenWidth: window.screen.width,
   }));
+  if (innerWidth <= screenWidth)
+    return { width: innerWidth, height: innerHeight };
+  return {
+    width: screenWidth,
+    height: Math.round((innerHeight * screenWidth) / innerWidth),
+  };
 }
