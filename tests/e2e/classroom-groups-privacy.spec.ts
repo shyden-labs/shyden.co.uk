@@ -247,6 +247,9 @@ test.describe('privacy — with JavaScript blocked', () => {
     async ({ page }) => {
       await page.goto('/classroom-groups');
       await expect(page.locator('noscript')).toHaveCount(1);
+      // Shown only while script is really blocked: with it on, a <noscript>
+      // holds raw text and #cg-noscript is not in the page at all (#1047).
+      await expect(page.locator('#cg-noscript')).toBeVisible();
     },
   );
 
