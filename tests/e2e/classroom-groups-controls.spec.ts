@@ -23,6 +23,7 @@ import {
   rectAtLeast44,
   spillPastCard,
 } from '../viewport';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -349,15 +350,11 @@ test.describe('the results are styled, not just present', () => {
 test.describe('classroom groups — mobile-first layout', () => {
   for (const path of localePaths('/classroom-groups')) {
     for (const width of [320, 375, 768, 1280]) {
-      test(
-        `${path}: no horizontal scroll at ${width}px`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(path);
-          await expectNoHorizontalScroll(page);
-        },
-      );
+      test(`${path}: no horizontal scroll at ${width}px`, async ({ page }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        await expectNoHorizontalScroll(page);
+      });
     }
   }
 
@@ -380,16 +377,14 @@ test.describe('classroom groups — mobile-first layout', () => {
   // content sits in a narrower column than the full viewport -- a distinct
   // geometry worth its own check.
   for (const width of [320, 768]) {
-    test(
-      `no horizontal scroll with Grouping options open, at ${width}px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/classroom-groups');
-        await tapOn(page.locator('#cg-grouping-toggle'));
-        await expectNoHorizontalScroll(page);
-      },
-    );
+    test(`no horizontal scroll with Grouping options open, at ${width}px`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/classroom-groups');
+      await tapOn(page.locator('#cg-grouping-toggle'));
+      await expectNoHorizontalScroll(page);
+    });
   }
 
   // Stage 2, Task 7: Sound & animation is the SECOND section to hold real
@@ -398,16 +393,14 @@ test.describe('classroom groups — mobile-first layout', () => {
   // the same reason (320px is the mobile-first floor; 768px is where
   // `.tool-sections` becomes two columns, a distinct geometry).
   for (const width of [320, 768]) {
-    test(
-      `no horizontal scroll with Sound & animation open, at ${width}px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/classroom-groups');
-        await tapOn(page.locator('#cg-sound-toggle'));
-        await expectNoHorizontalScroll(page);
-      },
-    );
+    test(`no horizontal scroll with Sound & animation open, at ${width}px`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/classroom-groups');
+      await tapOn(page.locator('#cg-sound-toggle'));
+      await expectNoHorizontalScroll(page);
+    });
   }
 
   // Design spec section 13: "no horizontal page scroll at any of those four
@@ -426,112 +419,108 @@ test.describe('classroom groups — mobile-first layout', () => {
   // measured, so a refusal fails here instead of passing.
   for (const width of [320, 768]) {
     for (const path of localePaths('/classroom-groups'))
-      test(
-        `no horizontal scroll with results shown, at ${width}px -- ${path}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(path);
-          await makeGroups(page, String(MAX_STUDENTS), '4');
-          await expect(page.locator('#cg-results .group')).toHaveCount(
-            Math.ceil(MAX_STUDENTS / 4),
-          );
-          await expectNoHorizontalScroll(page, `${path} with results shown`);
-        },
-      );
+      test(`no horizontal scroll with results shown, at ${width}px -- ${path}`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        await makeGroups(page, String(MAX_STUDENTS), '4');
+        await expect(page.locator('#cg-results .group')).toHaveCount(
+          Math.ceil(MAX_STUDENTS / 4),
+        );
+        await expectNoHorizontalScroll(page, `${path} with results shown`);
+      });
   }
 
   // Every locale (#423): the buttons and labels measured here hold the
   // page's own copy, and a two-character zh label can make a box narrower
   // than an English one.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `every control meets the 44px touch target -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 375, height: 900 });
-        await page.goto(path);
+    test(`every control meets the 44px touch target -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 375, height: 900 });
+      await page.goto(path);
 
-        // Measured in BOTH states of the mode field, because "students per
-        // group" and "how many groups" are never on screen at the same time —
-        // and a control that is not displayed measures 0, which is not the
-        // same thing as too small. Used to also toggle the naming radio's own
-        // conditional theme `<select>` the same way; Stage 3, Task 8 removed
-        // that field along with the radio that revealed it (design spec
-        // section 5), leaving one conditional field, not two.
-        //
-        // Stage 2, Task 5 added `#cg-form input[type="text"]` to this selector
-        // for the new #cg-class field. Honestly: this could not go red before
-        // that field existed, and does not prove much on its own even after --
-        // `small` starts and stays `[]` whether or not #cg-class is measured at
-        // all, which is exactly what happened when this line was added (a
-        // pre-implementation run stayed green, confirmed rather than assumed).
-        // What it DOES buy, from here on, is real: a #cg-class CSS rule that
-        // dropped below 44px would populate `small` and redden `expect(small).
-        // toEqual([])` below, the same as it would for any control this test
-        // already covered. `seen`'s own lower bound was left alone rather than
-        // bumped to "prove" #cg-class was counted -- the real baseline already
-        // includes the three section-toggle buttons inside #cg-form (missed on
-        // a first pass), so it sits comfortably above 5 with or without
-        // #cg-class, and tightening it to track an exact count would make this
-        // test brittle against unrelated future controls for no real gain.
-        //
-        // Noted on code review, not a hole: `#cg-speed` (and `#cg-sound-check`)
-        // moved into `#cg-sound-body` in Stage 2, Task 7, which starts
-        // `hidden`, and this test never opens it -- `offsetParent !== null`
-        // below correctly drops both from `small` and from `seen`'s count, the
-        // same as it would for any control inside a collapsed section. Neither
-        // control silently loses coverage overall: classroom-groups.spec.ts's
-        // own "every interactive target is at least 44px, collapsed and with
-        // every section open" test opens all four sections first and measures
-        // everything inside them, `#cg-speed` included. This test's own job is
-        // narrower -- the controls already on screen before a teacher opens
-        // anything -- and #cg-speed simply is not one of those any more.
-        // `[form="cg-form"]`: the form's controls that live outside it. #cg-go
-        // has since #384, and `#cg-form button` alone would stop measuring it.
-        const measureVisible = () =>
-          page
-            .locator(
-              '#cg-form select, #cg-form button, #cg-form input[type="number"], #cg-form input[type="text"], [form="cg-form"]',
-            )
-            .evaluateAll((els) =>
-              els
-                .filter((el) => (el as HTMLElement).offsetParent !== null)
-                .map((el) => ({
-                  id: el.id,
-                  height: el.getBoundingClientRect().height,
-                })),
-            );
-
-        // Every control measured, in both states: the population the verdict
-        // below is drawn from (#610).
-        const measured = [...(await measureVisible())];
-        await setCheckedOn(
-          page.locator('input[name="mode"][value="groupCount"]'),
-        );
-        measured.push(...(await measureVisible()));
-        const small = measured.filter((c) => c.height < 44);
-
-        // And prove the measurement actually saw the fields, rather than
-        // reporting nothing because it found nothing to look at.
-        const seen = await page
+      // Measured in BOTH states of the mode field, because "students per
+      // group" and "how many groups" are never on screen at the same time —
+      // and a control that is not displayed measures 0, which is not the
+      // same thing as too small. Used to also toggle the naming radio's own
+      // conditional theme `<select>` the same way; Stage 3, Task 8 removed
+      // that field along with the radio that revealed it (design spec
+      // section 5), leaving one conditional field, not two.
+      //
+      // Stage 2, Task 5 added `#cg-form input[type="text"]` to this selector
+      // for the new #cg-class field. Honestly: this could not go red before
+      // that field existed, and does not prove much on its own even after --
+      // `small` starts and stays `[]` whether or not #cg-class is measured at
+      // all, which is exactly what happened when this line was added (a
+      // pre-implementation run stayed green, confirmed rather than assumed).
+      // What it DOES buy, from here on, is real: a #cg-class CSS rule that
+      // dropped below 44px would populate `small` and redden `expect(small).
+      // toEqual([])` below, the same as it would for any control this test
+      // already covered. `seen`'s own lower bound was left alone rather than
+      // bumped to "prove" #cg-class was counted -- the real baseline already
+      // includes the three section-toggle buttons inside #cg-form (missed on
+      // a first pass), so it sits comfortably above 5 with or without
+      // #cg-class, and tightening it to track an exact count would make this
+      // test brittle against unrelated future controls for no real gain.
+      //
+      // Noted on code review, not a hole: `#cg-speed` (and `#cg-sound-check`)
+      // moved into `#cg-sound-body` in Stage 2, Task 7, which starts
+      // `hidden`, and this test never opens it -- `offsetParent !== null`
+      // below correctly drops both from `small` and from `seen`'s count, the
+      // same as it would for any control inside a collapsed section. Neither
+      // control silently loses coverage overall: classroom-groups.spec.ts's
+      // own "every interactive target is at least 44px, collapsed and with
+      // every section open" test opens all four sections first and measures
+      // everything inside them, `#cg-speed` included. This test's own job is
+      // narrower -- the controls already on screen before a teacher opens
+      // anything -- and #cg-speed simply is not one of those any more.
+      // `[form="cg-form"]`: the form's controls that live outside it. #cg-go
+      // has since #384, and `#cg-form button` alone would stop measuring it.
+      const measureVisible = () =>
+        page
           .locator(
             '#cg-form select, #cg-form button, #cg-form input[type="number"], #cg-form input[type="text"], [form="cg-form"]',
           )
-          .evaluateAll(
-            (els) =>
-              els.filter((el) => (el as HTMLElement).offsetParent !== null)
-                .length,
+          .evaluateAll((els) =>
+            els
+              .filter((el) => (el as HTMLElement).offsetParent !== null)
+              .map((el) => ({
+                id: el.id,
+                height: el.getBoundingClientRect().height,
+              })),
           );
-        expect(seen).toBeGreaterThanOrEqual(5);
-        expect(
-          searched(small, {
-            of: measured,
-            what: 'visible controls measured in both modes',
-          }),
-        ).toEqual([]);
-      },
-    );
+
+      // Every control measured, in both states: the population the verdict
+      // below is drawn from (#610).
+      const measured = [...(await measureVisible())];
+      await setCheckedOn(
+        page.locator('input[name="mode"][value="groupCount"]'),
+      );
+      measured.push(...(await measureVisible()));
+      const small = measured.filter((c) => c.height < 44);
+
+      // And prove the measurement actually saw the fields, rather than
+      // reporting nothing because it found nothing to look at.
+      const seen = await page
+        .locator(
+          '#cg-form select, #cg-form button, #cg-form input[type="number"], #cg-form input[type="text"], [form="cg-form"]',
+        )
+        .evaluateAll(
+          (els) =>
+            els.filter((el) => (el as HTMLElement).offsetParent !== null)
+              .length,
+        );
+      expect(seen).toBeGreaterThanOrEqual(5);
+      expect(
+        searched(small, {
+          of: measured,
+          what: 'visible controls measured in both modes',
+        }),
+      ).toEqual([]);
+    });
 
   // This is the page that ships a script, and it was the page without this
   // test. One test per language (#418): each has its own recorder and its own
@@ -570,46 +559,44 @@ test.describe('classroom groups — mobile-first layout', () => {
   // and width in the title instead of only in the message.
   for (const path of localePaths('/classroom-groups')) {
     for (const width of [320, 390, 768]) {
-      test(
-        `no horizontal scroll at ${width}px with any single section open — ${path}, every section derived`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          const failures: string[] = [];
-          await page.setViewportSize({ width, height: 900 });
+      test(`no horizontal scroll at ${width}px with any single section open — ${path}, every section derived`, async ({
+        page,
+      }) => {
+        const failures: string[] = [];
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        const ids = await page
+          .locator('button[aria-expanded][aria-controls]')
+          .evaluateAll((els) => els.map((e) => e.id).filter(Boolean));
+        // A page with no disclosures would make every assertion below
+        // vacuous, so the count is asserted rather than assumed.
+        expect(
+          ids.length,
+          `${path}: no disclosure buttons found`,
+        ).toBeGreaterThan(3);
+        // runtime population: the disclosure toggles this page rendered,
+        // read off the DOM above, so a section added later is covered the
+        // day it appears; collection time cannot know them (#417).
+        for (const id of ids) {
           await page.goto(path);
-          const ids = await page
-            .locator('button[aria-expanded][aria-controls]')
-            .evaluateAll((els) => els.map((e) => e.id).filter(Boolean));
-          // A page with no disclosures would make every assertion below
-          // vacuous, so the count is asserted rather than assumed.
-          expect(
-            ids.length,
-            `${path}: no disclosure buttons found`,
-          ).toBeGreaterThan(3);
-          // runtime population: the disclosure toggles this page rendered,
-          // read off the DOM above, so a section added later is covered the
-          // day it appears; collection time cannot know them (#417).
-          for (const id of ids) {
-            await page.goto(path);
-            await tapOn(page.locator(`#${id}`));
-            const overflow = await horizontalOverflow(page);
-            if (overflow > 0)
-              failures.push(
-                `${path} @${width}px with #${id} open: ${overflow}px`,
-              );
-          }
-          // …and every section open at once, which no earlier test did.
-          await page.goto(path);
-          for (const id of ids) await tapOn(page.locator(`#${id}`));
-          const all = await horizontalOverflow(page);
-          if (all > 0)
-            failures.push(`${path} @${width}px with ALL open: ${all}px`);
-          expect(
-            searched(failures, { of: ids, what: 'disclosure sections' }),
-            failures.join('\n'),
-          ).toEqual([]);
-        },
-      );
+          await tapOn(page.locator(`#${id}`));
+          const overflow = await horizontalOverflow(page);
+          if (overflow > 0)
+            failures.push(
+              `${path} @${width}px with #${id} open: ${overflow}px`,
+            );
+        }
+        // …and every section open at once, which no earlier test did.
+        await page.goto(path);
+        for (const id of ids) await tapOn(page.locator(`#${id}`));
+        const all = await horizontalOverflow(page);
+        if (all > 0)
+          failures.push(`${path} @${width}px with ALL open: ${all}px`);
+        expect(
+          searched(failures, { of: ids, what: 'disclosure sections' }),
+          failures.join('\n'),
+        ).toEqual([]);
+      });
     }
   }
 
@@ -1320,31 +1307,29 @@ test.describe('Grouping options', () => {
   //
   // Every locale (#423): each switch's label is the page's own copy.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `the two sex switches meet the 44px touch target once open -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 375, height: 900 });
-        await page.goto(path);
-        await expect(page.locator('#cg-sex-mix')).toBeHidden();
+    test(`the two sex switches meet the 44px touch target once open -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 375, height: 900 });
+      await page.goto(path);
+      await expect(page.locator('#cg-sex-mix')).toBeHidden();
 
-        const body = page.locator('#cg-grouping-body');
-        await tapOn(page.locator('#cg-grouping-toggle'));
-        const labels = await body
-          .locator('#cg-sex-mix, #cg-sex-separate')
-          .evaluateAll((els) =>
-            els.map((el) => {
-              const { width, height } = el
-                .closest('label')!
-                .getBoundingClientRect();
-              return { id: el.id, width, height };
-            }),
-          );
-        expect(labels).toHaveLength(2);
-        for (const { id, width, height } of labels)
-          rectAtLeast44({ width, height }, `${id} (label)`);
-      },
-    );
+      const body = page.locator('#cg-grouping-body');
+      await tapOn(page.locator('#cg-grouping-toggle'));
+      const labels = await body
+        .locator('#cg-sex-mix, #cg-sex-separate')
+        .evaluateAll((els) =>
+          els.map((el) => {
+            const { width, height } = el
+              .closest('label')!
+              .getBoundingClientRect();
+            return { id: el.id, width, height };
+          }),
+        );
+      expect(labels).toHaveLength(2);
+      for (const { id, width, height } of labels)
+        rectAtLeast44({ width, height }, `${id} (label)`);
+    });
 
   // Stage 2's `test.fixme('a separate-mode spillover warning renders,
   // naming who')` stood here. DELETED, whole, per this task's own plan step
@@ -1678,36 +1663,32 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   // One test per width (#418). The cell holds digits, the same width in
   // every language, so widths are the population and locales are not.
   for (const width of [390, 768, 1024, 1280, 1512])
-    test(
-      `a student number has room to be drawn, not just a value, at ${width}px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 950 });
-        await openRoster(page);
-        await tapOn(page.locator('.cg-add-student'));
-        await expect(page.locator('.cg-roster-number').first()).toHaveValue(
-          '1',
-        );
-        const box = await page
-          .locator('.cg-roster-number')
-          .first()
-          .evaluate((el) => {
-            const cs = getComputedStyle(el);
-            return (
-              el.getBoundingClientRect().width -
-              parseFloat(cs.paddingLeft) -
-              parseFloat(cs.paddingRight) -
-              parseFloat(cs.borderLeftWidth) -
-              parseFloat(cs.borderRightWidth)
-            );
-          });
-        // Two digits at this font need ~16px; a class of 30 has two.
-        expect(
-          box,
-          `@${width}px the # input has ${box.toFixed(1)}px of content box`,
-        ).toBeGreaterThan(16);
-      },
-    );
+    test(`a student number has room to be drawn, not just a value, at ${width}px`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 950 });
+      await openRoster(page);
+      await tapOn(page.locator('.cg-add-student'));
+      await expect(page.locator('.cg-roster-number').first()).toHaveValue('1');
+      const box = await page
+        .locator('.cg-roster-number')
+        .first()
+        .evaluate((el) => {
+          const cs = getComputedStyle(el);
+          return (
+            el.getBoundingClientRect().width -
+            parseFloat(cs.paddingLeft) -
+            parseFloat(cs.paddingRight) -
+            parseFloat(cs.borderLeftWidth) -
+            parseFloat(cs.borderRightWidth)
+          );
+        });
+      // Two digits at this font need ~16px; a class of 30 has two.
+      expect(
+        box,
+        `@${width}px the # input has ${box.toFixed(1)}px of content box`,
+      ).toBeGreaterThan(16);
+    });
 
   // The Remove button is 76px of min-content in a `table-layout: fixed` cell.
   // At 10% it did not fit and spilled 34.5px past the card's RIGHT BORDER at
@@ -1735,24 +1716,22 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   // test would rebuild exactly the shared budget this split took apart.
   for (const width of [320, 390, 600, 768, 1024, 1280, 1512]) {
     for (const path of localePaths('/classroom-groups')) {
-      test(
-        `nothing in the roster escapes its card at ${width}px -- ${path}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 950 });
-          await openRoster(page, path);
-          // openRoster already adds one, so three more makes four — enough rows
-          // that a wrapping or spilling control shows up.
-          for (let i = 0; i < 3; i++)
-            await tapOn(page.locator('.cg-add-student'));
-          await expect(page.locator('.cg-student')).toHaveCount(4);
-          const worst = await spillPastCard(page, 'cg-students');
-          expect(
-            worst.over,
-            `${path} @${width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
-          ).toBeLessThanOrEqual(0.5);
-        },
-      );
+      test(`nothing in the roster escapes its card at ${width}px -- ${path}`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 950 });
+        await openRoster(page, path);
+        // openRoster already adds one, so three more makes four — enough rows
+        // that a wrapping or spilling control shows up.
+        for (let i = 0; i < 3; i++)
+          await tapOn(page.locator('.cg-add-student'));
+        await expect(page.locator('.cg-student')).toHaveCount(4);
+        const worst = await spillPastCard(page, 'cg-students');
+        expect(
+          worst.over,
+          `${path} @${width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
+        ).toBeLessThanOrEqual(0.5);
+      });
     }
   }
 
@@ -1944,26 +1923,24 @@ test.describe('the five the operator asked for', () => {
  */
 test.describe('a full roster at the narrow end', () => {
   for (const path of localePaths('/classroom-groups')) {
-    test(
-      `${path}: thirty rows produce no horizontal scroll at 320px`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await openRoster(page, path);
-        await addSeveral(page, 29);
-        await expect(page.locator('.cg-student')).toHaveCount(30);
+    test(`${path}: thirty rows produce no horizontal scroll at 320px`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 900 });
+      await openRoster(page, path);
+      await addSeveral(page, 29);
+      await expect(page.locator('.cg-student')).toHaveCount(30);
 
-        await expectNoHorizontalScroll(page, 'document scrolls sideways');
+      await expectNoHorizontalScroll(page, 'document scrolls sideways');
 
-        // Page-level scrollWidth is not containment (#277): the card is
-        // the subject, which is how the Remove button once shipped
-        // hanging outside its border at every laptop width.
-        const worst = await spillPastCard(page, 'cg-students');
-        expect(worst.over, `${worst.who} escapes the card`).toBeLessThanOrEqual(
-          0.5,
-        );
-      },
-    );
+      // Page-level scrollWidth is not containment (#277): the card is
+      // the subject, which is how the Remove button once shipped
+      // hanging outside its border at every laptop width.
+      const worst = await spillPastCard(page, 'cg-students');
+      expect(worst.over, `${worst.who} escapes the card`).toBeLessThanOrEqual(
+        0.5,
+      );
+    });
   }
 });
 
