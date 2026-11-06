@@ -2101,3 +2101,42 @@ test.describe('the on-screen keyboard', () => {
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
 });
+
+test.describe('per-test isolation actually isolates state across back-to-back tests', () => {
+  // Moved from tests/device/real-device.spec.ts (#1049). Order matters and a failed setup half
+  // makes the isolation half meaningless, so the pair runs serially and proves the write landed.
+  test.describe.configure({ mode: 'serial' });
+
+  const PROBE_KEY = 'shyden-isolation-probe';
+  const PROBE_VALUE = 'leaked-if-you-can-read-this-in-the-next-test';
+
+  test('writes a distinctive localStorage value and a form field (setup half of the pair)', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
+      key: PROBE_KEY,
+      value: PROBE_VALUE,
+    });
+    expect(
+      await page.evaluate((key) => localStorage.getItem(key), PROBE_KEY),
+      'the probe value is readable in the test that wrote it, before the next test asserts its absence',
+    ).toBe(PROBE_VALUE);
+    await typeInto(page.locator('#cg-class'), 'ISOLATION-PROBE-CLASS-NAME');
+    await expect(page.locator('#cg-class')).toHaveValue(
+      'ISOLATION-PROBE-CLASS-NAME',
+    );
+  });
+
+  test('starts with no trace of the previous test (isolation half of the pair)', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    expect(
+      await page.evaluate((key) => localStorage.getItem(key), PROBE_KEY),
+      "localStorage is empty at the start of this test: the previous test's value did not leak",
+    ).toBeNull();
+    // #cg-class is never stored, so this is not storage evidence; it is kept as the original had it.
+    await expect(page.locator('#cg-class')).toHaveValue('');
+  });
+});

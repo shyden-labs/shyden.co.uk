@@ -84,7 +84,7 @@ export const BASE_URL_AWARE_APIS: readonly BaseUrlAwareApi[] = [
     bare: true,
     resolved: true,
     reason:
-      "measured directly on the physical device (tests/device/real-device.spec.ts's " +
+      "measured directly on the physical device (tests/e2e/head-and-sitemap.spec.ts's " +
       '"the bare request fixture..." test): Playwright builds the `request` fixture via ' +
       '`playwright.request.newContext()` (playwright/lib/index.js), a construction path ' +
       "independent of this file's `browser`/`context` overrides entirely, and it resolved a " +

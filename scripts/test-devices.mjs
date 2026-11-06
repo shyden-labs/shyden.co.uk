@@ -66,6 +66,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
 
@@ -1240,6 +1241,36 @@ function printSummaryTable(groups, totalDurationMs) {
   process.stdout.write('\n');
 }
 
+/**
+ * Every target's total, one line each, and whether they are even (#1049): the
+ * same suite ran on every target, so the totals must match and nothing may be
+ * skipped. Reads each group's report only when that group ran this run, so a
+ * report a earlier run left behind is never counted.
+ *
+ * @param {any[]} groups
+ * @param {number} excludedByDesign
+ */
+function judgeTotals(groups, excludedByDesign) {
+  /** @param {string} name */
+  const reportOf = (name) =>
+    groups.some((g) => g.name === name && g.status !== 'not-run')
+      ? /** @type {Record<string, any> | null} */ (
+          reportAt(
+            REPORT_FILES[/** @type {'desktop' | 'android' | 'ios'} */ (name)],
+            `${name}'s report`,
+          )
+        )
+      : null;
+  return evenTotals(
+    deviceTargets({
+      desktop: reportOf('desktop'),
+      android: reportOf('android'),
+      ios: reportOf('ios'),
+      excludedByDesign,
+    }),
+  );
+}
+
 // ── main ─────────────────────────────────────────────────────────────────
 
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -1465,7 +1496,12 @@ async function main() {
     writeDashboardFinal({ aborted: null, groups });
 
     printSummaryTable(groups, Date.now() - startedAt);
-    const anyBad = groups.some((g) => g.status !== 'passed');
+    const totals = judgeTotals(groups, excludedByDesign);
+    process.stdout.write(
+      `Totals per target:\n${totals.lines.map((l) => `  ${l}`).join('\n')}\n`,
+    );
+    if (!totals.ok) process.stdout.write(`\nFAILED: ${totals.reason}\n\n`);
+    const anyBad = groups.some((g) => g.status !== 'passed') || !totals.ok;
     process.exitCode = anyBad ? 1 : 0;
   } catch (fatal) {
     process.stderr.write(`\nABORTED: ${messageOf(fatal)}\n\n`);
