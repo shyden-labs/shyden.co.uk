@@ -302,3 +302,19 @@ for (const [outcome, key] of [
     await expect(page.locator('[data-report-status]:visible')).toHaveCount(1);
     await shoot(page, `The ${outcome} message, in place`, shown);
   });
+
+test('typing into the report form keeps what was typed (moved from the phone file, #1049)', async ({
+  page,
+}) => {
+  // The phone's datalist crash (#807) showed on exactly this sequence; the Chrome-process half
+  // stays in tests/device/real-device.spec.ts. English draws no report form; Indonesian does.
+  await page.goto('/id/');
+  const report = page.locator('[data-report]');
+  const quote = report.locator('#report-quote');
+  await report.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(quote).toBeFocused();
+  await page.keyboard.type('Tem', { delay: 120 });
+  await expect(quote).toHaveValue('Tem');
+});
