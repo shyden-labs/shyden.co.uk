@@ -228,7 +228,7 @@ test.describe('without JavaScript (#142 AC7)', () => {
 
       test(
         'the switch is absent, and the device setting applies',
-        { tag: '@requires-isolated-context' },
+        { tag: '@javascript-blocked' },
         async ({ page }) => {
           await page.goto('/');
           await expectTheme(page, theme);
@@ -259,28 +259,24 @@ test.describe('the choice persists (#142 AC4)', () => {
     );
   });
 
-  test(
-    'into a new session that carries the same storage',
-    { tag: '@requires-isolated-context' },
-    async ({ page, browser, baseURL }) => {
-      await page.goto('/');
-      await tapOn(toggle(page));
-      await expectTheme(page, 'light');
-      const storageState = await page.context().storageState();
-      const session = await browser.newContext({
-        storageState,
-        baseURL,
-        colorScheme: 'dark',
-      });
-      try {
-        const next = await session.newPage();
-        await next.goto('/');
-        await expectTheme(next, 'light');
-      } finally {
-        await session.close();
-      }
-    },
-  );
+  // A new page in the same browser, after the first is closed: it carries the same storage,
+  // as a returning visitor's does. A second browser context is not an option on the phone,
+  // which has exactly one (#1047).
+  test('into a new page that carries the same storage', async ({
+    page,
+    baseURL,
+  }) => {
+    await page.goto('/');
+    await tapOn(toggle(page));
+    await expectTheme(page, 'light');
+    const context = page.context();
+    await page.close();
+    const next = await context.newPage();
+    await next.emulateMedia({ colorScheme: 'dark' });
+    // A page made by hand has no base URL of its own on the phone.
+    await next.goto(new URL('/', baseURL).href);
+    await expectTheme(next, 'light');
+  });
 
   test('and a press after a stale saved value saves a valid one (Review Focus 1)', async ({
     page,

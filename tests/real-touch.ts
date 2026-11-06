@@ -365,6 +365,12 @@ async function touchAt(page: Page, x: number, y: number): Promise<void> {
 export interface TapOptions {
   /** A point inside the element, from its top-left corner, as `click({ position })`. */
   position?: { x: number; y: number };
+  /**
+   * The page runs no script (a test under `@javascript-blocked`, #1047), so no listener can
+   * report where the touch landed. The touch is as real; its landing is proved by what the
+   * test asserts next (a field's value, the URL a submit wrote), never skipped.
+   */
+  byEffect?: boolean;
 }
 
 /** A real tap on the phone, a real click everywhere else. */
@@ -378,6 +384,10 @@ export async function tapOn(
   }
   await target.waitFor({ state: 'visible' });
   const { point } = await bringIntoView(target, options.position, true);
+  if (options.byEffect) {
+    await touchAt(target.page(), point.x, point.y);
+    return;
+  }
   await armLanding(target);
   await touchAt(target.page(), point.x, point.y);
   const why = await landed(target.page());

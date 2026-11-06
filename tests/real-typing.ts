@@ -1,4 +1,4 @@
-import { tapOn } from './real-touch';
+import { tapOn, type TapOptions } from './real-touch';
 import type { Locator } from '@playwright/test';
 import { onRealDevice } from './device/device-downloads';
 
@@ -13,8 +13,12 @@ import { onRealDevice } from './device/device-downloads';
  * in an empty field is a key press a visitor would not make, and some
  * listeners count every `input` event.
  */
-export async function typeInto(field: Locator, text: string): Promise<void> {
-  await tapOn(field);
+export async function typeInto(
+  field: Locator,
+  text: string,
+  options: TapOptions = {},
+): Promise<void> {
+  await tapOn(field, options);
   if ((await field.inputValue()) !== '') {
     await field.press(selectAllKeys());
     await field.press('Backspace');

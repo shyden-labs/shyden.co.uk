@@ -88,6 +88,13 @@ const TEST_BODY_STAYS_IN_THE_SPEC =
  */
 const SEPARATE: ReadonlyMap<string, string> = new Map([
   [
+    "tests/e2e/classroom-groups-privacy.spec.ts:test('one notice still covers all four sections, not one each')  <->  tests/e2e/classroom-groups.spec.ts:test('the paste-names box and the keep-apart box are gone')",
+    'two three-line page checks that share only their shape (open the page, ' +
+      'assert on two locators): one proves the noscript notice is shown while ' +
+      'script is blocked, the other that two retired fields are absent. ' +
+      'Nothing to share but `page.goto` (#1047).',
+  ],
+  [
     'tests/e2e/classroom-groups-controls.spec.ts:test(`${path}: no horizontal scroll at ${width}px`)  <->  tests/e2e/classroom-groups-roster.spec.ts:test(`cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`)',
     TEST_BODY_STAYS_IN_THE_SPEC,
   ],
