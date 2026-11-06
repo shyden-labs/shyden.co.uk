@@ -23,9 +23,9 @@ const fakePage = (emulated: Size | null, real: Size) => {
       current = size;
     },
     evaluate: async () => ({
-      innerWidth: real.width,
-      innerHeight: real.height,
-      screenWidth: real.width,
+      vvWidth: real.width,
+      vvHeight: real.height,
+      vvScale: 1,
     }),
   } as unknown as Page;
   return { page, calls };
@@ -62,16 +62,33 @@ describe('atViewport', () => {
   });
 
   it('on a real phone, reports the screen a loaded page will have, even from a blank page', async () => {
-    // The 2026-11-06 phone run: called before page.goto, the OPPO's blank page
-    // said 980x1809 (Chrome's default layout width, no viewport meta) while
-    // the page the test then opened measured 411x759.
+    // Measured on the OPPO, 2026-11-07: about:blank has a 980px layout viewport
+    // zoomed to 0.4198; the page then opened measured 411x759. screen.width
+    // said 412 (rounded), one pixel off the page's own width.
     const page = {
       viewportSize: () => null,
       setViewportSize: async () => {},
       evaluate: async () => ({
-        innerWidth: 980,
-        innerHeight: 1809,
-        screenWidth: 411,
+        vvWidth: 980,
+        vvHeight: 1808.916748046875,
+        vvScale: 0.41982507705688477,
+      }),
+    } as unknown as Page;
+    expect(await atViewport(page, { width: 320, height: 900 })).toEqual({
+      width: 411,
+      height: 759,
+    });
+  });
+
+  it('on a real phone, reports a loaded page at its own whole-pixel size', async () => {
+    // The same phone with the page loaded: the visual viewport is 411.43 wide.
+    const page = {
+      viewportSize: () => null,
+      setViewportSize: async () => {},
+      evaluate: async () => ({
+        vvWidth: 411.4285583496094,
+        vvHeight: 759.4285888671875,
+        vvScale: 1,
       }),
     } as unknown as Page;
     expect(await atViewport(page, { width: 320, height: 900 })).toEqual({
