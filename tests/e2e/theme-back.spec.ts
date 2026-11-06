@@ -22,7 +22,19 @@ const toggle = (page: Page) => page.locator('header [data-theme-toggle]');
 test.describe('Back (#142 §5 step 5, AC4)', () => {
   test('a page restored from the back-forward cache shows the theme chosen after leaving it', async ({
     page,
+    browserName,
   }, testInfo) => {
+    // Chromium says why it did not restore a page; a reload fails naming that
+    // reason, so the cause is read off the run rather than guessed.
+    const notRestored: string[] = [];
+    if (browserName === 'chromium') {
+      const cdp = await page.context().newCDPSession(page);
+      cdp.on('Page.backForwardCacheNotUsed', (event) => {
+        for (const { reason } of event.notRestoredExplanations)
+          notRestored.push(reason);
+      });
+      await cdp.send('Page.enable');
+    }
     await page.goto('/');
     await expectTheme(page, 'dark');
     await page.evaluate(() => {
@@ -49,7 +61,8 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
     // handler ever running, so a reload fails here, naming the engine.
     expect(
       restored,
-      `${testInfo.project.name} reloaded the page instead of restoring it from the back-forward cache`,
+      `${testInfo.project.name} reloaded the page instead of restoring it from the back-forward cache` +
+        (notRestored.length ? ` (Chromium: ${notRestored.join(', ')})` : ''),
     ).toBe(true);
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
