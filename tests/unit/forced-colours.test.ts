@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { cssRules } from './css-rules';
+import { stylesheetCss } from './source-text';
 
 /**
  * Forced colours, read from the stylesheets (#1048, Shyden's ruling
@@ -9,6 +10,9 @@ import { cssRules } from './css-rules';
  * the source, and the source is the same on every target.
  */
 const read = (path: string) => readFileSync(path, 'utf8');
+/** Every rule in a file's stylesheets, comments removed first (`cssRules` needs that). */
+const rulesOf = (path: string) =>
+  stylesheetCss(path, read(path)).flatMap((css) => cssRules(css));
 
 describe('under forced colours', () => {
   it("the theme switch's icon paints the button's own colour, with no fixed colour of its own (Review Focus 4)", () => {
@@ -24,8 +28,7 @@ describe('under forced colours', () => {
       expect(paints.length, `${shape} paints nothing`).toBeGreaterThan(0);
       for (const paint of paints) expect(paint, shape).toBe('currentColor');
     }
-    const style = source.slice(source.indexOf('<style'));
-    for (const rule of cssRules(style.replace(/<\/?style[^>]*>/g, '')))
+    for (const rule of rulesOf('src/components/ThemeSwitch.astro'))
       for (const d of rule.declarations)
         if (d.property === 'fill' || d.property === 'stroke')
           expect(d.value, `${rule.chain.join(' ')} sets ${d.property}`).toBe(
@@ -34,7 +37,7 @@ describe('under forced colours', () => {
   });
 
   it('the ribbon is not drawn', () => {
-    const hidden = cssRules(read('src/styles/tokens.css')).filter(
+    const hidden = rulesOf('src/styles/tokens.css').filter(
       (rule) =>
         rule.chain.length === 2 &&
         rule.chain[0] === '@media (forced-colors: active)' &&

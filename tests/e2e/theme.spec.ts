@@ -189,33 +189,6 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await expect(toggle(page)).toHaveCount(1);
     await expect(toggle(page)).toBeHidden();
   });
-
-  test('under forced colours, its icon draws in the system text colour (Review Focus 4)', async ({
-    page,
-    browserName,
-  }) => {
-    test.skip(
-      browserName !== 'chromium',
-      'Playwright emulates forcedColors in Chromium alone',
-    );
-    await page.emulateMedia({ forcedColors: 'active' });
-    await page.goto('/');
-    const drawn = await toggle(page).evaluate((button) => ({
-      ink: getComputedStyle(button).color,
-      paints: [...button.querySelectorAll('svg')]
-        .filter((svg) => svg.getClientRects().length > 0)
-        .flatMap((svg) => [...svg.querySelectorAll('circle, path')])
-        .map((shape) => {
-          const style = getComputedStyle(shape);
-          return style.fill === 'none' ? style.stroke : style.fill;
-        }),
-    }));
-    expect(
-      drawn.paints.length,
-      'the visible icon draws something',
-    ).toBeGreaterThan(0);
-    expect([...new Set(drawn.paints)]).toEqual([drawn.ink]);
-  });
 });
 
 test.describe('without JavaScript (#142 AC7)', () => {
@@ -504,16 +477,6 @@ test.describe('the aurora ribbon (#371)', () => {
   test('does not print', async ({ page }) => {
     await page.goto('/');
     await page.emulateMedia({ media: 'print' });
-    expect((await ribbon(page)).display).toBe('none');
-  });
-
-  test('is not drawn under forced colours', async ({ page, browserName }) => {
-    test.skip(
-      browserName !== 'chromium',
-      'Playwright emulates forcedColors in Chromium alone',
-    );
-    await page.goto('/');
-    await page.emulateMedia({ forcedColors: 'active' });
     expect((await ribbon(page)).display).toBe('none');
   });
 });
