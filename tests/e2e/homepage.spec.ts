@@ -22,6 +22,7 @@ import { THEMES } from '../palette';
 import { emulateTheme, expectTheme, saveTheme } from '../themes';
 import { contrastRatio } from './helpers';
 import { contrast, parseColour } from '../wcag';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -389,31 +390,26 @@ test.describe('homepage content', () => {
     });
   }
 
-  test(
-    'call-to-action buttons meet the 44×44px touch target',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 375, height: 800 });
-      await page.goto('/');
-      const btns = page.locator('.btn');
-      await expect(btns.first()).toBeVisible();
-      // Written inline rather than hoisted to a variable: the unproved-loop
-      // scanner in `tests/guards/event-collectors.test.ts` matches this exact
-      // shape, so hoisting makes the loop invisible to it and it silently
-      // stops being checked for a liveness proof. Use the recognised idiom
-      // instead of widening the guard to fit new code.
-      for (const b of await btns.all()) {
-        const box = await b.boundingBox();
-        expect(box).not.toBeNull();
-        expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
-        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-      }
-      await shoot(
-        page,
-        `375px: all ${await btns.count()} buttons clear 44x44px`,
-      );
-    },
-  );
+  test('call-to-action buttons meet the 44×44px touch target', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 375, height: 800 });
+    await page.goto('/');
+    const btns = page.locator('.btn');
+    await expect(btns.first()).toBeVisible();
+    // Written inline rather than hoisted to a variable: the unproved-loop
+    // scanner in `tests/guards/event-collectors.test.ts` matches this exact
+    // shape, so hoisting makes the loop invisible to it and it silently
+    // stops being checked for a liveness proof. Use the recognised idiom
+    // instead of widening the guard to fit new code.
+    for (const b of await btns.all()) {
+      const box = await b.boundingBox();
+      expect(box).not.toBeNull();
+      expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+    }
+    await shoot(page, `375px: all ${await btns.count()} buttons clear 44x44px`);
+  });
 });
 
 // #403: ShyTalk and Yawelo Idle, both coming soon, with equal weight. Every
@@ -588,87 +584,80 @@ test.describe('the language band sits under the header (#599)', () => {
 
   // AC3 at load: the band and the header do not intersect.
   for (const width of BAND_WIDTHS)
-    test(
-      `at ${width}px the band and the header do not intersect at load`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/');
-        const { header, clip } = await readBand(page);
-        expect(
-          clip.top,
-          `the band's top (${clip.top}) is above the header's bottom (${header.bottom})`,
-        ).toBeGreaterThanOrEqual(header.bottom);
-        await shoot(
-          page,
-          `${width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
-        );
-      },
-    );
+    test(`at ${width}px the band and the header do not intersect at load`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/');
+      const { header, clip } = await readBand(page);
+      expect(
+        clip.top,
+        `the band's top (${clip.top}) is above the header's bottom (${header.bottom})`,
+      ).toBeGreaterThanOrEqual(header.bottom);
+      await shoot(
+        page,
+        `${width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
+      );
+    });
 
   // AC3 after scrolling: the band is unpinned, so it passes beneath the
   // sticky header, and wherever the two meet the header is the topmost thing.
   // `elementFromPoint` is what a click would hit, so it reads the painted
   // stacking order, which a bounding box cannot.
   for (const width of BAND_WIDTHS)
-    test(
-      `at ${width}px the header paints above the band as it scrolls beneath`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/');
-        const hit = await page.evaluate(async () => {
-          const header = document.querySelector('header');
-          const clip = document.querySelector('.marquee-clip');
-          if (!header || !clip) throw new Error('header or band missing');
-          const headerHeight = header.getBoundingClientRect().height;
-          // The band's top edge halfway up under the header.
-          window.scrollTo(
-            0,
-            clip.getBoundingClientRect().top +
-              window.scrollY -
-              headerHeight / 2,
-          );
-          const frame = () =>
-            new Promise((done) => requestAnimationFrame(done));
-          await frame();
-          await frame();
-          const h = header.getBoundingClientRect();
-          const c = clip.getBoundingClientRect();
-          const top = Math.max(h.top, c.top);
-          const bottom = Math.min(h.bottom, c.bottom);
-          const y = top + (bottom - top) / 2;
-          // Runs in the page over a population that exists only at runtime:
-          // the overlap's own sample points.
-          const samples = [0.1, 0.5, 0.9].map((f) => {
-            const x = window.innerWidth * f;
-            const el = document.elementFromPoint(x, y);
-            return {
-              inHeader: !!el?.closest('header'),
-              inBand: !!el?.closest('.band'),
-            };
-          });
-          return { overlap: bottom - top, samples };
-        });
-        // Liveness: the two really overlap, or nothing below was tested.
-        expect(
-          hit.overlap,
-          'the band never reached under the header',
-        ).toBeGreaterThan(0);
-        expect(
-          searched(
-            hit.samples.filter((s) => !s.inHeader || s.inBand),
-            { of: hit.samples, what: 'points sampled across the overlap' },
-          ),
-          'the band paints over the header',
-        ).toEqual([]);
-        expect(hit.samples).toHaveLength(3);
-        await shoot(
-          page,
-          `${width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
+    test(`at ${width}px the header paints above the band as it scrolls beneath`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/');
+      const hit = await page.evaluate(async () => {
+        const header = document.querySelector('header');
+        const clip = document.querySelector('.marquee-clip');
+        if (!header || !clip) throw new Error('header or band missing');
+        const headerHeight = header.getBoundingClientRect().height;
+        // The band's top edge halfway up under the header.
+        window.scrollTo(
+          0,
+          clip.getBoundingClientRect().top + window.scrollY - headerHeight / 2,
         );
-      },
-    );
+        const frame = () => new Promise((done) => requestAnimationFrame(done));
+        await frame();
+        await frame();
+        const h = header.getBoundingClientRect();
+        const c = clip.getBoundingClientRect();
+        const top = Math.max(h.top, c.top);
+        const bottom = Math.min(h.bottom, c.bottom);
+        const y = top + (bottom - top) / 2;
+        // Runs in the page over a population that exists only at runtime:
+        // the overlap's own sample points.
+        const samples = [0.1, 0.5, 0.9].map((f) => {
+          const x = window.innerWidth * f;
+          const el = document.elementFromPoint(x, y);
+          return {
+            inHeader: !!el?.closest('header'),
+            inBand: !!el?.closest('.band'),
+          };
+        });
+        return { overlap: bottom - top, samples };
+      });
+      // Liveness: the two really overlap, or nothing below was tested.
+      expect(
+        hit.overlap,
+        'the band never reached under the header',
+      ).toBeGreaterThan(0);
+      expect(
+        searched(
+          hit.samples.filter((s) => !s.inHeader || s.inBand),
+          { of: hit.samples, what: 'points sampled across the overlap' },
+        ),
+        'the band paints over the header',
+      ).toEqual([]);
+      expect(hit.samples).toHaveLength(3);
+      await shoot(
+        page,
+        `${width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
+      );
+    });
 
   // AC1: the band scrolls away with the page.
   test('the band scrolls away: past it, its box is above the viewport', async ({
@@ -701,22 +690,20 @@ test.describe('mobile-first layout', () => {
   // 320 and 1280px only, so 375 and 768px were read in English alone.
   for (const width of BAND_WIDTHS) {
     for (const locale of LOCALES)
-      test(
-        `${locale}: no horizontal scroll at ${width}px`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(localisePath('/', locale));
-          const overflow = await expectNoHorizontalScroll(page);
-          // This is the guard the marquee tripped: a rotated-and-scaled element
-          // is not clipped by an ancestor's `overflow`, so it pushed 10px of
-          // sideways scroll at every width. 1217 unit tests could not see it.
-          await shoot(
-            page,
-            `${locale} ${width}px: horizontal overflow is ${overflow}px`,
-          );
-        },
-      );
+      test(`${locale}: no horizontal scroll at ${width}px`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(localisePath('/', locale));
+        const overflow = await expectNoHorizontalScroll(page);
+        // This is the guard the marquee tripped: a rotated-and-scaled element
+        // is not clipped by an ancestor's `overflow`, so it pushed 10px of
+        // sideways scroll at every width. 1217 unit tests could not see it.
+        await shoot(
+          page,
+          `${locale} ${width}px: horizontal overflow is ${overflow}px`,
+        );
+      });
   }
   // Every locale (#390 F129): each loads its own capture and copy, and this
   // read only the English page.
@@ -900,51 +887,49 @@ test.describe('pause motion', () => {
   // risk: it is absolutely positioned, and an absolute box with nothing to
   // contain it can land anywhere, which at 320px means sideways scroll.
   for (const locale of LOCALES)
-    test(
-      `${locale}: at 320px the control and its hidden name stay inside the band, with no sideways scroll`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 800 });
-        await page.goto(localisePath('/', locale));
-        const target = page.locator('.band-pause');
-        await expect(target).toHaveCount(1);
-        const inside = await target.evaluate((label) => {
-          const band = label.closest('.band')!.getBoundingClientRect();
-          return [label, ...label.querySelectorAll('*')].map((el) => {
-            const r = el.getBoundingClientRect();
-            return {
-              what: el.tagName.toLowerCase() + '.' + el.getAttribute('class'),
-              ok:
-                r.left >= band.left - 0.5 &&
-                r.right <= band.right + 0.5 &&
-                r.left >= 0 &&
-                r.right <= 320,
-            };
-          });
+    test(`${locale}: at 320px the control and its hidden name stay inside the band, with no sideways scroll`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 800 });
+      await page.goto(localisePath('/', locale));
+      const target = page.locator('.band-pause');
+      await expect(target).toHaveCount(1);
+      const inside = await target.evaluate((label) => {
+        const band = label.closest('.band')!.getBoundingClientRect();
+        return [label, ...label.querySelectorAll('*')].map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            what: el.tagName.toLowerCase() + '.' + el.getAttribute('class'),
+            ok:
+              r.left >= band.left - 0.5 &&
+              r.right <= band.right + 0.5 &&
+              r.left >= 0 &&
+              r.right <= window.innerWidth,
+          };
         });
-        expect(
-          searched(
-            inside.filter((box) => !box.ok).map((box) => box.what),
-            { of: inside, what: 'boxes in the pause control' },
-          ),
-          'boxes in the control that leave the band or the viewport',
-        ).toEqual([]);
-        expect(
-          inside.map((box) => box.what),
-          'the boxes the control is built from, each measured',
-        ).toEqual(
-          expect.arrayContaining([
-            'label.band-pause',
-            'input.null',
-            'span.band-pause-disc',
-            'svg.band-pause-icon',
-            // its whole class attribute: the name wears the global recipe (#767)
-            'span.band-pause-name visually-hidden',
-          ]),
-        );
-        await expectNoHorizontalScroll(page);
-      },
-    );
+      });
+      expect(
+        searched(
+          inside.filter((box) => !box.ok).map((box) => box.what),
+          { of: inside, what: 'boxes in the pause control' },
+        ),
+        'boxes in the control that leave the band or the viewport',
+      ).toEqual([]);
+      expect(
+        inside.map((box) => box.what),
+        'the boxes the control is built from, each measured',
+      ).toEqual(
+        expect.arrayContaining([
+          'label.band-pause',
+          'input.null',
+          'span.band-pause-disc',
+          'svg.band-pause-icon',
+          // its whole class attribute: the name wears the global recipe (#767)
+          'span.band-pause-name visually-hidden',
+        ]),
+      );
+      await expectNoHorizontalScroll(page);
+    });
 });
 
 test.describe('the pause control is a small icon on the strip (#619)', () => {
@@ -1028,134 +1013,129 @@ test.describe('the pause control is a small icon on the strip (#619)', () => {
   });
 
   for (const width of BAND_WIDTHS)
-    test(
-      `at ${width}px no row sits between the header and the strip`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/');
-        const facts = await page.evaluate(() => {
-          const header = document.querySelector('header');
-          const strip = document.querySelector<HTMLElement>('.marquee');
-          const band = document.querySelector('.band');
-          const target = document.querySelector('.band-pause');
-          if (!header || !strip || !band || !target)
-            throw new Error('header, strip, band or control missing');
-          // The strip is rotated, so its bounding box is not its layout box:
-          // its LAYOUT top is the band's top plus its own offset.
-          const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
-          const t = target.getBoundingClientRect();
-          return {
-            gap: layoutTop - header.getBoundingClientRect().bottom,
-            margin: parseFloat(getComputedStyle(strip).marginTop),
-            targetMid: t.top + t.height / 2,
-            layoutTop,
-          };
-        });
-        expect(facts.margin, "the strip's own top margin").toBeGreaterThan(0);
-        expect(
-          facts.gap,
-          `${width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
-        ).toBeLessThanOrEqual(facts.margin + 1);
-        expect(
-          facts.targetMid,
-          'the control sits in the gap above the strip',
-        ).toBeGreaterThanOrEqual(facts.layoutTop);
-      },
-    );
+    test(`at ${width}px no row sits between the header and the strip`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/');
+      const facts = await page.evaluate(() => {
+        const header = document.querySelector('header');
+        const strip = document.querySelector<HTMLElement>('.marquee');
+        const band = document.querySelector('.band');
+        const target = document.querySelector('.band-pause');
+        if (!header || !strip || !band || !target)
+          throw new Error('header, strip, band or control missing');
+        // The strip is rotated, so its bounding box is not its layout box:
+        // its LAYOUT top is the band's top plus its own offset.
+        const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
+        const t = target.getBoundingClientRect();
+        return {
+          gap: layoutTop - header.getBoundingClientRect().bottom,
+          margin: parseFloat(getComputedStyle(strip).marginTop),
+          targetMid: t.top + t.height / 2,
+          layoutTop,
+        };
+      });
+      expect(facts.margin, "the strip's own top margin").toBeGreaterThan(0);
+      expect(
+        facts.gap,
+        `${width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
+      ).toBeLessThanOrEqual(facts.margin + 1);
+      expect(
+        facts.targetMid,
+        'the control sits in the gap above the strip',
+      ).toBeGreaterThanOrEqual(facts.layoutTop);
+    });
 
   for (const width of BAND_WIDTHS)
-    test(
-      `at ${width}px the disc is at most 28px, on the strip's tilted middle, and its 44px target takes a click at every edge`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/');
-        const control = page.getByRole('checkbox', {
-          name: getSiteStrings('en').home.pauseMotion,
-          exact: true,
-        });
-        const at = await page.evaluate(() => {
-          const target = document.querySelector<HTMLElement>('.band-pause');
-          const disc = document.querySelector<HTMLElement>('.band-pause-disc');
-          const strip = document.querySelector<HTMLElement>('.marquee');
-          if (!target || !disc || !strip)
-            throw new Error('control, disc or strip missing');
-          const centre = (el: Element) => {
-            const r = el.getBoundingClientRect();
-            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-          };
-          // The strip's tilt and scale, from the matrix the browser computed.
-          const m = new DOMMatrix(getComputedStyle(strip).transform);
-          const angle = Math.atan2(m.b, m.a);
-          const scale = Math.hypot(m.a, m.b);
-          const s = centre(strip);
-          const d = centre(disc);
-          // How far the disc's middle is from the strip's middle LINE, measured
-          // across the strip, and how much strip there is either side of it.
-          const across =
-            Math.abs(d.y - (s.y + (d.x - s.x) * Math.tan(angle))) *
-            Math.cos(angle);
-          const t = centre(target);
-          const reach = target.offsetWidth / 2 - 2;
-          return {
-            disc: { w: disc.offsetWidth, h: disc.offsetHeight },
-            target: { w: target.offsetWidth, h: target.offsetHeight },
-            stripHeight: strip.offsetHeight,
-            across,
-            room: (strip.offsetHeight * scale) / 2 - disc.offsetHeight / 2,
-            hitsAtCentre: target.contains(document.elementFromPoint(t.x, t.y)),
-            edges: [
-              { name: 'left', x: t.x - reach, y: t.y },
-              { name: 'right', x: t.x + reach, y: t.y },
-              { name: 'top', x: t.x, y: t.y - reach },
-              { name: 'bottom', x: t.x, y: t.y + reach },
-            ],
-          };
-        });
-        expect(
-          at.disc.w,
-          'the visible disc is no wider than 28px',
-        ).toBeLessThanOrEqual(28);
-        expect(
-          at.disc.h,
-          'the visible disc is no taller than 28px',
-        ).toBeLessThanOrEqual(28);
-        expect(
-          at.disc.h,
-          "the visible disc is no taller than the strip's layout box",
-        ).toBeLessThanOrEqual(at.stripHeight);
-        expect(
-          at.target.w,
-          'the tap target is at least 44px wide',
-        ).toBeGreaterThanOrEqual(44);
-        expect(
-          at.target.h,
-          'the tap target is at least 44px tall',
-        ).toBeGreaterThanOrEqual(44);
-        expect(
-          at.across,
-          `${width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
-        ).toBeLessThanOrEqual(1.5);
-        expect(
-          at.across,
-          `${width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
-        ).toBeLessThanOrEqual(at.room);
-        expect(
-          at.hitsAtCentre,
-          'a click at the centre misses the control',
-        ).toBe(true);
-        let ticked = false;
-        for (const edge of at.edges) {
-          await tapAt(page, edge.x, edge.y);
-          ticked = !ticked;
-          await expect(
-            control,
-            `a click at the target's ${edge.name} edge toggles the control`,
-          ).toBeChecked({ checked: ticked });
-        }
-      },
-    );
+    test(`at ${width}px the disc is at most 28px, on the strip's tilted middle, and its 44px target takes a click at every edge`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/');
+      const control = page.getByRole('checkbox', {
+        name: getSiteStrings('en').home.pauseMotion,
+        exact: true,
+      });
+      const at = await page.evaluate(() => {
+        const target = document.querySelector<HTMLElement>('.band-pause');
+        const disc = document.querySelector<HTMLElement>('.band-pause-disc');
+        const strip = document.querySelector<HTMLElement>('.marquee');
+        if (!target || !disc || !strip)
+          throw new Error('control, disc or strip missing');
+        const centre = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        };
+        // The strip's tilt and scale, from the matrix the browser computed.
+        const m = new DOMMatrix(getComputedStyle(strip).transform);
+        const angle = Math.atan2(m.b, m.a);
+        const scale = Math.hypot(m.a, m.b);
+        const s = centre(strip);
+        const d = centre(disc);
+        // How far the disc's middle is from the strip's middle LINE, measured
+        // across the strip, and how much strip there is either side of it.
+        const across =
+          Math.abs(d.y - (s.y + (d.x - s.x) * Math.tan(angle))) *
+          Math.cos(angle);
+        const t = centre(target);
+        const reach = target.offsetWidth / 2 - 2;
+        return {
+          disc: { w: disc.offsetWidth, h: disc.offsetHeight },
+          target: { w: target.offsetWidth, h: target.offsetHeight },
+          stripHeight: strip.offsetHeight,
+          across,
+          room: (strip.offsetHeight * scale) / 2 - disc.offsetHeight / 2,
+          hitsAtCentre: target.contains(document.elementFromPoint(t.x, t.y)),
+          edges: [
+            { name: 'left', x: t.x - reach, y: t.y },
+            { name: 'right', x: t.x + reach, y: t.y },
+            { name: 'top', x: t.x, y: t.y - reach },
+            { name: 'bottom', x: t.x, y: t.y + reach },
+          ],
+        };
+      });
+      expect(
+        at.disc.w,
+        'the visible disc is no wider than 28px',
+      ).toBeLessThanOrEqual(28);
+      expect(
+        at.disc.h,
+        'the visible disc is no taller than 28px',
+      ).toBeLessThanOrEqual(28);
+      expect(
+        at.disc.h,
+        "the visible disc is no taller than the strip's layout box",
+      ).toBeLessThanOrEqual(at.stripHeight);
+      expect(
+        at.target.w,
+        'the tap target is at least 44px wide',
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        at.target.h,
+        'the tap target is at least 44px tall',
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        at.across,
+        `${width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
+      ).toBeLessThanOrEqual(1.5);
+      expect(
+        at.across,
+        `${width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
+      ).toBeLessThanOrEqual(at.room);
+      expect(at.hitsAtCentre, 'a click at the centre misses the control').toBe(
+        true,
+      );
+      let ticked = false;
+      for (const edge of at.edges) {
+        await tapAt(page, edge.x, edge.y);
+        ticked = !ticked;
+        await expect(
+          control,
+          `a click at the target's ${edge.name} edge toggles the control`,
+        ).toBeChecked({ checked: ticked });
+      }
+    });
 
   for (const theme of THEMES)
     test(`${theme}: the icon clears 3:1 on the disc, and the disc clears 3:1 against the strip`, async ({
@@ -1487,57 +1467,54 @@ test.describe('the Yawelo Idle preview video', () => {
   });
 
   for (const width of PROMO_WIDTHS)
-    test(
-      `at ${width}px the preview and its description stay inside the card`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height: 900 });
-        await page.goto('/');
-        await tapOn(page.locator('#yawelo-idle summary'));
-        await expect(page.locator('#yawelo-idle details p')).toBeVisible();
-        const boxes = await page.evaluate(() => {
-          const rect = (selector: string) => {
-            const el = document.querySelector(selector);
-            if (!el) throw new Error(`${selector} missing`);
-            const r = el.getBoundingClientRect();
-            return {
-              left: r.left,
-              right: r.right,
-              width: r.width,
-              height: r.height,
-            };
-          };
+    test(`at ${width}px the preview and its description stay inside the card`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height: 900 });
+      await page.goto('/');
+      await tapOn(page.locator('#yawelo-idle summary'));
+      await expect(page.locator('#yawelo-idle details p')).toBeVisible();
+      const boxes = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const el = document.querySelector(selector);
+          if (!el) throw new Error(`${selector} missing`);
+          const r = el.getBoundingClientRect();
           return {
-            card: rect('#yawelo-idle'),
-            player: rect('#yawelo-idle video'),
-            shows: rect('#yawelo-idle details'),
+            left: r.left,
+            right: r.right,
+            width: r.width,
+            height: r.height,
           };
-        });
-        expect(
-          boxes.player.left,
-          "the player's left edge",
-        ).toBeGreaterThanOrEqual(boxes.card.left - 0.5);
-        expect(
-          boxes.player.right,
-          "the player's right edge",
-        ).toBeLessThanOrEqual(boxes.card.right + 0.5);
-        expect(boxes.shows.left, "shows's left edge").toBeGreaterThanOrEqual(
-          boxes.card.left - 0.5,
-        );
-        expect(boxes.shows.right, "shows's right edge").toBeLessThanOrEqual(
-          boxes.card.right + 0.5,
-        );
-        // The player is the tap target that plays it.
-        const box = await page.locator('#yawelo-idle video').boundingBox();
-        expect(box).not.toBeNull();
-        expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
-        expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-        await expectNoHorizontalScroll(page, `${width}px`);
-        await shoot(
-          page,
-          `${width}px: the Yawelo Idle preview in its card`,
-          page.locator('#yawelo-idle'),
-        );
-      },
-    );
+        };
+        return {
+          card: rect('#yawelo-idle'),
+          player: rect('#yawelo-idle video'),
+          shows: rect('#yawelo-idle details'),
+        };
+      });
+      expect(
+        boxes.player.left,
+        "the player's left edge",
+      ).toBeGreaterThanOrEqual(boxes.card.left - 0.5);
+      expect(boxes.player.right, "the player's right edge").toBeLessThanOrEqual(
+        boxes.card.right + 0.5,
+      );
+      expect(boxes.shows.left, "shows's left edge").toBeGreaterThanOrEqual(
+        boxes.card.left - 0.5,
+      );
+      expect(boxes.shows.right, "shows's right edge").toBeLessThanOrEqual(
+        boxes.card.right + 0.5,
+      );
+      // The player is the tap target that plays it.
+      const box = await page.locator('#yawelo-idle video').boundingBox();
+      expect(box).not.toBeNull();
+      expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
+      await expectNoHorizontalScroll(page, `${width}px`);
+      await shoot(
+        page,
+        `${width}px: the Yawelo Idle preview in its card`,
+        page.locator('#yawelo-idle'),
+      );
+    });
 });
