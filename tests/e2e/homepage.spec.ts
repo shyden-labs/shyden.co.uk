@@ -1351,6 +1351,10 @@ const PROMO_SOURCES = [
 ];
 const PROMO_WIDTHS = [320, 375, 768, 1280] as const;
 
+// Shyden's ruling (#1048, 2026-11-06): these stay red on Linux WebKit, naming why.
+const WEBKIT_MEDIA =
+  " (CI's Linux WebKit fetches before play and never plays: real Safari in CI is shyden-labs/shyden.co.uk#1036)";
+
 test.describe('the Yawelo Idle preview video', () => {
   for (const locale of LOCALES)
     test(`${locale}: the preview is a native player with its poster, sized before it loads`, async ({
@@ -1430,7 +1434,8 @@ test.describe('the Yawelo Idle preview video', () => {
         of: heard,
         what: 'requests the homepage made',
       }),
-      'preload="none": no rendition is fetched until the visitor plays it',
+      'preload="none": no rendition is fetched until the visitor plays it' +
+        WEBKIT_MEDIA,
     ).toEqual([]);
   });
 
@@ -1465,7 +1470,9 @@ test.describe('the Yawelo Idle preview video', () => {
       return v.play();
     });
     await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+        message: 'the clock moves once the preview plays' + WEBKIT_MEDIA,
+      })
       .toBeGreaterThan(0.2);
     const chosen = await video.evaluate((v: HTMLVideoElement) => v.currentSrc);
     test
