@@ -87,10 +87,15 @@ const countOf = (text: string, token: string): number =>
  * file because `homepage` calls it twice in two DIFFERENT tests, which is two
  * configurations, not a change.
  */
+// The resize helper (tests/viewport-at.ts, #1046) sets the viewport too.
+const RESIZE_HELPER = 'atViewport(';
+
 const viewportChanges = (text: string): boolean =>
   text
     .split(/\b(?:test|it)\s*\(/)
-    .some((chunk) => countOf(chunk, VIEWPORT) > 1);
+    .some(
+      (chunk) => countOf(chunk, VIEWPORT) + countOf(chunk, RESIZE_HELPER) > 1,
+    );
 
 const actionsIn = (text: string): string[] => {
   const found: string[] = ACTIONS.filter(
