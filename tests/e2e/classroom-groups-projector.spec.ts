@@ -87,6 +87,13 @@ const clickable = async (
   }, selector);
 };
 
+/**
+ * Whether this engine has element fullscreen at all. Without it (an iPhone,
+ * and Playwright's mobile-safari) the board is the overlay.
+ */
+const hasElementFullscreen = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => 'requestFullscreen' in Element.prototype);
+
 test.describe('the projector view', () => {
   // #743 AC1: the board can be put up before a shuffle, to deal with the
   // class watching, so its button follows the page's own Shuffle -- the
@@ -263,13 +270,27 @@ test.describe('the projector view', () => {
   }) => {
     // An iPhone has no element fullscreen at all, and neither has
     // Playwright's mobile-safari: no `Element.prototype.requestFullscreen`
-    // (run 39066325735), so there is no grant to race and its board is the
-    // overlay. Asked of the engine, not of a project name, so an engine that
-    // has the call and refuses it still runs this and fails below.
-    test.skip(
-      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
-      'no element fullscreen on this engine (iPhone Safari): no grant to race',
-    );
+    // (run 39066325735), so its board is the overlay and there is no grant
+    // to race. The claim holds there too: a close leaves nothing behind
+    // that ends the next showing (#1048). Asked of the engine, not of a
+    // project name, so an engine that has the call and refuses it still
+    // runs the race and fails below.
+    if (!(await hasElementFullscreen(page))) {
+      await withGroups(page);
+      await tapOn(page.getByRole('button', { name: 'Full screen' }));
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#cg-board')).toBeHidden();
+      await clickable(page, '#cg-board-open');
+      await tapOn(page.getByRole('button', { name: 'Full screen' }));
+      await expect(page.locator('#cg-board #cg-results')).toBeVisible();
+      // Settled: every group revealed, so anything the first showing left
+      // running has had its chance to end this one.
+      await expect(page.locator('#cg-board .group:not(.revealed)')).toHaveCount(
+        0,
+      );
+      await expect(page.locator('#cg-board')).toBeVisible();
+      return;
+    }
     await holdFirstGrantUntilTheNext(page);
     await withGroups(page);
     await tapOn(page.getByRole('button', { name: 'Full screen' }));
@@ -319,10 +340,29 @@ test.describe('the projector view', () => {
   test('a reopen cannot reach the page while the last showing is still being undone', async ({
     page,
   }) => {
-    test.skip(
-      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
-      'no element fullscreen on this engine (iPhone Safari): no grant to race',
-    );
+    // The overlay board (no element fullscreen, as on an iPhone) has no
+    // exit to hold: its close must leave no window at all. Read straight
+    // after the Escape, with no wait, the board is gone and the button is
+    // what a teacher's tap reaches (#1048).
+    if (!(await hasElementFullscreen(page))) {
+      await withGroups(page);
+      const open = page.getByRole('button', { name: 'Full screen' });
+      await tapOn(open);
+      await expect(page.locator('#cg-board')).toBeVisible();
+      await page.keyboard.press('Escape');
+      const box = (await open.boundingBox())!;
+      const straightAfter = await page.evaluate(
+        ({ x, y }) => ({
+          hidden: document.getElementById('cg-board')!.hidden,
+          hit: document.elementFromPoint(x, y)?.closest('button')?.id ?? null,
+        }),
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+      );
+      expect(straightAfter).toEqual({ hidden: true, hit: 'cg-board-open' });
+      await tapOn(open);
+      await expect(page.locator('#cg-board')).toBeVisible();
+      return;
+    }
     await holdTheTidyUpExit(page);
     await withGroups(page);
     const open = page.getByRole('button', { name: 'Full screen' });
