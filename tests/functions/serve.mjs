@@ -53,7 +53,7 @@ const server = spawn(
     '--port',
     String(PORT),
     '--compatibility-date',
-    '2026-09-30',
+    '2026-10-20',
     '--d1',
     `REPORTS=${DATABASE_ID}`,
     '--persist-to',
