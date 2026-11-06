@@ -633,7 +633,7 @@ function isIosPresent() {
  * it to the config's `grepInvert`, character for character. It was once two hand-typed copies,
  * and this one missed `@requires-download-bytes` for as long as that tag existed (#308).
  */
-const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport|@requires-isolated-context';
+const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport';
 
 /**
  * `android-chrome`'s `grepInvert`
@@ -647,17 +647,9 @@ const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport|@requires-isolated-context';
  * chromium's own testDir does not reach, carries neither tag (checked by hand), so
  * restricting this listing to tests/e2e does not undercount.
  *
- * Two tags, one count, on purpose: both exist for the identical reason (something
- * this suite's tests need is physically impossible to give them on ONE real device --
- * a resizable screen, or a fresh per-test browser context) and both are excluded from
- * the SAME `grepInvert`, so the Android group's own "skipped by design" number must be
- * their sum to stay honestly self-consistent with what actually ran (see
- * printSummaryTable / playwrightVerdict, which add this to Playwright's own
- * `stats.skipped` for the real run). Splitting them into two separately-reported
- * numbers was considered and rejected: nothing downstream (the dashboard, this
- * script's own exit-code logic) currently needs to tell them apart, and a single
- * `--grep` pattern kept in exact lock-step with the config's own `grepInvert` is one
- * fewer place for the two to silently drift apart than two separate queries would be.
+ * One tag now (#1047): `@javascript-blocked` tests run on the phone, with JavaScript blocked
+ * through Chrome's own settings, so only the screen-size tests are excluded by design. The
+ * pattern stays in exact lock-step with the config's own `grepInvert`.
  *
  * Never hardcoded: measured live against this exact source tree, every run, so a
  * future test gaining or losing either tag cannot make this number rot. `--list`'s own

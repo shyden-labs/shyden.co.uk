@@ -96,3 +96,15 @@ export function switchIsOn(node: UiNode): boolean {
     );
   return node.checked;
 }
+
+/**
+ * The radio button of the row labelled `label`: the last radio button before that label in
+ * document order, which is how Chrome's JavaScript setting lays its two rows out.
+ */
+export function radioBefore(nodes: readonly UiNode[], label: string): UiNode {
+  const at = nodes.findIndex((node) => node.text === label);
+  if (at < 0) throw new Error(`"${label}" is not on the screen`);
+  for (let i = at - 1; i >= 0; i--)
+    if (nodes[i].className.endsWith('RadioButton')) return nodes[i];
+  throw new Error(`no radio button comes before "${label}"`);
+}
