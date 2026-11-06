@@ -999,6 +999,11 @@ test.describe('the handover cannot be overheard', () => {
       ],
       new URL('/id/classroom-groups', receiver.url()).href,
     );
+    // The teacher goes back to the first tab to send the second class. A
+    // phone shows one tab at a time, and a handover pressed in a tab that is
+    // not on screen opened its window and download in only 3 of 10 runs on
+    // the real Android (#1060).
+    await page.bringToFront();
     const [, second] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
