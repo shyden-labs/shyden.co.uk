@@ -141,6 +141,15 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/token-reach.mjs
+      # The Workers runtime this project runs is set to the date the
+      # functions suite tests, and read back, before anything deploys (#907;
+      # Shyden's ruling 2026-11-07). It fails naming both dates, or naming any
+      # setting the update changed besides the runtime.
+      - name: The dev project runs the Workers date the functions suite tests
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/pages-runtime.mjs shyden-site-dev
       - name: Deploy dist/ to Cloudflare Pages (dev project)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
