@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  arrowKeysFor,
-  whyNoOption,
-  whyNoPickerPath,
-  whyNotChosen,
-} from '../real-select';
+import { arrowKeysFor, whyNoOption, whyNotChosen } from '../real-select';
 
 /**
  * The messages chooseOption fails with (#1027). Pure strings: no browser, no
@@ -52,9 +47,5 @@ describe('chooseOption failures', () => {
     expect(arrowKeysFor(o, 'M', 'F')).toEqual(['ArrowDown']);
     expect(arrowKeysFor(o, 'M', '')).toBeNull();
     expect(arrowKeysFor(o, 'M', 'Z')).toBeNull();
-  });
-
-  it('says the phone path is not built yet and no script stands in (#1027)', () => {
-    expect(whyNoPickerPath('sel', 'A')).toMatch(/not built yet \(#1027\)/);
   });
 });

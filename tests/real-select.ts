@@ -1,6 +1,7 @@
-import type { Locator } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
+import { chooseFromNativePicker } from './device/native-picker';
 import { onRealDevice } from './device/device-downloads';
-import { TapNotPossibleError, tapOn } from './real-touch';
+import { tapOn } from './real-touch';
 
 /**
  * Chooses an option of a `<select>` the way a visitor does (#1027): a real
@@ -18,20 +19,34 @@ import { TapNotPossibleError, tapOn } from './real-touch';
  * The chosen value is read back. If real input did not pick the wanted option
  * the test fails naming the select and the option: nothing falls back to
  * `selectOption()` or to setting `.value`. On the real Android phone the
- * native picker path is not built yet, so it throws rather than use a script.
+ * options live in Chrome's own dialog, chosen there by real taps.
  */
 export async function chooseOption(
   select: Locator,
   value: string,
 ): Promise<void> {
-  if (onRealDevice())
-    throw new TapNotPossibleError(whyNoPickerPath(String(select), value));
   const options = await select.evaluate((el) =>
     Array.from((el as HTMLSelectElement).options).map((option) => ({
       value: option.value,
       disabled: option.disabled,
+      label: option.text.trim(),
     })),
   );
+  if (onRealDevice()) {
+    // Chrome draws the options in its own dialog: a real tap opens it, and a
+    // real tap on the option's row chooses it (tests/device/native-picker.ts).
+    const option = options.find((o) => o.value === value && !o.disabled);
+    if (option === undefined)
+      throw new Error(whyNoOption(String(select), value));
+    await chooseFromNativePicker(select, option.label);
+    await expect
+      .poll(() => select.inputValue(), {
+        message: `${String(select)}: real taps on Chrome's picker did not choose "${value}"`,
+        timeout: 2_000,
+      })
+      .toBe(value);
+    return;
+  }
   const current = await select.inputValue();
   const keys = arrowKeysFor(options, current, value);
   if (keys === null) throw new Error(whyNoOption(String(select), value));
@@ -78,11 +93,6 @@ export function arrowKeysFor(
   if (Math.abs(steps) > 1 && target === reachable.length - 1) return ['End'];
   if (Math.abs(steps) > 1 && target === 0) return ['Home'];
   return Array(Math.abs(steps)).fill(steps > 0 ? 'ArrowDown' : 'ArrowUp');
-}
-
-/** Why the phone cannot choose yet: its native picker has no real-input path. */
-export function whyNoPickerPath(select: string, value: string): string {
-  return `${select}: choosing "${value}" on the real Android phone needs its native picker, and that path is not built yet (#1027); no script stands in for it`;
 }
 
 /** Why an option cannot be chosen: it is missing, or disabled. */
