@@ -1,4 +1,5 @@
 import { tapOn } from '../real-touch';
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
@@ -9,14 +10,34 @@ import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
+/**
+ * Bring the nav into view the way a visitor at this width would (#1046,
+ * Shyden 2026-11-07: the phone checks the menu, the laptop the nav row).
+ * Where the width puts the nav behind the menu, the menu is opened by a real
+ * tap; where it is a row, nothing is pressed. Returns which one the page
+ * showed, so a test can say what it measured.
+ */
+const revealNav = async (page: Page): Promise<'menu' | 'row'> => {
+  const summary = page.locator('header details.menu > summary');
+  if (!(await summary.isVisible())) return 'row';
+  await tapOn(summary);
+  await expect(page.locator('header details.menu')).toHaveJSProperty(
+    'open',
+    true,
+  );
+  return 'menu';
+};
+
+/** The width the page lays out to, scrollbar excluded. */
+const layoutWidth = (page: Page): Promise<number> =>
+  page.evaluate(() => document.documentElement.clientWidth);
+
 test.describe('header + footer', () => {
   test('nav links point to the section anchors in scroll order', async ({
     page,
   }) => {
-    // Pin desktop width: on mobile the nav is hidden until the disclosure opens,
-    // so this viewport-dependent test sets its own width (not the project's).
-    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+    await revealNav(page);
     const nav = page.locator('header nav');
     await expect(nav.locator('a')).toHaveText([
       'ShyTalk',
@@ -128,22 +149,28 @@ test.describe('header + footer', () => {
   // localised labels. `${locale} desktop` below reads each locale at 1280px,
   // but never after the menu was opened at a phone width first.
   for (const locale of LOCALES)
-    test(`${locale}: nav stays a horizontal row at desktop even if opened at mobile first`, async ({
+    test(`${locale}: nav takes the layout its width implies, even after the menu was opened narrower`, async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 375, height: 800 });
+      // An emulated target is opened at a phone width and then widened
+      // WITHOUT a reload; a real phone keeps its own width (#1046).
+      await atViewport(page, { width: 375, height: 800 });
       await page.goto(localisePath('/', locale));
-      await tapOn(page.locator('header details.menu > summary')); // open at mobile
-      await expect(page.locator('header details.menu')).toHaveJSProperty(
-        'open',
-        true,
-      );
-      await page.setViewportSize({ width: 1280, height: 800 }); // resize WITHOUT reload
+      await revealNav(page); // open the menu where the width shows one
+      await atViewport(page, { width: 1280, height: 800 });
       const nav = page.locator('header nav');
-      await expect(nav).toHaveCSS('flex-direction', 'row');
-      await expect(nav).toHaveCSS('position', 'static');
+      const summary = page.locator('header details.menu > summary');
+      if (await summary.isVisible()) {
+        await expect(nav).toHaveCSS('flex-direction', 'column');
+        await expect(nav).toHaveCSS('position', 'absolute');
+      } else {
+        await expect(nav).toHaveCSS('flex-direction', 'row');
+        await expect(nav).toHaveCSS('position', 'static');
+      }
       const lastBox = await page.locator('header nav a').last().boundingBox();
-      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
+      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(
+        await layoutWidth(page),
+      );
     });
 
   // Keyboard access in the header is TWO separate contracts, because engines
@@ -155,7 +182,7 @@ test.describe('header + footer', () => {
   // links are tabbed, and the contract that must hold everywhere — that each
   // control can take focus and none is removed from the tab order — is
   // asserted separately, on every engine.
-  test('desktop: the header is keyboard-reachable in order (WCAG 2.1.1)', async ({
+  test('the header is keyboard-reachable in order (WCAG 2.1.1)', async ({
     page,
     browserName,
   }) => {
@@ -165,8 +192,11 @@ test.describe('header + footer', () => {
         'so a Tab walk here would assert a browser preference, not our markup. ' +
         'Focusability and order are asserted for WebKit in the tests below.',
     );
-    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+    // Where the width puts the nav behind the menu, the menu is opened first
+    // (#1046). Its summary comes before the theme switch in the header, so
+    // Tab still runs from the language switcher straight to the links.
+    await revealNav(page);
     // Anchor on the language switcher's summary — the last focusable thing
     // in the bar before <nav> — rather than on the wordmark: engines differ on
     // how many Tab presses that gap costs, and an explicit focus() fixes the
@@ -199,8 +229,8 @@ test.describe('header + footer', () => {
     // our markup and not Safari's default. This is the whole header, not just
     // the language switcher — a control left out here would be unreachable by
     // keyboard even for a visitor who HAS opted in.
-    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+    await revealNav(page);
     for (const sel of [
       'header .wordmark',
       'header [data-theme-toggle]',
@@ -297,11 +327,14 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
       );
     });
 
-    test(`${locale} desktop: nav links are visible, on-screen and ≥44px including width`, async ({
+    test(`${locale} at a laptop width: nav links are visible, on-screen and ≥44px including width`, async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 1280, height: 800 });
+      // An emulated target is set to a laptop width; a real phone keeps its
+      // own, and its nav is checked behind the menu (#1046).
+      await atViewport(page, { width: 1280, height: 800 });
       await page.goto(localisePath('/', locale));
+      await revealNav(page);
       const links = page.locator('header nav a');
       // Counted from the locale's own nav labels, then read in order: a
       // literal 3 went stale when #403 added a fourth link, and failed
@@ -317,7 +350,9 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
       }
       // The last link (Contact) previously overflowed past the viewport edge.
       const lastBox = await links.last().boundingBox();
-      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
+      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(
+        await layoutWidth(page),
+      );
     });
   }
 });
