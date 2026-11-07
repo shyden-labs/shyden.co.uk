@@ -29,12 +29,25 @@ export async function atViewport(
     await page.setViewportSize(want);
     return want;
   }
-  // A real phone is measured. Before a test opens its page, the tab may hold
-  // a blank one with no viewport meta: a 980px layout zoomed to fit the
-  // screen (measured on the OPPO, 2026-11-07: 980 at scale 0.4198, then
-  // 411x759 once the page loaded). The visual viewport times its scale is the
-  // screen in CSS pixels either way, and the page's own innerWidth is that
-  // rounded down. screen.width rounds it instead (412), one pixel off.
+  return measuredViewport(page);
+}
+
+/**
+ * The size a test may hold the page to now, without changing it (#1046).
+ *
+ * An emulated target answers with the size the test set: Playwright's own
+ * record, so a window the engine grew by itself (Firefox under fullscreen,
+ * #758) still reads as a mismatch against the page. A real phone is measured
+ * as it is now. Before a test opens its page, the tab may hold a blank one
+ * with no viewport meta: a 980px layout zoomed to fit the screen (OPPO,
+ * 2026-11-07: 980 at scale 0.4198, then 411x759 once the page loaded). The
+ * visual viewport times its scale is the screen in CSS pixels either way, and
+ * the page's own innerWidth is that rounded down. And the screen changes: an
+ * open board makes Chrome hide its address bar (411x759 to 411x815).
+ */
+export async function measuredViewport(page: Page): Promise<ViewportSize> {
+  const set = page.viewportSize();
+  if (set !== null) return set;
   const { vvWidth, vvHeight, vvScale } = await page.evaluate(() => {
     const vv = window.visualViewport;
     if (vv === null) throw new Error('this browser has no visualViewport');
