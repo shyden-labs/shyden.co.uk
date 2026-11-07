@@ -28,6 +28,35 @@ import { atViewport } from '../viewport-at';
 test.use(recorded);
 
 /**
+ * How `.tool-sections` is laid out now: its grid tracks, the media rules in
+ * the page's stylesheets that set its columns, and whether the width matches
+ * them. Read in the page, so a breakpoint moved in the CSS moves here too.
+ */
+const sectionsLayout = (page: Page) =>
+  page.evaluate(() => {
+    const grid = document.querySelector('.tool-sections');
+    if (grid === null) throw new Error('no .tool-sections on the page');
+    const tracks = getComputedStyle(grid)
+      .gridTemplateColumns.split(' ')
+      .filter(Boolean).length;
+    const media: string[] = [];
+    for (const sheet of Array.from(document.styleSheets)) {
+      for (const rule of Array.from(sheet.cssRules)) {
+        if (!(rule instanceof CSSMediaRule)) continue;
+        const setsColumns = Array.from(rule.cssRules).some(
+          (inner) =>
+            inner instanceof CSSStyleRule &&
+            /^\.tool-sections(\[[^\]]+\])?$/.test(inner.selectorText) &&
+            inner.style.gridTemplateColumns !== '',
+        );
+        if (setsColumns) media.push(rule.media.mediaText);
+      }
+    }
+    const wide = media.length === 1 && matchMedia(media[0]).matches;
+    return { tracks, media, wide };
+  });
+
+/**
  * The controls the review found reachable from the page and asserted by
  * nothing: the theme picker, the leftovers radios, the sound label, and what
  * happens when the same button is pressed twice or after a refusal.
@@ -1040,25 +1069,41 @@ test.describe("the tool's collapsible sections", () => {
   //
   // Every locale (#423): a section's min-content is its copy, and one long
   // label pins a grid track (the #cg-io file input did exactly that).
+  //
+  // Each target is checked at the width it has (#1046, Shyden 2026-11-07):
+  // an emulated target is set to a laptop width and then a phone width, and
+  // a real phone is measured as it is. Which layout a width means is read
+  // from the page's own stylesheet, so no breakpoint is restated here.
+  const expectSectionsFitTheWidth = async (page: Page, width: number) => {
+    const { tracks, media, wide } = await sectionsLayout(page);
+    expect(
+      media,
+      'one @media rule gives .tool-sections its columns; the reader found',
+    ).toHaveLength(1);
+    const a = (await page.locator('#cg-grouping').boundingBox())!;
+    const b = (await page.locator('#cg-io').boundingBox())!;
+    if (wide) {
+      expect(tracks, `${width}px is inside ${media[0]}`).toBe(2);
+      expect(b.y).toBeCloseTo(a.y, 0); // same row
+      // …and the roster section takes the whole row above them.
+      const roster = (await page.locator('#cg-students').boundingBox())!;
+      expect(roster.width).toBeGreaterThan(a.width * 1.8);
+    } else {
+      expect(tracks, `${width}px is outside ${media[0]}`).toBe(1);
+      expect(b.y).toBeGreaterThan(a.y); // stacked
+    }
+  };
+
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `the simple sections sit two-by-two on a laptop and stacked on a phone -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.goto(path);
-        await page.setViewportSize({ width: 1280, height: 900 });
-        const a = (await page.locator('#cg-grouping').boundingBox())!;
-        const b = (await page.locator('#cg-io').boundingBox())!;
-        expect(b.y).toBeCloseTo(a.y, 0); // same row
-        // …and the roster section takes the whole row above them.
-        const roster = (await page.locator('#cg-students').boundingBox())!;
-        expect(roster.width).toBeGreaterThan(a.width * 1.8);
-        await page.setViewportSize({ width: 320, height: 800 });
-        const c = (await page.locator('#cg-grouping').boundingBox())!;
-        const d = (await page.locator('#cg-io').boundingBox())!;
-        expect(d.y).toBeGreaterThan(c.y); // stacked
-      },
-    );
+    test(`the simple sections sit two-by-two on a wide screen and stacked on a narrow one -- ${path}`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      const laptop = await atViewport(page, { width: 1280, height: 900 });
+      await expectSectionsFitTheWidth(page, laptop.width);
+      const phone = await atViewport(page, { width: 320, height: 800 });
+      await expectSectionsFitTheWidth(page, phone.width);
+    });
 
   test('each section is reachable by heading, and starts collapsed', async ({
     page,
