@@ -1041,24 +1041,22 @@ test.describe("the tool's collapsible sections", () => {
   // Every locale (#423): a section's min-content is its copy, and one long
   // label pins a grid track (the #cg-io file input did exactly that).
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `the simple sections sit two-by-two on a laptop and stacked on a phone -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.goto(path);
-        await page.setViewportSize({ width: 1280, height: 900 });
-        const a = (await page.locator('#cg-grouping').boundingBox())!;
-        const b = (await page.locator('#cg-io').boundingBox())!;
-        expect(b.y).toBeCloseTo(a.y, 0); // same row
-        // …and the roster section takes the whole row above them.
-        const roster = (await page.locator('#cg-students').boundingBox())!;
-        expect(roster.width).toBeGreaterThan(a.width * 1.8);
-        await page.setViewportSize({ width: 320, height: 800 });
-        const c = (await page.locator('#cg-grouping').boundingBox())!;
-        const d = (await page.locator('#cg-io').boundingBox())!;
-        expect(d.y).toBeGreaterThan(c.y); // stacked
-      },
-    );
+    test(`the simple sections sit two-by-two on a laptop and stacked on a phone -- ${path}`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      const a = (await page.locator('#cg-grouping').boundingBox())!;
+      const b = (await page.locator('#cg-io').boundingBox())!;
+      expect(b.y).toBeCloseTo(a.y, 0); // same row
+      // …and the roster section takes the whole row above them.
+      const roster = (await page.locator('#cg-students').boundingBox())!;
+      expect(roster.width).toBeGreaterThan(a.width * 1.8);
+      await page.setViewportSize({ width: 320, height: 800 });
+      const c = (await page.locator('#cg-grouping').boundingBox())!;
+      const d = (await page.locator('#cg-io').boundingBox())!;
+      expect(d.y).toBeGreaterThan(c.y); // stacked
+    });
 
   test('each section is reachable by heading, and starts collapsed', async ({
     page,

@@ -10,52 +10,47 @@ import { atViewport } from '../viewport-at';
 test.use(recorded);
 
 test.describe('header + footer', () => {
-  test(
-    'nav links point to the section anchors in scroll order',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      // Pin desktop width: on mobile the nav is hidden until the disclosure opens,
-      // so this viewport-dependent test sets its own width (not the project's).
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/');
-      const nav = page.locator('header nav');
-      await expect(nav.locator('a')).toHaveText([
-        'ShyTalk',
-        'Yawelo Idle',
-        'Tools',
-        'Contact',
-      ]);
-      await expect(nav.locator('a').nth(0)).toHaveAttribute(
-        'href',
-        '/#shytalk',
-      );
-      // Scroll order, as the title says: each link's section sits below the
-      // one before it. Read from the links' own fragments, so a section moved
-      // on the page without its link fails here.
-      const hrefs = await nav
-        .locator('a')
-        .evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''));
-      const tops: number[] = [];
-      for (const href of hrefs) {
-        const box = await page
-          .locator(new URL(href, page.url()).hash)
-          .boundingBox();
-        expect(box, `${href} leads to no section on the page`).not.toBeNull();
-        tops.push(box?.y ?? Number.NaN);
-      }
-      expect(tops, `section tops, in nav order: ${tops.join(', ')}`).toEqual(
-        [...tops].sort((a, b) => a - b),
-      );
-      // Aurora renamed these from Services/Work; this spec is the established
-      // home for nav-link facts, so the proof belongs here and not in a second
-      // guard elsewhere.
-      await shoot(
-        page,
-        'nav reads ShyTalk / Tools / Contact, in scroll order',
-        nav,
-      );
-    },
-  );
+  test('nav links point to the section anchors in scroll order', async ({
+    page,
+  }) => {
+    // Pin desktop width: on mobile the nav is hidden until the disclosure opens,
+    // so this viewport-dependent test sets its own width (not the project's).
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const nav = page.locator('header nav');
+    await expect(nav.locator('a')).toHaveText([
+      'ShyTalk',
+      'Yawelo Idle',
+      'Tools',
+      'Contact',
+    ]);
+    await expect(nav.locator('a').nth(0)).toHaveAttribute('href', '/#shytalk');
+    // Scroll order, as the title says: each link's section sits below the
+    // one before it. Read from the links' own fragments, so a section moved
+    // on the page without its link fails here.
+    const hrefs = await nav
+      .locator('a')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''));
+    const tops: number[] = [];
+    for (const href of hrefs) {
+      const box = await page
+        .locator(new URL(href, page.url()).hash)
+        .boundingBox();
+      expect(box, `${href} leads to no section on the page`).not.toBeNull();
+      tops.push(box?.y ?? Number.NaN);
+    }
+    expect(tops, `section tops, in nav order: ${tops.join(', ')}`).toEqual(
+      [...tops].sort((a, b) => a - b),
+    );
+    // Aurora renamed these from Services/Work; this spec is the established
+    // home for nav-link facts, so the proof belongs here and not in a second
+    // guard elsewhere.
+    await shoot(
+      page,
+      'nav reads ShyTalk / Tools / Contact, in scroll order',
+      nav,
+    );
+  });
 
   test('nav links are root-relative so they work from every page, not just /', async ({
     page,
@@ -133,25 +128,23 @@ test.describe('header + footer', () => {
   // localised labels. `${locale} desktop` below reads each locale at 1280px,
   // but never after the menu was opened at a phone width first.
   for (const locale of LOCALES)
-    test(
-      `${locale}: nav stays a horizontal row at desktop even if opened at mobile first`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 375, height: 800 });
-        await page.goto(localisePath('/', locale));
-        await tapOn(page.locator('header details.menu > summary')); // open at mobile
-        await expect(page.locator('header details.menu')).toHaveJSProperty(
-          'open',
-          true,
-        );
-        await page.setViewportSize({ width: 1280, height: 800 }); // resize WITHOUT reload
-        const nav = page.locator('header nav');
-        await expect(nav).toHaveCSS('flex-direction', 'row');
-        await expect(nav).toHaveCSS('position', 'static');
-        const lastBox = await page.locator('header nav a').last().boundingBox();
-        expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
-      },
-    );
+    test(`${locale}: nav stays a horizontal row at desktop even if opened at mobile first`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 800 });
+      await page.goto(localisePath('/', locale));
+      await tapOn(page.locator('header details.menu > summary')); // open at mobile
+      await expect(page.locator('header details.menu')).toHaveJSProperty(
+        'open',
+        true,
+      );
+      await page.setViewportSize({ width: 1280, height: 800 }); // resize WITHOUT reload
+      const nav = page.locator('header nav');
+      await expect(nav).toHaveCSS('flex-direction', 'row');
+      await expect(nav).toHaveCSS('position', 'static');
+      const lastBox = await page.locator('header nav a').last().boundingBox();
+      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
+    });
 
   // Keyboard access in the header is TWO separate contracts, because engines
   // genuinely disagree about one of them and agree about the other.
@@ -162,70 +155,67 @@ test.describe('header + footer', () => {
   // links are tabbed, and the contract that must hold everywhere — that each
   // control can take focus and none is removed from the tab order — is
   // asserted separately, on every engine.
-  test(
-    'desktop: the header is keyboard-reachable in order (WCAG 2.1.1)',
-    { tag: '@emulated-viewport' },
-    async ({ page, browserName }) => {
-      test.skip(
-        browserName === 'webkit',
-        'Safari omits plain links from the Tab sequence unless the visitor opts in, ' +
-          'so a Tab walk here would assert a browser preference, not our markup. ' +
-          'Focusability and order are asserted for WebKit in the tests below.',
-      );
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/');
-      // Anchor on the language switcher's summary — the last focusable thing
-      // in the bar before <nav> — rather than on the wordmark: engines differ on
-      // how many Tab presses that gap costs, and an explicit focus() fixes the
-      // starting point on all of them. Tab then advances in DOM order, so this
-      // asserts OUR running order.
-      const languages = page.locator('header details.lang-switch > summary');
-      await languages.focus();
-      // The theme switch sits immediately before the language switcher
-      // (#142 §5). Reached by Shift+Tab, never focused directly, so a switch
-      // taken out of the Tab order (tabindex="-1") is stepped over and this
-      // fails where a direct focus() would still succeed.
-      await page.keyboard.press('Shift+Tab');
-      await expect(page.locator('header [data-theme-toggle]')).toBeFocused();
+  test('desktop: the header is keyboard-reachable in order (WCAG 2.1.1)', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName === 'webkit',
+      'Safari omits plain links from the Tab sequence unless the visitor opts in, ' +
+        'so a Tab walk here would assert a browser preference, not our markup. ' +
+        'Focusability and order are asserted for WebKit in the tests below.',
+    );
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    // Anchor on the language switcher's summary — the last focusable thing
+    // in the bar before <nav> — rather than on the wordmark: engines differ on
+    // how many Tab presses that gap costs, and an explicit focus() fixes the
+    // starting point on all of them. Tab then advances in DOM order, so this
+    // asserts OUR running order.
+    const languages = page.locator('header details.lang-switch > summary');
+    await languages.focus();
+    // The theme switch sits immediately before the language switcher
+    // (#142 §5). Reached by Shift+Tab, never focused directly, so a switch
+    // taken out of the Tab order (tabindex="-1") is stepped over and this
+    // fails where a direct focus() would still succeed.
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('header [data-theme-toggle]')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(languages).toBeFocused();
+
+    for (const label of ['ShyTalk', 'Yawelo Idle', 'Tools', 'Contact']) {
       await page.keyboard.press('Tab');
-      await expect(languages).toBeFocused();
+      await expect(
+        page.locator('header nav a', { hasText: label }),
+      ).toBeFocused();
+    }
+  });
 
-      for (const label of ['ShyTalk', 'Yawelo Idle', 'Tools', 'Contact']) {
-        await page.keyboard.press('Tab');
-        await expect(
-          page.locator('header nav a', { hasText: label }),
-        ).toBeFocused();
-      }
-    },
-  );
-
-  test(
-    'every header link can take focus, on every engine',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      // The contract that holds regardless of the visitor's Tab preference:
-      // asserted with an explicit focus() rather than a Tab press, so it measures
-      // our markup and not Safari's default. This is the whole header, not just
-      // the language switcher — a control left out here would be unreachable by
-      // keyboard even for a visitor who HAS opted in.
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/');
-      for (const sel of [
-        'header .wordmark',
-        'header [data-theme-toggle]',
-        'header details.lang-switch > summary',
-        'header nav a:nth-of-type(1)',
-        'header nav a:nth-of-type(2)',
-        'header nav a:nth-of-type(3)',
-      ]) {
-        const el = page.locator(sel);
-        await expect(el, sel).toBeVisible();
-        await expect(el, sel).not.toHaveAttribute('tabindex', '-1');
-        await el.focus();
-        await expect(el, sel).toBeFocused();
-      }
-    },
-  );
+  test('every header link can take focus, on every engine', async ({
+    page,
+  }) => {
+    // The contract that holds regardless of the visitor's Tab preference:
+    // asserted with an explicit focus() rather than a Tab press, so it measures
+    // our markup and not Safari's default. This is the whole header, not just
+    // the language switcher — a control left out here would be unreachable by
+    // keyboard even for a visitor who HAS opted in.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    for (const sel of [
+      'header .wordmark',
+      'header [data-theme-toggle]',
+      'header details.lang-switch > summary',
+      'header nav a:nth-of-type(1)',
+      'header nav a:nth-of-type(2)',
+      'header nav a:nth-of-type(3)',
+    ]) {
+      const el = page.locator(sel);
+      await expect(el, sel).toBeVisible();
+      await expect(el, sel).not.toHaveAttribute('tabindex', '-1');
+      await el.focus();
+      await expect(el, sel).toBeFocused();
+    }
+  });
 
   test('no header link overrides the visitor’s own Tab preference', async ({
     page,
@@ -307,30 +297,28 @@ test.describe('touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
       );
     });
 
-    test(
-      `${locale} desktop: nav links are visible, on-screen and ≥44px including width`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 1280, height: 800 });
-        await page.goto(localisePath('/', locale));
-        const links = page.locator('header nav a');
-        // Counted from the locale's own nav labels, then read in order: a
-        // literal 3 went stale when #403 added a fourth link, and failed
-        // before measuring it.
-        const labels = Object.values(getSiteStrings(locale).nav);
-        await expect(links).toHaveCount(labels.length);
-        await expect(links).toHaveText(labels);
-        for (const a of await links.all()) {
-          // Guards the all-browser desktop-nav regression: a collapsed wrapper
-          // made these links render off-screen / non-visible on every engine.
-          await expect(a).toBeVisible();
-          await atLeast44(a, `"${await a.textContent()}"`);
-        }
-        // The last link (Contact) previously overflowed past the viewport edge.
-        const lastBox = await links.last().boundingBox();
-        expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
-      },
-    );
+    test(`${locale} desktop: nav links are visible, on-screen and ≥44px including width`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(localisePath('/', locale));
+      const links = page.locator('header nav a');
+      // Counted from the locale's own nav labels, then read in order: a
+      // literal 3 went stale when #403 added a fourth link, and failed
+      // before measuring it.
+      const labels = Object.values(getSiteStrings(locale).nav);
+      await expect(links).toHaveCount(labels.length);
+      await expect(links).toHaveText(labels);
+      for (const a of await links.all()) {
+        // Guards the all-browser desktop-nav regression: a collapsed wrapper
+        // made these links render off-screen / non-visible on every engine.
+        await expect(a).toBeVisible();
+        await atLeast44(a, `"${await a.textContent()}"`);
+      }
+      // The last link (Contact) previously overflowed past the viewport edge.
+      const lastBox = await links.last().boundingBox();
+      expect(lastBox!.x + lastBox!.width).toBeLessThanOrEqual(1280);
+    });
   }
 });
 
