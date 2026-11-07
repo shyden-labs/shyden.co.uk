@@ -8,6 +8,7 @@
 import { readdirSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { nonEmpty } from '../../scripts/errors.mjs';
+import { testedCompatibilityDate } from '../../scripts/pages-runtime.mjs';
 import { DATABASE_ID, PASSWORD, PERSIST, PORT, SECRET, d1 } from './local.mjs';
 
 // This script is measured for coverage, and nothing it starts is (#913): the
@@ -53,7 +54,9 @@ const server = spawn(
     '--port',
     String(PORT),
     '--compatibility-date',
-    '2026-10-20',
+    // The date's one home is ./wrangler.toml, which each deploy also sets
+    // both Pages projects to (#907).
+    testedCompatibilityDate(),
     '--d1',
     `REPORTS=${DATABASE_ID}`,
     '--persist-to',
