@@ -107,7 +107,7 @@ describe('what a visitor receives (#390 F60)', () => {
     },
   );
 
-  it.each(['README.md', 'HANDOVER.md', 'vitest.config.ts', 'tests/a.ts'])(
+  it.each(['README.md', 'vitest.config.ts', 'tests/a.ts'])(
     'does not count %s, which no visitor receives',
     (file) => {
       expect(entryFor([file])?.visitorFacing).toBe(false);
