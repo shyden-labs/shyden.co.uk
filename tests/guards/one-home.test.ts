@@ -545,6 +545,12 @@ export const spellsACompatibilityDate = (path: string, code: string) =>
   ) ||
   (path.endsWith('.toml') && /^\s*compatibility_date\s*=/m.test(code));
 
+/**
+ * The flag, built from parts, so these fixtures do not spell what the guard
+ * scans for and the guard does not find itself.
+ */
+const FLAG = ['--compatibility', 'date'].join('-');
+
 describe('the Workers compatibility date has exactly one home', () => {
   const HOME = 'tests/functions/wrangler.toml';
   const code = (path: string) => {
@@ -579,23 +585,17 @@ describe('the Workers compatibility date has exactly one home', () => {
     expect(
       spellsACompatibilityDate(
         'serve.mjs',
-        "spawn('npx', ['wrangler', '--compatibility-date',\n    '2026-10-20'])",
+        `spawn('npx', ['wrangler', '${FLAG}',\n    '2026-10-20'])`,
       ),
     ).toBe(true);
   });
 
   it('catches a date passed with = or a space', () => {
     expect(
-      spellsACompatibilityDate(
-        'x.yml',
-        'run: wrangler dev --compatibility-date=2026-10-20',
-      ),
+      spellsACompatibilityDate('x.yml', `run: wrangler dev ${FLAG}=2026-10-20`),
     ).toBe(true);
     expect(
-      spellsACompatibilityDate(
-        'x.yml',
-        'run: wrangler dev --compatibility-date 2026-10-20',
-      ),
+      spellsACompatibilityDate('x.yml', `run: wrangler dev ${FLAG} 2026-10-20`),
     ).toBe(true);
   });
 
@@ -615,7 +615,7 @@ describe('the Workers compatibility date has exactly one home', () => {
     expect(
       spellsACompatibilityDate(
         'serve.mjs',
-        "['--compatibility-date', testedCompatibilityDate()]",
+        `['${FLAG}', testedCompatibilityDate()]`,
       ),
     ).toBe(false);
     expect(
