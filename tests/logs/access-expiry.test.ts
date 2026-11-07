@@ -39,8 +39,8 @@ describe('the titles it opens issues under', () => {
     expect(NOT_ON_MAIN_NOTICE).toBe(
       'The Access service token expiry check was not started: `main` has ' +
         'no `.github/workflows/access-expiry.yml`, so the scheduled run ' +
-        'could not start it, and no token was read. Until the first release ' +
-        'puts the file on `main`, this is expected.',
+        'could not start it, and no token was read. A release has put it on ' +
+        '`main` before, so this is not expected: check what took it off.',
     );
     expect(NOT_ON_MAIN_NOTICE).not.toMatch(/\d/);
   });
