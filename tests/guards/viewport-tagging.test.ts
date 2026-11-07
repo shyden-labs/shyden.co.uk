@@ -620,7 +620,10 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
 // The visual baselines are pixels at fixed widths, and the theme gallery's
 // /classroom-groups picture is the laptop roster table at 1280. Only they may
 // keep the tag that leaves a test off the phone.
-const APPROVED_FIXED_WIDTH = ['tests/e2e/visual.spec.ts'];
+const APPROVED_FIXED_WIDTH = [
+  'tests/e2e/theme-gallery.spec.ts',
+  'tests/e2e/visual.spec.ts',
+];
 
 describe('only the approved fixed-width tests stay off the phone (#1046)', () => {
   it('no spec but the visual baselines and the theme gallery tags a test @emulated-viewport', () => {
