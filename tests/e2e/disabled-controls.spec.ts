@@ -10,6 +10,7 @@ import { addSeveral, openRoster, setSex } from './helpers';
 import { recorded } from './evidence';
 import { localePaths } from './locale-sampling';
 import { expectNoHorizontalScroll } from '../viewport';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -552,41 +553,39 @@ test.describe('a disabled control affords that it is disabled', () => {
   // reasons and labels are its own widths. One test per page, because a
   // hundred-row roster five times over would share one budget.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await openRoster(page, path);
-        await addSeveral(page, MAX_ROSTER - 1);
-        await openEveryDisclosure(page);
+    test(`at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${path}`, async ({
+      page,
+    }) => {
+      const took = await atViewport(page, { width: 320, height: 900 });
+      await openRoster(page, path);
+      await addSeveral(page, MAX_ROSTER - 1);
+      await openEveryDisclosure(page);
 
-        const { reachable } = await affordances(page);
+      const { reachable } = await affordances(page);
 
-        // UA-painted inputs are carved out for the reason the fill carve-out
-        // exists: the raw checkbox is not what a finger lands on. `.switch`'s
-        // 44px min-height sits on the LABEL, measured by
-        // classroom-groups-controls.spec.ts, and a second opinion here would
-        // only split the truth in two.
-        const measured = reachable.filter((a) => !a.uaPainted);
-        // A target is 44px each way: a control 44px tall and 30px wide is still
-        // a 30px target for a finger.
-        const small = measured
-          .filter((a) => a.width < 44 || a.height < 44)
-          .map(
-            (a) =>
-              `${a.label} — ${a.width.toFixed(1)} × ${a.height.toFixed(1)}px`,
-          );
-        expect(
-          searched(small, {
-            of: measured.map((a) => a.label),
-            what: 'disabled controls at 320px',
-          }),
-        ).toEqual([]);
+      // UA-painted inputs are carved out for the reason the fill carve-out
+      // exists: the raw checkbox is not what a finger lands on. `.switch`'s
+      // 44px min-height sits on the LABEL, measured by
+      // classroom-groups-controls.spec.ts, and a second opinion here would
+      // only split the truth in two.
+      const measured = reachable.filter((a) => !a.uaPainted);
+      // A target is 44px each way: a control 44px tall and 30px wide is still
+      // a 30px target for a finger.
+      const small = measured
+        .filter((a) => a.width < 44 || a.height < 44)
+        .map(
+          (a) =>
+            `${a.label} — ${a.width.toFixed(1)} × ${a.height.toFixed(1)}px`,
+        );
+      expect(
+        searched(small, {
+          of: measured.map((a) => a.label),
+          what: `disabled controls at ${took.width}px`,
+        }),
+      ).toEqual([]);
 
-        // The instrument classroom-groups-controls.spec.ts already uses, so
-        // the second home cannot disagree with the first about what counts.
-        await expectNoHorizontalScroll(page);
-      },
-    );
+      // The instrument classroom-groups-controls.spec.ts already uses, so
+      // the second home cannot disagree with the first about what counts.
+      await expectNoHorizontalScroll(page);
+    });
 });

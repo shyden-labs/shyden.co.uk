@@ -11,6 +11,7 @@ import { readsAsLineWidth } from '../device-pixels';
 import { LOCALES, getSiteStrings, localisePath } from '../../src/lib/i18n';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -157,15 +158,28 @@ test.describe('the switch (#142 §5, AC3)', () => {
   }) => {
     await page.goto('/');
     await expectTheme(page, 'dark');
-    const next = await toggle(page).evaluate(
-      (button) =>
-        new Promise<string>((resolve) => {
-          (button as HTMLElement).click();
-          requestAnimationFrame(() =>
-            resolve(getComputedStyle(document.documentElement).backgroundColor),
-          );
-        }),
-    );
+    // A real press (#1003). A bubbling click listener on the document runs
+    // straight after the switch's own handler, and asks for the next frame
+    // there, so the ground read is the first one painted after the press.
+    await page.evaluate(() => {
+      const state = window as unknown as { nextGround?: string };
+      document.addEventListener(
+        'click',
+        () =>
+          requestAnimationFrame(() => {
+            state.nextGround = getComputedStyle(
+              document.documentElement,
+            ).backgroundColor;
+          }),
+        { once: true },
+      );
+    });
+    await tapOn(toggle(page));
+    const next = await page
+      .waitForFunction(
+        () => (window as unknown as { nextGround?: string }).nextGround,
+      )
+      .then((handle) => handle.jsonValue());
     expect(next).toBe(themeColour('light', '--bg'));
   });
 
@@ -214,7 +228,7 @@ test.describe('without JavaScript (#142 AC7)', () => {
 
       test(
         'the switch is absent, and the device setting applies',
-        { tag: '@requires-isolated-context' },
+        { tag: '@javascript-blocked' },
         async ({ page }) => {
           await page.goto('/');
           await expectTheme(page, theme);
@@ -245,28 +259,24 @@ test.describe('the choice persists (#142 AC4)', () => {
     );
   });
 
-  test(
-    'into a new session that carries the same storage',
-    { tag: '@requires-isolated-context' },
-    async ({ page, browser, baseURL }) => {
-      await page.goto('/');
-      await tapOn(toggle(page));
-      await expectTheme(page, 'light');
-      const storageState = await page.context().storageState();
-      const session = await browser.newContext({
-        storageState,
-        baseURL,
-        colorScheme: 'dark',
-      });
-      try {
-        const next = await session.newPage();
-        await next.goto('/');
-        await expectTheme(next, 'light');
-      } finally {
-        await session.close();
-      }
-    },
-  );
+  // A new page in the same browser, after the first is closed: it carries the same storage,
+  // as a returning visitor's does. A second browser context is not an option on the phone,
+  // which has exactly one (#1047).
+  test('into a new page that carries the same storage', async ({
+    page,
+    baseURL,
+  }) => {
+    await page.goto('/');
+    await tapOn(toggle(page));
+    await expectTheme(page, 'light');
+    const context = page.context();
+    await page.close();
+    const next = await context.newPage();
+    await next.emulateMedia({ colorScheme: 'dark' });
+    // A page made by hand has no base URL of its own on the phone.
+    await next.goto(new URL('/', baseURL).href);
+    await expectTheme(next, 'light');
+  });
 
   test('and a press after a stale saved value saves a valid one (Review Focus 1)', async ({
     page,
@@ -548,54 +558,50 @@ test.describe('nothing moves when the theme changes (#386)', () => {
   // every locale, the 404 and its own switch never changed theme (TG1).
   for (const path of PUBLISHED_ROUTES) {
     for (const width of [390, 1280]) {
-      test(
-        `${path} at ${width}px: no element moves between dark and light`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await page.goto(path);
-          await page.addStyleTag({
-            content:
-              '*, *::before, *::after { animation: none !important; transition: none !important; }',
-          });
-          await page.evaluate(() => document.fonts.ready);
-          await emulateTheme(page, 'dark');
-          const dark = await boxes(page);
-          await tapOn(toggle(page));
-          await expectTheme(page, 'light');
-          const light = await boxes(page);
-          await tapOn(toggle(page));
-          await expectTheme(page, 'dark');
-          const darkAgain = await boxes(page);
+      test(`${path} at ${width}px: no element moves between dark and light`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await page.goto(path);
+        await page.addStyleTag({
+          content:
+            '*, *::before, *::after { animation: none !important; transition: none !important; }',
+        });
+        await page.evaluate(() => document.fonts.ready);
+        await emulateTheme(page, 'dark');
+        const dark = await boxes(page);
+        await tapOn(toggle(page));
+        await expectTheme(page, 'light');
+        const light = await boxes(page);
+        await tapOn(toggle(page));
+        await expectTheme(page, 'dark');
+        const darkAgain = await boxes(page);
 
-          const compared = dark.filter((d) => d.rendered && !d.inSwitch);
-          for (const [label, other] of [
-            ['light', light],
-            ['saved dark', darkAgain],
-          ] as const) {
-            expect(other, 'the document changed between passes').toHaveLength(
-              dark.length,
-            );
-            const moved = dark
-              .map((d, i) => ({ d, o: other[i] }))
-              .filter(
-                ({ d, o }) =>
-                  !d.inSwitch &&
-                  (d.rendered !== o.rendered ||
-                    d.box.some((v, k) => Math.abs(v - o.box[k]) > 0.5)),
-              )
-              .map(
-                ({ d, o }) => `${d.what} dark ${d.box} -> ${label} ${o.box}`,
-              );
-            expect(
-              searched(moved, {
-                of: compared,
-                what: 'rendered elements',
-              }),
-            ).toEqual([]);
-          }
-        },
-      );
+        const compared = dark.filter((d) => d.rendered && !d.inSwitch);
+        for (const [label, other] of [
+          ['light', light],
+          ['saved dark', darkAgain],
+        ] as const) {
+          expect(other, 'the document changed between passes').toHaveLength(
+            dark.length,
+          );
+          const moved = dark
+            .map((d, i) => ({ d, o: other[i] }))
+            .filter(
+              ({ d, o }) =>
+                !d.inSwitch &&
+                (d.rendered !== o.rendered ||
+                  d.box.some((v, k) => Math.abs(v - o.box[k]) > 0.5)),
+            )
+            .map(({ d, o }) => `${d.what} dark ${d.box} -> ${label} ${o.box}`);
+          expect(
+            searched(moved, {
+              of: compared,
+              what: 'rendered elements',
+            }),
+          ).toEqual([]);
+        }
+      });
     }
   }
 });

@@ -32,6 +32,7 @@ import {
   giveEveryoneASex,
   contrastRatio,
 } from './helpers';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -930,19 +931,17 @@ test.describe('class name and results heading', () => {
   // token with no spaces, which is exactly why this is a genuine check of
   // `#cg-results-h`'s own `overflow-wrap: anywhere` rather than something
   // normal text wrapping would already have covered.
-  test(
-    'a very long class name does not force the page to scroll sideways',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await page.goto('/classroom-groups');
-      await typeInto(page.getByLabel('Class (optional)'), 'x'.repeat(300));
-      await chooseSpeed(page, 'skip');
-      await tapOn(page.locator('#cg-go'));
-      await expect(page.locator('#cg-results-h')).toBeVisible();
-      await expectNoHorizontalScroll(page);
-    },
-  );
+  test('a very long class name does not force the page to scroll sideways', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 900 });
+    await page.goto('/classroom-groups');
+    await typeInto(page.getByLabel('Class (optional)'), 'x'.repeat(300));
+    await chooseSpeed(page, 'skip');
+    await tapOn(page.locator('#cg-go'));
+    await expect(page.locator('#cg-results-h')).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
 
   // The class name is read fresh at every submit (classroom-groups.ts), not
   // captured once -- a second shuffle with a different name in the field
@@ -1574,24 +1573,22 @@ test.describe('out-of-date groups', () => {
   // each language's own words and widths, and this read English only. The
   // fields go by id, since their labels are each language's own.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `the notice fits at 320px with no horizontal scroll, and its button meets the touch-target minimum -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await page.goto(path);
-        await typeInto(page.locator('#cg-count'), '12');
-        await tapOn(page.locator('#cg-go'));
-        await expect(page.locator('#cg-results .group')).toHaveCount(3);
-        await typeInto(page.locator('#cg-size'), '3');
-        await expect(page.locator('#cg-stale')).toBeVisible();
-        await expectNoHorizontalScroll(page, `${path}: the stale notice`);
-        await atLeast44(
-          page.locator('#cg-stale button'),
-          `${path}: the stale notice button`,
-        );
-      },
-    );
+    test(`the notice fits at 320px with no horizontal scroll, and its button meets the touch-target minimum -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 900 });
+      await page.goto(path);
+      await typeInto(page.locator('#cg-count'), '12');
+      await tapOn(page.locator('#cg-go'));
+      await expect(page.locator('#cg-results .group')).toHaveCount(3);
+      await typeInto(page.locator('#cg-size'), '3');
+      await expect(page.locator('#cg-stale')).toBeVisible();
+      await expectNoHorizontalScroll(page, `${path}: the stale notice`);
+      await atLeast44(
+        page.locator('#cg-stale button'),
+        `${path}: the stale notice button`,
+      );
+    });
 
   // "Assert whole rendered sentences, in both locales" (CLAUDE.md) -- every
   // test above is English-only, and the reason TEXT itself is
@@ -1969,14 +1966,12 @@ test.describe('the no-scroll rule, measured', () => {
   // source text for exactly that shape and is blind to a title passed by
   // reference or reached through an aliased callee.
   for (const { width, height } of VIEWPORTS) {
-    test(
-      `the primary action is reachable without scrolling at ${width}x${height}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height });
-        await measureFit(page);
-      },
-    );
+    test(`the primary action is reachable without scrolling at ${width}x${height}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height });
+      await measureFit(page);
+    });
   }
 
   // EVERY LOCALE, since #384. The loop above only ever measured English, and
@@ -1987,14 +1982,12 @@ test.describe('the no-scroll rule, measured', () => {
   // LOCALES, so a sixth language is measured the day it is added.
   for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE)) {
     for (const { width, height } of VIEWPORTS) {
-      test(
-        `/${locale}/: the primary action is reachable without scrolling at ${width}x${height}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height });
-          await measureFit(page, localisePath('/classroom-groups', locale));
-        },
-      );
+      test(`/${locale}/: the primary action is reachable without scrolling at ${width}x${height}`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height });
+        await measureFit(page, localisePath('/classroom-groups', locale));
+      });
     }
   }
 
@@ -2018,22 +2011,23 @@ test.describe('the no-scroll rule, measured', () => {
   // One test per viewport (#419): this spelled the four sizes out by hand,
   // and the two below looped them, under one budget.
   for (const { width, height } of VIEWPORTS)
-    test(
-      `the action row is sticky at ${width}x${height}, so the primary action is never below the fold`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height });
-        await page.goto('/classroom-groups');
-        const position = await page.evaluate(
-          () =>
-            getComputedStyle(
-              document.getElementById('cg-go')!.closest('.actions')!,
-            ).position,
-        );
-        expect(position).toBe('sticky');
-        await shoot(page, `${width}x${height}, the action row is sticky`);
-      },
-    );
+    test(`the action row is sticky at ${width}x${height}, so the primary action is never below the fold`, async ({
+      page,
+    }) => {
+      const took = await atViewport(page, { width, height });
+      await page.goto('/classroom-groups');
+      const position = await page.evaluate(
+        () =>
+          getComputedStyle(
+            document.getElementById('cg-go')!.closest('.actions')!,
+          ).position,
+      );
+      expect(position).toBe('sticky');
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the action row is sticky`,
+      );
+    });
 
   // The bar's COMPANION rule, which had no test at all until #188.
   // `scroll-padding-bottom` on `html` exists for one reason: to stop the
@@ -2049,33 +2043,30 @@ test.describe('the no-scroll rule, measured', () => {
   // did not, which is the one failure this rule exists to prevent, and it
   // would restate a value that already has a home in the stylesheet.
   for (const { width, height } of VIEWPORTS)
-    test(
-      `the scroll padding clears the pinned action row at ${width}x${height}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height });
-        await page.goto('/classroom-groups');
-        const { padding, bar } = await page.evaluate(() => ({
-          padding: parseFloat(
-            getComputedStyle(document.documentElement).scrollPaddingBottom,
-          ),
-          bar: document
-            .getElementById('cg-go')!
-            .closest('.actions')!
-            .getBoundingClientRect().height,
-        }));
-        // Liveness: a renamed class or a missing row would measure 0, and
-        // every padding value would then clear it.
-        expect(
-          bar,
-          'the action row must have a height to clear',
-        ).toBeGreaterThan(0);
-        expect(
-          padding,
-          'scroll padding must clear the pinned bar',
-        ).toBeGreaterThanOrEqual(bar);
-      },
-    );
+    test(`the scroll padding clears the pinned action row at ${width}x${height}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width, height });
+      await page.goto('/classroom-groups');
+      const { padding, bar } = await page.evaluate(() => ({
+        padding: parseFloat(
+          getComputedStyle(document.documentElement).scrollPaddingBottom,
+        ),
+        bar: document
+          .getElementById('cg-go')!
+          .closest('.actions')!
+          .getBoundingClientRect().height,
+      }));
+      // Liveness: a renamed class or a missing row would measure 0, and
+      // every padding value would then clear it.
+      expect(bar, 'the action row must have a height to clear').toBeGreaterThan(
+        0,
+      );
+      expect(
+        padding,
+        'scroll padding must clear the pinned bar',
+      ).toBeGreaterThanOrEqual(bar);
+    });
 
   // #188, operator decision 2026-09-17. Pinned at every width, the row
   // covers the edge of whatever sits above it before any scrolling -- at
@@ -2085,43 +2076,43 @@ test.describe('the no-scroll rule, measured', () => {
   // offset upward -- because a pinned literal would go on passing with the
   // offset flipped below the row, off the fold where nobody sees it.
   for (const { width, height } of VIEWPORTS)
-    test(
-      `the pinned action row casts a soft shadow upward at ${width}x${height}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width, height });
-        await page.goto('/classroom-groups');
-        const shadow = await page.evaluate(
-          () =>
-            getComputedStyle(
-              document.getElementById('cg-go')!.closest('.actions')!,
-            ).boxShadow,
-        );
-        // A computed shadow serialises colour first, then lengths:
-        // `rgba(0, 0, 0, 0.55) 0px -12px 24px -8px`.
-        const parts =
-          /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
-        expect(
-          parts,
-          `${width}x${height}: the pinned row has a shadow (computed: ${shadow})`,
-        ).not.toBeNull();
-        const [, colour, , offsetY, blur] = parts!;
-        expect(Number(offsetY), `${width}x${height}: cast upward`).toBeLessThan(
-          0,
-        );
-        expect(
-          Number(blur),
-          `${width}x${height}: soft, not a hard line`,
-        ).toBeGreaterThan(0);
-        expect(colour, `${width}x${height}: not transparent`).not.toMatch(
-          /, 0\)$/,
-        );
-        await shoot(
-          page,
-          `${width}x${height}, the row casts its shadow upward`,
-        );
-      },
-    );
+    test(`the pinned action row casts a soft shadow upward at ${width}x${height}`, async ({
+      page,
+    }) => {
+      const took = await atViewport(page, { width, height });
+      await page.goto('/classroom-groups');
+      const shadow = await page.evaluate(
+        () =>
+          getComputedStyle(
+            document.getElementById('cg-go')!.closest('.actions')!,
+          ).boxShadow,
+      );
+      // A computed shadow serialises colour first, then lengths:
+      // `rgba(0, 0, 0, 0.55) 0px -12px 24px -8px`.
+      const parts =
+        /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
+      expect(
+        parts,
+        `${took.width}x${took.height}: the pinned row has a shadow (computed: ${shadow})`,
+      ).not.toBeNull();
+      const [, colour, , offsetY, blur] = parts!;
+      expect(
+        Number(offsetY),
+        `${took.width}x${took.height}: cast upward`,
+      ).toBeLessThan(0);
+      expect(
+        Number(blur),
+        `${took.width}x${took.height}: soft, not a hard line`,
+      ).toBeGreaterThan(0);
+      expect(
+        colour,
+        `${took.width}x${took.height}: not transparent`,
+      ).not.toMatch(/, 0\)$/);
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the row casts its shadow upward`,
+      );
+    });
 
   // L-08. The brief's own literal query measured only what page LOAD
   // already shows -- nothing inside any of the four sections is on screen
@@ -2169,57 +2160,55 @@ test.describe('the no-scroll rule, measured', () => {
   //
   // Every locale (#423): every control on the page holds the page's own copy.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `every interactive target is at least 44px, collapsed and with every section open -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await page.goto(path);
-        for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
-          await tapOn(page.locator(`#${id}-toggle`));
-        }
-        // Every target on screen is measured; the ones too small are the
-        // verdict, the ones measured are its population (#610).
-        const { measured, small } = await page.evaluate(() => {
-          const targets = [
-            ...document.querySelectorAll(
-              'button, input, select, textarea, summary, a',
-            ),
-          ]
-            // Not the report form's honeypot, which no person is meant to
-            // reach: it sits under `aria-hidden` with `tabindex="-1"`, the
-            // same exclusion tests/typed-fields.ts makes. It is in every
-            // locale but English, so only the per-locale cases met it (#423).
-            .filter((el) => !el.closest('[aria-hidden="true"]'))
-            .map((el) => {
-              const isBoxControl =
-                el instanceof HTMLInputElement &&
-                (el.type === 'radio' || el.type === 'checkbox');
-              const target = isBoxControl ? (el.closest('label') ?? el) : el;
-              return {
-                tag: el.tagName,
-                id: el.id,
-                r: target.getBoundingClientRect(),
-              };
-            })
-            .filter(({ r }) => r.width > 0);
-          const name = ({ tag, id }: { tag: string; id: string }) =>
-            `${tag}#${id}`;
-          return {
-            measured: targets.map(name),
-            small: targets
-              .filter(({ r }) => r.height < 44 || r.width < 44)
-              .map(name),
-          };
-        });
-        expect(
-          searched(small, {
-            of: measured,
-            what: 'interactive targets on screen with every section open',
-          }),
-        ).toEqual([]);
-      },
-    );
+    test(`every interactive target is at least 44px, collapsed and with every section open -- ${path}`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 900 });
+      await page.goto(path);
+      for (const id of ['cg-students', 'cg-grouping', 'cg-io', 'cg-sound']) {
+        await tapOn(page.locator(`#${id}-toggle`));
+      }
+      // Every target on screen is measured; the ones too small are the
+      // verdict, the ones measured are its population (#610).
+      const { measured, small } = await page.evaluate(() => {
+        const targets = [
+          ...document.querySelectorAll(
+            'button, input, select, textarea, summary, a',
+          ),
+        ]
+          // Not the report form's honeypot, which no person is meant to
+          // reach: it sits under `aria-hidden` with `tabindex="-1"`, the
+          // same exclusion tests/typed-fields.ts makes. It is in every
+          // locale but English, so only the per-locale cases met it (#423).
+          .filter((el) => !el.closest('[aria-hidden="true"]'))
+          .map((el) => {
+            const isBoxControl =
+              el instanceof HTMLInputElement &&
+              (el.type === 'radio' || el.type === 'checkbox');
+            const target = isBoxControl ? (el.closest('label') ?? el) : el;
+            return {
+              tag: el.tagName,
+              id: el.id,
+              r: target.getBoundingClientRect(),
+            };
+          })
+          .filter(({ r }) => r.width > 0);
+        const name = ({ tag, id }: { tag: string; id: string }) =>
+          `${tag}#${id}`;
+        return {
+          measured: targets.map(name),
+          small: targets
+            .filter(({ r }) => r.height < 44 || r.width < 44)
+            .map(name),
+        };
+      });
+      expect(
+        searched(small, {
+          of: measured,
+          what: 'interactive targets on screen with every section open',
+        }),
+      ).toEqual([]);
+    });
 
   // L-09. The accent colour is the AA floor by design ("never lighten
   // without re-checking contrast", CLAUDE.md) -- this computes the REAL

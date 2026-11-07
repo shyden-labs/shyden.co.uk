@@ -185,7 +185,7 @@ test.describe('privacy — with JavaScript blocked', () => {
   ] as const) {
     test(
       `${path}: says so, in its own language`,
-      { tag: '@requires-isolated-context' },
+      { tag: '@javascript-blocked' },
       async ({ page }) => {
         await page.goto(path);
         // Not "a noscript tag exists" — the sentence a visitor actually reads.
@@ -215,7 +215,7 @@ test.describe('privacy — with JavaScript blocked', () => {
     const t = getStrings(locale);
     test(
       `${path}: the lead and How to use part 1 are reachable without JavaScript`,
-      { tag: '@requires-isolated-context' },
+      { tag: '@javascript-blocked' },
       async ({ page }) => {
         await page.goto(path);
         await expect(page.locator('#cg-howto-body')).toBeVisible();
@@ -244,16 +244,19 @@ test.describe('privacy — with JavaScript blocked', () => {
   // all and one notice already says why.
   test(
     'one notice still covers all four sections, not one each',
-    { tag: '@requires-isolated-context' },
+    { tag: '@javascript-blocked' },
     async ({ page }) => {
       await page.goto('/classroom-groups');
       await expect(page.locator('noscript')).toHaveCount(1);
+      // Shown only while script is really blocked: with it on, a <noscript>
+      // holds raw text and #cg-noscript is not in the page at all (#1047).
+      await expect(page.locator('#cg-noscript')).toBeVisible();
     },
   );
 
   test(
     'submitting cannot put a class list in the URL',
-    { tag: '@requires-isolated-context' },
+    { tag: '@javascript-blocked' },
     async ({ page }) => {
       await page.goto('/classroom-groups');
 
@@ -274,9 +277,16 @@ test.describe('privacy — with JavaScript blocked', () => {
       // control cannot be serialised into a form GET at all. Filled here
       // anyway, with a value distinctive enough to be unmistakable, so the
       // proof is concrete rather than resting on that guarantee alone.
-      await typeInto(page.locator('#cg-count'), '24');
-      await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B');
-      await tapOn(page.locator('#cg-go'));
+      // No script runs on this page, so no tap can report where it landed: each is proved by its
+      // effect, the typed value below and the URL the submit writes (#1047).
+      await typeInto(page.locator('#cg-count'), '24', { byEffect: true });
+      await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B', {
+        byEffect: true,
+      });
+      await expect(page.locator('#cg-class')).toHaveValue(
+        'PrivacyProbeClassName7B',
+      );
+      await tapOn(page.locator('#cg-go'), { byEffect: true });
       // WebKit schedules the form's GET after the click has returned, so the
       // click's own wait for navigations can end before it starts, and the URL
       // read next was the old one (#449, run 37026039545). Wait for the

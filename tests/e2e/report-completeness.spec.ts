@@ -1,5 +1,9 @@
+import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
+
+/** More real taps than any page has disclosures: past it, one never opens. */
+const OPEN_CEILING = 40;
 import { searched } from '../source-files';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import {
@@ -66,15 +70,23 @@ for (const locale of PREFIXED_LOCALES)
       // Every disclosure open, read from the DOM: a visitor can open any of
       // them, and a closed one's words fail checkVisibility below. Opening
       // the students section alone left the grouping, files and sound
-      // sections and the report form itself unread (RC1).
-      await page.evaluate(() => {
-        for (const toggle of document.querySelectorAll<HTMLElement>(
-          '[aria-expanded="false"][aria-controls]',
-        ))
-          toggle.click();
-        for (const details of document.querySelectorAll('details'))
-          details.open = true;
-      });
+      // sections and the report form itself unread (RC1). Each is opened by
+      // a real tap, as a visitor opens it (#1003), re-read after every tap
+      // so a disclosure inside one just opened is found too. A closed one no
+      // visitor can see has no visible words to check either. Last in the
+      // page first: the header's language list drops over what follows it
+      // (it covered a toggle on /zh/classroom-groups), and no visitor taps
+      // beneath an open list, so the header's own are opened last.
+      const closed = page.locator(
+        '[aria-expanded="false"][aria-controls]:visible, details:not([open]) > summary:visible',
+      );
+      for (let opened = 0; (await closed.count()) > 0; opened++) {
+        if (opened >= OPEN_CEILING)
+          throw new Error(
+            `${await closed.count()} disclosures still closed after ${OPEN_CEILING} real taps: one does not open when tapped`,
+          );
+        await tapOn(closed.last());
+      }
       const rendered = await page.evaluate(() => {
         const texts: string[] = [];
         const walker = document.createTreeWalker(

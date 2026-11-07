@@ -12,6 +12,7 @@ import {
   withoutTrailingSlash,
 } from './published-paths';
 import { contrast, over, parseColour, type RGB } from '../wcag';
+import { atViewport } from '../viewport-at';
 
 /**
  * Every piece of text the aurora ribbon sits behind clears WCAG AA, measured
@@ -200,49 +201,48 @@ test('the ribbon is measured on every built page', () => {
 for (const theme of THEMES)
   for (const width of WIDTHS)
     for (const path of PUBLISHED_ROUTES)
-      test(
-        `${theme} at ${width}px: every text run over the ribbon clears AA -- ${path}`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          // The ribbon exists and paints its tokens, or there is nothing here
-          // to measure and a clean result would mean nothing.
-          expect(ribbonLayers(tokensCss()).length).toBe(3);
-          await page.goto(path);
-          await emulateTheme(page, theme);
-          const scan = await scoreRuns(page, path);
-          // The page was read: its first screen held text the scan could see.
-          // A page can have nothing over the band, but a page with nothing seen
-          // at all is a scan that did not run there.
-          expect(scan.seen, `${path}: the scan read nothing`).toBeGreaterThan(
-            0,
-          );
-          const tightest = [...scan.runs].sort((a, b) => a.ratio - b.ratio)[0];
-          test.info().annotations.push({
-            type: 'tightest',
-            description: tightest
-              ? `${tightest.where} ${shown(tightest.ratio)}`
-              : // Layout, not a fault: at this width this page's text all
-                // starts below the band, so none of it is over the ribbon.
-                'no text over the ribbon',
-          });
-          const failing = scan.runs
-            .filter((run) => run.ratio < AA)
-            .map((run) => `${run.where} ${shown(run.ratio)}`);
-          expect(
-            searched(failing, {
-              of: scan.seen,
-              what: `text runs read on ${path}`,
-            }),
-          ).toEqual([]);
-          // The release evidence (#362) cites every page here, so every page
-          // takes its picture (#774: a cited case that captured nothing is
-          // fixed, never dropped). The scan left every glyph transparent to
-          // photograph the ground, so the picture is of a fresh load, as a
-          // visitor sees it, once its heading has painted.
-          await page.goto(path);
-          await emulateTheme(page, theme);
-          await expect(page.locator('h1').first()).toBeVisible();
-          await shoot(page, `${theme} at ${width}px: ${path} under the ribbon`);
-        },
-      );
+      test(`${theme} at ${width}px: every text run over the ribbon clears AA -- ${path}`, async ({
+        page,
+      }) => {
+        const took = await atViewport(page, { width, height: 900 });
+        // The ribbon exists and paints its tokens, or there is nothing here
+        // to measure and a clean result would mean nothing.
+        expect(ribbonLayers(tokensCss()).length).toBe(3);
+        await page.goto(path);
+        await emulateTheme(page, theme);
+        const scan = await scoreRuns(page, path);
+        // The page was read: its first screen held text the scan could see.
+        // A page can have nothing over the band, but a page with nothing seen
+        // at all is a scan that did not run there.
+        expect(scan.seen, `${path}: the scan read nothing`).toBeGreaterThan(0);
+        const tightest = [...scan.runs].sort((a, b) => a.ratio - b.ratio)[0];
+        test.info().annotations.push({
+          type: 'tightest',
+          description: tightest
+            ? `${tightest.where} ${shown(tightest.ratio)}`
+            : // Layout, not a fault: at this width this page's text all
+              // starts below the band, so none of it is over the ribbon.
+              'no text over the ribbon',
+        });
+        const failing = scan.runs
+          .filter((run) => run.ratio < AA)
+          .map((run) => `${run.where} ${shown(run.ratio)}`);
+        expect(
+          searched(failing, {
+            of: scan.seen,
+            what: `text runs read on ${path}`,
+          }),
+        ).toEqual([]);
+        // The release evidence (#362) cites every page here, so every page
+        // takes its picture (#774: a cited case that captured nothing is
+        // fixed, never dropped). The scan left every glyph transparent to
+        // photograph the ground, so the picture is of a fresh load, as a
+        // visitor sees it, once its heading has painted.
+        await page.goto(path);
+        await emulateTheme(page, theme);
+        await expect(page.locator('h1').first()).toBeVisible();
+        await shoot(
+          page,
+          `${theme} at ${took.width}px: ${path} under the ribbon`,
+        );
+      });

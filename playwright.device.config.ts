@@ -43,25 +43,18 @@ const ANDROID_SUITE = {
   // preflight project runs exactly one setup file that never touches the
   // viewport, and must not be affected by a grep option meant for the suite.
   //
-  // `@requires-isolated-context` is the second, structurally identical exclusion
-  // (tests/guards/isolated-context-tagging.test.ts is what keeps every such test tagged):
-  // `test.use({ javaScriptEnabled: false })` only takes effect on a context Playwright
-  // itself creates fresh. The real device has exactly ONE adopted context for the whole
-  // run (`browser.newContext()` measured to fail against it -- "Protocol error
-  // (Target.createBrowserContext): Failed to create browser context", tests/e2e/fixtures.ts's
-  // own `context` fixture comment), so the option is silently inert: JavaScript keeps
-  // running. classroom-groups-privacy.spec.ts's "privacy — with JavaScript blocked" tests
-  // are excluded here rather than left to fail (or, worse, pass for the wrong reason --
-  // see docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md) for exactly
-  // the same "physically impossible on one real device" reason @emulated-viewport already
-  // covers for the screen.
+  // `@javascript-blocked` is NOT excluded (#1047): those tests need JavaScript switched off,
+  // which `test.use({ javaScriptEnabled: false })` cannot do on the phone's one adopted
+  // context. The `context` fixture (tests/e2e/fixtures.ts) blocks it instead through
+  // Chrome's own Site settings, by real taps (tests/device/chrome-javascript-setting.ts), and
+  // puts it back after the test.
   // Downloads are NOT excluded (#308). The tests that read a download's bytes
   // were, on the belief that the phone could not give them back: every
   // download read "canceled". The cause was Playwright, which attached over
   // plain CDP and pointed the phone's downloads at a folder on the MAC. The
   // real-device fixture now points them at a folder on the phone
   // (tests/device/device-downloads.ts), and the bytes are read back over adb.
-  grepInvert: /@emulated-viewport|@requires-isolated-context/,
+  grepInvert: /@emulated-viewport/,
 };
 
 // `installsAClock` is the phone fixtures' worker option (tests/e2e/fixtures.ts, #854).

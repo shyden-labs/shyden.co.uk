@@ -25,13 +25,11 @@ import { CLOCK_TAG } from '../device/clock-declaration';
  * javaScriptEnabled: false })` -- and any future per-test context option
  * like it -- only takes effect on a context Playwright creates fresh, so
  * on the real device it is silently inert: JavaScript keeps running. Every
- * test that such a `test.use()` covers must carry the
- * `@requires-isolated-context` tag so `android-chrome`'s own `grepInvert`
- * (playwright.device.config.ts) excludes it, the same "physically
- * impossible on one real device" treatment `@emulated-viewport` already
- * gets for the screen (tests/guards/viewport-tagging.test.ts). This file is
- * what keeps that true: an exclusion list nobody checks rots the moment
- * someone adds a test.
+ * test that such a `test.use()` covers must carry the `@javascript-blocked`
+ * tag, so the phone's `context` fixture (tests/e2e/fixtures.ts) blocks
+ * JavaScript through Chrome's own Site settings for it and puts it back after
+ * (#1047). The tag excludes nothing. This file is what keeps that true: an
+ * untagged test would pass or fail with JavaScript left on.
  *
  * It reads the specs with the parser (`tests/playwright-declarations.ts`).
  * Until #218 it walked the text with regexes, on the premise that no parser
@@ -44,16 +42,15 @@ import { CLOCK_TAG } from '../device/clock-declaration';
  * THE RULE. A `test.use()` that sets `javaScriptEnabled: false` covers the
  * tests Playwright applies it to: every test in its group, nested groups
  * included, or every test in the file when it is called at file level. Each
- * covered test carries the tag. So does a test whose own body calls
- * `newContext()`, since that is the call the real device refuses (#142: a
- * choice carried into a new session). A tagged test that is neither is
- * stale. A
+ * covered test carries the tag, and a tagged test nothing covers is stale. A test
+ * whose own body calls `newContext()` is refused outright, since the real device
+ * refuses that call and no tag lets it run (#1047). A
  * `test.use()` inside a test body is a Playwright error, and a
  * `javaScriptEnabled` not written as `true` or `false` cannot be judged --
  * both are reported, never read as "JavaScript stays on".
  */
 
-const REQUIRES_ISOLATED_CONTEXT_TAG = '@requires-isolated-context';
+const JAVASCRIPT_BLOCKED_TAG = '@javascript-blocked';
 
 /**
  * THE CLOCK RULE (#854). The phone cannot take a clock back out of its one context either:
@@ -97,24 +94,24 @@ function untaggedMessage(file: string, decl: Declaration): string {
   return (
     `${file}:${decl.line} -- test('${decl.title}') is covered by a ` +
     'test.use({ javaScriptEnabled: false }), which is inert on the real-device harness (JavaScript ' +
-    `keeps running -- see tests/e2e/fixtures.ts) but is not tagged \`${REQUIRES_ISOLATED_CONTEXT_TAG}\` ` +
-    `-- tag it \`${REQUIRES_ISOLATED_CONTEXT_TAG}\` so android-chrome excludes it by design ` +
-    'instead of failing (or passing for the wrong reason).'
+    `keeps running -- see tests/e2e/fixtures.ts) but is not tagged \`${JAVASCRIPT_BLOCKED_TAG}\` ` +
+    `-- tag it \`${JAVASCRIPT_BLOCKED_TAG}\` so the phone blocks JavaScript through Chrome's own ` +
+    'settings for it (#1047), instead of passing for the wrong reason with JavaScript on.'
   );
 }
 
 function newContextMessage(file: string, decl: Declaration): string {
   return (
     `${file}:${decl.line} -- test('${decl.title}') calls newContext(), and the real device ` +
-    'refuses a second browser context (see tests/e2e/fixtures.ts) -- tag it ' +
-    `\`${REQUIRES_ISOLATED_CONTEXT_TAG}\` so android-chrome excludes it by design instead of failing.`
+    'refuses a second browser context (see tests/e2e/fixtures.ts), so the test could never run ' +
+    'there (#1047). No tag excuses it: open a new page in the same context instead.'
   );
 }
 
 function staleTagMessage(file: string, decl: Declaration): string {
   return (
-    `${file}:${decl.line} -- test('${decl.title}') is tagged \`${REQUIRES_ISOLATED_CONTEXT_TAG}\` ` +
-    'but no test.use({ javaScriptEnabled: false }) covers it and it calls no newContext() -- ' +
+    `${file}:${decl.line} -- test('${decl.title}') is tagged \`${JAVASCRIPT_BLOCKED_TAG}\` ` +
+    'but no test.use({ javaScriptEnabled: false }) covers it -- ' +
     'stale tag, silently costing ' +
     'real-device coverage for a test that no longer needs excluding. Remove the tag, or ' +
     'restore the javaScriptEnabled: false use it is supposed to describe.'
@@ -234,7 +231,7 @@ function read(file: string, text: string): Reading {
 
   for (const decl of declarations) {
     // A group's title is read by grep too, and routes every test in it.
-    for (const tag of [REQUIRES_ISOLATED_CONTEXT_TAG, CLOCK_TAG])
+    for (const tag of [JAVASCRIPT_BLOCKED_TAG, CLOCK_TAG])
       if (decl.title.includes(tag))
         findings.push(tagInTitleMessage(file, decl, tag));
     if (decl.kind !== 'test') continue;
@@ -244,11 +241,10 @@ function read(file: string, text: string): Reading {
         coveringGroups.has(group),
       );
     const opens = opensAContext(decl);
-    const tagged = decl.tags.includes(REQUIRES_ISOLATED_CONTEXT_TAG);
+    const tagged = decl.tags.includes(JAVASCRIPT_BLOCKED_TAG);
+    if (opens) findings.push(newContextMessage(file, decl));
     if (covered && !tagged) findings.push(untaggedMessage(file, decl));
-    else if (opens && !tagged) findings.push(newContextMessage(file, decl));
-    else if (!covered && !opens && tagged)
-      findings.push(staleTagMessage(file, decl));
+    else if (!covered && tagged) findings.push(staleTagMessage(file, decl));
     const clocked = usesAClock(decl);
     const clockTagged = decl.tags.includes(CLOCK_TAG);
     if (clocked && !clockTagged && !excepted(file, decl))
@@ -268,7 +264,7 @@ const analyze = (file: string, text: string): readonly string[] =>
   read(file, text).findings;
 
 describe('a real device has one browser context', () => {
-  it('every test run without JavaScript, or calling newContext(), is tagged @requires-isolated-context, and no tag is stale', () => {
+  it('every test run without JavaScript is tagged @javascript-blocked, no tag is stale, and none calls newContext()', () => {
     expectNothingFound(read, declarationsRead('tests read'));
   });
 
@@ -317,7 +313,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('synthetic.spec.ts:6');
     expect(findings[0]).toContain('shows the fallback notice');
-    expect(findings[0]).toContain(REQUIRES_ISOLATED_CONTEXT_TAG);
+    expect(findings[0]).toContain(JAVASCRIPT_BLOCKED_TAG);
   });
 
   it('accepts the identical test once tagged', () => {
@@ -327,7 +323,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "test.describe('no script', () => {",
       '  test.use({ javaScriptEnabled: false });',
       '',
-      "  test('shows the fallback notice', { tag: '@requires-isolated-context' }, async ({ page }) => {",
+      "  test('shows the fallback notice', { tag: '@javascript-blocked' }, async ({ page }) => {",
       "    await page.goto('/');",
       '  });',
       '});',
@@ -345,7 +341,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "import { test, expect } from './fixtures';",
       '',
       "test.describe('normal', () => {",
-      "  test('does nothing special', { tag: '@requires-isolated-context' }, async ({ page }) => {",
+      "  test('does nothing special', { tag: '@javascript-blocked' }, async ({ page }) => {",
       "    await page.goto('/');",
       '  });',
       '});',
@@ -368,7 +364,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "test.describe('with JavaScript blocked', () => {",
       '  test.use({ javaScriptEnabled: false });',
       '',
-      "  test('shows the notice', { tag: '@requires-isolated-context' }, async ({ page }) => {",
+      "  test('shows the notice', { tag: '@javascript-blocked' }, async ({ page }) => {",
       "    await page.goto('/');",
       '  });',
       '});',
@@ -447,7 +443,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "  for (const path of ['/a', '/b']) {",
       '    test(',
       '      `${path}: says so`,',
-      "      { tag: '@requires-isolated-context' },",
+      "      { tag: '@javascript-blocked' },",
       '      async ({ page }) => {',
       '        await page.goto(path);',
       '      },',
@@ -503,7 +499,7 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
       "import { test } from './fixtures';",
       "test.describe('no script', () => {",
       '  test.use({ javaScriptEnabled: false });',
-      "  test('real', { tag: '@requires-isolated-context' }, async () => {",
+      "  test('real', { tag: '@javascript-blocked' }, async () => {",
       '    const example = "test(\'not a test\', async () => {})";',
       '  });',
       '});',
@@ -567,14 +563,13 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('synthetic.spec.ts:3');
     expect(findings[0]).toContain('newContext()');
-    expect(findings[0]).toContain(REQUIRES_ISOLATED_CONTEXT_TAG);
   });
 
-  it('accepts that test once tagged', () => {
+  it('flags a test that opens its own context even when tagged, since no tag lets the phone run it', () => {
     const { judged, findings } = judgedBy([
       "import { test, expect } from './fixtures';",
       '',
-      "test('a new session', { tag: '@requires-isolated-context' }, async ({ browser }) => {",
+      "test('a new session', { tag: '@javascript-blocked' }, async ({ browser }) => {",
       '  const session = await browser.newContext();',
       '  await session.close();',
       '});',
@@ -582,14 +577,14 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     ]);
     expect(
       searched(findings, { of: judged, what: 'tests the scanner judged' }),
-    ).toEqual([]);
+    ).toHaveLength(2);
   });
 
   it('opens no context for a newContext() written only in a comment or a string', () => {
     const findings = scanned([
       "import { test, expect } from './fixtures';",
       '',
-      "test('a note', { tag: '@requires-isolated-context' }, async ({ page }) => {",
+      "test('a note', { tag: '@javascript-blocked' }, async ({ page }) => {",
       '  // browser.newContext() is not called here',
       "  await page.goto('/browser.newContext()');",
       '});',
@@ -702,11 +697,11 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     expect(findings[0]).toContain('in its title');
   });
 
-  it("flags @requires-isolated-context written in a test's title too (#854)", () => {
+  it("flags @javascript-blocked written in a test's title too (#854)", () => {
     const findings = scanned([
       "import { test, expect } from './fixtures';",
       '',
-      "test('runs without @requires-isolated-context', async ({ page }) => {",
+      "test('runs without @javascript-blocked', async ({ page }) => {",
       "  await page.goto('/');",
       '});',
       '',

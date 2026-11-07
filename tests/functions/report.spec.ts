@@ -53,7 +53,7 @@ test.describe('with JavaScript disabled', () => {
   // runs there, and the tag says so rather than leaving it to be noticed.
   test(
     'the homepage posts, lands on #report-sent, and the row is stored',
-    { tag: '@requires-isolated-context' },
+    { tag: '@javascript-blocked' },
     async ({ page }) => {
       const note = noteFor('homepage');
       await page.goto(pagePath('home', 'vi'));
@@ -76,7 +76,7 @@ test.describe('with JavaScript disabled', () => {
 
   test(
     'a quote on no page lands on #report-not-found and stores nothing',
-    { tag: '@requires-isolated-context' },
+    { tag: '@javascript-blocked' },
     async ({ page }) => {
       const stem = noteFor('not-found');
       const note = `${stem} refused`;
@@ -101,7 +101,7 @@ test.describe('with JavaScript disabled', () => {
   for (const locale of LOCALES.filter(isBetaLocale))
     test(
       `the 404's ${locale} block stores its own locale and notFound key`,
-      { tag: '@requires-isolated-context' },
+      { tag: '@javascript-blocked' },
       async ({ page }) => {
         const t = getSiteStrings(locale);
         const note = noteFor(`404 ${locale}`);
@@ -133,7 +133,7 @@ test.describe('with JavaScript disabled', () => {
 
   test(
     "another block's words are not found in this one, and nothing is stored",
-    { tag: '@requires-isolated-context' },
+    { tag: '@javascript-blocked' },
     async ({ page }) => {
       const stem = noteFor('404 cross-block');
       const note = `${stem} refused`;

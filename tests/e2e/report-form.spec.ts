@@ -16,6 +16,7 @@ import {
   getStrings,
 } from '../../src/lib/i18n';
 import { FOOTER_PAGE_IDS, pagePath } from '../../src/lib/report';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -116,39 +117,37 @@ for (const locale of PREFIXED_LOCALES)
 
 for (const locale of PREFIXED_LOCALES)
   for (const pageId of FOOTER_PAGE_IDS)
-    test(
-      `${pagePath(pageId, locale)}: no sideways scroll at 320px with the form open`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 800 });
-        await page.goto(pagePath(pageId, locale));
-        await tapOn(page.locator('[data-report] summary'));
-        await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
-        await expectNoHorizontalScroll(page);
-        // Page-level scrollWidth is not containment (CLAUDE.md): nothing in the
-        // form may escape the footer's own column.
-        const column = await page.locator('footer .inner').boundingBox();
-        expect(column, 'the footer column has a box').not.toBeNull();
-        const boxes = await page
-          .locator(
-            '[data-report] form > *:not(.visually-hidden):not(input[type="hidden"]):not(datalist)',
-          )
-          .evaluateAll((els) =>
-            els.map((el) => ({
-              right: el.getBoundingClientRect().right,
-              name: el.tagName,
-            })),
-          );
-        for (const box of boxes)
-          expect(box.right, box.name).toBeLessThanOrEqual(
-            column!.x + column!.width + 0.5,
-          );
-        // Liveness by content, after the invariant: the widest controls were measured.
-        expect(boxes.map(({ name }) => name)).toEqual(
-          expect.arrayContaining(['INPUT', 'TEXTAREA', 'BUTTON']),
+    test(`${pagePath(pageId, locale)}: no sideways scroll at 320px with the form open`, async ({
+      page,
+    }) => {
+      await atViewport(page, { width: 320, height: 800 });
+      await page.goto(pagePath(pageId, locale));
+      await tapOn(page.locator('[data-report] summary'));
+      await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
+      await expectNoHorizontalScroll(page);
+      // Page-level scrollWidth is not containment (CLAUDE.md): nothing in the
+      // form may escape the footer's own column.
+      const column = await page.locator('footer .inner').boundingBox();
+      expect(column, 'the footer column has a box').not.toBeNull();
+      const boxes = await page
+        .locator(
+          '[data-report] form > *:not(.visually-hidden):not(input[type="hidden"]):not(datalist)',
+        )
+        .evaluateAll((els) =>
+          els.map((el) => ({
+            right: el.getBoundingClientRect().right,
+            name: el.tagName,
+          })),
         );
-      },
-    );
+      for (const box of boxes)
+        expect(box.right, box.name).toBeLessThanOrEqual(
+          column!.x + column!.width + 0.5,
+        );
+      // Liveness by content, after the invariant: the widest controls were measured.
+      expect(boxes.map(({ name }) => name)).toEqual(
+        expect.arrayContaining(['INPUT', 'TEXTAREA', 'BUTTON']),
+      );
+    });
 
 test('/vi/classroom-groups submits in place: failed shows, takes focus, and the roster survives', async ({
   page,
@@ -302,3 +301,19 @@ for (const [outcome, key] of [
     await expect(page.locator('[data-report-status]:visible')).toHaveCount(1);
     await shoot(page, `The ${outcome} message, in place`, shown);
   });
+
+test('typing into the report form keeps what was typed (moved from the phone file, #1049)', async ({
+  page,
+}) => {
+  // The phone's datalist crash (#807) showed on exactly this sequence; the Chrome-process half
+  // stays in tests/device/real-device.spec.ts. English draws no report form; Indonesian does.
+  await page.goto('/id/');
+  const report = page.locator('[data-report]');
+  const quote = report.locator('#report-quote');
+  await report.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(quote).toBeFocused();
+  await page.keyboard.type('Tem', { delay: 120 });
+  await expect(quote).toHaveValue('Tem');
+});

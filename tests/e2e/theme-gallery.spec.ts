@@ -6,6 +6,7 @@ import { refuseFullscreen, withGroups } from './helpers';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
 import { expectNoHorizontalScroll } from '../viewport';
+import { atViewport } from '../viewport-at';
 
 /**
  * Every built page in both themes (#142 §6.7), in every locale, at the
@@ -28,53 +29,49 @@ for (const theme of THEMES) {
     // one test, so the 404 rode along with the English pages' budget.
     for (const width of WIDTHS)
       for (const path of PUBLISHED_ROUTES)
-        test(
-          `${path} at ${width}px: renders the theme, with no sideways scroll`,
-          { tag: '@emulated-viewport' },
-          async ({ page }) => {
-            await page.setViewportSize({ width, height: 900 });
-            await page.goto(path);
-            await expectTheme(page, theme);
-            await expectNoHorizontalScroll(page);
-            await shoot(page, `${path}, ${theme}, ${width}px`);
-          },
-        );
+        test(`${path} at ${width}px: renders the theme, with no sideways scroll`, async ({
+          page,
+        }) => {
+          const took = await atViewport(page, { width, height: 900 });
+          await page.goto(path);
+          await expectTheme(page, theme);
+          await expectNoHorizontalScroll(page);
+          await shoot(page, `${path}, ${theme}, ${took.width}px`);
+        });
 
     test.describe('interactive states', () => {
-      test(
-        'the header: the phone menu, the language list and the focused switch',
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width: 390, height: 844 });
-          await page.goto('/');
-          await expectTheme(page, theme);
-          const menu = page.locator('header details.menu > summary');
-          await tapOn(menu);
-          await expect(page.locator('header nav a').first()).toBeVisible();
-          await shoot(page, `${theme}: the phone menu, open`);
-          await tapOn(menu);
+      test('the header: the phone menu, the language list and the focused switch', async ({
+        page,
+      }) => {
+        await atViewport(page, { width: 390, height: 844 });
+        await page.goto('/');
+        await expectTheme(page, theme);
+        const menu = page.locator('header details.menu > summary');
+        await tapOn(menu);
+        await expect(page.locator('header nav a').first()).toBeVisible();
+        await shoot(page, `${theme}: the phone menu, open`);
+        await tapOn(menu);
 
-          const languages = page.locator('header details.lang-switch');
-          await tapOn(languages.locator('summary'));
-          await expect(languages.locator('a.entry').first()).toBeVisible();
-          await shoot(
-            page,
-            `${theme}: the language list, open beside the compact label`,
-            languages,
-          );
-          await tapOn(languages.locator('summary'));
+        const languages = page.locator('header details.lang-switch');
+        await tapOn(languages.locator('summary'));
+        await expect(languages.locator('a.entry').first()).toBeVisible();
+        await shoot(
+          page,
+          `${theme}: the language list, open beside the compact label`,
+          languages,
+        );
+        await tapOn(languages.locator('summary'));
 
-          const toggle = page.locator('header [data-theme-toggle]');
-          await page.keyboard.press('Shift');
-          await toggle.focus();
-          await expect(toggle).toBeFocused();
-          await shoot(
-            page,
-            `${theme}: the theme switch, focused`,
-            page.locator('header'),
-          );
-        },
-      );
+        const toggle = page.locator('header [data-theme-toggle]');
+        await page.keyboard.press('Shift');
+        await toggle.focus();
+        await expect(toggle).toBeFocused();
+        await shoot(
+          page,
+          `${theme}: the theme switch, focused`,
+          page.locator('header'),
+        );
+      });
 
       test(
         '/classroom-groups: results, the roster, the docked bar, print and the full-screen board',

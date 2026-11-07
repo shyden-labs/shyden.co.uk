@@ -16,6 +16,7 @@ import {
   FOLD_MS,
   travelSchedule,
 } from '../../src/lib/travel';
+import { atViewport } from '../viewport-at';
 
 /**
  * The board deals by moving each student from the waiting list into their
@@ -27,6 +28,8 @@ import {
 test.use(recorded);
 
 const COUNT = 12;
+/** The class the mid-deal Shuffle test deals: long enough for a real tap to land mid-deal (#1045). */
+const MID_DEAL_COUNT = 30;
 
 const bar = (page: Page) => page.locator('#cg-board-bar');
 const board = (page: Page) => page.locator('#cg-board');
@@ -298,10 +301,10 @@ const stopSampler = (page: Page): Promise<Samples> =>
   );
 
 /** The deal has ended: the list gone, every row seated, nothing moving. */
-const expectDealt = async (page: Page) => {
+const expectDealt = async (page: Page, count = COUNT) => {
   await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
   await expect(board(page).locator('#cg-waiting')).toBeHidden();
-  await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+  await expect(board(page).locator('.student.dealt')).toHaveCount(count);
   await page.waitForFunction(() => document.getAnimations().length === 0);
 };
 
@@ -550,46 +553,94 @@ test.describe('the board deals by moving students into their cards', () => {
   });
 
   // #768: the board's Shuffle is not refused mid-deal (operator, 2026-10-14).
-  // The press and the reads around it run in ONE task, because the submit
-  // handler supersedes the running deal before its first await: the rows
-  // read before the click are the abandoned deal's, the rows read after it
-  // are the new deal's, and no landing can fall between the two reads.
+  // The press is a real one (#1003), and the reads around it run in the
+  // press's own task: a capture listener on the document reads the rows
+  // before the button's handler runs, and a bubbling one reads them after.
+  // The handler supersedes the running deal before its first await, so the
+  // rows read before are the abandoned deal's, the rows read after are the
+  // new deal's, and no landing can fall between the two reads.
   test('a board Shuffle mid-deal starts from the top, and the abandoned deal lands nobody', async ({
     page,
   }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
+    // A real tap on the phone takes about 1.2 s from call to touch, and a
+    // deal of COUNT lands its last student about 1 s after the third
+    // (measured, #1045): the press came after the deal. A class this size
+    // deals for about 3.3 s, so the press still falls mid-deal.
+    await openWaitingBoard(page, String(MID_DEAL_COUNT), '4');
     await press(page, 'Make Groups');
     await expectThirdLanding(page);
-    const pressed = await bar(page)
-      .getByRole('button', { name: 'Shuffle again' })
-      .evaluate((button) => {
-        const rows = () =>
-          Array.from(
-            document.querySelectorAll<HTMLElement>('#cg-board .student'),
-          );
+    const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
+    await shuffle.evaluate((button) => {
+      type Pressed = {
+        unlandedAtPress: number;
+        freshDealt: number;
+        chipsWaiting: number;
+      };
+      const state = window as unknown as {
+        abandoned?: { old: HTMLElement[]; landed: boolean[] };
+        pressed?: Pressed;
+      };
+      const rows = () =>
+        Array.from(
+          document.querySelectorAll<HTMLElement>('#cg-board .student'),
+        );
+      const mine = (e: Event) =>
+        e.target instanceof Node && button.contains(e.target);
+      const before = (e: Event) => {
+        if (!mine(e)) return;
+        document.removeEventListener('click', before, true);
         const old = rows();
-        const landed = old.map((row) => row.classList.contains('dealt'));
-        (
-          window as unknown as {
-            abandoned: { old: HTMLElement[]; landed: boolean[] };
-          }
-        ).abandoned = { old, landed };
-        (button as HTMLButtonElement).click();
-        return {
-          unlandedAtPress: landed.filter((l) => !l).length,
+        state.abandoned = {
+          old,
+          landed: old.map((row) => row.classList.contains('dealt')),
+        };
+      };
+      const after = (e: Event) => {
+        if (!mine(e) || !state.abandoned) return;
+        document.removeEventListener('click', after);
+        state.pressed = {
+          unlandedAtPress: state.abandoned.landed.filter((l) => !l).length,
           freshDealt: rows().filter((row) => row.classList.contains('dealt'))
             .length,
           chipsWaiting: document.querySelectorAll(
             '#cg-board .waiting-student:not(.left)',
           ).length,
         };
-      });
+      };
+      document.addEventListener('click', before, true);
+      document.addEventListener('click', after);
+    });
+    await tapOn(shuffle);
+    const pressed = await page
+      .waitForFunction(
+        () =>
+          (
+            window as unknown as {
+              pressed?: {
+                unlandedAtPress: number;
+                freshDealt: number;
+                chipsWaiting: number;
+              };
+            }
+          ).pressed,
+      )
+      .then(
+        (handle) =>
+          handle.jsonValue() as Promise<{
+            unlandedAtPress: number;
+            freshDealt: number;
+            chipsWaiting: number;
+          }>,
+      );
     // The press fell mid-deal: some of the old deal had yet to land.
-    expect(pressed.unlandedAtPress).toBeGreaterThan(0);
+    expect(
+      pressed.unlandedAtPress,
+      `the press must land mid-deal, but all ${MID_DEAL_COUNT} students had landed before it arrived: the press was slower than the deal`,
+    ).toBeGreaterThan(0);
     // From the top: nobody of the new deal is seated, everyone waits.
     expect(pressed.freshDealt).toBe(0);
-    expect(pressed.chipsWaiting).toBe(COUNT);
-    await expectDealt(page);
+    expect(pressed.chipsWaiting).toBe(MID_DEAL_COUNT);
+    await expectDealt(page, MID_DEAL_COUNT);
     // A row of the abandoned deal that gains `.dealt` after the press was
     // landed by it, and its land sound plays in the same callback
     // (`board-travel.ts`, the flight's `finished` handler).
@@ -696,26 +747,24 @@ test.describe('the board deals by moving students into their cards', () => {
     ).toEqual([]);
   });
 
-  test(
-    'at 320px nothing scrolls sideways while students travel',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 640 });
-      await openWaitingBoard(page, String(COUNT), '4');
-      await startSampler(page);
-      await press(page, 'Make Groups');
-      await expectDealt(page);
-      const { flights } = await stopSampler(page);
-      const { travelled, during } = judgedPerStudent(
-        flights,
-        (f) => f.overflow > 0,
-      );
-      expect(
-        searched(during, { of: travelled, what: 'students seen travelling' }),
-        'students during whose flight the board scrolled sideways',
-      ).toEqual([]);
-    },
-  );
+  test('at 320px nothing scrolls sideways while students travel', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 640 });
+    await openWaitingBoard(page, String(COUNT), '4');
+    await startSampler(page);
+    await press(page, 'Make Groups');
+    await expectDealt(page);
+    const { flights } = await stopSampler(page);
+    const { travelled, during } = judgedPerStudent(
+      flights,
+      (f) => f.overflow > 0,
+    );
+    expect(
+      searched(during, { of: travelled, what: 'students seen travelling' }),
+      'students during whose flight the board scrolled sideways',
+    ).toEqual([]);
+  });
 
   test('the fit after the fold is the fit a fresh board gets', async ({
     page,

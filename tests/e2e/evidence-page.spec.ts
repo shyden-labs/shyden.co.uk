@@ -246,20 +246,14 @@ async function writtenAfter(
 const toggleAndWait = (page: Page, title: string): Promise<void> =>
   writtenAfter(page, () => toggle(page, title), `the change to "${title}"`);
 
-/** Several ticks in ONE task, so they are certain to fall inside one save window. */
-const toggleTogether = (page: Page, titles: readonly string[]) =>
-  page.evaluate((wanted) => {
-    for (const title of wanted) {
-      const section = Array.from(
-        document.querySelectorAll('section.journey'),
-      ).find(
-        (candidate) => candidate.querySelector('h3')?.textContent === title,
-      );
-      const label = section?.querySelector('label');
-      if (!label) throw new Error(`no tick found for "${title}"`);
-      label.click();
-    }
-  }, titles);
+/**
+ * Several real taps, one after the other. The caller has paused the page's
+ * clock first, so the save timer cannot fire between two taps however slowly
+ * the machine delivers them: they are certain to fall inside one save window.
+ */
+const toggleTogether = async (page: Page, titles: readonly string[]) => {
+  for (const title of titles) await toggle(page, title);
+};
 
 const ORDERS: ReadonlyArray<{ order: WriteOrder; when: string }> = [
   {
@@ -415,19 +409,26 @@ for (const { order, when } of ORDERS) {
         ).toBeChecked();
     });
 
-    test('several ticks inside one save window all persist', async ({
-      page,
-    }, testInfo) => {
-      await openEvidencePage(page, testInfo, { order });
-      await toggleAndWait(page, TITLES[0]);
-      await toggleTogether(page, TITLES.slice(1, 4));
-      await expect
-        .poll(
-          () => storedTicks(page),
-          'the store keeps every tick made inside the window',
-        )
-        .toEqual(idsOf(TITLES.slice(0, 4)));
-    });
+    test(
+      'several ticks inside one save window all persist',
+      // Pauses the page's clock, so it runs in the phone's clock project (#854).
+      { tag: '@installs-a-clock' },
+      async ({ page }, testInfo) => {
+        await page.clock.install();
+        await openEvidencePage(page, testInfo, { order });
+        await toggleAndWait(page, TITLES[0]);
+        // Held still, the save timer cannot fire until the clock runs again.
+        await page.clock.pauseAt(new Date(Date.now() + 1_000));
+        await toggleTogether(page, TITLES.slice(1, 4));
+        await page.clock.resume();
+        await expect
+          .poll(
+            () => storedTicks(page),
+            'the store keeps every tick made inside the window',
+          )
+          .toEqual(idsOf(TITLES.slice(0, 4)));
+      },
+    );
 
     test('a tick made before storage answers persists, and nothing already stored is lost', async ({
       page,
@@ -685,75 +686,73 @@ interface Observed {
 }
 
 /**
- * Plays a scenario out inside ONE page task and reads the page back after
- * every step. A timer turn follows each step, and timers fall due in
- * deadline order: a turn queued straight after a tick is due before that
- * tick's 400 ms save, so no release can slip past the save it is meant to
- * precede, however loaded the machine. `saved` is the one step that waits:
- * for the page's own save, then one turn for the write's echo.
+ * Plays a scenario out with real taps and reads the page back after every
+ * step. The caller has paused the page's clock, so it moves only here: a
+ * zero-length run after each step is the timer turn that lets the page's
+ * echo land, and no time passes between two steps, so a tick can never miss
+ * the save window it belongs to, however loaded the machine. `saved` is the
+ * one step that moves the clock on: in 10 ms runs, up to the page's own save,
+ * then one turn for the write's echo.
  */
-const playOut = (page: Page, steps: readonly Step[]) =>
-  page.evaluate(
-    async ({ all, numbered, doc }) => {
-      const standIn = (window as StandInWindow).__dbStandIn;
-      const turn = (ms = 0) =>
-        new Promise<void>((resolve) => setTimeout(resolve, ms));
-      const observed: Observed[] = [];
-      let saves = 0;
-      for (const step of all) {
-        if (step === 'saved') {
-          saves += 1;
-          const deadline = Date.now() + 5000;
-          while (standIn.writes() < saves) {
-            if (Date.now() > deadline)
-              throw new Error(
-                `the page made ${standIn.writes()} writes; "saved" waited for write ${saves}`,
-              );
-            await turn(10);
-          }
-        } else if (step === 'confirm' || step === 'resolve') {
-          standIn.release(step);
-        } else {
-          const [kind, number = ''] = step.split(' ');
-          const title = numbered[number] ?? '';
-          const section = Array.from(
-            document.querySelectorAll('section.journey'),
-          ).find(
-            (candidate) => candidate.querySelector('h3')?.textContent === title,
+const playOut = async (page: Page, steps: readonly Step[]) => {
+  const observed: Observed[] = [];
+  let saves = 0;
+  for (const step of steps) {
+    if (step === 'saved') {
+      saves += 1;
+      let waited = 0;
+      while ((await counters(page)).writes < saves) {
+        if (waited >= 5_000)
+          throw new Error(
+            `the page made ${(await counters(page)).writes} writes; "saved" waited for write ${saves}`,
           );
-          const box = section?.querySelector('input[type="checkbox"]');
-          const label = section?.querySelector('label');
-          if (!(box instanceof HTMLInputElement) || !label)
-            throw new Error(`no tick found for "${title}"`);
-          if (box.checked === (kind === 'tick'))
-            throw new Error(
-              `"${step}" found "${title}" ${box.checked ? 'ticked' : 'unticked'} already`,
-            );
-          label.click();
-        }
-        await turn();
-        const journeys = (standIn.read(doc)?.journeys ?? {}) as Record<
-          string,
-          unknown
-        >;
-        observed.push({
-          step,
-          shown: Array.from(
-            document.querySelectorAll<HTMLInputElement>('input[data-journey]'),
-          )
-            .filter((box) => box.checked)
-            .map((box) => box.dataset['journey'] ?? '')
-            .sort(),
-          stored: Object.keys(journeys)
-            .filter((id) => journeys[id] === true)
-            .sort(),
-          status: document.getElementById('state')?.textContent ?? '',
-        });
+        await page.clock.runFor(10);
+        waited += 10;
       }
-      return observed;
-    },
-    { all: steps, numbered: NUMBERED, doc: DOC },
-  );
+    } else if (step === 'confirm' || step === 'resolve') {
+      await page.evaluate(
+        (completion) =>
+          (window as StandInWindow).__dbStandIn.release(completion),
+        step,
+      );
+    } else {
+      const [kind, number = ''] = step.split(' ');
+      const title = NUMBERED[number] ?? '';
+      const box = tickBox(page, title);
+      if ((await box.isChecked()) === (kind === 'tick'))
+        throw new Error(
+          `"${step}" found "${title}" ${kind === 'tick' ? 'ticked' : 'unticked'} already`,
+        );
+      await toggle(page, title);
+    }
+    await page.clock.runFor(0);
+    observed.push(
+      await page.evaluate(
+        ({ doc, played }) => {
+          const journeys = ((window as StandInWindow).__dbStandIn.read(doc)
+            ?.journeys ?? {}) as Record<string, unknown>;
+          return {
+            step: played,
+            shown: Array.from(
+              document.querySelectorAll<HTMLInputElement>(
+                'input[data-journey]',
+              ),
+            )
+              .filter((box) => box.checked)
+              .map((box) => box.dataset['journey'] ?? '')
+              .sort(),
+            stored: Object.keys(journeys)
+              .filter((id) => journeys[id] === true)
+              .sort(),
+            status: document.getElementById('state')?.textContent ?? '',
+          };
+        },
+        { doc: DOC, played: step },
+      ),
+    );
+  }
+  return observed;
+};
 
 test.describe('evidence page sign-off ticks, when the store is slower than the save window', () => {
   // The two orders above complete a write 60 ms after it is made, so a test
@@ -836,11 +835,15 @@ test.describe('evidence page sign-off ticks, when the store is slower than the s
   });
 
   for (const { name, steps, left } of SLOW_STORE_SCENARIOS) {
-    test(name, async ({ page }, testInfo) => {
+    // Pauses the page's clock, so it runs in the phone's clock project (#854).
+    test(name, { tag: '@installs-a-clock' }, async ({ page }, testInfo) => {
+      await page.clock.install();
       await openEvidencePage(page, testInfo, {
         order: 'as-released',
         seed: signedOff([ALREADY_STORED]),
       });
+      // From here the clock moves only when playOut runs it.
+      await page.clock.pauseAt(new Date(Date.now() + 1_000));
       const observed = await playOut(page, steps);
       const intended = new Set<string>([ALREADY_STORED]);
       for (const seen of observed) {
@@ -901,11 +904,23 @@ test.describe('evidence page sign-off, whatever the write order', () => {
       `the page is laid out ${read.laidOut}px wide on a ${read.screen}px screen`,
     ).toBeLessThanOrEqual(read.screen);
     // The copy as written, where WebKit once showed "â€¦" for "…". Read in
-    // the click's own task: the page says it there, and its save replaces it.
-    const saying = await page.evaluate(() => {
-      document.querySelector<HTMLElement>('section.journey label')?.click();
-      return document.getElementById('state')?.textContent ?? '';
+    // the tick's own task: the page says it there, and its save replaces it.
+    // A real tap (#1003); a bubbling `change` listener on the document runs
+    // straight after the tick's own handler, in the same task.
+    await page.evaluate(() => {
+      const state = window as unknown as { saying?: string };
+      document.addEventListener(
+        'change',
+        () => {
+          state.saying = document.getElementById('state')?.textContent ?? '';
+        },
+        { once: true },
+      );
     });
+    await tapOn(page.locator('section.journey label').first());
+    const saying = await page
+      .waitForFunction(() => (window as unknown as { saying?: string }).saying)
+      .then((handle) => handle.jsonValue());
     expect(saying).toBe('Saving…');
   });
 

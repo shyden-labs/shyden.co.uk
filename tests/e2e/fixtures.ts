@@ -22,6 +22,13 @@ import {
 } from '../device/init-script-disposals';
 import { refuseUndeclaredClock } from '../device/clock-declaration';
 import { servingYaweloMedia } from './yawelo-media';
+import { setChromeJavaScript } from '../device/chrome-javascript-setting';
+
+/** A test carrying this tag needs JavaScript switched off (#1047). */
+const JAVASCRIPT_BLOCKED_TAG = '@javascript-blocked';
+
+/** Room for the settings walks around a `@javascript-blocked` test, and for a worker's first. */
+const SETTINGS_WALKS_MS = 120_000;
 
 const CDP_URL = process.env.ANDROID_CDP_URL ?? 'http://127.0.0.1:9222';
 
@@ -84,7 +91,7 @@ export const BASE_URL_AWARE_APIS: readonly BaseUrlAwareApi[] = [
     bare: true,
     resolved: true,
     reason:
-      "measured directly on the physical device (tests/device/real-device.spec.ts's " +
+      "measured directly on the physical device (tests/e2e/head-and-sitemap.spec.ts's " +
       '"the bare request fixture..." test): Playwright builds the `request` fixture via ' +
       '`playwright.request.newContext()` (playwright/lib/index.js), a construction path ' +
       "independent of this file's `browser`/`context` overrides entirely, and it resolved a " +
@@ -210,15 +217,19 @@ const realDeviceTest = base.extend<
         DEVICE_DOWNLOAD_BEHAVIOUR,
       );
       emptyDeviceDownloads();
+      // A run that crashed with JavaScript blocked left it off in Chrome's own settings
+      // (#1047): every worker puts it back before the first test.
+      await setChromeJavaScript(true);
       await use(browser);
       emptyDeviceDownloads();
       // Disconnects the client. It does not close Chrome on the phone.
       await browser.close();
     },
-    { scope: 'worker' },
+    // The first thing a worker does is a walk through Chrome's settings (above).
+    { scope: 'worker', timeout: SETTINGS_WALKS_MS },
   ],
 
-  context: async ({ browser, baseURL, installsAClock }, use) => {
+  context: async ({ browser, baseURL, installsAClock }, use, testInfo) => {
     // The phone has exactly one context and newContext() is unsupported, so every test
     // shares it -- which means state does not clear itself between tests the way it does
     // for a fresh desktop context.
@@ -287,7 +298,22 @@ const realDeviceTest = base.extend<
       patchable[INIT_SCRIPT_PATCHED] = true;
     }
 
-    await servingYaweloMedia(context, () => use(context));
+    // A test tagged `@javascript-blocked` runs with JavaScript off in Chrome's own Site
+    // settings, set by real taps before and put back after, whatever the test did (#1047).
+    const blocked = testInfo.tags.includes(JAVASCRIPT_BLOCKED_TAG);
+    // Two walks through Chrome's settings, one each way, take longer than a test's own budget.
+    if (blocked) testInfo.setTimeout(testInfo.timeout + SETTINGS_WALKS_MS);
+    if (blocked) await setChromeJavaScript(false);
+    try {
+      await servingYaweloMedia(context, () => use(context));
+    } finally {
+      if (blocked) await setChromeJavaScript(true);
+    }
+
+    // A clock this test paused would stay paused for the next test on the shared context: that
+    // test's page then sees no time pass (measured on the phone: 0 ms in 1 s real, #1044). The
+    // clock cannot be removed (#854), but resumed it runs at real speed again.
+    if (installsAClock) await context.clock.resume();
 
     // Undo every init script THIS test added -- see the patch comment above. Order does not
     // matter: each disposal only ever removes its own script. A refusal fails the test once

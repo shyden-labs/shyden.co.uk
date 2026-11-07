@@ -88,10 +88,15 @@ const countOf = (text: string, token: string): number =>
  * file because `homepage` calls it twice in two DIFFERENT tests, which is two
  * configurations, not a change.
  */
+// The resize helper (tests/viewport-at.ts, #1046) sets the viewport too.
+const RESIZE_HELPER = 'atViewport(';
+
 const viewportChanges = (text: string): boolean =>
   text
     .split(/\b(?:test|it)\s*\(/)
-    .some((chunk) => countOf(chunk, VIEWPORT) > 1);
+    .some(
+      (chunk) => countOf(chunk, VIEWPORT) + countOf(chunk, RESIZE_HELPER) > 1,
+    );
 
 const actionsIn = (text: string): string[] => {
   const found: string[] = ACTIONS.filter(
@@ -360,6 +365,12 @@ describe('evidence recording is opt-in, and the opt-in is derived', () => {
         { of: ACTIONS, what: 'action constructs' },
       ),
     ).toEqual([]);
+    // #1046: the resize helper is the same set, so two in one test are a change.
+    expect(
+      actionsIn(
+        "test('x', async () => { await atViewport(page, a); await atViewport(page, b); })",
+      ),
+    ).toEqual([VIEWPORT]);
   });
 
   it('some specs really do act, and some really do not', () => {

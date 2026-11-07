@@ -22,6 +22,7 @@ import { FLOOR_PX } from '../../src/scripts/projector';
 import { measureBoard, measureCover } from '../board-geometry';
 import { coverGaps } from '../device-pixels';
 import { recorded, shoot } from './evidence';
+import { atViewport, measuredViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -941,11 +942,9 @@ test.describe('the projector board holds a real name', () => {
  * disclosure except `#cg-io-toggle`, the only one holding a native file
  * input, and that was the one that broke.
  *
- * Split in two because driving the viewport is something a real phone cannot
- * do, and `@emulated-viewport` is how the device projects skip what they
- * cannot honour. Tagging the whole table would skip the four shapes that
- * never touch the viewport on exactly the device this ticket has to be
- * proved on.
+ * Split in two: the four shapes below never ask for a size, and the short
+ * boards ask for one through `atViewport`, which a real phone leaves alone, so
+ * the short boards are measured at the phone's own size (#1046).
  */
 const BOARD_SHAPES = [
   { what: 'five groups wrapping onto a second row', count: '25', size: '5' },
@@ -1041,15 +1040,17 @@ const boardGeometry = async (page: import('@playwright/test').Page) =>
 const expectNothingOutOfReach = async (
   page: import('@playwright/test').Page,
   what: string,
-  named?: { width: number; height: number },
+  sized = false,
 ) => {
   // A reading means what it says only at the viewport the test names (#758).
   // Granted fullscreen, Firefox grows the window to the runner's whole screen
   // (1366x768 on CI, from a 740x360 phone), asynchronously, and no context
-  // option holds it: measured in every engine on run 38376192900. The size
-  // is handed in by a test that set it, never read from `page.viewportSize()`,
-  // which is null on a real phone (`viewport-tagging.test.ts`).
-  if (named) {
+  // option holds it: measured in every engine on run 38376192900.
+  // Read once the board is open (Shyden, 2026-11-07, #1046): on a real
+  // phone the open board hides Chrome's address bar, so the screen really
+  // grows; an emulated target still answers with the size the test set.
+  if (sized) {
+    const named = await measuredViewport(page);
     const at = await page.evaluate(() => ({
       width: innerWidth,
       height: innerHeight,
@@ -1138,40 +1139,35 @@ test.describe('the projector board never hides a name', () => {
   }
 
   for (const shape of SHORT_BOARDS) {
-    test(
-      `nothing waiting is out of reach on ${shape.what}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize(shape.viewport);
-        await refuseFullscreen(page);
-        await openWaitingBoard(page, shape.count, shape.size);
-        await expectNothingOutOfReach(
-          page,
-          'the waiting board, short',
-          shape.viewport,
-        );
-      },
-    );
+    test(`nothing waiting is out of reach on ${shape.what}`, async ({
+      page,
+    }) => {
+      await atViewport(page, shape.viewport);
+      await refuseFullscreen(page);
+      await openWaitingBoard(page, shape.count, shape.size);
+      await expectNothingOutOfReach(page, 'the waiting board, short', true);
+    });
   }
 
-  test(
-    'the waiting board does not scroll sideways at 320px',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      const narrow = { width: 320, height: 568 };
-      await page.setViewportSize(narrow);
-      await refuseFullscreen(page);
-      await openWaitingBoard(page, '25', '5');
-      const stage = page.locator('#cg-board-stage');
-      const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
-        scrollWidth: el.scrollWidth,
-        clientWidth: el.clientWidth,
-      }));
-      expect(clientWidth).toBeGreaterThan(0);
-      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-      await expectNothingOutOfReach(page, 'the waiting board at 320px', narrow);
-    },
-  );
+  test('the waiting board does not scroll sideways at 320px', async ({
+    page,
+  }) => {
+    const narrow = await atViewport(page, { width: 320, height: 568 });
+    await refuseFullscreen(page);
+    await openWaitingBoard(page, '25', '5');
+    const stage = page.locator('#cg-board-stage');
+    const { scrollWidth, clientWidth } = await stage.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(clientWidth).toBeGreaterThan(0);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await expectNothingOutOfReach(
+      page,
+      `the waiting board at ${narrow.width}px`,
+      true,
+    );
+  });
 
   for (const shape of BOARD_SHAPES) {
     test(`nothing is out of reach -- ${shape.what}`, async ({ page }) => {
@@ -1181,19 +1177,11 @@ test.describe('the projector board never hides a name', () => {
   }
 
   for (const shape of SHORT_BOARDS) {
-    test(
-      `nothing is out of reach on ${shape.what}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize(shape.viewport);
-        await boardOf(page, shape.count, shape.size);
-        await expectNothingOutOfReach(
-          page,
-          'group cards on a short board',
-          shape.viewport,
-        );
-      },
-    );
+    test(`nothing is out of reach on ${shape.what}`, async ({ page }) => {
+      await atViewport(page, shape.viewport);
+      await boardOf(page, shape.count, shape.size);
+      await expectNothingOutOfReach(page, 'group cards on a short board', true);
+    });
   }
 
   test('the stage scrolls exactly when its sheet overflows, before and after the fonts land', async ({
@@ -1532,28 +1520,26 @@ test.describe('absent students on the board (#999)', () => {
     });
   }
 
-  test(
-    'at 320px the marked board does not scroll sideways',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 640 });
-      await absentClass(page);
-      await tapOn(page.locator('#cg-board-open'));
-      await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
-      );
-      expect(overflow).toBe(0);
-      // Containment, not only the page: every chip inside the board's stage.
-      const stage = await page.locator('#cg-board-stage').boundingBox();
-      for (const box of await board(page)
-        .locator('#cg-waiting-list .waiting-student')
-        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
-        expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
-    },
-  );
+  test('at 320px the marked board does not scroll sideways', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 640 });
+    await absentClass(page);
+    await tapOn(page.locator('#cg-board-open'));
+    await expect(board(page).locator('#cg-waiting-absent')).toBeVisible();
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(0);
+    // Containment, not only the page: every chip inside the board's stage.
+    const stage = await page.locator('#cg-board-stage').boundingBox();
+    for (const box of await board(page)
+      .locator('#cg-waiting-list .waiting-student')
+      .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().right)))
+      expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
+  });
 
   const sentences = {
     en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
