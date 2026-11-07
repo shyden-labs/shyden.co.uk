@@ -437,7 +437,7 @@ function buildRow(
   nameTd.appendChild(printMirror(student.name ?? '', 'name'));
 
   // Sex — blank (neutral) / M / F. The <option> VALUE is always the raw
-  // 'M'/'F' the engine's Student.sex type uses, in both languages; only the
+  // 'M'/'F' the engine's Student.sex type uses, in every language; only the
   // displayed text is localised (rosterSexMale/Female — see their own
   // comment in en.ts).
   const sexTd = columnCell('sex');
