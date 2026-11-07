@@ -3059,6 +3059,31 @@ describe('the dev token proves its reach before every dev deploy (#415)', () => 
   });
 });
 
+// ---- each deploy sets its project's runtime first (#907) -----------------
+//
+// The functions suite tests one Workers compatibility date, and the Pages
+// projects ran another (2026-07-24, read 2026-10-21) because nothing in git
+// set theirs. Shyden ruled (2026-11-07) that each deploy sets it by API and
+// reads it back before it deploys, for the project it deploys to.
+describe('each deploy sets its project to the tested Workers runtime first (#907)', () => {
+  for (const [file, job, project] of [
+    ['deploy-dev.yml', 'deploy-dev', 'shyden-site-dev'],
+    ['deploy-prod.yml', 'deploy-prod', 'shyden-site'],
+  ] as const)
+    it(`${job} sets ${project}'s runtime before it deploys ${project}`, () => {
+      const runs = jobNamed(file, job).runs.map((run) =>
+        withoutCommentLines(run).trim(),
+      );
+      const sync = runs.indexOf(`node scripts/pages-runtime.mjs ${project}`);
+      const deploy = runs.indexOf(
+        `npx wrangler pages deploy dist --project-name ${project} --branch main`,
+      );
+      expect(deploy, 'the deploy step').toBeGreaterThan(-1);
+      expect(sync, 'the runtime step').toBeGreaterThan(-1);
+      expect(sync, 'the runtime is set before the deploy').toBeLessThan(deploy);
+    });
+});
+
 // ---- browsers come with the pinned image (#431) ---------------------------
 //
 // Run 36973026350's shard 2 spent its whole job in `npx playwright install

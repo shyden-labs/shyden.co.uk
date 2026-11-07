@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { declaredName, parseSource } from '../unit/ast';
-import { withoutTsComments } from '../unit/source-text';
-import { filesUnder } from '../source-files';
+import { withoutTsComments, withoutYamlComments } from '../unit/source-text';
+import { filesUnder, searched, trackedFiles } from '../source-files';
+import { compatibilityDateOf } from '../../src/lib/pages-runtime';
 
 /**
  * Comment stripping lives in one place. Seven private copies had accumulated
@@ -520,5 +521,42 @@ describe("reading a caught value's message has exactly one home", () => {
     ['a guard, not a choice', 'error instanceof Error && error.stack'],
   ])('is not fired by %s', (_, code) => {
     expect(readsACaughtMessage(`const s = ${code};`)).toBe(false);
+  });
+});
+
+/**
+ * The Workers compatibility date has one home, `tests/functions/wrangler.toml`
+ * (#907). The functions suite runs on it, and each deploy sets both Pages
+ * projects to it (`scripts/pages-runtime.mjs`). A second spelling is how the
+ * tested runtime drifted from the deployed one: `serve.mjs` carried its own
+ * copy, and nothing read the deployed date at all.
+ */
+describe('the Workers compatibility date has exactly one home', () => {
+  const HOME = 'tests/functions/wrangler.toml';
+  const date = compatibilityDateOf(readFileSync(HOME, 'utf8'));
+  const code = (path: string) => {
+    const text = readFileSync(path, 'utf8');
+    return /\.ya?ml$/.test(path)
+      ? withoutYamlComments(text)
+      : withoutTsComments(text);
+  };
+  const scanned = trackedFiles(
+    (path) =>
+      path !== HOME &&
+      /^(tests|scripts|functions|src\/lib|\.github)\//.test(path) &&
+      /\.(ts|mjs|js|ya?ml|toml)$/.test(path),
+  );
+
+  it('is spelled in code nowhere but its home', () => {
+    expect(
+      searched(
+        scanned.filter((path) => code(path).includes(date)),
+        { of: scanned, what: 'test, script, function and workflow files' },
+      ),
+    ).toEqual([]);
+  });
+
+  it('scans the functions harness, where the second spelling lived', () => {
+    expect(scanned).toContain('tests/functions/serve.mjs');
   });
 });
