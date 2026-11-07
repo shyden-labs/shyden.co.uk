@@ -120,7 +120,7 @@ export async function travel(
         row.classList.remove('travelling');
         fly.cancel();
         hide.cancel();
-        if (landingsToSound(i, finishedEarly)) o.onLand(i);
+        if (landingsToSound(finishedEarly)) o.onLand(i);
       },
       () => undefined, // cancelled by a newer deal: nothing to tidy
     );

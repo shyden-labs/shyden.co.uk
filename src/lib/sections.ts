@@ -4,15 +4,10 @@ import type { Strings } from './i18n';
 /**
  * Everything a collapsed section header needs to describe itself.
  *
- * `dirty` cannot be made `true` by anything built so far -- there is no
- * roster yet, and a roster is what gets lost. It is declared here because
- * the shape is needed now, and it is honest to default it `false`: with
- * nothing to lose, "nothing to save yet" is simply true. A future stage that
- * gives the roster a `dirty` flag owns setting it to exactly one rule (true
- * once a non-empty roster changes since the last export or import, false on
- * load/export/import) and writes the tests for that rule; this interface
- * only reserves the field so `sectionState` does not need a second, later
- * shape change.
+ * `dirty` is true once a non-empty roster has changed since the last export
+ * or import, and false on load, export and import. `classroom-groups.ts`
+ * owns that rule (its `setRoster`), and the Import / export header reads it
+ * from here.
  */
 export interface ToolState {
   named: number;

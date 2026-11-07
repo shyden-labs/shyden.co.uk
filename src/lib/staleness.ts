@@ -17,13 +17,10 @@ import type { Strings } from './i18n';
  * mode radio (per-group / group count) AND its own number together into
  * one JSON string rather than two separate fields -- see `staleReason`'s
  * own doc comment for why that has to be a single comparison, not two.
- * `roster` is what the class list currently IS: stage 2 has no per-student
- * data yet, so #cg-count -- the page's only population control -- is the
- * whole of it (see classroom-groups.ts's own `readRoster`), the same way a
- * roster of named students would BE the class list once stage 3 gives the
- * page one. Stage 3 extends `readRoster` to fold real per-student fields
- * into the same object; it does not need a second field here or a second
- * machine alongside this one.
+ * `roster` is what the class list currently IS: the serialised roster when
+ * the teacher has entered students, or the Students count when the roster is
+ * empty (see classroom-groups.ts's own `readRoster`). One field covers both,
+ * so no second field or second machine is needed alongside this one.
  *
  * Every field is a STRING on purpose, not because the underlying data
  * naturally is one -- `mode` and `roster` both carry JSON.stringify'd

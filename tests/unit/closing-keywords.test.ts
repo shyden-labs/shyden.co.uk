@@ -212,10 +212,9 @@ describe('the rule covers a pull request body, not only a commit message', () =>
   it('covers both media a merge acts on: the body and every commit message', () => {
     // A closing keyword in a COMMIT MESSAGE closes the issue too, the moment
     // the commit lands on the default branch -- that is how the first accident
-    // happened. `.githooks/commit-msg` catches those, but `git commit
-    // --no-verify` skips it, and `.githooks/pre-push` advertises exactly that
-    // escape in its own failure message. CI is the only layer nobody can
-    // bypass, so it reads both media, through the same rule.
+    // happened. `.githooks/commit-msg` catches those, but a local hook can be
+    // skipped, and CI is the only layer nobody can bypass, so it reads both
+    // media, through the same rule.
     const [only] = workflowsRunningTheRule();
     const commands = only?.commands ?? [];
     const invocations = commands.filter((command) =>

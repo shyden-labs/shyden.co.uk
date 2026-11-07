@@ -62,7 +62,7 @@ export function travelSchedule(
  * Whether a landing plays its sound. A finish-now lands every remaining
  * student in one frame; sounding each would be a burst, not a deal.
  */
-export function landingsToSound(_landed: number, finishedEarly: boolean) {
+export function landingsToSound(finishedEarly: boolean) {
   return !finishedEarly;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { releaseTests } from '../../scripts/release-inventory.mjs';
+import { inventoryOf, releaseTests } from '../../scripts/release-inventory.mjs';
 import { fixtureReader } from '../fixture-texts';
 
 describe('the capture selection (#362)', () => {
@@ -94,4 +94,23 @@ test('shoots once', async ({ page }) => { await once(page); });
 `),
     ).toEqual(['tests/e2e/case.spec.ts:4']);
   });
+});
+
+describe('what a visitor receives (#390 F60)', () => {
+  const entryFor = (files: string[]) =>
+    inventoryOf([{ sha: 'x', parents: ['p'], subject: 's', files }])[0];
+
+  it.each(['package.json', 'package-lock.json', 'astro.config.mjs'])(
+    'counts %s, which shapes the built site',
+    (file) => {
+      expect(entryFor([file])?.visitorFacing).toBe(true);
+    },
+  );
+
+  it.each(['README.md', 'vitest.config.ts', 'tests/a.ts'])(
+    'does not count %s, which no visitor receives',
+    (file) => {
+      expect(entryFor([file])?.visitorFacing).toBe(false);
+    },
+  );
 });

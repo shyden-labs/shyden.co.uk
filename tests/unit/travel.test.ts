@@ -115,10 +115,10 @@ describe('travelSchedule', () => {
 
 describe('landingsToSound', () => {
   it('sounds a landing the flight made', () => {
-    expect(landingsToSound(3, false)).toBe(true);
+    expect(landingsToSound(false)).toBe(true);
   });
   it('silences a landing a finish-now made, so a skip is not a burst', () => {
-    expect(landingsToSound(3, true)).toBe(false);
+    expect(landingsToSound(true)).toBe(false);
   });
 });
 
