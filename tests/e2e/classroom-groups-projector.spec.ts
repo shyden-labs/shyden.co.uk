@@ -1544,7 +1544,7 @@ test.describe('absent students on the board (#999)', () => {
   const sentences = {
     en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
     id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
-    zh: ['/zh/classroom-groups', '3和7 号缺席。'],
+    zh: ['/zh/classroom-groups', '学号 3和7 缺席。'],
     vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],
     th: ['/th/classroom-groups', 'หมายเลข 3 และ 7 ขาดเรียน'],
   } as const;
