@@ -28,14 +28,14 @@ test.use(recorded);
 
 // Unset in test builds, so the page falls back to the production host. The
 // dev deploy sets PUBLIC_SHYTALK_URL and is covered by the deploy-gate specs.
-const SHYTALK_URL = 'https://shytalk.shyden.co.uk';
-const SHYTALK_HOST = 'shytalk.shyden.co.uk';
+const SHYTALK_URL = 'https://shytalk.app';
+const SHYTALK_HOST = 'shytalk.app';
 // The same rule for Yawelo Idle (#403): PUBLIC_YAWELO_IDLE_URL is unset here, so
-// the page links the production host. That host has no DNS record yet, by the
-// operator's choice (2026-10-04), which no assertion here depends on: these
-// read the href, they never follow it.
-const YAWELO_IDLE_URL = 'https://yawelo-idle.shyden.co.uk';
-const YAWELO_IDLE_HOST = 'yawelo-idle.shyden.co.uk';
+// the page links the production host. Neither product's new domain had a DNS
+// record when this changed, by the operator's choice (2026-11-08, #1084), which no
+// assertion here depends on: these read the href, they never follow it.
+const YAWELO_IDLE_URL = 'https://yaweloidle.com';
+const YAWELO_IDLE_HOST = 'yaweloidle.com';
 
 test.describe('homepage content', () => {
   // #370: the hero names no company. The label above the heading is gone in
