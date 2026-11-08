@@ -13,7 +13,7 @@ import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { CSV_LOCALES } from '../../src/lib/csv-locale';
 import {
   downloadText,
-  expectVisibleText,
+  softVisibleText,
   giveEveryoneASex,
   handoverTo,
   refuseFullscreen,
@@ -46,11 +46,9 @@ test.use(recorded);
 const LANGUAGES: readonly Locale[] = ['zh', 'vi', 'th'];
 
 /**
- * The roster every tool test below starts from, handed over to `locale`'s
- * tool: six students, five named, one absent, two together, one apart. Each
- * test starts here rather than where the one before left off, so each reads
- * one group of sentences inside its own budget: walked as one journey, the
- * tool ran past 30 s on WebKit whenever captures ran under load (#380).
+ * The roster the tool's walk starts from, handed over to `locale`'s tool: six
+ * students, five named, one absent, two together, one apart. Each language
+ * walks it once, making every check (#1086).
  */
 const openTool = async (
   page: Page,
@@ -81,19 +79,22 @@ const openTool = async (
 
 test.describe('the copy the operator approved on #161', () => {
   for (const locale of LANGUAGES) {
-    test(`${locale}: the form reads as approved`, async ({ page, context }) => {
+    test(`${locale}: the form, the groups, the board and the class list file read as approved`, async ({
+      page,
+      context,
+    }) => {
       const t = getStrings(locale);
       const tool = await openTool(page, context, locale);
 
       const go = tool.locator('#cg-go');
-      await expectVisibleText(go, t.makeGroups);
+      await softVisibleText(go, t.makeGroups);
       await shoot(tool, `${locale}: the button reads “${t.makeGroups}”`, go);
 
       const howTo = tool.locator('#cg-howto-toggle');
-      await expect(howTo).toHaveAttribute('aria-expanded', 'false');
+      await expect.soft(howTo).toHaveAttribute('aria-expanded', 'false');
       await tapOn(howTo);
       const step = tool.locator('#cg-howto-body ol li').nth(2);
-      await expectVisibleText(step, t.howToSteps[2]);
+      await softVisibleText(step, t.howToSteps[2]);
       await shoot(
         tool,
         `${locale}: the third step reads “${t.howToSteps[2]}”`,
@@ -101,8 +102,8 @@ test.describe('the copy the operator approved on #161', () => {
       );
 
       const students = tool.locator('#cg-students-toggle');
-      await expect(students).toContainText(t.sectionStudentsHeading);
-      await expectVisibleText(
+      await expect.soft(students).toContainText(t.sectionStudentsHeading);
+      await softVisibleText(
         students.locator('.state'),
         [
           t.stateNamed({ n: 5 }),
@@ -122,28 +123,19 @@ test.describe('the copy the operator approved on #161', () => {
         name: t.rosterColTogether,
         exact: true,
       });
-      await expect(together).toBeVisible();
+      await expect.soft(together).toBeVisible();
       await shoot(
         tool,
         `${locale}: the roster's column is headed “${t.rosterColTogether}”`,
         tool.locator('#cg-roster thead'),
       );
-    });
 
-    test(`${locale}: the groups and the board read as approved`, async ({
-      page,
-      context,
-    }) => {
-      const t = getStrings(locale);
-      const tool = await openTool(page, context, locale);
-
-      const go = tool.locator('#cg-go');
       await tapOn(go);
       const heading = tool.locator('#cg-results-h');
-      await expectVisibleText(heading, t.resultsHeading);
-      await expectVisibleText(go, t.again);
+      await softVisibleText(heading, t.resultsHeading);
+      await softVisibleText(go, t.again);
       const board = tool.locator('#cg-board-open');
-      await expectVisibleText(board, t.boardOpen);
+      await softVisibleText(board, t.boardOpen);
       await shoot(
         tool,
         `${locale}: the groups are headed “${t.resultsHeading}”, with “${t.again}” and “${t.boardOpen}”`,
@@ -152,7 +144,7 @@ test.describe('the copy the operator approved on #161', () => {
 
       await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
       await tapOn(go);
-      await expectVisibleText(
+      await softVisibleText(
         heading,
         t.resultsHeadingNamed({ className: '6A' }),
       );
@@ -174,33 +166,24 @@ test.describe('the copy the operator approved on #161', () => {
       // (projector.ts, `canFade`) -- so it is read the way a keyboard user
       // reaches it. A capture taken after the fade would show a ghost.
       await shuffle.focus();
-      await expect(bar).not.toHaveClass(/\bfaded\b/);
-      await expectVisibleText(shuffle, t.boardShuffle);
+      await expect.soft(bar).not.toHaveClass(/\bfaded\b/);
+      await softVisibleText(shuffle, t.boardShuffle);
       await shoot(
         tool,
         `${locale}: the board offers “${t.boardShuffle}”`,
         shuffle,
       );
       await tapOn(bar.getByRole('button', { name: t.boardExit, exact: true }));
-    });
-
-    test(`${locale}: the class list file reads as approved`, async ({
-      page,
-      context,
-    }) => {
-      const t = getStrings(locale);
-      const tool = await openTool(page, context, locale);
 
       // Named for a class, as a teacher's list is: the file then opens with
       // the class comment, and the header is its second line.
-      await typeInto(tool.getByLabel(t.classLabel, { exact: true }), '6A');
       await tapOn(tool.locator('#cg-io-toggle'));
       const file = await downloadText(tool, t.ioExportClassList);
       // The header CELLS, compared exactly: a header word is a parsing token,
       // and a substring test would pass `性` inside `性别`.
-      expect((file.split('\n')[1] ?? '').split(',')).toEqual(
-        Object.values(CSV_LOCALES[locale].columns),
-      );
+      expect
+        .soft((file.split('\n')[1] ?? '').split(','))
+        .toEqual(Object.values(CSV_LOCALES[locale].columns));
       await shoot(
         tool,
         `${locale}: the downloaded class list is headed ${Object.values(CSV_LOCALES[locale].columns).join(', ')}`,
@@ -217,7 +200,7 @@ test.describe('the copy the operator approved on #161', () => {
       const warning = tool.getByText(
         t.ioReplaceWarning({ total: 6, named: 5 }),
       );
-      await expect(warning).toBeVisible();
+      await expect.soft(warning).toBeVisible();
       await shoot(
         tool,
         `${locale}: importing over the roster warns “${t.ioReplaceWarning({ total: 6, named: 5 })}”`,
@@ -232,8 +215,8 @@ test.describe('the copy the operator approved on #161', () => {
       await page.goto(localisePath('/yeetalk-calculators', locale));
 
       const heading = page.getByRole('heading', { level: 1 });
-      await expectVisibleText(heading, glory.heading);
-      await expect(page).toHaveTitle(glory.title);
+      await softVisibleText(heading, glory.heading);
+      await expect.soft(page).toHaveTitle(glory.title);
       await shoot(
         page,
         `${locale}: the page is headed “${glory.heading}”, titled “${glory.title}”`,
