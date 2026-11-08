@@ -36,8 +36,31 @@ export function runWithDeadline(file, args, { timeoutMs, whenSilent }) {
     throw new Error(
       timedOut
         ? `${command} gave no answer within ${timeoutMs} ms: ${whenSilent}`
-        : `${command} failed: ${messageOf(error)}`,
+        : `${command} failed${printed(error)}`,
       { cause: error },
     );
   }
+}
+
+/**
+ * What a failed command said, in its own words: its exit status and each
+ * stream it printed on. A phone run once failed on "uiautomator dump failed:
+ * Command failed" and nothing more, because these were dropped (#1027).
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
+function printed(error) {
+  if (!(error instanceof Error) || !('status' in error))
+    return `: ${messageOf(error)}`;
+  const fields = /** @type {Record<string, unknown>} */ (
+    /** @type {unknown} */ (error)
+  );
+  const streams = ['stderr', 'stdout']
+    .map((name) => [name, String(fields[name] ?? '').trim()])
+    .filter(([, text]) => text !== '')
+    .map(([name, text]) => `${name} ${JSON.stringify(text)}`);
+  return ` with exit status ${error.status}: ${
+    streams.length === 0 ? 'it printed nothing' : streams.join(' ')
+  }`;
 }
