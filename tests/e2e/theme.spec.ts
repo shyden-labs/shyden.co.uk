@@ -117,15 +117,22 @@ test.describe('the switch (#142 §5, AC3)', () => {
     });
   }
 
-  test('is 44 × 44, with a visible focus ring', async ({ page }) => {
+  // One journey from a fresh dark page (#1086): what the switch is before it is
+  // pressed, then the presses, then what each one saved. Order matters: the
+  // first press saves a choice, which ends every "no choice saved" read, and
+  // print changes the media for the rest of the page.
+  test('the switch looks, follows the device, toggles and persists', async ({
+    page,
+    baseURL,
+  }) => {
     await page.goto('/');
-    await expect(toggle(page)).toBeVisible();
+    await expect.soft(toggle(page)).toBeVisible();
     await atLeast44(toggle(page), 'the theme switch');
     // A keypress first, so the focus below is keyboard focus to every
     // engine's :focus-visible heuristic.
     await page.keyboard.press('Shift');
     await toggle(page).focus();
-    await expect(toggle(page)).toHaveCSS('outline-style', 'solid');
+    await expect.soft(toggle(page)).toHaveCSS('outline-style', 'solid');
     // Declared, or snapped at this screen's ratio (#805): 2.857px on the 3.5x
     // phone, 3 on emulated Chrome at 2.75. Read once the ring is drawn, which
     // the style assertion above waits for.
@@ -133,31 +140,34 @@ test.describe('the switch (#142 §5, AC3)', () => {
       width: parseFloat(getComputedStyle(el).outlineWidth),
       ratio: window.devicePixelRatio,
     }));
-    expect(
-      readsAsLineWidth(ring.width, 3, ring.ratio),
-      `the 3px ring: read ${ring.width} at a ratio of ${ring.ratio}`,
-    ).toBe(true);
+    expect
+      .soft(
+        readsAsLineWidth(ring.width, 3, ring.ratio),
+        `the 3px ring: read ${ring.width} at a ratio of ${ring.ratio}`,
+      )
+      .toBe(true);
     await shoot(
       page,
       'the switch focused: its ring is the accent',
       toggle(page),
     );
-  });
 
-  test('Enter and Space each toggle it', async ({ page }) => {
-    await page.goto('/');
+    // With no choice saved, the page and the switch follow the device, live.
+    await expectTheme(page, 'dark');
+    await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await emulateTheme(page, 'light');
+    await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+    await emulateTheme(page, 'dark');
+    await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'true');
+
+    // Enter and Space each toggle it.
     await toggle(page).focus();
     await page.keyboard.press('Enter');
     await expectTheme(page, 'light');
     await page.keyboard.press('Space');
     await expectTheme(page, 'dark');
-  });
 
-  test('switches instantly: the next frame already paints the new ground', async ({
-    page,
-  }) => {
-    await page.goto('/');
-    await expectTheme(page, 'dark');
+    // Switches instantly: the next frame already paints the new ground.
     // A real press (#1003). A bubbling click listener on the document runs
     // straight after the switch's own handler, and asks for the next frame
     // there, so the ground read is the first one painted after the press.
@@ -180,15 +190,48 @@ test.describe('the switch (#142 §5, AC3)', () => {
         () => (window as unknown as { nextGround?: string }).nextGround,
       )
       .then((handle) => handle.jsonValue());
-    expect(next).toBe(themeColour('light', '--bg'));
-  });
+    expect.soft(next).toBe(themeColour('light', '--bg'));
+    await expectTheme(page, 'light');
 
-  test('does not print', async ({ page }) => {
-    await page.goto('/');
-    await expect(toggle(page)).toBeVisible();
+    // With a choice saved, a change on the device changes nothing (Review
+    // Focus 5).
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await expectTheme(page, 'light');
+    await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+
+    // The choice persists across a reload...
+    await page.reload();
+    await expectTheme(page, 'light');
+    await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'false');
+
+    // ...and the switch does not print. Before the next page, because the
+    // print media stays on this one.
+    await expect.soft(toggle(page)).toBeVisible();
     await page.emulateMedia({ media: 'print' });
-    await expect(toggle(page)).toHaveCount(1);
-    await expect(toggle(page)).toBeHidden();
+    await expect.soft(toggle(page)).toHaveCount(1);
+    await expect.soft(toggle(page)).toBeHidden();
+    await page.emulateMedia({ media: null });
+
+    // ...and a second page.
+    await page.goto('/yeetalk-calculators');
+    await expectTheme(page, 'light');
+    await shoot(
+      page,
+      'a light choice made on the homepage holds on /yeetalk-calculators',
+      toggle(page),
+    );
+
+    // A new page in the same browser, after the first is closed: it carries the same storage,
+    // as a returning visitor's does. A second browser context is not an option on the phone,
+    // which has exactly one (#1047).
+    const context = page.context();
+    await page.close();
+    const later = await context.newPage();
+    await later.emulateMedia({ colorScheme: 'dark' });
+    // A page made by hand has no base URL of its own on the phone.
+    await later.goto(new URL('/', baseURL).href);
+    await expectTheme(later, 'light');
   });
 
   test('under forced colours, its icon draws in the system text colour (Review Focus 4)', async ({
@@ -242,42 +285,6 @@ test.describe('without JavaScript (#142 AC7)', () => {
 });
 
 test.describe('the choice persists (#142 AC4)', () => {
-  test('across a reload and a second page', async ({ page }) => {
-    await page.goto('/');
-    await expectTheme(page, 'dark');
-    await tapOn(toggle(page));
-    await expectTheme(page, 'light');
-    await page.reload();
-    await expectTheme(page, 'light');
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
-    await page.goto('/yeetalk-calculators');
-    await expectTheme(page, 'light');
-    await shoot(
-      page,
-      'a light choice made on the homepage holds on /yeetalk-calculators',
-      toggle(page),
-    );
-  });
-
-  // A new page in the same browser, after the first is closed: it carries the same storage,
-  // as a returning visitor's does. A second browser context is not an option on the phone,
-  // which has exactly one (#1047).
-  test('into a new page that carries the same storage', async ({
-    page,
-    baseURL,
-  }) => {
-    await page.goto('/');
-    await tapOn(toggle(page));
-    await expectTheme(page, 'light');
-    const context = page.context();
-    await page.close();
-    const next = await context.newPage();
-    await next.emulateMedia({ colorScheme: 'dark' });
-    // A page made by hand has no base URL of its own on the phone.
-    await next.goto(new URL('/', baseURL).href);
-    await expectTheme(next, 'light');
-  });
-
   test('and a press after a stale saved value saves a valid one (Review Focus 1)', async ({
     page,
   }) => {
@@ -341,30 +348,6 @@ test.describe('storage refused (#142 AC7)', () => {
 });
 
 test.describe('the device (#142 AC2)', () => {
-  test('with no choice saved, the page and the switch follow it, live', async ({
-    page,
-  }) => {
-    await page.goto('/');
-    await expectTheme(page, 'dark');
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
-    await emulateTheme(page, 'light');
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
-    await emulateTheme(page, 'dark');
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('with a choice saved, a change on the device changes nothing (Review Focus 5)', async ({
-    page,
-  }) => {
-    await page.goto('/');
-    await tapOn(toggle(page));
-    await expectTheme(page, 'light');
-    await page.emulateMedia({ colorScheme: 'light' });
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await expectTheme(page, 'light');
-    await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
-  });
-
   test('an engine without MediaQueryList.addEventListener still switches, and logs nothing (Review Focus 3)', async ({
     page,
   }) => {
@@ -467,41 +450,47 @@ test.describe('the aurora ribbon (#371)', () => {
     return { ...layer, colours };
   };
 
-  for (const theme of THEMES)
-    test(`${theme}: the ribbon is drawn at the top of the page in the theme's own colours`, async ({
-      page,
-    }) => {
-      await page.goto('/');
+  // One page, one walk (#1086): each theme's ribbon is read and checked as it is
+  // drawn, the two are then compared, and print comes last because it changes
+  // the media for the rest of the page.
+  test('the ribbon is drawn in each theme, the themes differ, and print hides it', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const drawnIn: Record<
+      (typeof THEMES)[number],
+      Awaited<ReturnType<typeof ribbon>>
+    > = {} as never;
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const drawn = await ribbon(page);
-      expect(drawn.display).not.toBe('none');
-      expect(drawn.position).toBe('absolute');
-      expect(drawn.top).toBe('0px');
-      expect(drawn.image.match(/radial-gradient/g) ?? []).toHaveLength(3);
+      drawnIn[theme] = drawn;
+      expect.soft(drawn.display).not.toBe('none');
+      expect.soft(drawn.position).toBe('absolute');
+      expect.soft(drawn.top).toBe('0px');
+      expect.soft(drawn.image.match(/radial-gradient/g) ?? []).toHaveLength(3);
       for (const [n, colour] of drawn.colours.entries()) {
-        expect(colour, `${TOKENS[n]} resolves to a colour`).toMatch(/^rgba?\(/);
-        expect(drawn.image, `the ribbon paints ${TOKENS[n]}`).toContain(colour);
+        expect
+          .soft(colour, `${theme}: ${TOKENS[n]} resolves to a colour`)
+          .toMatch(/^rgba?\(/);
+        expect
+          .soft(drawn.image, `${theme}: the ribbon paints ${TOKENS[n]}`)
+          .toContain(colour);
       }
-    });
+    }
 
-  test('the two themes paint different ribbons', async ({ page }) => {
     // Each colour must be one the ribbon paints: an undefined token makes the
     // probe inherit the theme's ink, which also differs by theme (the dot
     // grid's version of this test passed against no grid at all, #371).
-    await page.goto('/');
-    await emulateTheme(page, 'light');
-    const light = await ribbon(page);
-    await emulateTheme(page, 'dark');
-    const dark = await ribbon(page);
+    const light = drawnIn.light;
+    const dark = drawnIn.dark;
     for (const drawn of [light, dark])
-      for (const colour of drawn.colours) expect(drawn.image).toContain(colour);
-    expect(light.colours).not.toEqual(dark.colours);
-  });
+      for (const colour of drawn.colours)
+        expect.soft(drawn.image).toContain(colour);
+    expect.soft(light.colours).not.toEqual(dark.colours);
 
-  test('does not print', async ({ page }) => {
-    await page.goto('/');
     await page.emulateMedia({ media: 'print' });
-    expect((await ribbon(page)).display).toBe('none');
+    expect.soft((await ribbon(page)).display).toBe('none');
   });
 
   test('is not drawn under forced colours', async ({ page, browserName }) => {
