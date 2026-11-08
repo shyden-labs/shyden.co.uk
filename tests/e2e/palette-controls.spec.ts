@@ -139,9 +139,6 @@ for (const theme of THEMES)
     await page.goto('/classroom-groups');
     const boxes = page.locator('input[type="checkbox"], input[type="radio"]');
     // Liveness: an empty list and a correct one both report zero offenders.
-    // Written as a locator assertion rather than `expect(await boxes.count())`
-    // because that is the form tests/guards/event-collectors.test.ts recognises,
-    // and a proof a guard cannot see is not a proof.
     await expect(boxes.first()).toBeVisible();
     await emulateTheme(page, theme);
 
@@ -152,9 +149,6 @@ for (const theme of THEMES)
     );
     const resolved = await resolvedColour(page, accent);
 
-    // Inline, not hoisted: `event-collectors.test.ts` matches this exact shape
-    // when scanning for locator loops that were never proved non-empty, and a
-    // hoisted list drops out of that scan without anything going red.
     for (const box of await boxes.all()) {
       await expect(box).toHaveCSS('accent-color', resolved);
     }

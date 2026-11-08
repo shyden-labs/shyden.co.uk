@@ -9,8 +9,7 @@
  * that runs past its deadline is stopped, and the error names the command.
  *
  * One home, imported by `scripts/test-devices.mjs` and by `tests/device/`, and
- * held by `tests/unit/adb.test.ts`; `tests/guards/device-tool-homes.test.ts`
- * refuses any other file that runs `adb` itself. The deadline is
+ * held by `tests/unit/adb.test.ts`. The deadline is
  * `scripts/run-with-deadline.mjs`, shared with `devicectl`.
  */
 

@@ -11,8 +11,7 @@
  * test timeout. The session can import a plain module, so both now read
  * through this one.
  *
- * Held by `tests/unit/devicectl.test.ts`, and by `device-tool-homes.test.ts`,
- * which refuses any other file that spawns `xcrun`.
+ * Held by `tests/unit/devicectl.test.ts`.
  */
 
 import { runWithDeadline } from './run-with-deadline.mjs';

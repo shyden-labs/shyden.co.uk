@@ -88,9 +88,8 @@ describe('WCAG relative luminance and contrast', () => {
  * The formula has one home, found by its constants rather than by its shape
  * (#277, #371).
  *
- * `duplication.test.ts` compares whole function bodies of 120 printed
- * characters or more, and it caught the three copies #277 was filed against.
- * It could not catch the fourth: text-over-ribbon.spec.ts spelled `lin` and
+ * A whole-body duplication scan (cut in #390) caught the three copies #277
+ * was filed against. It could not catch the fourth: text-over-ribbon.spec.ts spelled `lin` and
  * `lum` inside a large `evaluate` callback, each too short to be compared,
  * in a body too big to resemble anything. This asks the question directly.
  */
@@ -107,8 +106,7 @@ describe('the WCAG formula has one home', () => {
       '});',
     ].join('\n');
     expect(curvesIn(copy, 'copy.ts')).toEqual(['copy.ts:lin']);
-    // Quoted in a comment or a string, as duplication.test.ts's fixtures
-    // quote it, the formula is not a copy: beside a real one, only the real
+    // Quoted in a comment or a string, the formula is not a copy: beside a real one, only the real
     // one is found.
     const quoted = [
       '// return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;',
