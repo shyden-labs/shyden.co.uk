@@ -3,12 +3,6 @@ import { adb } from '../../scripts/adb.mjs';
 import { TapNotPossibleError, tapOn } from '../real-touch';
 import { dump as screen, tap as tapNode } from './chrome-javascript-setting';
 import type { UiNode } from './ui-dump';
-import { appendFileSync } from 'node:fs';
-const TRACE = process.env.PICKER_TRACE;
-function trace(tag: string, data: unknown): void {
-  if (TRACE) appendFileSync(TRACE, JSON.stringify({ t: Date.now(), tag, data }) + '\n');
-}
-const brief = (nodes: readonly UiNode[]) => ({ screen: nodes[0]?.bounds, rows: nodes.filter((n) => n.className === ROW || n.className === LIST).map((n) => [n.className.slice(-12), n.text, n.checked, n.bounds]) });
 
 /**
  * Chrome on Android draws a `<select>`'s options in its own dialog, outside
@@ -42,9 +36,18 @@ export function pickerOption(
   return nodes.find((node) => node.className === ROW && node.text === label);
 }
 
-/** The list the picker's rows scroll in, or undefined when no picker is open. */
+/**
+ * The list the picker's rows scroll in, or undefined when no picker is open.
+ *
+ * Only a list with height: after the picker closes, the screen can still hold
+ * ListViews 0 px tall that nobody can see (measured on the OPPO, 2026-11-08:
+ * 1200x0 at y=3014, in all ten failures of a 135-test run), and reading one
+ * as the picker failed the run with "still open" after it had closed.
+ */
 export function pickerList(nodes: readonly UiNode[]): UiNode | undefined {
-  return nodes.find((node) => node.className === LIST);
+  return nodes.find(
+    (node) => node.className === LIST && node.bounds.bottom > node.bounds.top,
+  );
 }
 
 /** The screen once the picker's list is on it; throws at the ceiling. */
@@ -68,14 +71,11 @@ async function openPicker(select: string): Promise<UiNode[]> {
  */
 async function pickerClosed(select: string): Promise<void> {
   const deadline = Date.now() + PICKER_CEILING_MS;
-  let n: UiNode[];
-  while (pickerList((n = screen()))) {
-    if (Date.now() >= deadline) {
-      trace('still-open', brief(n));
+  while (pickerList(screen())) {
+    if (Date.now() >= deadline)
       throw new TapNotPossibleError(
         `${select}: Chrome's option picker was still open ${PICKER_CEILING_MS} ms after a real tap on its row`,
       );
-    }
     await new Promise((resolve) => setTimeout(resolve, CLOSE_POLL_MS));
   }
 }
@@ -95,8 +95,6 @@ export async function chooseFromNativePicker(
   for (let swipe = 0; ; swipe++) {
     const row = pickerOption(nodes, label);
     if (row) {
-      trace('open', { select: name, label, swipe, ...brief(nodes) });
-      trace('tap', { row: [row.text, row.checked, row.bounds] });
       tapNode(row);
       await pickerClosed(name);
       return;
