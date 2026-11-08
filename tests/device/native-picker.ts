@@ -3,6 +3,12 @@ import { adb } from '../../scripts/adb.mjs';
 import { TapNotPossibleError, tapOn } from '../real-touch';
 import { dump as screen, tap as tapNode } from './chrome-javascript-setting';
 import type { UiNode } from './ui-dump';
+import { appendFileSync } from 'node:fs';
+const TRACE = process.env.PICKER_TRACE;
+function trace(tag: string, data: unknown): void {
+  if (TRACE) appendFileSync(TRACE, JSON.stringify({ t: Date.now(), tag, data }) + '\n');
+}
+const brief = (nodes: readonly UiNode[]) => ({ screen: nodes[0]?.bounds, rows: nodes.filter((n) => n.className === ROW || n.className === LIST).map((n) => [n.className.slice(-12), n.text, n.checked, n.bounds]) });
 
 /**
  * Chrome on Android draws a `<select>`'s options in its own dialog, outside
@@ -62,11 +68,14 @@ async function openPicker(select: string): Promise<UiNode[]> {
  */
 async function pickerClosed(select: string): Promise<void> {
   const deadline = Date.now() + PICKER_CEILING_MS;
-  while (pickerList(screen())) {
-    if (Date.now() >= deadline)
+  let n: UiNode[];
+  while (pickerList((n = screen()))) {
+    if (Date.now() >= deadline) {
+      trace('still-open', brief(n));
       throw new TapNotPossibleError(
         `${select}: Chrome's option picker was still open ${PICKER_CEILING_MS} ms after a real tap on its row`,
       );
+    }
     await new Promise((resolve) => setTimeout(resolve, CLOSE_POLL_MS));
   }
 }
@@ -86,6 +95,8 @@ export async function chooseFromNativePicker(
   for (let swipe = 0; ; swipe++) {
     const row = pickerOption(nodes, label);
     if (row) {
+      trace('open', { select: name, label, swipe, ...brief(nodes) });
+      trace('tap', { row: [row.text, row.checked, row.bounds] });
       tapNode(row);
       await pickerClosed(name);
       return;
