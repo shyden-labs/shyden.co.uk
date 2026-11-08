@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -69,11 +70,10 @@ const openTool = async (
     ['M', NAMES[3]],
   ]);
   for (const row of [0, 1])
-    await page
-      .locator('.cg-student')
-      .nth(row)
-      .getByLabel('Together')
-      .selectOption('A');
+    await chooseOption(
+      page.locator('.cg-student').nth(row).getByLabel('Together'),
+      'A',
+    );
   await tapOn(page.locator('#cg-io-toggle'));
   const [, tool] = await Promise.all([
     page.waitForEvent('download'),
@@ -185,10 +185,10 @@ test.describe('the sentences corrected on #319', () => {
 
       // Four students on one together letter cannot fit a group of two.
       for (const row of [2, 3])
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColTogether, { exact: true })
-          .selectOption('A');
+        await chooseOption(
+          rows.nth(row).getByLabel(t.rosterColTogether, { exact: true }),
+          'A',
+        );
       await typeInto(tool.locator('#cg-size'), '2');
       await tapOn(go);
       await expectVisibleText(
@@ -297,14 +297,14 @@ test.describe('the sentences corrected on #319', () => {
       // A together pair that is also an apart pair is refused as it is typed.
       // A select offers the letters in use and the next free one, so 'A' it is.
       for (const row of [0, 1]) {
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColTogether, { exact: true })
-          .selectOption('A');
-        await rows
-          .nth(row)
-          .getByLabel(t.rosterColApart, { exact: true })
-          .selectOption('A');
+        await chooseOption(
+          rows.nth(row).getByLabel(t.rosterColTogether, { exact: true }),
+          'A',
+        );
+        await chooseOption(
+          rows.nth(row).getByLabel(t.rosterColApart, { exact: true }),
+          'A',
+        );
       }
       const clash = tool.locator('#cg-roster-problem');
       await expectVisibleText(

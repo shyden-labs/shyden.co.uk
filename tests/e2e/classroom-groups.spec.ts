@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -1278,11 +1279,10 @@ test.describe('out-of-date groups', () => {
     [
       'changing a letter',
       (page: Page) =>
-        page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Together')
-          .selectOption('A'),
+        chooseOption(
+          page.locator('.cg-student').first().getByLabel('Together'),
+          'A',
+        ),
     ],
   ] as const) {
     test(`${what} marks the groups out of date`, async ({ page }) => {
@@ -1348,11 +1348,10 @@ test.describe('out-of-date groups', () => {
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
-    await page
-      .locator('.cg-student')
-      .first()
-      .getByLabel('Sex')
-      .selectOption('F');
+    await chooseOption(
+      page.locator('.cg-student').first().getByLabel('Sex'),
+      'F',
+    );
     await expect(
       page.getByText('These groups are out of date — the class list changed.'),
     ).toBeVisible();

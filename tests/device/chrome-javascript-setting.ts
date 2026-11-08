@@ -32,9 +32,40 @@ const BLOCK_LABEL = "Don't allow sites to use JavaScript";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function dump(): UiNode[] {
-  adb(['shell', 'uiautomator', 'dump', '/sdcard/ui.xml']);
-  return parseUiDump(adb(['shell', 'cat', '/sdcard/ui.xml']));
+const DUMP_FILE = '/sdcard/ui.xml';
+/** Killed by a signal (128 + SIGKILL's 9), as `uiautomator` is after it has written the file. */
+const KILLED = 137;
+
+/**
+ * Whether `uiautomator dump` wrote the file, though it exited non-zero.
+ * Measured on the OPPO (2026-11-08, #1027): it printed "UI hierchary dumped
+ * to: /sdcard/ui.xml" (the tool's own spelling) and then exited 137, killed
+ * after it had finished. Only that exact pair counts; any other failure is
+ * thrown as it came.
+ */
+function wroteBeforeKilled(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (!(cause instanceof Error)) return false;
+  const { status, stdout } = cause as Error & {
+    status?: number;
+    stdout?: unknown;
+  };
+  return (
+    status === KILLED &&
+    String(stdout ?? '')
+      .split('\n')
+      .some((line) => line.trim() === `UI hierchary dumped to: ${DUMP_FILE}`)
+  );
+}
+
+/** What the phone's screen shows now, read by `uiautomator dump`. */
+export function dump(): UiNode[] {
+  try {
+    adb(['shell', 'uiautomator', 'dump', DUMP_FILE]);
+  } catch (error) {
+    if (!wroteBeforeKilled(error)) throw error;
+  }
+  return parseUiDump(adb(['shell', 'cat', DUMP_FILE]));
 }
 
 /** A node the screen really shows: a dump can still hold the screens behind this one. */
@@ -64,7 +95,8 @@ async function waitFor(query: NodeQuery, why: string): Promise<UiNode[]> {
   );
 }
 
-function tap(node: UiNode): void {
+/** A real tap at the centre of `node`, sent with adb. */
+export function tap(node: UiNode): void {
   const { x, y } = centreOf(node);
   adb(['shell', 'input', 'tap', String(x), String(y)]);
 }

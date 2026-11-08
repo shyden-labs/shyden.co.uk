@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { openBoard } from '../board-settled';
@@ -112,7 +113,7 @@ export const giveEveryoneASex = async (page: Page, sex: 'M' | 'F' = 'M') => {
     const select = rows
       .nth(i)
       .getByLabel(stringsOf(page).rosterColSex, { exact: true });
-    if ((await select.inputValue()) === '') await select.selectOption(sex);
+    if ((await select.inputValue()) === '') await chooseOption(select, sex);
   }
 };
 
@@ -184,11 +185,13 @@ export const markAbsent = async (page: Page, path = '/classroom-groups') => {
 };
 
 export const setSex = async (page: Page, row: number, sex: 'M' | 'F') =>
-  page
-    .locator('.cg-student')
-    .nth(row)
-    .getByLabel(stringsOf(page).rosterColSex, { exact: true })
-    .selectOption(sex);
+  chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(row)
+      .getByLabel(stringsOf(page).rosterColSex, { exact: true }),
+    sex,
+  );
 
 /** [sex, name] per student, in order. The one builder every later suite uses. */
 export const buildRoster = async (
@@ -206,9 +209,10 @@ export const buildRoster = async (
         name,
       );
     if (sex)
-      await row
-        .getByLabel(stringsOf(page).rosterColSex, { exact: true })
-        .selectOption(sex);
+      await chooseOption(
+        row.getByLabel(stringsOf(page).rosterColSex, { exact: true }),
+        sex,
+      );
   }
   await expect(page.locator('.cg-student')).toHaveCount(students.length);
 };
@@ -340,21 +344,24 @@ export const rosterWithAnAbsence = async (page: Page) => {
     ['M', 'Eko'],
     [null],
   ]);
-  await page
-    .locator('.cg-student')
-    .nth(0)
-    .getByLabel(/Together/)
-    .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(1)
-    .getByLabel(/Together/)
-    .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(2)
-    .getByLabel(/Apart/)
-    .selectOption('A');
+  await chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(0)
+      .getByLabel(/Together/),
+    'A',
+  );
+  await chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(1)
+      .getByLabel(/Together/),
+    'A',
+  );
+  await chooseOption(
+    page.locator('.cg-student').nth(2).getByLabel(/Apart/),
+    'A',
+  );
   await setCheckedOn(
     page
       .locator('.cg-student')
