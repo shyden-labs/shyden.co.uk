@@ -1587,8 +1587,8 @@ test.describe('site-wide language switching', () => {
   });
 
   // Where the homepage's tool cards link, in every locale, is held by
-  // 'exactly two tool cards, each badged and linked in-locale' in
-  // homepage.spec.ts (#390 F129).
+  // '<locale>: hero, header nav, both product showcases, tool cards and showcase
+  // capture' in homepage.spec.ts (#390 F129).
 
   test.describe('what each page tells a search engine', () => {
     // Asserted by VALUE. Counting the tags cannot tell the difference between
