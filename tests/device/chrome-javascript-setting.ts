@@ -65,7 +65,8 @@ async function waitFor(query: NodeQuery, why: string): Promise<UiNode[]> {
   );
 }
 
-function tap(node: UiNode): void {
+/** A real tap at the centre of `node`, sent with adb. */
+export function tap(node: UiNode): void {
   const { x, y } = centreOf(node);
   adb(['shell', 'input', 'tap', String(x), String(y)]);
 }
