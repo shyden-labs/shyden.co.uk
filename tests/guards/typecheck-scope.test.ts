@@ -38,10 +38,7 @@ const scripts = (): string[] =>
  * and wider than the compiler does: a directive in a block comment, or below
  * the first statement, is flagged although TypeScript ignores it.
  *
- * Matched WITHOUT comment syntax: spelling `//` here makes this file read as
- * a comment stripper to `one-home.test.ts`, which is right to ask -- naming
- * comment syntax is how a second stripper starts. The directive's own name is
- * enough, and it appears nowhere else.
+ * Matched by the directive's own name, which appears nowhere else.
  */
 const optsOut = (text: string): boolean => /@ts-nocheck/.test(text);
 

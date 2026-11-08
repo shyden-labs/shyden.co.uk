@@ -11,8 +11,7 @@ import {
  * Nineteen calls across five files were bare `execFileSync('adb', ...)` with no
  * deadline. A wedged phone leaves `adb shell` waiting, and a synchronous wait
  * blocks the worker's event loop, so not even Playwright's test timeout can
- * fire: the gauntlet hangs with nothing to say why. That every call goes
- * through it is held by `device-tool-homes.test.ts`.
+ * fire: the gauntlet hangs with nothing to say why.
  */
 
 describe('adb()', () => {

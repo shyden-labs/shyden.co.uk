@@ -2048,8 +2048,7 @@ describe('build-and-test stands for the whole suite, run as shards (#163)', () =
   // refused its own count (#163). The shards were made to build first -- which
   // hid the defect in CI and left it for every fresh checkout to meet (#351).
   // The read now happens in the test that needs it, the web server builds for
-  // the run as it always did, and `collection-needs-no-build.test.ts` finds a
-  // read of `dist/` anywhere the suite is collected. A build step here would
+  // the run as it always did. A build step here would
   // pay for a second build and blind the one cold listing CI performs.
   it('no job running the e2e suite builds the site before it', () => {
     const suites = e2eSuites();

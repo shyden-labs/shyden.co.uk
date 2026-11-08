@@ -4,9 +4,7 @@
  * A synchronous call to a wedged phone blocks the event loop that would have
  * fired the test timeout, so the gauntlet hangs with nothing to say why. Here
  * a call that runs past its deadline is stopped, and the error names the
- * command. `scripts/adb.mjs` and `scripts/devicectl.mjs` are its callers;
- * `tests/guards/device-tool-homes.test.ts` refuses any other file that runs
- * either tool.
+ * command. `scripts/adb.mjs` and `scripts/devicectl.mjs` are its callers.
  */
 
 import { execFileSync } from 'node:child_process';

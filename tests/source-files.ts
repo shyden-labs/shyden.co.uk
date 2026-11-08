@@ -13,8 +13,6 @@ import { treeReading } from './tree-reading';
  * next guard reached for silently decided its blind spots: exactly how #67's
  * four hand-written `[tests/e2e, tests/device]` lists left the deploy gates
  * unscanned.
- *
- * `tests/guards/one-home.test.ts` fails if a tenth appears.
  */
 
 /**
