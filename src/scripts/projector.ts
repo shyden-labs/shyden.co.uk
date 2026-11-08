@@ -8,7 +8,7 @@ import { button } from './dom';
  * THE OVERLAY MOVES `#cg-results`; it never re-renders it. On entry the
  * results element is appended to the board and on exit put back exactly
  * where it was. That is why "a shuffle done on the board is what the page
- * shows on exit" needs no code of its own, and why a warning raised by a
+ * shows" (the second half of a merged e2e journey's title) needs no code of its own, and why a warning raised by a
  * board shuffle appears on the board: there is one element, one render
  * path, and nothing that can drift. A second rendering is how a projected
  * sheet ends up disagreeing with the screen.

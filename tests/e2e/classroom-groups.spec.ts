@@ -141,14 +141,6 @@ test.describe('classroom group creator', () => {
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   });
 
-  test('the paste-names box and the keep-apart box are gone', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await expect(page.locator('#cg-names')).toHaveCount(0);
-    await expect(page.locator('#cg-apart')).toHaveCount(0);
-  });
-
   // Two more tests retired along with the keep-apart box (#cg-apart) above
   // -- both fed `apart`, free text the rewritten engine no longer accepts
   // (see grouping.ts's GroupingInput). Their SUBJECTS are still alive and
@@ -169,17 +161,115 @@ test.describe('classroom group creator', () => {
   // the children actually in the room -- without opening Student details or
   // hand-building a row per pupil.
   //
-  // "Number of groups", not "students per group": 24 children in groups of
-  // five would be FOUR groups of six, since no group may be smaller than the
-  // size asked for. Five groups is what the teacher wants and what the
-  // ticket describes.
-  test('leaves a pupil typed absent out of the groups entirely', async ({
+  // Walked once, with every check soft: the number fields' gate (below) is
+  // exercised first, on the way to the shuffle, so one page load carries what
+  // were three journeys. The gate has two sources and they live apart. Its
+  // roster half is in classroom-groups-roster.spec.ts ('a duplicate number is
+  // refused as it is typed', 'a together-and-apart clash is refused as it is
+  // typed'); this is the number-field half. They cannot be tested together --
+  // a roster disables these fields outright (AC14) -- so a comment naming the
+  // other half is more honest than a describe pretending the fact has one
+  // home.
+  test('the number fields gate the shuffle, and a pupil typed absent is left out', async ({
     page,
   }) => {
+    const go = page.getByRole('button', { name: 'Make groups' });
+    const problem = page.locator('#cg-numbers-problem');
+    const absent = page.locator('#cg-numbers-absent');
     await page.goto('/classroom-groups');
-    await fill(page, { count: '25', groups: '5' });
-    await typeInto(page.locator('#cg-numbers-absent'), '7');
-    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7');
+
+    // Enabled FIRST. Disabled is not the default here, but asserting it
+    // anyway is what stops "it is disabled" passing against a page where the
+    // button never worked at all.
+    await expect.soft(go).toBeEnabled();
+    await shoot(page, 'Make groups enabled before anything is typed', go);
+
+    // #188, AC12: a bad number "re-validates immediately and refuses, rather
+    // than failing at Generate". The refusal SENTENCE was asserted in the
+    // announcements spec; the refusal ITSELF -- the shuffle being blocked --
+    // was not, which a mutation made obvious: `updateGoButton` could have
+    // ignored the number fields entirely and every test still passed.
+    await typeInto(page.locator('#cg-count'), '25');
+    await typeInto(absent, '26');
+    await expect.soft(problem).toBeVisible();
+    await shoot(
+      page,
+      'number 26 refused in a class of 25',
+      page.locator('.number-fields'),
+    );
+    await expect.soft(go).toBeDisabled();
+    await shoot(page, 'Make groups disabled while the refusal stands', go);
+
+    // Clean again, and by count as well as visibility: `toBeHidden` passes
+    // for an element that does not exist, so a renamed id would satisfy that
+    // line on its own and leave the refusals as the only thing asserting.
+    await typeInto(absent, '20');
+    await expect.soft(problem).toHaveCount(1);
+    await expect.soft(problem).toBeHidden();
+    await expect.soft(go).toBeEnabled();
+    await shoot(
+      page,
+      'number 20 absent from a class of 25, accepted',
+      page.locator('.number-fields'),
+    );
+
+    // #188, AC12, the direction the AC actually names. The refusal above is a
+    // number the class cannot hold; the AC's subject is the COUNT moving --
+    // "lowering the count below a number already typed re-validates
+    // immediately and refuses, rather than failing at Generate". Those are
+    // different code paths. A refusal on the number field's own keystroke
+    // needs only a listener on that field; a refusal when the COUNT changes
+    // works solely because the form's `input` listener is delegated and takes
+    // no `event.target` (src/scripts/classroom-groups.ts:1098). Keyed to its
+    // target, or with `updateNumbersValidation()` dropped from it, the check
+    // above stays green and a teacher learns only at "Make groups" that the
+    // number they typed no longer exists. Measured rather than assumed: M18.
+    //
+    // The class shrinks underneath it. No click: the refusal has to arrive on
+    // the count's own keystroke, which is the whole of AC12.
+    await typeInto(page.locator('#cg-count'), '10');
+    await expect.soft(problem).toBeVisible();
+    await expect
+      .soft(problem)
+      .toHaveText('There is no number 20. You have 10 students.');
+    await expect.soft(go).toBeDisabled();
+    await shoot(
+      page,
+      'the class shrinks to 10 and number 20 is refused on the keystroke',
+      page.locator('.number-fields'),
+    );
+
+    // Raising it back clears the refusal, so the gate is not stuck shut once
+    // it has closed -- the recovery direction the refusal above has to prove
+    // for the other path.
+    await typeInto(page.locator('#cg-count'), '25');
+    await expect.soft(problem).toBeHidden();
+    await expect.soft(go).toBeEnabled();
+    await shoot(
+      page,
+      'raised back to 25, the refusal is gone',
+      page.locator('.number-fields'),
+    );
+
+    // And the recovery direction of the number field itself, which is the
+    // one that proves the gate is not simply stuck shut once it has closed.
+    // This is also the absence the shuffle below is made with.
+    //
+    // "Number of groups", not "students per group": 24 children in groups of
+    // five would be FOUR groups of six, since no group may be smaller than the
+    // size asked for. Five groups is what the teacher wants and what the
+    // ticket describes.
+    await typeInto(absent, '7');
+    await expect.soft(problem).toBeHidden();
+    await shoot(
+      page,
+      'corrected to 7, the refusal is gone',
+      page.locator('.number-fields'),
+    );
+    await expect.soft(go).toBeEnabled();
+    await shoot(page, 'Make groups enabled again', go);
+    await fill(page, { groups: '5' });
+    await expect.soft(absent).toHaveValue('7');
     await shoot(
       page,
       'number 7 typed into Student numbers',
@@ -188,25 +278,25 @@ test.describe('classroom group creator', () => {
     await tapOn(page.locator('#cg-go'));
 
     const results = page.locator('#cg-results');
-    await expect(results.locator('.group')).toHaveCount(5);
-    await expect(results.locator('.student')).toHaveCount(24);
+    await expect.soft(results.locator('.group')).toHaveCount(5);
+    await expect.soft(results.locator('.student')).toHaveCount(24);
 
     // The absence needs a positive control beside it. If the labels were
     // malformed -- "Student NaN", or a renamed class -- then "no card says
     // Student 7" would pass for a reason that has nothing to do with
     // absence. Number 8 must be on the board, and 7 must not.
-    await expect(results.getByText('Student 8', { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(results.getByText('Student 7', { exact: true })).toHaveCount(
-      0,
-    );
+    await expect
+      .soft(results.getByText('Student 8', { exact: true }))
+      .toHaveCount(1);
+    await expect
+      .soft(results.getByText('Student 7', { exact: true }))
+      .toHaveCount(0);
 
     // And nobody was renumbered to close the gap: 25 is still the last
     // number, not 24 (AC9).
-    await expect(results.getByText('Student 25', { exact: true })).toHaveCount(
-      1,
-    );
+    await expect
+      .soft(results.getByText('Student 25', { exact: true }))
+      .toHaveCount(1);
     await shoot(
       page,
       'five groups of the 24 present, without number 7',
@@ -218,129 +308,36 @@ test.describe('classroom group creator', () => {
     // the board above it. Visible AND worded: `toHaveText` reads
     // `textContent`, which a hidden note still carries.
     const note = page.locator('#cg-grouped-note');
-    await expect(note).toBeVisible();
-    await expect(note).toHaveText('24 of 25 grouped — number 7 is absent.');
+    await expect.soft(note).toBeVisible();
+    await expect
+      .soft(note)
+      .toHaveText('24 of 25 grouped — number 7 is absent.');
     await shoot(page, 'the note names who is absent', note);
   });
 
-  // #188, AC12: a bad number "re-validates immediately and refuses, rather
-  // than failing at Generate". The refusal SENTENCE was asserted in the
-  // announcements spec; the refusal ITSELF -- the shuffle being blocked --
-  // was not, which a mutation made obvious: `updateGoButton` could have
-  // ignored the number fields entirely and every test still passed.
-  //
-  // The gate has two sources and they live apart. Its roster half is in
-  // classroom-groups-roster.spec.ts ('a duplicate number is refused as it is
-  // typed', 'a together-and-apart clash is refused as it is typed'); this is
-  // the number-field half. They cannot be tested together -- a roster
-  // disables these fields outright (AC14) -- so a comment naming the other
-  // half is more honest than a describe pretending the fact has one home.
-  test('a refused number blocks the shuffle until it is corrected', async ({
+  // Groups of four, walked once on one page with every check soft: the
+  // split, the operator's no-small-group rule, the readable results, the
+  // sentence the summary reads as, and the refusal that clears a stale label.
+  test('splitting by group size shows every student once, never a small group, then refuses', async ({
     page,
   }) => {
-    const go = page.getByRole('button', { name: 'Make groups' });
-    await page.goto('/classroom-groups');
-
-    // Enabled FIRST. Disabled is not the default here, but asserting it
-    // anyway is what stops "it is disabled" passing against a page where the
-    // button never worked at all.
-    await expect(go).toBeEnabled();
-    await shoot(page, 'Make groups enabled before anything is typed', go);
-
-    await typeInto(page.locator('#cg-count'), '25');
-    await typeInto(page.locator('#cg-numbers-absent'), '26');
-    await expect(page.locator('#cg-numbers-problem')).toBeVisible();
-    await shoot(
-      page,
-      'number 26 refused in a class of 25',
-      page.locator('.number-fields'),
-    );
-    await expect(go).toBeDisabled();
-    await shoot(page, 'Make groups disabled while the refusal stands', go);
-
-    // And the recovery direction, which is the one that proves the gate is
-    // not simply stuck shut once it has closed.
-    await typeInto(page.locator('#cg-numbers-absent'), '7');
-    await expect(page.locator('#cg-numbers-problem')).toBeHidden();
-    await shoot(
-      page,
-      'corrected to 7, the refusal is gone',
-      page.locator('.number-fields'),
-    );
-    await expect(go).toBeEnabled();
-    await shoot(page, 'Make groups enabled again', go);
-  });
-
-  // #188, AC12, the direction the AC actually names. The guard above types a
-  // number the class cannot hold; the AC's subject is the COUNT moving --
-  // "lowering the count below a number already typed re-validates immediately
-  // and refuses, rather than failing at Generate". Those are different code
-  // paths. A refusal on the number field's own keystroke needs only a listener
-  // on that field; a refusal when the COUNT changes works solely because the
-  // form's `input` listener is delegated and takes no `event.target`
-  // (src/scripts/classroom-groups.ts:1098). Keyed to its target, or with
-  // `updateNumbersValidation()` dropped from it, the guard above stays green
-  // and a teacher learns only at "Make groups" that the number they typed no
-  // longer exists. Measured rather than assumed: M18.
-  test('lowering the count refuses a number that was valid when it was typed', async ({
-    page,
-  }) => {
-    const go = page.getByRole('button', { name: 'Make groups' });
-    const problem = page.locator('#cg-numbers-problem');
-    await page.goto('/classroom-groups');
-
-    // Clean FIRST, and by count as well as visibility: `toBeHidden` passes for
-    // an element that does not exist, so a renamed id would satisfy this line
-    // on its own and leave the refusal below as the only thing asserting.
-    await typeInto(page.locator('#cg-count'), '25');
-    await typeInto(page.locator('#cg-numbers-absent'), '20');
-    await expect(problem).toHaveCount(1);
-    await expect(problem).toBeHidden();
-    await expect(go).toBeEnabled();
-    await shoot(
-      page,
-      'number 20 absent from a class of 25, accepted',
-      page.locator('.number-fields'),
-    );
-
-    // The class shrinks underneath it. No click: the refusal has to arrive on
-    // the count's own keystroke, which is the whole of AC12.
-    await typeInto(page.locator('#cg-count'), '10');
-    await expect(problem).toBeVisible();
-    await expect(problem).toHaveText(
-      'There is no number 20. You have 10 students.',
-    );
-    await expect(go).toBeDisabled();
-    await shoot(
-      page,
-      'the class shrinks to 10 and number 20 is refused on the keystroke',
-      page.locator('.number-fields'),
-    );
-
-    // Raising it back clears the refusal, so the gate is not stuck shut once
-    // it has closed -- the recovery direction the guard above proves for the
-    // other path.
-    await typeInto(page.locator('#cg-count'), '25');
-    await expect(problem).toBeHidden();
-    await expect(go).toBeEnabled();
-    await shoot(
-      page,
-      'raised back to 25, the refusal is gone',
-      page.locator('.number-fields'),
-    );
-  });
-
-  test('splits a class and shows every student exactly once', async ({
-    page,
-  }) => {
+    const go = page.locator('#cg-go');
+    const count = page.locator('#cg-count');
     await page.goto('/classroom-groups');
     await fill(page, { count: '22', size: '4' });
-    await tapOn(page.locator('#cg-go'));
+    await tapOn(go);
 
     // 22 students in groups of 4 => 5 groups.
-    await expect(page.locator('#cg-results .group')).toHaveCount(5);
-    await expect(page.locator('#cg-results .student')).toHaveCount(22);
-    await expect(page.locator('#cg-summary')).toContainText('22');
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(5);
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(22);
+    await expect.soft(page.locator('#cg-summary')).toContainText('22');
+    // The summary reads as a sentence, singular included below. The page said
+    // "1 groups from 7 students." since it shipped, and the old assertion was
+    // toContainText('22') -- a bare number, which would also have passed with
+    // the arguments the wrong way round.
+    await expect
+      .soft(page.locator('#cg-summary'))
+      .toHaveText('5 groups from 22 students.');
     await shoot(
       page,
       'five groups holding all 22 students',
@@ -351,31 +348,60 @@ test.describe('classroom group creator', () => {
     // grouped than typed. Counted first, because `toBeHidden` also passes
     // for an element that does not exist at all.
     const note = page.locator('#cg-grouped-note');
-    await expect(note).toHaveCount(1);
-    await expect(note).toBeHidden();
-  });
+    await expect.soft(note).toHaveCount(1);
+    await expect.soft(note).toBeHidden();
 
-  test('never makes a group smaller than the size asked for', async ({
-    page,
-  }) => {
     // The operator's core rule: 7 students in groups of 4 is ONE group of 7,
     // not 4 and 3.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '7', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-
-    await expect(page.locator('#cg-results .group')).toHaveCount(1);
-    await expect(page.locator('#cg-results .student')).toHaveCount(7);
+    await typeInto(count, '7');
+    await tapOn(go);
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(1);
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(7);
+    await expect
+      .soft(page.locator('#cg-summary'))
+      .toHaveText('1 group from 7 students.');
     await shoot(
       page,
       'one group of 7, never a 4 and a 3',
       page.locator('#cg-results'),
     );
+
+    // The whole accessibility argument: the answer exists as text regardless
+    // of whether anyone watched it being dealt.
+    await typeInto(count, '8');
+    await tapOn(go);
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(8);
+    await expect
+      .soft(page.locator('#cg-results .student').first())
+      .toBeVisible();
+    await expect.soft(go).toHaveText('Shuffle again');
+
+    // Now a refusal. Offering to reshuffle results that are no longer on
+    // screen is an offer the page cannot keep.
+    await typeInto(count, '0');
+    await tapOn(go);
+    await expect.soft(page.locator('#cg-error')).toBeVisible();
+    await expect.soft(go).toHaveText('Make Groups');
   });
 
-  test('numbers students since there is no roster to name them from yet', async ({
+  test('a mis-keyed class size is refused, then students are numbered and split by number of groups', async ({
     page,
   }) => {
+    await page.goto('/classroom-groups');
+
+    // Before the cap this allocated 100 million objects and the tab died --
+    // on a phone, taking the browser with it.
+    await fill(page, { count: '100000000', size: '4' });
+    await tapOn(page.locator('#cg-go'));
+    await expect
+      .soft(page.locator('#cg-error'))
+      .toHaveText(
+        'That is more students than this tool will take. The most is 100.',
+      );
+    // Still alive and still usable, which is the actual claim.
+    await expect.soft(page.locator('#cg-go')).toBeEnabled();
+    await expect.soft(page.locator('#cg-results')).toBeHidden();
+
     // The paste-names box is gone: it fed `students: string[]`, an input
     // shape the rewritten engine no longer accepts (see grouping.ts's
     // GroupingInput). Numbered students are the only mode there is until a
@@ -390,56 +416,78 @@ test.describe('classroom group creator', () => {
     // like "Student NaN" -- Student.number carries no whole/positive
     // validation on the record path (see the stage-2 ledger) -- so this
     // pins each full sentence, not a fragment of one.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '4', size: '2' });
+    await typeInto(page.locator('#cg-count'), '4');
+    await typeInto(page.locator('#cg-size'), '2');
     await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
-    expect(labels.sort()).toEqual([
-      'Student 1',
-      'Student 2',
-      'Student 3',
-      'Student 4',
-    ]);
+    expect
+      .soft(labels.sort())
+      .toEqual(['Student 1', 'Student 2', 'Student 3', 'Student 4']);
+
+    // The whole second half of the "how to split them" fieldset -- reachable
+    // from the page, and until now asserted by nothing.
+    await typeInto(page.locator('#cg-count'), '20');
+    await setCheckedOn(page.locator('input[name="mode"][value="groupCount"]'));
+    await typeInto(page.locator('#cg-groups'), '3');
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(3);
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(20);
   });
 
   // Task 8, the locale sweep. studentsHelp used to read "Leave the names box
   // empty to use numbered students." -- the paste-names box it describes was
-  // removed by Task 1's engine rewrite (see 'the paste-names box and the
-  // keep-apart box are gone' above), so this sentence had been describing a
-  // control that no longer exists on the page since stage 2 began. Nothing
+  // removed by Task 1's engine rewrite, so this sentence had been describing
+  // a control that no longer exists on the page since stage 2 began. Nothing
   // pinned its literal text before now, so the drift shipped silently.
   // Rewritten to state what is actually true today -- every student this
-  // field produces is anonymous and numbered -- matching the exact label
-  // 'numbers students since there is no roster to name them from yet' above
-  // already proves the results themselves carry ("Student 1", "Student 2",
-  // …). Would fail on either the old sentence returning or a typo dropping
-  // "numbered"/"anonymous".
-  test('the help text under Number of students describes what happens now, not the removed names box', async ({
+  // field produces is anonymous and numbered -- matching the labels the
+  // splitting journey above already proves the results themselves carry
+  // ("Student 1", "Student 2", …). Would fail on either the old sentence
+  // returning or a typo dropping "numbered"/"anonymous".
+  //
+  // The defaults are read first, before anything is pressed, and the page's
+  // own load is what the audio requests are measured against: Sound stays ON
+  // (the default) and speed stays 'normal' (not 'skip') -- the on-load
+  // prefetch trigger fires for all six purely from loading the page, with no
+  // form interaction at all. The animation runs last.
+  test('on load the page fetches only its own six sounds, then a fast shuffle deals every card and settles', async ({
     page,
   }) => {
+    const seen = recordRequests(page);
     await page.goto('/classroom-groups');
-    await expect(page.locator('#cg-count-help')).toHaveText(
-      'Students are anonymous and numbered — Student 1, Student 2, and so on.',
-    );
-  });
 
-  test('results are readable with the animation skipped', async ({ page }) => {
-    // The whole accessibility argument: the answer exists as text regardless
-    // of whether anyone watched it being dealt.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '8', size: '4', speed: 'skip' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .student')).toHaveCount(8);
-    await expect(page.locator('#cg-results .student').first()).toBeVisible();
-  });
+    // The paste-names box and the keep-apart box are gone.
+    await expect.soft(page.locator('#cg-names')).toHaveCount(0);
+    await expect.soft(page.locator('#cg-apart')).toHaveCount(0);
+    await expect
+      .soft(page.locator('#cg-count-help'))
+      .toHaveText(
+        'Students are anonymous and numbered — Student 1, Student 2, and so on.',
+      );
 
-  test('the animation deals every card and settles', async ({ page }) => {
-    await page.goto('/classroom-groups');
+    // Polled, not read once. The six `fetch` calls are issued during module
+    // evaluation, but their request events reach Node asynchronously over the
+    // browser protocol -- reading the array the instant `goto` resolved is
+    // exactly what CI caught returning `[]` (run 34391533802). Polling to an
+    // exact 6 still fails on five or seven: it waits for the count, it does
+    // not accept whatever count has arrived.
+    await expect
+      .poll(() => seen.matching(urlMatching(AUDIO_URL_PATTERN)).length)
+      .toBe(6);
+    const pageOrigin = new URL(page.url()).origin;
+    for (const url of seen.matching(urlMatching(AUDIO_URL_PATTERN))) {
+      // The CLAUDE.md/no-third-party-requests promise, asserted directly --
+      // the origin, not just that six requests happened to fire.
+      expect.soft(new URL(url).origin).toBe(pageOrigin);
+    }
+
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     await tapOn(page.locator('#cg-go'));
     // Auto-retries until the deal finishes — no timing bet.
-    await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
-    await expect(page.locator('#cg-go')).toBeEnabled();
+    await expect
+      .soft(page.locator('#cg-results .student.dealt'))
+      .toHaveCount(6);
+    await expect.soft(page.locator('#cg-go')).toBeEnabled();
   });
 
   test('with sound muted, running the animation creates no AudioContext at all', async ({
@@ -476,7 +524,7 @@ test.describe('classroom group creator', () => {
   // Task 9: the operator picked sound set C, six real CC0 files at
   // src/assets/sfx/ (provenance and licence in that directory's own
   // CREDITS.md), imported through Vite in classroom-groups.ts's own "sound"
-  // section. The five tests below are what actually protect that: the
+  // section. The tests below, and the load-time journey above, are what actually protect that: the
   // files really ship and really serve; sound-off and reduced-motion really
   // download nothing (the CLAUDE.md/third-party-requests promise, asserted
   // rather than assumed); sound-on requests really are ours, same-origin;
@@ -526,11 +574,18 @@ test.describe('classroom group creator', () => {
     });
   });
 
-  test('with sound off, a full shuffle fetches no audio at all', async ({
+  test('a muted choice survives a reload, and a full shuffle then fetches no audio at all', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
+    // Stage 2, Task 7: the checkbox now lives inside #cg-sound-body, and
+    // every visit starts with every tool section collapsed (design spec
+    // section 11 names only the how-to state and a later print panel as
+    // the UI preferences allowed to persist) -- so it has to be reopened
+    // after the reload below too, not just before the first check.
     await tapOn(page.locator('#cg-sound-toggle'));
+    // Sound is ON by default (operator decision).
+    await expect.soft(page.locator('#cg-sound-check')).toBeChecked();
     await setCheckedOn(page.locator('#cg-sound-check'), false);
 
     const seen = recordRequests(page);
@@ -541,50 +596,45 @@ test.describe('classroom group creator', () => {
     // exercise -- see that section's own doc comment.
     await page.reload();
     await tapOn(page.locator('#cg-sound-toggle'));
-    await expect(page.locator('#cg-sound-check')).not.toBeChecked();
+    await expect.soft(page.locator('#cg-sound-check')).not.toBeChecked();
 
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
-    const heard = requestsEveryEngineMakes(seen.all);
-    expect(
-      searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
-        of: heard,
-        what: 'requests the page made',
-      }),
-      'sound off means the assets are never downloaded',
-    ).toEqual([]);
-  });
-
-  test('with sound on, the audio requests that happen are exactly ours and same-origin', async ({
-    page,
-  }) => {
-    const seen = recordRequests(page);
-
-    // Sound stays ON (the default) and speed stays 'normal' (not 'skip') --
-    // the on-load prefetch trigger fires for all six purely from loading the
-    // page, with no form interaction at all.
-    await page.goto('/classroom-groups');
-
-    // Polled, not read once. The six `fetch` calls are issued during module
-    // evaluation, but their request events reach Node asynchronously over the
-    // browser protocol -- reading the array the instant `goto` resolved is
-    // exactly what CI caught returning `[]` (run 34391533802). Polling to an
-    // exact 6 still fails on five or seven: it waits for the count, it does
-    // not accept whatever count has arrived.
     await expect
-      .poll(() => seen.matching(urlMatching(AUDIO_URL_PATTERN)).length)
-      .toBe(6);
-    const pageOrigin = new URL(page.url()).origin;
-    for (const url of seen.matching(urlMatching(AUDIO_URL_PATTERN))) {
-      // The CLAUDE.md/no-third-party-requests promise, asserted directly --
-      // the origin, not just that six requests happened to fire.
-      expect(new URL(url).origin).toBe(pageOrigin);
-    }
+      .soft(page.locator('#cg-results .student.dealt'))
+      .toHaveCount(6);
+    // The choice is still the remembered one after the shuffle ran on it.
+    await expect.soft(page.locator('#cg-sound-check')).not.toBeChecked();
+    const heard = requestsEveryEngineMakes(seen.all);
+    expect
+      .soft(
+        searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+          of: heard,
+          what: 'requests the page made',
+        }),
+        'sound off means the assets are never downloaded',
+      )
+      .toEqual([]);
   });
 
   test.describe('a reduced-motion visitor', () => {
-    test('downloads no audio at all', async ({ page }) => {
+    /**
+     * The longest duration in a computed `transition-duration` list, in whole
+     * microseconds. Engines write 0.01ms differently (`1e-05s`, `0.00001s`),
+     * so it is compared as a number, never as text.
+     */
+    const longestMicroseconds = (durations: string): number =>
+      Math.max(
+        ...durations.split(',').map((duration) => {
+          const time = /^\s*([\d.e+-]+)(ms|s)\s*$/.exec(duration);
+          if (time === null) throw new Error(`not a CSS time: ${duration}`);
+          return Math.round(Number(time[1]) * (time[2] === 's' ? 1e6 : 1e3));
+        }),
+      );
+
+    test('downloads no audio and sees every dealt card at rest, with nothing left to move', async ({
+      page,
+    }) => {
       const seen = recordRequests(page);
 
       // `page.emulateMedia`, not `test.use({ reducedMotion: 'reduce' })`:
@@ -601,49 +651,20 @@ test.describe('classroom group creator', () => {
       // zero downloads, not just zero sound -- a real bandwidth promise on
       // a phone (see classroom-groups.ts's own "sound asset network
       // prefetch" section).
-      await expect(page.locator('#cg-speed')).toHaveValue('skip');
+      await expect.soft(page.locator('#cg-speed')).toHaveValue('skip');
       await typeInto(page.locator('#cg-count'), '6');
       await tapOn(page.locator('#cg-go'));
-      await expect(page.locator('#cg-results .student')).toHaveCount(6);
-      const heard = requestsEveryEngineMakes(seen.all);
-      expect(
-        searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
-          of: heard,
-          what: 'requests the page made',
-        }),
-        'a reduced-motion visitor downloads no audio at all',
-      ).toEqual([]);
-    });
+      const cards = page.locator('#cg-results .student');
+      await expect.soft(cards).toHaveCount(6);
 
-    /**
-     * The longest duration in a computed `transition-duration` list, in whole
-     * microseconds. Engines write 0.01ms differently (`1e-05s`, `0.00001s`),
-     * so it is compared as a number, never as text.
-     */
-    const longestMicroseconds = (durations: string): number =>
-      Math.max(
-        ...durations.split(',').map((duration) => {
-          const time = /^\s*([\d.e+-]+)(ms|s)\s*$/.exec(duration);
-          if (time === null) throw new Error(`not a CSS time: ${duration}`);
-          return Math.round(Number(time[1]) * (time[2] === 's' ? 1e6 : 1e3));
-        }),
-      );
-
-    test('sees every dealt card at rest, with nothing left to move', async ({
-      page,
-    }) => {
       // The mechanism that works, asserted as itself (#331): tokens.css's
       // reset cuts every transition to 0.01ms, and the script's forced `skip`
       // deals every card at once. The page's scoped <style> once carried a
       // reduced-motion rule for the cards that matched none of them, because
       // the script builds every card and none carries the component's scope.
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.goto('/classroom-groups');
-      await typeInto(page.locator('#cg-count'), '6');
-      await tapOn(page.locator('#cg-go'));
-      const cards = page.locator('#cg-results .student');
-      await expect(cards).toHaveCount(6);
-      await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
+      await expect
+        .soft(page.locator('#cg-results .student.dealt'))
+        .toHaveCount(6);
 
       const atRest = {
         transition: 'at most 0.01ms',
@@ -678,6 +699,18 @@ test.describe('classroom group creator', () => {
         'every dealt card at rest for a reduced-motion visitor',
         page.locator('#cg-results'),
       );
+      await expect.soft(cards).toHaveCount(6);
+
+      const heard = requestsEveryEngineMakes(seen.all);
+      expect
+        .soft(
+          searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
+            of: heard,
+            what: 'requests the page made',
+          }),
+          'a reduced-motion visitor downloads no audio at all',
+        )
+        .toEqual([]);
     });
   });
 
@@ -697,8 +730,8 @@ test.describe('classroom group creator', () => {
     await fill(page, { count: '6', size: '3', speed: 'fast' });
     await tapOn(page.locator('#cg-go'));
 
-    // Same assertions "the animation deals every card and settles" already
-    // makes for the unblocked case -- the point here is that blocking every
+    // Same assertions the load-time journey ("a fast shuffle deals every card and
+    // settles") already makes for the unblocked case -- the point here is that blocking every
     // audio request changes nothing about this outcome.
     await expect(page.locator('#cg-results .student.dealt')).toHaveCount(6);
     await expect(page.locator('#cg-go')).toBeEnabled();
@@ -707,85 +740,6 @@ test.describe('classroom group creator', () => {
     await reported.expectNoUncaught(
       'blocking every audio request must not surface as an uncaught error',
     );
-  });
-
-  test('splits by number of groups, not just by group size', async ({
-    page,
-  }) => {
-    // The whole second half of the "how to split them" fieldset — reachable
-    // from the page, and until now asserted by nothing.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '20', groups: '3' });
-    await tapOn(page.locator('#cg-go'));
-
-    await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await expect(page.locator('#cg-results .student')).toHaveCount(20);
-  });
-
-  test('a mis-keyed class size is refused, not attempted', async ({ page }) => {
-    // Before the cap this allocated 100 million objects and the tab died —
-    // on a phone, taking the browser with it.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '100000000', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-
-    await expect(page.locator('#cg-error')).toHaveText(
-      'That is more students than this tool will take. The most is 100.',
-    );
-    // Still alive and still usable, which is the actual claim.
-    await expect(page.locator('#cg-go')).toBeEnabled();
-    await expect(page.locator('#cg-results')).toBeHidden();
-  });
-
-  test('the summary reads as a sentence, singular included', async ({
-    page,
-  }) => {
-    // The tool's own headline case, and the page has said "1 groups from 7
-    // students." since it shipped. The old assertion was toContainText('22')
-    // — a bare number, which would also have passed with the arguments the
-    // wrong way round.
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '7', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-summary')).toHaveText(
-      '1 group from 7 students.',
-    );
-
-    await fill(page, { count: '22', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-summary')).toHaveText(
-      '5 groups from 22 students.',
-    );
-  });
-
-  test('the error clears the stale "Shuffle again" label', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '8', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-go')).toHaveText('Shuffle again');
-
-    // Now a refusal. Offering to reshuffle results that are no longer on
-    // screen is an offer the page cannot keep.
-    await fill(page, { count: '0', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-error')).toBeVisible();
-    await expect(page.locator('#cg-go')).toHaveText('Make Groups');
-  });
-
-  test('the mute choice survives a reload', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    // Stage 2, Task 7: the checkbox now lives inside #cg-sound-body, and
-    // every visit starts with every tool section collapsed (design spec
-    // section 11 names only the how-to state and a later print panel as
-    // the UI preferences allowed to persist) -- so it has to be reopened
-    // after the reload below too, not just before the first check.
-    await tapOn(page.locator('#cg-sound-toggle'));
-    // Sound is ON by default (operator decision).
-    await expect(page.locator('#cg-sound-check')).toBeChecked();
-    await setCheckedOn(page.locator('#cg-sound-check'), false);
-    await page.reload();
-    await tapOn(page.locator('#cg-sound-toggle'));
-    await expect(page.locator('#cg-sound-check')).not.toBeChecked();
   });
 });
 
@@ -800,78 +754,83 @@ test.describe('class name and results heading', () => {
   // (`#cg-tables`, where the script actually appends group cards) -- the
   // same class of locator mistake Task 1/Task 2's own ledger entries
   // already record and correct.
-  test('the class name heads the results, once', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await typeInto(page.getByLabel('Class (optional)'), '7B');
-    await fill(page, { count: '9', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
-    await expect(page.locator('#cg-tables').getByText('7B')).toHaveCount(0);
-  });
-
-  // the uncommitted #9 task brief's own count (9 students at the page's default group
-  // size, 4) predicted `#cg-groups .group` would have count 3. The engine's
-  // own targetSizes (src/lib/grouping.ts) says otherwise: groupCount =
-  // floor(9/4) = 2, not ceil -- the same "never smaller than the size you
-  // asked for" rule this file already pins above ('never makes a group
-  // smaller than the size asked for'). Confirmed against grouping.test.ts's
-  // own "Derivation: base = floor(9/4) = 2, remainder = 9 - 8 = 1" comment
-  // before writing this, rather than trusting the brief's arithmetic.
-  // Honestly: this passes even before #cg-class exists, since it never
-  // references the field at all -- confirmed, not assumed, by running it
-  // against the untouched page before implementing anything (RED baseline).
-  // It is not decoration, though: it pins the exact branch
-  // resultsHeadingText takes when nothing was typed, which is the same
-  // branch a teacher who never opens the class field exercises on the real
-  // page. What would redden it: a bug in that blank check (e.g. reading
-  // `classInput.value` before it exists, or comparing against `''` without
-  // `.trim()` so a later whitespace-only fix regresses), or the page's own
-  // default group size changing out from under the `.toHaveCount(2)` below.
-  test('a blank class name blocks nothing', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await fill(page, { count: '9', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
-    await expect(page.locator('#cg-results .group')).toHaveCount(2);
-    await expect(page.locator('#cg-results .student')).toHaveCount(9);
-  });
-
-  // Design spec section 8 says blank "blocks nothing" -- a teacher who
-  // fat-fingers the space bar has not typed a name a class would recognise
-  // as its own either. Distinct from the never-filled case above: this is
-  // the one place the `.trim()` blank-test is proven through the real
-  // control, not just the pure function (tests/unit/i18n.test.ts covers
-  // resultsHeadingText directly).
-  test('a class name of only spaces is treated as no class name', async ({
+  //
+  // One page, one split, every check soft. The blank field comes first,
+  // because nothing has been typed into it yet; then spaces, then a name,
+  // then a different name on the next shuffle.
+  test('the class name heads the results once, blank or spaces change nothing, a new name is picked up', async ({
     page,
   }) => {
+    const heading = page.locator('#cg-results-h');
+    const classField = page.getByLabel('Class (optional)');
     await page.goto('/classroom-groups');
-    await typeInto(page.getByLabel('Class (optional)'), '   ');
     await fill(page, { count: '9', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('Your groups');
-  });
 
-  // Corrected from the uncommitted #9 task brief's own `#cg-groups .group h3` locator --
-  // same mistake as above. Filling the class field first is what makes this
-  // a real test of THIS task's own wiring rather than a pin of
-  // stage-3-owned behaviour: a naive implementation that broke
-  // render()/groupName()'s call order while adding the heading write would
-  // show up here. The claim "groups are always numbered" -- i.e. that the
-  // theme picker and the naming radio are gone -- was stage 3's own removal
-  // (design spec section 3, delivery item 3; landed by Task 8, tested in
-  // classroom-groups-controls.spec.ts's "the theme select and the naming
-  // radio are gone" / "groups are numbered, always") and is NOT re-tested
-  // here; this only pins that setting a class name does not disturb today's
-  // numbered DEFAULT.
-  test('groups stay numbered when a class name is set', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await typeInto(page.getByLabel('Class (optional)'), '7B');
-    await fill(page, { count: '9', size: '4' });
+    // the uncommitted #9 task brief's own count (9 students at the page's default group
+    // size, 4) predicted `#cg-groups .group` would have count 3. The engine's
+    // own targetSizes (src/lib/grouping.ts) says otherwise: groupCount =
+    // floor(9/4) = 2, not ceil -- the same "never smaller than the size you
+    // asked for" rule the splitting journey above pins. Confirmed against
+    // grouping.test.ts's own "Derivation: base = floor(9/4) = 2, remainder =
+    // 9 - 8 = 1" comment before writing this, rather than trusting the
+    // brief's arithmetic.
+    // Honestly: this passes even before #cg-class exists, since it never
+    // references the field at all -- confirmed, not assumed, by running it
+    // against the untouched page before implementing anything (RED baseline).
+    // It is not decoration, though: it pins the exact branch
+    // resultsHeadingText takes when nothing was typed, which is the same
+    // branch a teacher who never opens the class field exercises on the real
+    // page. What would redden it: a bug in that blank check (e.g. reading
+    // `classInput.value` before it exists, or comparing against `''` without
+    // `.trim()` so a later whitespace-only fix regresses), or the page's own
+    // default group size changing out from under the `.toHaveCount(2)` below.
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .group h3').first()).toHaveText(
-      'Group 1',
-    );
+    await expect.soft(heading).toHaveText('Your groups');
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(2);
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(9);
+
+    // Design spec section 8 says blank "blocks nothing" -- a teacher who
+    // fat-fingers the space bar has not typed a name a class would recognise
+    // as its own either. Distinct from the never-filled case above: this is
+    // the one place the `.trim()` blank-test is proven through the real
+    // control, not just the pure function (tests/unit/i18n.test.ts covers
+    // resultsHeadingText directly).
+    await typeInto(classField, '   ');
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(heading).toHaveText('Your groups');
+
+    // Filling the class field is what makes this a real test of THIS task's
+    // own wiring rather than a pin of stage-3-owned behaviour: a naive
+    // implementation that broke render()/groupName()'s call order while
+    // adding the heading write would show up here. The claim "groups are
+    // always numbered" -- i.e. that the theme picker and the naming radio are
+    // gone -- was stage 3's own removal (design spec section 3, delivery item
+    // 3; landed by Task 8, tested in classroom-groups-controls.spec.ts's "the
+    // theme select and the naming radio are gone" / "groups are numbered,
+    // always") and is NOT re-tested here; this only pins that setting a class
+    // name does not disturb today's numbered DEFAULT.
+    await typeInto(classField, '7B');
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(heading).toHaveText('7B — your groups');
+    await expect
+      .soft(page.locator('#cg-tables').getByText('7B'))
+      .toHaveCount(0);
+    await expect
+      .soft(page.locator('#cg-results .group h3').first())
+      .toHaveText('Group 1');
+
+    // The class name is read fresh at every submit (classroom-groups.ts), not
+    // captured once -- a second shuffle with a different name in the field
+    // must show the NEW name, not the first one cached. This is about the
+    // correctness of THIS task's own wiring, not the staleness/dimming
+    // behaviour a later task owns (design spec section 8's "when the class
+    // changes after a shuffle") -- nothing here asserts the old groups are
+    // marked out of date, only that the heading itself keeps up.
+    await typeInto(classField, '8C');
+    // Nothing has been submitted yet, so the heading still reads the old name.
+    await expect.soft(heading).toHaveText('7B — your groups');
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(heading).toHaveText('8C — your groups');
   });
 
   // "A teacher's typed text is theirs" -- the class name reaches the DOM
@@ -883,7 +842,15 @@ test.describe('class name and results heading', () => {
   // from the rendered TEXT and its `onerror` would fire (a dialog opening)
   // -- so the exact literal string surviving, with no `<img>` ELEMENT ever
   // created and no dialog raised, is the only way this test can pass.
-  test('a class name is rendered literally, HTML metacharacters included', async ({
+  //
+  // Then design spec section 9: "The class name is made safe for a filename,
+  // and only there... The class name itself is never altered -- not on the
+  // page, not in the `# Class:` line, not in the results heading." Filenames
+  // are stage 4's own scope, but that line's promise about the results
+  // heading is testable now, so it is pinned now rather than left to
+  // whichever task builds the filename. A slash is the design doc's own
+  // example of a filename-unsafe character (`Year 7 / Set B`).
+  test('a class name is rendered literally, HTML metacharacters and a slash included', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
@@ -898,30 +865,17 @@ test.describe('class name and results heading', () => {
     // alone rather than going through fill().
     await chooseSpeed(page, 'skip');
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText(
-      `${raw} — your groups`,
-    );
-    await expect(page.locator('#cg-results-h img')).toHaveCount(0);
-    expect(dialogFired).toBe(false);
-  });
+    await expect
+      .soft(page.locator('#cg-results-h'))
+      .toHaveText(`${raw} — your groups`);
+    await expect.soft(page.locator('#cg-results-h img')).toHaveCount(0);
+    expect.soft(dialogFired).toBe(false);
 
-  // Design spec section 9: "The class name is made safe for a filename, and
-  // only there... The class name itself is never altered -- not on the
-  // page, not in the `# Class:` line, not in the results heading."
-  // Filenames are stage 4's own scope, but that line's promise about the
-  // results heading is testable now, so it is pinned now rather than left
-  // to whichever task builds the filename. A slash is the design doc's own
-  // example of a filename-unsafe character (`Year 7 / Set B`).
-  test('filename-unsafe characters reach the heading unaltered', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
-    await chooseSpeed(page, 'skip');
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText(
-      'Year 7 / Set B — your groups',
-    );
+    await expect
+      .soft(page.locator('#cg-results-h'))
+      .toHaveText('Year 7 / Set B — your groups');
   });
 
   // CLAUDE.md's own rule: no horizontal scroll at >= 320px, in any state. A
@@ -941,28 +895,6 @@ test.describe('class name and results heading', () => {
     await tapOn(page.locator('#cg-go'));
     await expect(page.locator('#cg-results-h')).toBeVisible();
     await expectNoHorizontalScroll(page);
-  });
-
-  // The class name is read fresh at every submit (classroom-groups.ts), not
-  // captured once -- a second shuffle with a different name in the field
-  // must show the NEW name, not the first one cached. This is about the
-  // correctness of THIS task's own wiring, not the staleness/dimming
-  // behaviour a later task owns (design spec section 8's "when the class
-  // changes after a shuffle") -- nothing here asserts the old groups are
-  // marked out of date, only that the heading itself keeps up.
-  test('a changed class name is picked up on the next shuffle', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    const classField = page.getByLabel('Class (optional)');
-    await typeInto(classField, '7B');
-    await fill(page, { count: '8', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('7B — your groups');
-
-    await typeInto(classField, '8C');
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('8C — your groups');
   });
 });
 
@@ -1025,22 +957,36 @@ test.describe('the Split by row names its own fields', () => {
 });
 
 test.describe('classroom group creator — Bahasa Indonesia', () => {
-  test('the Indonesian page is genuinely in Indonesian', async ({ page }) => {
+  // Mirrors the English journeys above -- "assert whole rendered sentences,
+  // in both locales" applies regardless of what the uncommitted #9 task
+  // brief's own snippet happened to show (it was English-only). One page, one
+  // walk, every check soft; the defaults are read before anything is pressed.
+  test('the Indonesian page is in Indonesian: labels, an error, the relabelled button and the class heading', async ({
+    page,
+  }) => {
     await page.goto('/id/classroom-groups');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'id');
-    await expect(page.locator('h1')).toHaveText('Pembuat Kelompok Kelas');
-    await expect(page.locator('#cg-go')).toHaveText('Buat Kelompok');
-  });
+    await expect.soft(page.locator('html')).toHaveAttribute('lang', 'id');
+    await expect.soft(page.locator('h1')).toHaveText('Pembuat Kelompok Kelas');
+    await expect.soft(page.locator('#cg-go')).toHaveText('Buat Kelompok');
+    // Task 8, the locale sweep. Mirrors the English 'the help text under
+    // Number of students…' check -- studentsHelp's Indonesian copy described
+    // the same removed paste-names box ("Biarkan kotak nama kosong untuk
+    // memakai siswa bernomor.") and had no test in either language.
+    await expect
+      .soft(page.locator('#cg-count-help'))
+      .toHaveText(
+        'Siswa bersifat anonim dan diberi nomor — Siswa 1, Siswa 2, dan seterusnya.',
+      );
 
-  test('anonymous students are labelled in Indonesian', async ({ page }) => {
     // Same whole-set assertion as the English cover above, for the same
     // reason: render order is genuinely shuffled, and a substring would
     // also pass for a malformed "Siswa NaN".
-    await page.goto('/id/classroom-groups');
     await fill(page, { count: '4', size: '2' });
     await tapOn(page.locator('#cg-go'));
     const labels = await page.locator('#cg-results .student').allTextContents();
-    expect(labels.sort()).toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
+    expect
+      .soft(labels.sort())
+      .toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
     // groupLabel's Indonesian output ("Kelompok N") was only ever proven at
     // the unit level (i18n.test.ts's groupName tests), never against the
     // real page in Indonesian -- the numbered heading every teacher sees
@@ -1048,73 +994,46 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
     // naming radio that used to choose between it and a themed heading are
     // both gone, design spec section 5) had no e2e assertion in Indonesian
     // at all before this test.
-    await expect(page.locator('#cg-results .group h3').first()).toHaveText(
-      'Kelompok 1',
-    );
-  });
+    await expect
+      .soft(page.locator('#cg-results .group h3').first())
+      .toHaveText('Kelompok 1');
+    // `again` ("Acak lagi") had no Indonesian assertion anywhere.
+    await expect.soft(page.locator('#cg-go')).toHaveText('Acak lagi');
 
-  test('errors are shown in Indonesian, not English', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await fill(page, { count: '0', size: '2' });
+    // Now a refusal: the error is Indonesian, and the button goes back to
+    // Buat Kelompok.
+    await typeInto(page.locator('#cg-count'), '0');
     await tapOn(page.locator('#cg-go'));
     const error = page.locator('#cg-error');
-    await expect(error).toBeVisible();
-    await expect(error).toContainText('Tambahkan siswa');
-  });
+    await expect.soft(error).toBeVisible();
+    await expect.soft(error).toContainText('Tambahkan siswa');
+    await expect.soft(page.locator('#cg-go')).toHaveText('Buat Kelompok');
 
-  // Task 8, the locale sweep. Mirrors the English 'the help text under
-  // Number of students…' test above -- studentsHelp's Indonesian copy
-  // described the same removed paste-names box ("Biarkan kotak nama kosong
-  // untuk memakai siswa bernomor.") and had no test in either language.
-  test('the help text under Jumlah siswa reads in Indonesian, as a whole sentence', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await expect(page.locator('#cg-count-help')).toHaveText(
-      'Siswa bersifat anonim dan diberi nomor — Siswa 1, Siswa 2, dan seterusnya.',
-    );
-  });
-
-  // Mirrors the English 'the error clears the stale "Shuffle again" label'
-  // test -- `again` ("Acak lagi") had no Indonesian assertion anywhere.
-  test('the button relabels to Acak lagi after a shuffle, and back to Buat Kelompok on a refusal', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await fill(page, { count: '8', size: '4' });
+    // The same refusal again at the default group size: the button relabels
+    // to Buat Kelompok on a refusal whatever the size was.
+    await typeInto(page.locator('#cg-size'), '4');
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-go')).toHaveText('Acak lagi');
+    await expect.soft(error).toBeVisible();
+    await expect.soft(page.locator('#cg-go')).toHaveText('Buat Kelompok');
 
-    await fill(page, { count: '0', size: '4' });
+    // Same honesty note as the English version: the blank class name passes
+    // before #cg-class exists too, for the same reason (never references the
+    // field), confirmed against the RED baseline rather than assumed.
+    await typeInto(page.locator('#cg-count'), '9');
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-error')).toBeVisible();
-    await expect(page.locator('#cg-go')).toHaveText('Buat Kelompok');
-  });
+    await expect
+      .soft(page.locator('#cg-results-h'))
+      .toHaveText('Kelompok Anda');
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(2);
 
-  // Mirrors the English 'class name and results heading' describe block
-  // above -- "assert whole rendered sentences, in both locales" applies
-  // regardless of what the uncommitted #9 task brief's own snippet happened to show (it
-  // was English-only).
-  test('the class name heads the results, once', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Kelas (opsional)'), '7B');
-    await fill(page, { count: '9', size: '4' });
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText(
-      '7B — kelompok Anda',
-    );
-    await expect(page.locator('#cg-tables').getByText('7B')).toHaveCount(0);
-  });
-
-  // Same honesty note as the English version above: passes before
-  // #cg-class exists too, for the same reason (never references the
-  // field), confirmed against the RED baseline rather than assumed.
-  test('a blank class name blocks nothing', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await fill(page, { count: '9', size: '4' });
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results-h')).toHaveText('Kelompok Anda');
-    await expect(page.locator('#cg-results .group')).toHaveCount(2);
+    await expect
+      .soft(page.locator('#cg-results-h'))
+      .toHaveText('7B — kelompok Anda');
+    await expect
+      .soft(page.locator('#cg-tables').getByText('7B'))
+      .toHaveCount(0);
   });
 });
 
@@ -1133,7 +1052,7 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
 // `#cg-grouping-body`, which starts collapsed -- the brief's snippet
 // predates that move. `#cg-go` is clicked by id throughout, not by
 // accessible name: its own label changes to "Shuffle again" after the first
-// success (see 'the error clears the stale "Shuffle again" label' above),
+// success (see the group-size splitting journey above, which checks that label),
 // and once results are stale, `#cg-stale`'s own button carries that SAME
 // name too -- `getByRole('button', { name: 'Shuffle again' })` would then
 // match two elements.
@@ -1144,107 +1063,154 @@ test.describe('out-of-date groups', () => {
     await expect(page.locator('#cg-results .group')).toHaveCount(3);
   };
 
-  test('changing the group size marks them out of date, naming the change', async ({
+  // One page, one shuffle, every check soft. The class name is typed first,
+  // while nothing is stale, and the old groups' opacity is read before the
+  // size changes.
+  test('a changed size or count marks the groups out of date, a class name does not, shuffling clears it', async ({
     page,
   }) => {
+    const results = page.locator('#cg-results');
+    const size = page.getByLabel('Students in each group');
+    const firstGroupOpacity = () =>
+      results
+        .locator('.group')
+        .first()
+        .evaluate((el) => getComputedStyle(el).opacity);
     await page.goto('/classroom-groups');
     await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await expect(
-      page.getByText('These groups are out of date — the group size changed.'),
-    ).toBeVisible();
+    const before = await firstGroupOpacity();
+
+    // The brief's own snippet also asserted `#cg-results-h` already read
+    // '7B — your groups' at this point. It does not, and confirming that
+    // against the RED baseline (before any staleness code existed) is what
+    // caught it: the heading is written once, at submit
+    // (classroom-groups.ts), and Task 5's own "a changed class name is
+    // picked up on the next shuffle" check already covers that timing
+    // directly. Typing a class name here does not reshuffle, so asserting a
+    // live heading update pins a DIFFERENT, already-false claim that has
+    // nothing to do with whether the change also marks the groups stale --
+    // which is the one thing this check's own name promises.
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
+    await expect.soft(page.getByText('out of date')).toHaveCount(0);
+
+    await typeInto(size, '3');
+    await expect
+      .soft(
+        page.getByText(
+          'These groups are out of date — the group size changed.',
+        ),
+      )
+      .toBeVisible();
+    // Pins the WHOLE sentence against the notice's own element, not just that
+    // SOME element on the page contains this text -- getByText above proves
+    // the sentence renders somewhere; this proves it renders exactly here.
+    // toHaveText is an EXACT match, unlike getByText's substring default, so
+    // a dropped trailing space or a second sentence glued on would fail this
+    // without failing the check above.
+    await expect
+      .soft(page.locator('#cg-stale-text'))
+      .toHaveText('These groups are out of date — the group size changed.');
+    await expect.soft(page.locator('#cg-stale')).toBeVisible();
+    // The old groups stay visible while stale.
+    await expect.soft(results.locator('.group')).toHaveCount(3);
+    // "Dimmed AND badged" (design spec section 8) -- the checks above only
+    // ever prove the cards are still PRESENT, never that anything about their
+    // appearance actually changed. This is the one that would catch a
+    // `.stale` class added to #cg-results with no CSS rule behind it at all.
+    await expect.soft(results).toHaveClass(/stale/);
+    expect.soft(Number(await firstGroupOpacity())).toBeLessThan(Number(before));
+
+    // Pinned in the OTHER direction too: staleness is a comparison against a
+    // fresh read of the form, not a flag, so putting the size back needs no
+    // code of its own to clear the notice.
+    await typeInto(size, '4');
+    await expect.soft(page.getByText('out of date')).toHaveCount(0);
+
+    // C-1 (review, task 6 fix): #cg-count ("Number of students") is the
+    // page's ONLY population control this stage -- there is no roster yet,
+    // so changing it is not cosmetic the way the class NAME is (above): it
+    // changes who the groups are actually made FROM. Before this fix,
+    // `snapshot()` (classroom-groups.ts) never read it at all, so shuffling
+    // 12 into 3 groups and then asking for 30 left the sheet showing three
+    // groups built from twelve students with no warning. `readRoster` folds
+    // the count into the SAME `roster` field staleness.ts's own Snapshot doc
+    // comment reserves for "a student was edited", rather than a parallel
+    // mechanism -- reusing `staleRoster`'s existing English ("the class list
+    // changed"), which is exactly what changing the count IS at this stage.
+    await typeInto(page.getByLabel('Number of students'), '30');
+    await expect
+      .soft(
+        page.getByText(
+          'These groups are out of date — the class list changed.',
+        ),
+      )
+      .toBeVisible();
+    // Same in the other direction: putting the count back clears it.
+    await typeInto(page.getByLabel('Number of students'), '12');
+    await expect.soft(page.getByText('out of date')).toHaveCount(0);
+
+    // Design spec section 8's own "the way out": the badge is not merely a
+    // notice, it is also how a teacher acts on it without scrolling back up
+    // to #cg-go. `form="cg-form"` associates the button to the form despite
+    // sitting outside it in the DOM -- proven here by getting the SAME
+    // reshuffle #cg-go itself would have produced, not by reading the
+    // attribute.
+    await typeInto(size, '3');
+    await expect.soft(page.locator('#cg-stale')).toBeVisible();
+    await tapOn(page.locator('#cg-stale button'));
+    await expect.soft(page.locator('#cg-stale')).toBeHidden();
+    // 12 students at the NEW size (3) => 4 groups. Proves a real reshuffle
+    // happened, not merely that the notice hid itself.
+    await expect.soft(results.locator('.group')).toHaveCount(4);
+
+    // And shuffling from the main button clears it too.
+    await typeInto(size, '4');
+    await expect.soft(page.locator('#cg-stale')).toBeVisible();
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(page.getByText('out of date')).toHaveCount(0);
   });
 
-  test('changing the leftovers choice marks them out of date', async ({
+  // The leftovers radio needs its section OPENED first: Stage 2, Task 4
+  // rehomed it inside `#cg-grouping-body`, which starts collapsed.
+  //
+  // The size test above never has TWO live changes at once -- the whole
+  // reason staleReason (src/lib/staleness.ts) is a comparison against a fresh
+  // read of the form, rather than a set of flags, is so this stays correct
+  // with no extra code: undoing the higher-priority change does not clear the
+  // notice, it just changes what the notice SAYS, because the very next
+  // recompute finds the leftovers mismatch still live.
+  test('the leftovers choice marks the groups out of date; with two changes, undoing one names the other', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
     await shuffle(page);
     await tapOn(page.locator('#cg-grouping-toggle'));
     await setCheckedOn(page.getByLabel('Put them all in one group'));
-    await expect(
-      page.getByText(
-        'These groups are out of date — the leftovers choice changed.',
-      ),
-    ).toBeVisible();
-  });
+    await expect
+      .soft(
+        page.getByText(
+          'These groups are out of date — the leftovers choice changed.',
+        ),
+      )
+      .toBeVisible();
 
-  // C-1 (review, task 6 fix): #cg-count ("Number of students") is the
-  // page's ONLY population control this stage -- there is no roster yet,
-  // so changing it is not cosmetic the way the class NAME is (see the very
-  // next test): it changes who the groups are actually made FROM. Before
-  // this fix, `snapshot()` (classroom-groups.ts) never read it at all, so
-  // shuffling 12 into 3 groups and then asking for 30 left the sheet
-  // showing three groups built from twelve students with no warning.
-  // `readRoster` folds the count into the SAME `roster` field
-  // staleness.ts's own Snapshot doc comment reserves for "a student was
-  // edited", rather than a parallel mechanism -- reusing `staleRoster`'s
-  // existing English ("the class list changed"), which is exactly what
-  // changing the count IS at this stage.
-  test('changing the number of students marks them out of date, naming the change', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Number of students'), '30');
-    await expect(
-      page.getByText('These groups are out of date — the class list changed.'),
-    ).toBeVisible();
-  });
-
-  // Pinned in the OTHER direction too, the same reason "undoing the
-  // change clears it" exists for group size below: staleness is a
-  // comparison against a fresh read of the form, not a flag, so putting
-  // the count back needs no code of its own to clear the notice.
-  test('undoing the count change clears it', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Number of students'), '30');
-    await typeInto(page.getByLabel('Number of students'), '12');
-    await expect(page.getByText('out of date')).toHaveCount(0);
-  });
-
-  // The brief's own snippet also asserted `#cg-results-h` already read
-  // '7B — your groups' at this point. It does not, and confirming that
-  // against the RED baseline (before any staleness code existed) is what
-  // caught it: the heading is written once, at submit
-  // (classroom-groups.ts), and Task 5's own "a changed class name is
-  // picked up on the next shuffle" test already covers that timing
-  // directly. Typing a class name here does not reshuffle, so asserting a
-  // live heading update pins a DIFFERENT, already-false claim that has
-  // nothing to do with whether the change also marks the groups stale --
-  // which is the one thing this test's own name promises.
-  test('the class name does NOT mark them out of date', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Class (optional)'), '7B');
-    await expect(page.getByText('out of date')).toHaveCount(0);
-  });
-
-  test('the old groups stay visible while stale', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
     await typeInto(page.getByLabel('Students in each group'), '3');
-    await expect(page.locator('#cg-results .group')).toHaveCount(3);
+    await typeInto(page.getByLabel('Students in each group'), '4'); // undoes ONLY the size change
+    await expect
+      .soft(
+        page.getByText(
+          'These groups are out of date — the leftovers choice changed.',
+        ),
+      )
+      .toBeVisible();
+    await expect.soft(page.locator('#cg-results')).toHaveClass(/stale/);
+
+    await setCheckedOn(page.getByLabel('Share them out evenly'));
+    await expect.soft(page.getByText('out of date')).toHaveCount(0);
+    await expect.soft(page.locator('#cg-results')).not.toHaveClass(/stale/);
   });
 
-  test('shuffling clears it', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.getByText('out of date')).toHaveCount(0);
-  });
-
-  test('undoing the change clears it', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await typeInto(page.getByLabel('Students in each group'), '4');
-    await expect(page.getByText('out of date')).toHaveCount(0);
-  });
-
-  // Stage 3, Task 9 (E-05…E-11). Every one of the tests above changes a
+  // Stage 3, Task 9 (E-05…E-11). Every one of the checks above changes a
   // control in the FORM. These four change the ROSTER, which reaches
   // `Snapshot.roster` by a different path -- `serialiseForCompare`
   // (src/lib/roster.ts) rather than `#cg-count` -- and so is only proven by
@@ -1416,145 +1382,54 @@ test.describe('out-of-date groups', () => {
     await expect(page.locator('#cg-results')).toContainText('Anna');
   });
 
-  // None of the six tests above ever has TWO live changes at once -- the
-  // whole reason staleReason (src/lib/staleness.ts) is a comparison against
-  // a fresh read of the form, rather than a set of flags, is so this stays
-  // correct with no extra code: undoing the higher-priority change does not
-  // clear the notice, it just changes what the notice SAYS, because the
-  // very next recompute finds the leftovers mismatch still live.
-  test('when two things change, undoing one still names the other', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await tapOn(page.locator('#cg-grouping-toggle'));
-    await setCheckedOn(page.getByLabel('Put them all in one group'));
-    await typeInto(page.getByLabel('Students in each group'), '4'); // undoes ONLY the size change
-    await expect(
-      page.getByText(
-        'These groups are out of date — the leftovers choice changed.',
-      ),
-    ).toBeVisible();
-    await expect(page.locator('#cg-results')).toHaveClass(/stale/);
-  });
-
-  test('when two things change, undoing both clears it', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await tapOn(page.locator('#cg-grouping-toggle'));
-    await setCheckedOn(page.getByLabel('Put them all in one group'));
-    await typeInto(page.getByLabel('Students in each group'), '4');
-    await setCheckedOn(page.getByLabel('Share them out evenly'));
-    await expect(page.getByText('out of date')).toHaveCount(0);
-    await expect(page.locator('#cg-results')).not.toHaveClass(/stale/);
-  });
-
-  // Pins the WHOLE sentence against the notice's own element, not just that
-  // SOME element on the page contains this text -- getByText above proves
-  // the sentence renders somewhere; this proves it renders exactly here.
-  // toHaveText is an EXACT match, unlike getByText's substring default, so
-  // a dropped trailing space or a second sentence glued on would fail this
-  // without failing the tests above.
-  test('the notice element itself carries the exact sentence', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await expect(page.locator('#cg-stale-text')).toHaveText(
-      'These groups are out of date — the group size changed.',
-    );
-  });
-
-  // Design spec section 8's own "the way out": the badge is not merely a
-  // notice, it is also how a teacher acts on it without scrolling back up
-  // to #cg-go. `form="cg-form"` associates the button to the form despite
-  // sitting outside it in the DOM -- proven here by getting the SAME
-  // reshuffle #cg-go itself would have produced, not by reading the
-  // attribute.
-  test('the notice offers its own way to reshuffle, without hunting for the main button', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await expect(page.locator('#cg-stale')).toBeVisible();
-    await tapOn(page.locator('#cg-stale button'));
-    await expect(page.locator('#cg-stale')).toBeHidden();
-    // 12 students at the NEW size (3) => 4 groups. Proves a real reshuffle
-    // happened, not merely that the notice hid itself.
-    await expect(page.locator('#cg-results .group')).toHaveCount(4);
-  });
-
-  // "Dimmed AND badged" (design spec section 8) -- the tests above only
-  // ever prove the cards are still PRESENT, never that anything about their
-  // appearance actually changed. This is the one that would catch a
-  // `.stale` class added to #cg-results with no CSS rule behind it at all.
-  test('the old groups are visually dimmed while stale, not merely still present', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await shuffle(page);
-    const before = await page
-      .locator('#cg-results .group')
-      .first()
-      .evaluate((el) => getComputedStyle(el).opacity);
-    await typeInto(page.getByLabel('Students in each group'), '3');
-    await expect(page.locator('#cg-results')).toHaveClass(/stale/);
-    const after = await page
-      .locator('#cg-results .group')
-      .first()
-      .evaluate((el) => getComputedStyle(el).opacity);
-    expect(Number(after)).toBeLessThan(Number(before));
-  });
-
-  // C-2 (review, task 6 fix): the test above only proves darker-than-before,
-  // which passes at ANY opacity, including one that fails WCAG AA -- it
-  // stayed green throughout the bug (opacity: 0.55 measured 3.9:1 against
-  // this page's actual background, `--bg`, under the 4.5:1 floor for
-  // normal text). This computes the contrast the browser actually PAINTS,
-  // from real computed styles read live off the page, using the same
-  // relative-luminance formula WCAG 2.1 defines -- not a pinned opacity
-  // constant that would drift silently if `--ink`/`--bg` were ever retuned
-  // without anyone re-running a contrast checker by hand (tokens.css's own
-  // "do NOT lighten past AA" on --accent is why that retuning is a real
-  // risk on this page, not a hypothetical one).
-  // One test per theme (#419).
-  for (const theme of THEMES)
-    test(`${theme}: the dim stays above the WCAG AA contrast floor for normal text`, async ({
-      page,
-    }) => {
-      await page.goto('/classroom-groups');
-      await shuffle(page);
-      await typeInto(page.getByLabel('Students in each group'), '3');
-      await expect(page.locator('#cg-results')).toHaveClass(/stale/);
-      await emulateTheme(page, theme);
-      const contrast = await contrastRatio(
-        page.locator('#cg-results .group').first(),
-      );
-      expect(contrast).toBeGreaterThanOrEqual(4.5);
-    });
-
+  // The accent colour is the AA floor by design ("never lighten without
+  // re-checking contrast", CLAUDE.md) -- L-09 computes the REAL painted
+  // contrast of the one button styled with it, the same relative-luminance
+  // formula the dim check below uses, rather than pinning the hex value. A
+  // pinned hex would only prove the STRING did not change, not what it
+  // renders as -- it would stay green even if `--accent`/`--bg` in tokens.css
+  // were retuned to something that fails AA. What would redden it: those
+  // custom properties moving closer together, or `.actions button`'s own
+  // background/color rules drifting from the variables entirely. It is read
+  // first, on the page as loaded, before anything is shuffled.
+  //
+  // C-2 (review, task 6 fix): "darker than before" passes at ANY opacity,
+  // including one that fails WCAG AA -- it stayed green throughout the bug
+  // (opacity: 0.55 measured 3.9:1 against this page's actual background,
+  // `--bg`, under the 4.5:1 floor for normal text). This computes the
+  // contrast the browser actually PAINTS, from real computed styles read live
+  // off the page, using the same relative-luminance formula WCAG 2.1 defines
+  // -- not a pinned opacity constant that would drift silently if
+  // `--ink`/`--bg` were ever retuned without anyone re-running a contrast
+  // checker by hand (tokens.css's own "do NOT lighten past AA" on --accent is
+  // why that retuning is a real risk on this page, not a hypothetical one).
+  //
   // #332. The notice paints its own cream ground (#fff6e3) but took its ink
   // from --ink, which Aurora made near-white: 1.05:1, a sentence nobody could
   // read. Scored the way the browser paints it, in the real state, so the
   // ground is the one the sentence actually sits on rather than a token pair.
+  // One test per theme (#419).
   for (const theme of THEMES)
-    test(`${theme}: the out-of-date sentence meets the WCAG AA contrast floor`, async ({
+    test(`${theme}: the accent, the dimmed groups and the out-of-date sentence meet the WCAG AA floor`, async ({
       page,
     }) => {
       await page.goto('/classroom-groups');
+      await emulateTheme(page, theme);
+      expect
+        .soft(await contrastRatio(page.locator('#cg-go')))
+        .toBeGreaterThanOrEqual(4.5);
       await shuffle(page);
       await typeInto(page.getByLabel('Students in each group'), '3');
+      await expect.soft(page.locator('#cg-results')).toHaveClass(/stale/);
       const sentence = page.locator('#cg-stale-text');
-      await expect(sentence).toBeVisible();
-      await expect(sentence).toHaveText(
-        'These groups are out of date — the group size changed.',
-      );
-      await emulateTheme(page, theme);
-      expect(await contrastRatio(sentence)).toBeGreaterThanOrEqual(4.5);
+      await expect.soft(sentence).toBeVisible();
+      await expect
+        .soft(sentence)
+        .toHaveText('These groups are out of date — the group size changed.');
+      expect
+        .soft(await contrastRatio(page.locator('#cg-results .group').first()))
+        .toBeGreaterThanOrEqual(4.5);
+      expect.soft(await contrastRatio(sentence)).toBeGreaterThanOrEqual(4.5);
       await shoot(
         page,
         `${theme}: the out-of-date sentence on its cream notice`,
@@ -1595,62 +1470,57 @@ test.describe('out-of-date groups', () => {
   // locale-varying content (unlike Task 5's own textContent/CSS mechanisms,
   // which are locale-invariant and deliberately not mirrored -- see that
   // task's own note in the 'class name and results heading' describe
-  // block above).
-  test('the reason reads in Indonesian, as a whole sentence', async ({
+  // block above). Mirrors the English count, size and leftovers checks.
+  // Each change is undone before the next, so each sentence is the only live
+  // reason.
+  test('the three reasons read in Indonesian, as whole sentences', async ({
     page,
   }) => {
+    const reason = page.locator('#cg-stale-text');
     await page.goto('/id/classroom-groups');
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
     await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '3');
-    await expect(page.locator('#cg-stale-text')).toHaveText(
-      'Kelompok ini sudah tidak berlaku lagi — ukuran kelompok berubah.',
-    );
-  });
+    await expect.soft(page.locator('#cg-results .group')).toHaveCount(3);
 
-  // Task 8, the locale sweep. Only staleMode (immediately above) had an
-  // Indonesian assertion; staleLeftovers and staleRoster are equally
-  // reachable today (the leftovers radios and #cg-count both work on this
-  // page) but had none. This test also exercises leftoversBunch's own
-  // Indonesian LABEL for the first time anywhere in this suite -- every
-  // other Indonesian leftovers test reaches the "bunch" radio through its
-  // `value` attribute (`input[name="leftovers"][value="bunch"]`), never
-  // through `getByLabel`, so a corrupted or deleted
-  // "Masukkan semuanya ke satu kelompok" string could not have failed
-  // anything before now. `{ exact: true }` because getByLabel's default
-  // match is a substring, not a whole string -- see 'the Split by row
-  // names its own fields' above for the mutation spot-check that found it.
-  test('the leftovers-choice reason reads in Indonesian, as a whole sentence', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
+    // Task 8, the locale sweep: the count is this stage's whole roster, so
+    // changing it is staleRoster ("the class list changed"), not cosmetic.
+    await typeInto(page.getByLabel('Jumlah siswa'), '30');
+    await expect
+      .soft(reason)
+      .toHaveText(
+        'Kelompok ini sudah tidak berlaku lagi — daftar kelas berubah.',
+      );
     await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .group')).toHaveCount(3);
+
+    await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '3');
+    await expect
+      .soft(reason)
+      .toHaveText(
+        'Kelompok ini sudah tidak berlaku lagi — ukuran kelompok berubah.',
+      );
+    await typeInto(page.getByLabel('Siswa dalam setiap kelompok'), '4');
+
+    // Only staleMode had an Indonesian assertion; staleLeftovers and
+    // staleRoster are equally reachable today (the leftovers radios and
+    // #cg-count both work on this page) but had none. This also exercises
+    // leftoversBunch's own Indonesian LABEL for the first time anywhere in
+    // this suite -- every other Indonesian leftovers test reaches the "bunch"
+    // radio through its `value` attribute
+    // (`input[name="leftovers"][value="bunch"]`), never through `getByLabel`,
+    // so a corrupted or deleted "Masukkan semuanya ke satu kelompok" string
+    // could not have failed anything before now. `{ exact: true }` because
+    // getByLabel's default match is a substring, not a whole string -- see
+    // 'the Split by row names its own fields' above for the mutation
+    // spot-check that found it.
     await tapOn(page.locator('#cg-grouping-toggle'));
     await setCheckedOn(
       page.getByLabel('Masukkan semuanya ke satu kelompok', { exact: true }),
     );
-    await expect(page.locator('#cg-stale-text')).toHaveText(
-      'Kelompok ini sudah tidak berlaku lagi — pilihan siswa tersisa berubah.',
-    );
-  });
-
-  // Mirrors the English 'changing the number of students marks them out of
-  // date' test (C-1 above): the count is this stage's whole roster, so
-  // changing it is staleRoster ("the class list changed"), not cosmetic.
-  test('the class-list reason reads in Indonesian, as a whole sentence', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await tapOn(page.locator('#cg-go'));
-    await expect(page.locator('#cg-results .group')).toHaveCount(3);
-    await typeInto(page.getByLabel('Jumlah siswa'), '30');
-    await expect(page.locator('#cg-stale-text')).toHaveText(
-      'Kelompok ini sudah tidak berlaku lagi — daftar kelas berubah.',
-    );
+    await expect
+      .soft(reason)
+      .toHaveText(
+        'Kelompok ini sudah tidak berlaku lagi — pilihan siswa tersisa berubah.',
+      );
   });
 });
 
@@ -1717,8 +1587,8 @@ test.describe('site-wide language switching', () => {
   });
 
   // Where the homepage's tool cards link, in every locale, is held by
-  // 'exactly two tool cards, each badged and linked in-locale' in
-  // homepage.spec.ts (#390 F129).
+  // '<locale>: hero, header nav, both product showcases, tool cards and showcase
+  // capture' in homepage.spec.ts (#390 F129).
 
   test.describe('what each page tells a search engine', () => {
     // Asserted by VALUE. Counting the tags cannot tell the difference between
@@ -1941,8 +1811,7 @@ test.describe('the no-scroll rule, measured', () => {
     { width: 1280, height: 800 }, // laptop
   ];
 
-  const measureFit = async (page: Page, path = '/classroom-groups') => {
-    await page.goto(path);
+  const measureFit = async (page: Page) => {
     await page.evaluate(() => document.fonts.ready);
     const { bottom, budget } = await page.evaluate(() => ({
       bottom: document.getElementById('cg-go')!.getBoundingClientRect().bottom,
@@ -1950,10 +1819,12 @@ test.describe('the no-scroll rule, measured', () => {
     }));
     // Compared RAW and rounded only for the reader: rounding first let a
     // button 0.4px under the fold read as above it (#371, #390 F114).
-    expect(
-      bottom,
-      `#cg-go's bottom at ${bottom.toFixed(1)}px against a ${budget}px fold`,
-    ).toBeLessThanOrEqual(budget);
+    expect
+      .soft(
+        bottom,
+        `#cg-go's bottom at ${bottom.toFixed(1)}px against a ${budget}px fold`,
+      )
+      .toBeLessThanOrEqual(budget);
   };
 
   // No `fits` flag and no if/else any more -- every viewport runs as `test`.
@@ -1965,12 +1836,97 @@ test.describe('the no-scroll rule, measured', () => {
   // hoisted to a variable, because tests/guards/viewport-tagging.test.ts scans
   // source text for exactly that shape and is blind to a title passed by
   // reference or reached through an aliased callee.
+  //
+  // One page load per viewport carries four measurements, all soft: where
+  // the button sits, and the three rules that keep it there -- the pixels
+  // cannot say which mechanism is keeping the button on screen.
   for (const { width, height } of VIEWPORTS) {
-    test(`the primary action is reachable without scrolling at ${width}x${height}`, async ({
+    test(`the action row is reachable, sticky, padded and shadowed at ${width}x${height}`, async ({
       page,
     }) => {
-      await atViewport(page, { width, height });
+      const took = await atViewport(page, { width, height });
+      await page.goto('/classroom-groups');
       await measureFit(page);
+
+      // ASSERT THE SEAM, not the sides. The contract CHANGED in #188
+      // (operator decision, 2026-09-16). It used to be "sticky below 600px,
+      // static above it", on the reasoning that 768 and 1280 fit unaided.
+      // Three number fields costing 116px ended that -- 1280x800 measured 912
+      // against a budget of 800 -- so the bar is now sticky at every width, by
+      // one mechanism rather than two kept in step. Still asserted at all four
+      // sizes rather than one: a rule that quietly stopped applying somewhere
+      // in the middle -- a stray `min-width`, a specificity fight with a later
+      // block -- would leave the pixel measurement passing wherever the page
+      // happened to fit anyway.
+      const { position, padding, bar, shadow } = await page.evaluate(() => {
+        const row = document.getElementById('cg-go')!.closest('.actions')!;
+        return {
+          position: getComputedStyle(row).position,
+          padding: parseFloat(
+            getComputedStyle(document.documentElement).scrollPaddingBottom,
+          ),
+          bar: row.getBoundingClientRect().height,
+          shadow: getComputedStyle(row).boxShadow,
+        };
+      });
+      expect.soft(position).toBe('sticky');
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the action row is sticky`,
+      );
+
+      // The bar's COMPANION rule, which had no test at all until #188.
+      // `scroll-padding-bottom` on `html` exists for one reason: to stop the
+      // browser scrolling a tabbed-to field, an anchor or a `scrollIntoView`
+      // target to a position the pinned action row covers. Asserted as a
+      // SEAM, not as a number: the padding clears the row as the row ACTUALLY
+      // measures, not that it reads `5rem` -- pinning the literal would go on
+      // passing if the bar grew and the padding did not.
+      // Liveness: a renamed class or a missing row would measure 0, and every
+      // padding value would then clear it.
+      expect
+        .soft(bar, 'the action row must have a height to clear')
+        .toBeGreaterThan(0);
+      expect
+        .soft(padding, 'scroll padding must clear the pinned bar')
+        .toBeGreaterThanOrEqual(bar);
+
+      // #188, operator decision 2026-09-17. Pinned at every width, the row
+      // covers the edge of whatever sits above it before any scrolling -- at
+      // 1280x900, the bottom of "Sound and animation". A soft shadow cast UP
+      // over that edge makes it read as passing under a docked bar rather
+      // than as clipped. Asserted as the property that does that work --
+      // visible, soft, offset upward -- because a pinned literal would go on
+      // passing with the offset flipped below the row, off the fold where
+      // nobody sees it. A computed shadow serialises colour first, then
+      // lengths: `rgba(0, 0, 0, 0.55) 0px -12px 24px -8px`.
+      const parts =
+        /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
+      expect
+        .soft(
+          parts,
+          `${took.width}x${took.height}: the pinned row has a shadow (computed: ${shadow})`,
+        )
+        .not.toBeNull();
+      if (parts) {
+        const [, colour, , offsetY, blur] = parts;
+        expect
+          .soft(Number(offsetY), `${took.width}x${took.height}: cast upward`)
+          .toBeLessThan(0);
+        expect
+          .soft(
+            Number(blur),
+            `${took.width}x${took.height}: soft, not a hard line`,
+          )
+          .toBeGreaterThan(0);
+        expect
+          .soft(colour, `${took.width}x${took.height}: not transparent`)
+          .not.toMatch(/, 0\)$/);
+      }
+      await shoot(
+        page,
+        `${took.width}x${took.height}, the row casts its shadow upward`,
+      );
     });
   }
 
@@ -1986,133 +1942,11 @@ test.describe('the no-scroll rule, measured', () => {
         page,
       }) => {
         await atViewport(page, { width, height });
-        await measureFit(page, localisePath('/classroom-groups', locale));
+        await page.goto(localisePath('/classroom-groups', locale));
+        await measureFit(page);
       });
     }
   }
-
-  // ASSERT THE SEAM, not the sides. The four tests above measure PIXELS, and
-  // pixels cannot say which mechanism is keeping the button on screen: if the
-  // sticky rule were deleted, they would report a number that happens to be
-  // too large, never the rule that moved.
-  //
-  // The contract CHANGED in #188 (operator decision, 2026-09-16). It used to
-  // be "sticky below 600px, static above it", on the reasoning that 768 and
-  // 1280 fit unaided. Three number fields costing 116px ended that -- 1280x800
-  // measured 912 against a budget of 800 -- so the bar is now sticky at every
-  // width, by one mechanism rather than two kept in step. This test going red
-  // is exactly what it is for: the old expectation was a statement about how
-  // much room those sizes had, and the page outgrew it.
-  //
-  // Still asserted at all four sizes rather than one. A rule that quietly
-  // stopped applying somewhere in the middle -- a stray `min-width`, a
-  // specificity fight with a later block -- would leave the pixel tests
-  // passing wherever the page happened to fit anyway.
-  // One test per viewport (#419): this spelled the four sizes out by hand,
-  // and the two below looped them, under one budget.
-  for (const { width, height } of VIEWPORTS)
-    test(`the action row is sticky at ${width}x${height}, so the primary action is never below the fold`, async ({
-      page,
-    }) => {
-      const took = await atViewport(page, { width, height });
-      await page.goto('/classroom-groups');
-      const position = await page.evaluate(
-        () =>
-          getComputedStyle(
-            document.getElementById('cg-go')!.closest('.actions')!,
-          ).position,
-      );
-      expect(position).toBe('sticky');
-      await shoot(
-        page,
-        `${took.width}x${took.height}, the action row is sticky`,
-      );
-    });
-
-  // The bar's COMPANION rule, which had no test at all until #188.
-  // `scroll-padding-bottom` on `html` exists for one reason: to stop the
-  // browser scrolling a tabbed-to field, an anchor or a `scrollIntoView`
-  // target to a position the pinned action row covers. Both rules were
-  // capped at `max-width: 599px`; the bar moved to every width and nothing
-  // in this suite would have noticed the padding staying behind, because
-  // nothing asserted the padding at all.
-  //
-  // Asserted as a SEAM, not as a number. What matters is that the padding
-  // clears the row as the row ACTUALLY measures, not that it reads `5rem`:
-  // pinning the literal would go on passing if the bar grew and the padding
-  // did not, which is the one failure this rule exists to prevent, and it
-  // would restate a value that already has a home in the stylesheet.
-  for (const { width, height } of VIEWPORTS)
-    test(`the scroll padding clears the pinned action row at ${width}x${height}`, async ({
-      page,
-    }) => {
-      await atViewport(page, { width, height });
-      await page.goto('/classroom-groups');
-      const { padding, bar } = await page.evaluate(() => ({
-        padding: parseFloat(
-          getComputedStyle(document.documentElement).scrollPaddingBottom,
-        ),
-        bar: document
-          .getElementById('cg-go')!
-          .closest('.actions')!
-          .getBoundingClientRect().height,
-      }));
-      // Liveness: a renamed class or a missing row would measure 0, and
-      // every padding value would then clear it.
-      expect(bar, 'the action row must have a height to clear').toBeGreaterThan(
-        0,
-      );
-      expect(
-        padding,
-        'scroll padding must clear the pinned bar',
-      ).toBeGreaterThanOrEqual(bar);
-    });
-
-  // #188, operator decision 2026-09-17. Pinned at every width, the row
-  // covers the edge of whatever sits above it before any scrolling -- at
-  // 1280x900, the bottom of "Sound and animation". A soft shadow cast UP over
-  // that edge makes it read as passing under a docked bar rather than as
-  // clipped. Asserted as the property that does that work -- visible, soft,
-  // offset upward -- because a pinned literal would go on passing with the
-  // offset flipped below the row, off the fold where nobody sees it.
-  for (const { width, height } of VIEWPORTS)
-    test(`the pinned action row casts a soft shadow upward at ${width}x${height}`, async ({
-      page,
-    }) => {
-      const took = await atViewport(page, { width, height });
-      await page.goto('/classroom-groups');
-      const shadow = await page.evaluate(
-        () =>
-          getComputedStyle(
-            document.getElementById('cg-go')!.closest('.actions')!,
-          ).boxShadow,
-      );
-      // A computed shadow serialises colour first, then lengths:
-      // `rgba(0, 0, 0, 0.55) 0px -12px 24px -8px`.
-      const parts =
-        /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(shadow);
-      expect(
-        parts,
-        `${took.width}x${took.height}: the pinned row has a shadow (computed: ${shadow})`,
-      ).not.toBeNull();
-      const [, colour, , offsetY, blur] = parts!;
-      expect(
-        Number(offsetY),
-        `${took.width}x${took.height}: cast upward`,
-      ).toBeLessThan(0);
-      expect(
-        Number(blur),
-        `${took.width}x${took.height}: soft, not a hard line`,
-      ).toBeGreaterThan(0);
-      expect(
-        colour,
-        `${took.width}x${took.height}: not transparent`,
-      ).not.toMatch(/, 0\)$/);
-      await shoot(
-        page,
-        `${took.width}x${took.height}, the row casts its shadow upward`,
-      );
-    });
 
   // L-08. The brief's own literal query measured only what page LOAD
   // already shows -- nothing inside any of the four sections is on screen
@@ -2208,27 +2042,6 @@ test.describe('the no-scroll rule, measured', () => {
           what: 'interactive targets on screen with every section open',
         }),
       ).toEqual([]);
-    });
-
-  // L-09. The accent colour is the AA floor by design ("never lighten
-  // without re-checking contrast", CLAUDE.md) -- this computes the REAL
-  // painted contrast of the one button styled with it, the same
-  // relative-luminance formula the 'the dim stays above the WCAG AA
-  // contrast floor for normal text' test above already uses, rather than
-  // pinning the hex value. A pinned hex would only prove the STRING did not
-  // change, not what it renders as -- it would stay green even if
-  // `--accent`/`--bg` in tokens.css were retuned to something that fails
-  // AA. What would redden this: those custom properties moving closer
-  // together, or `.actions button`'s own background/color rules drifting
-  // from the variables entirely.
-  for (const theme of THEMES)
-    test(`${theme}: the accent colour still meets the WCAG AA contrast floor`, async ({
-      page,
-    }) => {
-      await page.goto('/classroom-groups');
-      await emulateTheme(page, theme);
-      const contrast = await contrastRatio(page.locator('#cg-go'));
-      expect(contrast).toBeGreaterThanOrEqual(4.5);
     });
 
   // M-11. The one test in this file that never touches /classroom-groups --

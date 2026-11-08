@@ -631,8 +631,9 @@ if (form) {
   // roster -- still the only case this stage can actually reach, since
   // nothing yet populates one -- #cg-count remains the sole population
   // control, exactly as stage 2 left it: this branch is that same
-  // behaviour, unchanged, which is what keeps "changing the number of
-  // students marks them out of date" (classroom-groups.spec.ts) passing.
+  // behaviour, unchanged, which is what keeps the count step of "a changed
+  // size or count marks the groups out of date, a class name does not,
+  // shuffling clears it" (classroom-groups.spec.ts) passing.
   // JSON.stringify'd in that branch, the same way `readMode` stringifies
   // its own shape above, so the result is always a primitive `snapshot()`'s
   // comparison can compare by VALUE -- see staleReason's own

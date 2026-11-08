@@ -1237,8 +1237,8 @@ const sexWhyText = sexWhy(roster, t);
      incidental label the AA exemption would cover. No current figure is
      kept here, because the palette moves (#17, #142): the test named below
      measures the real composite in every run. Guarded by
-     tests/e2e/classroom-groups.spec.ts's "the dim stays above the WCAG AA
-     contrast floor for normal text", which computes the real composited
+     tests/e2e/classroom-groups.spec.ts's "the accent, the dimmed groups and
+     the out-of-date sentence meet the WCAG AA floor" (one test per theme), which computes the real composited
      contrast from live computed styles -- the older "darker than before"
      test beside it passes at ANY opacity, including the one that failed
      AA, so it could not have caught this on its own. */
@@ -2378,8 +2378,8 @@ const sexWhyText = sexWhy(roster, t);
        question than the tick box asked. `data-col` is stamped by roster-ui.ts's
        own `columnCell`, so reordering the row can no longer re-point this rule
        at a column nobody chose. Proved by mutation: moving Absent to second
-       reddens 'hiding absent pupils removes the Absent column and only that
-       column' under the ordinal, and leaves it green under the name. */
+       reddens 'hiding absent pupils drops the Absent column, and the absent
+       row' under the ordinal, and leaves it green under the name. */
     [data-print-absent='off'] #cg-roster th[data-col='absent'],
     [data-print-absent='off'] #cg-roster td[data-col='absent'],
     [data-print-absent='off'] #cg-roster .cg-student[data-absent='true'] {
