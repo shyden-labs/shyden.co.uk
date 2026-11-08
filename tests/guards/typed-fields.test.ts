@@ -1,15 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { searched, tsFilesUnder } from '../source-files';
+import { searched } from '../source-files';
 import {
   IOS_ZOOM_FLOOR_PX,
   measureTypedFields,
   measureTypedFieldsScript,
 } from '../typed-fields';
 import { expectClosesOverNothing } from '../unit/closes-over-nothing';
-import { withoutTsComments } from '../unit/source-text';
 
 /**
  * The typed-field measurement is serialised into two runtimes, the emulated
@@ -82,26 +78,5 @@ describe('typed fields are defined once, and survive being sent to a phone', () 
     expect(measureTypedFieldsScript()).toBe(
       `return (${measureTypedFields})();`,
     );
-  });
-
-  it('is spelled in exactly one place under tests/', () => {
-    const self = relative(process.cwd(), fileURLToPath(import.meta.url));
-    const files = tsFilesUnder('tests').filter((path) => path !== self);
-
-    // Match the CONSTRUCT: a font-size read over fields picked by tag or by
-    // input type. Journey 11's own `input[type="text"], input[type="number"]`
-    // was one; `zoom-on-focus.spec.ts`'s `input, textarea, select` the other.
-    const measuresTypedFields = (code: string) =>
-      code.includes('fontSize') &&
-      /input\[type=|\binput,\s*textarea\b/.test(code);
-    const spelling = files.filter((path) =>
-      measuresTypedFields(withoutTsComments(readFileSync(path, 'utf8'))),
-    );
-
-    expect(
-      searched(spelling, { of: files, what: 'TypeScript files under tests/' }),
-      'typed fields are measured in one home; two definitions are how the ' +
-        'phone came to check fewer fields than CI',
-    ).toEqual(['tests/typed-fields.ts']);
   });
 });

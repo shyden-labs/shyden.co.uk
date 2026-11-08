@@ -87,7 +87,7 @@ const isPlist = (bytes: Buffer): boolean => {
 
 /**
  * Reads every payload, and every plist nested in a payload's data, through
- * the one catalogue walk (one-home.test.ts). Nested plists wait in a queue
+ * the one catalogue walk. Nested plists wait in a queue
  * rather than a recursion of this file's own.
  */
 function decodeInto(first: Buffer, into: Reading): void {

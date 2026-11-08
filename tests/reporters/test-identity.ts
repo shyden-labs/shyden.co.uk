@@ -5,9 +5,7 @@ import type { Suite, TestCase } from '@playwright/test/reporter';
  * rather than from string indexing.
  *
  * One home for both, because `jsonl-reporter.ts` and `nav-timing-reporter.ts`
- * both need the project name and would otherwise carry the same walk twice --
- * the duplication `one-home.test.ts` exists to stop, in a directory it does
- * not yet scan.
+ * both need the project name and would otherwise carry the same walk twice.
  */
 
 /**

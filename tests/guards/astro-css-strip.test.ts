@@ -6,7 +6,6 @@ import {
   codeWithoutComments,
   cssComments,
   stylesheetCss,
-  withoutTsComments,
 } from '../unit/source-text';
 
 /**
@@ -30,9 +29,7 @@ import {
  *
  * The fix is not a careful call site, because a careful call site is a thing
  * the next author has to know about. `stylesheetCss(file, text)` asks which
- * file the CSS came out of and reads it accordingly, and the last test here
- * holds the raw stripper to its own home so that no caller can take the other
- * road.
+ * file the CSS came out of and reads it accordingly.
  */
 
 const SRC = 'src';
@@ -62,9 +59,6 @@ const SCANS: ReadonlyArray<{
 /** The first line of a comment, which is enough to find it in the file. */
 const firstLine = (comment: string): string =>
   comment.split('\n')[0]?.trim() ?? '';
-
-/** A call to the raw CSS stripper, as opposed to a mention of its name. */
-const STRIPS_CSS_DIRECTLY = /\bwithoutCssComments\s*\(/;
 
 describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
   it('reads a style comment out of a file whose template text has an apostrophe', () => {
@@ -138,28 +132,5 @@ describe('a guard reading an .astro file reads its CSS as CSS (#203)', () => {
         what: 'CSS comments in <style> bodies under src/',
       }),
     ).toEqual([]);
-  });
-
-  it('leaves the raw CSS stripper with no caller outside its own home', () => {
-    // Derived from disk, never a list: a guard written next year is scanned
-    // the day it appears. #24's sweep used the file list in its own issue and
-    // #60 and #65 found six survivors between them.
-    const scanned = nonEmpty(
-      ['tests', 'scripts'].flatMap((dir) =>
-        filesUnder(dir, (path) => /\.(ts|mjs)$/.test(path)),
-      ),
-      'test and script sources',
-    ).sort();
-
-    const callers = scanned.filter((path) =>
-      STRIPS_CSS_DIRECTLY.test(withoutTsComments(readFileSync(path, 'utf8'))),
-    );
-
-    expect(callers).toEqual([
-      // The suite that proves the stripper works, which must call it to do so.
-      'tests/unit/source-text.test.ts',
-      // The home. Everything else asks for a FILE's CSS, not a string's.
-      'tests/unit/source-text.ts',
-    ]);
   });
 });

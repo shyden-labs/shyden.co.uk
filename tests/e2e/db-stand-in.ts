@@ -170,7 +170,7 @@ export function installDbStandIn(options: DbStandInOptions): void {
 
   // A frozen copy, down through every nested object. JSON.parse hands its
   // reviver each value after that value's children, so freezing there freezes
-  // the whole body, with no walker of our own (one-home.test.ts).
+  // the whole body, with no walker of our own.
   const frozenCopyOf = (json: string): StoredBody =>
     JSON.parse(json, (_key: string, value: unknown) =>
       value !== null && typeof value === 'object'

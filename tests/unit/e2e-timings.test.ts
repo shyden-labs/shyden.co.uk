@@ -187,7 +187,7 @@ describe('the budget every table is measured against is the real one', () => {
     // unanchored `/\btimeout\b/i` over raw text is satisfied by a `timeout:`
     // setting exactly as readily as by the prose, so this control would stay
     // green in the one world the assertion above exists to catch. Asked of
-    // the parser, the `stranded-docblocks.test.ts` idiom, because only the
+    // the parser, because only the
     // grammar knows a `//` inside a string or a regex is not a comment (#65).
     const raw = readFileSync('playwright.config.ts', 'utf8');
     const prose = commentsIn(parseSource(raw, 'playwright.config.ts'))
