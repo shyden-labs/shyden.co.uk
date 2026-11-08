@@ -38,6 +38,10 @@ const files = [
 
 const SCRIPTED_TYPING: readonly [string, RegExp][] = [
   ['fill()', /\.fill\(/],
+  // A dropdown is chosen with chooseOption (tests/real-select.ts, #1027):
+  // selectOption() sets the option in a script and fires input and change
+  // itself, so no key press reaches the select.
+  ['selectOption()', /selectOption\s*\(/],
   ['a value set by script', /\.value\s*=(?!=)/],
   [
     'a scripted input or change event',

@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
@@ -1630,16 +1631,14 @@ test.describe('Grouping options, live from the roster — Indonesian', () => {
   }) => {
     await openRosterId(page);
     await addSeveral(page, 1);
-    await page
-      .locator('.cg-student')
-      .nth(0)
-      .getByLabel('Jenis kelamin')
-      .selectOption('M');
-    await page
-      .locator('.cg-student')
-      .nth(1)
-      .getByLabel('Jenis kelamin')
-      .selectOption('F');
+    await chooseOption(
+      page.locator('.cg-student').nth(0).getByLabel('Jenis kelamin'),
+      'M',
+    );
+    await chooseOption(
+      page.locator('.cg-student').nth(1).getByLabel('Jenis kelamin'),
+      'F',
+    );
     await tapOn(page.locator('#cg-grouping-toggle'));
     // Both switches, as its English twin reads (#426): this read Mix alone,
     // so a Separate switch that never enabled passed in Indonesian.
@@ -1657,16 +1656,14 @@ test.describe('Grouping options, live from the roster — Indonesian', () => {
   }) => {
     await openRosterId(page);
     await addSeveral(page, 2);
-    await page
-      .locator('.cg-student')
-      .nth(0)
-      .getByLabel('Jenis kelamin')
-      .selectOption('M');
-    await page
-      .locator('.cg-student')
-      .nth(1)
-      .getByLabel('Jenis kelamin')
-      .selectOption('F');
+    await chooseOption(
+      page.locator('.cg-student').nth(0).getByLabel('Jenis kelamin'),
+      'M',
+    );
+    await chooseOption(
+      page.locator('.cg-student').nth(1).getByLabel('Jenis kelamin'),
+      'F',
+    );
     const dewi = page.locator('.cg-student').nth(2);
     await typeInto(dewi.getByLabel('Nama'), 'Dewi');
     await setCheckedOn(dewi.getByLabel('Tidak hadir'));
@@ -1900,7 +1897,7 @@ test.describe('the five the operator asked for', () => {
     const sex = page.locator('.cg-student').first().getByLabel('Sex');
     // …and the placeholder is choosable only while it is still the answer.
     await expect(sex.locator('option[value=""]')).not.toBeDisabled();
-    await sex.selectOption('M');
+    await chooseOption(sex, 'M');
     await expect(sex.locator('option[value=""]')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Make groups' }),

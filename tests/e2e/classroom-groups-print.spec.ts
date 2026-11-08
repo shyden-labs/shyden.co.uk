@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -765,7 +766,7 @@ test.describe('the printed register after an edit', () => {
     );
 
   const useTheSelects = async (row: import('@playwright/test').Locator) => {
-    await row.getByLabel('Sex').selectOption('F');
+    await chooseOption(row.getByLabel('Sex'), 'F');
     await setCheckedOn(row.getByLabel('Absent'));
   };
 
