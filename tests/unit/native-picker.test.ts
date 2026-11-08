@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseUiDump } from '../device/ui-dump';
 import { pickerOption, pickerList } from '../device/native-picker';
 
+// Measured on the OPPO (2026-11-08, ten failures of 135): once the picker had
+// closed, the screen still held one to three ListViews 1200 px wide and 0 px
+// tall at y=3014, drawn by nothing a visitor can see.
+const EMPTY_LIST =
+  '<node text="" class="android.widget.ListView" bounds="[119,3014][1319,3014]" />';
+
 // A real dump of Chrome's own <select> picker on the OPPO (2026-11-07),
 // opened by a real tap on /classroom-groups' speed select (#1027).
 const PICKER = parseUiDump(
@@ -52,6 +58,13 @@ describe("Chrome's native select picker, read from a uiautomator dump (#1027)", 
     );
     expect(pickerList(page)).toBeUndefined();
   });
+
+  it('finds no list when the only one on screen has no height', () => {
+    const page = parseUiDump(
+      `<hierarchy><node text="" class="android.widget.FrameLayout" bounds="[0,0][1440,3168]">${EMPTY_LIST}${EMPTY_LIST}</node></hierarchy>`,
+    );
+    expect(pickerList(page)).toBeUndefined();
+  });
 });
 
 describe('choosing from the picker waits for it to close (#1027)', () => {
@@ -81,5 +94,26 @@ describe('choosing from the picker waits for it to close (#1027)', () => {
     const taps = calls.filter((args) => args.includes('tap'));
     expect(taps).toEqual([['shell', 'input', 'tap', '720', '1587']]);
     expect(screens, 'every dump until the picker closed was read').toEqual([]);
+  });
+
+  it('returns once the picker has gone, though an empty list is left on the screen', async () => {
+    vi.resetModules();
+    const picker = readFileSync(
+      'tests/unit/fixtures/android/select-picker.xml',
+      'utf8',
+    );
+    const page = `<hierarchy><node text="" class="android.widget.FrameLayout" bounds="[0,0][1440,3168]">${EMPTY_LIST}</node></hierarchy>`;
+    const screens = [picker, picker, page];
+    vi.doMock('../../scripts/adb.mjs', () => ({
+      adb: (args: string[]) =>
+        args.includes('cat') ? (screens.shift() ?? page) : '',
+    }));
+    vi.doMock('../real-touch', () => ({
+      tapOn: async () => {},
+      TapNotPossibleError: Error,
+    }));
+    const { chooseFromNativePicker } = await import('../device/native-picker');
+    await chooseFromNativePicker({ toString: () => 'sel' } as never, 'Fast');
+    expect(screens, 'the dump after the picker closed was read').toEqual([]);
   });
 });
