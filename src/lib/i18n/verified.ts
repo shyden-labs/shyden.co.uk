@@ -148,6 +148,8 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     rosterColAbsent: '缺席',
     rosterColTogether: '在一起',
     rosterColApart: '分开',
+    // Shyden 2026-11-08 (#999): 学号 is how a class names a student number.
+    boardAbsentNote: '学号 {absent} 缺席。',
     // #161's sheet, read by the operator on 2026-09-23.
     again: '重新洗牌',
     boardShuffle: '重新洗牌',

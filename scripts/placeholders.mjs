@@ -37,7 +37,7 @@ export const placeholderFindings = (files) =>
 
 /**
  * Every text file under `dir`. Node's own recursive read, so no hand-written
- * walk (one-home.test.ts), and `nonEmpty` refuses an empty directory.
+ * walk, and `nonEmpty` refuses an empty directory.
  * @param {string} dir @returns {string[]}
  */
 const textFilesUnder = (dir) =>

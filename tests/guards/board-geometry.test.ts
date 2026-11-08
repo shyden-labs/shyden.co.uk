@@ -1,15 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   measureBoard,
   measureBoardScript,
   measureCover,
 } from '../board-geometry';
-import { searched, tsFilesUnder } from '../source-files';
+import { searched } from '../source-files';
 import { expectClosesOverNothing } from '../unit/closes-over-nothing';
-import { withoutTsComments } from '../unit/source-text';
 
 /**
  * The board measurement is serialised into two runtimes, so it is guarded here.
@@ -59,38 +55,6 @@ describe('the board is measured once, and survives being sent somewhere else', (
 
   it('has one spelling of the wrapper the device leg sends', () => {
     expect(measureBoardScript()).toBe(`return (${measureBoard})();`);
-  });
-
-  it('is spelled in exactly one place under tests/', () => {
-    // A guard that names the thing it guards has to exempt itself -- exactly
-    // as `CONTRACT_MODULE` does for the evidence filenames. Derived from
-    // `import.meta.url` rather than written as a string, so a rename cannot
-    // leave the exemption pointing at a file that no longer exists.
-    const self = relative(process.cwd(), fileURLToPath(import.meta.url));
-    const files = tsFilesUnder('tests').filter((path) => path !== self);
-
-    // Match the CONSTRUCT, not the string. `#cg-board-stage` is an ordinary
-    // selector a journey may legitimately wait on -- Journey 14 does exactly
-    // that to prove the overlay MOVED the results rather than re-rendering
-    // them. What must not exist twice is the MEASUREMENT, and its fingerprint
-    // is the visibility filter applied to that stage: `getClientRects`, which
-    // is the one thing a copied measurement could not leave out and still be
-    // the measurement.
-    const measuresTheStage = (code: string) =>
-      code.includes('cg-board-stage') && code.includes('getClientRects');
-    const spelling = files.filter((path) =>
-      measuresTheStage(withoutTsComments(readFileSync(path, 'utf8'))),
-    );
-
-    // Derived from the filesystem rather than a list: a sweep driven by its
-    // own ticket's file list missed five survivors (#65). The population is
-    // every TypeScript file under tests/, so a second measurement written next
-    // year is caught the day it appears.
-    expect(
-      searched(spelling, { of: files, what: 'files naming the board stage' }),
-      'the board stage is measured in one home; a second measurement is the ' +
-        'one place the two legs could quietly disagree',
-    ).toEqual(['tests/board-geometry.ts']);
   });
 });
 

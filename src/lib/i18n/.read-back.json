@@ -1298,12 +1298,6 @@
         "verdict": "agrees",
         "note": "every point carried; the tagline reads \"Learn through games\", the site's own zh kicker"
       },
-      "{absent} 号缺席。": {
-        "english": "The {absent} symbol is missing.",
-        "writers": ["edited after DeepL"],
-        "verdict": "ambiguous",
-        "note": "Google took 号 as \"symbol\" with the bare slot; the same clause in groupedNote reads \"the {absent} number is absent\""
-      },
       "两款工具，即开即用。免费、无需注册，现在就能用。": {
         "english": "Both tools are ready to use right out of the box. They're free, require no registration, and are available immediately.",
         "writers": ["DeepL"],
@@ -1321,6 +1315,12 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "学号 {absent} 缺席。": {
+        "english": "Student ID {absent} is absent.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Shyden 2026-11-08 (#999): 学号 is how a class names a student number"
       }
     },
     "th": {
