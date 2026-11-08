@@ -1,7 +1,8 @@
 import type { Locator } from '@playwright/test';
 import { adb } from '../../scripts/adb.mjs';
 import { TapNotPossibleError, tapOn } from '../real-touch';
-import { centreOf, parseUiDump, type UiNode } from './ui-dump';
+import { dump as screen } from './chrome-javascript-setting';
+import { centreOf, type UiNode } from './ui-dump';
 
 /**
  * Chrome on Android draws a `<select>`'s options in its own dialog, outside
@@ -39,11 +40,6 @@ export function pickerOption(
 export function pickerList(nodes: readonly UiNode[]): UiNode | undefined {
   return nodes.find((node) => node.className === LIST);
 }
-
-const screen = (): UiNode[] => {
-  adb(['shell', 'uiautomator', 'dump', '/sdcard/ui.xml']);
-  return parseUiDump(adb(['shell', 'cat', '/sdcard/ui.xml']));
-};
 
 const tapNode = (node: UiNode): void => {
   const { x, y } = centreOf(node);

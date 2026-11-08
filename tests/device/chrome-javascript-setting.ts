@@ -32,7 +32,8 @@ const BLOCK_LABEL = "Don't allow sites to use JavaScript";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function dump(): UiNode[] {
+/** What the phone's screen shows now, read by `uiautomator dump`. */
+export function dump(): UiNode[] {
   adb(['shell', 'uiautomator', 'dump', '/sdcard/ui.xml']);
   return parseUiDump(adb(['shell', 'cat', '/sdcard/ui.xml']));
 }
