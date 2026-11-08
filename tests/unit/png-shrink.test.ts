@@ -98,6 +98,24 @@ describe('decodePng reads the pixels back', () => {
       expect([...image.pixels]).toEqual(rows.flat(2));
     });
 
+  it('breaks a Paeth tie toward the pixel above, as the format says', () => {
+    // The last pixel's left is 0, above 3, above-left 1: above and above-left
+    // are equally close to the estimate, and the format picks above.
+    const rows = [
+      [
+        [1, 1, 1],
+        [3, 3, 3],
+      ],
+      [
+        [0, 0, 0],
+        [9, 9, 9],
+      ],
+    ];
+    expect([...decodePng(pngOf(rows, { filter: 4 })).pixels]).toEqual(
+      rows.flat(2),
+    );
+  });
+
   it('keeps the alpha channel of an RGBA capture', () => {
     const rows = gradient(3, 2, 4);
     const image = decodePng(pngOf(rows, { filter: 4 }));
@@ -160,6 +178,21 @@ describe('shrinkPng', () => {
     expect(shrunk && [...decodePng(shrunk).pixels]).toEqual([
       15, 30, 45, 150, 150, 150,
     ]);
+  });
+
+  it('rounds a block mean to the nearest value', () => {
+    const rows = [
+      [
+        [0, 0, 0],
+        [1, 1, 1],
+      ],
+      [
+        [1, 1, 1],
+        [1, 1, 1],
+      ],
+    ];
+    const shrunk = shrinkPng(pngOf(rows), 1);
+    expect(shrunk && [...decodePng(shrunk).pixels]).toEqual([1, 1, 1]);
   });
 
   it('returns nothing when the image already fits, never enlarging it', () => {
