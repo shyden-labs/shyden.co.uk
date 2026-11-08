@@ -2378,8 +2378,8 @@ const sexWhyText = sexWhy(roster, t);
        question than the tick box asked. `data-col` is stamped by roster-ui.ts's
        own `columnCell`, so reordering the row can no longer re-point this rule
        at a column nobody chose. Proved by mutation: moving Absent to second
-       reddens 'hiding absent pupils removes the Absent column and only that
-       column' under the ordinal, and leaves it green under the name. */
+       reddens 'hiding absent pupils drops the Absent column, and the absent
+       row' under the ordinal, and leaves it green under the name. */
     [data-print-absent='off'] #cg-roster th[data-col='absent'],
     [data-print-absent='off'] #cg-roster td[data-col='absent'],
     [data-print-absent='off'] #cg-roster .cg-student[data-absent='true'] {

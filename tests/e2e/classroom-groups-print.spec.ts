@@ -111,44 +111,32 @@ const changeOneAndReload = async (
  */
 
 test.describe('the print panel', () => {
-  test('the panel offers what to print, with Both as the default', async ({
+  // One journey on one page of twelve: the defaults are read before anything
+  // is pressed, then a choice is made and the stored keys read, then Cancel.
+  test('defaults, only preferences stored, and Cancel keeps a choice', async ({
     page,
   }) => {
     await withGroups(page);
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openPrintPanel(page);
-    await expect(panel(page).getByLabel('Both')).toBeChecked();
-    await expect(panel(page).getByLabel('Class list')).not.toBeChecked();
-    await expect(panel(page).getByLabel('Group results')).not.toBeChecked();
-  });
-
-  test('all three tick boxes start ticked', async ({ page }) => {
-    await withGroups(page);
-    await openPrintPanel(page);
+    await expect.soft(panel(page).getByLabel('Both')).toBeChecked();
+    await expect.soft(panel(page).getByLabel('Class list')).not.toBeChecked();
+    await expect
+      .soft(panel(page).getByLabel('Group results'))
+      .not.toBeChecked();
     for (const label of [
       'Show students who are absent',
       'Show sex and the together/apart letters',
       'Include avatars',
     ]) {
-      await expect(panel(page).getByLabel(label), label).toBeChecked();
+      await expect.soft(panel(page).getByLabel(label), label).toBeChecked();
     }
-  });
 
-  for (const { label } of REMEMBERED.en.choices)
-    test(`${label}: the choice survives a reload, and only it moves`, async ({
-      page,
-    }) => {
-      await changeOneAndReload(page, REMEMBERED.en, label);
-    });
-
-  test('only preferences are stored — no class data', async ({ page }) => {
-    await withGroups(page);
-    await typeInto(page.getByLabel('Class (optional)'), '7B');
-    await openPrintPanel(page);
     await setCheckedOn(panel(page).getByLabel('Class list'));
     const stored = await page.evaluate(() =>
       JSON.stringify({ ...localStorage }),
     );
-    expect(stored).not.toContain('7B');
+    expect.soft(stored).not.toContain('7B');
     // The exact list is asserted HERE and nowhere earlier. Stage 2
     // deliberately asserts only the `cg-` prefix, so adding these four does
     // not break a test that has nothing to do with printing.
@@ -158,13 +146,28 @@ test.describe('the print panel', () => {
     // header is CLICKED (classroom-groups.ts's own `howToToggle` listener),
     // never on load, and nothing in this test clicks it. Verified by
     // reading the write site, then by running.
-    expect(Object.keys(JSON.parse(stored)).sort()).toEqual([
-      'cg-print-absent',
-      'cg-print-avatars',
-      'cg-print-letters',
-      'cg-print-what',
-    ]);
+    expect
+      .soft(Object.keys(JSON.parse(stored)).sort())
+      .toEqual([
+        'cg-print-absent',
+        'cg-print-avatars',
+        'cg-print-letters',
+        'cg-print-what',
+      ]);
+
+    await setCheckedOn(panel(page).getByLabel('Group results'));
+    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
+    await expect.soft(page.locator('#cg-print-panel')).toBeHidden();
+    await openPrintPanel(page);
+    await expect.soft(panel(page).getByLabel('Group results')).toBeChecked();
   });
+
+  for (const { label } of REMEMBERED.en.choices)
+    test(`${label}: the choice survives a reload, and only it moves`, async ({
+      page,
+    }) => {
+      await changeOneAndReload(page, REMEMBERED.en, label);
+    });
 
   // Q-21. The panel is a dialog: Escape closes it, and it does not print on
   // the way out. A panel a teacher cannot back out of is worse than a bare
@@ -215,16 +218,6 @@ test.describe('the print panel', () => {
     );
   });
 
-  test('Cancel closes it and keeps the choices made', async ({ page }) => {
-    await withGroups(page);
-    await openPrintPanel(page);
-    await setCheckedOn(panel(page).getByLabel('Group results'));
-    await tapOn(panel(page).getByRole('button', { name: 'Cancel' }));
-    await expect(page.locator('#cg-print-panel')).toBeHidden();
-    await openPrintPanel(page);
-    await expect(panel(page).getByLabel('Group results')).toBeChecked();
-  });
-
   // The panel writes what it was told onto the document, which is the whole
   // mechanism the printed sheet is styled from -- asserted directly rather
   // than through an appearance check, so a styling change cannot make this
@@ -255,25 +248,22 @@ test.describe('the print panel', () => {
 });
 
 test.describe('the print panel — Indonesian', () => {
-  test('the panel offers what to print, with Keduanya as the default', async ({
+  test('the panel starts on Keduanya with all three boxes ticked', async ({
     page,
   }) => {
     await withGroups(page, 2, '/id/classroom-groups');
     await openPrintPanel(page);
-    await expect(panel(page).getByLabel('Keduanya')).toBeChecked();
-    await expect(panel(page).getByLabel('Daftar kelas')).not.toBeChecked();
-    await expect(panel(page).getByLabel('Hasil kelompok')).not.toBeChecked();
-  });
-
-  test('all three tick boxes start ticked', async ({ page }) => {
-    await withGroups(page, 2, '/id/classroom-groups');
-    await openPrintPanel(page);
+    await expect.soft(panel(page).getByLabel('Keduanya')).toBeChecked();
+    await expect.soft(panel(page).getByLabel('Daftar kelas')).not.toBeChecked();
+    await expect
+      .soft(panel(page).getByLabel('Hasil kelompok'))
+      .not.toBeChecked();
     for (const label of [
       'Tampilkan siswa yang tidak hadir',
       'Tampilkan jenis kelamin dan huruf bersama/terpisah',
       'Sertakan avatar',
     ]) {
-      await expect(panel(page).getByLabel(label), label).toBeChecked();
+      await expect.soft(panel(page).getByLabel(label), label).toBeChecked();
     }
   });
 
@@ -340,7 +330,10 @@ test.describe('the printed class list', () => {
     await rosterWithAnAbsence(page); // 6 students, #4 absent, letters on #1/#2/#3
   });
 
-  test('absent ✓ letters ✓ — the full register', async ({ page }) => {
+  test('the full register carries its class name, a date, no tint', async ({
+    page,
+  }) => {
+    await typeInto(page.getByLabel('Class (optional)'), '7B');
     await sheet(page, {
       what: 'Class list',
       absent: true,
@@ -349,29 +342,36 @@ test.describe('the printed class list', () => {
     });
     // Absent leads the row now (operator, 2026-08-13) — it is the column a
     // teacher fills in first, so it is the column they read first.
-    await expect(page.locator('.print-list thead th:visible')).toHaveText([
-      'Absent',
-      '#',
-      'Name',
-      'Sex',
-      'Together',
-      'Apart',
-    ]);
-    await expect(page.locator('.print-list tbody tr:visible')).toHaveCount(6);
+    await expect
+      .soft(page.locator('.print-list thead th:visible'))
+      .toHaveText(['Absent', '#', 'Name', 'Sex', 'Together', 'Apart']);
+    await expect
+      .soft(page.locator('.print-list tbody tr:visible'))
+      .toHaveCount(6);
     // The ROW too, not only the header: a Remove cell that lost its name
     // printed a column of buttons under a hidden heading (#390 PL5).
-    await expect(
-      page
-        .locator('.print-list tbody tr:visible')
-        .first()
-        .locator('td:visible'),
-    ).toHaveCount(6);
-    await expect(page.locator('.print-foot')).toHaveText(
-      '6 students · 5 here · 1 absent',
-    );
+    await expect
+      .soft(
+        page
+          .locator('.print-list tbody tr:visible')
+          .first()
+          .locator('td:visible'),
+      )
+      .toHaveCount(6);
+    await expect
+      .soft(page.locator('.print-foot'))
+      .toHaveText('6 students · 5 here · 1 absent');
+    await expect.soft(page.locator('.print-head')).toContainText('7B');
+    await expect.soft(page.locator('.print-head')).toContainText(todayISO());
+    await expect.soft(page.locator('.print-list .cg-absent-pill')).toBeHidden();
+    await expect
+      .soft(page.locator('.print-list tbody tr').nth(3))
+      .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   });
 
-  test('absent ✓ letters ✗ — the Absent column STAYS', async ({ page }) => {
+  test('Absent stays with the letters off, then goes when absent is off', async ({
+    page,
+  }) => {
     // The combination that would otherwise print an absent child
     // indistinguishable from a present one.
     await sheet(page, {
@@ -380,18 +380,32 @@ test.describe('the printed class list', () => {
       letters: false,
       avatars: false,
     });
-    await expect(page.locator('.print-list thead th:visible')).toHaveText([
-      'Absent',
-      '#',
-      'Name',
-    ]);
-    await expect(page.locator('.print-list tbody tr:visible')).toHaveCount(6);
-    await expect(page.locator('.print-list tbody tr').nth(3)).toContainText(
-      '☑',
-    );
+    await expect
+      .soft(page.locator('.print-list thead th:visible'))
+      .toHaveText(['Absent', '#', 'Name']);
+    await expect
+      .soft(page.locator('.print-list tbody tr:visible'))
+      .toHaveCount(6);
+    await expect
+      .soft(page.locator('.print-list tbody tr').nth(3))
+      .toContainText('☑');
+
+    await page.emulateMedia({ media: 'screen' });
+    await sheet(page, {
+      what: 'Class list',
+      absent: false,
+      letters: false,
+      avatars: false,
+    });
+    await expect
+      .soft(page.locator('.print-list thead th:visible'))
+      .toHaveText(['#', 'Name']);
+    await expect
+      .soft(page.locator('.print-list tbody tr:visible'))
+      .toHaveCount(5);
   });
 
-  test('absent ✗ letters ✓ — dropped, and the numbers jump', async ({
+  test('absent dropped, the numbers jump; no form or chrome on the sheet', async ({
     page,
   }) => {
     await sheet(page, {
@@ -400,7 +414,9 @@ test.describe('the printed class list', () => {
       letters: true,
       avatars: false,
     });
-    await expect(page.locator('.print-list tbody tr:visible')).toHaveCount(5);
+    await expect
+      .soft(page.locator('.print-list tbody tr:visible'))
+      .toHaveCount(5);
     // `nth-child(2)`, not `first-child`: Absent took column 1. `first-child`
     // still MATCHES when that column is hidden — it would have read a run of
     // empty strings and compared them against the numbers, which is a test
@@ -408,30 +424,15 @@ test.describe('the printed class list', () => {
     const numbers = await page
       .locator('.print-list tbody tr:visible td:nth-child(2)')
       .allTextContents();
-    expect(numbers).toEqual(['1', '2', '3', '5', '6']);
-    await expect(page.locator('.print-foot-here')).toHaveText(
-      '5 students here today · 1 absent',
-    );
+    expect.soft(numbers).toEqual(['1', '2', '3', '5', '6']);
+    await expect
+      .soft(page.locator('.print-foot-here'))
+      .toHaveText('5 students here today · 1 absent');
     // …and the line it replaces is gone, so the sheet does not carry two
     // different totals.
-    await expect(page.locator('.print-foot')).toBeHidden();
-  });
+    await expect.soft(page.locator('.print-foot')).toBeHidden();
 
-  test('absent ✗ letters ✗ — numbers and names only', async ({ page }) => {
-    await sheet(page, {
-      what: 'Class list',
-      absent: false,
-      letters: false,
-      avatars: false,
-    });
-    await expect(page.locator('.print-list thead th:visible')).toHaveText([
-      '#',
-      'Name',
-    ]);
-    await expect(page.locator('.print-list tbody tr:visible')).toHaveCount(5);
-  });
-
-  test('no form and no site chrome on the sheet', async ({ page }) => {
+    await page.emulateMedia({ media: 'screen' });
     await sheet(page, {
       what: 'Both',
       absent: true,
@@ -456,7 +457,7 @@ test.describe('the printed class list', () => {
       '#cg-howto',
       '.cg-roster-toolbar',
     ]) {
-      await expect(page.locator(sel), sel).toBeHidden();
+      await expect.soft(page.locator(sel), sel).toBeHidden();
     }
     // Nothing a teacher could press or type into is left anywhere on the
     // sheet -- a stronger claim than naming sections one at a time, and the
@@ -466,41 +467,17 @@ test.describe('the printed class list', () => {
     const interactive = page.locator(
       '#cg-form input:visible, #cg-form select:visible, #cg-form button:visible, #cg-form textarea:visible, [form="cg-form"]:visible',
     );
-    await expect(interactive).toHaveCount(0);
+    await expect.soft(interactive).toHaveCount(0);
     // …and the class list is still there, which is the whole point of not
     // hiding the form.
-    await expect(page.locator('#cg-roster')).toBeVisible();
-  });
-
-  test('the sheet carries the class name and a date', async ({ page }) => {
-    await typeInto(page.getByLabel('Class (optional)'), '7B');
-    await sheet(page, {
-      what: 'Class list',
-      absent: true,
-      letters: true,
-      avatars: false,
-    });
-    await expect(page.locator('.print-head')).toContainText('7B');
-    await expect(page.locator('.print-head')).toContainText(todayISO());
-  });
-
-  test('paper carries neither the tint nor the pill', async ({ page }) => {
-    await sheet(page, {
-      what: 'Class list',
-      absent: true,
-      letters: true,
-      avatars: false,
-    });
-    await expect(page.locator('.print-list .cg-absent-pill')).toBeHidden();
-    await expect(page.locator('.print-list tbody tr').nth(3)).toHaveCSS(
-      'background-color',
-      'rgba(0, 0, 0, 0)',
-    );
+    await expect.soft(page.locator('#cg-roster')).toBeVisible();
   });
 
   // Q-16/Q-17: the two What-to-print choices actually exclude each other's
   // section. Without this a sheet asked for one could quietly carry both.
-  test('Class list prints the roster and not the groups', async ({ page }) => {
+  test('Class list and Group results each print only their own section', async ({
+    page,
+  }) => {
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Make Groups' }));
     await sheet(page, {
@@ -509,23 +486,22 @@ test.describe('the printed class list', () => {
       letters: true,
       avatars: false,
     });
-    await expect(page.locator('#cg-students')).toBeVisible();
-    await expect(page.locator('#cg-results')).toBeHidden();
-  });
+    await expect.soft(page.locator('#cg-students')).toBeVisible();
+    await expect.soft(page.locator('#cg-results')).toBeHidden();
 
-  test('Group results prints the groups and not the roster', async ({
-    page,
-  }) => {
-    await giveEveryoneASex(page);
-    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
+    await page.emulateMedia({ media: 'screen' });
     await sheet(page, {
       what: 'Group results',
       absent: true,
       letters: true,
       avatars: false,
     });
-    await expect(page.locator('#cg-results')).toBeVisible();
-    await expect(page.locator('#cg-students')).toBeHidden();
+    await expect.soft(page.locator('#cg-results')).toBeVisible();
+    await expect.soft(page.locator('#cg-students')).toBeHidden();
+    // Dewi is #4 and absent, so she was never in the results at all --
+    // design spec section 4. The absent tick box governs the class list
+    // only, which is why this holds with it ON.
+    await expect.soft(page.locator('.print-groups')).not.toContainText('Dewi');
   });
 
   test('Both prints both', async ({ page }) => {
@@ -537,8 +513,8 @@ test.describe('the printed class list', () => {
       letters: true,
       avatars: false,
     });
-    await expect(page.locator('#cg-students')).toBeVisible();
-    await expect(page.locator('#cg-results')).toBeVisible();
+    await expect.soft(page.locator('#cg-students')).toBeVisible();
+    await expect.soft(page.locator('#cg-results')).toBeVisible();
   });
 
   // A rename after the panel was last opened must reach the paper. The
@@ -607,22 +583,6 @@ test.describe('the printed groups', () => {
     await expect(page.locator('.print-groups svg:visible')).toHaveCount(0);
   });
 
-  test('group results print minus absent students', async ({ page }) => {
-    await rosterWithAnAbsence(page);
-    await giveEveryoneASex(page);
-    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
-    await sheet(page, {
-      what: 'Group results',
-      absent: true,
-      letters: true,
-      avatars: false,
-    });
-    // Dewi is #4 and absent, so she was never in the results at all --
-    // design spec section 4. The absent tick box governs the class list
-    // only, which is why this holds with it ON.
-    await expect(page.locator('.print-groups')).not.toContainText('Dewi');
-  });
-
   test('legible with no colour at all', async ({ page }) => {
     await buildRoster(page, [
       ['F', 'Ana'],
@@ -666,8 +626,11 @@ test.describe('the printed groups', () => {
 
 // ── What the operator found by pressing Print ──────────────────────────────
 test.describe('the printed sheet', () => {
-  test('carries no controls', async ({ page }) => {
+  test('carries no controls, a rule, or the class name and date', async ({
+    page,
+  }) => {
     await withGroups(page, 6);
+    await typeInto(page.locator('#cg-class'), 'Year 9 — Set 2');
     await page.emulateMedia({ media: 'print' });
     // Every button and link on the page, and which of them print: the
     // population the verdict is drawn from (#610).
@@ -685,35 +648,16 @@ test.describe('the printed sheet', () => {
     });
     // "Full screen" printed on every sheet: the print CSS named controls one
     // at a time and that button was never added to the list.
-    expect(
-      searched(controls, {
-        of: candidates,
-        what: 'buttons and links on the page',
-      }),
-      `printed controls: ${controls.join(' | ')}`,
-    ).toEqual([]);
-  });
+    expect
+      .soft(
+        searched(controls, {
+          of: candidates,
+          what: 'buttons and links on the page',
+        }),
+        `printed controls: ${controls.join(' | ')}`,
+      )
+      .toEqual([]);
 
-  test('carries the class name and the date however it was printed', async ({
-    page,
-  }) => {
-    await withGroups(page, 6);
-    await typeInto(page.locator('#cg-class'), 'Year 9 — Set 2');
-    // Ctrl/Cmd+P, not the in-page Print button. `writePrintHead` used to run
-    // only from the print panel's apply, so printing the way people actually
-    // print produced a sheet with no class name and no date.
-    await page.emulateMedia({ media: 'print' });
-    await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-    const head = page.locator('#cg-print-head');
-    await expect(head).toContainText('Year 9 — Set 2');
-    await expect(head).toContainText(/\d{4}-\d{2}-\d{2}/);
-  });
-
-  test('draws no rule under a class list whose toolbar is hidden', async ({
-    page,
-  }) => {
-    await withGroups(page, 6);
-    await page.emulateMedia({ media: 'print' });
     // The toolbar lives in `<tfoot><td colspan="7">`. Hiding only the div
     // inside left the cell in the table and its 1px top border drew a
     // full-width rule across the bottom of every printed class list.
@@ -722,7 +666,15 @@ test.describe('the printed sheet', () => {
       if (!tf) return 'no tfoot';
       return getComputedStyle(tf).display;
     });
-    expect(foot).toBe('none');
+    expect.soft(foot).toBe('none');
+
+    // Ctrl/Cmd+P, not the in-page Print button. `writePrintHead` used to run
+    // only from the print panel's apply, so printing the way people actually
+    // print produced a sheet with no class name and no date.
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    const head = page.locator('#cg-print-head');
+    await expect.soft(head).toContainText('Year 9 — Set 2');
+    await expect.soft(head).toContainText(/\d{4}-\d{2}-\d{2}/);
   });
 });
 
@@ -1011,7 +963,7 @@ test.describe('which columns reach paper is decided by name, not by position', (
     );
   });
 
-  test('hiding absent pupils removes the Absent column and only that column', async ({
+  test('hiding absent pupils drops the Absent column, and the absent row', async ({
     page,
   }) => {
     await buildRoster(page, [
@@ -1030,9 +982,15 @@ test.describe('which columns reach paper is decided by name, not by position', (
     // rule ever names the wrong column, THIS is the assertion that says which
     // one went instead, by name, rather than reporting a count that moved.
     const columns = await printedColumns(page, 1);
-    expect(
-      [...searched(columns, { of: columns, what: 'printed columns' })].sort(),
-    ).toEqual(ALL_SIX.filter((c) => c !== 'absent').sort());
+    expect
+      .soft(
+        [...searched(columns, { of: columns, what: 'printed columns' })].sort(),
+      )
+      .toEqual(ALL_SIX.filter((c) => c !== 'absent').sort());
+
+    const rows = page.locator('.cg-student');
+    await expect.soft(rows.nth(0)).toBeHidden();
+    await expect.soft(rows.nth(1)).toBeVisible();
 
     await shoot(
       page,
@@ -1070,26 +1028,6 @@ test.describe('which columns reach paper is decided by name, not by position', (
       page,
       'letters hidden: Sex, Together and Apart are gone, Absent stays',
     );
-  });
-
-  test('an absent pupil leaves the sheet entirely, a present one stays', async ({
-    page,
-  }) => {
-    await buildRoster(page, [
-      ['M', 'Ana'],
-      ['F', 'Budi'],
-    ]);
-    await setCheckedOn(page.locator('.cg-student').nth(0).getByLabel('Absent'));
-    await sheet(page, {
-      what: 'Class list',
-      absent: false,
-      letters: true,
-      avatars: true,
-    });
-
-    const rows = page.locator('.cg-student');
-    await expect(rows.nth(0)).toBeHidden();
-    await expect(rows.nth(1)).toBeVisible();
   });
 });
 
