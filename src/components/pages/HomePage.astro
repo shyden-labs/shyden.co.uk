@@ -16,16 +16,15 @@ const t = getSiteStrings(lang).home;
 
 // Env-derived so we never cross environments: the DEV site must link to DEV
 // ShyTalk, prod to prod. Defaults to prod; deploy-dev.yml sets
-// PUBLIC_SHYTALK_URL=https://dev.shytalk.shyden.co.uk before the dev build.
-const shytalkUrl =
-  import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.shyden.co.uk';
+// PUBLIC_SHYTALK_URL=https://dev.shytalk.app before the dev build.
+const shytalkUrl = import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.app';
 
 // The same rule for Yawelo Idle (#403): deploy-dev.yml sets
 // PUBLIC_YAWELO_IDLE_URL=https://dev.yawelo-idle.shyden.co.uk before the dev build.
-// The production host had no DNS record when this shipped; the operator chose
-// to link it from release day anyway (2026-10-04).
+// Neither product's own domain had a DNS record when these moved; the operator
+// chose to link them from the next release anyway (2026-11-08, #1084).
 const yaweloIdleUrl =
-  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yawelo-idle.shyden.co.uk';
+  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yaweloidle.com';
 
 // The preview video (#835) is published by the Yawelo Idle project to the
 // shared media host (Cloudflare R2, yawelo-idle#713), never copied here. One
@@ -378,7 +377,7 @@ const yaweloIdleFeatures = [
       width: 24rem;
     }
   }
-  /* ShyTalk brand wordmark — the exact two-tone mark from shytalk.shyden.co.uk:
+  /* ShyTalk brand wordmark — the exact two-tone mark from the ShyTalk product:
      light "Shy" + light-purple glowing "Talk", bold with tight tracking.
      Colours taken from the live logo; values live in src/lib/shytalk-brand.ts,
      and the tile's theme token in tokens.css (#142 §3.4). */
