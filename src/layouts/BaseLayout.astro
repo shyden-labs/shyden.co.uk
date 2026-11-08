@@ -43,9 +43,9 @@ const site = getSiteStrings(lang);
 const siteOrigin = Astro.site ?? Astro.url;
 const canonical = new URL(Astro.url.pathname, siteOrigin).href;
 
-// hreflang for BOTH locales plus x-default. Without these, search engines
-// treat the English and Indonesian pages as unrelated near-duplicates rather
-// than translations of one another, and may index only one of them.
+// hreflang for every locale plus x-default. Without these, search engines
+// treat the five language versions as unrelated near-duplicates rather than
+// translations of one another, and may index only one of them.
 const alternates = LOCALES.map((code) => ({
   code,
   href: new URL(localisePath(Astro.url.pathname, code), siteOrigin).href,
