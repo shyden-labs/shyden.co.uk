@@ -165,9 +165,10 @@ in CI, so "deployed to dev" only meant `wrangler` had not errored.
 
 - Cloudflare Pages project `shyden-site`. Build: `npm run build`, output `dist`,
   Node 24.
-- Custom domain `shyden.co.uk`; `shytalk.shyden.co.uk` points at ShyTalk.
-- The outbound ShyTalk link is env-derived (`PUBLIC_SHYTALK_URL`) so a dev build
-  never links to production. Both sanity suites assert this.
+- Custom domain `shyden.co.uk`. The products have their own: `shytalk.app` and
+  `yaweloidle.com`.
+- The outbound product links are env-derived (`PUBLIC_SHYTALK_URL`,
+  `PUBLIC_YAWELO_IDLE_URL`) so a dev build never links to production. Both sanity suites assert this.
 
 ## Conventions
 
