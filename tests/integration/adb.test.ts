@@ -38,7 +38,7 @@ describe('adb()', () => {
 
   it("names the command and adb's own words when adb fails", () => {
     expect(() => adb(['fail'])).toThrow(
-      /^adb fail failed: [\s\S]*no devices\/emulators found/,
+      /^adb fail failed with exit status 1: stderr "[\s\S]*no devices\/emulators found/,
     );
   });
 });
