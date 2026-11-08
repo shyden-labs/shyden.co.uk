@@ -55,7 +55,7 @@ export interface ProjectorHandlers {
   /**
    * Why the board may not be opened right now, or `null`.
    *
-   * Task 6 wires the out-of-date refusal through this. A predicate, not a
+   * The out-of-date refusal comes through this (classroom-groups.ts). A predicate, not a
    * boolean read once: the answer changes as the teacher edits.
    */
   refuseReason?: () => string | null;

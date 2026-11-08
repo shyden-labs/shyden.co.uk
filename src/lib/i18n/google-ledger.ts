@@ -120,8 +120,17 @@ export async function takeLock(
   for (;;) {
     if (files.create(path, mine)) return release;
     const text = files.read(path);
-    // Released between the two calls: take it on the next pass.
-    if (text === undefined) continue;
+    // Released between the two calls: take it on the next pass. A create that
+    // keeps failing with nothing there is not a release, so this waits and
+    // stops at the ceiling rather than spinning (#390 F25).
+    if (text === undefined) {
+      if (clock.now() - began >= ceiling)
+        throw new Error(
+          `could not create the read-back lock ${path} in ${ceiling / 60_000} minutes, though no lock is there`,
+        );
+      await clock.wait(LOCK_POLL_MS);
+      continue;
+    }
     const holder = holderOf(text);
     if (!holder)
       throw new Error(
