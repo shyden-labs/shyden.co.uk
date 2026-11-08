@@ -383,7 +383,7 @@ test.describe('classroom groups — mobile-first layout', () => {
   // Every locale (#423): the buttons and labels measured here hold the
   // page's own copy, and a two-character zh label can make a box narrower
   // than an English one.
-  const expectTouchTargets = async (page: Page, path: string) => {
+  const expectTouchTargets = async (page: Page) => {
     // Measured in BOTH states of the mode field, because "students per
     // group" and "how many groups" are never on screen at the same time —
     // and a control that is not displayed measures 0, which is not the
@@ -503,7 +503,7 @@ test.describe('classroom groups — mobile-first layout', () => {
         await atViewport(page, { width, height: 900 });
         await page.goto(path);
         await expectNoScrollSoft(page, page.url());
-        if (width === 375) await expectTouchTargets(page, path);
+        if (width === 375) await expectTouchTargets(page);
         if (withResults) {
           await makeGroups(page, String(MAX_STUDENTS), '4');
           await expect
