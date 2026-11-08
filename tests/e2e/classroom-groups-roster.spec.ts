@@ -779,7 +779,8 @@ test.describe('validation as it is typed', () => {
         page.getByText(/are kept together, so they cannot also be kept apart/),
       )
       .toBeVisible();
-    await expect.soft(go).toBeDisabled();
+    // The press above renamed the button, so it is read by its id here.
+    await expect.soft(page.locator('#cg-go')).toBeDisabled();
   });
 
   // #332, the stale notice's twin. The warning paints its own cream ground
@@ -1320,7 +1321,8 @@ test.describe('Indonesian', () => {
     await expect
       .soft(page.getByText(/sudah ditandai untuk disatukan/))
       .toBeVisible();
-    await expect.soft(go).toBeDisabled();
+    // The press above renamed the button, so it is read by its id here.
+    await expect.soft(page.locator('#cg-go')).toBeDisabled();
   });
 
   // Stage 3, Task 6's own i18n requirement. Mirrors 'Student details
