@@ -275,7 +275,7 @@ const realDeviceTest = base.extend<
       // ~174 tests: running classroom-groups-privacy.spec.ts's "a mid-module failure still
       // cannot leak the class list" test (registers a context.addInitScript that makes
       // `matchMedia` throw) immediately before either "the tool still makes groups" (same
-      // file) or "the mute choice survives a reload" (a DIFFERENT file, 18 tests later in a
+      // file) or "a muted choice survives a reload, and a full shuffle then fetches no audio at all" (a DIFFERENT file, 18 tests later in a
       // full run) reproduces that later test's exact full-run failure signature with nothing
       // else involved. Disposing every init script a test added, the instant that test ends,
       // is what a fresh desktop context gives every desktop test for free -- see

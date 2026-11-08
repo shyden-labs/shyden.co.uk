@@ -81,8 +81,8 @@ export const en = {
   studentsLabel: 'Number of students',
   // Task 8, the locale sweep. Used to read "Leave the names box empty to
   // use numbered students." -- the paste-names box it described was removed
-  // by Task 1's engine rewrite (see classroom-groups.spec.ts's own 'the
-  // paste-names box and the keep-apart box are gone'), so this sentence had
+  // by Task 1's engine rewrite (see classroom-groups.spec.ts's load-time
+  // check that the paste-names box and the keep-apart box are gone), so this sentence had
   // been describing a control absent from the page since stage 2 began.
   // Rewritten to say what is true today: every student this field produces
   // is anonymous and numbered, the exact form `studentNumber` below renders

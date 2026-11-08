@@ -8,8 +8,9 @@ import type { Strings } from './i18n';
  * code path that could undo the change, and the one that forgets is the
  * bug -- "the teacher put the size back to 4" would leave a badge saying
  * the groups are wrong when they are not (see classroom-groups.spec.ts's
- * own "undoing the change clears it" test, which exists to prove exactly
- * that). A comparison against a snapshot taken at shuffle time needs no
+ * own "a changed size or count marks the groups out of date, a class name
+ * does not, shuffling clears it" test, which proves exactly that when it
+ * puts the size back). A comparison against a snapshot taken at shuffle time needs no
  * clearing at all: it is simply re-evaluated, every time, against whatever
  * the form says right now.
  *
@@ -79,8 +80,8 @@ const assertComparable = (snapshot: Snapshot): void => {
  * recomputes this on every input -- so undoing the highest-priority
  * mismatch does not clear the notice by itself, it just means the very
  * next recompute reports whichever mismatch is still live (or `null`, if
- * none is). See classroom-groups.spec.ts's own "when two things change,
- * undoing one still names the other" test, which a one-shot "first cause
+ * none is). See classroom-groups.spec.ts's own "the leftovers choice marks the groups
+ * out of date; with two changes, undoing one names the other" test, which a one-shot "first cause
  * wins forever" implementation would fail.
  */
 export function staleReason(
