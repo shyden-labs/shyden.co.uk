@@ -8,7 +8,7 @@ import {
   type Page,
   type APIRequestContext,
 } from '@playwright/test';
-import { ensureChromeForegroundOrRecover } from '../device/chrome-foreground';
+import { checkChromeForeground } from '../device/chrome-foreground';
 import { openTabsAsAVisitor } from '../device/visitor-tab';
 import {
   DEVICE_DOWNLOAD_BEHAVIOUR,
@@ -327,15 +327,10 @@ const realDeviceTest = base.extend<
   },
 
   page: async ({ context, baseURL, colorScheme }, use, testInfo) => {
-    // Chrome losing foreground mid-run is a real, observed failure mode (147 failed / 62
-    // failed in otherwise-clean runs -- see tests/device/chrome-foreground.ts's own module
-    // comment for the evidence and the design doc for the full trail).
-    // android-preflight.setup.ts's own precondition 3 only confirms this ONCE, before the run
-    // starts; this is the re-check, once per test, BEFORE that test's own actions begin, so no
-    // test ever knowingly runs against the wrong foreground app. Cheap (median ~68ms,
-    // measured) when Chrome already holds it, which is every test except a genuine
-    // interruption.
-    await ensureChromeForegroundOrRecover(testInfo.title);
+    // Chrome losing the foreground is a real, observed failure (147 and 62 failed in
+    // otherwise-clean runs; see tests/device/chrome-foreground.ts). The preflight confirms it
+    // once; this re-checks it before each test and fails the test naming the holder (#1073).
+    checkChromeForeground(testInfo.title);
 
     const page = await context.newPage();
     // The theme is pinned per test (#142 §6.2). The phone's context was made
