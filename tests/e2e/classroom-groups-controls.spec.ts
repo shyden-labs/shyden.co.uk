@@ -705,257 +705,128 @@ test.describe('classroom groups — mobile-first layout', () => {
 // above (classroom-groups.spec.ts): the label reads "Number of students"
 // (`studentsLabel` in en.ts), not "How many students?". Corrected to the
 // real label here too, rather than reproduced verbatim.
-test.describe('How to use', () => {
-  test('sits above the form and outside the tool sections', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    const howTo = page.locator('#cg-howto');
-    const form = page.locator('#cg-form');
-    const hy = (await howTo.boundingBox())!.y;
-    const fy = (await form.boundingBox())!.y;
-    expect(hy).toBeLessThan(fy);
-    // and it is not one of the tool's collapsible sections
-    await expect(form.locator('#cg-howto')).toHaveCount(0);
-  });
+/**
+ * One walk of the How to use section (#1086): every check is made on the one
+ * journey, softly, so a failure does not hide the checks after it.
+ */
+const howToJourney = async (
+  page: Page,
+  copy: {
+    path: string;
+    toggle: string;
+    studentsLabel: string;
+    partOne: string;
+    partTwo: string;
+  },
+) => {
+  await page.goto(copy.path);
+  const howTo = page.locator('#cg-howto');
+  const form = page.locator('#cg-form');
+  const toggle = page.getByRole('button', { name: copy.toggle });
+  const partOne = page.getByText(copy.partOne);
+  const partTwo = page.getByText(copy.partTwo);
 
-  // The who-and-why paragraph is the page's lead: read before anything is
-  // opened, where How to use now starts with what the tool does (operator,
-  // 2026-09-30, #384).
-  test('the lead says who it is for and why, before any click', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    const lead = page.locator('.lead');
-    await expect(lead).toHaveCount(1);
-    await expect(lead).toBeVisible();
-    await expect(lead).toHaveText(
-      'Built for teachers, by Shyden. Splitting a class fairly takes time you do not have, and doing it by hand invites an argument about favourites. This does it in one press — free, with no sign-up, and with nothing about your class ever leaving your browser.',
-    );
-  });
+  // It sits above the form, and it is not one of the tool's collapsible sections.
+  const hy = (await howTo.boundingBox())!.y;
+  const fy = (await form.boundingBox())!.y;
+  expect.soft(hy).toBeLessThan(fy);
+  await expect.soft(form.locator('#cg-howto')).toHaveCount(0);
+
+  // The old markup was a real <h2>; the toggle rewrite dropped it to a bare
+  // <button>, which a screen reader can no longer find by heading navigation.
+  // Assert the role and level a screen-reader user would land on, not a tag
+  // count.
+  await expect
+    .soft(page.getByRole('heading', { name: copy.toggle, level: 2 }))
+    .toBeVisible();
 
   // Reverses design spec section 3's original "open by default" -- section
   // 2's operator ruling 2 (2026-08-08) collapses it, because measurement
   // showed it was ~310px of a phone screen, the single biggest saving
   // toward the tool fitting one. The header stays visible and operable
   // regardless -- a control that hides itself is a trap.
-  test('holds both parts and is collapsed by default', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await expect(
-      page.getByRole('button', { name: 'How to use' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'How to use' }),
-    ).toHaveAttribute('aria-expanded', 'false');
-    // The whole sentence. Part 1 says WHAT the tool does; WHO it is for and
-    // WHY it exists moved to the page's lead (operator, 2026-09-30, #384).
-    await expect(
-      page.getByText(
-        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
-      ),
-    ).toBeHidden();
-    await expect(
-      page.getByText('Say how many students are in your class.'),
-    ).toBeHidden();
-  });
+  await expect.soft(toggle).toBeVisible();
+  await expect.soft(toggle).toHaveAttribute('aria-expanded', 'false');
+  // The whole sentence. Part 1 says WHAT the tool does; WHO it is for and
+  // WHY it exists moved to the page's lead (operator, 2026-09-30, #384).
+  await expect.soft(partOne).toBeHidden();
+  await expect.soft(partTwo).toBeHidden();
 
-  test('clicking the toggle opens both parts', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await tapOn(page.getByRole('button', { name: 'How to use' }));
-    await expect(
-      page.getByText(
-        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
-      ),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Say how many students are in your class.'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'How to use' }),
-    ).toBeVisible();
-  });
+  await tapOn(toggle);
+  await expect.soft(partOne).toBeVisible();
+  await expect.soft(partTwo).toBeVisible();
+  await expect.soft(toggle).toBeVisible();
+  // The toggle still works with the heading restored, and the heading stays.
+  await expect
+    .soft(page.getByRole('heading', { name: copy.toggle, level: 2 }))
+    .toBeVisible();
 
-  // A control that only ever opens is a trap too. The test above only
-  // proves a first click reveals the content -- it never proves it can be
-  // put away again. Click a second time and look for the actual sentences
-  // leaving, not just an attribute flipping back.
-  test('clicking the toggle a second time closes both parts again', async ({
+  // A control that only ever opens is a trap too. Look for the actual
+  // sentences leaving, not just an attribute flipping back.
+  await tapOn(toggle);
+  await expect.soft(partOne).toBeHidden();
+  await expect.soft(partTwo).toBeHidden();
+  await expect.soft(toggle).toBeVisible();
+
+  // "Collapse it, reload, still collapsed" would be vacuous -- collapsed is
+  // the default, so that would pass even with persistence completely unwired.
+  // What proves the state round-trips through localStorage is the other
+  // direction: open it, reload, and it must still be open.
+  await tapOn(toggle);
+  await page.reload();
+  await expect.soft(partTwo).toBeVisible();
+  await expect.soft(toggle).toHaveAttribute('aria-expanded', 'true');
+
+  // Only the preference is stored, never class data.
+  await typeInto(page.getByLabel(copy.studentsLabel), '12');
+  await tapOn(toggle);
+  const stored = await page.evaluate(() => ({ ...localStorage }));
+  expect.soft(Object.values(stored).join(' ')).not.toContain('12');
+  expect.soft(Object.keys(stored)).toContain('cg-howto-collapsed');
+  // Every key this page writes starts `cg-`, and none of them may carry class
+  // data. Asserting the EXACT list here would be a false economy: stage 5 adds
+  // four print preferences and would break a test that is not about printing.
+  expect.soft(Object.keys(stored).every((k) => k.startsWith('cg-'))).toBe(true);
+};
+
+test.describe('How to use', () => {
+  // The who-and-why paragraph is the page's lead: read before anything is
+  // opened, where How to use now starts with what the tool does (operator,
+  // 2026-09-30, #384).
+  test('the lead says who it is for and why, and How to use opens, closes and remembers', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
-    const toggle = page.getByRole('button', { name: 'How to use' });
-    await tapOn(toggle);
-    await tapOn(toggle);
-    await expect(
-      page.getByText(
+    const lead = page.locator('.lead');
+    await expect.soft(lead).toHaveCount(1);
+    await expect.soft(lead).toBeVisible();
+    await expect
+      .soft(lead)
+      .toHaveText(
+        'Built for teachers, by Shyden. Splitting a class fairly takes time you do not have, and doing it by hand invites an argument about favourites. This does it in one press — free, with no sign-up, and with nothing about your class ever leaving your browser.',
+      );
+    await howToJourney(page, {
+      path: '/classroom-groups',
+      toggle: 'How to use',
+      // Not 'How many students?' -- see the comment above this describe block.
+      studentsLabel: 'Number of students',
+      partOne:
         'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
-      ),
-    ).toBeHidden();
-    await expect(
-      page.getByText('Say how many students are in your class.'),
-    ).toBeHidden();
-    await expect(toggle).toBeVisible();
-  });
-
-  // "Collapse it, reload, still collapsed" would now be vacuous -- collapsed
-  // is the default, so that would pass even with persistence completely
-  // unwired. The test that actually proves the state round-trips through
-  // localStorage is the other direction: open it, reload, and it must still
-  // be open.
-  test('the opened state survives a reload', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await tapOn(page.getByRole('button', { name: 'How to use' }));
-    await page.reload();
-    await expect(
-      page.getByText('Say how many students are in your class.'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'How to use' }),
-    ).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  test('only the preference is stored, never class data', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    // Not 'How many students?' -- see the describe block's own comment.
-    await typeInto(page.getByLabel('Number of students'), '12');
-    await tapOn(page.getByRole('button', { name: 'How to use' }));
-    const stored = await page.evaluate(() => ({ ...localStorage }));
-    expect(Object.values(stored).join(' ')).not.toContain('12');
-    expect(Object.keys(stored)).toContain('cg-howto-collapsed');
-    // Every key this page writes starts `cg-`, and none of them may carry
-    // class data. Asserting the EXACT list here would be a false economy:
-    // stage 5 adds four print preferences and would break a test that is
-    // not about printing.
-    expect(Object.keys(stored).every((k) => k.startsWith('cg-'))).toBe(true);
-  });
-
-  // The old markup was a real <h2>; the toggle rewrite dropped it to a bare
-  // <button>, which a screen reader can no longer find by heading
-  // navigation. Assert the role and level a screen-reader user would land
-  // on, not a tag count, and confirm the click still works with the
-  // heading restored.
-  test('the section is reachable by heading, and the toggle still works', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await expect(
-      page.getByRole('heading', { name: 'How to use', level: 2 }),
-    ).toBeVisible();
-    const toggle = page.getByRole('button', { name: 'How to use' });
-    await tapOn(toggle);
-    await expect(
-      page.getByText('Say how many students are in your class.'),
-    ).toBeVisible();
+      partTwo: 'Say how many students are in your class.',
+    });
   });
 });
 
 test.describe('How to use — Indonesian', () => {
-  test('sits above the form and outside the tool sections', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    const howTo = page.locator('#cg-howto');
-    const form = page.locator('#cg-form');
-    const hy = (await howTo.boundingBox())!.y;
-    const fy = (await form.boundingBox())!.y;
-    expect(hy).toBeLessThan(fy);
-    await expect(form.locator('#cg-howto')).toHaveCount(0);
-  });
-
-  // Mirrors the English suite's own default-state test -- see that describe
-  // block's own comment for the ruling behind the reversal.
-  test('holds both parts and is collapsed by default', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await expect(
-      page.getByRole('button', { name: 'Cara menggunakan' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Cara menggunakan' }),
-    ).toHaveAttribute('aria-expanded', 'false');
-    await expect(
-      page.getByText(
+  test('How to use opens, closes and remembers', async ({ page }) => {
+    await howToJourney(page, {
+      path: '/id/classroom-groups',
+      toggle: 'Cara menggunakan',
+      studentsLabel: 'Jumlah siswa',
+      partOne:
         'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
-      ),
-    ).toBeHidden();
-    await expect(
-      page.getByText('Masukkan jumlah siswa di kelas Anda.'),
-    ).toBeHidden();
-  });
-
-  test('clicking the toggle opens both parts', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
-    await expect(
-      page.getByText(
-        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
-      ),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Masukkan jumlah siswa di kelas Anda.'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Cara menggunakan' }),
-    ).toBeVisible();
-  });
-
-  // Mirrors the English suite's own close-again test -- a control that only
-  // ever opens is a trap too, in every language this page ships.
-  test('clicking the toggle a second time closes both parts again', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    const toggle = page.getByRole('button', { name: 'Cara menggunakan' });
-    await tapOn(toggle);
-    await tapOn(toggle);
-    await expect(
-      page.getByText(
-        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
-      ),
-    ).toBeHidden();
-    await expect(
-      page.getByText('Masukkan jumlah siswa di kelas Anda.'),
-    ).toBeHidden();
-    await expect(toggle).toBeVisible();
-  });
-
-  // Mirrors the English suite's own reload test -- see that describe
-  // block's own comment for why the meaningful direction is now "opened",
-  // not "collapsed".
-  test('the opened state survives a reload', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
-    await page.reload();
-    await expect(
-      page.getByText('Masukkan jumlah siswa di kelas Anda.'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Cara menggunakan' }),
-    ).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  test('only the preference is stored, never class data', async ({ page }) => {
-    await page.goto('/id/classroom-groups');
-    await typeInto(page.getByLabel('Jumlah siswa'), '12');
-    await tapOn(page.getByRole('button', { name: 'Cara menggunakan' }));
-    const stored = await page.evaluate(() => ({ ...localStorage }));
-    expect(Object.values(stored).join(' ')).not.toContain('12');
-    expect(Object.keys(stored)).toContain('cg-howto-collapsed');
-    expect(Object.keys(stored).every((k) => k.startsWith('cg-'))).toBe(true);
-  });
-
-  // Mirrors the English suite's own heading-reachability test.
-  test('the section is reachable by heading, and the toggle still works', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await expect(
-      page.getByRole('heading', { name: 'Cara menggunakan', level: 2 }),
-    ).toBeVisible();
-    const toggle = page.getByRole('button', { name: 'Cara menggunakan' });
-    await tapOn(toggle);
-    await expect(
-      page.getByText('Masukkan jumlah siswa di kelas Anda.'),
-    ).toBeVisible();
+      partTwo: 'Masukkan jumlah siswa di kelas Anda.',
+    });
   });
 });
 
