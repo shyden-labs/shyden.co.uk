@@ -1,4 +1,4 @@
-import { expect, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type TestInfo } from '@playwright/test';
 import { chooseFromNativePicker } from './device/native-picker';
 import { onRealDevice } from './device/device-downloads';
 import { tapOn } from './real-touch';
@@ -35,6 +35,7 @@ export async function chooseOption(
   if (onRealDevice()) {
     // Chrome draws the options in its own dialog: a real tap opens it, and a
     // real tap on the option's row chooses it (tests/device/native-picker.ts).
+    allowForPhoneChoices(test.info());
     const option = options.find((o) => o.value === value && !o.disabled);
     if (option === undefined)
       throw new Error(whyNoOption(String(select), value));
@@ -63,6 +64,17 @@ export async function chooseOption(
   const got = await select.inputValue();
   const why = whyNotChosen(String(select), value, got);
   if (why !== null) throw new Error(why);
+}
+
+/**
+ * One real choice on the phone costs about 5.5 s (two uiautomator dumps of
+ * 2.1 s and the taps, measured 2026-11-07), so a test making several outruns
+ * 30 s. Shyden ruled 2026-11-08 (#1027): the phone gets Playwright's slow
+ * allowance (3x, 90 s) rather than fewer real taps. Calling it again in the
+ * same test changes nothing.
+ */
+export function allowForPhoneChoices(info: Pick<TestInfo, 'slow'>): void {
+  info.slow(true, "a real choice in Chrome's own picker costs about 5.5 s");
 }
 
 export interface OptionState {

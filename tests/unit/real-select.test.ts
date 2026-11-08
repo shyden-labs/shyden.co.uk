@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { arrowKeysFor, whyNoOption, whyNotChosen } from '../real-select';
+import {
+  allowForPhoneChoices,
+  arrowKeysFor,
+  whyNoOption,
+  whyNotChosen,
+} from '../real-select';
 
 /**
  * The messages chooseOption fails with (#1027). Pure strings: no browser, no
@@ -47,5 +52,16 @@ describe('chooseOption failures', () => {
     expect(arrowKeysFor(o, 'M', 'F')).toEqual(['ArrowDown']);
     expect(arrowKeysFor(o, 'M', '')).toBeNull();
     expect(arrowKeysFor(o, 'M', 'Z')).toBeNull();
+  });
+});
+
+describe('a real choice on the phone (#1027, Shyden 2026-11-08)', () => {
+  it('marks the test slow once, naming why', () => {
+    const calls: unknown[][] = [];
+    const info = { slow: (...args: unknown[]) => void calls.push(args) };
+    allowForPhoneChoices(info);
+    expect(calls).toEqual([
+      [true, "a real choice in Chrome's own picker costs about 5.5 s"],
+    ]);
   });
 });
