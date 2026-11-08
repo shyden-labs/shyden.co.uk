@@ -67,53 +67,112 @@ describe("Chrome's native select picker, read from a uiautomator dump (#1027)", 
   });
 });
 
-describe('choosing from the picker waits for it to close (#1027)', () => {
-  it('returns only once the picker it tapped has gone, so the next tap meets the page', async () => {
+describe('choosing from the picker reads the window, not the whole screen (#1086)', () => {
+  const LABELS = ['Normal', 'Fast', 'Skip the animation'];
+  const PICKER_XML = readFileSync(
+    'tests/unit/fixtures/android/select-picker.xml',
+    'utf8',
+  );
+  const FOCUS = (id: string) =>
+    `  mCurrentFocus=null\n  mCurrentFocus=Window{${id} u0 com.android.chrome/Main}`;
+
+  /**
+   * The phone as measured on the OPPO (2026-11-09): the picker is a window of
+   * its own, so the focused window changes while it is open and goes back when
+   * it closes, one `dumpsys window` read (about 130 ms) against 2.2 s for a
+   * uiautomator dump. `closesAfter` is how many reads the dialog stays up after
+   * the tap on its row.
+   */
+  const phone = async ({
+    opens = true,
+    closesAfter = 0,
+  }: { opens?: boolean; closesAfter?: number } = {}) => {
     vi.resetModules();
-    const picker = readFileSync(
-      'tests/unit/fixtures/android/select-picker.xml',
-      'utf8',
-    );
-    const page =
-      '<hierarchy><node text="" class="android.widget.FrameLayout" bounds="[0,0][1440,3168]" /></hierarchy>';
-    // The dialog is still drawn for two dumps after the row is tapped.
-    const screens = [picker, picker, picker, page];
+    let window = 'page';
+    let closing = -1;
     const calls: string[][] = [];
     vi.doMock('../../scripts/adb.mjs', () => ({
       adb: (args: string[]) => {
         calls.push(args);
-        return args.includes('cat') ? (screens.shift() ?? page) : '';
+        if (args.includes('dumpsys')) {
+          if (closing === 0) window = 'page';
+          if (closing >= 0) closing -= 1;
+          return FOCUS(window);
+        }
+        if (args.includes('tap')) closing = closesAfter;
+        return args.includes('cat') ? PICKER_XML : '';
       },
     }));
     vi.doMock('../real-touch', () => ({
-      tapOn: async () => {},
+      tapOn: async () => {
+        if (opens) window = 'dialog';
+      },
       TapNotPossibleError: Error,
     }));
-    const { chooseFromNativePicker } = await import('../device/native-picker');
-    await chooseFromNativePicker({ toString: () => 'sel' } as never, 'Fast');
-    const taps = calls.filter((args) => args.includes('tap'));
-    expect(taps).toEqual([['shell', 'input', 'tap', '720', '1587']]);
-    expect(screens, 'every dump until the picker closed was read').toEqual([]);
+    const { chooseFromNativePicker, PICKER_CEILING_MS } =
+      await import('../device/native-picker');
+    const select = { toString: () => 'sel' } as never;
+    return {
+      choose: (label: string, labels = LABELS) =>
+        chooseFromNativePicker(select, label, labels),
+      ceiling: PICKER_CEILING_MS,
+      dumps: () => calls.filter((args) => args.includes('dump')).length,
+      taps: () => calls.filter((args) => args.includes('tap')),
+    };
+  };
+
+  it('the first choice from a list reads the screen once, and taps the row', async () => {
+    const { choose, dumps, taps } = await phone();
+    await choose('Fast');
+    expect(dumps()).toBe(1);
+    expect(taps()).toEqual([['shell', 'input', 'tap', '720', '1587']]);
   });
 
-  it('returns once the picker has gone, though an empty list is left on the screen', async () => {
-    vi.resetModules();
-    const picker = readFileSync(
-      'tests/unit/fixtures/android/select-picker.xml',
-      'utf8',
-    );
-    const page = `<hierarchy><node text="" class="android.widget.FrameLayout" bounds="[0,0][1440,3168]">${EMPTY_LIST}</node></hierarchy>`;
-    const screens = [picker, picker, page];
-    vi.doMock('../../scripts/adb.mjs', () => ({
-      adb: (args: string[]) =>
-        args.includes('cat') ? (screens.shift() ?? page) : '',
-    }));
-    vi.doMock('../real-touch', () => ({
-      tapOn: async () => {},
-      TapNotPossibleError: Error,
-    }));
-    const { chooseFromNativePicker } = await import('../device/native-picker');
-    await chooseFromNativePicker({ toString: () => 'sel' } as never, 'Fast');
-    expect(screens, 'the dump after the picker closed was read').toEqual([]);
+  it('a later choice from the same list taps the row it knows, with no screen read', async () => {
+    const { choose, dumps, taps } = await phone();
+    await choose('Fast');
+    await choose('Skip the animation');
+    expect(dumps()).toBe(1);
+    expect(taps()).toHaveLength(2);
+    expect(taps()[1]).not.toEqual(taps()[0]);
+  });
+
+  it('a different list is read again', async () => {
+    const { choose, dumps } = await phone();
+    await choose('Fast');
+    await choose('Fast', ['Fast', 'Normal', 'Skip the animation', 'Slow']);
+    expect(dumps()).toBe(2);
+  });
+
+  it('a list the screen shows only part of is never remembered: its rows move', async () => {
+    const { choose, dumps } = await phone();
+    const longer = [...LABELS, 'Slow'];
+    await choose('Fast', longer);
+    await choose('Fast', longer);
+    expect(dumps()).toBe(2);
+  });
+
+  it('returns only once the window has gone back, so the next tap meets the page', async () => {
+    const { choose, taps } = await phone({ closesAfter: 2 });
+    let done = false;
+    const choosing = choose('Fast').then(() => {
+      done = true;
+    });
+    await choosing;
+    expect(done).toBe(true);
+    expect(taps()).toHaveLength(1);
+  });
+
+  it('fails naming the select when the tap opened no picker', async () => {
+    vi.useFakeTimers();
+    try {
+      const { choose, ceiling, taps } = await phone({ opens: false });
+      const choosing = choose('Fast').catch((error: Error) => error.message);
+      await vi.advanceTimersByTimeAsync(ceiling + 1_000);
+      expect(await choosing).toMatch(/sel: a real tap did not open Chrome/);
+      expect(taps()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

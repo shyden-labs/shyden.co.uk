@@ -39,7 +39,11 @@ export async function chooseOption(
     const option = options.find((o) => o.value === value && !o.disabled);
     if (option === undefined)
       throw new Error(whyNoOption(String(select), value));
-    await chooseFromNativePicker(select, option.label);
+    await chooseFromNativePicker(
+      select,
+      option.label,
+      options.map((o) => o.label),
+    );
     await expect
       .poll(() => select.inputValue(), {
         message: `${String(select)}: real taps on Chrome's picker did not choose "${value}"`,
