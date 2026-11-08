@@ -24,6 +24,13 @@ const LIST = 'android.widget.ListView';
 
 /** How long the picker may take to appear after the tap, and how often to look. */
 export const PICKER_CEILING_MS = 5_000;
+/**
+ * How long a new picker takes to accept touches once its window has focus. No
+ * signal says so: `dumpsys window` reads it drawn and `dumpsys activity top`
+ * does not list its rows. A tap at once was lost 3 times in 28, and none in 24
+ * from 100 ms on (OPPO, 2026-11-09, #1086). A tap lost anyway fails, named.
+ */
+export const PICKER_SETTLE_MS = 300;
 const PICKER_POLL_MS = 250;
 const FOCUS_POLL_MS = 50;
 
@@ -109,8 +116,12 @@ export async function chooseFromNativePicker(
   );
   const key = labels.join('\n');
   const known = knownRows.get(key)?.get(label);
-  if (known) tapNode(known);
-  else tapNode(await readRow(name, label, labels, key));
+  if (known) {
+    await new Promise((resolve) => setTimeout(resolve, PICKER_SETTLE_MS));
+    tapNode(known);
+  } else {
+    tapNode(await readRow(name, label, labels, key));
+  }
   await untilFocus(
     (focus) => focus === page,
     `${name}: Chrome's option picker was still open ${PICKER_CEILING_MS} ms after a real tap on its row`,

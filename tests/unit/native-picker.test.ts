@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { parseUiDump } from '../device/ui-dump';
-import { pickerOption, pickerList } from '../device/native-picker';
+import {
+  PICKER_SETTLE_MS,
+  pickerOption,
+  pickerList,
+} from '../device/native-picker';
 
 // Measured on the OPPO (2026-11-08, ten failures of 135): once the picker had
 // closed, the screen still held one to three ListViews 1200 px wide and 0 px
@@ -135,6 +139,22 @@ describe('choosing from the picker reads the window, not the whole screen (#1086
     expect(dumps()).toBe(1);
     expect(taps()).toHaveLength(2);
     expect(taps()[1]).not.toEqual(taps()[0]);
+  });
+
+  it('a known row waits for the dialog to take touches before its tap', async () => {
+    const { choose, taps } = await phone();
+    await choose('Fast');
+    vi.useFakeTimers();
+    try {
+      const choosing = choose('Fast');
+      await vi.advanceTimersByTimeAsync(PICKER_SETTLE_MS - 1);
+      expect(taps()).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await choosing;
+      expect(taps()).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a different list is read again', async () => {
