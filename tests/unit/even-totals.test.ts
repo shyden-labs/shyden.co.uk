@@ -129,7 +129,6 @@ describe('deviceTargets', () => {
   const desktop = report(
     test('chromium', 'expected'),
     test('webkit', 'expected'),
-    test('content', 'expected'),
   );
   const android = report(
     test('android-preflight', 'expected'),
@@ -144,7 +143,7 @@ describe('deviceTargets', () => {
     numTodoTests: 0,
   };
 
-  it('makes one target per browser project, leaving out content', () => {
+  it('makes one target per browser project', () => {
     const names = deviceTargets({ desktop, android: null, ios: null }).map(
       (t: { target: string }) => t.target,
     );

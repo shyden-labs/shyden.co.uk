@@ -18,13 +18,11 @@ import { workflowJobs } from '../workflow-jobs';
 type PlaywrightConfigModule = typeof import('../../playwright.config');
 
 /*
- * The Playwright config and the engine-dependence parser are loaded before
- * the first test, never while this file loads (#731). Measured on the runner
- * (run 38304695925, nine loads): `@playwright/test`, which the config
- * imports, and `typescript`, which the parser imports, were 74-91% of loading
- * this file, and its load stood at 518-874 ms of own CPU against the 700 ms
- * the guards files are cut to. Every reader of these bindings is a test, so
- * each finds them set.
+ * The Playwright config is loaded before the first test, never while this
+ * file loads (#731). Measured on the runner (run 38304695925, nine loads):
+ * `@playwright/test`, which the config imports, was most of loading this
+ * file, against the 700 ms the guards files are cut to. Every reader of these
+ * bindings is a test, so each finds them set.
  */
 let config: PlaywrightConfigModule['default'];
 let VISUAL_PROJECT: PlaywrightConfigModule['VISUAL_PROJECT'];
