@@ -11,6 +11,7 @@ import {
   trackedFiles,
 } from '../source-files';
 import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
+import { ENGINES } from '../engines';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
 import { workflowJobs } from '../workflow-jobs';
 
@@ -26,39 +27,20 @@ type PlaywrightConfigModule = typeof import('../../playwright.config');
  * each finds them set.
  */
 let config: PlaywrightConfigModule['default'];
-let CONTENT_ONLY_SPECS: PlaywrightConfigModule['CONTENT_ONLY_SPECS'];
 let VISUAL_PROJECT: PlaywrightConfigModule['VISUAL_PROJECT'];
 let VISUAL_MEASURE_PROJECT: PlaywrightConfigModule['VISUAL_MEASURE_PROJECT'];
-let engineDependence: (typeof import('../unit/engine-dependence'))['engineDependence'];
-let ENGINE_DEPENDENT_NAMES: (typeof import('../unit/engine-dependence'))['ENGINE_DEPENDENT_NAMES'];
 
 beforeAll(async () => {
-  const [playwright, parser] = await Promise.all([
-    import('../../playwright.config'),
-    import('../unit/engine-dependence'),
-  ]);
+  const playwright = await import('../../playwright.config');
   config = playwright.default;
-  ({ CONTENT_ONLY_SPECS, VISUAL_PROJECT, VISUAL_MEASURE_PROJECT } = playwright);
-  ({ engineDependence, ENGINE_DEPENDENT_NAMES } = parser);
+  ({ VISUAL_PROJECT, VISUAL_MEASURE_PROJECT } = playwright);
 });
 
 /**
- * Five browser projects × every spec is not five times the signal.
- *
- * The suite runs 431 unique tests on chromium, firefox, webkit, mobile-chrome
- * and mobile-safari. For anything that renders, that is the point: a collapsed
- * nav wrapper once pushed the header links off-screen on every engine, and only
- * a real engine could have caught it.
- *
- * But some specs assert HTTP responses and DOM text — a sitemap's URLs, a
- * canonical tag, whether two words render touching. `textContent` is
- * spec-defined; those bytes are identical on every engine, so four of the five
- * runs cost time and return nothing the first run did not already prove.
- *
- * The line between the two is not a matter of taste, which is why it can be
- * tested: a spec is content-only exactly when it neither drives the viewport
- * nor reads layout (`engine-dependence.ts`, #198). The moment one does, it is
- * engine-dependent and belongs on all five.
+ * Every spec runs on every engine (#1067). Six specs that read only bytes and
+ * DOM text once ran on Desktop Chrome alone, as a project of their own;
+ * Shyden's rule of 2026-11-05 is one suite, run unchanged on every browser,
+ * with no engine carved out.
  */
 
 /**
@@ -123,148 +105,41 @@ const claims = (project: ResolvedProject, path: string): boolean => {
 
 const E2E = 'tests/e2e';
 const VISUAL_SPEC = join(E2E, 'visual.spec.ts');
-const read = (spec: string) => readFileSync(join(E2E, spec), 'utf8');
-describe('the content-only project', () => {
-  it('names specs that actually exist', () => {
-    const contentOnly = CONTENT_ONLY_SPECS;
-    const missing = contentOnly.filter((s) => !existsSync(join(E2E, s)));
+/** The six specs the `content` project once ran on Desktop Chrome alone. */
+const ONCE_CONTENT_ONLY = [
+  'head-and-sitemap.spec.ts',
+  'seo.spec.ts',
+  'baseurl-guard.spec.ts',
+  'locale-parity.spec.ts',
+  'copy-reaches-a-page.spec.ts',
+  'theme-script.spec.ts',
+];
+
+describe('every engine runs the whole suite (#1067)', () => {
+  it('runs each once content-only spec on all five engines', () => {
+    // Asked of what a project MATCHES, as Playwright resolves it (#33, #194).
+    const projects = resolvedProjects(config, 'playwright.config.ts');
+    for (const spec of ONCE_CONTENT_ONLY)
+      expect(
+        projects.filter((p) => claims(p, join(E2E, spec))).map((p) => p.name),
+        spec,
+      ).toEqual(ENGINES.map((engine) => engine.name));
+  });
+
+  it('excuses no project from proving the navigation collector alive (#355)', () => {
     expect(
-      searched(missing, {
-        of: contentOnly,
-        what: 'content-only specs',
-      }),
-      'a renamed spec would silently stop being scoped',
+      (config.projects ?? [])
+        .filter((p) => p.metadata?.requiresNavigation === false)
+        .map((p) => p.name),
     ).toEqual([]);
   });
 
-  it('does not simply list every spec, which would assert nothing', () => {
-    // Without this, the rule below is satisfiable by scoping the whole suite
-    // to one engine — the opposite of what it is for.
-    const all = config.projects?.length ?? 0;
-    expect(all).toBeGreaterThan(1);
+  it('has the five engines as its projects, and no other', () => {
     expect(
-      CONTENT_ONLY_SPECS.length,
-      'scoping every spec to one engine would delete the cross-engine gate',
-    ).toBeLessThan(10);
-  });
-
-  it('holds only specs whose verdict cannot depend on the engine or viewport', () => {
-    // #198: this once asked only whether a spec DRIVES the viewport, by
-    // substring. `rendered-text.spec.ts` READ layout instead, through
-    // `getClientRects`, so it ran at 1280px on one engine and failed on every
-    // page of a real phone.
-    const contentOnly = CONTENT_ONLY_SPECS;
-    const engineDependent = contentOnly.flatMap((spec) => {
-      const signals = engineDependence(read(spec));
-      return signals.length > 0 ? [`${spec}: ${signals.join(', ')}`] : [];
-    });
-
-    expect(
-      searched(engineDependent, {
-        of: contentOnly,
-        what: 'content-only specs',
-      }),
-      'a spec that drives the viewport or reads layout is engine-dependent ' +
-        'and must run on all five',
-    ).toEqual([]);
-  });
-
-  it('is judged by a detector that sees layout reads in the real suite', () => {
-    // The positive control for the absence above: the spec #198 moved out
-    // reads layout, and a detector gone blind would find nothing anywhere.
-    // Exact, so a detector that starts reporting prose shows up here too.
-    // Its clip reading moved into a reader shipped into the page (#619), so
-    // the reader's name is one of what it reads.
-    expect(engineDependence(read('rendered-text.spec.ts'))).toEqual([
-      'clientWidth',
-      'innerText',
-      'visibleLinesReaderScript',
-    ]);
-  });
-
-  it('counts a reader shipped into the page as text as a layout read (#619)', () => {
-    // A module guarded by `expectClosesOverNothing` is shipped into the page
-    // and makes its DOM calls there, so a spec that names only the reader
-    // reads layout through it, and would otherwise sit on the content-only
-    // side, measured on one engine. Derived from the guards that ship them,
-    // so a reader is covered the day its guard is written.
-    const guards = trackedFiles((path) =>
-      /^tests\/guards\/.+\.test\.ts$/.test(path),
-    );
-    const shipped = [
-      ...new Set(
-        guards.flatMap((path) =>
-          [
-            ...withoutTsComments(readFileSync(path, 'utf8')).matchAll(
-              /expectClosesOverNothing\(\s*'([^']+)'/g,
-            ),
-          ].map((match) => match[1]),
-        ),
-      ),
-    ].sort();
-    const readers = shipped.flatMap((path) =>
-      [
-        ...withoutTsComments(readFileSync(path, 'utf8')).matchAll(
-          /^export (?:const|function) ([a-z]\w*)/gm,
-        ),
-      ].map((match) => match[1]),
-    );
-    expect(
-      searched(
-        readers.filter((name) => !ENGINE_DEPENDENT_NAMES.has(name)),
-        { of: readers, what: 'readers shipped into the page' },
-      ),
-      'a shipped reader the detector does not name hides every layout read ' +
-        'it makes from the content-only boundary',
-    ).toEqual([]);
-  });
-
-  it('runs those specs on exactly one project', () => {
-    // Ask what a project actually MATCHES, not what its `testIgnore` spells.
-    // Reading `testIgnore` alone made a project scoped the OTHER way -- by
-    // `testMatch`, which is how `visual` is scoped -- look like it ran
-    // everything (#33). The hand-written matcher that replaced it still
-    // searched each pattern's text for the spec's NAME, so an engine ignoring
-    // a pattern that spelled every content-only name and matched none read as
-    // an exclusion, with the whole unit suite green (#194). Playwright's own
-    // resolution answers instead.
-    const runners = resolvedProjects(config, 'playwright.config.ts').filter(
-      (p) => CONTENT_ONLY_SPECS.some((spec) => claims(p, join(E2E, spec))),
-    );
-
-    expect(runners.map((p) => p.name)).toEqual(['content']);
-  });
-
-  it('is the one project excused from proving the navigation collector alive (#355)', () => {
-    // `scripts/test-e2e.mjs` reads this mark back out of the json report and
-    // leaves the project out of the count its liveness verdict judges. Marking
-    // a rendering engine would let a dead collector pass on that engine's run,
-    // so the marked set must be exactly the set that runs content-only specs.
-    const runners = resolvedProjects(config, 'playwright.config.ts')
-      .filter((p) =>
-        CONTENT_ONLY_SPECS.some((spec) => claims(p, join(E2E, spec))),
-      )
-      .map((p) => p.name);
-    const excused = (config.projects ?? [])
-      .filter((p) => p.metadata?.requiresNavigation === false)
-      .map((p) => p.name);
-
-    expect(runners).toHaveLength(1);
-    expect(excused).toEqual(runners);
-  });
-
-  it('leaves every rendering engine still covering the rest of the suite', () => {
-    const engines = (config.projects ?? [])
-      .map((p) => p.name)
-      .filter((n) => n !== 'content' && n !== 'visual');
-
-    expect(engines).toEqual([
-      'chromium',
-      'firefox',
-      'webkit',
-      'mobile-chrome',
-      'mobile-safari',
-    ]);
+      (config.projects ?? [])
+        .map((p) => p.name)
+        .filter((n) => n !== VISUAL_PROJECT.name),
+    ).toEqual(ENGINES.map((engine) => engine.name));
   });
 });
 
@@ -455,19 +330,8 @@ describe('the real-device config (#194)', () => {
     ).toEqual([]);
   });
 
-  it('still runs every other e2e spec on the phone, content-only ones included', () => {
+  it('still runs every other e2e spec on the phone', () => {
     const android = phone();
-    // The invariant first, so it is judged even when the exact set below is
-    // not: an expectation ordered after a failing one never runs.
-    const contentOnly = CONTENT_ONLY_SPECS;
-    const dropped = contentOnly.filter(
-      (spec) => !claims(android, join(E2E, spec)),
-    );
-    expect(
-      searched(dropped, { of: contentOnly, what: 'content-only specs' }),
-      'the phone is the only run that measures touching words at phone width (#198)',
-    ).toEqual([]);
-
     const specs = specFilesUnder(E2E);
     expect(specs.filter((spec) => claims(android, spec))).toEqual(
       specs.filter((spec) => spec !== VISUAL_SPEC),
