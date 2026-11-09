@@ -62,7 +62,11 @@ import {
   secondReadingsReview,
   toRead,
 } from '../src/lib/i18n/readers.ts';
-import { deeplDrafts, deeplEndpoint } from '../src/lib/i18n/translate.ts';
+import {
+  deeplDrafts,
+  deeplEndpoint,
+  deeplKeyFrom,
+} from '../src/lib/i18n/translate.ts';
 
 const STORE = new URL('../src/lib/i18n/.second-readings.json', import.meta.url);
 const DRAFTS = new URL('../src/lib/i18n/.translations.json', import.meta.url);
@@ -142,9 +146,7 @@ async function engine(reader) {
   }
   if (reader === 'deepl') {
     const local = readIfThere('.env.local');
-    const apiKey =
-      process.env.DEEPL_API_KEY ??
-      (local ? (/^DEEPL_API_KEY=(.*)$/m.exec(local)?.[1] ?? '') : '');
+    const apiKey = deeplKeyFrom(process.env.DEEPL_API_KEY, local);
     if (!apiKey.trim()) die('DEEPL_API_KEY is not set (env or .env.local)');
     const url = deeplEndpoint(apiKey);
     return async (locale, texts) =>

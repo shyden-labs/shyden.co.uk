@@ -22,8 +22,7 @@ import { posix } from 'node:path';
 /**
  * Where the trace starts beside `tests/e2e/`: the two configs a capture run
  * loads (Playwright's, and Astro's for the build its web server makes) and
- * every script the job runs. `tests/guards/pipeline-wiring.test.ts` holds
- * the job's own scripts to this list.
+ * every script the job runs.
  */
 export const CAPTURE_ENTRIES = Object.freeze([
   'astro.config.mjs',

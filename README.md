@@ -66,7 +66,7 @@ re-approves — that failure is the review, and it is the point.
 | Command                | What it covers                                                                                              |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `npm run test:unit`    | Vitest — pure logic, i18n completeness, pipeline wiring                                                     |
-| `npm run test:e2e`     | Playwright, 6 projects (five browsers plus `content`), against a built `dist/`                              |
+| `npm run test:e2e`     | Playwright, 5 projects (one per browser engine), against a built `dist/`                                    |
 | `npm test`             | both of the above                                                                                           |
 | `npm run test:devices` | Real-device gauntlet — emulated + real Android Chrome (CDP) + real iOS Safari (WebDriver) against one build |
 | `npm run dashboard`    | Live read-only view of a gauntlet run at http://localhost:4322                                              |

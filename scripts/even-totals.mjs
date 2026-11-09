@@ -88,7 +88,7 @@ export function vitestCounts(report) {
 }
 
 /** Projects that are not a browser running the shared suite. */
-const NOT_A_TARGET = new Set(['content', 'android-preflight']);
+const NOT_A_TARGET = new Set(['android-preflight']);
 
 /**
  * The targets of a phone run: one per desktop browser project, one for the
