@@ -8,8 +8,9 @@
  * Pure: every function here works from its arguments alone, and returns a
  * value or throws. `scripts/pages-runtime.mjs` does the fetching. Node runs
  * this file by stripping its types, with no build step, so it uses erasable
- * TypeScript only, and imports only `is-record.ts`, by its full name.
+ * TypeScript only, and imports by full name.
  */
+import { errorsIn } from './cloudflare-envelope.ts';
 import { isRecord } from './is-record.ts';
 
 /** A Pages environment's deployment config, as the API returns it. */
@@ -50,17 +51,10 @@ export const compatibilityDateOf = (toml: string): string => {
  * Null when an API answer says it succeeded; otherwise Cloudflare's own
  * errors, `code message` each, so a bad token reads as a bad token.
  */
-const refusalOf = (answer: unknown): string | null => {
-  if (isRecord(answer) && answer.success === true) return null;
-  const errors =
-    isRecord(answer) && Array.isArray(answer.errors) ? answer.errors : [];
-  const said = errors
-    .map((e) =>
-      isRecord(e) ? `${String(e.code)} ${String(e.message)}` : String(e),
-    )
-    .join('; ');
-  return said || '(no error given)';
-};
+const refusalOf = (answer: unknown): string | null =>
+  isRecord(answer) && answer.success === true
+    ? null
+    : errorsIn(answer).replace(/^ \((.*)\)$/s, '$1') || '(no error given)';
 
 /**
  * The production deployment config out of a `GET /pages/projects/{name}`
