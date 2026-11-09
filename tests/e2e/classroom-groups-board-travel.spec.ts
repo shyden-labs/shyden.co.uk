@@ -436,7 +436,7 @@ test.describe('the board deals by moving students into their cards', () => {
     });
   });
 
-  test('the list keeps its size while students travel, then folds away', async ({
+  test("a deal holds the list and the cards still, a second Shuffle deals again, and the fit is a fresh board's", async ({
     page,
   }) => {
     await openWaitingBoard(page, String(COUNT), '4');
@@ -444,32 +444,62 @@ test.describe('the board deals by moving students into their cards', () => {
     await press(page, 'Make Groups');
     await expectDealt(page);
     const { flights } = await stopSampler(page);
-    const first = flights[0]?.listHeight;
-    const { travelled, during } = judgedPerStudent(
-      flights,
-      (f) => f.listHeight !== first,
-    );
-    expect(
-      searched(during, { of: travelled, what: 'students seen travelling' }),
-      'students during whose flight the list changed height',
-    ).toEqual([]);
-  });
 
-  test('the cards hold still while students travel', async ({ page }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
+    // The list keeps its size while students travel, then folds away.
+    const firstHeight = flights[0]?.listHeight;
+    const list = judgedPerStudent(flights, (f) => f.listHeight !== firstHeight);
+    expect
+      .soft(
+        searched(list.during, {
+          of: list.travelled,
+          what: 'students seen travelling',
+        }),
+        'students during whose flight the list changed height',
+      )
+      .toEqual([]);
+
+    // The cards hold still while students travel.
+    const firstCards = flights[0]?.cards;
+    const cards = judgedPerStudent(flights, (f) => f.cards !== firstCards);
+    expect
+      .soft(
+        searched(cards.during, {
+          of: cards.travelled,
+          what: 'students seen travelling',
+        }),
+        'students during whose flight a card moved or changed size',
+      )
+      .toEqual([]);
+
+    // A second Shuffle returns everyone to the list, then deals again.
     await startSampler(page);
-    await press(page, 'Make Groups');
+    await press(page, 'Shuffle again');
+    await expect.soft(board(page).locator('#cg-waiting')).toBeVisible();
+    await expect
+      .soft(board(page).locator('.waiting-student'))
+      .toHaveCount(COUNT);
     await expectDealt(page);
-    const { flights } = await stopSampler(page);
-    const first = flights[0]?.cards;
-    const { travelled, during } = judgedPerStudent(
-      flights,
-      (f) => f.cards !== first,
-    );
-    expect(
-      searched(during, { of: travelled, what: 'students seen travelling' }),
-      'students during whose flight a card moved or changed size',
-    ).toEqual([]);
+    const { students } = await stopSampler(page);
+    expect
+      .soft(
+        searched(
+          students.filter(([, t]) => t.both > 0 || t.none > 0),
+          { of: students, what: 'students sampled' },
+        ),
+        'students seen twice, or nowhere, in one frame',
+      )
+      .toEqual([]);
+
+    // The fit after the fold is the fit a fresh board gets.
+    const font = async () =>
+      parseFloat((await page.evaluate(measureBoard)).font);
+    const afterFold = await font();
+    await page.keyboard.press('Escape');
+    // Exact: while the board closes, its own "Exit full screen" matches too.
+    await tapOn(page.getByRole('button', { name: 'Full screen', exact: true }));
+    await expect.soft(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+    expect.soft(await font()).toBe(afterFold);
+    expect.soft(afterFold).toBeGreaterThanOrEqual(FLOOR_PX);
   });
 
   test('the schedule is the one travelSchedule states', async ({ page }) => {
@@ -504,27 +534,6 @@ test.describe('the board deals by moving students into their cards', () => {
       description: `${wall} ms against ${schedule.totalMs} ms scheduled`,
     });
     expect(wall).toBeGreaterThanOrEqual(schedule.totalMs);
-  });
-
-  test('a second Shuffle returns everyone to the list, then deals again', async ({
-    page,
-  }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
-    await press(page, 'Make Groups');
-    await expectDealt(page);
-    await startSampler(page);
-    await press(page, 'Shuffle again');
-    await expect(board(page).locator('#cg-waiting')).toBeVisible();
-    await expect(board(page).locator('.waiting-student')).toHaveCount(COUNT);
-    await expectDealt(page);
-    const { students } = await stopSampler(page);
-    expect(
-      searched(
-        students.filter(([, t]) => t.both > 0 || t.none > 0),
-        { of: students, what: 'students sampled' },
-      ),
-      'students seen twice, or nowhere, in one frame',
-    ).toEqual([]);
   });
 
   test('a Shuffle pressed while students travel starts again, and nobody is seen twice', async ({
@@ -764,22 +773,5 @@ test.describe('the board deals by moving students into their cards', () => {
       searched(during, { of: travelled, what: 'students seen travelling' }),
       'students during whose flight the board scrolled sideways',
     ).toEqual([]);
-  });
-
-  test('the fit after the fold is the fit a fresh board gets', async ({
-    page,
-  }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
-    await press(page, 'Make Groups');
-    await expectDealt(page);
-    const font = async () =>
-      parseFloat((await page.evaluate(measureBoard)).font);
-    const afterFold = await font();
-    await page.keyboard.press('Escape');
-    // Exact: while the board closes, its own "Exit full screen" matches too.
-    await tapOn(page.getByRole('button', { name: 'Full screen', exact: true }));
-    await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
-    expect(await font()).toBe(afterFold);
-    expect(afterFold).toBeGreaterThanOrEqual(FLOOR_PX);
   });
 });
