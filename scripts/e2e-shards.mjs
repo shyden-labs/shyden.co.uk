@@ -678,7 +678,7 @@ export function projectTotals(accounts) {
     const counts = isRecord(value) ? value.projectCounts : undefined;
     if (!isRecord(counts)) continue;
     for (const [name, each] of Object.entries(counts)) {
-      if (name === 'content' || !isRecord(each)) continue;
+      if (!isRecord(each)) continue;
       const sum = sums.get(name) ?? { passed: 0, failed: 0, skipped: 0 };
       sum.passed += Number(each.passed);
       sum.failed += Number(each.failed);

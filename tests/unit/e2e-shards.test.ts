@@ -1101,13 +1101,12 @@ describe('projectTotals: each browser`s own total, printed and not judged (#1049
     skipped,
   });
 
-  it('adds a project across the shards and prints one line per browser, content left out', () => {
+  it('adds a project across the shards and prints one line per browser', () => {
     const accounts = [
       account(1, 10, {
         projectCounts: {
           chromium: counts(3),
           webkit: counts(2, 1),
-          content: counts(4),
         },
       }),
       account(2, 10, {
