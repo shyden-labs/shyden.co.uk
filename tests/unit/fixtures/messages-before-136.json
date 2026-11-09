@@ -8,6 +8,18 @@
     "'M' | 'F'": ["M", "F"]
   },
   "messages": {
+    "csvProblemNumberTooLow": [
+      {
+        "params": { "row": 2, "value": "0" },
+        "en": "Row 2 — number '0' is too low. Numbers start at 1.",
+        "id": "Baris 2 — nomor '0' terlalu kecil. Nomor dimulai dari 1."
+      },
+      {
+        "params": { "row": 3, "value": "00 {n}" },
+        "en": "Row 3 — number '00 {n}' is too low. Numbers start at 1.",
+        "id": "Baris 3 — nomor '00 {n}' terlalu kecil. Nomor dimulai dari 1."
+      }
+    ],
     "boardAbsentNote": [
       {
         "params": { "absent": [4] },

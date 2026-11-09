@@ -282,7 +282,8 @@
     "Keep the current list": "保留当前列表",
     "Two tools, ready to use. Free, no sign-up, and working right now.": "两款工具，即开即用。免费、无需注册，现在就能用。",
     "Get in touch": "联系我们",
-    "Translations may not be accurate. If you notice a mistake, please report it.": "翻译内容可能不准确。如果您发现错误，请报告。"
+    "Translations may not be accurate. If you notice a mistake, please report it.": "翻译内容可能不准确。如果您发现错误，请报告。",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "行 {row} — 数字 '{value}' 太小。数字从 1 开始。"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -567,7 +568,8 @@
     "Keep the current list": "Giữ nguyên danh sách hiện tại",
     "Two tools, ready to use. Free, no sign-up, and working right now.": "Hai công cụ, sẵn sàng sử dụng. Miễn phí, không cần đăng ký và đang hoạt động ngay bây giờ.",
     "Get in touch": "Liên hệ với chúng tôi",
-    "Translations may not be accurate. If you notice a mistake, please report it.": "Các bản dịch có thể không chính xác. Nếu bạn phát hiện lỗi, vui lòng báo cáo."
+    "Translations may not be accurate. If you notice a mistake, please report it.": "Các bản dịch có thể không chính xác. Nếu bạn phát hiện lỗi, vui lòng báo cáo.",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1."
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -852,7 +854,8 @@
     "Keep the current list": "เก็บรายชื่อปัจจุบันไว้",
     "Two tools, ready to use. Free, no sign-up, and working right now.": "เครื่องมือสองชิ้น พร้อมใช้งานทันที ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที",
     "Get in touch": "ติดต่อเรา",
-    "Translations may not be accurate. If you notice a mistake, please report it.": "การแปลอาจไม่ถูกต้อง หากพบข้อผิดพลาด โปรดแจ้งให้ทราบ"
+    "Translations may not be accurate. If you notice a mistake, please report it.": "การแปลอาจไม่ถูกต้อง หากพบข้อผิดพลาด โปรดแจ้งให้ทราบ",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "แถว {row} — ตัวเลข '{value}' ต่ำเกินไป ตัวเลขเริ่มต้นที่ 1"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",
