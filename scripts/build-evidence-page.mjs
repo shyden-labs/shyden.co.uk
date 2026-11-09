@@ -139,19 +139,18 @@ const blockKey = (/** @type {{ file: string, block: string }} */ s) =>
  * @returns {string}
  */
 export const noRecordingNote = (specs, title, engine) => {
-  void engine;
+  // This journey's result on THIS engine: a journey runs on several, and the
+  // last of them answered for all when this was keyed by title (#1103).
+  const entry = specs.find((s) => s.title === title && s.project === engine);
+  if (entry === undefined) return 'no test result';
+  if (STILLS_ONLY_PROJECTS.has(entry.project))
+    return 'no recording for this leg';
   const recordingBlocks = new Set(
     specs
       .filter((s) => s.video)
       .map((s) => blockKey(/** @type {{ file: string, block: string }} */ (s))),
   );
-  const specEntryOf = new Map(specs.map((s) => [s.title, s]));
-  if (!specEntryOf.has(title)) return 'no test result';
-  const entry = specEntryOf.get(title);
-  if (entry !== undefined && STILLS_ONLY_PROJECTS.has(entry.project))
-    return 'no recording for this leg';
-  return entry !== undefined &&
-    entry.file !== undefined &&
+  return entry.file !== undefined &&
     recordingBlocks.has(
       blockKey(/** @type {{ file: string, block: string }} */ (entry)),
     )
