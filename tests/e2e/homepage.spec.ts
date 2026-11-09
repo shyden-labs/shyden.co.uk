@@ -441,10 +441,10 @@ test.describe('homepage content', () => {
       await expect.soft(toolBadges).toHaveText([live, live]);
       // A screen reader hears each card's title, badge and description, not
       // the title alone (#390 F10: an aria-label replaced the whole name).
-      const home = getSiteStrings(locale).home;
+      const cardCopy = getSiteStrings(locale).home;
       for (const [title, body] of [
-        [home.workCalculatorsTitle, home.workCalculatorsBody],
-        [home.workClassroomTitle, home.workClassroomBody],
+        [cardCopy.workCalculatorsTitle, cardCopy.workCalculatorsBody],
+        [cardCopy.workClassroomTitle, cardCopy.workClassroomBody],
       ]) {
         const card = tools.getByRole('link', { name: title });
         await expect.soft(card).toHaveCount(1);
