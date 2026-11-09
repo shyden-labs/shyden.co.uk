@@ -348,24 +348,16 @@ export const videoCandidates = (report) => {
 };
 
 /**
- * The one spelling of the directory recordings are published into.
- *
- * `reconcileFiles` clears this namespace and nothing else, so the prefix that
- * BUILDS a published path is the same prefix that AUTHORISES its removal. Two
- * spellings would be two namespaces the day one of them moved -- and the failure
- * is a removal rule that stops matching, which looks exactly like a capture with
- * nothing to remove.
- */
-export /**
  * Where an EARLIER capture published its recordings as supporting files.
  *
  * Nothing writes this prefix any more -- recordings went to the asset store in
  * #268 -- but `reconcileFiles` still has to REMOVE what earlier captures left
  * under it. A path left out of a redeploy's map is kept, not removed, so
  * dropping this constant with the route that wrote it would strand every
- * recording ever published this way against the 255-entry ceiling.
+ * recording ever published this way against the 255-entry ceiling. One
+ * spelling, so the prefix a removal matches is the prefix that was written.
  */
-const PUBLISHED_PREFIX = 'evidence/';
+export const PUBLISHED_PREFIX = 'evidence/';
 
 /** Where the artifact serves a stored asset, in every view (#268). */
 const BLOB_PREFIX = '/_blob/';

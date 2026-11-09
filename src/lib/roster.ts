@@ -262,7 +262,9 @@ export function rosterProblems(roster: Student[], t: Strings): Problem[] {
   // Absent students are included. They are still students on the list, and a
   // roster half-filled because someone happened to be away is exactly the
   // state this rule exists to stop reaching the shuffle.
-  const noSex = roster.filter((s) => s.sex === null);
+  // Anything but M or F is missing, undefined included: a sex can arrive
+  // undefined from the page (grouping.ts), and this rule fails closed (#390 F9).
+  const noSex = roster.filter((s) => s.sex !== 'M' && s.sex !== 'F');
   if (noSex.length > 0) {
     problems.push({
       kind: 'no-sex',

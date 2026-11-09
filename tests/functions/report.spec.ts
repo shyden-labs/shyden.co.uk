@@ -22,6 +22,7 @@ import {
   reportsStartingWith,
   reportsWithNote,
 } from './local.mjs';
+import { waitBeforeSeedingADay } from '../utc-midnight';
 
 const vi = getSiteStrings('vi').report;
 const tool = getStrings('vi');
@@ -261,6 +262,19 @@ test.describe('on a tool page', () => {
 });
 
 const today = () => new Date().toISOString().slice(0, 10);
+/**
+ * Planting a row for today is only safe when today will still be today when
+ * the server counts: inside the last seconds before UTC midnight, wait for
+ * the day to turn first, and say so (#390 F50).
+ */
+const awayFromMidnight = async () => {
+  const wait = waitBeforeSeedingADay(new Date());
+  if (wait === 0) return;
+  console.log(
+    `waiting ${wait} ms for UTC midnight to pass before seeding today`,
+  );
+  await new Promise((resolve) => setTimeout(resolve, wait));
+};
 const send = (request: APIRequestContext, ip: string, note: string) =>
   request.post('/api/report', {
     headers: {
@@ -307,6 +321,7 @@ test.describe('the daily limits on real D1 (#872)', () => {
   test('the 50th report is stored and the 51st refused', async ({
     request,
   }) => {
+    await awayFromMidnight();
     await query(
       "INSERT INTO report_counts (day, counter, count) VALUES (?1, 'all', 49)",
       [today()],
@@ -321,6 +336,7 @@ test.describe('the daily limits on real D1 (#872)', () => {
   test("yesterday's counts are gone after today's first report", async ({
     request,
   }) => {
+    await awayFromMidnight();
     await query(
       "INSERT INTO report_counts (day, counter, count) VALUES ('2000-01-01', 'all', 3)",
     );

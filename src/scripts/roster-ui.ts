@@ -4,7 +4,7 @@
  * ONE renderer, two CSS layouts (design spec section 3, "The roster is a
  * table on a laptop and cards on a phone"). `renderRoster` below builds a
  * single `<table>` whose `<tr class="cg-student">` rows are, structurally,
- * the same elements Stage 3, Task 3's own CSS
+ * the same elements the page's CSS
  * (ClassroomGroupsPage.astro's `<style is:global>` block, anchored on
  * `#cg-roster`) turns into cards below ~600px purely with `display: block`
  * on the table parts under a media query — no second render path. If a
@@ -75,7 +75,7 @@ export interface RosterHandlers {
    * see this row's own click listener, below) rather than the snapshot
    * this render started with, so a pending, uncommitted text edit made to
    * a DIFFERENT row is not silently discarded the moment this one is
-   * removed — the exact shape of bug Stage 3, Task 3 already found and
+   * removed — the exact shape of bug already found and
    * fixed for `onTextChange`/`onSelectChange` (see `renderRoster`'s own
    * `liveRoster` comment, below). Re-renders safely, the same reasoning
    * `onSelectChange` above already rests on: removing a row is a discrete
@@ -152,15 +152,29 @@ const printMirror = (value: string, column: PrintColumn): HTMLSpanElement => {
   return span;
 };
 
-/** M/F, or an em dash for unset. NOT the glyph the <select> shows: since #249
- * the collapsed control names its own column instead, while paper keeps the
- * dash for an empty cell. */
-const sexText = (student: Student, t: Strings): string =>
-  student.sex === 'M'
-    ? t.rosterSexMale
-    : student.sex === 'F'
-      ? t.rosterSexFemale
-      : t.rosterUnset;
+/**
+ * What each cell of a student's row prints, in one place: the row builder
+ * here and `refreshPrintMirrors` (classroom-groups.ts) both read it, so the
+ * paper cannot drift from itself (#390 F19). Sex is M/F, or the unset dash:
+ * NOT the glyph the <select> shows, since #249 the collapsed control names
+ * its own column instead, while paper keeps the dash for an empty cell.
+ */
+export const printTexts = (
+  student: Student,
+  t: Strings,
+): Record<PrintColumn, string> => ({
+  number: String(student.number),
+  name: student.name ?? '',
+  sex:
+    student.sex === 'M'
+      ? t.rosterSexMale
+      : student.sex === 'F'
+        ? t.rosterSexFemale
+        : t.rosterUnset,
+  absent: student.absent ? '\u2611' : '\u2610',
+  together: student.together ?? t.rosterUnset,
+  apart: student.apart ?? t.rosterUnset,
+});
 
 const buildOption = (value: string, label: string): HTMLOptionElement => {
   const option = document.createElement('option');
@@ -377,6 +391,7 @@ function buildRow(
   togetherLetters: readonly string[],
   apartLetters: readonly string[],
 ): HTMLTableRowElement {
+  const print = printTexts(student, t);
   const tr = document.createElement('tr');
   tr.className = 'cg-student';
   // Design spec section 4: "the row is tinted instead" -- a tint, a stripe
@@ -396,8 +411,8 @@ function buildRow(
 
   // # — the number. Editable (design spec section 4: "The teacher may
   // override them"); identity is the number everywhere else in this
-  // engine, so this is the one field a later task's duplicate check
-  // (rosterProblems, a later task) watches.
+  // engine, so this is the one field the duplicate check
+  // (`rosterProblems`) watches.
   const numberTd = columnCell('number');
   const numberInput = document.createElement('input');
   numberInput.type = 'number';
@@ -412,7 +427,7 @@ function buildRow(
     }
   });
   numberTd.appendChild(numberInput);
-  numberTd.appendChild(printMirror(String(student.number), 'number'));
+  numberTd.appendChild(printMirror(print.number, 'number'));
 
   // Name — optional. `placeholder` previews the SAME fallback label the
   // results grid and every error message already use for this student
@@ -434,7 +449,7 @@ function buildRow(
     handlers.onTextChange(patched(getRoster(), index, { name: value }));
   });
   nameTd.appendChild(nameInput);
-  nameTd.appendChild(printMirror(student.name ?? '', 'name'));
+  nameTd.appendChild(printMirror(print.name, 'name'));
 
   // Sex — blank (neutral) / M / F. The <option> VALUE is always the raw
   // 'M'/'F' the engine's Student.sex type uses, in every language; only the
@@ -463,7 +478,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { sex: value }));
   });
   sexTd.appendChild(sexSelect);
-  sexTd.appendChild(printMirror(sexText(student, t), 'sex'));
+  sexTd.appendChild(printMirror(print.sex, 'sex'));
 
   // Absent — ticking it marks the student out of the shuffle (design spec
   // section 4). Nothing else in this row is ever disabled by it — a later
@@ -510,9 +525,7 @@ function buildRow(
   // A ticked BOX, not a word: design spec section 10's own "the `Absent`
   // column says it in no ink and no colour". \u2611/\u2610 read identically in
   // greyscale and need no legend.
-  absentTd.appendChild(
-    printMirror(student.absent ? '\u2611' : '\u2610', 'absent'),
-  );
+  absentTd.appendChild(printMirror(print.absent, 'absent'));
 
   // Together / Apart — a letter each, from a dropdown that grows as needed
   // (design spec section 4; `availableLetters`, src/lib/roster.ts).
@@ -533,9 +546,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { together: value }));
   });
   togetherTd.appendChild(togetherSelect);
-  togetherTd.appendChild(
-    printMirror(student.together ?? t.rosterUnset, 'together'),
-  );
+  togetherTd.appendChild(printMirror(print.together, 'together'));
 
   const apartTd = columnCell('apart');
   const apartSelect = document.createElement('select');
@@ -550,7 +561,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { apart: value }));
   });
   apartTd.appendChild(apartSelect);
-  apartTd.appendChild(printMirror(student.apart ?? t.rosterUnset, 'apart'));
+  apartTd.appendChild(printMirror(print.apart, 'apart'));
 
   // Remove — design spec section 4: "Removing a row removes the student."
   // A SEVENTH cell, with a real (visually-hidden) header of its own — see
@@ -599,8 +610,8 @@ function buildRow(
  * With an EMPTY roster, only the toolbar renders (`+ Add student` /
  * `+ Add several…`) — there is no `<table id="cg-roster">` at all until
  * there is at least one row for it to hold. `#cg-roster` existing, or not,
- * is itself meaningful to at least one later task's own test (Student
- * details refusing to open above MAX_ROSTER leaves no table behind either)
+ * is itself meaningful to a test (Student details refusing to open above
+ * MAX_ROSTER leaves no table behind either)
  * so an empty-but-present table was deliberately avoided here.
  */
 export function renderRoster(
@@ -638,9 +649,7 @@ export function renderRoster(
   // makes an empty name box shrink next to a full one (R-10); `table-
   // layout: fixed` (also in that CSS) is what makes a <col>'s width apply
   // uniformly down its whole column regardless of any one row's content.
-  // Seven, not six, since Stage 3, Task 6: the seventh is Remove's own
-  // column — see `buildRow`'s own comment on why it earns a <col> but not
-  // a matching <th>.
+  // The seventh is Remove's own column, with its own <th> (`removeTh`).
   const colgroup = document.createElement('colgroup');
   for (let i = 0; i < 7; i++)
     colgroup.appendChild(document.createElement('col'));
@@ -721,8 +730,7 @@ export function renderRoster(
   thead.appendChild(headRow);
   table.appendChild(thead);
 
-  // Bug found while adding Stage 3, Task 3's own "editing every field
-  // works" test (task-3-brief.md's own Step 1, verbatim): every row below
+  // Bug found while adding the "editing every field works" test: every row below
   // is built ONCE, here, and every field's own `patched()` call (buildRow)
   // used to close directly over THIS render's `roster` array. `onTextChange`
   // (number/name) deliberately never re-renders -- see `RosterHandlers`'
@@ -755,7 +763,7 @@ export function renderRoster(
       liveRoster = next;
       handlers.onSelectChange(next);
     },
-    // Stage 3, Task 6. Same reasoning as onTextChange/onSelectChange just
+    // Same reasoning as onTextChange/onSelectChange just
     // above: kept current here even though a removal always triggers a
     // fresh `renderRoster` call of its own (see RosterHandlers.onRemove's
     // own doc comment) -- defensive, matching this pair's own established
@@ -785,8 +793,8 @@ export function renderRoster(
 
   // The toolbar again, "inline in the table footer" (design spec section
   // 4) — a real <tfoot>, not a sibling element after the table, so it
-  // reflows exactly like every other row once a later task's CSS turns
-  // this table into a stack of cards below the breakpoint.
+  // reflows exactly like every other row once the page's CSS turns this
+  // table into a stack of cards below the breakpoint.
   const tfoot = document.createElement('tfoot');
   const footRow = document.createElement('tr');
   const footCell = document.createElement('td');
