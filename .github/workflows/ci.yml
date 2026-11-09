@@ -135,7 +135,7 @@ jobs:
     # read` is restated beside it; labels live under the issues scope, which
     # is what `issues: read` buys. deploy-dev.yml's dispatch path calls this
     # workflow and must grant the same, since a called workflow's token can
-    # only be narrowed (tests/guards/pipeline-wiring.test.ts).
+    # only be narrowed.
     permissions:
       contents: read
       issues: read
@@ -219,8 +219,7 @@ jobs:
     # that every shard was skipped rather than adding up accounts.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The e2e policy, restated per shard: tests/guards/pipeline-wiring.test.ts
-    # pins it and fails if any job running the suite carries another.
+    # The e2e policy, restated per shard.
     timeout-minutes: 20
     # The pinned Playwright image (#431): browsers and their system packages
     # come with it, so no step downloads them. A `playwright install` here
@@ -255,7 +254,7 @@ jobs:
       # No build step, on purpose: the web server builds for the run, and the
       # unfiltered `--list` each shard is held to runs first, on a tree with
       # no `dist/`. That makes every shard prove collection needs no build
-      # (#351); `pipeline-wiring.test.ts` refuses a build here.
+      # (#351), so nothing builds here.
       # The total is the matrix's own size, never a number written beside it,
       # so the two cannot disagree. Each shard enumerates the WHOLE suite and
       # writes down what it ran (scripts/test-e2e.mjs), for build-and-test to
