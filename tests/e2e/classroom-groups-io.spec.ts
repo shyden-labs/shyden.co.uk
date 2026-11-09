@@ -843,7 +843,7 @@ test.describe('the handover cannot be overheard', () => {
     await expect(receiver.locator('.cg-student')).toHaveCount(0);
   });
 
-  test('a receiver with work of its own is warned before it is replaced', async ({
+  test('a second handover opens a tab of its own, and work in another tab is untouched', async ({
     page,
     context,
   }) => {
