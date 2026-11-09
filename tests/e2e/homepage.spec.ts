@@ -439,6 +439,26 @@ test.describe('homepage content', () => {
       const live = getSiteStrings(locale).home.toolBadge;
       const toolBadges = tools.locator('.status-badge');
       await expect.soft(toolBadges).toHaveText([live, live]);
+      // A screen reader hears each card's title, badge and description, not
+      // the title alone (#390 F10: an aria-label replaced the whole name).
+      const home = getSiteStrings(locale).home;
+      for (const [title, body] of [
+        [home.workCalculatorsTitle, home.workCalculatorsBody],
+        [home.workClassroomTitle, home.workClassroomBody],
+      ]) {
+        const card = tools.getByRole('link', { name: title });
+        await expect.soft(card).toHaveCount(1);
+        await expect
+          .soft(card)
+          .toHaveAccessibleName(
+            new RegExp(
+              [title, live, body]
+                .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                .join('.*'),
+              's',
+            ),
+          );
+      }
       for (const n of [0, 1])
         await expect.soft(toolBadges.nth(n)).toBeVisible();
       // The exact set: each tool once, in this locale, and nothing else.
