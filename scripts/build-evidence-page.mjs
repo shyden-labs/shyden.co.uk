@@ -123,6 +123,42 @@ export const flattenReport = (report) => {
  */
 export const STILLS_ONLY_PROJECTS = new Set(['ios-safari-real-device']);
 
+/** Keyed by file AND block, because two files may name a block alike. */
+const blockKey = (/** @type {{ file: string, block: string }} */ s) =>
+  `${s.file}\u0000${s.block}`;
+
+/**
+ * Why a journey has no embedded recording on `engine`: no result there, a
+ * stills-only leg, a recording that went missing, or none by policy. The
+ * policy is derived from the report (a block records when any of its own
+ * results carries a video, #292), never stated a second time.
+ *
+ * @param {{ title: string, project: string, file?: string, block: string, video?: string }[]} specs
+ * @param {string} title
+ * @param {string} engine
+ * @returns {string}
+ */
+export const noRecordingNote = (specs, title, engine) => {
+  void engine;
+  const recordingBlocks = new Set(
+    specs
+      .filter((s) => s.video)
+      .map((s) => blockKey(/** @type {{ file: string, block: string }} */ (s))),
+  );
+  const specEntryOf = new Map(specs.map((s) => [s.title, s]));
+  if (!specEntryOf.has(title)) return 'no test result';
+  const entry = specEntryOf.get(title);
+  if (entry !== undefined && STILLS_ONLY_PROJECTS.has(entry.project))
+    return 'no recording for this leg';
+  return entry !== undefined &&
+    entry.file !== undefined &&
+    recordingBlocks.has(
+      blockKey(/** @type {{ file: string, block: string }} */ (entry)),
+    )
+    ? 'recording missing'
+    : 'not recorded by policy';
+};
+
 /**
  * The run report an evidence directory holds, read as Playwright's (#354). A
  * Playwright run leaves `report.json`; a real-device iOS run leaves Vitest's
@@ -728,34 +764,8 @@ export const renderEvidencePage = ({
   // stop. Operator decision 2026-09-22: derive the finer key from the report,
   // rather than state the policy a second time in an annotation.
   //
-  // Keyed by file AND block, because two files may name a block alike.
-  const blockKey = (/** @type {{ file: string, block: string }} */ s) =>
-    `${s.file}\u0000${s.block}`;
-  const recordingBlocks = new Set(
-    specs.filter((s) => s.video).map((s) => blockKey(s)),
-  );
-  const specEntryOf = new Map(specs.map((s) => [s.title, s]));
-  /** @param {string} title */
-  const noRecordingNote = (title) => {
-    // `order` is built from the manifest AND the report, so a title the report
-    // never mentioned carries no spec file and there is no recording policy to
-    // read. Answering "not recorded by policy" there asserts a policy this page
-    // never saw: the defect #214 exists to stop, one level further in, a third
-    // fact wearing the second's words.
-    //
-    // `has`, not `get() === undefined`: a journey the report DOES carry whose
-    // entry has no file is still a spec that did not ask to be recorded, and
-    // the two cases are only distinguishable through the key.
-    if (!specEntryOf.has(title)) return 'no test result';
-    const entry = specEntryOf.get(title);
-    if (entry !== undefined && STILLS_ONLY_PROJECTS.has(entry.project))
-      return 'no recording for this leg';
-    return entry !== undefined &&
-      entry.file !== undefined &&
-      recordingBlocks.has(blockKey(entry))
-      ? 'recording missing'
-      : 'not recorded by policy';
-  };
+  /** @param {string} title @param {string} engine */
+  const noteFor = (title, engine) => noRecordingNote(specs, title, engine);
 
   // Derived, in first-seen order, so the page reflects the run rather than a
   // list somebody kept in step by hand.
@@ -875,7 +885,7 @@ export const renderEvidencePage = ({
         .map((e) =>
           videos.has(`${j.id}|${e}`)
             ? `<figure><video controls preload="none" src="${videos.get(`${j.id}|${e}`)}"></video><figcaption class="mono">${esc(e)}</figcaption></figure>`
-            : `<figure class="absent"><div class="novid mono">${esc(noRecordingNote(j.title))}</div><figcaption class="mono">${esc(e)}</figcaption></figure>`,
+            : `<figure class="absent"><div class="novid mono">${esc(noteFor(j.title, e))}</div><figcaption class="mono">${esc(e)}</figcaption></figure>`,
         )
         .join('')}
     </div>
