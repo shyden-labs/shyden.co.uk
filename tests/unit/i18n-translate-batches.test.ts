@@ -8,7 +8,11 @@ import { draftAll } from '../../scripts/i18n-translate.mjs';
  * request, and a refusal throws instead of exiting. `fetch` is stood in: a
  * unit test reaches no network.
  */
-const deepl = { endpoint: 'https://deepl.test', apiKey: 'k', target: 'zh' };
+const deepl = {
+  endpoint: 'https://deepl.test',
+  apiKey: 'k',
+  target: 'zh' as const,
+};
 
 afterEach(() => vi.unstubAllGlobals());
 
