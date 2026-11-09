@@ -25,6 +25,7 @@
  * on an argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
+import { githubJson } from './json-answer.mjs';
 import { endpoint, setting } from './settings.mjs';
 import {
   NOTICE_ASSIGNEE,
