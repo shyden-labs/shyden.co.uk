@@ -9,6 +9,7 @@ import { searched } from '../source-files';
 import { localePaths } from './locale-sampling';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
+import { contrast, parseColour } from '../wcag';
 import { getStrings, localeFromPath } from '../../src/lib/i18n';
 import { expectNoHorizontalScroll, horizontalOverflow } from '../viewport';
 import {
@@ -408,7 +409,7 @@ test.describe('an absent student', () => {
   // it at AA" (this task's own constraint) applies to the pill's own
   // background just as much as the row's.
   for (const theme of THEMES)
-    test(`${theme}: is tinted, striped and labelled; the pill text meets the WCAG AA contrast floor`, async ({
+    test(`${theme}: is tinted, striped and labelled; the pill text meets the WCAG AA contrast floor; every select's arrow meets 3:1`, async ({
       page,
     }) => {
       await markAbsent(page);
@@ -418,10 +419,40 @@ test.describe('an absent student', () => {
         .soft(row)
         .toHaveCSS('background-color', 'rgb(255, 246, 227)');
       await expect.soft(row.locator('.cg-absent-pill')).toHaveText('absent');
-      const contrast = await contrastRatio(
+      const pillContrast = await contrastRatio(
         page.locator('.cg-absent-pill').first(),
       );
-      expect.soft(contrast).toBeGreaterThanOrEqual(4.5);
+      expect.soft(pillContrast).toBeGreaterThanOrEqual(4.5);
+
+      // #390 F21: the arrow drawn on each select (the native one is reset for
+      // WebKit's touch target) is a non-text control part, so WCAG 1.4.11's
+      // 3:1 applies, in this theme. A colour baked into a data-URI cannot
+      // follow the theme and reads as no colour at all here.
+      for (const select of [
+        row.locator('select').first(),
+        page.locator('#cg-speed'),
+      ]) {
+        const { image, ground } = await select.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            image: style.backgroundImage,
+            ground: style.backgroundColor,
+          };
+        });
+        const paint = (image.match(/rgba?\([^)]*\)/g) ?? [])
+          .map(parseColour)
+          .filter((c): c is NonNullable<typeof c> => !!c && c.alpha > 0);
+        const behind = parseColour(ground);
+        expect
+          .soft(paint.length, `a colour the arrow is drawn in: ${image}`)
+          .toBeGreaterThan(0);
+        expect.soft(behind?.alpha, `an opaque ground: ${ground}`).toBe(1);
+        for (const ink of paint)
+          if (behind)
+            expect
+              .soft(contrast(ink.rgb, behind.rgb), `${image} on ${ground}`)
+              .toBeGreaterThanOrEqual(3);
+      }
     });
 
   test('the consequence line is there before anyone is marked; the count line reads students, here and absent', async ({

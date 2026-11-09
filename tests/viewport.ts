@@ -69,8 +69,8 @@ export const expectNoHorizontalScroll = async (
 };
 
 /**
- * The element inside `#cardId` reaching furthest past the card's padding
- * edge, and by how much: the containment question `horizontalOverflow`
+ * The element inside `#cardId` reaching furthest past either padding edge
+ * of the card, left or right, and by how much: the containment question `horizontalOverflow`
  * cannot answer, since content can overflow a card by 34.5px while the
  * document stays still. Two copies in `classroom-groups-controls.spec.ts`
  * disagreed about what counts as rendered (#390 F110).
@@ -88,15 +88,35 @@ export const spillPastCard = (
     if (card === null) throw new Error(`no #${id} to measure against`);
     const box = card.getBoundingClientRect();
     const style = getComputedStyle(card);
-    const inner =
+    // Both edges (#1103, #390 F53): a child pushed past the left edge
+    // spills as surely as one past the right.
+    const innerRight =
       box.right -
       parseFloat(style.paddingRight) -
       parseFloat(style.borderRightWidth);
+    const innerLeft =
+      box.left +
+      parseFloat(style.paddingLeft) +
+      parseFloat(style.borderLeftWidth);
     let over = 0;
     let who = '';
+    // Clipped to nothing paints nothing: `.visually-hidden` (clip-path
+    // inset(50%), margin -1px) sits 1px past the left edge and shows no
+    // pixel there (#1103).
+    const clippedAway = (el: Element): boolean => {
+      for (
+        let at: Element | null = el;
+        at && at !== card;
+        at = at.parentElement
+      )
+        if (getComputedStyle(at).clipPath.startsWith('inset(50%')) return true;
+      return false;
+    };
     for (const el of card.querySelectorAll('*')) {
       if (el.getClientRects().length === 0) continue;
-      const spill = el.getBoundingClientRect().right - inner;
+      if (clippedAway(el)) continue;
+      const rect = el.getBoundingClientRect();
+      const spill = Math.max(rect.right - innerRight, innerLeft - rect.left);
       if (spill > over) {
         over = spill;
         who = String(el.className).split(' ')[0] || el.tagName;
