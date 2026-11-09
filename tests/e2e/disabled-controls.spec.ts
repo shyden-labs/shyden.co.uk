@@ -331,15 +331,13 @@ const expectNoEntryCursor = (
     of: reachable.map((a) => a.label),
     what: `disabled controls (${scenario})`,
   });
-  expect(reachable.map((a) => `${a.label}: ${a.cursor}`)).toEqual(
-    reachable.map((a) => `${a.label}: not-allowed`),
-  );
-  // Ordered AFTER the invariant on purpose. This is a validity check on the
-  // reading, and an assertion placed before a weaker one is the only one that
-  // ever runs (#156): the cursor is the thing AC7 protects.
-  expect(reachable.map((a) => `${a.label}: ${a.relation}`)).toEqual(
-    reachable.map((a) => `${a.label}: self`),
-  );
+  expect
+    .soft(reachable.map((a) => `${a.label}: ${a.cursor}`))
+    .toEqual(reachable.map((a) => `${a.label}: not-allowed`));
+  // A validity check on the reading: the cursor is the thing AC7 protects.
+  expect
+    .soft(reachable.map((a) => `${a.label}: ${a.relation}`))
+    .toEqual(reachable.map((a) => `${a.label}: self`));
 };
 
 /**
@@ -365,20 +363,20 @@ const expectDisabledPaint = (
     of: painted.map((a) => a.label),
     what: `page-painted disabled controls (${scenario})`,
   });
-  expect(painted.map((a) => `${a.label}: ${a.background}`)).toEqual(
-    painted.map((a) => `${a.label}: ${fill}`),
-  );
-  expect(painted.map((a) => `${a.label}: ${a.opacity}`)).toEqual(
-    painted.map((a) => `${a.label}: 1`),
-  );
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.background}`))
+    .toEqual(painted.map((a) => `${a.label}: ${fill}`));
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.opacity}`))
+    .toEqual(painted.map((a) => `${a.label}: 1`));
   // The ratio the contrast suite computes is `--ink-soft` on
   // `--disabled-fill`. This is what makes that pair the one a teacher
   // actually receives: without it the suite would be scoring two tokens
   // against each other while Safari painted the label in the UA's own
   // disabled grey, which is a guard measuring a pixel that does not exist.
-  expect(painted.map((a) => `${a.label}: ${a.ink}`)).toEqual(
-    painted.map((a) => `${a.label}: ${ink}`),
-  );
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.ink}`))
+    .toEqual(painted.map((a) => `${a.label}: ${ink}`));
 };
 
 type Reason = {
@@ -444,17 +442,19 @@ const expectAReasonWithoutHover = (
     of: seen.map((r) => r.label),
     what: `disabled controls needing a reason (${scenario})`,
   });
-  expect(
-    seen.map((r) => `${r.label}: ${r.names} → ${r.resolves || '(unwired)'}`),
-  ).toEqual(
-    seen.map(
-      (r) =>
-        `${r.label}: ${r.names} → ${r.names
-          .split(' ')
-          .map((id) => `${id}=visible`)
-          .join(' ')}`,
-    ),
-  );
+  expect
+    .soft(
+      seen.map((r) => `${r.label}: ${r.names} → ${r.resolves || '(unwired)'}`),
+    )
+    .toEqual(
+      seen.map(
+        (r) =>
+          `${r.label}: ${r.names} → ${r.names
+            .split(' ')
+            .map((id) => `${id}=visible`)
+            .join(' ')}`,
+      ),
+    );
 };
 
 test.describe('a disabled control affords that it is disabled', () => {
@@ -489,52 +489,81 @@ test.describe('a disabled control affords that it is disabled', () => {
     expectAReasonWithoutHover(await reasons(page), 'default');
   });
 
-  // One test per theme (#419): a hundred-row roster under two themes was one
-  // budget.
-  for (const theme of THEMES)
-    test(`${theme}: one student — the count, the number fields, Make groups and the sex switches`, async ({
-      page,
-    }) => {
-      await openRoster(page);
-      await openEveryDisclosure(page);
+  test('one student — what is disabled, what the UA paints, and the cursor apart from the enabled controls, then both themes', async ({
+    page,
+  }) => {
+    await openRoster(page);
+    await openEveryDisclosure(page);
+
+    const { reachable, enabled } = await affordances(page);
+
+    // The fill carve-out, asserted rather than assumed. Without this the
+    // `uaPainted` branch could grow to swallow a control that SHOULD be
+    // painted, and `expectDisabledPaint` would quietly stop covering it.
+    const carvedOut = reachable.filter((a) => a.uaPainted).map((a) => a.label);
+    searched(carvedOut, {
+      of: carvedOut,
+      what: 'UA-painted disabled controls',
+    });
+    expect.soft(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
+
+    // The no-entry cursor marks the disabled controls apart from the enabled
+    // ones, both read from the SAME snapshot, so the contrast is one screen a
+    // teacher is looking at rather than two page states.
+    const leaked = enabled
+      .filter((control) => control.cursor === 'not-allowed')
+      .map((control) => control.label);
+    expect
+      .soft(
+        searched(leaked, {
+          of: enabled.map((control) => control.label),
+          what: 'enabled controls',
+        }),
+      )
+      .toEqual([]);
+    expectNoEntryCursor(reachable, 'one student, against the enabled controls');
+
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const { reachable, fill, ink } = await affordances(page);
-      expect(labelsOf(reachable)).toEqual(ONE_STUDENT_DISABLES);
+      expect.soft(labelsOf(reachable)).toEqual(ONE_STUDENT_DISABLES);
       expectNoEntryCursor(reachable, `one student, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `one student, ${theme}`);
       // `reasons` reads the tags `affordances` just wrote, so it runs after.
       expectAReasonWithoutHover(await reasons(page), 'one student');
-    });
+    }
+  });
 
-  for (const theme of THEMES)
-    test(`${theme}: roster at the limit — the add buttons`, async ({
-      page,
-    }) => {
-      test.slow(onRealDevice(), LIMIT_IS_SLOW);
-      await openRoster(page);
-      // `openRoster` already added one, so this lands exactly ON the limit
-      // rather than asking the page to clamp an overshoot.
-      // Every section first: the toggles sit at the top, and the add buttons
-      // end the last real tap on screen, so no drag runs down 100 rows.
-      await openEveryDisclosure(page);
-      await addSeveral(page, MAX_ROSTER - 1);
+  test('roster at the limit — the add buttons, in both themes', async ({
+    page,
+  }) => {
+    test.slow(onRealDevice(), LIMIT_IS_SLOW);
+    await openRoster(page);
+    // `openRoster` already added one, so this lands exactly ON the limit
+    // rather than asking the page to clamp an overshoot.
+    // Every section first: the toggles sit at the top, and the add buttons
+    // end the last real tap on screen, so no drag runs down 100 rows.
+    await openEveryDisclosure(page);
+    await addSeveral(page, MAX_ROSTER - 1);
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const { reachable, fill, ink } = await affordances(page, AT_THE_LIMIT);
-      expect(labelsOf(reachable)).toEqual(AT_THE_LIMIT_LABELS);
+      expect.soft(labelsOf(reachable)).toEqual(AT_THE_LIMIT_LABELS);
       expectNoEntryCursor(reachable, `at-limit, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `at-limit, ${theme}`);
       expectAReasonWithoutHover(await reasons(page), 'at-limit');
-    });
+    }
+  });
 
-  for (const theme of THEMES)
-    test(`${theme}: the disabled placeholder option is excluded deliberately, and it exists`, async ({
-      page,
-    }) => {
-      await openRoster(page);
-      // Choosing a sex is what disables that row's "—" option (roster-ui.ts).
-      // Without this the exclusion branch never fires, and a detector branch
-      // that has never matched anything is itself vacuous (#118).
-      await setSex(page, 0, 'M');
+  test('the disabled placeholder option is excluded deliberately, and it exists, in both themes', async ({
+    page,
+  }) => {
+    await openRoster(page);
+    // Choosing a sex is what disables that row's "—" option (roster-ui.ts).
+    // Without this the exclusion branch never fires, and a detector branch
+    // that has never matched anything is itself vacuous (#118).
+    await setSex(page, 0, 'M');
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const { reachable, excluded, fill, ink } = await affordances(page);
       searched(excluded, {
@@ -543,53 +572,10 @@ test.describe('a disabled control affords that it is disabled', () => {
       });
       // Exactly one row, so exactly one placeholder — and nothing BUT an
       // `<option>` may sit in the excluded set.
-      expect(excluded).toEqual(['option']);
+      expect.soft(excluded).toEqual(['option']);
       expectNoEntryCursor(reachable, `a sex chosen, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `a sex chosen, ${theme}`);
-    });
-
-  test('only checkbox, radio and file inputs are left to the UA to paint', async ({
-    page,
-  }) => {
-    // The fill carve-out, asserted rather than assumed. Without this the
-    // `uaPainted` branch could grow to swallow a control that SHOULD be
-    // painted, and `expectDisabledPaint` would quietly stop covering it.
-    await openRoster(page);
-    await openEveryDisclosure(page);
-
-    const { reachable } = await affordances(page);
-    const carvedOut = reachable.filter((a) => a.uaPainted).map((a) => a.label);
-    searched(carvedOut, {
-      of: carvedOut,
-      what: 'UA-painted disabled controls',
-    });
-    expect(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
-  });
-
-  test('the no-entry cursor marks the disabled controls apart from the enabled ones', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await openEveryDisclosure(page);
-
-    const { reachable, enabled } = await affordances(page);
-
-    // The NEW invariant first. A test stops at its first failed expectation
-    // (#156), so an assertion ordered after one this file already makes
-    // would only ever be evaluated while that one holds.
-    const leaked = enabled
-      .filter((control) => control.cursor === 'not-allowed')
-      .map((control) => control.label);
-    expect(
-      searched(leaked, {
-        of: enabled.map((control) => control.label),
-        what: 'enabled controls',
-      }),
-    ).toEqual([]);
-
-    // ...and the other half, read from the SAME snapshot, so the contrast is
-    // one screen a teacher is looking at rather than two page states.
-    expectNoEntryCursor(reachable, 'one student, against the enabled controls');
+    }
   });
 
   // Every locale (#390 F135): a fit test, and each language's disabled

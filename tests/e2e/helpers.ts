@@ -95,6 +95,12 @@ export const expectVisibleText = async (target: Locator, text: string) => {
   await expect(target).toHaveText(text);
 };
 
+/** The same two checks for a walk making many: one failure hides no other. */
+export const softVisibleText = async (target: Locator, text: string) => {
+  await expect.soft(target).toBeVisible();
+  await expect.soft(target).toHaveText(text);
+};
+
 /**
  * Give every roster row a sex.
  *
