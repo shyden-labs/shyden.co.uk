@@ -619,6 +619,24 @@
         "by": {
           "Azure Translator": "Read the exact number of coins, beans, and the total value of the rewards needed to reach that goal."
         }
+      },
+      "Kalkulator Nilai Hadiah": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Prize Value Calculator" }
+      },
+      "Masukkan nilai hadiah pada kotak di bawah ini.": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Enter the prize value in the box below." }
+      },
+      "Nilai hadiah": {
+        "writers": ["DeepL"],
+        "by": { "Azure Translator": "Value of the prize" }
+      },
+      "Asumsinya, hadiah dikonversi menjadi bean dengan rasio 40%, dan setiap bean dapat ditukarkan dengan 0,9 koin, dengan jumlah bean dan koin dibulatkan ke bawah ke angka bulat.": {
+        "writers": ["edited after DeepL"],
+        "by": {
+          "Azure Translator": "The assumption is that the reward is converted into a bean at a 40% ratio, and each bean can be redeemed for 0.9 coins, with the number of beans and coins rounded down to a round number."
+        }
       }
     },
     "vi": {
@@ -811,6 +829,10 @@
       "Mở các công cụ tính": {
         "writers": ["edited after DeepL"],
         "by": { "Azure Translator": "Open the calculator" }
+      },
+      "Máy tính giá trị quà tặng": {
+        "writers": ["edited after DeepL"],
+        "by": { "Azure Translator": "Gift Value Calculator" }
       }
     }
   }
