@@ -31,12 +31,10 @@ import { LOCALES } from './i18n/locales';
  *
  * The newline case is not decorative: a teacher pasting from a spreadsheet
  * can carry one into a name box, and unquoted it splits one student into
- * two rows on the way back in. A semicolon or a tab is quoted because a
- * spreadsheet may split on it where the region's list separator differs, and
- * text after it would start a cell of its own, unseen by `asText`.
+ * two rows on the way back in.
  */
 const cell = (value: string): string =>
-  /[",;\t\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 
 /**
  * A name a spreadsheet would run as a formula (OWASP CSV injection), with any
@@ -47,15 +45,30 @@ const cell = (value: string): string =>
 const LOOKS_LIKE_A_FORMULA =
   /^'*(?:\s*[=+\-@\uff1d\uff0b\uff0d\uff20]|[\t\r\n])/;
 
+/**
+ * The same inside a name, after anything a spreadsheet may split a cell or a
+ * row on. Where a region's list separator is `;` the file is not split on its
+ * commas, so the name is not the start of a cell and its quotes mean nothing:
+ * quoting cannot protect it, only the apostrophe can.
+ */
+const FORMULA_AFTER_A_SEPARATOR =
+  /([;\t\r\n]\s*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+const ADDED_AFTER_A_SEPARATOR =
+  /([;\t\r\n]\s*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+
 /** The class list opens in a spreadsheet: a formula goes in as text. */
-const asText = (name: string): string =>
-  LOOKS_LIKE_A_FORMULA.test(name) ? `'${name}` : name;
+const asText = (name: string): string => {
+  const inside = name.replace(FORMULA_AFTER_A_SEPARATOR, "$1'$2");
+  return LOOKS_LIKE_A_FORMULA.test(name) ? `'${inside}` : inside;
+};
 
 /** `asText` undone, so a name reads back as it was typed. */
-const fromText = (name: string): string =>
-  name.startsWith("'") && LOOKS_LIKE_A_FORMULA.test(name)
-    ? name.slice(1)
-    : name;
+const fromText = (name: string): string => {
+  const inside = name.replace(ADDED_AFTER_A_SEPARATOR, '$1$2');
+  return inside.startsWith("'") && LOOKS_LIKE_A_FORMULA.test(inside)
+    ? inside.slice(1)
+    : inside;
+};
 
 /** A row of already-stringified values, joined and newline-terminated. */
 const row = (values: string[]): string => values.map(cell).join(',') + '\n';

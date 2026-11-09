@@ -1402,9 +1402,9 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
 describe('a name a spreadsheet would run as a formula', () => {
   const named = (name: string) => [student({ number: 1, name })];
 
-  it('the class list writes a tab-led formula as text, quoted for its tab', () => {
+  it('the class list writes a tab-led formula as text', () => {
     expect(serialiseRoster(named('\t=1+1'), '', 'en').split('\n')[1]).toBe(
-      `1,"'\t=1+1",,,,`,
+      `1,'\t'=1+1,,,,`,
     );
   });
 
@@ -1433,24 +1433,58 @@ describe('a name a spreadsheet would run as a formula', () => {
     },
   );
 
-  // Excel splits on `;` where the region's list separator is `;`, and a quoted
-  // cell stays whole under any separator.
-  it.each(['Ana;=1+1', 'Ana\t=1+1'])(
-    'the class list quotes %j, so another separator cannot start a cell there',
-    (name) => {
-      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
-        `1,"${name}",,,,`,
+  // Excel splits on `;` where the region's list separator is `;`, and quoting
+  // cannot help there: the name is not the row's first cell, so its opening
+  // quote sits inside a field and is read as an ordinary character.
+  it.each([
+    ['Ana;=1+1', "Ana;'=1+1"],
+    ['Ana; =1+1', "Ana; '=1+1"],
+    ['Ana\t=1+1', "Ana\t'=1+1"],
+    ['Ana;\uff1d1+1', "Ana;'\uff1d1+1"],
+  ])('the class list writes %j as %j', (name, written) => {
+    expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+      `1,${written},,,,`,
+    );
+  });
+
+  it('a formula after a line break in a name is text too', () => {
+    expect(serialiseRoster(named('Ana\n=1+1'), '', 'en').split('\n')[2]).toBe(
+      `'=1+1",,,,`,
+    );
+  });
+
+  it.each([';', '\t', '\n', ','])(
+    'no cell starts a formula when a spreadsheet splits the file on %j',
+    (separator) => {
+      const names = ['Ana;=1+1', 'Ana; @x', 'Ana\t+1', 'Ana\n-1', '=1', ' =1'];
+      const file = serialiseRoster(
+        names.map((name, i) => student({ number: i + 1, name })),
+        '',
+        'en',
       );
+      const cells = file.split(separator);
+      expect(cells.length).toBeGreaterThan(1);
+      expect(
+        cells.filter((text) =>
+          /^\s*[=+\-@\uff1d\uff0b\uff0d\uff20]/.test(text),
+        ),
+      ).toEqual([]);
     },
   );
 
-  it.each([' =1+1', '\u3000=1+1', '\uff1d1+1', 'Ana;=1+1', 'Ana\t=1+1'])(
-    'reads %j back without its added apostrophe',
-    (name) => {
-      const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
-      expect(out.ok && out.roster[0]?.name).toBe(name);
-    },
-  );
+  it.each([
+    ' =1+1',
+    '\u3000=1+1',
+    '\uff1d1+1',
+    'Ana;=1+1',
+    "Ana;'=1+1",
+    'Ana\t=1+1',
+    'Ana\n=1+1',
+    '\t=1+1',
+  ])('reads %j back without its added apostrophe', (name) => {
+    const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
+    expect(out.ok && out.roster[0]?.name).toBe(name);
+  });
 
   it('the groups file writes it as text', () => {
     expect(
