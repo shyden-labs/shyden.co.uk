@@ -154,6 +154,8 @@ export const th: Catalogue = {
   csvProblemNumberBlank:
     'แถว {row} — ไม่ได้ใส่หมายเลข นักเรียนทุกคนต้องมีหมายเลข',
   csvProblemNumberNotWhole: "แถว {row} — หมายเลข '{value}' ไม่ใช่จำนวนเต็ม",
+  csvProblemNumberTooLow:
+    "แถว {row} — หมายเลข '{value}' ต่ำเกินไป หมายเลขเริ่มต้นที่ 1",
   csvProblemDuplicateNumber:
     'แถว {row} — หมายเลข {value} ถูกใช้แล้วโดยแถว {firstRow}',
   csvProblemSex:

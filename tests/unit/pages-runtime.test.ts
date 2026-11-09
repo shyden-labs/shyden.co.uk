@@ -78,6 +78,23 @@ describe('productionConfigOf reads what the project runs in production', () => {
     ).toThrow('Cloudflare refused: 10000 Authentication error');
   });
 
+  it('names every API error, and says so when there are none', () => {
+    expect(() =>
+      productionConfigOf({
+        success: false,
+        errors: [
+          { code: 10000, message: 'Authentication error' },
+          { code: 9109, message: 'Invalid access token' },
+        ],
+      }),
+    ).toThrow(
+      'Cloudflare refused: 10000 Authentication error; 9109 Invalid access token',
+    );
+    expect(() => productionConfigOf({ success: false, errors: [] })).toThrow(
+      'Cloudflare refused: (no error given)',
+    );
+  });
+
   it('refuses an answer with no production config', () => {
     expect(() =>
       productionConfigOf({

@@ -529,6 +529,11 @@ export const en = {
       row: number;
       value: string;
     }>,
+  csvProblemNumberTooLow:
+    "Row {row} — number '{value}' is too low. Numbers start at 1." as Message<{
+      row: number;
+      value: string;
+    }>,
   csvProblemDuplicateNumber:
     'Row {row} — number {value} is already used by row {firstRow}.' as Message<{
       row: number;
