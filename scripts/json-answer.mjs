@@ -41,7 +41,7 @@ export const answerOf = async (what, url, init, timeoutMs) => {
  * GitHub's REST API for one token: `get` and `post` each answer with the
  * parsed JSON, through `answerOf`, so both daily jobs send the same headers;
  * `status` answers with the HTTP status alone, whatever it is (#882), and
- * throws only when no answer comes.
+ * throws only when no answer comes; `text` answers with the body as text.
  *
  * @param {string} token
  * @param {string} userAgent
@@ -81,6 +81,30 @@ export const githubJson = (token, userAgent, timeoutMs) => {
         },
         timeoutMs(),
       ),
+    /**
+     * The answer as text, for what is not JSON (a job log), once GitHub
+     * answered 2xx; a body POSTs as JSON. Redirects are followed, as a job
+     * log answers with one to its storage.
+     *
+     * @param {string} url
+     * @param {unknown} [body]
+     * @returns {Promise<string>}
+     */
+    text: async (url, body) => {
+      const response = await fetch(url, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers:
+          body === undefined
+            ? headers
+            : { ...headers, 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs()),
+      });
+      const answer = await response.text();
+      if (!response.ok)
+        throw new Error(`GitHub answered HTTP ${response.status}`);
+      return answer;
+    },
   };
 };
 

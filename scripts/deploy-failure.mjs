@@ -50,35 +50,14 @@ const github = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const token = setting('GITHUB_TOKEN', /^\S+$/);
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'shyden-deploy-failure',
-  };
+  const client = githubJson(token, 'shyden-deploy-failure', timeoutMs);
   /**
-   * The answer's text, once GitHub answered 2xx. Redirects are followed, as
-   * a job log answers with one to its storage.
-   *
    * @param {string} path
    * @param {unknown} [body]
    * @returns {Promise<string>}
    */
-  const text = async (path, body) => {
-    const response = await fetch(`${api}/repos/${repository}${path}`, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers:
-        body === undefined
-          ? headers
-          : { ...headers, 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs()),
-    });
-    const answer = await response.text();
-    if (!response.ok)
-      throw new Error(`GitHub answered HTTP ${response.status}`);
-    return answer;
-  };
+  const text = (path, body) =>
+    client.text(`${api}/repos/${repository}${path}`, body);
   /**
    * @param {string} path
    * @param {unknown} [body]
