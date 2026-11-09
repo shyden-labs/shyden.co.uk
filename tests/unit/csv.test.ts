@@ -1392,3 +1392,51 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
     );
   });
 });
+
+/**
+ * OWASP CSV injection (#390 F23). The class list is meant to be opened in a
+ * spreadsheet, which runs a cell beginning =, +, - or @ as a formula. A name
+ * like that is written with a leading apostrophe, which a spreadsheet shows as
+ * text, and reading the file back takes the apostrophe off again.
+ */
+describe('a name a spreadsheet would run as a formula', () => {
+  const named = (name: string) => [student({ number: 1, name })];
+
+  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)', '\t=1+1'])(
+    'the class list writes %s as text',
+    (name) => {
+      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+        `1,'${name},,,,`,
+      );
+    },
+  );
+
+  it('the groups file writes it as text', () => {
+    expect(
+      serialiseGroups([named('=1+1')], '', '2026-11-09', 'en').split('\n')[2],
+    ).toBe(`1,1,'=1+1`);
+  });
+
+  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)', '\t=1+1', "'=1+1", "''=1+1"])(
+    'reads %s back as it was typed',
+    (name) => {
+      const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
+      expect(out.ok && out.roster[0]?.name).toBe(name);
+    },
+  );
+
+  it.each(["O'Brien", "'Ana", 'Ana-Maria', 'a=b'])(
+    'leaves %s alone, in the file and on the way back',
+    (name) => {
+      const file = serialiseRoster(named(name), '', 'en');
+      expect(file.split('\n')[1]).toBe(`1,${name},,,,`);
+      const out = parseRoster(file, 'en', en);
+      expect(out.ok && out.roster[0]?.name).toBe(name);
+    },
+  );
+
+  it('takes the apostrophe off a formula a teacher wrote that way by hand', () => {
+    const out = parseRoster("number,name\n1,'=1+1\n", 'en', en);
+    expect(out.ok && out.roster[0]?.name).toBe('=1+1');
+  });
+});

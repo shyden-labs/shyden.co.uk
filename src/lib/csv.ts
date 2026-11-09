@@ -36,6 +36,23 @@ import { LOCALES } from './i18n/locales';
 const cell = (value: string): string =>
   /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 
+/**
+ * A name a spreadsheet would run as a formula (OWASP CSV injection), with any
+ * apostrophes already in front of it, so one the file itself added can always
+ * be told from one a teacher typed.
+ */
+const LOOKS_LIKE_A_FORMULA = /^'*[=+\-@\t\r]/;
+
+/** The class list opens in a spreadsheet: a formula goes in as text. */
+const asText = (name: string): string =>
+  LOOKS_LIKE_A_FORMULA.test(name) ? `'${name}` : name;
+
+/** `asText` undone, so a name reads back as it was typed. */
+const fromText = (name: string): string =>
+  name.startsWith("'") && LOOKS_LIKE_A_FORMULA.test(name)
+    ? name.slice(1)
+    : name;
+
 /** A row of already-stringified values, joined and newline-terminated. */
 const row = (values: string[]): string => values.map(cell).join(',') + '\n';
 
@@ -76,7 +93,7 @@ const studentCells = (student: Student, locale: Locale): string[] => {
   const t = CSV_LOCALES[locale];
   return [
     String(student.number),
-    student.name ?? '',
+    asText(student.name ?? ''),
     student.sex ? t.sex[student.sex] : '',
     student.absent ? t.absentYes : '',
     student.together ?? '',
@@ -122,7 +139,9 @@ export function serialiseGroups(
     row([t.groupColumn, t.columns.number, t.columns.name]) +
     groups
       .flatMap((group, i) =>
-        group.map((s) => row([String(i + 1), String(s.number), s.name ?? ''])),
+        group.map((s) =>
+          row([String(i + 1), String(s.number), asText(s.name ?? '')]),
+        ),
       )
       .join('')
   );
@@ -526,7 +545,7 @@ export function parseRoster(
     if (number !== null) {
       roster.push({
         number,
-        name: rawName === '' ? null : rawName,
+        name: rawName === '' ? null : fromText(rawName),
         sex,
         absent,
         together,
