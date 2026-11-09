@@ -44,6 +44,7 @@ import {
   slotsKept,
   translatableSentences,
   deeplDrafts,
+  deeplKeyFrom,
   TRANSLATABLE_LOCALES,
 } from '../src/lib/i18n/translate.ts';
 
@@ -229,13 +230,10 @@ export async function main() {
    * Never printed, never interpolated into a URL or an error. `.env.local` is
    * gitignored (`.env.*`), and the same value lives as a repo secret.
    */
-  const apiKey =
-    env.DEEPL_API_KEY ??
-    (existsSync('.env.local')
-      ? (/^DEEPL_API_KEY=(.*)$/m.exec(
-          readFileSync('.env.local', 'utf8'),
-        )?.[1] ?? '')
-      : '');
+  const apiKey = deeplKeyFrom(
+    env.DEEPL_API_KEY,
+    existsSync('.env.local') ? readFileSync('.env.local', 'utf8') : undefined,
+  );
   if (!apiKey.trim()) die('DEEPL_API_KEY is not set (env or .env.local)');
   const endpoint = deeplEndpoint(apiKey);
   /** @type {Deepl} */
