@@ -10,8 +10,8 @@
  * anything interpolated — a file's contents and a class name are a
  * teacher's text, not markup, and this section renders both.
  *
- * PRIVACY (design spec section 9, and the promise the page makes in both
- * languages): a download is a `Blob` and an object URL that is revoked the
+ * PRIVACY (design spec section 9, and the promise the page makes in every
+ * locale): a download is a `Blob` and an object URL that is revoked the
  * moment the click is dispatched. Nothing here writes to `localStorage`,
  * `sessionStorage`, a cookie or the address bar, and
  * classroom-groups-privacy.spec.ts asserts exactly that after each

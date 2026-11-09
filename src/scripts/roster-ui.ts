@@ -4,7 +4,7 @@
  * ONE renderer, two CSS layouts (design spec section 3, "The roster is a
  * table on a laptop and cards on a phone"). `renderRoster` below builds a
  * single `<table>` whose `<tr class="cg-student">` rows are, structurally,
- * the same elements Stage 3, Task 3's own CSS
+ * the same elements the page's CSS
  * (ClassroomGroupsPage.astro's `<style is:global>` block, anchored on
  * `#cg-roster`) turns into cards below ~600px purely with `display: block`
  * on the table parts under a media query — no second render path. If a
@@ -75,7 +75,7 @@ export interface RosterHandlers {
    * see this row's own click listener, below) rather than the snapshot
    * this render started with, so a pending, uncommitted text edit made to
    * a DIFFERENT row is not silently discarded the moment this one is
-   * removed — the exact shape of bug Stage 3, Task 3 already found and
+   * removed — the exact shape of bug already found and
    * fixed for `onTextChange`/`onSelectChange` (see `renderRoster`'s own
    * `liveRoster` comment, below). Re-renders safely, the same reasoning
    * `onSelectChange` above already rests on: removing a row is a discrete
@@ -396,8 +396,8 @@ function buildRow(
 
   // # — the number. Editable (design spec section 4: "The teacher may
   // override them"); identity is the number everywhere else in this
-  // engine, so this is the one field a later task's duplicate check
-  // (rosterProblems, a later task) watches.
+  // engine, so this is the one field the duplicate check
+  // (`rosterProblems`) watches.
   const numberTd = columnCell('number');
   const numberInput = document.createElement('input');
   numberInput.type = 'number';
@@ -599,8 +599,8 @@ function buildRow(
  * With an EMPTY roster, only the toolbar renders (`+ Add student` /
  * `+ Add several…`) — there is no `<table id="cg-roster">` at all until
  * there is at least one row for it to hold. `#cg-roster` existing, or not,
- * is itself meaningful to at least one later task's own test (Student
- * details refusing to open above MAX_ROSTER leaves no table behind either)
+ * is itself meaningful to a test (Student details refusing to open above
+ * MAX_ROSTER leaves no table behind either)
  * so an empty-but-present table was deliberately avoided here.
  */
 export function renderRoster(
@@ -638,9 +638,7 @@ export function renderRoster(
   // makes an empty name box shrink next to a full one (R-10); `table-
   // layout: fixed` (also in that CSS) is what makes a <col>'s width apply
   // uniformly down its whole column regardless of any one row's content.
-  // Seven, not six, since Stage 3, Task 6: the seventh is Remove's own
-  // column — see `buildRow`'s own comment on why it earns a <col> but not
-  // a matching <th>.
+  // The seventh is Remove's own column, with its own <th> (`removeTh`).
   const colgroup = document.createElement('colgroup');
   for (let i = 0; i < 7; i++)
     colgroup.appendChild(document.createElement('col'));
@@ -721,8 +719,7 @@ export function renderRoster(
   thead.appendChild(headRow);
   table.appendChild(thead);
 
-  // Bug found while adding Stage 3, Task 3's own "editing every field
-  // works" test (task-3-brief.md's own Step 1, verbatim): every row below
+  // Bug found while adding the "editing every field works" test: every row below
   // is built ONCE, here, and every field's own `patched()` call (buildRow)
   // used to close directly over THIS render's `roster` array. `onTextChange`
   // (number/name) deliberately never re-renders -- see `RosterHandlers`'
@@ -755,7 +752,7 @@ export function renderRoster(
       liveRoster = next;
       handlers.onSelectChange(next);
     },
-    // Stage 3, Task 6. Same reasoning as onTextChange/onSelectChange just
+    // Same reasoning as onTextChange/onSelectChange just
     // above: kept current here even though a removal always triggers a
     // fresh `renderRoster` call of its own (see RosterHandlers.onRemove's
     // own doc comment) -- defensive, matching this pair's own established
@@ -785,8 +782,8 @@ export function renderRoster(
 
   // The toolbar again, "inline in the table footer" (design spec section
   // 4) — a real <tfoot>, not a sibling element after the table, so it
-  // reflows exactly like every other row once a later task's CSS turns
-  // this table into a stack of cards below the breakpoint.
+  // reflows exactly like every other row once the page's CSS turns this
+  // table into a stack of cards below the breakpoint.
   const tfoot = document.createElement('tfoot');
   const footRow = document.createElement('tr');
   const footCell = document.createElement('td');
