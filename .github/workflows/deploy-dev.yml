@@ -91,8 +91,7 @@ jobs:
   # No `runs-on` and no `timeout-minutes`: GitHub refuses both on a calling
   # job, and every job it calls carries its own. A called workflow's token can
   # only be narrowed, so this job grants what ci.yml's jobs ask for -- `issues:
-  # read` for the dependabot-label check -- and
-  # tests/guards/pipeline-wiring.test.ts fails if they part.
+  # read` for the dependabot-label check.
   test:
     name: Comprehensive web tests
     if: github.event_name != 'push'
