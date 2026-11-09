@@ -100,8 +100,21 @@ export const spillPastCard = (
       parseFloat(style.borderLeftWidth);
     let over = 0;
     let who = '';
+    // Clipped to nothing paints nothing: `.visually-hidden` (clip-path
+    // inset(50%), margin -1px) sits 1px past the left edge and shows no
+    // pixel there (#1103).
+    const clippedAway = (el: Element): boolean => {
+      for (
+        let at: Element | null = el;
+        at && at !== card;
+        at = at.parentElement
+      )
+        if (getComputedStyle(at).clipPath.startsWith('inset(50%')) return true;
+      return false;
+    };
     for (const el of card.querySelectorAll('*')) {
       if (el.getClientRects().length === 0) continue;
+      if (clippedAway(el)) continue;
       const rect = el.getBoundingClientRect();
       const spill = Math.max(rect.right - innerRight, innerLeft - rect.left);
       if (spill > over) {

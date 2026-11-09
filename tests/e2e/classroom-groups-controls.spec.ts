@@ -1987,5 +1987,10 @@ test.describe('the containment helper', () => {
     const worst = await spillPastCard(page, 'fixture-card');
     expect(worst.who).toBe('pushed-left');
     expect(worst.over).toBeCloseTo(40, 1);
+    // A screen-reader-only label, clipped to nothing, paints no spill.
+    await page.setContent(
+      '<div id="fixture-card" style="box-sizing:border-box;width:200px;margin-left:100px;padding:10px;border:1px solid"><span class="visually-hidden" style="position:absolute;width:1px;height:1px;margin:-1px -1px -1px -20px;overflow:hidden;clip-path:inset(50%)">label</span></div>',
+    );
+    expect((await spillPastCard(page, 'fixture-card')).over).toBe(0);
   });
 });
