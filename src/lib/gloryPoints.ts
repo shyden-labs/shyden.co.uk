@@ -33,7 +33,8 @@ export function calculateGlory(rawInput: string): GloryOutcome {
   if (!parsed.ok) return parsed;
   const gloryPoints = parsed.value;
 
-  const coinsNeeded = Math.ceil(gloryPoints * 1);
+  // One glory point costs one coin.
+  const coinsNeeded = gloryPoints;
   const beansNeeded = Math.ceil(coinsNeeded / COINS_PER_BEAN);
   const totalGiftValue = Math.ceil(beansNeeded / GIFT_BEAN_RATE);
 
