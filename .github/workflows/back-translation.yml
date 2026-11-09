@@ -14,8 +14,7 @@
 name: back-translation
 on:
   pull_request:
-    # Everything the review reads, held by pipeline-wiring.test.ts against the
-    # script's own import closure, so a new input cannot go unwatched.
+    # Everything the review reads: a new input to the script belongs here too.
     paths:
       - 'src/lib/i18n/**'
       - 'src/lib/catalogue-leaves.ts'
