@@ -882,7 +882,7 @@ test.describe('evidence page sign-off ticks, when the store is slower than the s
 });
 
 test.describe('evidence page sign-off, whatever the write order', () => {
-  test('the page is the document a reader receives: standards mode, UTF-8, laid out at the device width', async ({
+  test('the page a reader receives: its document, its ticks, its progress line and its save status', async ({
     page,
   }, testInfo) => {
     await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
@@ -895,18 +895,49 @@ test.describe('evidence page sign-off, whatever the write order', () => {
       laidOut: document.documentElement.clientWidth,
       screen: screen.width,
     }));
-    expect({ mode: read.mode, charset: read.charset }).toEqual({
+    expect.soft({ mode: read.mode, charset: read.charset }).toEqual({
       mode: 'CSS1Compat',
       charset: 'UTF-8',
     });
-    expect(
-      read.laidOut,
-      `the page is laid out ${read.laidOut}px wide on a ${read.screen}px screen`,
-    ).toBeLessThanOrEqual(read.screen);
+    expect
+      .soft(
+        read.laidOut,
+        `the page is laid out ${read.laidOut}px wide on a ${read.screen}px screen`,
+      )
+      .toBeLessThanOrEqual(read.screen);
+
+    // Each tick is named for the journey it marks.
+    for (const title of TITLES)
+      await expect
+        .soft(tickBox(page, title))
+        .toHaveAccessibleName(`Reviewed: ${title}`);
+
+    // The progress line counts each journey once, and each carries its capture.
+    await expect
+      .soft(page.locator('#progress'))
+      .toHaveText(`0 of ${TITLES.length} journeys reviewed`);
+    for (const title of TITLES)
+      await expect
+        .soft(
+          journeySection(page, title).locator('img'),
+          `"${title}" shows the capture its manifest row names`,
+        )
+        .toHaveCount(1);
+    await shoot(page, 'five journeys, each counted once', signOff(page));
+
+    // Asked of the save status itself, not of "the page's one status region":
+    // the out-of-date notice (#197) is a second, and a proxy would break on it
+    // while this property held.
+    const status = page.locator('#state');
+    await expect.soft(status).toHaveRole('status');
+    await expect.soft(status).toHaveText(/^Ready\b/);
+    await shoot(page, 'the save status is a status message', status);
+
     // The copy as written, where WebKit once showed "â€¦" for "…". Read in
     // the tick's own task: the page says it there, and its save replaces it.
     // A real tap (#1003); a bubbling `change` listener on the document runs
-    // straight after the tick's own handler, in the same task.
+    // straight after the tick's own handler, in the same task. Last, because
+    // the tick is the one thing this walk changes.
     await page.evaluate(() => {
       const state = window as unknown as { saying?: string };
       document.addEventListener(
@@ -921,45 +952,7 @@ test.describe('evidence page sign-off, whatever the write order', () => {
     const saying = await page
       .waitForFunction(() => (window as unknown as { saying?: string }).saying)
       .then((handle) => handle.jsonValue());
-    expect(saying).toBe('Saving…');
-  });
-
-  test('each tick is named for the journey it marks', async ({
-    page,
-  }, testInfo) => {
-    await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    for (const title of TITLES)
-      await expect(tickBox(page, title)).toHaveAccessibleName(
-        `Reviewed: ${title}`,
-      );
-  });
-
-  test('the progress line counts each journey once, and each carries its capture', async ({
-    page,
-  }, testInfo) => {
-    await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    await expect(page.locator('#progress')).toHaveText(
-      `0 of ${TITLES.length} journeys reviewed`,
-    );
-    for (const title of TITLES)
-      await expect(
-        journeySection(page, title).locator('img'),
-        `"${title}" shows the capture its manifest row names`,
-      ).toHaveCount(1);
-    await shoot(page, 'five journeys, each counted once', signOff(page));
-  });
-
-  test('the save status is exposed to assistive technology as a status message', async ({
-    page,
-  }, testInfo) => {
-    await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    // Asked of the save status itself, not of "the page's one status region":
-    // the out-of-date notice (#197) is a second, and a proxy would break on it
-    // while this property held.
-    const status = page.locator('#state');
-    await expect(status).toHaveRole('status');
-    await expect(status).toHaveText(/^Ready\b/);
-    await shoot(page, 'the save status is a status message', status);
+    expect.soft(saying).toBe('Saving…');
   });
 
   test('the status says so when live updates stop', async ({
@@ -1186,40 +1179,62 @@ async function expectCurrent(page: Page, button: Locator): Promise<void> {
 }
 
 test.describe('a verdict covers the journeys it was given on (#197)', () => {
-  test('approved, then rebuilt with a journey added: the approval is out of date and names it, and one press approves again', async ({
+  test('approved: an unchanged rebuild keeps it, a rebuild with a journey added puts it out of date and names it, and one press approves again', async ({
     page,
   }, testInfo) => {
     await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
     await writtenAfter(page, () => tapOn(approveButton(page)), 'the approval');
-    await expect(approveButton(page)).toHaveAttribute('aria-pressed', 'true');
-    expect(
-      await storedVerdict(page),
-      'the approval records the journeys it was given on',
-    ).toEqual({ verdict: 'approved', covers: coveredBy(HTML) });
+    await expect
+      .soft(approveButton(page))
+      .toHaveAttribute('aria-pressed', 'true');
+    expect
+      .soft(
+        await storedVerdict(page),
+        'the approval records the journeys it was given on',
+      )
+      .toEqual({ verdict: 'approved', covers: coveredBy(HTML) });
     await shoot(page, 'approved on five journeys', signOff(page));
+
+    await republish(page, pageOf(TITLES));
+    await expectCurrent(page, approveButton(page));
+    expect.soft(await storedVerdict(page)).toEqual({
+      verdict: 'approved',
+      covers: coveredBy(HTML),
+    });
+    await shoot(page, 'rebuilt unchanged: still approved', signOff(page));
 
     await republish(page, HTML_WITH_ADDED);
     const notice = outOfDate(page);
-    await expect(
-      notice,
-      'the stale approval is a status message, so it is announced',
-    ).toBeVisible();
-    await expect(notice).toHaveId('standing');
-    await expect(notice).toContainText(
-      'Your sign-off is out of date. You signed off before this page changed.',
-    );
-    await expect(
-      notice.getByRole('link', { name: ADDED, exact: true }),
-      'the journey added since is named',
-    ).toBeVisible();
-    await expect(
-      approveButton(page),
-      'an out-of-date approval is not shown as given',
-    ).toHaveAttribute('aria-pressed', 'false');
-    expect(
-      await storedVerdict(page),
-      'opening the page changed nothing stored',
-    ).toEqual({ verdict: 'approved', covers: coveredBy(HTML) });
+    await expect
+      .soft(
+        notice,
+        'the stale approval is a status message, so it is announced',
+      )
+      .toBeVisible();
+    await expect.soft(notice).toHaveId('standing');
+    await expect
+      .soft(notice)
+      .toContainText(
+        'Your sign-off is out of date. You signed off before this page changed.',
+      );
+    await expect
+      .soft(
+        notice.getByRole('link', { name: ADDED, exact: true }),
+        'the journey added since is named',
+      )
+      .toBeVisible();
+    await expect
+      .soft(
+        approveButton(page),
+        'an out-of-date approval is not shown as given',
+      )
+      .toHaveAttribute('aria-pressed', 'false');
+    expect
+      .soft(
+        await storedVerdict(page),
+        'opening the page changed nothing stored',
+      )
+      .toEqual({ verdict: 'approved', covers: coveredBy(HTML) });
     await shoot(
       page,
       'republished with a sixth journey: out of date, naming it',
@@ -1232,25 +1247,13 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
       'the approval given again',
     );
     await expectCurrent(page, approveButton(page));
-    expect(
-      await storedVerdict(page),
-      'the approval now records every journey on the page',
-    ).toEqual({ verdict: 'approved', covers: coveredBy(HTML_WITH_ADDED) });
+    expect
+      .soft(
+        await storedVerdict(page),
+        'the approval now records every journey on the page',
+      )
+      .toEqual({ verdict: 'approved', covers: coveredBy(HTML_WITH_ADDED) });
     await shoot(page, 'one press: approved on all six', signOff(page));
-  });
-
-  test('an unchanged rebuild keeps the approval', async ({
-    page,
-  }, testInfo) => {
-    await openEvidencePage(page, testInfo, { order: 'resolve-then-confirm' });
-    await writtenAfter(page, () => tapOn(approveButton(page)), 'the approval');
-    await republish(page, pageOf(TITLES));
-    await expectCurrent(page, approveButton(page));
-    expect(await storedVerdict(page)).toEqual({
-      verdict: 'approved',
-      covers: coveredBy(HTML),
-    });
-    await shoot(page, 'rebuilt unchanged: still approved', signOff(page));
   });
 
   test('a journey removed since puts the approval out of date, and is named', async ({
