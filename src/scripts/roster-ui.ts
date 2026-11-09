@@ -152,15 +152,29 @@ const printMirror = (value: string, column: PrintColumn): HTMLSpanElement => {
   return span;
 };
 
-/** M/F, or an em dash for unset. NOT the glyph the <select> shows: since #249
- * the collapsed control names its own column instead, while paper keeps the
- * dash for an empty cell. */
-const sexText = (student: Student, t: Strings): string =>
-  student.sex === 'M'
-    ? t.rosterSexMale
-    : student.sex === 'F'
-      ? t.rosterSexFemale
-      : t.rosterUnset;
+/**
+ * What each cell of a student's row prints, in one place: the row builder
+ * here and `refreshPrintMirrors` (classroom-groups.ts) both read it, so the
+ * paper cannot drift from itself (#390 F19). Sex is M/F, or the unset dash:
+ * NOT the glyph the <select> shows, since #249 the collapsed control names
+ * its own column instead, while paper keeps the dash for an empty cell.
+ */
+export const printTexts = (
+  student: Student,
+  t: Strings,
+): Record<PrintColumn, string> => ({
+  number: String(student.number),
+  name: student.name ?? '',
+  sex:
+    student.sex === 'M'
+      ? t.rosterSexMale
+      : student.sex === 'F'
+        ? t.rosterSexFemale
+        : t.rosterUnset,
+  absent: student.absent ? '\u2611' : '\u2610',
+  together: student.together ?? t.rosterUnset,
+  apart: student.apart ?? t.rosterUnset,
+});
 
 const buildOption = (value: string, label: string): HTMLOptionElement => {
   const option = document.createElement('option');
@@ -377,6 +391,7 @@ function buildRow(
   togetherLetters: readonly string[],
   apartLetters: readonly string[],
 ): HTMLTableRowElement {
+  const print = printTexts(student, t);
   const tr = document.createElement('tr');
   tr.className = 'cg-student';
   // Design spec section 4: "the row is tinted instead" -- a tint, a stripe
@@ -412,7 +427,7 @@ function buildRow(
     }
   });
   numberTd.appendChild(numberInput);
-  numberTd.appendChild(printMirror(String(student.number), 'number'));
+  numberTd.appendChild(printMirror(print.number, 'number'));
 
   // Name — optional. `placeholder` previews the SAME fallback label the
   // results grid and every error message already use for this student
@@ -434,7 +449,7 @@ function buildRow(
     handlers.onTextChange(patched(getRoster(), index, { name: value }));
   });
   nameTd.appendChild(nameInput);
-  nameTd.appendChild(printMirror(student.name ?? '', 'name'));
+  nameTd.appendChild(printMirror(print.name, 'name'));
 
   // Sex — blank (neutral) / M / F. The <option> VALUE is always the raw
   // 'M'/'F' the engine's Student.sex type uses, in every language; only the
@@ -463,7 +478,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { sex: value }));
   });
   sexTd.appendChild(sexSelect);
-  sexTd.appendChild(printMirror(sexText(student, t), 'sex'));
+  sexTd.appendChild(printMirror(print.sex, 'sex'));
 
   // Absent — ticking it marks the student out of the shuffle (design spec
   // section 4). Nothing else in this row is ever disabled by it — a later
@@ -510,9 +525,7 @@ function buildRow(
   // A ticked BOX, not a word: design spec section 10's own "the `Absent`
   // column says it in no ink and no colour". \u2611/\u2610 read identically in
   // greyscale and need no legend.
-  absentTd.appendChild(
-    printMirror(student.absent ? '\u2611' : '\u2610', 'absent'),
-  );
+  absentTd.appendChild(printMirror(print.absent, 'absent'));
 
   // Together / Apart — a letter each, from a dropdown that grows as needed
   // (design spec section 4; `availableLetters`, src/lib/roster.ts).
@@ -533,9 +546,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { together: value }));
   });
   togetherTd.appendChild(togetherSelect);
-  togetherTd.appendChild(
-    printMirror(student.together ?? t.rosterUnset, 'together'),
-  );
+  togetherTd.appendChild(printMirror(print.together, 'together'));
 
   const apartTd = columnCell('apart');
   const apartSelect = document.createElement('select');
@@ -550,7 +561,7 @@ function buildRow(
     handlers.onSelectChange(patched(getRoster(), index, { apart: value }));
   });
   apartTd.appendChild(apartSelect);
-  apartTd.appendChild(printMirror(student.apart ?? t.rosterUnset, 'apart'));
+  apartTd.appendChild(printMirror(print.apart, 'apart'));
 
   // Remove — design spec section 4: "Removing a row removes the student."
   // A SEVENTH cell, with a real (visually-hidden) header of its own — see
