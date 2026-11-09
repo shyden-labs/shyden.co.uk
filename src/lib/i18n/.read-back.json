@@ -1321,6 +1321,10 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Shyden 2026-11-08 (#999): 学号 is how a class names a student number"
+      },
+      "行 {row} — 编号 '{value}' 太小。编号从 1 开始。": {
+        "english": "The {row} number ' {value} ' is too small. Numbering should start from 1.",
+        "writers": ["edited after DeepL"]
       }
     },
     "th": {
@@ -2694,6 +2698,10 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "แถว {row} — หมายเลข '{value}' ต่ำเกินไป หมายเลขเริ่มต้นที่ 1": {
+        "english": "Row {row} — Number ' {value} ' is too low. Starting number is 1.",
+        "writers": ["edited after DeepL"]
       }
     },
     "id": {
@@ -4132,6 +4140,10 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Baris {row} — nomor '{value}' terlalu kecil. Nomor dimulai dari 1.": {
+        "english": "Row {row} — number ' {value} ' is too small. Numbers start at 1.",
+        "writers": ["no DeepL draft"]
       }
     },
     "vi": {
@@ -5530,6 +5542,10 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1.": {
+        "english": "Row {row} — the number ' {value} ' is too small. Numbers start from 1.",
+        "writers": ["DeepL"]
       }
     }
   },
