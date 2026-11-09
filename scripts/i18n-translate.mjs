@@ -31,7 +31,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { argv, env, exit } from 'node:process';
-import { die } from './errors.mjs';
+import { die, messageOf } from './errors.mjs';
 
 import {
   DO_NOT_TRANSLATE,
@@ -93,12 +93,16 @@ function writeCache(cache, target, known) {
 /**
  *  Every source drafted, in order, 50 texts to a request.
  *
+ * Each batch is handed to `landed` as it arrives, so the caller can save it
+ * before the next request: a refusal mid-run throws, and the drafts already
+ * paid for are kept (#390 F41).
+ *
  * @param {string[]} sources
  * @param {Record<string, unknown>} options
  * @param {Deepl} deepl the endpoint, the key and the target locale
+ * @param {(batch: string[], drafts: string[]) => void} landed
  */
-async function draftAll(sources, options, deepl) {
-  const drafts = [];
+export async function draftAll(sources, options, deepl, landed) {
   for (let i = 0; i < sources.length; i += BATCH) {
     const batch = sources.slice(i, i + BATCH);
     const response = await fetch(deepl.endpoint, {
@@ -114,13 +118,12 @@ async function draftAll(sources, options, deepl) {
       body: JSON.stringify(buildRequestBody(batch, deepl.target, options)),
     });
     // The status only, never the body: a DeepL error can echo the request.
-    if (!response.ok) die(`DeepL responded ${response.status}`);
+    if (!response.ok) throw new Error(`DeepL responded ${response.status}`);
     // Checked before it is used: the caller pairs drafts with sources by
     // position, so a short answer would shift every later draft.
-    drafts.push(...deeplDrafts(await response.json(), batch.length));
+    landed(batch, deeplDrafts(await response.json(), batch.length));
     console.log(`  ${Math.min(i + BATCH, sources.length)}/${sources.length}`);
   }
-  return drafts;
 }
 
 /**
@@ -239,9 +242,20 @@ export async function main() {
   /** @type {Deepl} */
   const deepl = { endpoint, apiKey, target };
 
-  (await draftAll(pending, { tagSlots: false }, deepl)).forEach((draft, n) => {
-    known[pending[n]] = draft;
-  });
+  /** Runs a send, saving each batch as it lands; a refusal ends the run. */
+  const sending = async (/** @type {() => Promise<void>} */ send) => {
+    try {
+      await send();
+    } catch (error) {
+      die(`${messageOf(error)}; the drafts before it are kept in ${CACHE}`);
+    }
+  };
+  await sending(() =>
+    draftAll(pending, { tagSlots: false }, deepl, (batch, drafts) => {
+      batch.forEach((s, n) => (known[s] = drafts[n]));
+      writeCache(cache, target, known);
+    }),
+  );
 
   /**
    * Sent bare, a slot keeps its spacing and the words beside it whole, but DeepL
@@ -253,9 +267,14 @@ export async function main() {
   const retry = pending.filter((s) => !slotsKept(s, known[s]));
   if (retry.length > 0) {
     console.log(`retrying ${retry.length} with tagged slots`);
-    (await draftAll(retry, { tagSlots: true }, deepl)).forEach((draft, n) => {
-      known[retry[n]] = betterDraft(retry[n], known[retry[n]], draft);
-    });
+    await sending(() =>
+      draftAll(retry, { tagSlots: true }, deepl, (batch, drafts) => {
+        batch.forEach(
+          (s, n) => (known[s] = betterDraft(s, known[s], drafts[n])),
+        );
+        writeCache(cache, target, known);
+      }),
+    );
   }
   const unresolved = retry.filter((s) => !slotsKept(s, known[s]));
   for (const s of unresolved)
