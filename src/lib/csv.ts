@@ -36,6 +36,50 @@ import { LOCALES } from './i18n/locales';
 const cell = (value: string): string =>
   /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 
+/**
+ * A name a spreadsheet would run as a formula (OWASP CSV injection), with any
+ * apostrophes already in front of it, so one the file itself added can always
+ * be told from one a teacher typed. Spaces in front count, full-width signs
+ * count, and a name opening with a tab or a return counts on its own.
+ */
+const LOOKS_LIKE_A_FORMULA =
+  /^'*(?:\s*[=+\-@\uff1d\uff0b\uff0d\uff20]|[\t\r\n])/;
+
+/**
+ * The same inside a name, after anything a spreadsheet may split a cell or a
+ * row on. Where a region's list separator is `;` the file is not split on its
+ * commas, so the name is not the start of a cell and its quotes mean nothing:
+ * quoting cannot protect it, only the apostrophe can. Double quotes between
+ * the separator and the sign count too: `Ana;"=1` splits into a quoted cell.
+ */
+const FORMULA_AFTER_A_SEPARATOR =
+  /([;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+const ADDED_AFTER_A_SEPARATOR =
+  /([;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+
+/**
+ * The class name follows `# Class:` on its line, so it is never at the start
+ * of a field and its quotes are never honoured: a comma splits it too.
+ */
+const CLASS_FORMULA_AFTER_A_SEPARATOR =
+  /([,;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+const CLASS_ADDED_AFTER_A_SEPARATOR =
+  /([,;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+
+/** The class list opens in a spreadsheet: a formula goes in as text. */
+const asText = (name: string): string => {
+  const inside = name.replace(FORMULA_AFTER_A_SEPARATOR, "$1'$2");
+  return LOOKS_LIKE_A_FORMULA.test(name) ? `'${inside}` : inside;
+};
+
+/** `asText` undone, so a name reads back as it was typed. */
+const fromText = (name: string): string => {
+  const inside = name.replace(ADDED_AFTER_A_SEPARATOR, '$1$2');
+  return inside.startsWith("'") && LOOKS_LIKE_A_FORMULA.test(inside)
+    ? inside.slice(1)
+    : inside;
+};
+
 /** A row of already-stringified values, joined and newline-terminated. */
 const row = (values: string[]): string => values.map(cell).join(',') + '\n';
 
@@ -51,7 +95,9 @@ const row = (values: string[]): string => values.map(cell).join(',') + '\n';
 const classLine = (className: string, locale: Locale): string =>
   className.trim() === ''
     ? ''
-    : `${CSV_LOCALES[locale].classComment} ${cell(className)}\n`;
+    : `${CSV_LOCALES[locale].classComment} ${cell(
+        className.replace(CLASS_FORMULA_AFTER_A_SEPARATOR, "$1'$2"),
+      )}\n`;
 
 const COLUMN_ORDER: CsvColumn[] = [
   'number',
@@ -76,7 +122,7 @@ const studentCells = (student: Student, locale: Locale): string[] => {
   const t = CSV_LOCALES[locale];
   return [
     String(student.number),
-    student.name ?? '',
+    asText(student.name ?? ''),
     student.sex ? t.sex[student.sex] : '',
     student.absent ? t.absentYes : '',
     student.together ?? '',
@@ -122,7 +168,9 @@ export function serialiseGroups(
     row([t.groupColumn, t.columns.number, t.columns.name]) +
     groups
       .flatMap((group, i) =>
-        group.map((s) => row([String(i + 1), String(s.number), s.name ?? ''])),
+        group.map((s) =>
+          row([String(i + 1), String(s.number), asText(s.name ?? '')]),
+        ),
       )
       .join('')
   );
@@ -370,7 +418,11 @@ export function parseRoster(
       const line = cells.join(',');
       const prefix = table.classComment;
       if (line.trimStart().toLowerCase().startsWith(prefix.toLowerCase())) {
-        className = line.trimStart().slice(prefix.length).trim();
+        className = line
+          .trimStart()
+          .slice(prefix.length)
+          .trim()
+          .replace(CLASS_ADDED_AFTER_A_SEPARATOR, '$1$2');
       }
       continue;
     }
@@ -529,7 +581,7 @@ export function parseRoster(
     if (number !== null) {
       roster.push({
         number,
-        name: rawName === '' ? null : rawName,
+        name: rawName === '' ? null : fromText(rawName),
         sex,
         absent,
         together,
