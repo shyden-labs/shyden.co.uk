@@ -504,6 +504,9 @@ export function parseRoster(
       problem(t.csvProblemNumberBlank({ row: rowNumber }));
     } else if (!/^\d+$/.test(rawNumber)) {
       problem(t.csvProblemNumberNotWhole({ row: rowNumber, value: rawNumber }));
+    } else if (Number(rawNumber) < 1) {
+      // The roster's own number boxes say min="1" (#1097).
+      problem(t.csvProblemNumberTooLow({ row: rowNumber, value: rawNumber }));
     } else {
       number = Number(rawNumber);
       const first = claimedBy.get(number);
