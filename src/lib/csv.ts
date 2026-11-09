@@ -49,12 +49,22 @@ const LOOKS_LIKE_A_FORMULA =
  * The same inside a name, after anything a spreadsheet may split a cell or a
  * row on. Where a region's list separator is `;` the file is not split on its
  * commas, so the name is not the start of a cell and its quotes mean nothing:
- * quoting cannot protect it, only the apostrophe can.
+ * quoting cannot protect it, only the apostrophe can. Double quotes between
+ * the separator and the sign count too: `Ana;"=1` splits into a quoted cell.
  */
 const FORMULA_AFTER_A_SEPARATOR =
-  /([;\t\r\n]\s*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 const ADDED_AFTER_A_SEPARATOR =
-  /([;\t\r\n]\s*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+
+/**
+ * The class name follows `# Class:` on its line, so it is never at the start
+ * of a field and its quotes are never honoured: a comma splits it too.
+ */
+const CLASS_FORMULA_AFTER_A_SEPARATOR =
+  /([,;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+const CLASS_ADDED_AFTER_A_SEPARATOR =
+  /([,;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 
 /** The class list opens in a spreadsheet: a formula goes in as text. */
 const asText = (name: string): string => {
@@ -85,7 +95,9 @@ const row = (values: string[]): string => values.map(cell).join(',') + '\n';
 const classLine = (className: string, locale: Locale): string =>
   className.trim() === ''
     ? ''
-    : `${CSV_LOCALES[locale].classComment} ${cell(className)}\n`;
+    : `${CSV_LOCALES[locale].classComment} ${cell(
+        className.replace(CLASS_FORMULA_AFTER_A_SEPARATOR, "$1'$2"),
+      )}\n`;
 
 const COLUMN_ORDER: CsvColumn[] = [
   'number',
@@ -406,7 +418,11 @@ export function parseRoster(
       const line = cells.join(',');
       const prefix = table.classComment;
       if (line.trimStart().toLowerCase().startsWith(prefix.toLowerCase())) {
-        className = line.trimStart().slice(prefix.length).trim();
+        className = line
+          .trimStart()
+          .slice(prefix.length)
+          .trim()
+          .replace(CLASS_ADDED_AFTER_A_SEPARATOR, '$1$2');
       }
       continue;
     }

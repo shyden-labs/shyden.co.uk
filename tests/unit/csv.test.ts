@@ -1456,17 +1456,26 @@ describe('a name a spreadsheet would run as a formula', () => {
   it.each([';', '\t', '\n', ','])(
     'no cell starts a formula when a spreadsheet splits the file on %j',
     (separator) => {
-      const names = ['Ana;=1+1', 'Ana; @x', 'Ana\t+1', 'Ana\n-1', '=1', ' =1'];
+      const names = [
+        'Ana;=1+1',
+        'Ana; @x',
+        'Ana\t+1',
+        'Ana\n-1',
+        '=1',
+        ' =1',
+        'Ana;"=1+1',
+        'Ana;" =1+1',
+      ];
       const file = serialiseRoster(
         names.map((name, i) => student({ number: i + 1, name })),
-        '',
+        'a,=1;"+2\t-3',
         'en',
       );
       const cells = file.split(separator);
       expect(cells.length).toBeGreaterThan(1);
       expect(
         cells.filter((text) =>
-          /^\s*[=+\-@\uff1d\uff0b\uff0d\uff20]/.test(text),
+          /^[\s"]*[=+\-@\uff1d\uff0b\uff0d\uff20]/.test(text),
         ),
       ).toEqual([]);
     },
@@ -1481,10 +1490,24 @@ describe('a name a spreadsheet would run as a formula', () => {
     'Ana\t=1+1',
     'Ana\n=1+1',
     '\t=1+1',
+    'Ana;"=1+1',
+    'Ana;" =1+1',
   ])('reads %j back without its added apostrophe', (name) => {
     const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
     expect(out.ok && out.roster[0]?.name).toBe(name);
   });
+
+  it.each(['a,=1', 'a, =1', 'a;"=1', "a,'=1", 'a,"+1', '7B "Blue", =x'])(
+    'reads the class name %j back as it was typed',
+    (className) => {
+      const out = parseRoster(
+        serialiseRoster(named('Ana'), className, 'en'),
+        'en',
+        en,
+      );
+      expect(out.ok && out.className).toBe(className);
+    },
+  );
 
   it('the groups file writes it as text', () => {
     expect(
