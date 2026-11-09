@@ -31,17 +31,21 @@ import { LOCALES } from './i18n/locales';
  *
  * The newline case is not decorative: a teacher pasting from a spreadsheet
  * can carry one into a name box, and unquoted it splits one student into
- * two rows on the way back in.
+ * two rows on the way back in. A semicolon or a tab is quoted because a
+ * spreadsheet may split on it where the region's list separator differs, and
+ * text after it would start a cell of its own, unseen by `asText`.
  */
 const cell = (value: string): string =>
-  /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  /[",;\t\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 
 /**
  * A name a spreadsheet would run as a formula (OWASP CSV injection), with any
  * apostrophes already in front of it, so one the file itself added can always
- * be told from one a teacher typed.
+ * be told from one a teacher typed. Spaces in front count, full-width signs
+ * count, and a name opening with a tab or a return counts on its own.
  */
-const LOOKS_LIKE_A_FORMULA = /^'*[=+\-@\t\r]/;
+const LOOKS_LIKE_A_FORMULA =
+  /^'*(?:\s*[=+\-@\uff1d\uff0b\uff0d\uff20]|[\t\r\n])/;
 
 /** The class list opens in a spreadsheet: a formula goes in as text. */
 const asText = (name: string): string =>

@@ -1402,12 +1402,53 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
 describe('a name a spreadsheet would run as a formula', () => {
   const named = (name: string) => [student({ number: 1, name })];
 
-  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)', '\t=1+1'])(
+  it('the class list writes a tab-led formula as text, quoted for its tab', () => {
+    expect(serialiseRoster(named('\t=1+1'), '', 'en').split('\n')[1]).toBe(
+      `1,"'\t=1+1",,,,`,
+    );
+  });
+
+  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)'])(
     'the class list writes %s as text',
     (name) => {
       expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
         `1,'${name},,,,`,
       );
+    },
+  );
+
+  it.each([
+    ' =1+1',
+    '\u3000=1+1',
+    '\uff1d1+1',
+    '\uff0b1',
+    '\uff0d1',
+    '\uff201',
+  ])(
+    'the class list writes %j, a formula behind a space or in full width, as text',
+    (name) => {
+      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+        `1,'${name},,,,`,
+      );
+    },
+  );
+
+  // Excel splits on `;` where the region's list separator is `;`, and a quoted
+  // cell stays whole under any separator.
+  it.each(['Ana;=1+1', 'Ana\t=1+1'])(
+    'the class list quotes %j, so another separator cannot start a cell there',
+    (name) => {
+      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+        `1,"${name}",,,,`,
+      );
+    },
+  );
+
+  it.each([' =1+1', '\u3000=1+1', '\uff1d1+1', 'Ana;=1+1', 'Ana\t=1+1'])(
+    'reads %j back without its added apostrophe',
+    (name) => {
+      const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
+      expect(out.ok && out.roster[0]?.name).toBe(name);
     },
   );
 
