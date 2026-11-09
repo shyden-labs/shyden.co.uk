@@ -1766,10 +1766,12 @@ const sexWhyText = sexWhy(roster, t);
       linear-gradient(45deg, transparent 50%, var(--ink) 50%),
       linear-gradient(135deg, var(--ink) 50%, transparent 50%);
     background-repeat: no-repeat;
+    /* Whole pixels: two halves at fractional offsets round apart and leave
+       a seam down the middle of the caret. */
     background-position:
-      right calc(0.4rem + 0.33rem) center,
-      right 0.4rem center;
-    background-size: 0.33rem 0.33rem;
+      right 12px center,
+      right 6px center;
+    background-size: 6px 6px;
   }
   #cg-roster input[type='checkbox'] {
     width: 1.3rem;
@@ -2729,9 +2731,9 @@ const sexWhyText = sexWhy(roster, t);
       linear-gradient(135deg, var(--ink) 50%, transparent 50%);
     background-repeat: no-repeat;
     background-position:
-      right calc(0.75rem + 0.35rem) center,
-      right 0.75rem center;
-    background-size: 0.35rem 0.35rem;
+      right 18px center,
+      right 12px center;
+    background-size: 6px 6px;
     color: var(--ink);
   }
   textarea {
