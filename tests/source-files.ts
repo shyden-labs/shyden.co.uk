@@ -168,10 +168,6 @@ function isSubstantive(member: unknown): boolean {
  * Prefer handing it the population ITSELF over a count. A count is taken on
  * trust; an array is content-checked by `isSubstantive` above, which is the
  * only form that closes #112.
- *
- * Every search also checks its population's recorded floor in the same test,
- * because one unit still read keeps this green (#515); there is no exemption
- * (#534). `floorless-searches.test.ts` holds that.
  */
 export function searched<T>(
   findings: readonly T[],
