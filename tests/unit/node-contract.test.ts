@@ -174,7 +174,7 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
   // One exact release, so CI's Node changes only in the pull request that
   // bumps it (#982, global rule 2026-10-29). The literal moves with each bump.
   it('names the exact release every project runs (#982, #990)', () => {
-    expect(exactNodeVersion(readFileSync(PIN, 'utf8'))).toBe('26.12.1');
+    expect(exactNodeVersion(readFileSync(PIN, 'utf8'))).toBe('26.13.0');
   });
 
   const DIGEST =
