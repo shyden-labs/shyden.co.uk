@@ -226,12 +226,24 @@ test.describe('header + footer', () => {
     page,
   }) => {
     // The contract that holds regardless of the visitor's Tab preference:
-    // asserted with an explicit focus() rather than a Tab press, so it measures
-    // our markup and not Safari's default. This is the whole header, not just
+    // reached with Option+Tab on WebKit (tabKey), which includes links whatever
+    // Safari's default. This is the whole header, not just
     // the language switcher — a control left out here would be unreachable by
     // keyboard even for a visitor who HAS opted in.
     await page.goto('/');
-    await revealNav(page);
+    // Opened by keys, as a keyboard visitor opens it: WebKit keeps focus on a
+    // clicked <summary>, so a walk after a tap never leaves it (measured in
+    // CI on webkit and mobile-safari, #1034).
+    const menu = page.locator('header details.menu > summary');
+    const menuFirst = await menu.isVisible();
+    if (menuFirst) {
+      await tabTo(menu);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('header details.menu')).toHaveJSProperty(
+        'open',
+        true,
+      );
+    }
     for (const sel of [
       'header .wordmark',
       'header [data-theme-toggle]',
@@ -243,7 +255,12 @@ test.describe('header + footer', () => {
       const el = page.locator(sel);
       await expect(el, sel).toBeVisible();
       await expect(el, sel).not.toHaveAttribute('tabindex', '-1');
-      await tabTo(el);
+      // The wordmark sits just before the menu, so from the opened menu the
+      // walk to it goes back.
+      await tabTo(
+        el,
+        menuFirst && sel === 'header .wordmark' ? 'backwards' : 'forwards',
+      );
       await expect(el, sel).toBeFocused();
     }
   });
