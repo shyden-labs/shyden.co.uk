@@ -83,7 +83,7 @@ test.describe('Import / export', () => {
     await expect
       .soft(
         page.getByText(
-          "Row 2 — sex 'Male' not understood. Use M, F, or leave blank.",
+          "Row 2 — sex 'Male' is not understood. Use M, F, or leave blank.",
         ),
       )
       .toBeVisible();
