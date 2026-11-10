@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -139,7 +140,7 @@ test.describe('header + footer', () => {
     await expect(details).toHaveJSProperty('open', true);
     await expect(firstLink).toBeVisible();
     // Keyboard: native <summary> activation toggles the disclosure on Enter.
-    await page.locator('header details.menu > summary').focus();
+    await tabTo(page.locator('header details.menu > summary'));
     await page.keyboard.press('Enter');
     await expect(details).toHaveJSProperty('open', false);
     await expect(firstLink).toBeHidden();
@@ -199,11 +200,11 @@ test.describe('header + footer', () => {
     await revealNav(page);
     // Anchor on the language switcher's summary — the last focusable thing
     // in the bar before <nav> — rather than on the wordmark: engines differ on
-    // how many Tab presses that gap costs, and an explicit focus() fixes the
-    // starting point on all of them. Tab then advances in DOM order, so this
+    // how many Tab presses that gap costs, and tabTo walks to it by Tab on
+    // all of them. Tab then advances in DOM order, so this
     // asserts OUR running order.
     const languages = page.locator('header details.lang-switch > summary');
-    await languages.focus();
+    await tabTo(languages);
     // The theme switch sits immediately before the language switcher
     // (#142 §5). Reached by Shift+Tab, never focused directly, so a switch
     // taken out of the Tab order (tabindex="-1") is stepped over and this
@@ -225,12 +226,24 @@ test.describe('header + footer', () => {
     page,
   }) => {
     // The contract that holds regardless of the visitor's Tab preference:
-    // asserted with an explicit focus() rather than a Tab press, so it measures
-    // our markup and not Safari's default. This is the whole header, not just
+    // reached with Option+Tab on WebKit (tabKey), which includes links whatever
+    // Safari's default. This is the whole header, not just
     // the language switcher — a control left out here would be unreachable by
     // keyboard even for a visitor who HAS opted in.
     await page.goto('/');
-    await revealNav(page);
+    // Opened by keys, as a keyboard visitor opens it: WebKit keeps focus on a
+    // clicked <summary>, so a walk after a tap never leaves it (measured in
+    // CI on webkit and mobile-safari, #1034).
+    const menu = page.locator('header details.menu > summary');
+    const menuFirst = await menu.isVisible();
+    if (menuFirst) {
+      await tabTo(menu);
+      await page.keyboard.press('Enter');
+      await expect(page.locator('header details.menu')).toHaveJSProperty(
+        'open',
+        true,
+      );
+    }
     for (const sel of [
       'header .wordmark',
       'header [data-theme-toggle]',
@@ -242,7 +255,12 @@ test.describe('header + footer', () => {
       const el = page.locator(sel);
       await expect(el, sel).toBeVisible();
       await expect(el, sel).not.toHaveAttribute('tabindex', '-1');
-      await el.focus();
+      // The wordmark sits just before the menu, so from the opened menu the
+      // walk to it goes back.
+      await tabTo(
+        el,
+        menuFirst && sel === 'header .wordmark' ? 'backwards' : 'forwards',
+      );
       await expect(el, sel).toBeFocused();
     }
   });

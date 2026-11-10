@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
@@ -75,7 +76,7 @@ test('the Glory Points calculator computes, not just loads', async ({
   // bundle 404s after a partial deploy, the page still serves 200 and still
   // contains every label — and this is where that shows.
   await typeInto(page.locator('#glory-input'), '1000');
-  await page.click('#glory-submit');
+  await tapOn(page.locator('#glory-submit'));
 
   // The handler fills exactly one of the two boxes. Wait for its answer,
   // whichever it is, so the no-error invariant below runs even when the
@@ -221,7 +222,7 @@ test(
   },
   async ({ page }) => {
     await page.goto('/api/docs/');
-    await page.locator('#swagger .opblock-summary-control').first().click();
+    await tapOn(page.locator('#swagger .opblock-summary-control').first());
     await expect(
       page.locator('#swagger .opblock-post .opblock-body'),
     ).toBeVisible();

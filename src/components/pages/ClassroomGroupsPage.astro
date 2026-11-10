@@ -914,10 +914,8 @@ const sexWhyText = sexWhy(roster, t);
            the array could never be non-empty. Now it can.
 
            A <ul>, not a <p>: `warnings` is an ARRAY, and rendering only
-           `warnings[0]` would silently drop the rest. That is a real shape
-           today (a spillover warning and a pinned-mixed-sex warning can
-           both apply to one shuffle once stage 5 wires pins), not a
-           hypothetical -- and the roster's own single-message validation
+           `warnings[0]` would silently drop the rest -- and the roster's own
+           single-message validation
            box is a deliberately different case: there, one calm message at
            a time as a teacher types. Here the shuffle is finished and every
            thing it has to report is equally true.
@@ -1760,10 +1758,18 @@ const sexWhyText = sexWhy(roster, t);
   #cg-roster select {
     min-width: max-content;
     padding-right: 1.6rem;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23444' stroke-width='2' stroke-linecap='round'/></svg>");
+    /* A caret drawn in the theme's ink: a colour inside a data-URI cannot
+       follow the theme, and #444 read 2.0:1 on dark (#390 F21). */
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+      linear-gradient(135deg, var(--ink) 50%, transparent 50%);
     background-repeat: no-repeat;
-    background-position: right 0.4rem center;
-    background-size: 0.65rem;
+    /* Whole pixels: two halves at fractional offsets round apart and leave
+       a seam down the middle of the caret. */
+    background-position:
+      right 12px center,
+      right 6px center;
+    background-size: 6px 6px;
   }
   #cg-roster input[type='checkbox'] {
     width: 1.3rem;
@@ -2716,10 +2722,16 @@ const sexWhyText = sexWhy(roster, t);
     border: 1px solid var(--border-strong);
     border-radius: 6px;
     background-color: var(--bg);
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23444' stroke-width='2' stroke-linecap='round'/></svg>");
+    /* A caret drawn in the theme's ink: a colour inside a data-URI cannot
+       follow the theme, and #444 read 2.0:1 on dark (#390 F21). */
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+      linear-gradient(135deg, var(--ink) 50%, transparent 50%);
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 0.7rem;
+    background-position:
+      right 18px center,
+      right 12px center;
+    background-size: 6px 6px;
     color: var(--ink);
   }
   textarea {

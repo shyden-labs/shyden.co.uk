@@ -59,7 +59,6 @@ export function apartSweep(n: number, seeds: number): ApartSweep {
         mode,
         leftovers: 'spread',
         sexMode: 'off',
-        pinned: [],
         random: seeded(seed * 97 + n),
       };
       const out = buildGroups(input);

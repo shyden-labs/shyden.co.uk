@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
@@ -165,7 +166,7 @@ test.describe('the copy the operator approved on #161', () => {
       // The bar fades to 6% after a pause, and never while it holds focus
       // (projector.ts, `canFade`) -- so it is read the way a keyboard user
       // reaches it. A capture taken after the fade would show a ghost.
-      await shuffle.focus();
+      await tabTo(shuffle);
       await expect.soft(bar).not.toHaveClass(/\bfaded\b/);
       await softVisibleText(shuffle, t.boardShuffle);
       await shoot(

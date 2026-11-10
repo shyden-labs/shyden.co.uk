@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -439,6 +440,26 @@ test.describe('homepage content', () => {
       const live = getSiteStrings(locale).home.toolBadge;
       const toolBadges = tools.locator('.status-badge');
       await expect.soft(toolBadges).toHaveText([live, live]);
+      // A screen reader hears each card's title, badge and description, not
+      // the title alone (#390 F10: an aria-label replaced the whole name).
+      const cardCopy = getSiteStrings(locale).home;
+      for (const [title, body] of [
+        [cardCopy.workCalculatorsTitle, cardCopy.workCalculatorsBody],
+        [cardCopy.workClassroomTitle, cardCopy.workClassroomBody],
+      ]) {
+        const card = tools.getByRole('link', { name: title });
+        await expect.soft(card).toHaveCount(1);
+        await expect
+          .soft(card)
+          .toHaveAccessibleName(
+            new RegExp(
+              [title, live, body]
+                .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                .join('.*'),
+              's',
+            ),
+          );
+      }
       for (const n of [0, 1])
         await expect.soft(toolBadges.nth(n)).toBeVisible();
       // The exact set: each tool once, in this locale, and nothing else.
@@ -713,7 +734,7 @@ test.describe('homepage content', () => {
         .toBeGreaterThanOrEqual(3);
 
       const control = pauseControl(page, 'en');
-      await page.locator('.hero a').first().focus();
+      await tabTo(page.locator('.hero a').first());
       await page.keyboard.press(
         browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab',
       );
@@ -1274,7 +1295,7 @@ test.describe('pause motion', () => {
 
     // The band now sits before the hero in the DOM (#599), so the control is
     // the first hero link's predecessor in tab order.
-    await page.locator('.hero a').first().focus();
+    await tabTo(page.locator('.hero a').first());
     // Safari's Tab skips form controls unless Full Keyboard Access is on;
     // its documented way to reach one is Option+Tab, which is what WebKit
     // here is given. Every other engine takes a plain Tab.

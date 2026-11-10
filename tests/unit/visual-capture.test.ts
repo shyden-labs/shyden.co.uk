@@ -148,6 +148,25 @@ describe('capturedBaselines commits a rewrite only past the pixel rule', () => {
     });
   });
 
+  // Shyden 2026-11-10 ("Also hand back check fails"): a rewrite of 60 pixels
+  // or fewer that the `visual` gate would still fail is handed back too,
+  // judged by Playwright's own comparator at the gate's tolerances, so the
+  // capture never keeps out a picture the gate then refuses.
+  it('commits a rewrite under the pixel rule that the visual gate would fail', () => {
+    expect(
+      judged(picture(pixels), picture(withChangedPixels(pixels, 5, 128))),
+    ).toEqual({
+      commit: [{ file, differing: 5, failsGate: true }],
+      kept: [],
+    });
+  });
+
+  it('keeps a rewrite under the pixel rule that the visual gate passes', () => {
+    expect(
+      judged(picture(pixels), picture(withChangedPixels(pixels, 5, 1))),
+    ).toEqual({ commit: [], kept: [{ file, differing: 5 }] });
+  });
+
   it('keeps a rewrite whose pixels did not move at all', () => {
     expect(judged(picture(pixels), picture(pixels)).kept).toEqual([
       { file, differing: 0 },
@@ -192,16 +211,18 @@ describe('captureSummary names every page committed and every page kept', () => 
           { file: png('home-en'), differing: 5148 },
           { file: png('home-th'), differing: 'new' },
           { file: png('yeetalk-calculators'), differing: 'size' },
+          { file: png('classroom-groups'), differing: 5, failsGate: true },
         ],
         kept: [{ file: png('not-found'), differing: 17 }],
       }),
     ).toBe(
       [
-        '3 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
+        '4 baselines committed (more than 60 pixels differ, the visual gate fails it, new, or a new size; #678):',
         `- \`${png('home-en')}\`: 5148 pixels differ`,
         `- \`${png('home-th')}\`: new`,
         `- \`${png('yeetalk-calculators')}\`: size changed`,
-        '1 rewrite kept out (60 pixels or fewer differ):',
+        `- \`${png('classroom-groups')}\`: 5 pixels differ, and the visual gate fails them`,
+        '1 rewrite kept out (60 pixels or fewer differ, and the visual gate passes):',
         `- \`${png('not-found')}\`: 17 pixels differ`,
       ].join('\n'),
     );
@@ -221,7 +242,7 @@ describe('captureSummary names every page committed and every page kept', () => 
       }),
     ).toBe(
       [
-        '1 baseline committed (more than 60 pixels differ, new, or a new size; #678):',
+        '1 baseline committed (more than 60 pixels differ, the visual gate fails it, new, or a new size; #678):',
         `- \`${png('home-en')}\`: 61 pixels differ`,
       ].join('\n'),
     );
@@ -235,8 +256,8 @@ describe('captureSummary names every page committed and every page kept', () => 
       }),
     ).toBe(
       [
-        '0 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
-        '1 rewrite kept out (60 pixels or fewer differ):',
+        '0 baselines committed (more than 60 pixels differ, the visual gate fails it, new, or a new size; #678):',
+        '1 rewrite kept out (60 pixels or fewer differ, and the visual gate passes):',
         `- \`${png('home-en')}\`: 1 pixel differs`,
       ].join('\n'),
     );
@@ -250,8 +271,8 @@ describe('captureSummary names every page committed and every page kept', () => 
       }),
     ).toBe(
       [
-        '0 baselines committed (more than 60 pixels differ, new, or a new size; #678):',
-        '1 rewrite kept out (60 pixels or fewer differ):',
+        '0 baselines committed (more than 60 pixels differ, the visual gate fails it, new, or a new size; #678):',
+        '1 rewrite kept out (60 pixels or fewer differ, and the visual gate passes):',
         `- \`${png('home-en')}\`: 0 pixels differ`,
       ].join('\n'),
     );

@@ -24,7 +24,7 @@ export const id: Catalogue = {
   // What the tool does; the lead until the operator swapped the two (#384).
   // See en.ts's comments on `lead` and `howToWhat`.
   howToWhat:
-    'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
+    'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan, kecuali seluruh kelas memang lebih kecil.',
   // Rewritten alongside `howToWhat` above, mirroring en.ts's own correction:
   // the old step 1 mentioned pasting names, a box the rewritten engine no
   // longer has anywhere to put (see grouping.ts's GroupingInput).
@@ -120,7 +120,7 @@ export const id: Catalogue = {
   leftoversSpread: 'Bagikan merata',
   leftoversBunch: 'Masukkan semuanya ke satu kelompok',
   leftoversHelp:
-    'Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih.',
+    'Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih, kecuali seluruh kelas memang lebih kecil.',
 
   soundOn: 'Suara aktif',
   soundOff: 'Suara mati',
@@ -258,6 +258,8 @@ export const id: Catalogue = {
     'Baris {row} — nomor kosong. Setiap siswa memerlukannya.',
   csvProblemNumberNotWhole:
     "Baris {row} — nomor '{value}' bukan bilangan bulat.",
+  csvProblemNumberTooLow:
+    "Baris {row} — nomor '{value}' terlalu kecil. Nomor dimulai dari 1.",
   csvProblemDuplicateNumber:
     'Baris {row} — nomor {value} sudah dipakai oleh baris {firstRow}.',
   csvProblemSex:
@@ -458,38 +460,6 @@ export const id: Catalogue = {
     // terbukti.
     SEX_SEPARATE_SEARCH_GAVE_UP:
       'Huruf yang harus disatukan dan aturan pemisahan di sini terlalu banyak untuk dihitung sekaligus, sambil juga menjaga laki-laki dan perempuan di kelompok terpisah. Coba gunakan lebih sedikit huruf, atau matikan mode ini.',
-    // Task 9. Lihat komentar pada versi Inggrisnya (en.ts) untuk alasan
-    // lengkap. Tidak ada percabangan tunggal/jamak di sini -- Bahasa
-    // Indonesia tidak mengubah bentuk kata untuk jamak.
-    PINNED_SPLITS_UNIT:
-      '{names} ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.',
-    // Task 9. Lihat komentar pada versi Inggrisnya (en.ts) untuk alasan
-    // lengkap.
-    PINNED_APART_CLASH:
-      '{names} ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.',
-    // Task 9. Satu nama yang sudah diselesaikan, bukan daftar -- lihat
-    // komentar pada versi Inggrisnya (en.ts).
-    PINNED_IN_TWO_GROUPS:
-      '{name} dikunci ke dalam dua kelompok berbeda sekaligus. Satu siswa hanya bisa dikunci ke dalam satu kelompok. Keluarkan dari salah satu kelompok tersebut.',
-    // Fix round 1, F-1/F-2. Lihat komentar pada versi Inggrisnya (en.ts)
-    // untuk alasan lengkap. Tidak ada percabangan tunggal/jamak di sini --
-    // Bahasa Indonesia tidak mengubah bentuk kata untuk jamak.
-    //
-    // Fix round 2. Arah ketiga: kunci mengklaim LEBIH BANYAK kelompok
-    // daripada yang diminta (`pinnedGroupCount > requestedGroups`),
-    // sementara masih ada siswa tersisa -- kunci tiga kelompok, lalu turunkan
-    // kolom jumlah kelompok menjadi dua. Sebelumnya masuk ke cabang
-    // `poolGroupsNeeded <= 0` di bawah dan memakai ulang bukaan "X dari Y
-    // kelompok"-nya, yang hanya masuk akal saat X <= Y -- menghasilkan
-    // "Kunci Anda sudah memakai 3 dari 2 kelompok yang Anda minta". Sekarang
-    // punya cabang sendiri, diperiksa lebih dulu, dengan bukaan sendiri.
-    // Solusinya tetap sama persis dengan kasus `poolGroupsNeeded === 0` di
-    // bawahnya -- lihat alasan lengkapnya di versi Inggris (en.ts).
-    PINNED_TOO_MANY_GROUPS:
-      '{situation, select, ' +
-      'over {Kunci Anda sudah memakai {pinnedGroupCount} kelompok — lebih banyak daripada {requestedGroups} kelompok yang Anda minta — sehingga tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.} ' +
-      'full {Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.} ' +
-      'other {Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa — tidak cukup untuk {poolGroupsNeeded} kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok.}}',
   },
 
   warnings: {
@@ -502,12 +472,6 @@ export const id: Catalogue = {
       '{sex, select, ' +
       'M {{names} bergabung dengan kelompok perempuan karena jumlah laki-laki tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.} ' +
       'other {{names} bergabung dengan kelompok laki-laki karena jumlah perempuan tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.}}',
-    // Task 9. Lihat komentar pada versi Inggrisnya (en.ts) untuk alasan
-    // lengkap. Tidak ada bidang `sex` di sini, berbeda dengan SEX_SPILLOVER
-    // di atas -- tidak ada satu pihak yang "meluap" ke pihak lain, seluruh
-    // kelompok memang campuran karena guru menguncinya seperti itu.
-    PINNED_MIXED_SEX:
-      '{names} dikunci bersama dalam satu kelompok, tetapi {howMany, select, two {tidak berjenis kelamin sama} other {tidak semuanya berjenis kelamin sama}}, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.',
     // Whole-branch review, I-2. Lihat komentar pada versi Inggrisnya (en.ts)
     // untuk alasan lengkap. Tidak ada bidang `sex` di sini -- tidak ada
     // pihak yang jadi "tuan rumah" dan tidak ada pihak yang "meluap",

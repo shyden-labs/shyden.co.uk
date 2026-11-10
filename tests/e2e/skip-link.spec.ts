@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
 import { PUBLISHED_ROUTES } from './published-paths';
@@ -79,7 +80,7 @@ test.describe('skip link — WCAG 2.4.1', () => {
     // Off-screen until focused, which is the only time it is any use — and
     // `display: none` would have made it unfocusable, i.e. not a skip link.
     await expect(link).not.toBeInViewport();
-    await link.focus();
+    await tabTo(link);
     await expect(link).toBeInViewport();
 
     await page.keyboard.press('Enter');

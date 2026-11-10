@@ -43,7 +43,7 @@ export const en = {
   // that has already shipped three broken sentences on this site (see
   // rendered-text.spec.ts).
   howToWhat:
-    'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
+    'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ends up smaller than you asked for unless the whole class is.',
   // Rewritten alongside `howToWhat` above: the old step 1 ("...or paste their
   // names, one per line") described the free-text names box removed when the
   // engine was rewritten to a numbered roster (see grouping.ts's
@@ -232,7 +232,7 @@ export const en = {
   leftoversSpread: 'Share them out evenly',
   leftoversBunch: 'Put them all in one group',
   leftoversHelp:
-    'Either way, no group is ever smaller than the size you chose.',
+    'Either way, no group is smaller than the size you chose unless the whole class is.',
 
   soundOn: 'Sound on',
   soundOff: 'Sound off',
@@ -529,6 +529,11 @@ export const en = {
       row: number;
       value: string;
     }>,
+  csvProblemNumberTooLow:
+    "Row {row} — number '{value}' is too low. Numbers start at 1." as Message<{
+      row: number;
+      value: string;
+    }>,
   csvProblemDuplicateNumber:
     'Row {row} — number {value} is already used by row {firstRow}.' as Message<{
       row: number;
@@ -536,13 +541,13 @@ export const en = {
       firstRow: number;
     }>,
   csvProblemSex:
-    "Row {row} — sex '{value}' not understood. Use {accepted}, or leave blank." as Message<{
+    "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank." as Message<{
       row: number;
       value: string;
       accepted: string;
     }>,
   csvProblemAbsent:
-    "Row {row} — absent '{value}' not understood. Use {accepted}, or leave blank." as Message<{
+    "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank." as Message<{
       row: number;
       value: string;
       accepted: string;
@@ -892,62 +897,6 @@ export const en = {
     // one of the tried splits gave up rather than being exhausted.
     SEX_SEPARATE_SEARCH_GAVE_UP:
       'There are too many together- and apart-letters here to work through while also keeping boys and girls in separate groups. Try using fewer letters, or turn this mode off.',
-    // Task 9. Carries `students: number[]`, never names -- same resolver
-    // pattern as TOGETHER_APART_CLASH above. Always >= 2 by construction: at
-    // least one student locked inside the pinned group and one outside it,
-    // sharing the together letter that straddles the boundary.
-    PINNED_SPLITS_UNIT:
-      '{names} are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.' as Message<{
-        names: string[];
-      }>,
-    // Task 9. Carries `students: number[]`, never names -- same resolver
-    // pattern. Always >= 2 by construction: an apart-letter needs at least
-    // two holders, and this only fires when both are in the SAME pinned
-    // group.
-    PINNED_APART_CLASH:
-      '{names} are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.' as Message<{
-        names: string[];
-      }>,
-    // Task 9. Carries a single resolved name, not a list -- `number: number`
-    // on the error (like DUPLICATE_NUMBER) always names exactly one student,
-    // never a pair, so there is no second party for this sentence to name
-    // and no plural form to branch for.
-    PINNED_IN_TWO_GROUPS:
-      '{name} is pinned into two different groups at once. A student can only be pinned into one group. Remove them from one of the two.' as Message<{
-        name: string;
-      }>,
-    // Fix round 1, F-1/F-2. Replaces TOO_MANY_GROUPS on the pinned path --
-    // see ERROR_CODES.pinnedTooManyGroups's doc comment in grouping.ts. The
-    // old sentence here (still TOO_MANY_GROUPS at the time) named a `max`
-    // that, under `groupCount` mode, was ALWAYS the exact number the
-    // teacher had just typed -- a tautology, not a fix (F-2) -- and did not
-    // exist at all for the opposite direction, where MORE pool groups were
-    // asked for than pool students remain to fill them (F-1).
-    //
-    // Fix round 2. A third direction the two-way branch below did not
-    // cover: the pins can claim MORE groups than were requested
-    // (`pinnedGroupCount > requestedGroups`) while pool students still
-    // remain -- pin three groups, then lower the count field to two. That
-    // used to fall into the `poolGroupsNeeded <= 0` branch below and reuse
-    // its "fill X of the Y groups" opening, which only reads coherently
-    // when X <= Y -- producing "Your pins already fill 3 of the 2 groups
-    // you asked for". Split off as its own branch, checked first, with its
-    // own opening ("already use N groups -- more than the M you asked
-    // for"). Its remedy is still "Unpin a group, or ask for more groups",
-    // shared verbatim with the `poolGroupsNeeded === 0` case just below it
-    // -- both directions move `poolGroupsNeeded` the same way (up, toward
-    // 1), so the same two actions (unpin, or ask for more) are still true
-    // here; only "X of the Y" needed to change, not the remedy.
-    PINNED_TOO_MANY_GROUPS: ('{situation, select, ' +
-      'over {Your pins already use {pinnedGroupCount} {pinnedGroupCount, plural, one {group} other {groups}} — more than the {requestedGroups} {requestedGroups, plural, one {group} other {groups}} you asked for — which leaves {remainingStudents} {remainingStudents, plural, one {student} other {students}} with no group left for them. Unpin a group, or ask for more groups.} ' +
-      'full {Your pins already fill {pinnedGroupCount} of the {requestedGroups} {requestedGroups, plural, one {group} other {groups}} you asked for, which only leaves {remainingStudents} {remainingStudents, plural, one {student} other {students}} with no group left for them. Unpin a group, or ask for more groups.} ' +
-      'other {Your pins already fill {pinnedGroupCount} of the {requestedGroups} {requestedGroups, plural, one {group} other {groups}} you asked for, which only leaves {remainingStudents} {remainingStudents, plural, one {student} other {students}} — not enough for the {poolGroupsNeeded} {poolGroupsNeeded, plural, one {group} other {groups}} still needed. Unpin a group, or ask for fewer groups.}}') as Message<{
-      requestedGroups: number;
-      pinnedGroupCount: number;
-      remainingStudents: number;
-      poolGroupsNeeded: number;
-      situation: 'over' | 'full' | 'short';
-    }>,
   },
 
   warnings: {
@@ -966,20 +915,6 @@ export const en = {
       names: string[];
       sex: 'M' | 'F';
     }>,
-    // Task 9. Carries `students: number[]`, never names -- same resolver
-    // pattern as SEX_SPILLOVER above. Always >= 2 by construction (a pinned
-    // group needs at least one of each sex to be mixed), so, like
-    // SEX_SEPARATE_SPLITS_UNIT, this never branches for singular/plural. No
-    // `sex` field, unlike SEX_SPILLOVER: there is no single "spilled" side
-    // here, the whole group is mixed because the teacher pinned it that
-    // way, and the copy does not need to say which sex is which to make
-    // that point -- see WARNING_CODES.pinnedMixedSex's doc comment in
-    // grouping.ts for the decision this is the honest wording of.
-    PINNED_MIXED_SEX:
-      '{names} are pinned together as one group, but {howMany, select, two {are not the same sex} other {are not all the same sex}}, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.' as Message<{
-        names: string[];
-        howMany: 'two' | 'more';
-      }>,
     // Whole-branch review, I-2. Carries `students: number[]` -- everyone in
     // the one merged group, both sexes -- and no `sex` field, unlike
     // SEX_SPILLOVER above: there is no host side and no spilled side here,

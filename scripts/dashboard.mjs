@@ -606,7 +606,9 @@ async function main() {
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(PORT, '0.0.0.0', () => resolve(undefined));
+    // Loopback only: the run is readable with no login, and the laptop is
+    // often on a shared network (#390 F43).
+    server.listen(PORT, '127.0.0.1', () => resolve(undefined));
   });
 
   // eslint-disable-next-line no-console

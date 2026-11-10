@@ -83,7 +83,7 @@ test.describe('Import / export', () => {
     await expect
       .soft(
         page.getByText(
-          "Row 2 — sex 'Male' not understood. Use M, F, or leave blank.",
+          "Row 2 — sex 'Male' is not understood. Use M, F, or leave blank.",
         ),
       )
       .toBeVisible();
@@ -843,7 +843,7 @@ test.describe('the handover cannot be overheard', () => {
     await expect(receiver.locator('.cg-student')).toHaveCount(0);
   });
 
-  test('a receiver with work of its own is warned before it is replaced', async ({
+  test('a second handover opens a tab of its own, and work in another tab is untouched', async ({
     page,
     context,
   }) => {

@@ -193,8 +193,15 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * build/remote.js, utils/redirectValidation.js, internal.js,
  * services/service.js and the config schema are 7.4.4's, minified on both
  * sides, on the same internal-helpers 0.13.0.
+ * Re-read on 7.4.7 (2026-11-10, Dependabot #1093, #1114): the same five
+ * files and the config schemas (base, refined, refined-validators) are
+ * 7.4.5's, minified on both sides; build/remote.js is still the library's
+ * only importer. internal-helpers moved to 0.13.1: its remote.js
+ * (isRemoteAllowed) is 0.13.0's byte for byte, and only path.js changed (case
+ * folding in the directory-containment check, now on Windows paths alone),
+ * which the remote-image gate does not use.
  */
-const ASTRO_READ = '7.4.5';
+const ASTRO_READ = '7.4.7';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {

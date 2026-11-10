@@ -1,5 +1,5 @@
 import { chooseOption } from '../real-select';
-import { setCheckedOn, tapOn } from '../real-touch';
+import { scrollToOn, setCheckedOn, tapOn } from '../real-touch';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
@@ -774,7 +774,7 @@ test.describe('How to use', () => {
       // Not 'How many students?' -- see the comment above this describe block.
       studentsLabel: 'Number of students',
       partOne:
-        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
+        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ends up smaller than you asked for unless the whole class is.',
       partTwo: 'Say how many students are in your class.',
     });
   });
@@ -787,7 +787,7 @@ test.describe('How to use — Indonesian', () => {
       toggle: 'Cara menggunakan',
       studentsLabel: 'Jumlah siswa',
       partOne:
-        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
+        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan, kecuali seluruh kelas memang lebih kecil.',
       partTwo: 'Masukkan jumlah siswa di kelas Anda.',
     });
   });
@@ -1649,7 +1649,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
-    await count.focus();
+    await tapOn(count);
     // The starting value is READ, not named. This test is about a wheel
     // leaving it alone; what the page starts at has its own home in "the
     // class size starts at 30", and a second copy of that number here is one
@@ -1658,7 +1658,13 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     // value that was never read.
     const before = await count.inputValue();
     expect(before).not.toBe('');
-    await count.hover();
+    await scrollToOn(count);
+    const box = await count.boundingBox();
+    expect(
+      box,
+      'the number field has a box to hold the pointer over',
+    ).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.wheel(0, 240);
     await expect(count).toHaveValue(before);
     await page.mouse.wheel(0, -240);
@@ -1912,7 +1918,7 @@ test.describe('the on-screen keyboard', () => {
     page,
   }) => {
     const { rowBottom, layoutHeight, shrink } = await shrinkingViewport(page);
-    await page.focus('#cg-size');
+    await tapOn(page.locator('#cg-size'));
     await shrink(200);
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
@@ -1929,7 +1935,7 @@ test.describe('the on-screen keyboard', () => {
     );
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight, 0);
     // Liveness: the view really is 200px short, as a field taking typing shows.
-    await page.focus('#cg-size');
+    await tapOn(page.locator('#cg-size'));
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
 });
@@ -1970,5 +1976,27 @@ test.describe('per-test isolation actually isolates state across back-to-back te
     ).toBeNull();
     // #cg-class is never stored, so this is not storage evidence; it is kept as the original had it.
     await expect(page.locator('#cg-class')).toHaveValue('');
+  });
+});
+
+test.describe('the containment helper', () => {
+  // #1103 (#390 F53): spillPastCard measured the right edge alone, so a
+  // child pushed past the card's LEFT edge read as contained. A fixture page,
+  // because no page here spills left today: the helper must see it the day
+  // one does.
+  test('spillPastCard reads a spill past either edge of the card', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<div id="fixture-card" style="box-sizing:border-box;width:200px;margin-left:100px;padding:10px;border:1px solid"><div class="pushed-left" style="margin-left:-40px;width:50px;height:10px"></div></div>',
+    );
+    const worst = await spillPastCard(page, 'fixture-card');
+    expect(worst.who).toBe('pushed-left');
+    expect(worst.over).toBeCloseTo(40, 1);
+    // A screen-reader-only label, clipped to nothing, paints no spill.
+    await page.setContent(
+      '<div id="fixture-card" style="box-sizing:border-box;width:200px;margin-left:100px;padding:10px;border:1px solid"><span class="visually-hidden" style="position:absolute;width:1px;height:1px;margin:-1px -1px -1px -20px;overflow:hidden;clip-path:inset(50%)">label</span></div>',
+    );
+    expect((await spillPastCard(page, 'fixture-card')).over).toBe(0);
   });
 });

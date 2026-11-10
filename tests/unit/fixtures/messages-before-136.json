@@ -8,6 +8,18 @@
     "'M' | 'F'": ["M", "F"]
   },
   "messages": {
+    "csvProblemNumberTooLow": [
+      {
+        "params": { "row": 2, "value": "0" },
+        "en": "Row 2 — number '0' is too low. Numbers start at 1.",
+        "id": "Baris 2 — nomor '0' terlalu kecil. Nomor dimulai dari 1."
+      },
+      {
+        "params": { "row": 3, "value": "00 {n}" },
+        "en": "Row 3 — number '00 {n}' is too low. Numbers start at 1.",
+        "id": "Baris 3 — nomor '00 {n}' terlalu kecil. Nomor dimulai dari 1."
+      }
+    ],
     "boardAbsentNote": [
       {
         "params": { "absent": [4] },
@@ -1178,7 +1190,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 0 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1187,7 +1199,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1196,7 +1208,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 0 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1205,7 +1217,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1214,7 +1226,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 1 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1223,7 +1235,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1232,7 +1244,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 1 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1241,7 +1253,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1250,7 +1262,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 2 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1259,7 +1271,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1268,7 +1280,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 2 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1277,7 +1289,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       }
     ],
@@ -1288,7 +1300,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 0 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1297,7 +1309,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1306,7 +1318,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 0 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1315,7 +1327,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1324,7 +1336,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 1 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1333,7 +1345,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1342,7 +1354,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 1 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1351,7 +1363,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1360,7 +1372,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 2 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1369,7 +1381,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1378,7 +1390,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 2 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1387,7 +1399,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       }
     ],
@@ -2280,313 +2292,6 @@
         "id": "Laki-laki dan perempuan tidak bisa tetap berada di kelompok terpisah dalam 2 kelompok sekaligus memenuhi aturan Anda yang lain. Pencarian ini tidak bisa memastikan aturan mana yang jadi masalah, jadi coba salah satu perbaikan ini: minta jumlah kelompok yang berbeda, atau matikan mode ini."
       }
     ],
-    "errors.PINNED_SPLITS_UNIT": [
-      {
-        "params": {
-          "names": ["Ana"]
-        },
-        "en": "Ana are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.",
-        "id": "Ana ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok."
-      },
-      {
-        "params": {
-          "names": ["Ana", "Budi"]
-        },
-        "en": "Ana, Budi are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.",
-        "id": "Ana, Budi ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok."
-      },
-      {
-        "params": {
-          "names": ["Ana", "D'Arcy {n} #", "Citra"]
-        },
-        "en": "Ana, D'Arcy {n} #, Citra are marked to stay together, but only some of them are in a pinned group. Unpin the group, or remove the together letter from whoever is outside it.",
-        "id": "Ana, D'Arcy {n} #, Citra ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok."
-      }
-    ],
-    "errors.PINNED_APART_CLASH": [
-      {
-        "params": {
-          "names": ["Ana"]
-        },
-        "en": "Ana are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.",
-        "id": "Ana ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut."
-      },
-      {
-        "params": {
-          "names": ["Ana", "Budi"]
-        },
-        "en": "Ana, Budi are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.",
-        "id": "Ana, Budi ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut."
-      },
-      {
-        "params": {
-          "names": ["Ana", "D'Arcy {n} #", "Citra"]
-        },
-        "en": "Ana, D'Arcy {n} #, Citra are marked to be kept apart from each other, but a pinned group puts them in the same one. Unpin the group, or remove the apart letter from one of them.",
-        "id": "Ana, D'Arcy {n} #, Citra ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut."
-      }
-    ],
-    "errors.PINNED_IN_TWO_GROUPS": [
-      {
-        "params": {
-          "name": "Ana"
-        },
-        "en": "Ana is pinned into two different groups at once. A student can only be pinned into one group. Remove them from one of the two.",
-        "id": "Ana dikunci ke dalam dua kelompok berbeda sekaligus. Satu siswa hanya bisa dikunci ke dalam satu kelompok. Keluarkan dari salah satu kelompok tersebut."
-      },
-      {
-        "params": {
-          "name": "D'Arcy {n} #"
-        },
-        "en": "D'Arcy {n} # is pinned into two different groups at once. A student can only be pinned into one group. Remove them from one of the two.",
-        "id": "D'Arcy {n} # dikunci ke dalam dua kelompok berbeda sekaligus. Satu siswa hanya bisa dikunci ke dalam satu kelompok. Keluarkan dari salah satu kelompok tersebut."
-      }
-    ],
-    "errors.PINNED_TOO_MANY_GROUPS": [
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 0 of the 0 groups you asked for, which only leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 0 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 0 of the 0 groups you asked for, which only leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 0 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 0 of the 0 groups you asked for, which only leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 0 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already use 1 group — more than the 0 groups you asked for — which leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already use 1 group — more than the 0 groups you asked for — which leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already use 1 group — more than the 0 groups you asked for — which leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already use 2 groups — more than the 0 groups you asked for — which leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already use 2 groups — more than the 0 groups you asked for — which leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 0,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already use 2 groups — more than the 0 groups you asked for — which leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 0 kelompok yang Anda minta — sehingga tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 0 of the 1 group you asked for, which only leaves 0 students — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 0 of the 1 group you asked for, which only leaves 1 student — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 0 of the 1 group you asked for, which only leaves 2 students — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 1 of the 1 group you asked for, which only leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 1 of the 1 group you asked for, which only leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 1 of the 1 group you asked for, which only leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 1 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already use 2 groups — more than the 1 group you asked for — which leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 1 kelompok yang Anda minta — sehingga tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already use 2 groups — more than the 1 group you asked for — which leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 1 kelompok yang Anda minta — sehingga tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 1,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already use 2 groups — more than the 1 group you asked for — which leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 kelompok — lebih banyak daripada 1 kelompok yang Anda minta — sehingga tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 0 of the 2 groups you asked for, which only leaves 0 students — not enough for the 2 groups still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa — tidak cukup untuk 2 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 0 of the 2 groups you asked for, which only leaves 1 student — not enough for the 2 groups still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa — tidak cukup untuk 2 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 0,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 0 of the 2 groups you asked for, which only leaves 2 students — not enough for the 2 groups still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 0 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa — tidak cukup untuk 2 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 1 of the 2 groups you asked for, which only leaves 0 students — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 1 of the 2 groups you asked for, which only leaves 1 student — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 1,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 1 of the 2 groups you asked for, which only leaves 2 students — not enough for the 1 group still needed. Unpin a group, or ask for fewer groups.",
-        "id": "Kunci Anda sudah memakai 1 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa — tidak cukup untuk 1 kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 0
-        },
-        "en": "Your pins already fill 2 of the 2 groups you asked for, which only leaves 0 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 0 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 1
-        },
-        "en": "Your pins already fill 2 of the 2 groups you asked for, which only leaves 1 student with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 1 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      },
-      {
-        "params": {
-          "requestedGroups": 2,
-          "pinnedGroupCount": 2,
-          "remainingStudents": 2
-        },
-        "en": "Your pins already fill 2 of the 2 groups you asked for, which only leaves 2 students with no group left for them. Unpin a group, or ask for more groups.",
-        "id": "Kunci Anda sudah memakai 2 dari 2 kelompok yang Anda minta, sehingga hanya tersisa 2 siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok."
-      }
-    ],
     "warnings.SEX_SPILLOVER": [
       {
         "params": {
@@ -2635,29 +2340,6 @@
         },
         "en": "Ana, D'Arcy {n} #, Citra have joined a group of boys because there were not enough girls to make a group of their own. That is simply how the numbers divided, not a mistake to fix.",
         "id": "Ana, D'Arcy {n} #, Citra bergabung dengan kelompok laki-laki karena jumlah perempuan tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki."
-      }
-    ],
-    "warnings.PINNED_MIXED_SEX": [
-      {
-        "params": {
-          "names": ["Ana"]
-        },
-        "en": "Ana are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.",
-        "id": "Ana dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki."
-      },
-      {
-        "params": {
-          "names": ["Ana", "Budi"]
-        },
-        "en": "Ana, Budi are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.",
-        "id": "Ana, Budi dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki."
-      },
-      {
-        "params": {
-          "names": ["Ana", "D'Arcy {n} #", "Citra"]
-        },
-        "en": "Ana, D'Arcy {n} #, Citra are pinned together as one group, but are not all the same sex, so this group was not split by sex like the others. That is what the pin asked for, not a mistake to fix.",
-        "id": "Ana, D'Arcy {n} #, Citra dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki."
       }
     ],
     "warnings.SEX_BOTH_TOO_SMALL": [

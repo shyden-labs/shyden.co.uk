@@ -13,14 +13,11 @@ const student = (number: number, absent = false): Student => ({
 
 describe('waitingRoll (#999)', () => {
   it('lists a bare count as 1..n, nobody absent', () => {
-    expect(waitingRoll(3, new Set()).map((s) => s.number)).toEqual([1, 2, 3]);
+    expect(waitingRoll(3).map((s) => s.number)).toEqual([1, 2, 3]);
   });
 
   it('keeps absent students, in roster order', () => {
-    const roll = waitingRoll(
-      [student(4), student(2, true), student(9)],
-      new Set(),
-    );
+    const roll = waitingRoll([student(4), student(2, true), student(9)]);
     expect(roll.map((s) => [s.number, s.absent])).toEqual([
       [4, false],
       [2, true],
@@ -28,16 +25,8 @@ describe('waitingRoll (#999)', () => {
     ]);
   });
 
-  it('leaves out a student already seated by a pin', () => {
-    const roll = waitingRoll(
-      [student(1), student(2), student(3)],
-      new Set([2]),
-    );
-    expect(roll.map((s) => s.number)).toEqual([1, 3]);
-  });
-
   it('lists nobody for an empty roster', () => {
-    expect(waitingRoll([], new Set())).toEqual([]);
+    expect(waitingRoll([])).toEqual([]);
   });
 });
 

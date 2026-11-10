@@ -48,8 +48,7 @@ export const DOCS_READ_BY_CODE = Object.freeze([
  * The ci.yml jobs a docs-only verdict skips: the ones that build or serve the
  * site. `checks` always runs, and `visual` too, because it is required by
  * name and `scripts/deploy-gate.mjs` refuses it skipped (operator,
- * 2026-10-06). `tests/guards/pipeline-wiring.test.ts` holds the workflow to
- * exactly this list.
+ * 2026-10-06).
  */
 export const SKIPPED_WHEN_DOCS_ONLY = Object.freeze([
   'coverage',
