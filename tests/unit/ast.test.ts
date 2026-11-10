@@ -598,9 +598,9 @@ describe('code without its literals is what a text cross-check reads (#477)', ()
 describe('a read JSON.parse stands on is data, when the closure asks (#570)', () => {
   /**
    * anchored-presence calls raw text "a readFileSync no JSON.parse stands
-   * on", and its closure counted the parsed read too. `floorBreach` reads
-   * floors.json through JSON.parse, so a helper checking a floor made what it
-   * returned read as raw source: six `toContain`s over a child process's
+   * on", and its closure counted the parsed read too. A helper that read a
+   * JSON file through JSON.parse made what it returned read as raw source:
+   * six `toContain`s over a child process's
    * output in waiting-reports-script.test.ts. absence-liveness still wants
    * the parsed read, since a population read from JSON is a discovered one,
    * so the default is unchanged and the option is asked for.
