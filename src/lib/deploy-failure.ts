@@ -144,10 +144,14 @@ export const noticeBody = ({
 /**
  * The number of the open notice a failure comments on, from GitHub's list
  * of open issues: an issue, not a pull request, opened by `NOTICE_AUTHOR`,
- * whose title is exactly `NOTICE_TITLE`. The issue tracker is public, so a
+ * whose title is exactly `title` (`NOTICE_TITLE` unless another notice
+ * names its own, #1119). The issue tracker is public, so a
  * stranger's issue under the same title is not the notice.
  */
-export const openNoticeOf = (issues: unknown): number | undefined => {
+export const openNoticeOf = (
+  issues: unknown,
+  title: string = NOTICE_TITLE,
+): number | undefined => {
   if (!Array.isArray(issues)) throw new Error('the open issues are not a list');
   const notice = issues.find(
     (issue) =>
@@ -156,7 +160,7 @@ export const openNoticeOf = (issues: unknown): number | undefined => {
       issue.pull_request === undefined &&
       isRecord(issue.user) &&
       issue.user.login === NOTICE_AUTHOR &&
-      issue.title === NOTICE_TITLE &&
+      issue.title === title &&
       typeof issue.number === 'number',
   );
   return isRecord(notice) ? Number(notice.number) : undefined;
