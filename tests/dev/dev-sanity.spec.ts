@@ -372,22 +372,3 @@ test(
     );
   },
 );
-
-// #748 AC5, Shyden's ruling 2026-10-14: planted so the deployed dev site
-// fails its check on purpose, proving that dev falls back to the deployment
-// before it and that the notice opens. The next pull request removes it.
-test(
-  'a planted failure proves the dev fall-back (#748 AC5)',
-  {
-    tag: '@deployed-only',
-    annotation: {
-      type: 'deployed-only',
-      description:
-        'it fails on the deployed dev site on purpose, to prove the fall-back and its notice (#748 AC5)',
-    },
-  },
-  async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('#748 AC5: a planted failure');
-  },
-);
