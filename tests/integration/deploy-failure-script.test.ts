@@ -230,7 +230,7 @@ describe('only a failure on develop is reported', () => {
     const { code, out } = await run({ GITHUB_REF_NAME: '725-plant' });
     expect(code, out).toBe(0);
     expect(out).toBe(
-      'Failed: deploy-dev.\nA failure on 725-plant, not develop: no notice.\n',
+      'Failed: deploy-dev.\nFall-back: none.\nA failure on 725-plant, not develop: no notice.\n',
     );
   });
 
@@ -414,6 +414,7 @@ describe('a production release that fails its live check (#748)', () => {
     );
 
     received.length = 0;
+    routes[`POST ${REPO}/issues/900/comments`] = { status: 201, body: {} };
     routes[`GET ${ISSUES}`] = {
       status: 200,
       body: [
