@@ -680,7 +680,14 @@ describe('the daily limits (#872)', () => {
       NOW,
     );
     expect(await outcomeOf(response)).toBe('sent');
-    expect(batches[0]).toHaveLength(2);
+    // No count is written: the batch prunes, inserts and retires (#1140), and
+    // nothing in it counts.
+    expect(
+      batches[0]!.filter(({ query }) =>
+        query.startsWith('INSERT INTO report_counts'),
+      ),
+    ).toEqual([]);
+    expect(batches[0]).toHaveLength(3);
   });
   it.each([
     ['limits-invalid', { REPORT_LIMITS: 'yes' }, '203.0.113.9'],
