@@ -85,7 +85,7 @@ for (const path of PAGES) {
         ).toBeGreaterThan(0);
         // And that the selector was run over a page with something on it
         // (#610): the elements it examined are the population of that
-        // absence, with a recorded floor, so a page that lost its content
+        // absence, so a page that lost its content
         // does not read as one that merely paints no controls.
         expect(
           searched(readings, {

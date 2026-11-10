@@ -23,35 +23,6 @@ test.use(recorded);
 const WIDTHS = [320, 1280] as const;
 const THEMES = ['light', 'dark'] as const;
 /**
- * Each docs page's recorded floors, spelled once here so the floor reader can
- * find them (literal-floors.test.ts); a page with no entry fails its tests.
- */
-const FLOORS: Readonly<
-  Record<
-    string,
-    {
-      readonly texts: string;
-      readonly controls: string;
-      readonly typed: string;
-      readonly painted: string;
-    }
-  >
-> = {
-  '/api/docs/': {
-    texts: 'api-docs/public-texts',
-    controls: 'api-docs/public-controls',
-    typed: 'api-docs/public-typed-fields',
-    painted: 'api-docs/public-painted-controls',
-  },
-  '/api/docs/private/': {
-    texts: 'api-docs/private-texts',
-    controls: 'api-docs/private-controls',
-    typed: 'api-docs/private-typed-fields',
-    painted: 'api-docs/private-painted-controls',
-  },
-};
-
-/**
  * Opens every operation and its Try it out, then sends each, as a visitor
  * exploring would. A preview of dist/ runs no Pages Function, so the API's
  * answer is a stand-in: the response view is what is measured, not the API.
@@ -154,8 +125,6 @@ test.describe('the API docs meet the site bar (#781)', () => {
           const took = await atViewport(page, { width, height: 900 });
           await page.goto(path);
           await openEverything(page, path);
-          const floors = FLOORS[path];
-          if (!floors) throw new Error(`${path} has no floors in FLOORS`);
 
           const box = await page.evaluate(() => {
             const mount = document.querySelector('#swagger');
