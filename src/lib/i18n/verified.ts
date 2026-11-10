@@ -38,9 +38,9 @@ import type { Locale } from './locales.ts';
  * correcting one keeps the old word readable: `supersededColumns`.
  *
  * #319 added every message its own sheet corrected, because the feature-word
- * check it built cannot hold them all: th `PINNED_TOO_MANY_GROUPS` said
- * `พินของคุณ` (your PINs) and passed, since `ปักหมุด` appears once in it.
- * Those entries carry their own comment, as the operator has not read them yet.
+ * check it built cannot hold them all: th's pin message said `พินของคุณ`
+ * (your PINs) and passed, since `ปักหมุด` appeared once in it (that message
+ * went with the pinned path, #390 F20).
  */
 export const VERIFIED: Record<Locale, Record<string, string>> = {
   en: {
@@ -190,10 +190,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       '无法将你的班级分成 {groupsTried} 个小组，同时把所有需要分开的学生都分到不同组。要么增加小组数量，要么取消其中一条规则。',
     'errors.NO_STUDENTS':
       '添加一些学生，或者确保其中至少有一人未被标记为缺席。',
-    'errors.PINNED_APART_CLASH':
-      '{names} 已被标记为“分开”，但一个固定的组把他们放进了同一组。请取消固定该组，或从其中一人身上移除“分开”字母。',
-    'errors.PINNED_TOO_MANY_GROUPS':
-      '{situation, select, over {您固定的组已占用 {pinnedGroupCount} 个组——超过了您要求的 {requestedGroups} 个组——导致 {remainingStudents} 名学生无组可去。请取消固定一个组，或者增加组数。} full {您固定的组已占满您要求的 {requestedGroups} 个组中的 {pinnedGroupCount} 个，剩下的 {remainingStudents} 名学生已无组可去。请取消固定一个组，或者增加组数。} other {您已将所请求的 {requestedGroups} 个小组中的 {pinnedGroupCount} 个小组固定，这意味着只剩下 {remainingStudents} 名学生——这不足以组成仍需的 {poolGroupsNeeded} 个小组。请取消固定一个小组，或者减少请求的小组数量。}}',
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       '这里的“在一起”和“分开”字母太多，无法在把男孩和女孩分到不同组的同时完成分组。请尝试减少字母数量，或者关闭此模式。',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
@@ -207,8 +203,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     leftoversSpread: '把他们平均分到各组',
     printWhatGroups: '分组结果',
     rosterClashMessage: '{names} 被放在一起，因此无法再把他们分开。',
-    'warnings.PINNED_MIXED_SEX':
-      '{howMany, select, two {{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): 否, a form's no, where 不 was.
     'csv.absentNo': '否',
@@ -312,10 +306,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       'Ở đây có quá nhiều chữ cái “cùng nhau” và “tách biệt” để có thể xử lý hết cùng một lúc. Hãy thử dùng ít chữ cái hơn ở cả hai loại, hoặc tăng quy mô các nhóm.',
     'errors.KEEP_APART_NO_ARRANGEMENT':
       'Không có cách nào để chia lớp của bạn thành {groupsTried} nhóm mà vẫn tách biệt tất cả những học sinh cần được tách biệt. Hãy tạo thêm nhóm hoặc loại bỏ một trong các quy tắc.',
-    'errors.PINNED_APART_CLASH':
-      '{names} đã được đánh dấu “tách biệt” với nhau, nhưng một nhóm được ghim lại xếp các em vào cùng một nhóm. Hãy bỏ ghim nhóm đó, hoặc gỡ chữ cái “tách biệt” khỏi một trong số các em.',
-    'errors.PINNED_TOO_MANY_GROUPS':
-      '{situation, select, over {Các nhóm bạn đã ghim hiện đã dùng {pinnedGroupCount} nhóm — nhiều hơn số {requestedGroups} nhóm mà bạn đã yêu cầu — khiến {remainingStudents} học sinh không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.} full {Các nhóm bạn đã ghim hiện đã chiếm {pinnedGroupCount} trong tổng số {requestedGroups} nhóm mà bạn đã yêu cầu, nên {remainingStudents} học sinh còn lại không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.} other {Các nhóm bạn đã ghim đã chiếm {pinnedGroupCount} trong số {requestedGroups} nhóm mà bạn yêu cầu, do đó chỉ còn lại {remainingStudents} học sinh — con số này không đủ để tạo {poolGroupsNeeded} nhóm còn thiếu. Hãy bỏ ghim một nhóm hoặc yêu cầu ít nhóm hơn.}}',
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       'Ở đây có quá nhiều chữ cái “cùng nhau” và “tách biệt” để xử lý hết trong khi vẫn phải xếp nam và nữ vào các nhóm riêng. Hãy thử dùng ít chữ cái hơn hoặc tắt chế độ này đi.',
     'errors.TOGETHER_APART_CLASH':
@@ -328,8 +318,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       'Hiển thị giới tính và các chữ cái "cùng nhau"/"tách biệt"',
     rosterClashMessage:
       '{names} được xếp cùng nhau, nên không thể đồng thời tách biệt các em.',
-    'warnings.PINNED_MIXED_SEX':
-      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     // #603's sheet, read by the operator on 2026-10-07 (every short label no
     // check could judge, https://claude.ai/artifact/AgCDjpCJ2AQkKmdSC4cznm).
     // Values are as they stand AFTER the twelve changes he agreed there.
@@ -446,14 +434,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       'ที่นี่มีตัวอักษร "ด้วยกัน" และ "แยก" มากเกินไปจนไม่สามารถจัดการได้ทั้งหมดในครั้งเดียว ลองใช้ตัวอักษรประเภทใดประเภทหนึ่งให้น้อยลง หรือเพิ่มขนาดกลุ่มให้ใหญ่ขึ้น',
     'errors.KEEP_APART_NO_ARRANGEMENT':
       'ไม่มีทางที่จะจัดชั้นเรียนของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงแยกทุกคนที่ต้องแยกกันให้อยู่คนละกลุ่ม ดังนั้น คุณต้องเพิ่มจำนวนกลุ่มให้มากขึ้น หรือยกเลิกกฎข้อใดข้อหนึ่ง',
-    'errors.PINNED_APART_CLASH':
-      '{names} ถูกทำเครื่องหมายให้แยกกัน แต่กลุ่มที่ปักหมุดไว้ทำให้พวกเขาอยู่ในกลุ่มเดียวกัน ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร "แยก" ออกจากนักเรียนคนใดคนหนึ่ง',
-    'errors.PINNED_IN_TWO_GROUPS':
-      '{name} ถูกปักหมุดไว้ในสองกลุ่มที่แตกต่างกันพร้อมกัน นักเรียนหนึ่งคนปักหมุดไว้ได้เพียงกลุ่มเดียวเท่านั้น โปรดนำชื่อเขา/เธอออกจากกลุ่มใดกลุ่มหนึ่ง',
-    'errors.PINNED_SPLITS_UNIT':
-      '{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่มีเพียงบางคนเท่านั้นที่อยู่ในกลุ่มที่ปักหมุดไว้ ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร "ด้วยกัน" ออกจากนักเรียนที่อยู่นอกกลุ่ม',
-    'errors.PINNED_TOO_MANY_GROUPS':
-      '{situation, select, over {กลุ่มที่คุณปักหมุดไว้ใช้ไปแล้ว {pinnedGroupCount} กลุ่ม — มากกว่า {requestedGroups} กลุ่มที่คุณขอ — ซึ่งทำให้นักเรียน {remainingStudents} คนไม่มีกลุ่มเหลือให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก} full {กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ ทำให้นักเรียนที่เหลือ {remainingStudents} คนไม่มีกลุ่มให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก} other {กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ เหลือนักเรียนเพียง {remainingStudents} คน — ไม่พอสำหรับ {poolGroupsNeeded} กลุ่มที่ยังต้องจัด โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอลดจำนวนกลุ่มลง}}',
     'errors.SEX_SEPARATE_SEARCH_GAVE_UP':
       'ที่นี่มีตัวอักษร "ด้วยกัน" และ "แยก" มากเกินไปจนไม่สามารถจัดการได้ พร้อมกับต้องแบ่งเด็กชายและเด็กหญิงเป็นกลุ่มต่างกัน ลองใช้ตัวอักษรน้อยลง หรือปิดโหมดนี้ไป',
     'errors.SEX_SEPARATE_SPLITS_UNIT':
@@ -467,8 +447,6 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       'ข้อมูลนี้จะแทนที่รายชื่อนักเรียนปัจจุบันของคุณ — นักเรียน {total} คน มีชื่อแล้ว {named} คน',
     printShowLetters: 'แสดงเพศ และตัวอักษร "ด้วยกัน"/"แยก"',
     rosterClashMessage: '{names} ถูกจัดให้อยู่ด้วยกัน จึงไม่สามารถแยกกันได้',
-    'warnings.PINNED_MIXED_SEX':
-      '{howMany, select, two {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข} other {{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข}}',
     // #390: the CSV yes/no tokens, chosen by the operator on 2026-09-30
     // ("Change all three"): ไม่ใช่, a form's no, where ไม่ was.
     'csv.absentNo': 'ไม่ใช่',

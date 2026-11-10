@@ -3,17 +3,15 @@ import { anonymousStudent, type Student } from './grouping';
 /**
  * Issue 999. Who the full-screen board lists while it waits for the first
  * shuffle: every student in roster order, absent ones INCLUDED (the page
- * marks them), less anyone a pin has already seated. A bare count is 1..n,
+ * marks them). A bare count is 1..n,
  * nobody absent, which is what the deal itself reads it as.
  */
 export const waitingRoll = (
   students: number | readonly Student[],
-  pinned: ReadonlySet<number>,
 ): Student[] =>
-  (typeof students === 'number'
+  typeof students === 'number'
     ? Array.from({ length: students }, (_, i) => anonymousStudent(i + 1))
-    : [...students]
-  ).filter((s) => !pinned.has(s.number));
+    : [...students];
 
 /**
  * Issue 999. The absent students' numbers, in roster order. Both sources

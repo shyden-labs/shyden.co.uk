@@ -982,39 +982,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "{names} 已被标记为“分开”，但一个固定的组把他们放进了同一组。请取消固定该组，或从其中一人身上移除“分开”字母。": {
-        "english": "{names} has been marked \"separate\", but a pinned group has put them in the same group. Please unpin the group or remove the \"separate\" letter from one of them.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "您固定的组已占用 {pinnedGroupCount} 个组——超过了您要求的 {requestedGroups} 个组——导致 {remainingStudents} 名学生无组可去。请取消固定一个组，或者增加组数。": {
-        "english": "Your pinned groups have occupied {pinnedGroupCount} groups—exceeding your requested {requestedGroups} groups—resulting in {remainingStudents} students having no groups to join. Please unpin a group or increase the number of groups.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "您固定的组已占满您要求的 {requestedGroups} 个组中的 {pinnedGroupCount} 个，剩下的 {remainingStudents} 名学生已无组可去。请取消固定一个组，或者增加组数。": {
-        "english": "Your pinned groups have filled the requested {requestedGroups} {pinnedGroupCount} , leaving {remainingStudents} students with no groups available. Please unpin a group or increase the number of groups.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "Google scrambled the slots; the zh says pins fill {pinnedGroupCount} of the {requestedGroups} groups"
-      },
-      "您已将所请求的 {requestedGroups} 个小组中的 {pinnedGroupCount} 个小组固定，这意味着只剩下 {remainingStudents} 名学生——这不足以组成仍需的 {poolGroupsNeeded} 个小组。请取消固定一个小组，或者减少请求的小组数量。": {
-        "english": "You have pinned {pinnedGroupCount} groups out of the requested {requestedGroups} groups, which means there are only {remainingStudents} students left – not enough to form the remaining {poolGroupsNeeded} groups. Please unpin one group or reduce the number of groups requested.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。": {
-        "english": "{names} are grouped together, but they are not of the same gender, so this group is not separated by gender like the other groups. This is exactly what fixed grouping is required for, and it is not an error that needs to be corrected.",
-        "writers": ["edited after DeepL"],
-        "verdict": "ambiguous",
-        "note": "固定 read as 'fixed'; the zh says this is what the pin asked for"
-      },
-      "{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。": {
-        "english": "{names} are grouped together, but they are not all of the same gender, so this group is not separated by gender like the other groups. This is exactly what fixed grouping is required for, and it is not an error that needs to be corrected.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "固定 read as 'fixed'; the zh says this is what the pin asked for"
-      },
       "“{text}”不是整数。请输入 1 到 {count} 之间的学号。": {
         "english": "\" {text} \" is not an integer. Please enter a student ID between 1 and {count} .",
         "writers": ["edited after DeepL"],
@@ -1182,16 +1149,6 @@
       },
       "在 {groupsRequested} 个小组中，无法同时满足将男生和女生分在不同小组以及您设定的其他规则的要求。搜索功能无法确定是哪条规则导致了问题，因此请尝试以下任一解决方法：指定不同数量的小组，或者关闭此模式。": {
         "english": "Within the {groupsRequested} groups, it's impossible to simultaneously satisfy the requirements of separating males and females into different groups, as well as other rules you've set. The search function cannot determine which rule is causing the problem, so please try one of the following solutions: specify a different number of groups, or turn this mode off.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "{names} 已被标记为“保持在一起”，但其中只有一部分被归入固定组。请取消固定该组，或者将组外人员的“保持在一起”标记移除。": {
-        "english": "{names} has been marked \"Keep Together\", but only some of its members are pinned. Please unpin this group or remove the \"Keep Together\" tag from members outside the group.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "{name} 同时被固定在两个不同的组中。一名学生只能被固定在一个组中。请将其从其中一个组中移除。": {
-        "english": "{name} is currently pinned to two different groups. A student can only be pinned to one group. Please remove them from one of the groups.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -1957,51 +1914,6 @@
         "writers": ["DeepL"],
         "verdict": "ambiguous",
         "note": "ตัวอักษร (letter) read as 'word'"
-      },
-      "{names} ถูกทำเครื่องหมายให้อยู่ด้วยกัน แต่มีเพียงบางคนเท่านั้นที่อยู่ในกลุ่มที่ปักหมุดไว้ ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร \"ด้วยกัน\" ออกจากนักเรียนที่อยู่นอกกลุ่ม": {
-        "english": "{names} are marked together, but only some of them are in the pinned group. Unpin the group or remove the word \"together\" from students outside the group.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "ตัวอักษร (letter) read as 'word'"
-      },
-      "{names} ถูกทำเครื่องหมายให้แยกกัน แต่กลุ่มที่ปักหมุดไว้ทำให้พวกเขาอยู่ในกลุ่มเดียวกัน ให้เลิกปักหมุดกลุ่มนั้น หรือลบตัวอักษร \"แยก\" ออกจากนักเรียนคนใดคนหนึ่ง": {
-        "english": "{names} are marked as separate, but the pinned groups keep them together. Unpin the group, or remove the word \"separate\" from any of the students.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "ตัวอักษร (letter) read as 'word'"
-      },
-      "{name} ถูกปักหมุดไว้ในสองกลุ่มที่แตกต่างกันพร้อมกัน นักเรียนหนึ่งคนปักหมุดไว้ได้เพียงกลุ่มเดียวเท่านั้น โปรดนำชื่อเขา/เธอออกจากกลุ่มใดกลุ่มหนึ่ง": {
-        "english": "{name} has been pinned to two different groups simultaneously. A student can only pin to one group. Please remove their name from either group.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "กลุ่มที่คุณปักหมุดไว้ใช้ไปแล้ว {pinnedGroupCount} กลุ่ม — มากกว่า {requestedGroups} กลุ่มที่คุณขอ — ซึ่งทำให้นักเรียน {remainingStudents} คนไม่มีกลุ่มเหลือให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก": {
-        "english": "The group you pinned is already in use, {pinnedGroupCount} groups — more than the {requestedGroups} groups you requested — leaving {remainingStudents} students with no groups left to join. Please unpin one group or request another.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "Google split the clause; the th says your pins fill {pinnedGroupCount} of the {requestedGroups} groups"
-      },
-      "กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ ทำให้นักเรียนที่เหลือ {remainingStudents} คนไม่มีกลุ่มให้เข้าร่วม โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอเพิ่มกลุ่มอีก": {
-        "english": "The group you have pinned is full. {pinnedGroupCount} from {requestedGroups} groups you requested has left the remaining {remainingStudents} students with no groups to join. Please unpin one group or request another.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "Google split the clause; the th says your pins fill {pinnedGroupCount} of the {requestedGroups} groups"
-      },
-      "กลุ่มที่คุณปักหมุดไว้เต็มแล้ว {pinnedGroupCount} จาก {requestedGroups} กลุ่มที่คุณขอ เหลือนักเรียนเพียง {remainingStudents} คน — ไม่พอสำหรับ {poolGroupsNeeded} กลุ่มที่ยังต้องจัด โปรดเลิกปักหมุดกลุ่มหนึ่ง หรือขอลดจำนวนกลุ่มลง": {
-        "english": "The group you have pinned is full. {pinnedGroupCount} of {requestedGroups} groups you requested only have {remainingStudents} remaining — not enough for the {poolGroupsNeeded} groups that still need to be organized. Please unpin one group or request to reduce the number of groups.",
-        "writers": ["DeepL"],
-        "verdict": "ambiguous",
-        "note": "Google split the clause; the th says your pins fill {pinnedGroupCount} of the {requestedGroups} groups"
-      },
-      "{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่เพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
-        "english": "{names} are pinned together as a single group, but they are not of the same gender. Therefore, this group is not divided by gender like other groups. That's what the pinning process dictates; it's not an error that needs fixing.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "{names} ถูกปักหมุดไว้ด้วยกันเป็นกลุ่มเดียว แต่ไม่ใช่ทุกคนในกลุ่มนี้เป็นเพศเดียวกัน ดังนั้นกลุ่มนี้จึงไม่ถูกแบ่งตามเพศเหมือนกลุ่มอื่น ๆ นั่นคือสิ่งที่การปักหมุดกำหนดไว้ ไม่ใช่ข้อผิดพลาดที่ต้องแก้ไข": {
-        "english": "{names} are pinned together as a single group, but not everyone in this group is of the same gender. Therefore, this group is not categorized by gender like other groups. That's what the pinning process dictates; it's not an error that needs fixing.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
       },
       "\"{text}\" ไม่ใช่จำนวนเต็ม กรุณาพิมพ์หมายเลขประจำตัวตั้งแต่ 1 ถึง {count}": {
         "english": "\" {text} \" is not an integer. Please enter an identification number from 1 to {count}",
@@ -3664,42 +3576,6 @@
         "verdict": "ambiguous",
         "note": "huruf gabung read as 'letters to combine'; laki-laki dan perempuan read as 'men and women'"
       },
-      "{names} ditandai untuk disatukan, tetapi hanya sebagian dari mereka yang berada di kelompok yang dikunci. Batalkan kunci kelompok itu, atau hapus huruf penyatu itu dari yang berada di luar kelompok.": {
-        "english": "{names} are marked for grouping, but only some of them are in the locked group. Unlock the group, or remove the grouping letter from those outside the group.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'lock'; the id uses kunci for pinning throughout"
-      },
-      "{names} ditandai untuk dipisahkan satu sama lain, tetapi kelompok yang dikunci menempatkan mereka bersama. Batalkan kunci kelompok itu, atau hapus huruf pemisah itu dari salah satu siswa tersebut.": {
-        "english": "{names} are marked to be separated from each other, but a locked group places them together. Unlock that group, or remove the separator letter from one of those students.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'lock'; the id uses kunci for pinning throughout"
-      },
-      "{name} dikunci ke dalam dua kelompok berbeda sekaligus. Satu siswa hanya bisa dikunci ke dalam satu kelompok. Keluarkan dari salah satu kelompok tersebut.": {
-        "english": "{name} is locked into two different groups at once. A student can only be locked into one group. Remove him from one of those groups.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'lock'; dia read as 'him'"
-      },
-      "Kunci Anda sudah memakai {pinnedGroupCount} kelompok — lebih banyak daripada {requestedGroups} kelompok yang Anda minta — sehingga tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.": {
-        "english": "Your lock already uses {pinnedGroupCount} groups — more than the {requestedGroups} groups you requested — leaving {remainingStudents} students with no groups left for them. Please unlock one of the groups, or request more groups.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'lock'; the id uses kunci for pinning throughout"
-      },
-      "Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa tanpa kelompok tersisa untuk mereka. Batalkan kunci salah satu kelompok, atau minta lebih banyak kelompok.": {
-        "english": "Your lock already uses {pinnedGroupCount} of the {requestedGroups} groups you requested, leaving only {remainingStudents} students with no groups left for them. Please unlock one of the groups, or request more groups.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'lock'; the id uses kunci for pinning throughout"
-      },
-      "Kunci Anda sudah memakai {pinnedGroupCount} dari {requestedGroups} kelompok yang Anda minta, sehingga hanya tersisa {remainingStudents} siswa — tidak cukup untuk {poolGroupsNeeded} kelompok yang masih dibutuhkan. Batalkan kunci salah satu kelompok, atau minta lebih sedikit kelompok.": {
-        "english": "Your key already uses {pinnedGroupCount} of the {requestedGroups} groups you requested, leaving only {remainingStudents} students — not enough for the {poolGroupsNeeded} groups you still need. Cancel the key on one of the groups, or request fewer groups.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'key'"
-      },
       "{names} bergabung dengan kelompok perempuan karena jumlah laki-laki tidak cukup untuk membentuk kelompok sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.": {
         "english": "{names} joined the girls' group because there weren't enough boys to form their own group. This was purely a matter of numbers, not a mistake that needed to be corrected.",
         "writers": ["no DeepL draft"],
@@ -3709,18 +3585,6 @@
         "english": "{names} joined the boys' group because there weren't enough girls to form their own group. This was purely a matter of numbers, not a mistake that needed to be corrected.",
         "writers": ["no DeepL draft"],
         "verdict": "agrees"
-      },
-      "{names} dikunci bersama dalam satu kelompok, tetapi tidak berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.": {
-        "english": "{names} are locked together in a group, but they are not of the same gender, so this group is not gender-segregated like the other groups. This is a request for the group lock, not an error that needs to be fixed.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'locked'"
-      },
-      "{names} dikunci bersama dalam satu kelompok, tetapi tidak semuanya berjenis kelamin sama, sehingga kelompok ini tidak dipisahkan berdasarkan jenis kelamin seperti kelompok lainnya. Itu sesuai permintaan kunci kelompoknya, bukan kesalahan yang perlu diperbaiki.": {
-        "english": "{names} are locked together in a group, but they are not all of the same gender, so this group is not gender-segregated like the other groups. This is a request for the group lock, not an error that needs to be fixed.",
-        "writers": ["no DeepL draft"],
-        "verdict": "ambiguous",
-        "note": "kunci (pin) read as 'locked'"
       },
       "{names} digabungkan menjadi satu kelompok karena jumlah laki-laki maupun perempuan tidak cukup untuk membentuk kelompok sendiri-sendiri. Ini murni soal angka, bukan kesalahan yang perlu diperbaiki.": {
         "english": "{names} were combined into one group because there weren't enough men or women to form their own groups. This is purely a matter of numbers, not a mistake that needs to be corrected.",
@@ -4577,37 +4441,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "{names} đã được đánh dấu “tách biệt” với nhau, nhưng một nhóm được ghim lại xếp các em vào cùng một nhóm. Hãy bỏ ghim nhóm đó, hoặc gỡ chữ cái “tách biệt” khỏi một trong số các em.": {
-        "english": "{names} have been marked \"separate\" from each other, but a pinned group groups them together. Unpin that group, or remove the \"separate\" letter from one of the names.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Các nhóm bạn đã ghim hiện đã dùng {pinnedGroupCount} nhóm — nhiều hơn số {requestedGroups} nhóm mà bạn đã yêu cầu — khiến {remainingStudents} học sinh không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.": {
-        "english": "The groups you've pinned are now using {pinnedGroupCount} groups — more than the number of {requestedGroups} groups you requested — leaving {remainingStudents} students with no groups available. Unpin a group or request more groups.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Các nhóm bạn đã ghim hiện đã chiếm {pinnedGroupCount} trong tổng số {requestedGroups} nhóm mà bạn đã yêu cầu, nên {remainingStudents} học sinh còn lại không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.": {
-        "english": "The groups you've pinned now occupy {pinnedGroupCount} of the total {requestedGroups} groups you've requested, so the remaining {remainingStudents} students have no groups left. Unpin a group or request more groups.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Các nhóm bạn đã ghim đã chiếm {pinnedGroupCount} trong số {requestedGroups} nhóm mà bạn yêu cầu, do đó chỉ còn lại {remainingStudents} học sinh — con số này không đủ để tạo {poolGroupsNeeded} nhóm còn thiếu. Hãy bỏ ghim một nhóm hoặc yêu cầu ít nhóm hơn.": {
-        "english": "The pinned groups you've already accounted for {pinnedGroupCount} of the {requestedGroups} groups you requested, leaving only {remainingStudents} students—which isn't enough to create the missing {poolGroupsNeeded} group. Unpin a group or request fewer groups.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.": {
-        "english": "{names} are pinned together in a group, but not by gender, so this group isn't divided by gender like the others. That's exactly what you requested when pinning the group, not a mistake that needs fixing.",
-        "writers": ["edited after DeepL"],
-        "verdict": "ambiguous",
-        "note": "'không cùng giới tính' (not the same sex) read as 'not by gender'"
-      },
-      "{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.": {
-        "english": "{names} are pinned together in a group, but not all are of the same gender, so this group isn't divided by gender like the others. That's exactly what you requested when pinning the group, not a mistake that needs fixing.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
       "Chia lớp học của bạn thành các nhóm ngay lập tức — ngay trên trình duyệt, mà không cần gửi dữ liệu đi đâu cả.": {
         "english": "Divide your class into groups instantly — right in your browser, without sending any data anywhere.",
         "writers": ["DeepL"],
@@ -5110,16 +4943,6 @@
         "writers": ["DeepL"],
         "verdict": "ambiguous",
         "note": "Google dropped the plural after {groupsRequested}"
-      },
-      "{names} được đánh dấu để ở cùng nhau, nhưng chỉ một số người trong số họ nằm trong nhóm được ghim. Hãy bỏ ghim nhóm đó, hoặc gỡ bỏ ký hiệu “ở cùng nhau” khỏi những người nằm ngoài nhóm.": {
-        "english": "{names} are marked to be together, but only some of them are in the pinned group. Unpin that group, or remove the “be together” symbol from those outside the group.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "{name} hiện đang được ghim vào hai nhóm khác nhau cùng một lúc. Một học sinh chỉ có thể được ghim vào một nhóm. Hãy gỡ học sinh đó ra khỏi một trong hai nhóm.": {
-        "english": "{name} is currently pinned to two different groups at the same time. A student can only be pinned to one group at a time. Please remove that student from one of the two groups.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
       },
       "{names} đã được xếp vào một nhóm chung vì số lượng của cả hai giới đều không đủ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia theo số lượng, chứ không phải là một sai sót cần sửa chữa.": {
         "english": "{names} were grouped together because the number of names of both genders was insufficient to form a separate group. This is simply a classification based on numbers, not an error that needs correction.",

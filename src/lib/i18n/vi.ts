@@ -270,20 +270,10 @@ export const vi: Catalogue = {
       'Không thể chia các em trai và em gái thành các nhóm riêng biệt trong {groupsRequested} nhóm mà vẫn đảm bảo tuân thủ các quy tắc khác của bạn. Hệ thống tìm kiếm không thể xác định được quy tắc nào là nguyên nhân gây ra vấn đề, vì vậy hãy thử một trong hai cách khắc phục sau: yêu cầu số lượng nhóm khác hoặc tắt chế độ này.',
     SEX_SEPARATE_SEARCH_GAVE_UP:
       'Ở đây có quá nhiều chữ cái “cùng nhau” và “tách biệt” để xử lý hết trong khi vẫn phải xếp nam và nữ vào các nhóm riêng. Hãy thử dùng ít chữ cái hơn hoặc tắt chế độ này đi.',
-    PINNED_SPLITS_UNIT:
-      '{names} được đánh dấu để ở cùng nhau, nhưng chỉ một số người trong số họ nằm trong nhóm được ghim. Hãy bỏ ghim nhóm đó, hoặc gỡ bỏ ký hiệu “ở cùng nhau” khỏi những người nằm ngoài nhóm.',
-    PINNED_APART_CLASH:
-      '{names} đã được đánh dấu “tách biệt” với nhau, nhưng một nhóm được ghim lại xếp các em vào cùng một nhóm. Hãy bỏ ghim nhóm đó, hoặc gỡ chữ cái “tách biệt” khỏi một trong số các em.',
-    PINNED_IN_TWO_GROUPS:
-      '{name} hiện đang được ghim vào hai nhóm khác nhau cùng một lúc. Một học sinh chỉ có thể được ghim vào một nhóm. Hãy gỡ học sinh đó ra khỏi một trong hai nhóm.',
-    PINNED_TOO_MANY_GROUPS:
-      '{situation, select, over {Các nhóm bạn đã ghim hiện đã dùng {pinnedGroupCount} nhóm — nhiều hơn số {requestedGroups} nhóm mà bạn đã yêu cầu — khiến {remainingStudents} học sinh không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.} full {Các nhóm bạn đã ghim hiện đã chiếm {pinnedGroupCount} trong tổng số {requestedGroups} nhóm mà bạn đã yêu cầu, nên {remainingStudents} học sinh còn lại không còn nhóm nào dành cho mình. Hãy bỏ ghim một nhóm hoặc yêu cầu thêm nhóm.} other {Các nhóm bạn đã ghim đã chiếm {pinnedGroupCount} trong số {requestedGroups} nhóm mà bạn yêu cầu, do đó chỉ còn lại {remainingStudents} học sinh — con số này không đủ để tạo {poolGroupsNeeded} nhóm còn thiếu. Hãy bỏ ghim một nhóm hoặc yêu cầu ít nhóm hơn.}}',
   },
   warnings: {
     SEX_SPILLOVER:
       '{sex, select, M {{names} đã gia nhập một nhóm các bạn nữ vì không có đủ số lượng các bạn nam để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.} other {{names} đã gia nhập một nhóm các bạn nam vì không có đủ số lượng các bạn nữ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia số lượng, chứ không phải là một sai lầm cần khắc phục.}}',
-    PINNED_MIXED_SEX:
-      '{howMany, select, two {{names} được ghim cùng nhau thành một nhóm, nhưng không cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.} other {{names} được ghim cùng nhau thành một nhóm, nhưng không phải tất cả đều cùng giới tính, nên nhóm này không được chia theo giới tính như các nhóm khác. Đó chính là điều bạn yêu cầu khi ghim nhóm, chứ không phải là một sai sót cần sửa.}}',
     SEX_BOTH_TOO_SMALL:
       '{names} đã được xếp vào một nhóm chung vì số lượng của cả hai giới đều không đủ để thành lập một nhóm riêng. Đó chỉ đơn giản là cách phân chia theo số lượng, chứ không phải là một sai sót cần sửa chữa.',
   },
