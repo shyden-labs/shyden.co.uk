@@ -91,8 +91,9 @@ const workflowGraphs = () =>
 const deploysProd = (scripts: string) =>
   /--project-name[= ]+shyden-site(?![\w.-])/.test(scripts);
 const rollsProdBack = (scripts: string) =>
-  /\/pages\/projects\/shyden-site(?![\w.-])/.test(scripts) &&
-  /\/rollback\b/.test(scripts);
+  (/\/pages\/projects\/shyden-site(?![\w.-])/.test(scripts) &&
+    /\/rollback\b/.test(scripts)) ||
+  /node scripts\/pages\.mjs restore shyden-site(?![\w.-])/.test(scripts);
 // Reading the production reports count (#349): the script's count mode, with
 // no argument, as a whole command line. A shell comment naming it is not a
 // reader, and neither is `report-failure`, which never reads Cloudflare.
@@ -349,6 +350,14 @@ describe('the deploy pipeline runs what it claims to', () => {
       environment: 'dev',
       in: (scripts: string) =>
         /--project-name[= ]+shyden-site-dev(?![\w.-])/.test(scripts),
+    },
+    {
+      does: 'falls shyden-site-dev back',
+      environment: 'dev',
+      in: (scripts: string) =>
+        /node scripts\/pages\.mjs restore shyden-site-dev(?![\w.-])/.test(
+          scripts,
+        ),
     },
     { does: 'deploys shyden-site', environment: 'prod', in: deploysProd },
     {
