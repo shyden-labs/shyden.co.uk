@@ -174,9 +174,25 @@ jobs:
   # and playwright.dev.config.ts were both written for exactly this and were
   # referenced by NOTHING in CI, so a dev deploy serving a blank page would
   # have gone green and gated nothing.
+  # The Playwright image the verify job runs in (#444), picked as ci.yml's
+  # browser jobs pick it, so nothing downloads browsers on the way to
+  # `dev-verified`.
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
   verify-dev:
     name: Verify dev + dev-verified
-    needs: deploy-dev
+    needs: [deploy-dev, image]
     # One of the two gates above skips on every event, by design, and a job
     # with no condition carries an implicit `success()` the runner judges over
     # EVERY upstream job — so without this, verify skipped on every run: 866bc23
@@ -188,7 +204,12 @@ jobs:
     if: >-
       !cancelled() && needs.deploy-dev.result == 'success'
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    # The slowest of the last 15 green runs took 179 s, browser download
+    # included (read 2026-11-11); the image removes the download.
+    timeout-minutes: 8
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
     # It reads DEV_BASIC_AUTH_PASSWORD, so it names `dev`, the environment
     # holding it: the repository holds no secrets (read 2026-10-04, #390
     # F163), and a repository secret would reach a workflow on any branch
@@ -208,7 +229,6 @@ jobs:
         with:
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Sanity-check the live dev site
         env:
           # The dev site is behind Basic auth; the username half is ignored by
@@ -225,14 +245,8 @@ jobs:
         # and the integration it exists to force.
         if: github.ref_name == 'develop'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -f state=success \
-            -f context=dev-verified \
-            -f "description=Dev deployed + verified (run ${{ github.run_id }})" \
-            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "Posted dev-verified=success on ${{ github.sha }}"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/commit-status.mjs dev-verified "Dev deployed + verified (run ${GITHUB_RUN_ID})"
 
   # ---- Tell the operator when a develop deploy failed (#725) --------------
   # Run 38219259063 failed on Cloudflare's own 524 and nothing said so: dev

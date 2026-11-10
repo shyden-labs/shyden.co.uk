@@ -175,7 +175,8 @@ describe('the deploy pipeline runs what it claims to', () => {
     // any condition of the right shape, and this is the one the runner was
     // measured running after a skipped gate (run 34743720266).
     const verify = jobNamed('deploy-dev.yml', 'verify-dev');
-    expect(verify.needs).toEqual(['deploy-dev']);
+    // `image` is the Playwright image it runs in (#444), not a gate.
+    expect(verify.needs).toEqual(['deploy-dev', 'image']);
     expect(verify.condition).toBe(
       "!cancelled() && needs.deploy-dev.result == 'success'",
     );
