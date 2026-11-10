@@ -192,9 +192,9 @@ const label = (student: Student, t: Strings): string =>
  * letters lapse with them" -- an absent student's together/apart letters
  * constrain nobody, so a clash that exists only because an absent student
  * shares a letter must not block a shuffle that would, in fact, succeed.
- * Mirrors the engine's own `togetherApartClash`, checked against the POOL
- * (present, unpinned students) rather than the raw roster -- see the call
- * site in `buildGroups`.
+ * Mirrors the engine's own `togetherApartClash`, checked against the
+ * present students rather than the raw roster -- see the call site in
+ * `buildGroups`.
  */
 export function rosterProblems(roster: Student[], t: Strings): Problem[] {
   const problems: Problem[] = [];

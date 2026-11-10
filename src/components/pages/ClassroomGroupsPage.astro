@@ -914,10 +914,8 @@ const sexWhyText = sexWhy(roster, t);
            the array could never be non-empty. Now it can.
 
            A <ul>, not a <p>: `warnings` is an ARRAY, and rendering only
-           `warnings[0]` would silently drop the rest. That is a real shape
-           today (a spillover warning and a pinned-mixed-sex warning can
-           both apply to one shuffle once stage 5 wires pins), not a
-           hypothetical -- and the roster's own single-message validation
+           `warnings[0]` would silently drop the rest -- and the roster's own
+           single-message validation
            box is a deliberately different case: there, one calm message at
            a time as a teacher types. Here the shuffle is finished and every
            thing it has to report is equally true.

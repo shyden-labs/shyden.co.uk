@@ -2246,10 +2246,7 @@ if (form) {
    * absent ones beside them, marked (#999): the class sees every number.
    */
   const waitingPool = (input: ReturnType<typeof dealInput>): Student[] =>
-    waitingRoll(
-      input.students,
-      new Set(input.pinned.flat().map((s) => s.number)),
-    );
+    waitingRoll(input.students);
 
   /**
    * One student's chip: the number, the name where the roster has one, and
@@ -2405,20 +2402,13 @@ if (form) {
       mode: readMode(),
       leftovers: readLeftovers(),
       sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
-      pinned: [], // a later stage wires the pins
     };
   };
 
   /** The board's travelling deal (#744): order, schedule, then the flights. */
-  const travelDeal = async (
-    groups: Student[][],
-    input: ReturnType<typeof dealInput>,
-  ) => {
+  const travelDeal = async (groups: Student[][]) => {
     ++dealToken; // a page deal still running stops, as a newer deal says
-    const pinned = new Set(input.pinned.flat().map((s) => s.number));
-    for (const row of tables.querySelectorAll<HTMLElement>('.student'))
-      if (pinned.has(Number(row.dataset.number))) row.classList.add('dealt');
-    const order = travelOrder(groups, pinned);
+    const order = travelOrder(groups);
     const schedule = travelSchedule(
       order.length,
       speedSelect.value === 'fast' ? 'fast' : 'normal',
@@ -2612,7 +2602,7 @@ if (form) {
     updateStaleness();
 
     try {
-      if (travels) await travelDeal(groups, input);
+      if (travels) await travelDeal(groups);
       else await animate(speedSelect.value);
     } finally {
       // The deal no longer disables this button at all (see `animate`), so

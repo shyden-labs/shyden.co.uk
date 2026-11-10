@@ -86,7 +86,7 @@ export async function travel(
     const { from, to } = boxes[i];
     if (!row) return Promise.resolve();
     if (!chip || !from || !to) {
-      // No chip to leave from: seated at once, like a pinned student.
+      // No chip to leave from: seated at once.
       row.classList.remove('travelling');
       row.classList.add('dealt', 'landed');
       return Promise.resolve();
