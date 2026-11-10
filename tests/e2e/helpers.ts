@@ -283,8 +283,22 @@ export { todayISO } from '../../src/lib/csv';
  * a tap on the phone, a click elsewhere. STAND-IN: the file is then handed
  * to the chooser that press opened, because the operating system's file
  * dialog is outside the browser and no test can drive it.
+ *
+ * The page keeps one `filechooser` listener for its whole life (#1115).
+ * Playwright intercepts choosers only while something listens, and
+ * `waitForEvent` stops listening the moment it resolves, so each upload
+ * switched interception off and back on. On Firefox 159 (Playwright 1.65)
+ * a press during that switch raised no chooser, and the page never raised
+ * one again: 10 of 32 presses on one page, against 32 of 32 with this
+ * listener (CI runs 42722260664 and 42726833401).
  */
+const keepsChoosersIntercepted = new WeakSet<Page>();
+
 export const upload = async (page: Page, name: string, body: string) => {
+  if (!keepsChoosersIntercepted.has(page)) {
+    page.on('filechooser', () => {});
+    keepsChoosersIntercepted.add(page);
+  }
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     tapOn(page.locator('#cg-import')),
