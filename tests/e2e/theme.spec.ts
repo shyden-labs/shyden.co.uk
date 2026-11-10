@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { doubleTapOn, tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -128,10 +129,9 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await page.goto('/');
     await expect.soft(toggle(page)).toBeVisible();
     await atLeast44(toggle(page), 'the theme switch');
-    // A keypress first, so the focus below is keyboard focus to every
-    // engine's :focus-visible heuristic.
-    await page.keyboard.press('Shift');
-    await toggle(page).focus();
+    // Reached by Tab, so it is keyboard focus to every engine's
+    // :focus-visible heuristic.
+    await tabTo(toggle(page));
     await expect.soft(toggle(page)).toHaveCSS('outline-style', 'solid');
     // Declared, or snapped at this screen's ratio (#805): 2.857px on the 3.5x
     // phone, 3 on emulated Chrome at 2.75. Read once the ring is drawn, which
@@ -161,7 +161,7 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await expect.soft(toggle(page)).toHaveAttribute('aria-pressed', 'true');
 
     // Enter and Space each toggle it.
-    await toggle(page).focus();
+    await tabTo(toggle(page));
     await page.keyboard.press('Enter');
     await expectTheme(page, 'light');
     await page.keyboard.press('Space');

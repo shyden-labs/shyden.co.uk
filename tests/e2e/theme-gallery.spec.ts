@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -61,10 +62,16 @@ for (const theme of THEMES) {
           languages,
         );
         await tapOn(languages.locator('summary'));
+        // WebKit keeps keyboard focus on a clicked <summary>: no Tab or
+        // Shift+Tab, with or without Option, moves it (measured in CI on
+        // webkit and mobile-safari, #1034). A tap on the heading, as a
+        // visitor clicks away, starts the walk from the page instead.
+        await tapOn(page.locator('h1').first());
 
         const toggle = page.locator('header [data-theme-toggle]');
-        await page.keyboard.press('Shift');
-        await toggle.focus();
+        // The switch sits just before the language list (#142 §5), so the
+        // walk to it from the page goes back.
+        await tabTo(toggle, 'backwards');
         await expect(toggle).toBeFocused();
         await shoot(
           page,
