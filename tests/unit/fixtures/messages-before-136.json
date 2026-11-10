@@ -1178,7 +1178,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 0 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1187,7 +1187,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1196,7 +1196,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 0 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1205,7 +1205,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1214,7 +1214,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 1 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1223,7 +1223,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1232,7 +1232,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 1 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1241,7 +1241,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1250,7 +1250,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 2 — sex 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — sex 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1259,7 +1259,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — sex 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — sex 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1268,7 +1268,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 2 — sex 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — sex 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1277,7 +1277,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — sex 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — sex 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — jenis kelamin 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       }
     ],
@@ -1288,7 +1288,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 0 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1297,7 +1297,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1306,7 +1306,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 0 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 0 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 0 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1315,7 +1315,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 0 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 0 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 0 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1324,7 +1324,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 1 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1333,7 +1333,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1342,7 +1342,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 1 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 1 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 1 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1351,7 +1351,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 1 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 1 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 1 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1360,7 +1360,7 @@
           "value": "Ana",
           "accepted": "Ana"
         },
-        "en": "Row 2 — absent 'Ana' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — absent 'Ana' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — tidak hadir 'Ana' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1369,7 +1369,7 @@
           "value": "Ana",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — absent 'Ana' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — absent 'Ana' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — tidak hadir 'Ana' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       },
       {
@@ -1378,7 +1378,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "Ana"
         },
-        "en": "Row 2 — absent 'D'Arcy {n} #' not understood. Use Ana, or leave blank.",
+        "en": "Row 2 — absent 'D'Arcy {n} #' is not understood. Use Ana, or leave blank.",
         "id": "Baris 2 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan Ana, atau kosongkan."
       },
       {
@@ -1387,7 +1387,7 @@
           "value": "D'Arcy {n} #",
           "accepted": "D'Arcy {n} #"
         },
-        "en": "Row 2 — absent 'D'Arcy {n} #' not understood. Use D'Arcy {n} #, or leave blank.",
+        "en": "Row 2 — absent 'D'Arcy {n} #' is not understood. Use D'Arcy {n} #, or leave blank.",
         "id": "Baris 2 — tidak hadir 'D'Arcy {n} #' tidak dikenali. Gunakan D'Arcy {n} #, atau kosongkan."
       }
     ],

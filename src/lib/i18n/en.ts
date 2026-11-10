@@ -43,7 +43,7 @@ export const en = {
   // that has already shipped three broken sentences on this site (see
   // rendered-text.spec.ts).
   howToWhat:
-    'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
+    'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ends up smaller than you asked for unless the whole class is.',
   // Rewritten alongside `howToWhat` above: the old step 1 ("...or paste their
   // names, one per line") described the free-text names box removed when the
   // engine was rewritten to a numbered roster (see grouping.ts's
@@ -232,7 +232,7 @@ export const en = {
   leftoversSpread: 'Share them out evenly',
   leftoversBunch: 'Put them all in one group',
   leftoversHelp:
-    'Either way, no group is ever smaller than the size you chose.',
+    'Either way, no group is smaller than the size you chose unless the whole class is.',
 
   soundOn: 'Sound on',
   soundOff: 'Sound off',
@@ -536,13 +536,13 @@ export const en = {
       firstRow: number;
     }>,
   csvProblemSex:
-    "Row {row} — sex '{value}' not understood. Use {accepted}, or leave blank." as Message<{
+    "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank." as Message<{
       row: number;
       value: string;
       accepted: string;
     }>,
   csvProblemAbsent:
-    "Row {row} — absent '{value}' not understood. Use {accepted}, or leave blank." as Message<{
+    "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank." as Message<{
       row: number;
       value: string;
       accepted: string;

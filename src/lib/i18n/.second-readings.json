@@ -2,7 +2,7 @@
   "readings": {
     "zh": {
       "行 {row} — 缺席 '{value}' 无法识别。请使用 {accepted}，或留空。": {
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "by": {
           "LibreTranslate": "line {row} – absent '{value}'is not recognized. please use {accepted}, or leave empty。"
         }
@@ -626,7 +626,7 @@
       "không": { "writers": ["DeepL"], "by": { "LibreTranslate": "none" } },
       "nhóm": { "writers": ["DeepL"], "by": { "LibreTranslate": "group" } },
       "Dòng {row} — vắng mặt '{value}' không được nhận diện. Hãy sử dụng {accepted} hoặc để trống.": {
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "by": {
           "LibreTranslate": "Line (16row): — absent 'Favalue}' unrecognised. Use (\"Diccepted\") or leave blank."
         }

@@ -612,7 +612,7 @@ describe('parseRoster', () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.problems[0].message).toBe(
-      "Row 1 — absent 'maybe' not understood. Use yes, no, or leave blank.",
+      "Row 1 — absent 'maybe' is not understood. Use yes, no, or leave blank.",
     );
   });
 
@@ -621,7 +621,7 @@ describe('parseRoster', () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.problems[0].message).toBe(
-      "Row 1 — sex 'Male' not understood. Use M, F, or leave blank.",
+      "Row 1 — sex 'Male' is not understood. Use M, F, or leave blank.",
     );
   });
 
@@ -635,7 +635,7 @@ describe('parseRoster', () => {
     expect(out.problems[0].message).toContain('L');
     expect(out.problems[0].message).not.toContain('Use M, F');
     expect(out.problems[0].message).not.toBe(
-      "Row 1 — sex 'Male' not understood. Use M, F, or leave blank.",
+      "Row 1 — sex 'Male' is not understood. Use M, F, or leave blank.",
     );
   });
 
