@@ -1,3 +1,5 @@
+import { tabKey } from '../tab-key';
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -27,7 +29,7 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
   await page.goto(pagePath('home', 'vi'));
   const t = getSiteStrings('vi').report;
   const summary = page.locator('[data-report] summary');
-  await summary.focus();
+  await tabTo(summary);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
   for (const label of [t.quoteLabel, t.suggestionLabel, t.noteLabel]) {
@@ -35,14 +37,10 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
     await expect(page.getByLabel(label, { exact: true })).toBeFocused();
   }
   const send = page.getByRole('button', { name: t.send });
-  if (browserName === 'webkit') {
-    // Safari leaves buttons out of the Tab sequence unless the visitor opts
-    // in ("Press Tab to highlight each item"), so a Tab here would assert a
-    // browser preference, not our markup (skip-link.spec.ts, chrome.spec.ts).
-    // The fields above are in its sequence and were walked; the button is
-    // held to being focusable.
-    await send.focus();
-  } else await page.keyboard.press('Tab');
+  // Safari leaves buttons out of a plain Tab walk unless the visitor opts in
+  // ("Press Tab to highlight each item"); Option+Tab, its own way of reaching
+  // every control, takes the next step there (tabKey).
+  await page.keyboard.press(tabKey(browserName));
   await expect(send).toBeFocused();
   // The hints are joined by aria-describedby (spec 3.4).
   await expect(
@@ -310,7 +308,7 @@ test('typing into the report form keeps what was typed (moved from the phone fil
   await page.goto('/id/');
   const report = page.locator('[data-report]');
   const quote = report.locator('#report-quote');
-  await report.locator('summary').focus();
+  await tabTo(report.locator('summary'));
   await page.keyboard.press('Enter');
   await page.keyboard.press('Tab');
   await expect(quote).toBeFocused();

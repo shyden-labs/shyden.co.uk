@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { setCheckedOn, tapAt, tapOn } from '../real-touch';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
@@ -190,11 +191,14 @@ test.describe('the projector view', () => {
     // out of the tab order. Fading it out of existence would strand a
     // keyboard user mid-Tab with no visible way out.
     await expectFaded(page);
-    await bar(page).getByRole('button', { name: 'Exit full screen' }).focus();
+    await tabTo(bar(page).getByRole('button', { name: 'Exit full screen' }));
     await expect.soft(bar(page)).not.toHaveClass(/faded/);
 
     // It does NOT fade while a control inside it has focus.
-    await bar(page).getByRole('button', { name: 'Shuffle again' }).focus();
+    await tabTo(
+      bar(page).getByRole('button', { name: 'Shuffle again' }),
+      'backwards',
+    );
     await expect.soft(bar(page)).not.toHaveClass(/faded/);
     // …and it STAYS that way. A keyboard user must not lose the control
     // they are standing on. Proved by waiting past the same fade delay that
@@ -207,7 +211,7 @@ test.describe('the projector view', () => {
     );
     await expect.soft(bar(page)).not.toHaveClass(/faded/);
 
-    await bar(page).getByRole('button', { name: 'Exit full screen' }).focus();
+    await tabTo(bar(page).getByRole('button', { name: 'Exit full screen' }));
     await page.keyboard.press('Enter');
     await expect.soft(page.locator('#cg-board')).toBeHidden();
   });
