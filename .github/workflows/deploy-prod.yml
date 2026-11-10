@@ -30,6 +30,22 @@ permissions:
   contents: read
 
 jobs:
+  # The Playwright image the smoke job runs in (#444), picked as ci.yml's
+  # browser jobs pick it, so nothing downloads browsers on the way to
+  # `prod-verified`. It holds no secret and needs no approval.
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
   deploy-prod:
     name: Deploy to Prod (needs approval)
     runs-on: ubuntu-26.04
@@ -99,9 +115,14 @@ jobs:
   # asking "was this SHA ever live?".
   smoke-and-verify:
     name: Post-prod smoke + prod-verified
-    needs: deploy-prod
+    needs: [deploy-prod, image]
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    # Measured 56 s on the last release (run 42014524980), browser download
+    # included; the image removes the download.
+    timeout-minutes: 6
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
     # The report health check is private on production (#782), and the Access
     # service token that signs in for it lives in `prod`, behind Shyden's
     # approval like every production credential: so this job asks for that
@@ -137,7 +158,6 @@ jobs:
         with:
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Smoke and verify the live prod site
         env:
           WEB_BASE_URL: https://shyden.co.uk
@@ -150,14 +170,8 @@ jobs:
       # that did not render.
       - name: Post prod-verified status on the released commit
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -f state=success \
-            -f context=prod-verified \
-            -f "description=Prod deployed + browser-verified (run ${{ github.run_id }})" \
-            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "Posted prod-verified=success on ${{ github.sha }}"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/commit-status.mjs prod-verified "Prod deployed + browser-verified (run ${GITHUB_RUN_ID})"
 
   # ---- A release that fails its live check falls back (#748) --------------
   # Only when the release deployed AND its live check failed: a bare

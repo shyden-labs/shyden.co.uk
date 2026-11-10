@@ -175,7 +175,8 @@ describe('the deploy pipeline runs what it claims to', () => {
     // any condition of the right shape, and this is the one the runner was
     // measured running after a skipped gate (run 34743720266).
     const verify = jobNamed('deploy-dev.yml', 'verify-dev');
-    expect(verify.needs).toEqual(['deploy-dev']);
+    // `image` is the Playwright image it runs in (#444), not a gate.
+    expect(verify.needs).toEqual(['deploy-dev', 'image']);
     expect(verify.condition).toBe(
       "!cancelled() && needs.deploy-dev.result == 'success'",
     );
@@ -230,13 +231,13 @@ describe('the deploy pipeline runs what it claims to', () => {
   // protection requiring it blocks every PR forever.
   it('dev-verified is posted by the dev workflow', () => {
     const dev = workflowSteps('deploy-dev.yml');
-    expect(dev).toContain('context=dev-verified');
+    expect(dev).toContain('node scripts/commit-status.mjs dev-verified');
     expect(dev).toContain('statuses: write');
   });
 
   it('prod-verified is posted by the prod workflow', () => {
     const prod = workflowSteps('deploy-prod.yml');
-    expect(prod).toContain('context=prod-verified');
+    expect(prod).toContain('node scripts/commit-status.mjs prod-verified');
     expect(prod).toContain('statuses: write');
   });
 
@@ -520,7 +521,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   // develop.
   it('dev-verified is only posted for develop', () => {
     const dev = workflowSteps('deploy-dev.yml');
-    const post = dev.indexOf('/statuses/');
+    const post = dev.indexOf('node scripts/commit-status.mjs dev-verified');
     expect(post, 'no dev-verified status step found').toBeGreaterThan(-1);
     const step = dev.slice(Math.max(0, post - 900), post);
     expect(step).toMatch(/if:.*github\.ref_name\s*==\s*'develop'/);
@@ -546,7 +547,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   it('prod-verified is gated on a real browser run, not a curl smoke', () => {
     const prod = workflowSteps('deploy-prod.yml');
     const browser = prod.indexOf('playwright.prod.config');
-    const status = prod.indexOf('/statuses/');
+    const status = prod.indexOf('node scripts/commit-status.mjs prod-verified');
 
     expect(browser, 'prod never runs playwright.prod.config').toBeGreaterThan(
       -1,
