@@ -100,7 +100,7 @@ const day = (iso: string) => iso.slice(0, 10);
 /** The notice: one line per failed run, with its log's error line. */
 export const failuresBody = (failures: ReportedUpdate[], since: Date): string =>
   [
-    `Dependabot update runs that failed since ${day(since.toISOString())} (#1119):`,
+    `Dependabot update runs that failed since ${day(since.toISOString())}:`,
     '',
     ...failures.map(({ title, url, created, errorLine, unread }) => {
       const why =

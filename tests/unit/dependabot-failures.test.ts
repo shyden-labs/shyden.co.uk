@@ -7,8 +7,7 @@ import {
   updateErrorLine,
   windowStart,
 } from '../../src/lib/dependabot-failures';
-import { ERROR_LINE_LIMIT } from '../../src/lib/deploy-failure';
-import { openNoticeOf } from '../../src/lib/deploy-failure';
+import { ERROR_LINE_LIMIT, openNoticeOf } from '../../src/lib/deploy-failure';
 
 /**
  * A failed Dependabot update run opens, or comments on, one issue (#1119;
