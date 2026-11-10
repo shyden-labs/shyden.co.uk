@@ -142,6 +142,9 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     title: 'Pembuat Kelompok Kelas',
   },
   zh: {
+    // Shyden read it 2026-11-11, after the pin messages that used to
+    // witness it were removed (#390 F20).
+    modeLabel: '按……划分',
     rosterColNumber: '#',
     rosterColName: '姓名',
     rosterColSex: '性别',
@@ -388,6 +391,9 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     title: 'Trình tạo nhóm trong lớp học',
   },
   th: {
+    // Shyden read it 2026-11-11, after the pin messages that used to
+    // witness it were removed (#390 F20).
+    modeLabel: 'แบ่งตาม',
     rosterColNumber: '#',
     rosterColName: 'ชื่อ',
     rosterColSex: 'เพศ',
