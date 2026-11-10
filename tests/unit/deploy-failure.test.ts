@@ -196,6 +196,32 @@ describe('lastErrorLine', () => {
     );
   });
 
+  it("names a Playwright failure's own error, not its Error Context pointer (#1134)", () => {
+    // The tail of run 42896191453's failed verify step, #748 AC5's planted
+    // check, as its log held it.
+    const log = [
+      '  1) [chromium] › tests/dev/dev-sanity.spec.ts:379:1 › a planted failure proves the dev fall-back (#748 AC5) @deployed-only',
+      '',
+      '    Error: expect(locator).toHaveText(expected) failed',
+      '',
+      "    Locator:  locator('h1')",
+      '    Expected: "#748 AC5: a planted failure"',
+      '    Received: "Shyden makes small software, with care."',
+      '        at /home/runner/work/shyden.co.uk/shyden.co.uk/tests/dev/dev-sanity.spec.ts:391:38',
+      '',
+      '    Error Context: test-results/dev-sanity-a-planted-failu-c2ff2--the-dev-fall-back-748-AC5--chromium/error-context.md',
+      '',
+      '  1 failed',
+      '  42 passed (42.1s)',
+      '##[error]Process completed with exit code 1.',
+    ]
+      .map(stamped)
+      .join('\n');
+    expect(lastErrorLine(log)).toBe(
+      'Error: expect(locator).toHaveText(expected) failed',
+    );
+  });
+
   it('reads a CRLF log as a LF one', () => {
     expect(lastErrorLine(LOG_524.replaceAll('\n', '\r\n'))).toBe(
       '✘ [ERROR] Received a malformed response from the API',
