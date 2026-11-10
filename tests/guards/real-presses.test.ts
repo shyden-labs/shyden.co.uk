@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { directPresses } from '../direct-presses';
 import { inPageClicks } from '../in-page-clicks';
 import { filesUnder, searched } from '../source-files';
 
@@ -29,6 +30,7 @@ const files = SUITES.flatMap((dir) =>
 ).map((path) => ({
   path,
   clicks: inPageClicks(readFileSync(path, 'utf8'), path),
+  presses: directPresses(readFileSync(path, 'utf8'), path),
 }));
 
 describe('every browser test presses with real input (#1003)', () => {
@@ -39,5 +41,21 @@ describe('every browser test presses with real input (#1003)', () => {
         .map(({ path, clicks }) => [path, clicks.length]),
     );
     expect(counts).toEqual({});
+  });
+
+  // #1034: focus(), hover(), click() and dblclick() reach a control by script
+  // or protocol; a browser test goes through tapOn, doubleTapOn, scrollToOn
+  // (tests/real-touch.ts) or tabTo (tests/tab-to.ts) instead. Proven on
+  // synthetic input in tests/unit/direct-presses.test.ts.
+  it('no browser test calls focus(), hover(), click() or dblclick() itself', () => {
+    const found = Object.fromEntries(
+      searched(files, { of: files, what: 'browser test files' })
+        .filter(({ presses }) => presses.length > 0)
+        .map(({ path, presses }) => [
+          path,
+          presses.map(({ line, call }) => `${line}:${call}`),
+        ]),
+    );
+    expect(found).toEqual({});
   });
 });

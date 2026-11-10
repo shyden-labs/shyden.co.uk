@@ -1,3 +1,5 @@
+import { tabKey } from '../tab-key';
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -106,7 +108,7 @@ test('a block walks its own fields from the keyboard, each labelled and describe
   const locale = BETA[BETA.length - 1];
   const t = getSiteStrings(locale).report;
   const details = block(page, locale);
-  await details.locator('summary').focus();
+  await tabTo(details.locator('summary'));
   await page.keyboard.press('Enter');
   await expect(details).toHaveAttribute('open', '');
   for (const label of [t.quoteLabel, t.suggestionLabel, t.noteLabel]) {
@@ -114,9 +116,9 @@ test('a block walks its own fields from the keyboard, each labelled and describe
     await expect(details.getByLabel(label, { exact: true })).toBeFocused();
   }
   const send = details.getByRole('button', { name: t.send });
-  // Safari keeps buttons out of the Tab order by preference (report-form.spec.ts).
-  if (browserName === 'webkit') await send.focus();
-  else await page.keyboard.press('Tab');
+  // Safari keeps buttons out of a plain Tab walk by preference; Option+Tab,
+  // its own way of reaching every control, takes the next step there.
+  await page.keyboard.press(tabKey(browserName));
   await expect(send).toBeFocused();
   await expect(
     details.getByLabel(t.quoteLabel, { exact: true }),
