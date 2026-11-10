@@ -104,10 +104,7 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
       .toHaveLength(1);
 
     // The population sits INSIDE the assertion (#118), so an empty `stored`
-    // cannot make this pass by leaving nothing to search. `absence-liveness`
-    // cannot see this site at all -- a value derived from `page.evaluate` is
-    // the blind spot #185 is open about -- so the idiom is here by choice,
-    // not because a guard insisted.
+    // cannot make this pass by leaving nothing to search.
     // `12` on its own rather than the text as typed: a page that parsed the
     // field and stored `[7,12]` leaks exactly what one storing `7, 12` does,
     // and every serialisation of that absence contains it.

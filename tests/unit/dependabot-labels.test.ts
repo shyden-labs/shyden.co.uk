@@ -50,10 +50,8 @@ describe('the labels dependabot.yml asks for', () => {
     const invented = 'a-label-that-only-a-comment-names';
     const withComment = `${config()}\n# labels:\n#   - '${invented}'\n`;
 
-    // `searched` sits INSIDE the expectation, which is the idiom
-    // `absence-liveness.test.ts` recognises: a population bound to a variable
-    // first is invisible to it, and widening that detector to see my spelling
-    // is how a mandatory control acquires an escape hatch (#118).
+    // `searched` sits INSIDE the expectation (#118), so the population
+    // cannot be forgotten between the search and its verdict.
     const declared = declaredLabels(withComment);
     expect(
       searched(
