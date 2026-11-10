@@ -774,7 +774,7 @@ test.describe('How to use', () => {
       // Not 'How many students?' -- see the comment above this describe block.
       studentsLabel: 'Number of students',
       partOne:
-        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ever ends up smaller than you asked for.',
+        'Tell it how big your class is and how many students you want per group. It shuffles and deals everyone out, and no group ends up smaller than you asked for unless the whole class is.',
       partTwo: 'Say how many students are in your class.',
     });
   });
@@ -787,7 +787,7 @@ test.describe('How to use — Indonesian', () => {
       toggle: 'Cara menggunakan',
       studentsLabel: 'Jumlah siswa',
       partOne:
-        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
+        'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan, kecuali seluruh kelas memang lebih kecil.',
       partTwo: 'Masukkan jumlah siswa di kelas Anda.',
     });
   });
