@@ -23,7 +23,7 @@ export const vi: Catalogue = {
     'Mọi thứ đều diễn ra ngay trong trình duyệt của bạn. Danh sách lớp học sẽ không bao giờ được chuyển ra khỏi trang này.',
   howToHeading: 'Cách sử dụng',
   howToWhat:
-    'Hãy cho chương trình biết lớp của bạn có bao nhiêu học sinh và bạn muốn mỗi nhóm có bao nhiêu học sinh. Chương trình sẽ xáo trộn danh sách và phân chia học sinh vào các nhóm, đồng thời đảm bảo không có nhóm nào có số lượng học sinh ít hơn số lượng bạn yêu cầu.',
+    'Hãy cho chương trình biết lớp của bạn có bao nhiêu học sinh và bạn muốn mỗi nhóm có bao nhiêu học sinh. Chương trình sẽ xáo trộn danh sách và phân chia học sinh vào các nhóm, đồng thời đảm bảo không có nhóm nào có số lượng học sinh ít hơn số lượng bạn yêu cầu, trừ khi cả lớp có ít học sinh hơn số đó.',
   howToSteps: [
     'Hãy cho biết trong lớp bạn có bao nhiêu học sinh.',
     'Hãy chọn cách chia nhóm cho các em.',
@@ -81,7 +81,7 @@ export const vi: Catalogue = {
   leftoversSpread: 'Chia đều các em vào các nhóm',
   leftoversBunch: 'Gộp tất cả vào một nhóm',
   leftoversHelp:
-    'Dù thế nào đi nữa, không có nhóm nào có quy mô nhỏ hơn quy mô mà bạn đã chọn.',
+    'Dù thế nào đi nữa, không có nhóm nào có quy mô nhỏ hơn quy mô mà bạn đã chọn, trừ khi cả lớp có ít học sinh hơn số đó.',
   soundOn: 'Bật âm thanh',
   soundOff: 'Tắt âm thanh',
   speedLabel: 'Tốc độ',

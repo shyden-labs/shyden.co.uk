@@ -65,7 +65,7 @@ export const siteEn = {
     openCalculators: 'Open the calculators',
     workClassroomTitle: 'Classroom Group Creator',
     workClassroomBody:
-      'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
+      'Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.',
     openClassroom: 'Open the group creator',
     getInTouch: 'Get in touch',
     pauseMotion: 'Pause motion',
@@ -231,7 +231,7 @@ export const siteId: SiteStrings = {
     openCalculators: 'Buka kalkulator',
     workClassroomTitle: 'Pembuat Kelompok Kelas',
     workClassroomBody:
-      'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
+      'Ketik atau impor daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
     openClassroom: 'Buka pembuat kelompok',
     getInTouch: 'Hubungi',
     pauseMotion: 'Jeda gerakan',
@@ -380,7 +380,7 @@ export const siteZh: SiteStrings = {
     openCalculators: '打开计算器',
     workClassroomTitle: '课堂小组创建器',
     workClassroomBody:
-      '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
+      '输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。',
     openClassroom: '打开小组创建器',
     getInTouch: '取得联系',
     pauseMotion: '暂停动画',
@@ -527,7 +527,7 @@ export const siteVi: SiteStrings = {
     openCalculators: 'Mở các công cụ tính',
     workClassroomTitle: 'Trình tạo nhóm trong lớp học',
     workClassroomBody:
-      'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
+      'Nhập hoặc tải lên danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
     openClassroom: 'Mở trình tạo nhóm',
     getInTouch: 'Liên hệ',
     pauseMotion: 'Tạm dừng chuyển động',
@@ -678,7 +678,7 @@ export const siteTh: SiteStrings = {
     openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
-      'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
+      'พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
     getInTouch: 'ติดต่อ',
     pauseMotion: 'หยุดภาพเคลื่อนไหว',
