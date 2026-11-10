@@ -4,11 +4,14 @@ import {
   NOTICE_ASSIGNEE,
   NOTICE_AUTHOR,
   NOTICE_TITLE,
+  PIPELINES,
   failureOf,
   failedNeeds,
+  fallBackOf,
   lastErrorLine,
   noticeBody,
   openNoticeOf,
+  reportNeeded,
 } from '../../src/lib/deploy-failure';
 import { searched } from '../source-files';
 
@@ -341,5 +344,217 @@ describe('openNoticeOf', () => {
     expect(() => openNoticeOf({ message: 'Bad credentials' })).toThrow(
       'the open issues are not a list',
     );
+  });
+});
+
+/**
+ * A production release that fails opens the same kind of notice (#748), at
+ * once, and says what the fall-back will do or did: production serves the
+ * deployment live before the release only after Shyden approves it in
+ * `prod-rollback` (his ruling, 2026-10-14). Dev falls back without waiting.
+ */
+describe('a failed release says what its fall-back does (#748)', () => {
+  const RUN =
+    'https://github.com/shyden-labs/shyden.co.uk/actions/runs/40000000001';
+  const SHA = 'a96ec1fd9f5353122314c9176e9da2aaa7e55465';
+  const need = (result: string, outputs: Record<string, string> = {}) => ({
+    result,
+    outputs,
+  });
+
+  it('names each pipeline by its branch, its jobs and its own notice title', () => {
+    expect(PIPELINES.dev).toMatchObject({
+      ref: 'develop',
+      title: NOTICE_TITLE,
+      deployJob: 'deploy-dev',
+      checkJob: 'verify-dev',
+    });
+    expect(PIPELINES.prod).toMatchObject({
+      ref: 'main',
+      title: 'A production release failed',
+      deployJob: 'deploy-prod',
+      checkJob: 'smoke-and-verify',
+    });
+  });
+
+  it('a release that deployed and failed its check waits for the approved fall-back', () => {
+    expect(
+      fallBackOf(
+        {
+          'deploy-prod': need('success', { before: 'd-prev' }),
+          'smoke-and-verify': need('failure'),
+        },
+        'prod',
+      ),
+    ).toEqual({ state: 'waiting', to: 'd-prev' });
+  });
+
+  it('a fall-back that succeeded restored the deployment recorded before the release', () => {
+    expect(
+      fallBackOf(
+        {
+          'deploy-prod': need('success', { before: 'd-prev' }),
+          'smoke-and-verify': need('failure'),
+          'fall-back': need('success'),
+        },
+        'prod',
+      ),
+    ).toEqual({ state: 'restored', to: 'd-prev' });
+  });
+
+  it('a fall-back refused at its approval, failed or cancelled left the release live', () => {
+    for (const result of ['failure', 'cancelled'])
+      expect(
+        fallBackOf(
+          {
+            'deploy-prod': need('success', { before: 'd-prev' }),
+            'smoke-and-verify': need('failure'),
+            'fall-back': need(result),
+          },
+          'prod',
+        ),
+      ).toEqual({ state: 'failed', to: 'd-prev' });
+  });
+
+  it('nothing to fall back from when the deploy itself failed', () => {
+    expect(
+      fallBackOf(
+        {
+          'deploy-prod': need('failure'),
+          'smoke-and-verify': need('skipped'),
+        },
+        'prod',
+      ),
+    ).toEqual({ state: 'none' });
+  });
+
+  it('nothing to fall back from when the check was cancelled, not failed', () => {
+    expect(
+      fallBackOf(
+        {
+          'deploy-prod': need('success', { before: 'd-prev' }),
+          'smoke-and-verify': need('cancelled'),
+        },
+        'prod',
+      ),
+    ).toEqual({ state: 'none' });
+  });
+
+  it('reads the dev jobs for dev', () => {
+    expect(
+      fallBackOf(
+        {
+          'deploy-dev': need('success', { before: 'd-dev' }),
+          'verify-dev': need('failure'),
+          'fall-back': need('success'),
+        },
+        'dev',
+      ),
+    ).toEqual({ state: 'restored', to: 'd-dev' });
+  });
+
+  it('a report is needed when a job failed, or when a fall-back ran', () => {
+    expect(reportNeeded({ a: need('failure') })).toBe(true);
+    expect(
+      reportNeeded({ a: need('success'), 'fall-back': need('success') }),
+    ).toBe(true);
+    expect(
+      reportNeeded({ a: need('success'), 'fall-back': need('cancelled') }),
+    ).toBe(true);
+    expect(
+      reportNeeded({ a: need('success'), 'fall-back': need('skipped') }),
+    ).toBe(false);
+    expect(reportNeeded({ a: need('success') })).toBe(false);
+  });
+
+  const failure = {
+    jobId: 9,
+    job: 'Post-prod smoke + prod-verified',
+    step: 'Smoke and verify the live prod site',
+  };
+
+  it('a waiting fall-back names what it restores and where to approve it', () => {
+    expect(
+      noticeBody({
+        runUrl: RUN,
+        sha: SHA,
+        failure,
+        errorLine: 'Error: 1 failed',
+        unread: [],
+        pipeline: 'prod',
+        fallBack: { state: 'waiting', to: 'd-prev' },
+      }),
+    ).toBe(
+      [
+        'A production release from `main` failed.',
+        '',
+        `- Run: ${RUN}`,
+        `- Commit: \`${SHA}\``,
+        '- Failed: Post-prod smoke + prod-verified › Smoke and verify the live prod site',
+        '- Last error line: `Error: 1 failed`',
+        `- Fall-back: waiting for approval in \`prod-rollback\`. Approving it makes production serve deployment \`d-prev\` again, the one live before this release: ${RUN}`,
+        '',
+        'A check can fail for a reason that is not the release: read the error first. Then fix forward and release again, or revert the release on `main`. This issue is retired by hand once production serves a release that passed its live check.',
+      ].join('\n'),
+    );
+  });
+
+  it('a done fall-back says main and the live site now differ', () => {
+    const body = noticeBody({
+      runUrl: RUN,
+      sha: SHA,
+      failure,
+      errorLine: undefined,
+      unread: [],
+      pipeline: 'prod',
+      fallBack: { state: 'restored', to: 'd-prev' },
+    });
+    expect(body.split('\n')[6]).toBe(
+      `- Fall-back: done. Production serves deployment \`d-prev\` again, the one live before this release, so \`main\` (commit \`${SHA}\`) and the live site now differ.`,
+    );
+  });
+
+  it('a failed fall-back says the failing release is still live', () => {
+    const body = noticeBody({
+      runUrl: RUN,
+      sha: SHA,
+      failure,
+      errorLine: undefined,
+      unread: [],
+      pipeline: 'prod',
+      fallBack: { state: 'failed', to: 'd-prev' },
+    });
+    expect(body.split('\n')[6]).toBe(
+      '- Fall-back: refused or failed, so production still serves the failing release.',
+    );
+  });
+
+  it('a fall-back with no recorded deployment says so', () => {
+    const body = noticeBody({
+      runUrl: RUN,
+      sha: SHA,
+      failure,
+      errorLine: undefined,
+      unread: [],
+      pipeline: 'dev',
+      fallBack: { state: 'restored', to: undefined },
+    });
+    expect(body.split('\n')[6]).toBe(
+      `- Fall-back: done. Dev serves deployment (id not recorded) again, the one live before this deploy, so \`develop\` (commit \`${SHA}\`) and dev now differ.`,
+    );
+  });
+
+  it('a dev notice with no fall-back reads as it always has', () => {
+    const body = noticeBody({
+      runUrl: RUN,
+      sha: SHA,
+      failure,
+      errorLine: undefined,
+      unread: [],
+    });
+    expect(body.split('\n')[0]).toBe(
+      'A deploy of `develop` to dev failed, so dev.shyden.co.uk is behind `develop`.',
+    );
+    expect(body).not.toContain('Fall-back');
   });
 });
