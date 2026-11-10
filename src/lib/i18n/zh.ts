@@ -22,7 +22,7 @@ export const zh: Catalogue = {
   privacy: '所有操作都在您的浏览器中完成。班级名单绝不会离开此页面。',
   howToHeading: '使用方法',
   howToWhat:
-    '只需输入班级人数以及每组希望安排多少名学生，系统就会自动将学生随机分组，确保每个小组的人数都不会少于您设定的最低人数。',
+    '只需输入班级人数以及每组希望安排多少名学生，系统就会自动将学生随机分组。除非整个班级的人数少于您设定的数量，否则每个小组的人数都不会少于该数量。',
   howToSteps: [
     '填写你班上的学生人数。',
     '选择如何给他们分组。',
@@ -69,7 +69,8 @@ export const zh: Catalogue = {
   leftoversLabel: '如果还有剩余的学生',
   leftoversSpread: '把他们平均分到各组',
   leftoversBunch: '把他们全都放进同一个组',
-  leftoversHelp: '无论哪种情况，任何一组的人数都不会少于你所选的数量。',
+  leftoversHelp:
+    '无论哪种情况，除非整个班级的人数都少于你选择的数量，否则任何小组的人数都不会少于你选择的数量。',
   soundOn: '声音：开',
   soundOff: '声音：关',
   speedLabel: '速度',
