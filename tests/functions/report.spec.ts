@@ -14,6 +14,8 @@ import {
   isBetaLocale,
 } from '../../src/lib/i18n';
 import { pagePath } from '../../src/lib/report';
+import { REVIEW_SELECT } from '../../src/lib/report-review';
+import { COUNT_SQL } from '../../src/lib/waiting-reports';
 import { expectReportsBound } from '../report-health';
 import { searched } from '../source-files';
 import {
@@ -378,4 +380,43 @@ test.describe('the daily limits on real D1 (#872)', () => {
       expect.stringMatching(/^[0-9a-f]{64}$/),
     ]);
   });
+});
+
+/**
+ * Reports are kept for a year (Shyden, 2026-11-11, #1140). Run on the real
+ * table, because what is deleted rests on SQLite comparing an ISO timestamp
+ * with a day, which no stand-in performs.
+ */
+test('a report written deletes the year-old ones; the count and review read what is left (#1140)', async ({
+  request,
+}) => {
+  await awayFromMidnight();
+  const daysAgo = (days: number) => {
+    const at = new Date(`${today()}T12:00:00.000Z`);
+    at.setUTCDate(at.getUTCDate() - days);
+    return at.toISOString();
+  };
+  const plantAged = async (days: number) => {
+    const id = randomUUID();
+    await query(
+      "INSERT INTO reports (id, received_at, locale, page, quote, keys, suggestion, note) VALUES (?, ?, 'vi', 'home', 'planted aged', '[]', '', ?)",
+      [id, daysAgo(days), noteFor(`aged ${days}`)],
+    );
+    return id;
+  };
+  const count = async () => (await query(COUNT_SQL))[0]!['count(*)'] as number;
+  const old = await plantAged(366);
+  const recent = await plantAged(364);
+  const before = await count();
+
+  expect(
+    (await send(request, '198.51.100.40', noteFor('retire'))).status(),
+  ).toBe(200);
+
+  const ids = (await query(REVIEW_SELECT)).map(({ id }) => id);
+  expect(ids).not.toContain(old);
+  expect(ids).toContain(recent);
+  // One deleted, one written: the count is unchanged and matches the review.
+  expect(await count()).toBe(before);
+  expect(ids).toHaveLength(before);
 });
