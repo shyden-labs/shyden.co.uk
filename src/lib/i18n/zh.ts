@@ -242,20 +242,10 @@ export const zh: Catalogue = {
       '在 {groupsRequested} 个小组中，无法同时满足将男生和女生分在不同小组以及您设定的其他规则的要求。搜索功能无法确定是哪条规则导致了问题，因此请尝试以下任一解决方法：指定不同数量的小组，或者关闭此模式。',
     SEX_SEPARATE_SEARCH_GAVE_UP:
       '这里的“在一起”和“分开”字母太多，无法在把男孩和女孩分到不同组的同时完成分组。请尝试减少字母数量，或者关闭此模式。',
-    PINNED_SPLITS_UNIT:
-      '{names} 已被标记为“保持在一起”，但其中只有一部分被归入固定组。请取消固定该组，或者将组外人员的“保持在一起”标记移除。',
-    PINNED_APART_CLASH:
-      '{names} 已被标记为“分开”，但一个固定的组把他们放进了同一组。请取消固定该组，或从其中一人身上移除“分开”字母。',
-    PINNED_IN_TWO_GROUPS:
-      '{name} 同时被固定在两个不同的组中。一名学生只能被固定在一个组中。请将其从其中一个组中移除。',
-    PINNED_TOO_MANY_GROUPS:
-      '{situation, select, over {您固定的组已占用 {pinnedGroupCount} 个组——超过了您要求的 {requestedGroups} 个组——导致 {remainingStudents} 名学生无组可去。请取消固定一个组，或者增加组数。} full {您固定的组已占满您要求的 {requestedGroups} 个组中的 {pinnedGroupCount} 个，剩下的 {remainingStudents} 名学生已无组可去。请取消固定一个组，或者增加组数。} other {您已将所请求的 {requestedGroups} 个小组中的 {pinnedGroupCount} 个小组固定，这意味着只剩下 {remainingStudents} 名学生——这不足以组成仍需的 {poolGroupsNeeded} 个小组。请取消固定一个小组，或者减少请求的小组数量。}}',
   },
   warnings: {
     SEX_SPILLOVER:
       '{sex, select, M {{names}加入了一个女生组，因为男生人数不足，无法单独组成一个组。这纯粹是人数分配的结果，并非需要纠正的错误。} other {{names} 加入了一个男孩小组，因为女孩人数不足，无法单独组成一个小组。这只是人数分配的结果，并非需要纠正的错误。}}',
-    PINNED_MIXED_SEX:
-      '{howMany, select, two {{names} 被一起固定在同一组里，但他们并非同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。} other {{names} 被一起固定在同一组里，但他们并非全是同一性别，因此这个组没有像其他组那样按性别划分。这正是固定分组所要求的，并不是需要更正的错误。}}',
     SEX_BOTH_TOO_SMALL:
       '{names} 被归入一个合并组，是因为无论哪一性别的人数都不够多，无法单独组成一个组。这只是人数分布的自然结果，并非需要更正的错误。',
   },
