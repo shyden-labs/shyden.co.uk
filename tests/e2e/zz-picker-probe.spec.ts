@@ -12,6 +12,8 @@ test('PROBE #1115: a file chooser per press, by gap since the last upload @emula
   browserName,
 }) => {
   test.setTimeout(600_000);
+  // H2: interception never switches off while this listener lives.
+  page.on('filechooser', () => {});
   await rosterOf(page, 3);
   await page.locator('#cg-io-toggle').click();
   const press = async () => {
