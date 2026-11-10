@@ -1,3 +1,4 @@
+import { doubleTapOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { randomUUID } from 'node:crypto';
 import {
@@ -35,7 +36,7 @@ test.beforeEach(async () => {
 });
 
 async function fillReport(page: Page, quote: string, note: string) {
-  await page.locator('[data-report] summary').click();
+  await tapOn(page.locator('[data-report] summary'));
   await typeInto(page.getByLabel(vi.quoteLabel, { exact: true }), quote);
   await typeInto(page.getByLabel(vi.noteLabel, { exact: true }), note);
 }
@@ -59,7 +60,7 @@ test.describe('with JavaScript disabled', () => {
       const note = noteFor('homepage');
       await page.goto(pagePath('home', 'vi'));
       await fillReport(page, vi.open, note);
-      await page.getByRole('button', { name: vi.send }).click();
+      await tapOn(page.getByRole('button', { name: vi.send }));
       await expect(page).toHaveURL(/\/vi\/#report-sent$/);
       await expect(page.locator('#report-sent')).toBeVisible();
       const rows = await reportsWithNote(note);
@@ -84,7 +85,7 @@ test.describe('with JavaScript disabled', () => {
       await plantReport(`${stem} control`);
       await page.goto(pagePath('home', 'vi'));
       await fillReport(page, 'on no page at all, anywhere', note);
-      await page.getByRole('button', { name: vi.send }).click();
+      await tapOn(page.getByRole('button', { name: vi.send }));
       await expect(page).toHaveURL(/#report-not-found$/);
       await expect(page.locator('#report-not-found')).toBeVisible();
       // Drawn from the table's own rows under this test's stem: the planted
@@ -108,7 +109,7 @@ test.describe('with JavaScript disabled', () => {
         const note = noteFor(`404 ${locale}`);
         const block = page.locator(`details[data-report][lang="${locale}"]`);
         await page.goto('/404');
-        await block.locator('summary').click();
+        await tapOn(block.locator('summary'));
         await typeInto(
           block.getByLabel(t.report.quoteLabel, { exact: true }),
           t.notFound.heading,
@@ -117,7 +118,7 @@ test.describe('with JavaScript disabled', () => {
           block.getByLabel(t.report.noteLabel, { exact: true }),
           note,
         );
-        await block.getByRole('button', { name: t.report.send }).click();
+        await tapOn(block.getByRole('button', { name: t.report.send }));
         await expect(page).toHaveURL(new RegExp(`/404#report-${locale}-sent$`));
         await expect(page.locator(`#report-${locale}-sent`)).toBeVisible();
         const rows = await reportsWithNote(note);
@@ -141,13 +142,13 @@ test.describe('with JavaScript disabled', () => {
       await plantReport(`${stem} control`);
       const block = page.locator('details[data-report][lang="vi"]');
       await page.goto('/404');
-      await block.locator('summary').click();
+      await tapOn(block.locator('summary'));
       await typeInto(
         block.getByLabel(vi.quoteLabel, { exact: true }),
         getSiteStrings('zh').notFound.heading,
       );
       await typeInto(block.getByLabel(vi.noteLabel, { exact: true }), note);
-      await block.getByRole('button', { name: vi.send }).click();
+      await tapOn(block.getByRole('button', { name: vi.send }));
       await expect(page).toHaveURL(/\/404#report-vi-not-found$/);
       await expect(page.locator('#report-vi-not-found')).toBeVisible();
       // The planted control is the only row under this test's stem.
@@ -195,8 +196,8 @@ test('a cross-origin POST is refused and stores nothing', async ({
 test.describe('on a tool page', () => {
   async function typeARoster(page: Page) {
     await page.goto(pagePath('classroom-groups', 'vi'));
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: tool.rosterAddStudent }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: tool.rosterAddStudent }));
     await typeInto(
       page.locator('.cg-student').first().getByLabel(tool.rosterColName),
       'Lan',
@@ -209,7 +210,7 @@ test.describe('on a tool page', () => {
     const note = noteFor('roster');
     await typeARoster(page);
     await fillReport(page, vi.open, note);
-    await page.getByRole('button', { name: vi.send }).click();
+    await tapOn(page.getByRole('button', { name: vi.send }));
     const sent = page.locator('#report-sent');
     await expect(sent).toBeVisible();
     await expect(sent).toBeFocused();
@@ -226,7 +227,7 @@ test.describe('on a tool page', () => {
     const note = noteFor('double-click');
     await typeARoster(page);
     await fillReport(page, vi.open, note);
-    await page.getByRole('button', { name: vi.send }).dblclick();
+    await doubleTapOn(page.getByRole('button', { name: vi.send }));
     await expect(page.locator('#report-sent')).toBeVisible();
     expect(await reportsWithNote(note)).toHaveLength(1);
   });
@@ -235,10 +236,10 @@ test.describe('on a tool page', () => {
     const note = noteFor('replace');
     await typeARoster(page);
     await fillReport(page, 'on no page at all, anywhere', note);
-    await page.getByRole('button', { name: vi.send }).click();
+    await tapOn(page.getByRole('button', { name: vi.send }));
     await expect(page.locator('#report-not-found')).toBeVisible();
     await typeInto(page.getByLabel(vi.quoteLabel, { exact: true }), vi.open);
-    await page.getByRole('button', { name: vi.send }).click();
+    await tapOn(page.getByRole('button', { name: vi.send }));
     await expect(page.locator('#report-sent')).toBeVisible();
     await expect(page.locator('#report-not-found')).toBeHidden();
     await expect(page.locator('.report-status:visible')).toHaveCount(1);
@@ -253,7 +254,7 @@ test.describe('on a tool page', () => {
     await page.goto(`${pagePath('classroom-groups', 'vi')}#report-not-found`);
     await expect(page.locator('#report-not-found')).toBeVisible();
     await fillReport(page, vi.open, note);
-    await page.getByRole('button', { name: vi.send }).click();
+    await tapOn(page.getByRole('button', { name: vi.send }));
     await expect(page.locator('#report-sent')).toBeVisible();
     await expect(page.locator('#report-not-found')).toBeHidden();
     await expect(page.locator('.report-status:visible')).toHaveCount(1);

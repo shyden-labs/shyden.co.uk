@@ -1,5 +1,5 @@
 import { chooseOption } from '../real-select';
-import { setCheckedOn, tapOn } from '../real-touch';
+import { scrollToOn, setCheckedOn, tapOn } from '../real-touch';
 import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
@@ -1649,7 +1649,7 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
-    await count.focus();
+    await tapOn(count);
     // The starting value is READ, not named. This test is about a wheel
     // leaving it alone; what the page starts at has its own home in "the
     // class size starts at 30", and a second copy of that number here is one
@@ -1658,7 +1658,13 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     // value that was never read.
     const before = await count.inputValue();
     expect(before).not.toBe('');
-    await count.hover();
+    await scrollToOn(count);
+    const box = await count.boundingBox();
+    expect(
+      box,
+      'the number field has a box to hold the pointer over',
+    ).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.wheel(0, 240);
     await expect(count).toHaveValue(before);
     await page.mouse.wheel(0, -240);
@@ -1912,7 +1918,7 @@ test.describe('the on-screen keyboard', () => {
     page,
   }) => {
     const { rowBottom, layoutHeight, shrink } = await shrinkingViewport(page);
-    await page.focus('#cg-size');
+    await tapOn(page.locator('#cg-size'));
     await shrink(200);
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
@@ -1929,7 +1935,7 @@ test.describe('the on-screen keyboard', () => {
     );
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight, 0);
     // Liveness: the view really is 200px short, as a field taking typing shows.
-    await page.focus('#cg-size');
+    await tapOn(page.locator('#cg-size'));
     await expect.poll(rowBottom).toBeCloseTo(layoutHeight - 200, 0);
   });
 });
