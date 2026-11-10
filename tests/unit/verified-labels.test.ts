@@ -201,7 +201,11 @@ const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
     'site.calculators.title',
     'site.home.openCalculators',
   ],
+  // #390 F20: `modeLabel` ("Split by") was witnessed only by the pin
+  // messages, removed with the pinned path. Awaiting the operator's read in
+  // zh and th, then pinned.
   zh: [
+    'modeLabel',
     'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
@@ -215,6 +219,7 @@ const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
     'site.home.openCalculators',
   ],
   th: [
+    'modeLabel',
     'site.calculators.gift.heading',
     'site.calculators.title',
     'site.home.openCalculators',

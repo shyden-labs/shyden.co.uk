@@ -22,18 +22,17 @@ export interface TravelSchedule {
 
 /**
  * Dealt like cards: the first seat of every group, then the second, and so
- * on. A full group is passed over; a pinned student is already seated.
+ * on. A full group is passed over.
  */
 export function travelOrder(
   groups: readonly (readonly { number: number }[])[],
-  pinned: ReadonlySet<number>,
 ): number[] {
   const order: number[] = [];
   const longest = Math.max(0, ...groups.map((g) => g.length));
   for (let seat = 0; seat < longest; seat++)
     for (const group of groups) {
       const student = group[seat];
-      if (student && !pinned.has(student.number)) order.push(student.number);
+      if (student) order.push(student.number);
     }
   return order;
 }
