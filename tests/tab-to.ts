@@ -27,18 +27,43 @@ export async function tabTo(
   const key = tabKey(browser.browserType().name(), direction);
   const focused = () =>
     target.evaluate((element) => element === document.activeElement);
+  /** Where focus stood after each press, for the failure to show. */
+  const walked: string[] = [];
   for (let presses = 0; presses < TAB_CEILING; presses += 1) {
     if (await focused()) return;
     await page.keyboard.press(key);
+    walked.push(await page.evaluate(describeFocus));
   }
   if (await focused()) return;
-  const ended = await page.evaluate(() => {
-    const active = document.activeElement;
-    if (active === null) return 'nothing';
-    const id = active.id ? `#${active.id}` : '';
-    return `${active.tagName.toLowerCase()}${id}`;
-  });
   throw new Error(
-    `${TAB_CEILING} presses of ${key} never gave ${String(target)} focus; focus ended on ${ended}`,
+    `${TAB_CEILING} presses of ${key} never gave ${String(target)} focus; the walk ended ${foldWalk(walked)}`,
   );
 }
+
+/** The element holding focus, as `tag#id.class` (its parent's class when it has none). */
+function describeFocus(): string {
+  const active = document.activeElement;
+  if (active === null) return 'nothing';
+  const name = (element: Element) =>
+    `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${
+      element.classList[0] ? `.${element.classList[0]}` : ''
+    }`;
+  const parent = active.parentElement;
+  return active.classList.length === 0 && active.id === '' && parent !== null
+    ? `${name(parent)}/${name(active)}`
+    : name(active);
+}
+
+/** The last steps of a walk, a run of one element folded to `name (xN)`. */
+const foldWalk = (walked: string[]): string => {
+  const runs: { name: string; count: number }[] = [];
+  for (const name of walked) {
+    const last = runs.at(-1);
+    if (last?.name === name) last.count += 1;
+    else runs.push({ name, count: 1 });
+  }
+  return runs
+    .slice(-12)
+    .map(({ name, count }) => (count === 1 ? name : `${name} (x${count})`))
+    .join(' > ');
+};

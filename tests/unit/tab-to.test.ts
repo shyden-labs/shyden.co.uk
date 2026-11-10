@@ -62,12 +62,25 @@ describe('tabTo: reaches a control by real Tab presses (#1034)', () => {
     expect(pressed).toEqual([]);
   });
 
-  it('fails at its ceiling, naming the control, the key and where focus ended', async () => {
+  it('fails at its ceiling, naming the control, the key and the last of the walk', async () => {
     const { target, pressed } = walk(null);
+    const last = Array.from(
+      { length: 12 },
+      (_, i) => `button#step-${TAB_CEILING - 11 + i}`,
+    );
     await expect(tabTo(target)).rejects.toThrow(
-      `${TAB_CEILING} presses of Tab never gave locator('#target') focus; focus ended on button#step-${TAB_CEILING}`,
+      `${TAB_CEILING} presses of Tab never gave locator('#target') focus; the walk ended ${last.join(' > ')}`,
     );
     expect(pressed).toHaveLength(TAB_CEILING);
+  });
+
+  it('folds a walk that never moves into one step, so a stuck focus reads as stuck', async () => {
+    const { target, page } = walk(null);
+    (page as unknown as { evaluate: () => Promise<string> }).evaluate =
+      async () => 'summary';
+    await expect(tabTo(target)).rejects.toThrow(
+      `${TAB_CEILING} presses of Tab never gave locator('#target') focus; the walk ended summary (x${TAB_CEILING})`,
+    );
   });
 
   it('reaches a control exactly at the ceiling', async () => {
