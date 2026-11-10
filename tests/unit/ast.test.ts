@@ -1,25 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import ts from 'typescript';
-import {
-  bind,
-  callGraph,
-  codeWithoutLiterals,
-  derivationOf,
-  parseSource,
-  type Bound,
-} from './ast';
-import { scratchDir } from '../scratch-dir';
+import { bind, codeWithoutLiterals, parseSource, type Bound } from './ast';
 
 /**
- * The resolver both meta-guards stand on (#184).
+ * The resolver the structural readers stand on (#184).
  *
  * `declarationsIn` used to key every `const` in a file by bare name, so the
- * last declaration won in every scope. `supply-chain.test.ts` declares
- * `const config` four times, and `anchored-presence` read two stripped
- * assertions as raw because line 258's `parseCleanYaml(...)` overwrote the
- * `configBody()` each of those tests actually uses. Every fixture below is a
+ * last declaration won in every scope: `supply-chain.test.ts` declares
+ * `const config` four times, and a reader saw line 258's `parseCleanYaml(...)`
+ * where two tests actually used `configBody()`. Every fixture below is a
  * place where a name-keyed or hand-rolled resolver answers differently from
  * the language itself.
  */
@@ -61,12 +50,6 @@ function resolvedIn(bound: Bound, sf: ts.SourceFile): (string | undefined)[] {
 const resolved = (source: string): (string | undefined)[] => {
   const { bound, sf } = fixture(source);
   return resolvedIn(bound, sf);
-};
-
-/** Every name each `use(...)` derives from. A set: the order is the walk's. */
-const derivedNames = (source: string): Set<string>[] => {
-  const { bound, sf } = fixture(source);
-  return useArguments(sf).map((arg) => new Set(derivationOf(arg, bound).names));
 };
 
 describe('a name resolves to the declaration the language binds it to', () => {
@@ -153,8 +136,7 @@ describe('a name resolves to the declaration the language binds it to', () => {
   it("does not let a sibling's derivation leak into a binding", () => {
     // The other direction, and the reason #184 stopped here at all: following
     // the whole source gave `readings` the expression that builds `allowed`,
-    // and `absence-liveness` then called an assertion over `readings` a
-    // collector it is not.
+    // so a reader took `readings` for a collector it is not.
     const both = resolved(`
       it('a', () => {
         const { readings, allowed } = { readings: mine(), allowed: [].filter(f) };
@@ -319,229 +301,6 @@ describe('an import resolves to the declaration its own file makes', () => {
   });
 });
 
-describe('an expression derives from what its own scope binds', () => {
-  it('follows an assertion through the declaration in its own test', () => {
-    // The shape measured at supply-chain.test.ts:206.
-    expect(
-      derivedNames(`
-        const configBody = () => withoutYamlComments(dependabot());
-        it('watches npm', () => { const config = configBody(); use(config); });
-        it('parses it', () => { const config = parseCleanYaml(dependabot()); });
-      `),
-    ).toEqual([
-      new Set(['config', 'configBody', 'withoutYamlComments', 'dependabot']),
-    ]);
-  });
-
-  it('takes no roots from type positions', () => {
-    expect(
-      derivedNames(`
-        const cast = load() as { updates: string; ignore: Rule[] };
-        const checked = make() satisfies Shape;
-        const typed = (input: Input): Output => input;
-        use(cast); use(checked); use(typed);
-      `),
-    ).toEqual([
-      new Set(['cast', 'load']),
-      new Set(['checked', 'make']),
-      new Set(['typed', 'input']),
-    ]);
-  });
-
-  it('keeps the base of a class expression, which is a value, not a type', () => {
-    expect(
-      derivedNames(`
-        const Base = make();
-        const Derived = class extends Base {};
-        use(Derived);
-      `),
-    ).toEqual([new Set(['Derived', 'Base', 'make'])]);
-  });
-
-  it('reports every initializer it followed, in the order reached', () => {
-    const { bound, sf } = fixture(`
-      const found = [];
-      const view = found;
-      use(view);
-    `);
-    const [arg] = useArguments(sf);
-    if (!arg) throw new Error('the fixture no longer calls use()');
-    expect(
-      derivationOf(arg, bound).initializers.map((init) => init.getText()),
-    ).toEqual(['found', '[]']);
-  });
-
-  it('terminates on bindings that refer to each other', () => {
-    expect(
-      derivedNames(`
-        let a = b;
-        let b = a;
-        use(a);
-      `),
-    ).toEqual([new Set(['a', 'b'])]);
-  });
-});
-
-describe('a derivation stops where it is told, and names what it cannot see into (#225)', () => {
-  const isDecode = (call: ts.CallExpression): boolean =>
-    ts.isIdentifier(call.expression) && call.expression.text === 'decode';
-
-  it('does not enter a call it is told to stop at, callee included', () => {
-    const { bound, sf } = fixture(`
-      const text = read();
-      const data = decode(text);
-      use(data);
-      use(text + decode(read()).size);
-    `);
-    expect(
-      useArguments(sf).map(
-        (arg) => new Set(derivationOf(arg, bound, { stopAt: isDecode }).names),
-      ),
-    ).toEqual([new Set(['data']), new Set(['text', 'read'])]);
-    // Told nothing, the same walk enters every call, as it always has.
-    expect(derivedNames('const data = decode(read()); use(data);')).toEqual([
-      new Set(['data', 'decode', 'read']),
-    ]);
-  });
-
-  it('names the bindings it could not follow, and none that it did', () => {
-    const { bound, sf } = fixture(`
-      import { load } from './elsewhere';
-      function helper() { return 1; }
-      const local = (p: string) => load(helper(), p);
-      use(local('x') + missing);
-    `);
-    const [arg] = useArguments(sf);
-    if (!arg) throw new Error('the fixture no longer calls use()');
-    const { names, opaque } = derivationOf(arg, bound);
-    expect(new Set(names)).toEqual(
-      new Set(['local', 'load', 'helper', 'p', 'missing']),
-    );
-    // An import, a function declaration, a parameter and an unbound name
-    // hold no initializer; `local` held one, and the walk went inside it.
-    expect(new Set(opaque)).toEqual(
-      new Set(['load', 'helper', 'p', 'missing']),
-    );
-  });
-});
-
-describe('a parameter binds its name, like any other local (#277)', () => {
-  /**
-   * `callGraph` reads its files from disk, so the fixture is on disk. Two
-   * files, one name: a module-scope `lines` that reads a file, and three
-   * files away a PARAMETER called `lines` that is handed a string.
-   *
-   * Before this, only `const` bound a name, so the parameter fell through to
-   * the by-bare-name fallback and inherited the reader. Two behavioural
-   * absence assertions in `workflow-jobs.test.ts` -- input written beside
-   * them -- were reported as needing a discovery control, which is the false
-   * alarm that gets a working control deleted.
-   */
-  const corpus = () => {
-    const dir = scratchDir('ast-binding-');
-    const reader = join(dir, 'reader.ts');
-    const user = join(dir, 'user.ts');
-    writeFileSync(
-      reader,
-      "const lines = (file: string) => readFileSync(file, 'utf8').split('\n');\n" +
-        'export const count = (f: string) => lines(f).length;\n',
-    );
-    writeFileSync(
-      user,
-      'export const onlyJob = (lines: string) => parse(`jobs:\n${lines}`);\n',
-    );
-    return { reader, user };
-  };
-
-  it('does not give a parameter the property of a same-named reader', () => {
-    const { reader, user } = corpus();
-    const reached = callGraph([reader, user]).close(new Set(['readFileSync']));
-    // One name, two files, opposite answers -- which is the whole claim.
-    // The `true` is also the positive control: a graph that resolved nothing
-    // at all would satisfy the `false` for a reason of its own.
-    expect(reached.reaches(reader, 'lines')).toBe(true);
-    expect(reached.reaches(user, 'lines')).toBe(false);
-  });
-});
-
-describe('a name resolves through the import that binds it, or the binding that makes it (#477)', () => {
-  /**
-   * `anchored-presence` counted two assertions over raw file text that read
-   * none, found by #477's text reading of the same population: a `config`
-   * imported from `playwright.config.ts`, outside the graph, and a `source`
-   * destructured in a `for...of` over string literals. Neither is declared
-   * locally, so each fell through to the union of every same-named function
-   * in the suite, and some `config` and some `source` there read a file.
-   */
-  const corpus = () => {
-    const dir = scratchDir('ast-import-');
-    const file = (name: string, text: string) => {
-      const path = join(dir, name);
-      writeFileSync(path, text);
-      return path;
-    };
-    return {
-      reader: file(
-        'reader.ts',
-        "export const load = (f: string) => readFileSync(f, 'utf8');\n" +
-          "export function config() { return readFileSync('c', 'utf8'); }\n" +
-          "export function source() { return readFileSync('s', 'utf8'); }\n",
-      ),
-      pure: file('pure.ts', 'export const load = (s: string) => s.trim();\n'),
-      fromReader: file(
-        'from-reader.ts',
-        "import { load } from './reader';\nexport const a = load('x');\n",
-      ),
-      fromPure: file(
-        'from-pure.ts',
-        "import { load } from './pure';\nexport const b = load('x');\n",
-      ),
-      aliased: file(
-        'aliased.ts',
-        "import { load as fetchText } from './reader';\nexport const c = fetchText('x');\n",
-      ),
-      outside: file(
-        'outside.ts',
-        "import config from '../not-in-the-graph';\nexport const d = config.x;\n",
-      ),
-      destructured: file(
-        'destructured.ts',
-        "for (const [source] of [['a']]) use(source);\n",
-      ),
-    };
-  };
-  const reached = (files: Record<string, string>) =>
-    callGraph(Object.values(files)).close(new Set(['readFileSync']));
-
-  it('follows an import to the module it names', () => {
-    const files = corpus();
-    expect(reached(files).reaches(files.fromReader, 'load')).toBe(true);
-  });
-
-  it('does not follow an import to a same-named function elsewhere', () => {
-    const files = corpus();
-    expect(reached(files).reaches(files.fromPure, 'load')).toBe(false);
-  });
-
-  it('follows an aliased import under its local name', () => {
-    const files = corpus();
-    expect(reached(files).reaches(files.aliased, 'fetchText')).toBe(true);
-  });
-
-  it('gives an import from outside the graph nothing inside it', () => {
-    const files = corpus();
-    // The positive control: the same name, declared in the graph, reads.
-    expect(reached(files).reaches(files.reader, 'config')).toBe(true);
-    expect(reached(files).reaches(files.outside, 'config')).toBe(false);
-  });
-
-  it('binds a destructured name locally', () => {
-    const files = corpus();
-    expect(reached(files).reaches(files.reader, 'source')).toBe(true);
-    expect(reached(files).reaches(files.destructured, 'source')).toBe(false);
-  });
-});
-
 describe('code without its literals is what a text cross-check reads (#477)', () => {
   // A cross-check counting a construct in raw text is satisfied by a string,
   // a template or a regex that spells it: the guards' own fixtures do. The
@@ -593,51 +352,4 @@ describe('code without its literals is what a text cross-check reads (#477)', ()
     expect(out).toContain('expect(c).toEqual([]);');
     expect(out).not.toContain('gone');
   });
-});
-
-describe('a read JSON.parse stands on is data, when the closure asks (#570)', () => {
-  /**
-   * anchored-presence calls raw text "a readFileSync no JSON.parse stands
-   * on", and its closure counted the parsed read too. A helper that read a
-   * JSON file through JSON.parse made what it returned read as raw source:
-   * six `toContain`s over a child process's
-   * output in waiting-reports-script.test.ts. absence-liveness still wants
-   * the parsed read, since a population read from JSON is a discovered one,
-   * so the default is unchanged and the option is asked for.
-   */
-  const corpus = () => {
-    const file = join(scratchDir('ast-parsed-'), 'readers.ts');
-    writeFileSync(
-      file,
-      "const parsed = (f: string) => JSON.parse(readFileSync(f, 'utf8'));\n" +
-        'export const usesParsed = (f: string) => parsed(f).length;\n' +
-        "const raw = (f: string) => readFileSync(f, 'utf8');\n" +
-        'export const usesRaw = (f: string) => raw(f).length;\n' +
-        'const both = (f: string) =>\n' +
-        "  JSON.parse(readFileSync(f, 'utf8')) + readFileSync(f, 'utf8');\n",
-    );
-    return file;
-  };
-
-  it.each([
-    ['parsed', true, false],
-    ['usesParsed', true, false],
-    ['parsed', false, true],
-    ['usesParsed', false, true],
-    ['raw', true, true],
-    ['usesRaw', true, true],
-    ['raw', false, true],
-    ['usesRaw', false, true],
-    ['both', true, true],
-    ['both', false, true],
-  ] as const)(
-    '%s, with parsedIsData %s, reaches readFileSync: %s',
-    (name, parsedIsData, reaches) => {
-      const file = corpus();
-      const closure = callGraph([file]).close(new Set(['readFileSync']), {
-        parsedIsData,
-      });
-      expect(closure.reaches(file, name)).toBe(reaches);
-    },
-  );
 });

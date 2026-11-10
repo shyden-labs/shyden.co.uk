@@ -474,9 +474,8 @@ test.describe('a disabled control affords that it is disabled', () => {
     // liveness control doing exactly its job. Stated positively instead, so
     // a control that STOPS being UA-painted turns this red rather than
     // slipping past an assertion that was never reached.
-    // The population inside the verdict (#446): absence-liveness could not
-    // see through `const { reachable } = await affordances(page)` until AC6,
-    // so this absence went unjudged, held up only by the call above.
+    // The population inside the verdict (#446), so an empty `reachable`
+    // cannot pass in silence.
     expect(
       searched(
         reachable.filter((a) => !a.uaPainted).map((a) => a.label),
