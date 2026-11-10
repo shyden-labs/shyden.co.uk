@@ -24,7 +24,7 @@ export const id: Catalogue = {
   // What the tool does; the lead until the operator swapped the two (#384).
   // See en.ts's comments on `lead` and `howToWhat`.
   howToWhat:
-    'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.',
+    'Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan, kecuali seluruh kelas memang lebih kecil.',
   // Rewritten alongside `howToWhat` above, mirroring en.ts's own correction:
   // the old step 1 mentioned pasting names, a box the rewritten engine no
   // longer has anywhere to put (see grouping.ts's GroupingInput).
@@ -120,7 +120,7 @@ export const id: Catalogue = {
   leftoversSpread: 'Bagikan merata',
   leftoversBunch: 'Masukkan semuanya ke satu kelompok',
   leftoversHelp:
-    'Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih.',
+    'Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih, kecuali seluruh kelas memang lebih kecil.',
 
   soundOn: 'Suara aktif',
   soundOff: 'Suara mati',
