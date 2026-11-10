@@ -170,8 +170,13 @@ export const failureOf = (answer: unknown): Failure | undefined => {
   };
 };
 
-/** The runner's own closing line, which names no cause. */
-const EXIT_LINE = /^Process completed with exit code \d+\.$/;
+/**
+ * Lines that name no cause: the runner's own closing line, and Playwright's
+ * pointer to a context file on the runner, printed after the real error
+ * (#1134).
+ */
+const POINTER_LINE =
+  /^(?:Process completed with exit code \d+\.|Error Context: )/;
 
 /** The timestamp the runner puts before every log line. */
 const STAMP = /^\d{4}-\d\d-\d\dT[\d:.]+Z /;
@@ -196,7 +201,7 @@ export const lastErrorLine = (log: string): string | undefined => {
       line.startsWith(ANNOTATION) ? line.slice(ANNOTATION.length) : line,
     );
   const line =
-    naming.findLast((each) => !EXIT_LINE.test(each)) ?? naming.at(-1);
+    naming.findLast((each) => !POINTER_LINE.test(each)) ?? naming.at(-1);
   if (line === undefined) return undefined;
   return line.length > ERROR_LINE_LIMIT
     ? `${line.slice(0, ERROR_LINE_LIMIT - 1)}…`
