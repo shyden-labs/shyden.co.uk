@@ -546,9 +546,7 @@ describe('the deploy pipeline runs what it claims to', () => {
   it('prod-verified is gated on a real browser run, not a curl smoke', () => {
     const prod = workflowSteps('deploy-prod.yml');
     const browser = prod.indexOf('playwright.prod.config');
-    const status = prod.indexOf(
-      'node scripts/commit-status.mjs prod-verified',
-    );
+    const status = prod.indexOf('node scripts/commit-status.mjs prod-verified');
 
     expect(browser, 'prod never runs playwright.prod.config').toBeGreaterThan(
       -1,
