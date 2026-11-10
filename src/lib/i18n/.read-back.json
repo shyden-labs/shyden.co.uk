@@ -27,11 +27,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "只需输入班级人数以及每组希望安排多少名学生，系统就会自动将学生随机分组，确保每个小组的人数都不会少于您设定的最低人数。": {
-        "english": "Simply enter the number of students in the class and how many students you want in each group, and the system will automatically group the students randomly, ensuring that each group has no fewer than the minimum number you set.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
       "填写你班上的学生人数。": {
         "english": "Enter the number of students in your class.",
         "writers": ["DeepL"],
@@ -155,11 +150,6 @@
       },
       "把他们全都放进同一个组": {
         "english": "Put them all in the same group",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "无论哪种情况，任何一组的人数都不会少于你所选的数量。": {
-        "english": "In either case, the number of people in any group will not be less than the number you selected.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -686,11 +676,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。": {
-        "english": "Paste a class roster and get fair, random groupings in seconds. Made for teachers, and permanently free.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "打开小组创建器": {
         "english": "Open Group Creator",
         "writers": ["edited after DeepL"],
@@ -933,7 +918,7 @@
       },
       "行 {row} — 缺席 '{value}' 无法识别。请使用 {accepted}，或留空。": {
         "english": "The row {row} {value} missing and cannot be recognized. Please use {accepted} or leave it blank.",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "ambiguous",
         "note": "Google garbled the line; the zh says absent '{value}' is not understood"
       },
@@ -1121,7 +1106,7 @@
       },
       "行 {row} — 性别 '{value}' 无法识别。请使用 {accepted}，或留空。": {
         "english": "The row {row} — gender ' {value} ' is not recognized. Please use {accepted} , or leave it blank.",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
       "第{row}行 — {column} '{value}' 不是单个字母。": {
@@ -1322,6 +1307,24 @@
         "verdict": "agrees",
         "note": "Shyden 2026-11-08 (#999): 学号 is how a class names a student number"
       },
+      "只需输入班级人数以及每组希望安排多少名学生，系统就会自动将学生随机分组。除非整个班级的人数少于您设定的数量，否则每个小组的人数都不会少于该数量。": {
+        "english": "Simply enter the number of students in the class and how many students you want in each group, and the system will automatically group the students randomly. Unless the total number of students in the class is less than the number you set, each group will have no fewer than that number.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "无论哪种情况，除非整个班级的人数都少于你选择的数量，否则任何小组的人数都不会少于你选择的数量。": {
+        "english": "In either case, no group will have fewer members than you selected, unless the entire class has fewer members than the number you selected.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。": {
+        "english": "Enter or import class rosters to generate fair, random groupings in seconds. Designed for teachers and permanently free.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
       "行 {row} — 编号 '{value}' 太小。编号从 1 开始。": {
         "english": "The {row} number ' {value} ' is too small. Numbering should start from 1.",
         "writers": ["edited after DeepL"],
@@ -1353,11 +1356,6 @@
       },
       "วิธีใช้": {
         "english": "How to use",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "บอกระบบว่าชั้นเรียนของคุณมีนักเรียนกี่คน และต้องการให้นักเรียนในกลุ่มละกี่คน ระบบจะสับเปลี่ยนและจัดนักเรียนให้แต่ละกลุ่ม โดยไม่มีกลุ่มใดที่มีจำนวนนักเรียนน้อยกว่าที่คุณกำหนด": {
-        "english": "Tell the system how many students are in your class and how many students you want in each group. The system will shuffle and assign students to each group, ensuring that no group has fewer students than you specify.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -1485,11 +1483,6 @@
       },
       "รวมทั้งหมดไว้ในกลุ่มเดียว": {
         "english": "Combine them all into one group.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "ไม่ว่าจะอย่างไร กลุ่มใดก็ตามจะไม่เล็กกว่าขนาดที่คุณเลือกไว้": {
-        "english": "Regardless, no group will be smaller than the size you have chosen.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -1909,7 +1902,7 @@
       },
       "แถว {row} — ไม่เข้าใจค่า '{value}' สำหรับการขาดเรียน ใช้ {accepted} หรือทิ้งว่างไว้": {
         "english": "Row {row} — Does not understand the value ' {value} ' for absence. Use {accepted} or leave blank.",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
       "ข้อมูลนี้จะแทนที่รายชื่อนักเรียนปัจจุบันของคุณ — นักเรียน {total} คน มีชื่อแล้ว {named} คน": {
@@ -2408,11 +2401,6 @@
         "verdict": "ambiguous",
         "note": "Thai has no plural; calculators"
       },
-      "วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป": {
-        "english": "Enter your student list and get a fair, random group in seconds. Made for teachers. Free forever.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "เปิดเครื่องมือสร้างกลุ่ม": {
         "english": "Open the group creation tool.",
         "writers": ["DeepL"],
@@ -2700,6 +2688,24 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "บอกระบบว่าชั้นเรียนของคุณมีนักเรียนกี่คน และต้องการให้นักเรียนในกลุ่มละกี่คน ระบบจะสับเปลี่ยนและจัดนักเรียนให้แต่ละกลุ่ม โดยไม่มีกลุ่มใดที่มีจำนวนนักเรียนน้อยกว่าที่คุณกำหนด เว้นแต่ทั้งชั้นเรียนจะมีจำนวนนักเรียนน้อยกว่านั้น": {
+        "english": "Tell the system how many students are in your class and how many students you want in each group. The system will shuffle and assign students to each group, ensuring no group has fewer students than you specify, unless the entire class has fewer students than that.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "ไม่ว่าจะอย่างไร กลุ่มใดก็ไม่มีขนาดเล็กกว่าขนาดที่คุณเลือก เว้นแต่ทั้งชั้นเรียนจะมีขนาดเล็กกว่า": {
+        "english": "Regardless, no group can be smaller than the size you've chosen, unless the entire class is smaller.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป": {
+        "english": "Print or import class lists and get fair, random groups in seconds. Designed for teachers, free forever.",
+        "writers": ["DeepL"],
+        "verdict": "ambiguous",
+        "note": "พิมพ์ means both 'type' and 'print'; Google took 'print'. The line says type."
       },
       "แถว {row} — หมายเลข '{value}' ต่ำเกินไป หมายเลขเริ่มต้นที่ 1": {
         "english": "Row {row} — Number ' {value} ' is too low. Starting number is 1.",
@@ -3078,11 +3084,6 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
-      "Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan.": {
-        "english": "Enter the number of students in your class and how many students you want per group. This tool will randomize and assign everyone, ensuring no group will be smaller than the number you specify.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "Masukkan jumlah siswa di kelas Anda.": {
         "english": "Enter the number of students in your class.",
         "writers": ["edited after DeepL"],
@@ -3209,11 +3210,6 @@
       },
       "Masukkan semuanya ke satu kelompok": {
         "english": "Put them all in one group",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
-      "Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih.": {
-        "english": "In any case, no group will be smaller than the size you choose.",
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
@@ -3848,11 +3844,6 @@
         "verdict": "ambiguous",
         "note": "hadiah (gift) read as 'prize/reward'"
       },
-      "Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.": {
-        "english": "Paste your class list and get fair, random groups in seconds. Made for teachers, free forever.",
-        "writers": ["no DeepL draft"],
-        "verdict": "agrees"
-      },
       "Buka pembuat kelompok": {
         "english": "Open group creator",
         "writers": ["no DeepL draft"],
@@ -4144,6 +4135,24 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Masukkan jumlah siswa di kelas Anda dan berapa siswa yang Anda inginkan per kelompok. Alat ini akan mengacak dan membagikan semuanya, dan tidak ada kelompok yang jumlahnya kurang dari yang Anda tentukan, kecuali seluruh kelas memang lebih kecil.": {
+        "english": "Enter the number of students in your class and how many students you want per group. The tool will randomize and assign everyone, and no group will be smaller than the number you specify, unless the entire class is smaller.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "Dengan cara apa pun, tidak ada kelompok yang lebih kecil dari ukuran yang Anda pilih, kecuali seluruh kelas memang lebih kecil.": {
+        "english": "In any case, no group can be smaller than the size you choose, unless the entire class is indeed smaller.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "Ketik atau impor daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.": {
+        "english": "Type or import a class list and get fair, random groups in seconds. Made for teachers, free forever.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
       },
       "Baris {row} — nomor '{value}' terlalu kecil. Nomor dimulai dari 1.": {
         "english": "Row {row} — number ' {value} ' is too small. Numbers start at 1.",
@@ -4542,7 +4551,7 @@
       },
       "Dòng {row} — vắng mặt '{value}' không được nhận diện. Hãy sử dụng {accepted} hoặc để trống.": {
         "english": "The line {row} — the absence of ' {value} ' means it is not recognized. Use {accepted} or leave it blank.",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "ambiguous",
         "note": "Google garbled the line; the vi says absent '{value}' is not recognised"
       },
@@ -4625,11 +4634,6 @@
       },
       "Cách sử dụng": {
         "english": "How to use",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Hãy cho chương trình biết lớp của bạn có bao nhiêu học sinh và bạn muốn mỗi nhóm có bao nhiêu học sinh. Chương trình sẽ xáo trộn danh sách và phân chia học sinh vào các nhóm, đồng thời đảm bảo không có nhóm nào có số lượng học sinh ít hơn số lượng bạn yêu cầu.": {
-        "english": "Tell the program how many students are in your class and how many students you want in each group. The program will shuffle the list and divide the students into groups, ensuring that no group has fewer students than you requested.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -4749,11 +4753,6 @@
       },
       "Gộp tất cả vào một nhóm": {
         "english": "Group them all together.",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
-      "Dù thế nào đi nữa, không có nhóm nào có quy mô nhỏ hơn quy mô mà bạn đã chọn.": {
-        "english": "In any case, no group is smaller than the size you have chosen.",
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
@@ -4917,7 +4916,7 @@
       },
       "Dòng {row} — giới tính '{value}' không được nhận diện. Hãy sử dụng {accepted} hoặc để trống.": {
         "english": "The row {row} — gender ' {value} ' is not recognized. Use {accepted} or leave it blank.",
-        "writers": ["DeepL"],
+        "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
       "Dòng {row} — {column} '{value}' không phải là một ký tự duy nhất.": {
@@ -5248,11 +5247,6 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.": {
-        "english": "Paste your class list and get randomly assigned to fair groups in seconds. For teachers, free forever.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "Mở trình tạo nhóm": {
         "english": "Open the group builder.",
         "writers": ["DeepL"],
@@ -5548,6 +5542,24 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Read beside its English; Shyden approved the set, 2026-11-02 (#1017)"
+      },
+      "Hãy cho chương trình biết lớp của bạn có bao nhiêu học sinh và bạn muốn mỗi nhóm có bao nhiêu học sinh. Chương trình sẽ xáo trộn danh sách và phân chia học sinh vào các nhóm, đồng thời đảm bảo không có nhóm nào có số lượng học sinh ít hơn số lượng bạn yêu cầu, trừ khi cả lớp có ít học sinh hơn số đó.": {
+        "english": "Tell the program how many students are in your class and how many students you want in each group. The program will shuffle the list and divide the students into groups, ensuring that no group has fewer students than you requested, unless the entire class has fewer students than that number.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "Dù thế nào đi nữa, không có nhóm nào có quy mô nhỏ hơn quy mô mà bạn đã chọn, trừ khi cả lớp có ít học sinh hơn số đó.": {
+        "english": "In any case, no group can be smaller than the size you've chosen, unless the entire class has fewer students than that number.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "Nhập hoặc tải lên danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.": {
+        "english": "Import or upload class lists and receive random, fair groups in seconds. For teachers, free forever.",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "Nhập means both 'enter/type' and 'import'; Google took 'import'. The line says type, then tải lên (upload) for import."
       },
       "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1.": {
         "english": "Row {row} — the number ' {value} ' is too small. Numbers start from 1.",
