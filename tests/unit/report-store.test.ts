@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { storeReport } from '../../src/lib/report-store';
+import { retiredBefore, storeReport } from '../../src/lib/report-store';
 import {
   refusedOn,
   scriptedDatabase,
@@ -21,15 +21,47 @@ const DAY = '2026-10-19';
 const COUNT = { counter: 'k'.repeat(64), limits: { total: 50, connection: 5 } };
 
 describe('storeReport with the limits off', () => {
-  it('prunes other days, then inserts the row, in one batch', async () => {
+  it('prunes other days, inserts the row, then retires year-old reports, in one batch', async () => {
     const { db, batches } = scriptedDatabase([STORED_OFF]);
     expect(await storeReport(db, ROW, DAY, null)).toBe('sent');
     expect(batches).toHaveLength(1);
     expect(
       batches[0]!.map(({ query }) => query.split(' ').slice(0, 3).join(' ')),
-    ).toEqual(['DELETE FROM report_counts', 'INSERT INTO reports']);
+    ).toEqual([
+      'DELETE FROM report_counts',
+      'INSERT INTO reports',
+      'DELETE FROM reports',
+    ]);
     expect(batches[0]![0]!.values).toEqual([DAY]);
     expect(batches[0]![1]!.values).toEqual(ROW);
+  });
+});
+
+/**
+ * Reports are kept for a year (Shyden, 2026-11-11, #1140): every write also
+ * deletes the reports received before the same day a year earlier.
+ */
+describe('a report older than a year is deleted when the next one is written', () => {
+  it('the cutoff is the day 365 days earlier', () => {
+    expect(retiredBefore('2026-10-19')).toBe('2025-10-19');
+    // Across a leap day the cutoff is still 365 days back.
+    expect(retiredBefore('2028-03-01')).toBe('2027-03-02');
+  });
+
+  it('ends the batch with the delete, bound to the cutoff, with the limits off', async () => {
+    const { db, batches } = scriptedDatabase([STORED_OFF]);
+    await storeReport(db, ROW, DAY, null);
+    const last = batches[0]!.at(-1)!;
+    expect(last.query).toBe('DELETE FROM reports WHERE received_at < ?1');
+    expect(last.values).toEqual(['2025-10-19']);
+  });
+
+  it('ends the batch with the same delete with the limits on, and still answers sent', async () => {
+    const { db, batches } = scriptedDatabase([storedOn(1, 1)]);
+    expect(await storeReport(db, ROW, DAY, COUNT)).toBe('sent');
+    const last = batches[0]!.at(-1)!;
+    expect(last.query).toBe('DELETE FROM reports WHERE received_at < ?1');
+    expect(last.values).toEqual(['2025-10-19']);
   });
 });
 
