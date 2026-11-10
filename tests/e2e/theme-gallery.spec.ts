@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
@@ -63,8 +64,9 @@ for (const theme of THEMES) {
         await tapOn(languages.locator('summary'));
 
         const toggle = page.locator('header [data-theme-toggle]');
-        await page.keyboard.press('Shift');
-        await toggle.focus();
+        // The switch sits just before the language list (#142 §5), so the
+        // walk to it from the list goes back.
+        await tabTo(toggle, 'backwards');
         await expect(toggle).toBeFocused();
         await shoot(
           page,

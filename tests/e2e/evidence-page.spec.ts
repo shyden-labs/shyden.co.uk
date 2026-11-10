@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { randomUUID } from 'node:crypto';
@@ -1396,7 +1397,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
       name: ADDED,
       exact: true,
     });
-    await link.focus();
+    await tabTo(link);
     await expect(link).toBeFocused();
     await shoot(page, 'the link to the added journey has focus', signOff(page));
     await page.keyboard.press('Enter');
@@ -1428,7 +1429,7 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
       exact: true,
     });
     await expect(link).toBeVisible();
-    await approveButton(page).focus();
+    await tabTo(approveButton(page));
     await page.keyboard.press('Shift+Tab');
     await expect(
       link,

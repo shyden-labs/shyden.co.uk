@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -733,7 +734,7 @@ test.describe('homepage content', () => {
         .toBeGreaterThanOrEqual(3);
 
       const control = pauseControl(page, 'en');
-      await page.locator('.hero a').first().focus();
+      await tabTo(page.locator('.hero a').first());
       await page.keyboard.press(
         browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab',
       );
@@ -1294,7 +1295,7 @@ test.describe('pause motion', () => {
 
     // The band now sits before the hero in the DOM (#599), so the control is
     // the first hero link's predecessor in tab order.
-    await page.locator('.hero a').first().focus();
+    await tabTo(page.locator('.hero a').first());
     // Safari's Tab skips form controls unless Full Keyboard Access is on;
     // its documented way to reach one is Option+Tab, which is what WebKit
     // here is given. Every other engine takes a plain Tab.

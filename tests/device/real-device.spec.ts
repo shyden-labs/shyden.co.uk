@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import type { Page } from '@playwright/test';
 import { adb, renderedScreen } from '../../scripts/adb.mjs';
 import { test, expect } from '../e2e/fixtures';
@@ -49,7 +50,7 @@ test("a test's tab shows a datalist's suggestions without Chrome crashing", asyn
   const report = page.locator('[data-report]');
   const quote = report.locator('#report-quote');
   // From the keyboard, as report-form.spec.ts walks the fields: open the form, Tab in.
-  await report.locator('summary').focus();
+  await tabTo(report.locator('summary'));
   await page.keyboard.press('Enter');
   await page.keyboard.press('Tab');
   await expect(quote).toBeFocused();

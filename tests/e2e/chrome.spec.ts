@@ -1,3 +1,4 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -139,7 +140,7 @@ test.describe('header + footer', () => {
     await expect(details).toHaveJSProperty('open', true);
     await expect(firstLink).toBeVisible();
     // Keyboard: native <summary> activation toggles the disclosure on Enter.
-    await page.locator('header details.menu > summary').focus();
+    await tabTo(page.locator('header details.menu > summary'));
     await page.keyboard.press('Enter');
     await expect(details).toHaveJSProperty('open', false);
     await expect(firstLink).toBeHidden();
@@ -199,11 +200,11 @@ test.describe('header + footer', () => {
     await revealNav(page);
     // Anchor on the language switcher's summary — the last focusable thing
     // in the bar before <nav> — rather than on the wordmark: engines differ on
-    // how many Tab presses that gap costs, and an explicit focus() fixes the
-    // starting point on all of them. Tab then advances in DOM order, so this
+    // how many Tab presses that gap costs, and tabTo walks to it by Tab on
+    // all of them. Tab then advances in DOM order, so this
     // asserts OUR running order.
     const languages = page.locator('header details.lang-switch > summary');
-    await languages.focus();
+    await tabTo(languages);
     // The theme switch sits immediately before the language switcher
     // (#142 §5). Reached by Shift+Tab, never focused directly, so a switch
     // taken out of the Tab order (tabindex="-1") is stepped over and this
@@ -242,7 +243,7 @@ test.describe('header + footer', () => {
       const el = page.locator(sel);
       await expect(el, sel).toBeVisible();
       await expect(el, sel).not.toHaveAttribute('tabindex', '-1');
-      await el.focus();
+      await tabTo(el);
       await expect(el, sel).toBeFocused();
     }
   });
