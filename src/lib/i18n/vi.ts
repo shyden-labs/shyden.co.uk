@@ -158,6 +158,8 @@ export const vi: Catalogue = {
     'Dòng {row} — chưa có số thứ tự. Mỗi học sinh cần có một số.',
   csvProblemNumberNotWhole:
     "Dòng {row} — số '{value}' không phải là số nguyên.",
+  csvProblemNumberTooLow:
+    "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1.",
   csvProblemDuplicateNumber:
     'Dòng {row} — số {value} đã được dòng {firstRow} sử dụng.',
   csvProblemSex:

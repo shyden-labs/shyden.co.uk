@@ -282,7 +282,8 @@
     "Either way, no group is smaller than the size you chose unless the whole class is.": "无论哪种情况，除非整个班级的人数都少于你选择的数量，否则任何小组的人数都不会少于你选择的数量。",
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "Row {row} — 无法识别性别 '{value}'。请使用 {accepted}，或留空。",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "行 {row} — 未提供 '{value}'，系统无法识别。请使用 {accepted}，或留空。",
-    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。"
+    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "行 {row} — 数字 '{value}' 太小。数字从 1 开始。"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -567,7 +568,8 @@
     "Either way, no group is smaller than the size you chose unless the whole class is.": "Dù thế nào đi nữa, không có nhóm nào có quy mô nhỏ hơn quy mô mà bạn đã chọn, trừ khi cả lớp đều như vậy.",
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "Dòng {row} — giới tính '{value}' không được nhận diện. Vui lòng sử dụng {accepted} hoặc để trống.",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "Dòng {row} — nếu thiếu '{value}' thì hệ thống sẽ không nhận diện được. Hãy sử dụng {accepted} hoặc để trống.",
-    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "Chỉ cần nhập hoặc tải lên danh sách học sinh là bạn sẽ có ngay các nhóm học sinh công bằng và ngẫu nhiên chỉ trong vài giây. Được thiết kế dành riêng cho giáo viên, miễn phí vĩnh viễn."
+    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "Chỉ cần nhập hoặc tải lên danh sách học sinh là bạn sẽ có ngay các nhóm học sinh công bằng và ngẫu nhiên chỉ trong vài giây. Được thiết kế dành riêng cho giáo viên, miễn phí vĩnh viễn.",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1."
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -852,7 +854,8 @@
     "Either way, no group is smaller than the size you chose unless the whole class is.": "ไม่ว่าจะอย่างไร กลุ่มใดก็ไม่มีขนาดเล็กกว่าขนาดที่คุณเลือก เว้นแต่ทั้งชั้นเรียนจะมีขนาดเล็กกว่า",
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "แถว {row} — ไม่เข้าใจค่า '{value}' สำหรับเพศ ใช้ {accepted} หรือทิ้งว่างไว้",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "แถว {row} — ไม่เข้าใจค่า '{value}' ที่ขาดไป โปรดใช้ {accepted} หรือทิ้งว่างไว้",
-    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป"
+    "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป",
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "แถว {row} — ตัวเลข '{value}' ต่ำเกินไป ตัวเลขเริ่มต้นที่ 1"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",

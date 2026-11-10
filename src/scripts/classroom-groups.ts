@@ -31,6 +31,7 @@ import {
   studentsBoxLocked,
 } from '../lib/roster';
 import {
+  printTexts,
   renderRoster,
   type RosterHandlers,
   type PrintColumn,
@@ -988,19 +989,7 @@ if (form) {
       // own comment in roster-ui.ts for what that printed (#253). A mirror
       // carries the column it belongs to, so reordering the table can no
       // longer re-point them without anyone noticing.
-      const texts: Record<PrintColumn, string> = {
-        number: String(student.number),
-        name: student.name ?? '',
-        sex:
-          student.sex === 'M'
-            ? t.rosterSexMale
-            : student.sex === 'F'
-              ? t.rosterSexFemale
-              : t.rosterUnset,
-        absent: student.absent ? '\u2611' : '\u2610',
-        together: student.together ?? t.rosterUnset,
-        apart: student.apart ?? t.rosterUnset,
-      };
+      const texts = printTexts(student, t);
       row.querySelectorAll<HTMLElement>('.cg-print-value').forEach((el) => {
         const column = el.dataset.col as PrintColumn | undefined;
         const text = column === undefined ? undefined : texts[column];

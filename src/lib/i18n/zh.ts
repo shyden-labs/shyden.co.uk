@@ -140,6 +140,7 @@ export const zh: Catalogue = {
   csvProblemNoNumberColumn: '该文件中没有编号列。每个学生都需要一个编号。',
   csvProblemNumberBlank: '行 {row} — 编号处为空。每位学生都需要一个。',
   csvProblemNumberNotWhole: "行 {row} — 编号 '{value}' 不是整数。",
+  csvProblemNumberTooLow: "行 {row} — 编号 '{value}' 太小。编号从 1 开始。",
   csvProblemDuplicateNumber: '行 {row} — 编号 {value} 已被行 {firstRow} 占用。',
   csvProblemSex:
     "行 {row} — 性别 '{value}' 无法识别。请使用 {accepted}，或留空。",

@@ -254,13 +254,19 @@ function tagOutput(tag, child) {
  * @param {string} tag
  * @param {string} command
  * @param {readonly string[]} args
- * @param {{ env?: NodeJS.ProcessEnv, cwd?: string }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv, cwd?: string, detached?: boolean }} [options]
  */
-function spawnTagged(tag, command, args, { env, cwd = ROOT } = {}) {
+function spawnTagged(
+  tag,
+  command,
+  args,
+  { env, cwd = ROOT, detached = false } = {},
+) {
   const child = spawn(command, args, {
     cwd,
     env: env ?? process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached,
   });
   tagOutput(tag, child);
   return child;
@@ -355,6 +361,80 @@ export function pidsListeningOnPort(port) {
     );
     if (spawned.status === 1 && !spawned.stdout) return [];
     throw error;
+  }
+}
+
+/** How long a run waits for another server to give up its preview port. */
+export const PORT_WAIT_CEILING_MS = 600_000;
+
+/**
+ * Whether the run may take `port` now (#390 F44). It is never taken from
+ * anyone: a holder is named and waited for, and the run fails at the
+ * ceiling naming it. Pure; `waitForPortFree` asks the system who holds it.
+ *
+ * @param {number} port
+ * @param {{ pid: number, command: string }[]} holders
+ * @param {number} waitedMs
+ * @param {number} ceilingMs
+ * @returns {{ free: true } | { free: false, say: string }}
+ */
+export function portWait(port, holders, waitedMs, ceilingMs) {
+  if (holders.length === 0) return { free: true };
+  const named = holders.map((h) => `pid ${h.pid} (${h.command})`).join(', ');
+  const ceiling = `${Math.round(ceilingMs / 1000)} s`;
+  if (waitedMs >= ceilingMs)
+    throw new Error(
+      `port ${port} is still held by ${named} after ${ceiling}; stop that server, or wait for its run to end, then start again`,
+    );
+  return {
+    free: false,
+    say: `port ${port} is held by ${named}; waiting for it to close, up to ${ceiling}`,
+  };
+}
+
+/**
+ * Each process listening on `port`, with its command line, for a message.
+ *
+ * @param {number} port
+ * @returns {{ pid: number, command: string }[]}
+ */
+function portHolders(port) {
+  return pidsListeningOnPort(port).map((pid) => {
+    let command = 'unknown';
+    try {
+      command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+        encoding: 'utf8',
+      }).trim();
+    } catch {
+      // Gone between the two reads: the next poll will not list it.
+    }
+    return { pid, command };
+  });
+}
+
+/**
+ * Waits for `port` to be free, saying who holds it once, and fails at
+ * `PORT_WAIT_CEILING_MS` naming the holder.
+ *
+ * @param {number} port
+ * @returns {Promise<void>}
+ */
+export async function waitForPortFree(port) {
+  const startedAt = Date.now();
+  let said = '';
+  for (;;) {
+    const verdict = portWait(
+      port,
+      portHolders(port),
+      Date.now() - startedAt,
+      PORT_WAIT_CEILING_MS,
+    );
+    if (verdict.free) return;
+    if (verdict.say !== said) {
+      process.stdout.write(`==> ${verdict.say}\n`);
+      said = verdict.say;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
 }
 
@@ -1299,11 +1379,14 @@ export function exitCodeFor(signal) {
 const cleanup = once(async () => {
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
-    await killByPort(PORT).catch((error) =>
+    try {
+      if (previewChild.pid !== undefined)
+        process.kill(-previewChild.pid, 'SIGTERM');
+    } catch (error) {
       process.stderr.write(
-        `cleanup: failed to free port ${PORT}: ${messageOf(error)}\n`,
-      ),
-    );
+        `cleanup: failed to stop the preview server: ${messageOf(error)}\n`,
+      );
+    }
   }
   await cleanupAdbTunnels();
 });
@@ -1412,10 +1495,9 @@ async function main() {
     // it.
     await startDashboard();
 
-    process.stdout.write(
-      '==> Freeing port 4321 (any stale server from a previous run)...\n',
-    );
-    await killByPort(PORT);
+    // Waited for, never taken: the server on it may be another session's
+    // or worktree's (#390 F44).
+    await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
     const build = await runTagged('build', 'npm', ['run', 'build']);
@@ -1428,13 +1510,14 @@ async function main() {
     process.stdout.write(
       '==> Starting the shared preview server (npm run preview -- --host 0.0.0.0)...\n',
     );
-    previewChild = spawnTagged('preview', 'npm', [
-      'run',
+    // Its own process group: cleanup stops npm AND the server it started,
+    // and nothing else that happens to use the port (#390 F44).
+    previewChild = spawnTagged(
       'preview',
-      '--',
-      '--host',
-      '0.0.0.0',
-    ]);
+      'npm',
+      ['run', 'preview', '--', '--host', '0.0.0.0'],
+      { detached: true },
+    );
     await waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
       timeoutMs: 30_000,
       describe: `the shared preview server to answer on :${PORT}`,

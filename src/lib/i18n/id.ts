@@ -258,6 +258,8 @@ export const id: Catalogue = {
     'Baris {row} — nomor kosong. Setiap siswa memerlukannya.',
   csvProblemNumberNotWhole:
     "Baris {row} — nomor '{value}' bukan bilangan bulat.",
+  csvProblemNumberTooLow:
+    "Baris {row} — nomor '{value}' terlalu kecil. Nomor dimulai dari 1.",
   csvProblemDuplicateNumber:
     'Baris {row} — nomor {value} sudah dipakai oleh baris {firstRow}.',
   csvProblemSex:

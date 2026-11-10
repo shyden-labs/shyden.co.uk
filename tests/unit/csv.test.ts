@@ -670,6 +670,26 @@ describe('parseRoster', () => {
     );
   });
 
+  it.each(['0', '00'])(
+    'refuses number %s, as the roster does, by name (#1097)',
+    (value) => {
+      const out = parseRoster(`number\n1\n${value}\n2\n`, 'en', en);
+      expect(out.ok).toBe(false);
+      if (out.ok) return;
+      expect(out.problems).toEqual([
+        {
+          row: 2,
+          message: `Row 2 — number '${value}' is too low. Numbers start at 1.`,
+        },
+      ]);
+    },
+  );
+
+  it('still takes number 1, and a 2 written as 02', () => {
+    const out = parseRoster('number\n1\n02\n', 'en', en);
+    expect(out.ok && out.roster.map((s) => s.number)).toEqual([1, 2]);
+  });
+
   it('refuses a file with no number column at all', () => {
     const out = parseRoster('name,sex\nAna,F\n', 'en', en);
     expect(out.ok).toBe(false);

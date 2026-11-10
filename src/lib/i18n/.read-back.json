@@ -1324,6 +1324,12 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "行 {row} — 编号 '{value}' 太小。编号从 1 开始。": {
+        "english": "The {row} number ' {value} ' is too small. Numbering should start from 1.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning; 行 {row} read as 'The {row}', as the sibling csvProblem lines read"
       }
     },
     "th": {
@@ -2700,6 +2706,12 @@
         "writers": ["DeepL"],
         "verdict": "ambiguous",
         "note": "พิมพ์ means both 'type' and 'print'; Google took 'print'. The line says type."
+      },
+      "แถว {row} — หมายเลข '{value}' ต่ำเกินไป หมายเลขเริ่มต้นที่ 1": {
+        "english": "Row {row} — Number ' {value} ' is too low. Starting number is 1.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning: too low, numbers start at 1"
       }
     },
     "id": {
@@ -4141,6 +4153,12 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "Same meaning as the English, read by Claude beside it."
+      },
+      "Baris {row} — nomor '{value}' terlalu kecil. Nomor dimulai dari 1.": {
+        "english": "Row {row} — number ' {value} ' is too small. Numbers start at 1.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "Same meaning; too small for too low"
       }
     },
     "vi": {
@@ -5542,6 +5560,12 @@
         "writers": ["edited after DeepL"],
         "verdict": "ambiguous",
         "note": "Nhập means both 'enter/type' and 'import'; Google took 'import'. The line says type, then tải lên (upload) for import."
+      },
+      "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1.": {
+        "english": "Row {row} — the number ' {value} ' is too small. Numbers start from 1.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Same meaning; too small for too low"
       }
     }
   },

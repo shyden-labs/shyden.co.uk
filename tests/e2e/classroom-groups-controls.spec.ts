@@ -1972,3 +1972,25 @@ test.describe('per-test isolation actually isolates state across back-to-back te
     await expect(page.locator('#cg-class')).toHaveValue('');
   });
 });
+
+test.describe('the containment helper', () => {
+  // #1103 (#390 F53): spillPastCard measured the right edge alone, so a
+  // child pushed past the card's LEFT edge read as contained. A fixture page,
+  // because no page here spills left today: the helper must see it the day
+  // one does.
+  test('spillPastCard reads a spill past either edge of the card', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<div id="fixture-card" style="box-sizing:border-box;width:200px;margin-left:100px;padding:10px;border:1px solid"><div class="pushed-left" style="margin-left:-40px;width:50px;height:10px"></div></div>',
+    );
+    const worst = await spillPastCard(page, 'fixture-card');
+    expect(worst.who).toBe('pushed-left');
+    expect(worst.over).toBeCloseTo(40, 1);
+    // A screen-reader-only label, clipped to nothing, paints no spill.
+    await page.setContent(
+      '<div id="fixture-card" style="box-sizing:border-box;width:200px;margin-left:100px;padding:10px;border:1px solid"><span class="visually-hidden" style="position:absolute;width:1px;height:1px;margin:-1px -1px -1px -20px;overflow:hidden;clip-path:inset(50%)">label</span></div>',
+    );
+    expect((await spillPastCard(page, 'fixture-card')).over).toBe(0);
+  });
+});
