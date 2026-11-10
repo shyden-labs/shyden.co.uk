@@ -74,6 +74,11 @@ type Gap = { ms: number; before: number; after: number };
 type Samples = {
   students: [number, Tally][];
   flights: Flight[];
+  /**
+   * Every student whose row the page set travelling, from a MutationObserver
+   * (#940): the page's own changes, which no frame rate can miss.
+   */
+  took: number[];
   gap: Gap;
   /** The same, counted only from the first student's flight on: the deal itself. */
   flightGap: Gap;
@@ -266,6 +271,7 @@ const startSampler = (page: Page) =>
       return {
         students: [...tally],
         flights,
+        took: [],
         gap,
         flightGap,
         slowestTick: Math.round(slowestTick),
@@ -443,7 +449,14 @@ test.describe('the board deals by moving students into their cards', () => {
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { flights } = await stopSampler(page);
+    const { flights, took } = await stopSampler(page);
+
+    // Every dealt student travels, counted from the page's own class changes
+    // (#940), never from frames: a flight that starts and lands between two
+    // sampled frames is still counted.
+    expect
+      .soft(took, 'students the page set travelling')
+      .toEqual(Array.from({ length: COUNT }, (_, i) => i + 1));
 
     // The list keeps its size while students travel, then folds away.
     const firstHeight = flights[0]?.listHeight;
