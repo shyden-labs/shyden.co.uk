@@ -136,6 +136,25 @@ const startSampler = (page: Page) =>
     const measure = new Function(measureScript) as () => BoardGeometry;
     const tally = new Map<number, Tally>();
     const flights: Flight[] = [];
+    // Every row the page sets travelling, from its own class changes (#940).
+    // A record's old value still holds the class when the page added and
+    // removed it within one task, before any frame or this callback ran.
+    const took = new Set<number>();
+    const travelling = (el: Element, classes: string | null) =>
+      el.classList.contains('student') &&
+      (el.classList.contains('travelling') ||
+        (classes ?? '').split(/\s+/).includes('travelling'));
+    const observer = new MutationObserver((records) => {
+      for (const r of records)
+        if (r.target instanceof HTMLElement && travelling(r.target, r.oldValue))
+          took.add(Number(r.target.dataset.number));
+    });
+    observer.observe(document.getElementById('cg-board')!, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+      attributeOldValue: true,
+    });
     let on = true;
     let frame = 0;
     const start = performance.now();
@@ -268,10 +287,14 @@ const startSampler = (page: Page) =>
     requestAnimationFrame(tick);
     (window as unknown as { stopSampler: () => Samples }).stopSampler = () => {
       on = false;
+      for (const r of observer.takeRecords())
+        if (r.target instanceof HTMLElement && travelling(r.target, r.oldValue))
+          took.add(Number(r.target.dataset.number));
+      observer.disconnect();
       return {
         students: [...tally],
         flights,
-        took: [],
+        took: [...took].sort((a, b) => a - b),
         gap,
         flightGap,
         slowestTick: Math.round(slowestTick),
@@ -457,6 +480,13 @@ test.describe('the board deals by moving students into their cards', () => {
     expect
       .soft(took, 'students the page set travelling')
       .toEqual(Array.from({ length: COUNT }, (_, i) => i + 1));
+    const seen = new Set(flights.flatMap((f) => f.flying));
+    const unsampled = took.filter((n) => !seen.has(n));
+    if (unsampled.length > 0)
+      test.info().annotations.push({
+        type: 'flights no frame caught',
+        description: `${unsampled.join(', ')} of ${took.length}: their in-flight checks below have no frame to judge`,
+      });
 
     // The list keeps its size while students travel, then folds away.
     const firstHeight = flights[0]?.listHeight;
