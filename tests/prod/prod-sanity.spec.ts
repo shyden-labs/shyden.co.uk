@@ -196,7 +196,7 @@ for (const [from, to] of LEGACY_REDIRECTS)
       annotation: {
         type: 'deployed-only',
         description:
-          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+          'the functions suite proves the redirect, functions/_middleware.js, before the merge (#394); only the deployed site proves shyden.co.uk itself answers it',
       },
     },
     async ({ request }) => {
