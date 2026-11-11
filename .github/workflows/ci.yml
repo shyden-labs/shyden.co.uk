@@ -558,8 +558,8 @@ jobs:
   #
   # It NEVER passes `--update-snapshots`. A CI run that can rewrite the
   # baseline it is checking against asserts nothing at all, which is the whole
-  # failure class this repo keeps finding; `npm run test:visual:update` is the
-  # only way a baseline changes, and it changes as a reviewable diff in a PR.
+  # failure class this repo keeps finding; `visual-capture.yml` is the only
+  # way a baseline changes, and it changes as a reviewable diff in a PR.
   visual:
     needs: image
     runs-on: ubuntu-26.04

@@ -126,13 +126,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: test-devices.mjs [--ios] (got --no-such-flag)',
   },
-  // With no `docker` on PATH it refuses rather than compare nothing (#202).
-  'visual.mjs': {
-    args: [],
-    env: { PATH: '/nonexistent' },
-    status: 1,
-    says: 'docker is not available',
-  },
   // The three that did all their work at module scope until #276. Each refuses
   // on `argv` alone, before it reads the cache or the catalogue, so the probe
   // proves the entry point ran without touching either.

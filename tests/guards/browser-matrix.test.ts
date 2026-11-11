@@ -236,28 +236,6 @@ describe('the visual-regression project', () => {
     expect(config.snapshotPathTemplate).toContain('{platform}');
   });
 
-  it('regenerates with `all`, never Playwright’s `changed` preset', () => {
-    // `--update-snapshots` BARE is not "update everything": Playwright 1.63
-    // documents `preset: "changed"`, which rewrites only baselines whose
-    // comparison FAILED and leaves a stale-but-passing one in place -- exactly
-    // the drift #134 exists to stop. Every ticket that regenerates asks for
-    // `all`, and the zero-allowance evidence above was gathered with `all` by
-    // hand, through a flag the repo's own command did not pass (#152).
-    //
-    // Comment-stripped: visual.mjs's prose names this flag repeatedly, so a
-    // raw read is satisfied by the documentation describing the bug.
-    const runner = withoutTsComments(
-      readFileSync('scripts/visual.mjs', 'utf8'),
-    );
-
-    expect(runner, 'the update path must name its mode').toContain(
-      "'--update-snapshots=all'",
-    );
-    expect(runner, 'a bare flag silently means `changed`').not.toMatch(
-      /'--update-snapshots'/,
-    );
-  });
-
   it('refuses to write a baseline nobody asked for', () => {
     // Playwright 1.63 defaults `updateSnapshots` to 'missing'
     // (`runner/index.js:583`). Under that default a run whose baseline is

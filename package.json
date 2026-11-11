@@ -21,8 +21,6 @@
     "test:e2e": "node scripts/test-e2e.mjs",
     "test:functions": "playwright test --config=playwright.functions.config.ts",
     "test:sanity": "SANITY_ON_BUILD=1 playwright test -c playwright.dev.config.ts && SANITY_ON_BUILD=1 playwright test -c playwright.prod.config.ts",
-    "test:visual": "node scripts/visual.mjs",
-    "test:visual:update": "node scripts/visual.mjs --update",
     "test:ios": "vitest run --configLoader native --config vitest.ios.config.ts --reporter=verbose",
     "test:devices": "node scripts/test-devices.mjs",
     "i18n:translate": "node scripts/i18n-translate.mjs",

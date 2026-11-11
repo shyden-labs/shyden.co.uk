@@ -965,6 +965,22 @@ describe('neither bot can push, commit or amend (#889)', () => {
     ]);
   });
 
+  it('captures with `all`, never Playwright’s `changed` preset', () => {
+    // `--update-snapshots` BARE is not "update everything": Playwright
+    // documents `preset: "changed"`, which rewrites only baselines whose
+    // comparison FAILED and leaves a stale-but-passing one in place, exactly
+    // the drift #134 exists to stop. The capture is the one way a baseline
+    // changes (#654, #673), so every Playwright run in it names `all`. Parsed
+    // run lines: the workflow's comments name the flag too.
+    const lines = scriptLines(CAPTURE_WORKFLOW);
+    const runs = lines.filter((line) => /\bplaywright test\b/.test(line));
+    expect(runs, `Playwright runs in ${CAPTURE_WORKFLOW}`).not.toEqual([]);
+    for (const run of runs)
+      expect(run.match(/--update-snapshots(=\S+)?/g), run).toEqual([
+        '--update-snapshots=all',
+      ]);
+  });
+
   it('runs no capture line that pushes, commits or amends, and calls no gh', () => {
     const lines = scriptLines(CAPTURE_WORKFLOW);
     expect(
