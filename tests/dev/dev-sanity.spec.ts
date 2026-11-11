@@ -123,7 +123,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'functions/_middleware.js serves the dev robots.txt, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves functions/_middleware.js serves this robots.txt before the merge (#394); only the deployed site proves dev.shyden.co.uk itself serves it',
     },
   },
   async ({ request }) => {
@@ -173,7 +173,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'the Basic-auth gate is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves the Basic-auth gate, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself is gated',
     },
   },
   async () => {
@@ -197,7 +197,7 @@ for (const [from, to] of LEGACY_REDIRECTS)
       annotation: {
         type: 'deployed-only',
         description:
-          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+          'the functions suite proves the redirect, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself answers it',
       },
     },
     async () => {
