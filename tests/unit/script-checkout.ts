@@ -26,7 +26,7 @@ import { join, resolve } from 'node:path';
  * blur into each other on one platform and not on the other.
  *
  * `node_modules` is linked in beside the copy, so a script that resolves a
- * package from its own location (`visual.mjs` does, at load) finds the
+ * package from its own location finds the
  * checkout's packages, as it would in a real checkout. `remove` unlinks that
  * link without following it; Node's `rmSync` never follows symlinks.
  */

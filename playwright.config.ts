@@ -179,7 +179,7 @@ export default defineConfig({
    * `'none'` refuses outright and writes nothing, and it is the only value for
    * which `applySuggestedRebaselines` returns early instead of being willing
    * to rewrite expectations during a normal run. Baselines change exactly one
-   * way: `npm run test:visual:update`, reviewed as a diff in a PR.
+   * way: `visual-capture.yml` (#654), reviewed as a diff in a PR.
    */
   updateSnapshots: 'none',
   expect: {
