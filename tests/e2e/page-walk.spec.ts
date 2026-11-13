@@ -9,6 +9,10 @@ import { THAI_CHECK } from './checks/thai';
 import { CHROME_CHECKS } from './checks/chrome';
 import { HOMEPAGE_WIDTH_CHECKS } from './checks/homepage';
 import { LANGUAGE_SWITCHER_CHECKS } from './checks/language-switcher';
+import {
+  SWITCHER_OPEN_CHECKS,
+  SWITCHER_READ_CHECKS,
+} from './checks/switcher-open';
 import { HEAD_CHECKS } from './checks/head';
 import { NOT_FOUND_CHECKS } from './checks/not-found';
 import { SERVED_PAGE_CHECKS } from './checks/served-page';
@@ -33,8 +37,8 @@ import { RECORDER_CHECKS } from './checks/recorders';
  * In ORDER: the checks that only read come first; then those that change the
  * page (`mutates`), each placed after every check whose reading it would
  * change. The scan's own seam check puts its planted paragraph back; the
- * touching-words check opens the flow's disclosures, then the palette opens
- * all of them; the recorders plant errors and silence the console; the last
+ * touching-words check opens the flow's disclosures, one tap opens the
+ * language switcher, then the palette opens all of them; the recorders plant errors and silence the console; the last
  * two replace the homepage's body. The ribbon scan hides every glyph and
  * then loads the page again, so it comes before the checks that open things.
  *
@@ -56,6 +60,7 @@ const WALK: readonly PageCheck[] = [
   ...CHROME_CHECKS,
   ...HOMEPAGE_WIDTH_CHECKS,
   ...LANGUAGE_SWITCHER_CHECKS,
+  ...SWITCHER_READ_CHECKS,
   ACCENT_CHECK,
   SPACE_CHECK,
   PLACEHOLDER_CHECK,
@@ -63,6 +68,7 @@ const WALK: readonly PageCheck[] = [
   SEAM_CHECK,
   RIBBON_CHECK,
   TOUCHING_CHECK,
+  ...SWITCHER_OPEN_CHECKS,
   ...PALETTE_CHECKS,
   ...RECORDER_CHECKS,
   ...BODY_CHECKS,
