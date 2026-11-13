@@ -1,17 +1,12 @@
 import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import {
-  LOCALES,
-  getSiteStrings,
-  localisePath,
-  type Locale,
-  otherLocales,
-} from '../../src/lib/i18n';
+import { LOCALES, localisePath, otherLocales } from '../../src/lib/i18n';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { recorded, shoot } from './evidence';
-import { atLeast44, expectNoHorizontalScroll } from '../viewport';
+import { atLeast44 } from '../viewport';
 import { sitePaths } from '../site-pages';
+import { SWITCHER } from './checks/language-switcher';
 import { atViewport } from '../viewport-at';
 
 test.use(recorded);
@@ -32,47 +27,6 @@ test.use(recorded);
  * and put 74px of scroll on a 320px screen).
  */
 
-const SWITCHER = 'details.lang-switch';
-
-/**
- * Below this width the menu button appears, and the switcher shows its flag
- * and short code instead of the full name. The operator's decision for #329,
- * 2026-09-23: one breakpoint shared with the menu, in every locale.
- */
-const COMPACT_BELOW = 720;
-
-/**
- * Which of the two labels shows, asserted on what is VISIBLE. Both are in the
- * markup at every width, so the hidden one still sits in `textContent`, and a
- * `toContainText` on the summary passes whichever the page paints.
- */
-const expectLabel = async (
-  page: Page,
-  locale: Locale,
-  width: number,
-): Promise<void> => {
-  const summary = page.locator(`${SWITCHER} > summary`);
-  const { nativeName, shortName } = LOCALE_METADATA[locale];
-  const [shown, hidden, text] =
-    width < COMPACT_BELOW
-      ? ['.short', '.full', shortName]
-      : ['.full', '.short', nativeName];
-  const where = `${locale} at ${width}px`;
-  await expect(summary.locator(shown), `${where}: ${shown}`).toBeVisible();
-  await expect(summary.locator(shown)).toHaveText(text);
-  await expect(summary.locator(hidden), `${where}: ${hidden}`).toHaveCount(1);
-  await expect(summary.locator(hidden), `${where}: ${hidden}`).toBeHidden();
-  // The label changes and the control's name does not (#329, AC9).
-  await expect(summary).toHaveAccessibleName(
-    getSiteStrings(locale).language.label,
-  );
-  await shoot(
-    page,
-    `${where}: the switcher shows ${text}`,
-    page.locator('header'),
-  );
-};
-
 /** Each switcher entry's href, keyed by the language it offers. */
 const switcherTargets = (page: Page): Promise<Record<string, string>> =>
   page
@@ -91,31 +45,11 @@ const withSlash = (path: string): string =>
   path.endsWith('/') ? path : `${path}/`;
 
 test.describe('language switcher', () => {
-  // One test per case below (#420): per locale, and per locale and width.
-  for (const locale of LOCALES)
-    test(`${locale}: names the current language in its own language, as its width calls for`, async ({
-      page,
-    }) => {
-      // No viewport is set, so this runs at each project's own width -- and on
-      // a real phone, which emulates nothing: the desktop projects see the full
-      // name and the phone projects the short code, so both branches run.
-      await page.goto(localisePath('/', locale));
-      const width = await page.evaluate(() => window.innerWidth);
-      await expectLabel(page, locale, width);
-    });
+  // The label at the target's own width, the label on both sides of 720px,
+  // and no sideways scroll at 320px are read on each homepage's walk:
+  // checks/language-switcher.ts (#1086).
 
-  // Both sides of the edge, and both ends of the range (#329).
-  for (const locale of LOCALES)
-    for (const width of [320, COMPACT_BELOW - 1, COMPACT_BELOW, 1280])
-      test(`${locale} at ${width}px: shows the short code below 720px and the full name from 720px`, async ({
-        page,
-      }) => {
-        // The label follows the width the page really has: a phone takes none of
-        // the widths asked for, so it is checked at its own (#1046).
-        const took = await atViewport(page, { width, height: 720 });
-        await page.goto(localisePath('/', locale));
-        await expectLabel(page, locale, took.width);
-      });
+  // One test per case below (#420): per locale, and per locale and width.
 
   for (const locale of LOCALES)
     test(`${locale}: lists every language in one fixed order, the current one ticked in place, every other a link`, async ({
@@ -246,19 +180,6 @@ test.describe('language switcher', () => {
   // than English — so the three locales #22 added are exactly the ones this
   // test most needed to see. One test per locale (#420): the loop that once
   // lived inside this test shared one budget across all five.
-  for (const locale of LOCALES)
-    test(`${locale}: adds no horizontal scroll at 320px`, async ({ page }) => {
-      const path = localisePath('/', locale);
-      const took = await atViewport(page, { width: 320, height: 720 });
-      await page.goto(path);
-      // Not vacuous: a switcher hidden at 320px would satisfy "no overflow"
-      // trivially, and would also be the wrong fix.
-      await expect(page.locator(`${SWITCHER} > summary`)).toBeVisible();
-      await expectNoHorizontalScroll(
-        page,
-        `${path} scrolls sideways at ${took.width}px`,
-      );
-    });
 
   // Every language (#390 F131): the panel hangs off a summary whose width is
   // each language's own, so this is a fit test, and it read English only.
