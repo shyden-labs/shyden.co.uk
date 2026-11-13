@@ -1,13 +1,6 @@
 import { test, expect } from './fixtures';
 import { expectNoHorizontalScroll } from '../viewport';
 import { atViewport } from '../viewport-at';
-test('custom 404 renders branded not-found copy', async ({ page }) => {
-  const res = await page.goto('/no-such-page-xyz');
-  expect(res?.status()).toBe(404);
-  await expect(page.locator('h1')).toContainText(/not found/i);
-  await expect(page.locator('main a[href="/"]')).toBeVisible();
-});
-
 // The 404's back-home sentence, read whole in every language, is held by
 // 'ends each back-home sentence in its own language' in not-found.spec.ts.
 // This file kept an English-and-Indonesian copy titled "in both languages",
