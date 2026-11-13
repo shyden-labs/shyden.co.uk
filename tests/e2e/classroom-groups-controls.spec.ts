@@ -495,8 +495,15 @@ test.describe('classroom groups — mobile-first layout', () => {
         async (_took, asked) => {
           await page.goto(path);
           await expectNoScrollSoft(page, page.url());
-          if (asked.includes(375)) await expectTouchTargets(page);
+          const touched = asked.includes(375);
+          if (touched) await expectTouchTargets(page);
           if (asked.includes(320) || asked.includes(768)) {
+            // The touch-target check leaves the mode on "how many groups",
+            // which hides #cg-size. Each width once had its own fresh page;
+            // a phone's one walk does both, so it starts the groups from a
+            // fresh page as they did (measured on the Android phone,
+            // 2026-11-13: makeGroups waited 30s on a hidden #cg-size).
+            if (touched) await page.goto(path);
             await makeGroups(page, String(MAX_STUDENTS), '4');
             await expect
               .soft(page.locator('#cg-results .group'))
