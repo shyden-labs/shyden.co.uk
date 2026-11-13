@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
 import { PUBLISHED_ROUTES } from './published-paths';
-import { measuredViewport, atViewport } from '../viewport-at';
+import { atViewport, measuredViewport, onRealPhone } from '../viewport-at';
 import { WIDTH_CHECK_HEIGHT, type PageCheck, type Visit } from './page-checks';
 import { RIBBON_CHECK } from './checks/ribbon';
 import { REPORT_FORM_CHECKS } from './checks/report-form';
@@ -133,7 +133,7 @@ test.describe('one walk per page (#1086)', () => {
           return response;
         };
 
-        if (page.viewportSize() === null) {
+        if (onRealPhone(page)) {
           // A real phone: one load, every check, at its own width.
           const response = await load();
           const took = await measuredViewport(page);

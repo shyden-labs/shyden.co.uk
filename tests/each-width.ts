@@ -1,5 +1,10 @@
 import { test, type Page } from '@playwright/test';
-import { atViewport, measuredViewport, type ViewportSize } from './viewport-at';
+import {
+  atViewport,
+  measuredViewport,
+  onRealPhone,
+  type ViewportSize,
+} from './viewport-at';
 
 type Step = (title: string, body: () => Promise<void>) => Promise<void>;
 
@@ -26,7 +31,7 @@ export async function eachWidth(
   { step = (title, body) => test.step(title, body) }: { step?: Step } = {},
 ): Promise<void> {
   if (widths.length === 0) throw new Error('eachWidth was given no widths');
-  if (page.viewportSize() === null) {
+  if (onRealPhone(page)) {
     // A real phone: one walk at the width it has, standing for every width
     // asked, so a journey that checks something different at each width
     // makes all of those checks on it.
