@@ -2,7 +2,10 @@ import { test, expect } from './fixtures';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
 import { PUBLISHED_ROUTES } from './published-paths';
-import type { PageCheck } from './page-checks';
+import { measuredViewport, atViewport } from '../viewport-at';
+import { WIDTH_CHECK_HEIGHT, type PageCheck, type Visit } from './page-checks';
+import { RIBBON_CHECK } from './checks/ribbon';
+import { THAI_CHECK } from './checks/thai';
 import { HEAD_CHECKS } from './checks/head';
 import { NOT_FOUND_CHECKS } from './checks/not-found';
 import { SERVED_PAGE_CHECKS } from './checks/served-page';
@@ -29,7 +32,15 @@ import { RECORDER_CHECKS } from './checks/recorders';
  * change. The scan's own seam check puts its planted paragraph back; the
  * touching-words check opens the flow's disclosures, then the palette opens
  * all of them; the recorders plant errors and silence the console; the last
- * two replace the homepage's body.
+ * two replace the homepage's body. The ribbon scan hides every glyph and
+ * then loads the page again, so it comes before the checks that open things.
+ *
+ * WIDTHS (Shyden, 2026-11-13, "One test, widths inside"). A check read at set
+ * widths was one test per width, and a real phone, which cannot take an
+ * emulated width (#1046), ran each as the identical journey at its own width.
+ * On an emulated target the walk reads its other checks at the target's own
+ * size, then loads the page again at each width a check asks for. On a real
+ * phone everything is read on its one load, at the width it has.
  */
 const [SEAM_CHECK, ...BODY_CHECKS] = RENDERED_TEXT_SELF_CHECKS;
 const [SPACE_CHECK, PLACEHOLDER_CHECK, TOUCHING_CHECK] = RENDERED_TEXT_CHECKS;
@@ -42,7 +53,9 @@ const WALK: readonly PageCheck[] = [
   ACCENT_CHECK,
   SPACE_CHECK,
   PLACEHOLDER_CHECK,
+  THAI_CHECK,
   SEAM_CHECK,
+  RIBBON_CHECK,
   TOUCHING_CHECK,
   ...PALETTE_CHECKS,
   ...RECORDER_CHECKS,
@@ -85,19 +98,55 @@ test.describe('one walk per page (#1086)', () => {
       test(`${route}, ${theme}: one walk, ${checks.length} checks`, async ({
         page,
       }) => {
-        const response = await page.goto(route);
-        await emulateTheme(page, theme);
-        for (const check of checks)
-          await test.step(check.name, async () => {
+        const check = async (one: PageCheck, visit: Visit, label: string) =>
+          test.step(label, async () => {
             // A check that throws (a reader refusing an empty population) is
             // reported like a soft failure, so it hides none of the checks
             // after it.
             try {
-              await check.run({ page, route, theme, response });
+              await one.run(visit);
             } catch (error) {
-              expect.soft(error, `${check.name} threw`).toBeUndefined();
+              expect.soft(error, `${one.name} threw`).toBeUndefined();
             }
           });
+        const load = async () => {
+          const response = await page.goto(route);
+          await emulateTheme(page, theme);
+          return response;
+        };
+
+        if (page.viewportSize() === null) {
+          // A real phone: one load, every check, at its own width.
+          const response = await load();
+          const took = await measuredViewport(page);
+          for (const one of checks)
+            await check(one, { page, route, theme, response, took }, one.name);
+          return;
+        }
+
+        const atOwnSize = checks.filter((one) => !one.widths);
+        if (atOwnSize.length > 0) {
+          const response = await load();
+          const took = await measuredViewport(page);
+          for (const one of atOwnSize)
+            await check(one, { page, route, theme, response, took }, one.name);
+        }
+        const widths = [
+          ...new Set(checks.flatMap((one) => one.widths ?? [])),
+        ].sort((a, b) => a - b);
+        for (const width of widths) {
+          const took = await atViewport(page, {
+            width,
+            height: WIDTH_CHECK_HEIGHT,
+          });
+          const response = await load();
+          for (const one of checks.filter((c) => c.widths?.includes(width)))
+            await check(
+              one,
+              { page, route, theme, response, took },
+              `at ${width}px: ${one.name}`,
+            );
+        }
       });
     }
 });
