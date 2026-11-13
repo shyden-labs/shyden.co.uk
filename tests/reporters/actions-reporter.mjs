@@ -18,8 +18,12 @@ export default class ActionsReporter {
     const where = step.location
       ? `@${step.location.file.replace(/^.*\/tests\//, '')}:${step.location.line}`
       : '';
+    // The nearest enclosing test.step: on the page walk, the check it belongs to.
+    let owner = step.parent;
+    while (owner && owner.category !== 'test.step') owner = owner.parent;
+    const tag = owner ? ` [step: ${owner.title}]` : '';
     (step.category === 'pw:api' ? entry.actions : entry.expects).push(
-      step.title + where,
+      step.title + where + tag,
     );
     this.steps.set(test.id, entry);
   }
