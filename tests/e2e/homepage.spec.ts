@@ -2,6 +2,8 @@ import { tabTo } from '../tab-to';
 import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { eachWidth } from '../each-width';
+import { BAND_WIDTHS } from './checks/homepage';
 import { recorded, shoot } from './evidence';
 import {
   recordErrors,
@@ -17,7 +19,7 @@ import {
   type Locale,
 } from '../../src/lib/i18n';
 import { searched } from '../source-files';
-import { expectNoHorizontalScroll, horizontalOverflow } from '../viewport';
+import { horizontalOverflow } from '../viewport';
 import { readsAsLineWidth } from '../device-pixels';
 import { THEMES } from '../palette';
 import { emulateTheme, expectTheme, saveTheme } from '../themes';
@@ -126,10 +128,6 @@ const PROMO_SOURCES = [
 ];
 // The widths at which the preview's card is read, all of them among BAND_WIDTHS.
 const PROMO_WIDTHS: readonly number[] = [320, 375, 768, 1280];
-
-// The six widths the band is held to (#599 AC2): the four #423 read, plus 390
-// (the common phone) and 1024 (the tablet-landscape edge).
-const BAND_WIDTHS = [320, 375, 390, 768, 1024, 1280];
 
 // Keyed by Locale, so a sixth language fails to compile until its sentence
 // is written here (#390 F128): this listed English and Indonesian, the two
@@ -941,287 +939,274 @@ test.describe('the language band sits under the header (#599)', () => {
   // header, the pause disc on the strip, the 44px target pressed at each edge,
   // and (where the preview's card is read) the preview inside its card. The
   // page is read before any press, and scrolled only after the edges are hit.
-  for (const width of BAND_WIDTHS)
-    test(`at ${width}px: band, header, pause disc and video card lay out right, no sideways scroll`, async ({
+  test('at every width: band, header, pause disc and video card lay out right, no sideways scroll', async ({
+    page,
+  }) => {
+    await eachWidth(
       page,
-    }) => {
-      const took = await atViewport(page, { width, height: 900 });
-      await page.goto('/');
-      const control = pauseControl(page, 'en');
+      BAND_WIDTHS.map((width) => ({ width, height: 900 })),
+      async (took, asked) => {
+        await page.goto('/');
+        const control = pauseControl(page, 'en');
 
-      // AC3 at load: the band and the header do not intersect.
-      const { header, clip } = await readBand(page);
-      expect
-        .soft(
-          clip.top,
-          `the band's top (${clip.top}) is above the header's bottom (${header.bottom})`,
-        )
-        .toBeGreaterThanOrEqual(header.bottom);
-      await shoot(
-        page,
-        `${took.width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
-      );
-
-      // No row sits between the header and the strip.
-      const facts = await page.evaluate(() => {
-        const headerEl = document.querySelector('header');
-        const strip = document.querySelector<HTMLElement>('.marquee');
-        const band = document.querySelector('.band');
-        const target = document.querySelector('.band-pause');
-        if (!headerEl || !strip || !band || !target)
-          throw new Error('header, strip, band or control missing');
-        // The strip is rotated, so its bounding box is not its layout box:
-        // its LAYOUT top is the band's top plus its own offset.
-        const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
-        const t = target.getBoundingClientRect();
-        return {
-          gap: layoutTop - headerEl.getBoundingClientRect().bottom,
-          margin: parseFloat(getComputedStyle(strip).marginTop),
-          targetMid: t.top + t.height / 2,
-          layoutTop,
-        };
-      });
-      expect
-        .soft(facts.margin, "the strip's own top margin")
-        .toBeGreaterThan(0);
-      expect
-        .soft(
-          facts.gap,
-          `${took.width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
-        )
-        .toBeLessThanOrEqual(facts.margin + 1);
-      expect
-        .soft(facts.targetMid, 'the control sits in the gap above the strip')
-        .toBeGreaterThanOrEqual(facts.layoutTop);
-
-      // Every locale at every width (#423): theme-gallery reads every locale
-      // at 320 and 1280px only, so 375 and 768px were read in English alone.
-      // English is read here; the other locales have their own tests below.
-      // This is the guard the marquee tripped: a rotated-and-scaled element
-      // is not clipped by an ancestor's `overflow`, so it pushed 10px of
-      // sideways scroll at every width. 1217 unit tests could not see it.
-      const overflow = await expectNoScrollSoft(page, page.url());
-      await shoot(
-        page,
-        `en ${took.width}px: horizontal overflow is ${overflow}px`,
-      );
-
-      // The disc is small, on the strip's tilted middle, and its 44px target
-      // takes a click at every edge. Geometry is read in the page from layout
-      // boxes (`offsetWidth`), because the control sits on a rail tilted like
-      // the strip, and a rotated box's bounding rect is larger than the box.
-      const at = await page.evaluate(() => {
-        const target = document.querySelector<HTMLElement>('.band-pause');
-        const disc = document.querySelector<HTMLElement>('.band-pause-disc');
-        const strip = document.querySelector<HTMLElement>('.marquee');
-        if (!target || !disc || !strip)
-          throw new Error('control, disc or strip missing');
-        const centre = (el: Element) => {
-          const r = el.getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-        };
-        // The strip's tilt and scale, from the matrix the browser computed.
-        const m = new DOMMatrix(getComputedStyle(strip).transform);
-        const angle = Math.atan2(m.b, m.a);
-        const scale = Math.hypot(m.a, m.b);
-        const s = centre(strip);
-        const d = centre(disc);
-        // How far the disc's middle is from the strip's middle LINE, measured
-        // across the strip, and how much strip there is either side of it.
-        const across =
-          Math.abs(d.y - (s.y + (d.x - s.x) * Math.tan(angle))) *
-          Math.cos(angle);
-        const t = centre(target);
-        const reach = target.offsetWidth / 2 - 2;
-        return {
-          disc: { w: disc.offsetWidth, h: disc.offsetHeight },
-          target: { w: target.offsetWidth, h: target.offsetHeight },
-          stripHeight: strip.offsetHeight,
-          across,
-          room: (strip.offsetHeight * scale) / 2 - disc.offsetHeight / 2,
-          hitsAtCentre: target.contains(document.elementFromPoint(t.x, t.y)),
-          edges: [
-            { name: 'left', x: t.x - reach, y: t.y },
-            { name: 'right', x: t.x + reach, y: t.y },
-            { name: 'top', x: t.x, y: t.y - reach },
-            { name: 'bottom', x: t.x, y: t.y + reach },
-          ],
-        };
-      });
-      expect
-        .soft(at.disc.w, 'the visible disc is no wider than 28px')
-        .toBeLessThanOrEqual(28);
-      expect
-        .soft(at.disc.h, 'the visible disc is no taller than 28px')
-        .toBeLessThanOrEqual(28);
-      expect
-        .soft(
-          at.disc.h,
-          "the visible disc is no taller than the strip's layout box",
-        )
-        .toBeLessThanOrEqual(at.stripHeight);
-      expect
-        .soft(at.target.w, 'the tap target is at least 44px wide')
-        .toBeGreaterThanOrEqual(44);
-      expect
-        .soft(at.target.h, 'the tap target is at least 44px tall')
-        .toBeGreaterThanOrEqual(44);
-      expect
-        .soft(
-          at.across,
-          `${took.width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
-        )
-        .toBeLessThanOrEqual(1.5);
-      expect
-        .soft(
-          at.across,
-          `${took.width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
-        )
-        .toBeLessThanOrEqual(at.room);
-      expect
-        .soft(at.hitsAtCentre, 'a click at the centre misses the control')
-        .toBe(true);
-      let ticked = false;
-      for (const edge of at.edges) {
-        await tapAt(page, edge.x, edge.y);
-        ticked = !ticked;
-        await expect
+        // AC3 at load: the band and the header do not intersect.
+        const { header, clip } = await readBand(page);
+        expect
           .soft(
-            control,
-            `a click at the target's ${edge.name} edge toggles the control`,
+            clip.top,
+            `the band's top (${clip.top}) is above the header's bottom (${header.bottom})`,
           )
-          .toBeChecked({ checked: ticked });
-      }
-
-      // AC3 after scrolling: the band is unpinned, so it passes beneath the
-      // sticky header, and wherever the two meet the header is the topmost
-      // thing. `elementFromPoint` is what a click would hit, so it reads the
-      // painted stacking order, which a bounding box cannot.
-      const hit = await page.evaluate(async () => {
-        const headerEl = document.querySelector('header');
-        const clipEl = document.querySelector('.marquee-clip');
-        if (!headerEl || !clipEl) throw new Error('header or band missing');
-        const headerHeight = headerEl.getBoundingClientRect().height;
-        // The band's top edge halfway up under the header.
-        window.scrollTo(
-          0,
-          clipEl.getBoundingClientRect().top +
-            window.scrollY -
-            headerHeight / 2,
+          .toBeGreaterThanOrEqual(header.bottom);
+        await shoot(
+          page,
+          `${took.width}px: the band starts at ${Math.round(clip.top)}px, the header ends at ${Math.round(header.bottom)}px`,
         );
-        const frame = () => new Promise((done) => requestAnimationFrame(done));
-        await frame();
-        await frame();
-        const h = headerEl.getBoundingClientRect();
-        const c = clipEl.getBoundingClientRect();
-        const top = Math.max(h.top, c.top);
-        const bottom = Math.min(h.bottom, c.bottom);
-        const y = top + (bottom - top) / 2;
-        // Runs in the page over a population that exists only at runtime:
-        // the overlap's own sample points.
-        const samples = [0.1, 0.5, 0.9].map((f) => {
-          const x = window.innerWidth * f;
-          const el = document.elementFromPoint(x, y);
+
+        // No row sits between the header and the strip.
+        const facts = await page.evaluate(() => {
+          const headerEl = document.querySelector('header');
+          const strip = document.querySelector<HTMLElement>('.marquee');
+          const band = document.querySelector('.band');
+          const target = document.querySelector('.band-pause');
+          if (!headerEl || !strip || !band || !target)
+            throw new Error('header, strip, band or control missing');
+          // The strip is rotated, so its bounding box is not its layout box:
+          // its LAYOUT top is the band's top plus its own offset.
+          const layoutTop = band.getBoundingClientRect().top + strip.offsetTop;
+          const t = target.getBoundingClientRect();
           return {
-            inHeader: !!el?.closest('header'),
-            inBand: !!el?.closest('.band'),
+            gap: layoutTop - headerEl.getBoundingClientRect().bottom,
+            margin: parseFloat(getComputedStyle(strip).marginTop),
+            targetMid: t.top + t.height / 2,
+            layoutTop,
           };
         });
-        return { overlap: bottom - top, samples };
-      });
-      // Liveness: the two really overlap, or nothing below was tested.
-      expect
-        .soft(hit.overlap, 'the band never reached under the header')
-        .toBeGreaterThan(0);
-      expect
-        .soft(
-          searched(
-            hit.samples.filter((s) => !s.inHeader || s.inBand),
-            { of: hit.samples, what: 'points sampled across the overlap' },
-          ),
-          'the band paints over the header',
-        )
-        .toEqual([]);
-      expect.soft(hit.samples).toHaveLength(3);
-      await shoot(
-        page,
-        `${took.width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
-      );
+        expect
+          .soft(facts.margin, "the strip's own top margin")
+          .toBeGreaterThan(0);
+        expect
+          .soft(
+            facts.gap,
+            `${took.width}px: header bottom to strip top is ${facts.gap}px; the strip's own margin is ${facts.margin}px`,
+          )
+          .toBeLessThanOrEqual(facts.margin + 1);
+        expect
+          .soft(facts.targetMid, 'the control sits in the gap above the strip')
+          .toBeGreaterThanOrEqual(facts.layoutTop);
 
-      if (!PROMO_WIDTHS.includes(width)) return;
-
-      // The preview and its description stay inside the card.
-      await tapOn(page.locator('#yawelo-idle summary'));
-      await expect.soft(page.locator('#yawelo-idle details p')).toBeVisible();
-      const boxes = await page.evaluate(() => {
-        const rect = (selector: string) => {
-          const el = document.querySelector(selector);
-          if (!el) throw new Error(`${selector} missing`);
-          const r = el.getBoundingClientRect();
-          return {
-            left: r.left,
-            right: r.right,
-            width: r.width,
-            height: r.height,
-          };
-        };
-        return {
-          card: rect('#yawelo-idle'),
-          player: rect('#yawelo-idle video'),
-          shows: rect('#yawelo-idle details'),
-        };
-      });
-      expect
-        .soft(boxes.player.left, "the player's left edge")
-        .toBeGreaterThanOrEqual(boxes.card.left - 0.5);
-      expect
-        .soft(boxes.player.right, "the player's right edge")
-        .toBeLessThanOrEqual(boxes.card.right + 0.5);
-      expect
-        .soft(boxes.shows.left, "shows's left edge")
-        .toBeGreaterThanOrEqual(boxes.card.left - 0.5);
-      expect
-        .soft(boxes.shows.right, "shows's right edge")
-        .toBeLessThanOrEqual(boxes.card.right + 0.5);
-      // The player is the tap target that plays it.
-      const playerBox = await page.locator('#yawelo-idle video').boundingBox();
-      expect.soft(playerBox).not.toBeNull();
-      if (playerBox) {
-        expect.soft(Math.round(playerBox.width)).toBeGreaterThanOrEqual(44);
-        expect.soft(Math.round(playerBox.height)).toBeGreaterThanOrEqual(44);
-      }
-      await expectNoScrollSoft(page, `${took.width}px`);
-      await shoot(
-        page,
-        `${took.width}px: the Yawelo Idle preview in its card`,
-        page.locator('#yawelo-idle'),
-      );
-    });
-});
-
-test.describe('mobile-first layout', () => {
-  // Every locale at every width (#423): theme-gallery reads every locale at
-  // 320 and 1280px only, so 375 and 768px were read in English alone. English
-  // is read at each width inside the band's visit above (the same page at the
-  // same size), so it is not repeated here.
-  for (const width of BAND_WIDTHS) {
-    for (const locale of LOCALES.filter((l) => l !== 'en'))
-      test(`${locale}: no horizontal scroll at ${width}px`, async ({
-        page,
-      }) => {
-        const took = await atViewport(page, { width, height: 900 });
-        await page.goto(localisePath('/', locale));
-        const overflow = await expectNoHorizontalScroll(page);
+        // Every locale at every width (#423): theme-gallery reads every locale
+        // at 320 and 1280px only, so 375 and 768px were read in English alone.
+        // English is read here; the other locales have their own tests below.
         // This is the guard the marquee tripped: a rotated-and-scaled element
         // is not clipped by an ancestor's `overflow`, so it pushed 10px of
         // sideways scroll at every width. 1217 unit tests could not see it.
+        const overflow = await expectNoScrollSoft(page, page.url());
         await shoot(
           page,
-          `${locale} ${took.width}px: horizontal overflow is ${overflow}px`,
+          `en ${took.width}px: horizontal overflow is ${overflow}px`,
         );
-      });
-  }
+
+        // The disc is small, on the strip's tilted middle, and its 44px target
+        // takes a click at every edge. Geometry is read in the page from layout
+        // boxes (`offsetWidth`), because the control sits on a rail tilted like
+        // the strip, and a rotated box's bounding rect is larger than the box.
+        const at = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>('.band-pause');
+          const disc = document.querySelector<HTMLElement>('.band-pause-disc');
+          const strip = document.querySelector<HTMLElement>('.marquee');
+          if (!target || !disc || !strip)
+            throw new Error('control, disc or strip missing');
+          const centre = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          };
+          // The strip's tilt and scale, from the matrix the browser computed.
+          const m = new DOMMatrix(getComputedStyle(strip).transform);
+          const angle = Math.atan2(m.b, m.a);
+          const scale = Math.hypot(m.a, m.b);
+          const s = centre(strip);
+          const d = centre(disc);
+          // How far the disc's middle is from the strip's middle LINE, measured
+          // across the strip, and how much strip there is either side of it.
+          const across =
+            Math.abs(d.y - (s.y + (d.x - s.x) * Math.tan(angle))) *
+            Math.cos(angle);
+          const t = centre(target);
+          const reach = target.offsetWidth / 2 - 2;
+          return {
+            disc: { w: disc.offsetWidth, h: disc.offsetHeight },
+            target: { w: target.offsetWidth, h: target.offsetHeight },
+            stripHeight: strip.offsetHeight,
+            across,
+            room: (strip.offsetHeight * scale) / 2 - disc.offsetHeight / 2,
+            hitsAtCentre: target.contains(document.elementFromPoint(t.x, t.y)),
+            edges: [
+              { name: 'left', x: t.x - reach, y: t.y },
+              { name: 'right', x: t.x + reach, y: t.y },
+              { name: 'top', x: t.x, y: t.y - reach },
+              { name: 'bottom', x: t.x, y: t.y + reach },
+            ],
+          };
+        });
+        expect
+          .soft(at.disc.w, 'the visible disc is no wider than 28px')
+          .toBeLessThanOrEqual(28);
+        expect
+          .soft(at.disc.h, 'the visible disc is no taller than 28px')
+          .toBeLessThanOrEqual(28);
+        expect
+          .soft(
+            at.disc.h,
+            "the visible disc is no taller than the strip's layout box",
+          )
+          .toBeLessThanOrEqual(at.stripHeight);
+        expect
+          .soft(at.target.w, 'the tap target is at least 44px wide')
+          .toBeGreaterThanOrEqual(44);
+        expect
+          .soft(at.target.h, 'the tap target is at least 44px tall')
+          .toBeGreaterThanOrEqual(44);
+        expect
+          .soft(
+            at.across,
+            `${took.width}px: the disc's middle is ${at.across.toFixed(1)}px off the strip's middle line`,
+          )
+          .toBeLessThanOrEqual(1.5);
+        expect
+          .soft(
+            at.across,
+            `${took.width}px: the disc hangs off the strip (room either side ${at.room.toFixed(1)}px)`,
+          )
+          .toBeLessThanOrEqual(at.room);
+        expect
+          .soft(at.hitsAtCentre, 'a click at the centre misses the control')
+          .toBe(true);
+        let ticked = false;
+        for (const edge of at.edges) {
+          await tapAt(page, edge.x, edge.y);
+          ticked = !ticked;
+          await expect
+            .soft(
+              control,
+              `a click at the target's ${edge.name} edge toggles the control`,
+            )
+            .toBeChecked({ checked: ticked });
+        }
+
+        // AC3 after scrolling: the band is unpinned, so it passes beneath the
+        // sticky header, and wherever the two meet the header is the topmost
+        // thing. `elementFromPoint` is what a click would hit, so it reads the
+        // painted stacking order, which a bounding box cannot.
+        const hit = await page.evaluate(async () => {
+          const headerEl = document.querySelector('header');
+          const clipEl = document.querySelector('.marquee-clip');
+          if (!headerEl || !clipEl) throw new Error('header or band missing');
+          const headerHeight = headerEl.getBoundingClientRect().height;
+          // The band's top edge halfway up under the header.
+          window.scrollTo(
+            0,
+            clipEl.getBoundingClientRect().top +
+              window.scrollY -
+              headerHeight / 2,
+          );
+          const frame = () =>
+            new Promise((done) => requestAnimationFrame(done));
+          await frame();
+          await frame();
+          const h = headerEl.getBoundingClientRect();
+          const c = clipEl.getBoundingClientRect();
+          const top = Math.max(h.top, c.top);
+          const bottom = Math.min(h.bottom, c.bottom);
+          const y = top + (bottom - top) / 2;
+          // Runs in the page over a population that exists only at runtime:
+          // the overlap's own sample points.
+          const samples = [0.1, 0.5, 0.9].map((f) => {
+            const x = window.innerWidth * f;
+            const el = document.elementFromPoint(x, y);
+            return {
+              inHeader: !!el?.closest('header'),
+              inBand: !!el?.closest('.band'),
+            };
+          });
+          return { overlap: bottom - top, samples };
+        });
+        // Liveness: the two really overlap, or nothing below was tested.
+        expect
+          .soft(hit.overlap, 'the band never reached under the header')
+          .toBeGreaterThan(0);
+        expect
+          .soft(
+            searched(
+              hit.samples.filter((s) => !s.inHeader || s.inBand),
+              { of: hit.samples, what: 'points sampled across the overlap' },
+            ),
+            'the band paints over the header',
+          )
+          .toEqual([]);
+        expect.soft(hit.samples).toHaveLength(3);
+        await shoot(
+          page,
+          `${took.width}px: the header is the topmost thing over ${Math.round(hit.overlap)}px of overlap`,
+        );
+
+        // On a real phone this one walk stands for every width (#1086).
+        if (!asked.some((w) => PROMO_WIDTHS.includes(w))) return;
+
+        // The preview and its description stay inside the card.
+        await tapOn(page.locator('#yawelo-idle summary'));
+        await expect.soft(page.locator('#yawelo-idle details p')).toBeVisible();
+        const boxes = await page.evaluate(() => {
+          const rect = (selector: string) => {
+            const el = document.querySelector(selector);
+            if (!el) throw new Error(`${selector} missing`);
+            const r = el.getBoundingClientRect();
+            return {
+              left: r.left,
+              right: r.right,
+              width: r.width,
+              height: r.height,
+            };
+          };
+          return {
+            card: rect('#yawelo-idle'),
+            player: rect('#yawelo-idle video'),
+            shows: rect('#yawelo-idle details'),
+          };
+        });
+        expect
+          .soft(boxes.player.left, "the player's left edge")
+          .toBeGreaterThanOrEqual(boxes.card.left - 0.5);
+        expect
+          .soft(boxes.player.right, "the player's right edge")
+          .toBeLessThanOrEqual(boxes.card.right + 0.5);
+        expect
+          .soft(boxes.shows.left, "shows's left edge")
+          .toBeGreaterThanOrEqual(boxes.card.left - 0.5);
+        expect
+          .soft(boxes.shows.right, "shows's right edge")
+          .toBeLessThanOrEqual(boxes.card.right + 0.5);
+        // The player is the tap target that plays it.
+        const playerBox = await page
+          .locator('#yawelo-idle video')
+          .boundingBox();
+        expect.soft(playerBox).not.toBeNull();
+        if (playerBox) {
+          expect.soft(Math.round(playerBox.width)).toBeGreaterThanOrEqual(44);
+          expect.soft(Math.round(playerBox.height)).toBeGreaterThanOrEqual(44);
+        }
+        await expectNoScrollSoft(page, `${took.width}px`);
+        await shoot(
+          page,
+          `${took.width}px: the Yawelo Idle preview in its card`,
+          page.locator('#yawelo-idle'),
+        );
+      },
+    );
+  });
 });
+
+// The other languages' homepages at every width are read on their walks:
+// checks/homepage.ts (#1086).
 
 test.describe('reduced motion', () => {
   // #390 F61. The global reduced-motion rule in tokens.css shortened every
@@ -1350,50 +1335,8 @@ test.describe('pause motion', () => {
   // Vietnamese running past the band) is now the screen-reader text's to
   // risk: it is absolutely positioned, and an absolute box with nothing to
   // contain it can land anywhere, which at 320px means sideways scroll.
-  for (const locale of LOCALES)
-    test(`${locale}: at 320px the control and its hidden name stay inside the band, with no sideways scroll`, async ({
-      page,
-    }) => {
-      await atViewport(page, { width: 320, height: 800 });
-      await page.goto(localisePath('/', locale));
-      const target = page.locator('.band-pause');
-      await expect(target).toHaveCount(1);
-      const inside = await target.evaluate((label) => {
-        const band = label.closest('.band')!.getBoundingClientRect();
-        return [label, ...label.querySelectorAll('*')].map((el) => {
-          const r = el.getBoundingClientRect();
-          return {
-            what: el.tagName.toLowerCase() + '.' + el.getAttribute('class'),
-            ok:
-              r.left >= band.left - 0.5 &&
-              r.right <= band.right + 0.5 &&
-              r.left >= 0 &&
-              r.right <= window.innerWidth,
-          };
-        });
-      });
-      expect(
-        searched(
-          inside.filter((box) => !box.ok).map((box) => box.what),
-          { of: inside, what: 'boxes in the pause control' },
-        ),
-        'boxes in the control that leave the band or the viewport',
-      ).toEqual([]);
-      expect(
-        inside.map((box) => box.what),
-        'the boxes the control is built from, each measured',
-      ).toEqual(
-        expect.arrayContaining([
-          'label.band-pause',
-          'input.null',
-          'span.band-pause-disc',
-          'svg.band-pause-icon',
-          // its whole class attribute: the name wears the global recipe (#767)
-          'span.band-pause-name visually-hidden',
-        ]),
-      );
-      await expectNoHorizontalScroll(page);
-    });
+  // Each language's control is measured at 320px on its homepage's walk:
+  // checks/homepage.ts (#1086).
 });
 
 test.describe('the Yawelo Idle preview video', () => {

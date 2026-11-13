@@ -7,6 +7,7 @@ import { WIDTH_CHECK_HEIGHT, type PageCheck, type Visit } from './page-checks';
 import { RIBBON_CHECK } from './checks/ribbon';
 import { THAI_CHECK } from './checks/thai';
 import { CHROME_CHECKS } from './checks/chrome';
+import { HOMEPAGE_WIDTH_CHECKS } from './checks/homepage';
 import { HEAD_CHECKS } from './checks/head';
 import { NOT_FOUND_CHECKS } from './checks/not-found';
 import { SERVED_PAGE_CHECKS } from './checks/served-page';
@@ -52,6 +53,7 @@ const WALK: readonly PageCheck[] = [
   ...SERVED_PAGE_CHECKS,
   ...REPORT_PRESENCE_CHECKS,
   ...CHROME_CHECKS,
+  ...HOMEPAGE_WIDTH_CHECKS,
   ACCENT_CHECK,
   SPACE_CHECK,
   PLACEHOLDER_CHECK,
