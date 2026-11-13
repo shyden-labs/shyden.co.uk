@@ -494,37 +494,46 @@ test.describe('a disabled control affords that it is disabled', () => {
     await openRoster(page);
     await openEveryDisclosure(page);
 
-    const { reachable, enabled } = await affordances(page);
-
-    // The fill carve-out, asserted rather than assumed. Without this the
-    // `uaPainted` branch could grow to swallow a control that SHOULD be
-    // painted, and `expectDisabledPaint` would quietly stop covering it.
-    const carvedOut = reachable.filter((a) => a.uaPainted).map((a) => a.label);
-    searched(carvedOut, {
-      of: carvedOut,
-      what: 'UA-painted disabled controls',
-    });
-    expect.soft(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
-
-    // The no-entry cursor marks the disabled controls apart from the enabled
-    // ones, both read from the SAME snapshot, so the contrast is one screen a
-    // teacher is looking at rather than two page states.
-    const leaked = enabled
-      .filter((control) => control.cursor === 'not-allowed')
-      .map((control) => control.label);
-    expect
-      .soft(
-        searched(leaked, {
-          of: enabled.map((control) => control.label),
-          what: 'enabled controls',
-        }),
-      )
-      .toEqual([]);
-    expectNoEntryCursor(reachable, 'one student, against the enabled controls');
-
-    for (const theme of THEMES) {
+    // Two walks over the controls, one per theme. The carve-out and the
+    // enabled controls' cursor are read in the first theme's walk: a third
+    // walk, in whatever theme the target starts in, ran the whole test to
+    // 30.9 s on the Android phone (#1151; Shyden 2026-11-07: fits 30 s, no
+    // limit raised).
+    for (const [index, theme] of THEMES.entries()) {
       await emulateTheme(page, theme);
-      const { reachable, fill, ink } = await affordances(page);
+      const { reachable, enabled, fill, ink } = await affordances(page);
+      if (index === 0) {
+        // The fill carve-out, asserted rather than assumed. Without this the
+        // `uaPainted` branch could grow to swallow a control that SHOULD be
+        // painted, and `expectDisabledPaint` would quietly stop covering it.
+        const carvedOut = reachable
+          .filter((a) => a.uaPainted)
+          .map((a) => a.label);
+        searched(carvedOut, {
+          of: carvedOut,
+          what: 'UA-painted disabled controls',
+        });
+        expect.soft(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
+
+        // The no-entry cursor marks the disabled controls apart from the
+        // enabled ones, both read from the SAME snapshot, so the contrast is
+        // one screen a teacher is looking at rather than two page states.
+        const leaked = enabled
+          .filter((control) => control.cursor === 'not-allowed')
+          .map((control) => control.label);
+        expect
+          .soft(
+            searched(leaked, {
+              of: enabled.map((control) => control.label),
+              what: 'enabled controls',
+            }),
+          )
+          .toEqual([]);
+        expectNoEntryCursor(
+          reachable,
+          'one student, against the enabled controls',
+        );
+      }
       expect.soft(labelsOf(reachable)).toEqual(ONE_STUDENT_DISABLES);
       expectNoEntryCursor(reachable, `one student, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `one student, ${theme}`);
