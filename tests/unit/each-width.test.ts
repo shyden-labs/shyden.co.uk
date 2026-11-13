@@ -72,6 +72,23 @@ describe('eachWidth', () => {
     expect(titles).toEqual(['at 411px']);
   });
 
+  it('tells each walk which of the asked widths it stands for', async () => {
+    const emulated = fakePage(
+      { width: 1280, height: 720 },
+      { width: 1, height: 1 },
+    );
+    const phone = fakePage(null, { width: 411, height: 759 });
+    const stood: number[][] = [];
+    const record = async (_: unknown, asked: readonly number[]) =>
+      void stood.push([...asked]);
+    await eachWidth(emulated, WIDTHS, record, steps());
+    // A real phone's one walk stands for every width asked, so a journey that
+    // checks something different at each width makes every one of those
+    // checks on it.
+    await eachWidth(phone, WIDTHS, record, steps());
+    expect(stood).toEqual([[320], [768], [1280], [320, 768, 1280]]);
+  });
+
   it('refuses an empty list, which would check nothing', async () => {
     const page = fakePage(
       { width: 1280, height: 720 },

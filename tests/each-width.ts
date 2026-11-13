@@ -1,5 +1,5 @@
 import { test, type Page } from '@playwright/test';
-import { atViewport, type ViewportSize } from './viewport-at';
+import { atViewport, measuredViewport, type ViewportSize } from './viewport-at';
 
 type Step = (title: string, body: () => Promise<void>) => Promise<void>;
 
@@ -15,20 +15,32 @@ type Step = (title: string, body: () => Promise<void>) => Promise<void>;
  * as each per-width test did; a real phone answers every request with the one
  * width it has, so it is walked once, at that width.
  *
- * Each step is named with the width it ran at, so a failure still says which.
+ * `run` is told which of the asked widths its walk stands for: one on an
+ * emulated target, all of them on a phone. Each step is named with the width
+ * it ran at, so a failure still says which.
  */
 export async function eachWidth(
   page: Page,
   widths: readonly ViewportSize[],
-  run: (took: ViewportSize) => Promise<void>,
+  run: (took: ViewportSize, asked: readonly number[]) => Promise<void>,
   { step = (title, body) => test.step(title, body) }: { step?: Step } = {},
 ): Promise<void> {
   if (widths.length === 0) throw new Error('eachWidth was given no widths');
-  const walked = new Set<number>();
+  if (page.viewportSize() === null) {
+    // A real phone: one walk at the width it has, standing for every width
+    // asked, so a journey that checks something different at each width
+    // makes all of those checks on it.
+    const took = await measuredViewport(page);
+    await step(`at ${took.width}px`, () =>
+      run(
+        took,
+        widths.map((want) => want.width),
+      ),
+    );
+    return;
+  }
   for (const want of widths) {
     const took = await atViewport(page, want);
-    if (walked.has(took.width)) continue;
-    walked.add(took.width);
-    await step(`at ${took.width}px`, () => run(took));
+    await step(`at ${took.width}px`, () => run(took, [want.width]));
   }
 }
