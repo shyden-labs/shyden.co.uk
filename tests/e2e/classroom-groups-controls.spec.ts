@@ -4,6 +4,7 @@ import { onRealDevice } from '../device/device-downloads';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { eachWidth } from '../each-width';
 import { makeGroups } from '../make-groups';
 import { MAX_STUDENTS } from '../../src/lib/grouping';
 import { recordErrors } from './recorders';
@@ -365,20 +366,11 @@ test.describe('classroom groups — mobile-first layout', () => {
   // check the loop above gave Grouping options, for the same two widths and
   // the same reason (320px is the mobile-first floor; 768px is where
   // `.tool-sections` becomes two columns, a distinct geometry).
-  for (const width of [320, 768]) {
-    test(`no horizontal scroll with Grouping options, then Sound & animation, open, at ${width}px`, async ({
-      page,
-    }) => {
-      await atViewport(page, { width, height: 900 });
-      await page.goto('/classroom-groups');
-      await tapOn(page.locator('#cg-grouping-toggle'));
-      await expectNoScrollSoft(page, 'Grouping options open');
-      // Closed again, so Sound & animation is measured open on its own.
-      await tapOn(page.locator('#cg-grouping-toggle'));
-      await tapOn(page.locator('#cg-sound-toggle'));
-      await expectNoScrollSoft(page, 'Sound & animation open');
-    });
-  }
+  // #1086: this was its own test, at 320 and 768px on /classroom-groups:
+  // open Grouping options, measure, close it, open Sound & animation, measure.
+  // 'no horizontal scroll at every width with any single section open'
+  // below makes exactly those measurements, each section open alone, at 320,
+  // 390 and 768px, on every locale's page, so this exact duplicate is gone.
 
   // Every locale (#423): the buttons and labels measured here hold the
   // page's own copy, and a two-character zh label can make a box narrower
@@ -490,30 +482,30 @@ test.describe('classroom groups — mobile-first layout', () => {
   // first, before anything is pressed; then, at the widths that name them,
   // the page with a full set of results (320, 768) and every control's touch
   // target (375).
-  for (const path of localePaths('/classroom-groups')) {
-    for (const width of [320, 375, 768, 1280]) {
-      const withResults = width === 320 || width === 768;
-      const title =
-        `${path}: no horizontal scroll at ${width}px` +
-        (withResults ? ', and with results shown' : '') +
-        (width === 375
-          ? ', and every control meets the 44px touch target'
-          : '');
-      test(title, async ({ page }) => {
-        await atViewport(page, { width, height: 900 });
-        await page.goto(path);
-        await expectNoScrollSoft(page, page.url());
-        if (width === 375) await expectTouchTargets(page);
-        if (withResults) {
-          await makeGroups(page, String(MAX_STUDENTS), '4');
-          await expect
-            .soft(page.locator('#cg-results .group'))
-            .toHaveCount(Math.ceil(MAX_STUDENTS / 4));
-          await expectNoScrollSoft(page, `${path} with results shown`);
-        }
-      });
-    }
-  }
+  for (const path of localePaths('/classroom-groups'))
+    // Its widths inside one test (#1086; Shyden 2026-11-13). On a real phone,
+    // which keeps its own width (#1046), one load stands for every width, so
+    // it makes every width's checks: the results and the touch targets too.
+    test(`${path}: no horizontal scroll at every width, with results shown at 320 and 768px, and every control meeting the 44px touch target at 375px`, async ({
+      page,
+    }) => {
+      await eachWidth(
+        page,
+        [320, 375, 768, 1280].map((width) => ({ width, height: 900 })),
+        async (_took, asked) => {
+          await page.goto(path);
+          await expectNoScrollSoft(page, page.url());
+          if (asked.includes(375)) await expectTouchTargets(page);
+          if (asked.includes(320) || asked.includes(768)) {
+            await makeGroups(page, String(MAX_STUDENTS), '4');
+            await expect
+              .soft(page.locator('#cg-results .group'))
+              .toHaveCount(Math.ceil(MAX_STUDENTS / 4));
+            await expectNoScrollSoft(page, `${path} with results shown`);
+          }
+        },
+      );
+    });
 
   // ── The gap that let a real overflow ship ──────────────────────────────
   //
@@ -537,45 +529,52 @@ test.describe('classroom groups — mobile-first layout', () => {
   // pattern in homepage.spec.ts / site-meta.spec.ts, each case runs ~7
   // navigations, the cases run in parallel, and a failure names its locale
   // and width in the title instead of only in the message.
+  // Its widths inside one test since #1086 (Shyden 2026-11-13): a real phone
+  // keeps its own width (#1046), so it walks this once.
   for (const path of localePaths('/classroom-groups')) {
-    for (const width of [320, 390, 768]) {
-      test(`no horizontal scroll at ${width}px with any single section open — ${path}, every section derived`, async ({
+    {
+      test(`no horizontal scroll at every width with any single section open — ${path}, every section derived`, async ({
         page,
       }) => {
-        const failures: string[] = [];
-        const took = await atViewport(page, { width, height: 900 });
-        await page.goto(path);
-        const ids = await page
-          .locator('button[aria-expanded][aria-controls]')
-          .evaluateAll((els) => els.map((e) => e.id).filter(Boolean));
-        // A page with no disclosures would make every assertion below
-        // vacuous, so the count is asserted rather than assumed.
-        expect(
-          ids.length,
-          `${path}: no disclosure buttons found`,
-        ).toBeGreaterThan(3);
-        // runtime population: the disclosure toggles this page rendered,
-        // read off the DOM above, so a section added later is covered the
-        // day it appears; collection time cannot know them (#417).
-        for (const id of ids) {
-          await page.goto(path);
-          await tapOn(page.locator(`#${id}`));
-          const overflow = await horizontalOverflow(page);
-          if (overflow > 0)
-            failures.push(
-              `${path} @${took.width}px with #${id} open: ${overflow}px`,
-            );
-        }
-        // …and every section open at once, which no earlier test did.
-        await page.goto(path);
-        for (const id of ids) await tapOn(page.locator(`#${id}`));
-        const all = await horizontalOverflow(page);
-        if (all > 0)
-          failures.push(`${path} @${took.width}px with ALL open: ${all}px`);
-        expect(
-          searched(failures, { of: ids, what: 'disclosure sections' }),
-          failures.join('\n'),
-        ).toEqual([]);
+        await eachWidth(
+          page,
+          [320, 390, 768].map((width) => ({ width, height: 900 })),
+          async (took) => {
+            const failures: string[] = [];
+            await page.goto(path);
+            const ids = await page
+              .locator('button[aria-expanded][aria-controls]')
+              .evaluateAll((els) => els.map((e) => e.id).filter(Boolean));
+            // A page with no disclosures would make every assertion below
+            // vacuous, so the count is asserted rather than assumed.
+            expect(
+              ids.length,
+              `${path}: no disclosure buttons found`,
+            ).toBeGreaterThan(3);
+            // runtime population: the disclosure toggles this page rendered,
+            // read off the DOM above, so a section added later is covered the
+            // day it appears; collection time cannot know them (#417).
+            for (const id of ids) {
+              await page.goto(path);
+              await tapOn(page.locator(`#${id}`));
+              const overflow = await horizontalOverflow(page);
+              if (overflow > 0)
+                failures.push(
+                  `${path} @${took.width}px with #${id} open: ${overflow}px`,
+                );
+            }
+            // …and every section open at once, which no earlier test did.
+            await page.goto(path);
+            for (const id of ids) await tapOn(page.locator(`#${id}`));
+            const all = await horizontalOverflow(page);
+            if (all > 0)
+              failures.push(`${path} @${took.width}px with ALL open: ${all}px`);
+            expect(
+              searched(failures, { of: ids, what: 'disclosure sections' }),
+              failures.join('\n'),
+            ).toEqual([]);
+          },
+        );
       });
     }
   }
@@ -1533,62 +1532,72 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   // locale (tests/e2e/locale-sampling.ts), and five locales inside one
   // test would rebuild exactly the shared budget this split took apart.
   const numberWidths = [390, 768, 1024, 1280, 1512];
-  for (const width of [320, 390, 600, 768, 1024, 1280, 1512]) {
+  // Its widths inside one test since #1086 (Shyden 2026-11-13): a real phone
+  // keeps its own width (#1046), so it walks this once, standing for them all.
+  {
     for (const path of localePaths('/classroom-groups')) {
-      test(`nothing in the roster escapes its card, and a student number has room to be drawn, at ${width}px -- ${path}`, async ({
+      test(`nothing in the roster escapes its card, and a student number has room to be drawn, at every width -- ${path}`, async ({
         page,
       }) => {
-        const took = await atViewport(page, { width, height: 950 });
-        await openRoster(page, path);
+        await eachWidth(
+          page,
+          [320, 390, 600, 768, 1024, 1280, 1512].map((width) => ({
+            width,
+            height: 950,
+          })),
+          async (took, asked) => {
+            await openRoster(page, path);
 
-        // The roster's `#` cell is ~40px wide. It used to inherit `select`'s
-        // chevron rule — `padding: 0.5rem 2.2rem 0.5rem 0.6rem`, 44.8px of
-        // horizontal padding — which with `box-sizing: border-box` left a
-        // NEGATIVE content box. The value was in the DOM the whole time, so
-        // `toHaveValue` passed while the number could not be seen at all. Only
-        // the content box proves it. The cell holds digits, the same width in
-        // every language, so it is measured on the widths the number was
-        // always measured at, on every page that walks them.
-        await tapOn(page.locator('.cg-add-student'));
-        if (numberWidths.includes(width)) {
-          await expect
-            .soft(page.locator('.cg-roster-number').first())
-            .toHaveValue('1');
-          const box = await page
-            .locator('.cg-roster-number')
-            .first()
-            .evaluate((el) => {
-              const cs = getComputedStyle(el);
-              return (
-                el.getBoundingClientRect().width -
-                parseFloat(cs.paddingLeft) -
-                parseFloat(cs.paddingRight) -
-                parseFloat(cs.borderLeftWidth) -
-                parseFloat(cs.borderRightWidth)
-              );
-            });
-          // Two digits at this font need ~16px; a class of 30 has two.
-          expect
-            .soft(
-              box,
-              `@${took.width}px the # input has ${box.toFixed(1)}px of content box`,
-            )
-            .toBeGreaterThan(16);
-        }
+            // The roster's `#` cell is ~40px wide. It used to inherit `select`'s
+            // chevron rule — `padding: 0.5rem 2.2rem 0.5rem 0.6rem`, 44.8px of
+            // horizontal padding — which with `box-sizing: border-box` left a
+            // NEGATIVE content box. The value was in the DOM the whole time, so
+            // `toHaveValue` passed while the number could not be seen at all. Only
+            // the content box proves it. The cell holds digits, the same width in
+            // every language, so it is measured on the widths the number was
+            // always measured at, on every page that walks them.
+            await tapOn(page.locator('.cg-add-student'));
+            if (asked.some((w) => numberWidths.includes(w))) {
+              await expect
+                .soft(page.locator('.cg-roster-number').first())
+                .toHaveValue('1');
+              const box = await page
+                .locator('.cg-roster-number')
+                .first()
+                .evaluate((el) => {
+                  const cs = getComputedStyle(el);
+                  return (
+                    el.getBoundingClientRect().width -
+                    parseFloat(cs.paddingLeft) -
+                    parseFloat(cs.paddingRight) -
+                    parseFloat(cs.borderLeftWidth) -
+                    parseFloat(cs.borderRightWidth)
+                  );
+                });
+              // Two digits at this font need ~16px; a class of 30 has two.
+              expect
+                .soft(
+                  box,
+                  `@${took.width}px the # input has ${box.toFixed(1)}px of content box`,
+                )
+                .toBeGreaterThan(16);
+            }
 
-        // openRoster already adds one and the tap above one more, so two more
-        // makes four — enough rows that a wrapping or spilling control shows
-        // up.
-        for (let i = 0; i < 2; i++)
-          await tapOn(page.locator('.cg-add-student'));
-        await expect.soft(page.locator('.cg-student')).toHaveCount(4);
-        const worst = await spillPastCard(page, 'cg-students');
-        expect
-          .soft(
-            worst.over,
-            `${path} @${took.width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
-          )
-          .toBeLessThanOrEqual(0.5);
+            // openRoster already adds one and the tap above one more, so two more
+            // makes four — enough rows that a wrapping or spilling control shows
+            // up.
+            for (let i = 0; i < 2; i++)
+              await tapOn(page.locator('.cg-add-student'));
+            await expect.soft(page.locator('.cg-student')).toHaveCount(4);
+            const worst = await spillPastCard(page, 'cg-students');
+            expect
+              .soft(
+                worst.over,
+                `${path} @${took.width}px: ${worst.who} is ${worst.over.toFixed(1)}px past the card`,
+              )
+              .toBeLessThanOrEqual(0.5);
+          },
+        );
       });
     }
   }

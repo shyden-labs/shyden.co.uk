@@ -2,11 +2,8 @@ import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recorded } from './evidence';
-import { atLeast44, expectNoHorizontalScroll } from '../viewport';
 import { getSiteStrings } from '../../src/lib/i18n/index';
 import { expectVisibleText } from './helpers';
-import { localePaths } from './locale-sampling';
-import { atViewport } from '../viewport-at';
 
 const en = getSiteStrings('en').calculators;
 const id = getSiteStrings('id').calculators;
@@ -181,31 +178,9 @@ test.describe('glory points — explains what it does and how to use it', () => 
   });
 });
 
-test.describe('glory points — touch targets ≥ 44×44px (WCAG / mobile-first)', () => {
-  // Every locale (#423): the submit button's label is the page's own copy.
-  for (const path of localePaths('/yeetalk-calculators'))
-    test(`mobile: attribution link, input and submit button are ≥44px -- ${path}`, async ({
-      page,
-    }) => {
-      await atViewport(page, { width: 375, height: 800 });
-      await page.goto(path);
-      await atLeast44(page.locator('a[href="https://yeetalkapp.com/"]'));
-      await atLeast44(page.locator('#glory-input'));
-      await atLeast44(page.locator('#glory-submit'));
-    });
-});
+// The controls' 44px targets at 375px are read on each locale's walk:
+// checks/yeetalk.ts (#1086).
 
 // Every locale at every width (#423): theme-gallery reads every locale at 320
 // and 1280px only, so 375 and 768px were read in English alone.
-test.describe('glory points — mobile-first layout', () => {
-  for (const width of [320, 375, 768, 1280]) {
-    for (const path of localePaths('/yeetalk-calculators'))
-      test(`no horizontal scroll at ${width}px -- ${path}`, async ({
-        page,
-      }) => {
-        await atViewport(page, { width, height: 900 });
-        await page.goto(path);
-        await expectNoHorizontalScroll(page);
-      });
-  }
-});
+// The page at every width is read on each locale's walk: checks/yeetalk.ts (#1086).

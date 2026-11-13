@@ -669,7 +669,7 @@ test.describe('the handover destination is chosen, not assumed', () => {
     for (const locale of others) {
       // Its OWN name, and `lang` so a screen reader says it in that language
       // rather than spelling it out in English -- the same rule the header
-      // switcher follows (tests/e2e/language-switcher.spec.ts).
+      // switcher follows (tests/e2e/checks/switcher-open.ts).
       const choice = choices.filter({
         hasText: LOCALE_METADATA[locale].nativeName,
       });

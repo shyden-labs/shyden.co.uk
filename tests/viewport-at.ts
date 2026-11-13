@@ -58,3 +58,12 @@ export async function measuredViewport(page: Page): Promise<ViewportSize> {
     height: Math.floor(vvHeight * vvScale),
   };
 }
+
+/**
+ * Whether this target is a real phone: one screen, which takes no emulated
+ * width (#1046). Playwright reports no viewport size exactly there. A test
+ * that walks several widths asks this once, so a phone walks its one width
+ * once instead of repeating the journey at widths it never takes (#1086).
+ */
+export const onRealPhone = (page: Page): boolean =>
+  page.viewportSize() === null;

@@ -24,6 +24,8 @@ export const RENDERED_TEXT_CHECKS: readonly PageCheck[] = [
     name: 'no sentence loses a space',
     routes: () => PUBLISHED_ROUTES,
     themes: [DEFAULT_THEME],
+    // `renderedText` opens every disclosure and unhides every `[hidden]`.
+    mutates: true,
     run: async ({ page, route }) => {
       const text = await renderedText(page);
       const findings = scan(text).map(({ why, at }) => {
@@ -49,6 +51,8 @@ export const RENDERED_TEXT_CHECKS: readonly PageCheck[] = [
     name: 'no unfilled [[placeholder]] reaches the page',
     routes: () => PUBLISHED_ROUTES,
     themes: [DEFAULT_THEME],
+    // `renderedText` opens every disclosure and unhides every `[hidden]`.
+    mutates: true,
     run: async ({ page, route }) => {
       const text = await renderedText(page);
       const findings = [...text.matchAll(/\[\[[^\]]{1,60}\]\]/g)].map(
