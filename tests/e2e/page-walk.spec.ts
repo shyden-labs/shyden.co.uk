@@ -8,6 +8,7 @@ import { RIBBON_CHECK } from './checks/ribbon';
 import { REPORT_FORM_CHECKS } from './checks/report-form';
 import { THAI_CHECK } from './checks/thai';
 import { CHROME_CHECKS } from './checks/chrome';
+import { YEETALK_WIDTH_CHECKS } from './checks/yeetalk';
 import { HOMEPAGE_WIDTH_CHECKS } from './checks/homepage';
 import { LANGUAGE_SWITCHER_CHECKS } from './checks/language-switcher';
 import {
@@ -60,6 +61,7 @@ const WALK: readonly PageCheck[] = [
   ...REPORT_PRESENCE_CHECKS,
   ...CHROME_CHECKS,
   ...HOMEPAGE_WIDTH_CHECKS,
+  ...YEETALK_WIDTH_CHECKS,
   ...LANGUAGE_SWITCHER_CHECKS,
   ...SWITCHER_READ_CHECKS,
   ACCENT_CHECK,
