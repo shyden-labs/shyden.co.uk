@@ -24,6 +24,7 @@ import { measureBoard, measureCover } from '../board-geometry';
 import { coverGaps } from '../device-pixels';
 import { recorded, shoot } from './evidence';
 import { atViewport, measuredViewport } from '../viewport-at';
+import { eachWidth } from '../each-width';
 
 test.use(recorded);
 
@@ -923,20 +924,15 @@ const BOARD_SHAPES = [
   },
 ] as const;
 
-/** The same question, on a board too short to be generous. */
-const SHORT_BOARDS = [
-  {
-    what: 'a landscape phone',
-    count: '25',
-    size: '5',
-    viewport: { width: 740, height: 360 },
-  },
-  {
-    what: 'a 720p projector',
-    count: '25',
-    size: '5',
-    viewport: { width: 1280, height: 720 },
-  },
+/**
+ * The same question, on a board too short to be generous: 25 in fives on a
+ * landscape phone and on a 720p projector. One class at two sizes is one
+ * journey with the widths inside (#1086), so a real phone walks it once.
+ */
+const SHORT_BOARD = { count: '25', size: '5' } as const;
+const SHORT_VIEWPORTS = [
+  { width: 740, height: 360 },
+  { width: 1280, height: 720 },
 ] as const;
 
 /**
@@ -1095,16 +1091,13 @@ test.describe('the projector board never hides a name', () => {
     });
   }
 
-  for (const shape of SHORT_BOARDS) {
-    test(`nothing waiting is out of reach on ${shape.what}`, async ({
-      page,
-    }) => {
-      await atViewport(page, shape.viewport);
-      await refuseFullscreen(page);
-      await openWaitingBoard(page, shape.count, shape.size);
+  test('nothing waiting is out of reach on a short board', async ({ page }) => {
+    await refuseFullscreen(page);
+    await eachWidth(page, SHORT_VIEWPORTS, async () => {
+      await openWaitingBoard(page, SHORT_BOARD.count, SHORT_BOARD.size);
       await expectNothingOutOfReach(page, 'the waiting board, short', true);
     });
-  }
+  });
 
   test('the waiting board does not scroll sideways at 320px', async ({
     page,
@@ -1144,13 +1137,12 @@ test.describe('the projector board never hides a name', () => {
     });
   }
 
-  for (const shape of SHORT_BOARDS) {
-    test(`nothing is out of reach on ${shape.what}`, async ({ page }) => {
-      await atViewport(page, shape.viewport);
-      await boardOf(page, shape.count, shape.size);
+  test('nothing is out of reach on a short board', async ({ page }) => {
+    await eachWidth(page, SHORT_VIEWPORTS, async () => {
+      await boardOf(page, SHORT_BOARD.count, SHORT_BOARD.size);
       await expectNothingOutOfReach(page, 'group cards on a short board', true);
     });
-  }
+  });
 
   test('the stage scrolls exactly when its sheet overflows, before and after the fonts land', async ({
     page,
@@ -1486,8 +1478,10 @@ test.describe('absent students on the board (#999)', () => {
       expect(box).toBeLessThanOrEqual(stage!.x + stage!.width + 0.5);
   });
 
+  // English is not here: the first journey above opens this same class on
+  // the English page and reads this same sentence, so an English test here
+  // walked that journey's opening again for a check it already makes (#1086).
   const sentences = {
-    en: ['/classroom-groups', 'Numbers 3 and 7 are absent.'],
     id: ['/id/classroom-groups', 'Nomor 3 dan 7 tidak hadir.'],
     zh: ['/zh/classroom-groups', '学号 3和7 缺席。'],
     vi: ['/vi/classroom-groups', 'Số 3 và 7 vắng mặt.'],

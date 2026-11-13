@@ -4,7 +4,7 @@ import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { atLeast44, expectNoHorizontalScroll } from '../viewport';
+import { atLeast44Soft, expectNoScrollSoft } from '../viewport';
 import { contrastRatio, formTextsUnderAA } from './helpers';
 import { THEMES } from '../palette';
 import { searched } from '../source-files';
@@ -20,7 +20,7 @@ import {
   reportIdStem,
   reportOptions,
 } from '../../src/lib/report';
-import { atViewport } from '../viewport-at';
+import { eachWidth } from '../each-width';
 
 /**
  * The 404's report route (#350, spec 14). One form per translated block,
@@ -157,43 +157,46 @@ for (const theme of THEMES)
   test.describe(`${theme} theme`, () => {
     test.use({ colorScheme: theme });
 
-    for (const locale of BETA)
-      test(`${locale}: every control is at least 44px and every text meets AA`, async ({
-        page,
-      }) => {
+    // One journey per theme (#1086): every block opened in turn on one load,
+    // each measured as it opens, then every form open at 320px. Each block
+    // was its own test, and a fifth opened them all again at 320px.
+    test('every control is at least 44px, every text meets AA, and nothing scrolls sideways at 320px with every form open', async ({
+      page,
+    }) => {
+      await page.goto(NOT_FOUND);
+      for (const locale of BETA)
+        await test.step(locale, async () => {
+          const t = getSiteStrings(locale).report;
+          const details = block(page, locale);
+          await tapOn(details.locator('summary'));
+          await expect.soft(details).toHaveAttribute('open', '');
+          for (const target of [
+            details.locator('summary'),
+            details.getByLabel(t.quoteLabel, { exact: true }),
+            details.getByLabel(t.suggestionLabel, { exact: true }),
+            details.getByLabel(t.noteLabel, { exact: true }),
+            details.getByRole('button', { name: t.send }),
+          ])
+            await atLeast44Soft(target, target.toString());
+          // On the 404 the form sits on the page's ground, not the footer's,
+          // so its words are measured here too (#97 measured them in the
+          // footer).
+          const { failing, read } = await formTextsUnderAA(
+            details,
+            details.getByRole('button', { name: t.send }),
+          );
+          expect
+            .soft(searched(failing, { of: read, what: `${locale} form texts` }))
+            .toEqual([]);
+        });
+      await eachWidth(page, [{ width: 320, height: 800 }], async () => {
         await page.goto(NOT_FOUND);
-        const t = getSiteStrings(locale).report;
-        const details = block(page, locale);
-        await tapOn(details.locator('summary'));
-        await expect(details).toHaveAttribute('open', '');
-        for (const target of [
-          details.locator('summary'),
-          details.getByLabel(t.quoteLabel, { exact: true }),
-          details.getByLabel(t.suggestionLabel, { exact: true }),
-          details.getByLabel(t.noteLabel, { exact: true }),
-          details.getByRole('button', { name: t.send }),
-        ])
-          await atLeast44(target);
-        // On the 404 the form sits on the page's ground, not the footer's,
-        // so its words are measured here too (#97 measured them in the
-        // footer).
-        const { failing, read } = await formTextsUnderAA(
-          details,
-          details.getByRole('button', { name: t.send }),
-        );
-        expect(
-          searched(failing, { of: read, what: `${locale} form texts` }),
-        ).toEqual([]);
+        for (const locale of BETA)
+          await tapOn(block(page, locale).locator('summary'));
+        await expectNoScrollSoft(page, 'the 404 with every form open');
       });
+    });
   });
-
-test('no sideways scroll at 320px with every form open', async ({ page }) => {
-  await atViewport(page, { width: 320, height: 800 });
-  await page.goto(NOT_FOUND);
-  for (const locale of BETA)
-    await tapOn(block(page, locale).locator('summary'));
-  await expectNoHorizontalScroll(page);
-});
 
 test('no form reaches paper', async ({ page }) => {
   await page.goto(NOT_FOUND);

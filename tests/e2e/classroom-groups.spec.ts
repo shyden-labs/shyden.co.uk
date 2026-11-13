@@ -33,6 +33,7 @@ import {
   contrastRatio,
 } from './helpers';
 import { atViewport } from '../viewport-at';
+import { eachWidth } from '../each-width';
 
 test.use(recorded);
 
@@ -1832,7 +1833,7 @@ test.describe('the no-scroll rule, measured', () => {
   // and #32 removed the last two of those; a flag with one possible value is
   // dead weight, and the branch it fed is precisely what made "tracked, not
   // hidden" assertable without being true. `test(` is still written
-  // literally, with its title inline as a template literal rather than
+  // literally, with its title inline rather than
   // hoisted to a variable, because tests/guards/viewport-tagging.test.ts scans
   // source text for exactly that shape and is blind to a title passed by
   // reference or reached through an aliased callee.
@@ -1840,11 +1841,13 @@ test.describe('the no-scroll rule, measured', () => {
   // One page load per viewport carries four measurements, all soft: where
   // the button sits, and the three rules that keep it there -- the pixels
   // cannot say which mechanism is keeping the button on screen.
-  for (const { width, height } of VIEWPORTS) {
-    test(`the action row is reachable, sticky, padded and shadowed at ${width}x${height}`, async ({
-      page,
-    }) => {
-      const took = await atViewport(page, { width, height });
+  //
+  // One test, the four sizes as its steps (#1086): the same journey at each
+  // width, so a real phone walks it once, at its own.
+  test('the action row is reachable, sticky, padded and shadowed at every size', async ({
+    page,
+  }) => {
+    await eachWidth(page, VIEWPORTS, async (took) => {
       await page.goto('/classroom-groups');
       await measureFit(page);
 
@@ -1928,7 +1931,7 @@ test.describe('the no-scroll rule, measured', () => {
         `${took.width}x${took.height}, the row casts its shadow upward`,
       );
     });
-  }
+  });
 
   // EVERY LOCALE, since #384. The loop above only ever measured English, and
   // copy length is exactly what moves the fold: on develop before #384,
@@ -1936,17 +1939,16 @@ test.describe('the no-scroll rule, measured', () => {
   // every test green. Swapping the lead for the longer who-and-why paragraph
   // then pushed English (+33px) and Thai (+55px) over too. Derived from
   // LOCALES, so a sixth language is measured the day it is added.
-  for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE)) {
-    for (const { width, height } of VIEWPORTS) {
-      test(`/${locale}/: the primary action is reachable without scrolling at ${width}x${height}`, async ({
-        page,
-      }) => {
-        await atViewport(page, { width, height });
+  // Each language one test, the four sizes as its steps (#1086).
+  for (const locale of LOCALES.filter((l) => l !== DEFAULT_LOCALE))
+    test(`/${locale}/: the primary action is reachable without scrolling at every size`, async ({
+      page,
+    }) => {
+      await eachWidth(page, VIEWPORTS, async () => {
         await page.goto(localisePath('/classroom-groups', locale));
         await measureFit(page);
       });
-    }
-  }
+    });
 
   // L-08. The brief's own literal query measured only what page LOAD
   // already shows -- nothing inside any of the four sections is on screen

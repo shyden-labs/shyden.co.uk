@@ -166,3 +166,38 @@ export const atLeast44 = async (
   expect(box, `${what} has a box`).not.toBeNull();
   rectAtLeast44(box!, what);
 };
+
+// A merged journey checks many things in one visit, so its checks can be
+// soft: one small control or one sideways scroll does not hide the checks
+// after it. Same assertions as `atLeast44`, `rectAtLeast44` and
+// `expectNoHorizontalScroll` (above), which stop at the first.
+export const rectAtLeast44Soft = (
+  rect: { readonly width: number; readonly height: number },
+  what: string,
+): void => {
+  expect
+    .soft(Math.round(rect.width), `${what} width`)
+    .toBeGreaterThanOrEqual(44);
+  expect
+    .soft(Math.round(rect.height), `${what} height`)
+    .toBeGreaterThanOrEqual(44);
+};
+
+export const atLeast44Soft = async (
+  locator: Locator,
+  what: string,
+): Promise<void> => {
+  const box = await locator.boundingBox();
+  expect.soft(box, `${what} has a box`).not.toBeNull();
+  if (box) rectAtLeast44Soft(box, what);
+};
+
+export const expectNoScrollSoft = async (
+  page: Page,
+  note: string,
+): Promise<void> => {
+  const overflow = await horizontalOverflow(page);
+  expect
+    .soft(overflow, `${note} scrolls sideways by ${overflow}px`)
+    .toBeLessThanOrEqual(0);
+};
