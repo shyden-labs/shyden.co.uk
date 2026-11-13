@@ -343,6 +343,7 @@ export function mergeReporters(argv = []) {
   if (!reporters.includes('json')) reporters.push('json');
   if (!reporters.includes(NAV_TIMING_REPORTER))
     reporters.push(NAV_TIMING_REPORTER);
+  reporters.push('./tests/reporters/actions-reporter.mjs');
   return { passthrough, reporter: reporters.join(',') };
 }
 
