@@ -38,12 +38,17 @@ import { RECORDER_CHECKS } from './checks/recorders';
  * rest. Each check is a `test.step` named as the test it replaced.
  *
  * In ORDER: the checks that only read come first; then those that change the
- * page (`mutates`), each placed after every check whose reading it would
- * change. The scan's own seam check puts its planted paragraph back; the
- * touching-words check opens the flow's disclosures, one tap opens the
- * language switcher, then the palette opens all of them; the recorders plant errors and silence the console; the last
- * two replace the homepage's body. The ribbon scan hides every glyph and
- * then loads the page again, so it comes before the checks that open things.
+ * page (`mutates`), placed so each reads the page its old test read. The
+ * ribbon scan hides every glyph and loads the page again, so it goes first.
+ * The report form, then the language switcher, are each opened by one real
+ * tap; between them the touching-words check opens the flow's disclosures by
+ * script (the switcher is in the header, which it leaves shut). The palette
+ * opens every disclosure. The text scans (`renderedText`) open every
+ * disclosure and remove every `hidden` attribute, so they come after every
+ * check that reads the page as served: placed earlier, they changed what the
+ * touching-words and palette checks read (#1086, found from a trace on PR
+ * #1147). The recorders plant errors and silence the console; the last two
+ * replace the homepage's body.
  *
  * WIDTHS (Shyden, 2026-11-13, "One test, widths inside"). A check read at set
  * widths was one test per width, and a real phone, which cannot take an
@@ -67,15 +72,15 @@ const WALK: readonly PageCheck[] = [
   ...LANGUAGE_SWITCHER_CHECKS,
   ...SWITCHER_READ_CHECKS,
   ACCENT_CHECK,
-  SPACE_CHECK,
-  PLACEHOLDER_CHECK,
   THAI_CHECK,
-  SEAM_CHECK,
   RIBBON_CHECK,
   ...REPORT_FORM_CHECKS,
   TOUCHING_CHECK,
   ...SWITCHER_OPEN_CHECKS,
   ...PALETTE_CHECKS,
+  SPACE_CHECK,
+  PLACEHOLDER_CHECK,
+  SEAM_CHECK,
   ...RECORDER_CHECKS,
   ...BODY_CHECKS,
 ];
