@@ -6,15 +6,14 @@
  * real driver for the protocol Safari's page speaks -- not a mock of
  * Playwright's API.
  *
- * INTERACTION MODE (design doc s5a). Input is DOM dispatch today -- see
- * tests/device/ios/interaction.ts's own module doc -- until #838 brings
- * WebDriverAgent's real taps. Every journey below calls only
- * `session.interaction.click/type/clear`, never element-level
- * click/sendKeys/clear directly, so it is written once and does not know
- * or care which mode is active. The mode is logged prominently by
- * session.ts when the session starts, and again at the start of every
- * test here (see `logMode` below) -- a DOM-dispatch run must never read as
- * though taps were taps.
+ * INTERACTION MODE (design doc s5a; #838). Every tap is a real touch and
+ * every keystroke the iPhone's own keyboard, through WebDriverAgent -- see
+ * tests/device/ios/interaction.ts's own module doc. Each tap is checked to
+ * land on its element (nothing on top at its centre; a trusted touch
+ * inside its box), and a tap that does not land fails the test naming
+ * why. Every journey below calls only `session.interaction.click/type/clear`.
+ * The mode is logged by session.ts when the session starts, and again at
+ * the start of every test here (see `logMode` below).
  *
  * TASK 3a + 3b SCOPE. The task brief lists 13 journeys, in three groups
  * (happy 1-4, unhappy 5-7, edge 8-10) plus three iOS-only proofs (11-13)
@@ -25,15 +24,9 @@
  * that way in the first place: a later journey drops in with no new
  * plumbing.
  *
- * Journeys 11 and 13 are bounded by the SAME dual-mode limitation this
- * whole file already carries (see INTERACTION MODE, above):
- * dom-dispatch mode does not exercise the touch input path itself, so
- * neither can verify that a real tap actually lands on a control (Journey
- * 13) or that focusing a field via a real tap changes
- * `visualViewport.scale` (Journey 11) -- only the real, computed geometry
- * each one measures (an input's own computed font-size; a control's own
- * real `rect()`) is asserted, and each says so plainly in its own test
- * name. Journey 12 is a measurement, not a threshold -- see
+ * Journey 11 measures each typed field's computed font-size;
+ * Journey 13 taps each primary control for real, so a control a finger
+ * cannot reach fails there. Journey 12 is a measurement, not a threshold -- see
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 5, for why real hardware, not an emulated profile, is the whole
  * point of this file.
@@ -125,6 +118,21 @@ afterAll(async () => {
   // file could safely call teardown() on.
   await session?.teardown();
 }, 120_000);
+
+/**
+ * Chooses "Skip the animation" the way a teacher does: a real tap opens the
+ * Sound and animation section if it is closed, and the speed is picked in
+ * the phone's own menu (global rule 2026-10-31: all device input is real).
+ */
+async function skipTheAnimation(): Promise<void> {
+  const toggle = await session.driver.findElement('#cg-sound-toggle');
+  if ((await toggle.attribute('aria-expanded')) !== 'true')
+    await session.interaction.click(toggle);
+  await session.interaction.select(
+    await session.driver.findElement('#cg-speed'),
+    'skip',
+  );
+}
 
 /**
  * Design doc s5a's own requirement, restated at the point every reader
@@ -557,23 +565,10 @@ describe.each(LOCALES)(
       logMode(`Journey 8a (${locale})`);
       await session.navigateToPath(path);
 
-      // A real, product-level preference (Skip the animation) -- exactly
-      // what a reduced-motion device gets by default, per
-      // src/scripts/classroom-groups.ts's own `reduceMotion` branch, which
-      // sets this same field the same direct way: no dispatched event,
-      // because the submit handler reads `speedSelect.value` fresh at
-      // shuffle time and nothing listens for a `change` on this field.
-      // Set here purely so MAX_STUDENTS worth of per-card deal animation
-      // (otherwise ~110ms EACH, on the phone's one shared main thread) does
-      // not still be running when the very next journey issues its own
-      // commands against the same page. A plain script, a
-      // direct value assignment exactly like the product's own
-      // `reduceMotion` branch already performs -- not a synthetic
-      // click/keyboard interaction, so this does not go through
-      // `session.interaction` either.
-      await session.driver.executeScript(
-        `document.getElementById('cg-speed').value = 'skip';`,
-      );
+      // Skip the animation, so MAX_STUDENTS cards are not dealt one by one
+      // (~110ms each on the phone's one main thread) while the next journey
+      // starts. Chosen with real taps, as a teacher would.
+      await skipTheAnimation();
 
       const count = await session.driver.findElement('#cg-count');
       await session.interaction.click(count);
@@ -727,14 +722,12 @@ describe.each(LOCALES)(
       ).toBe(true);
     });
 
-    // iOS-only proofs (11-13): the reason this whole runner exists. Bounded
-    // by the SAME dual-mode limitation as the rest of this file -- see this
-    // file's own module doc, and design doc s5a.
+    // iOS-only proofs (11-13): the reason this whole runner exists.
     // The fields are the ones `zoom-on-focus.spec.ts` checks in CI, from the
     // one definition in tests/typed-fields.ts. This journey used to check only
     // `input[type=text|number]`, so the one leg on real WebKit skipped every
     // select, textarea and email field (#390).
-    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px (tap-triggered focus and scale change are NOT verified in dom-dispatch mode)', async () => {
+    test('Journey 11 -- iOS-only, no zoom on focus: every typed field has a real computed font-size >= 16px (the zoom a real tap causes is a shared-spec check for both phones)', async () => {
       logMode(`Journey 11 (${locale})`);
       await session.navigateToPath(path);
 
@@ -807,7 +800,7 @@ describe.each(LOCALES)(
       ).toBeLessThanOrEqual(geometry.innerWidth);
     });
 
-    test('Journey 13 -- iOS-only, 44px touch targets: primary controls meet the minimum at real pixel density (geometry only -- that a tap actually lands is NOT verified)', async () => {
+    test('Journey 13 -- iOS-only, 44px touch targets: primary controls meet the minimum at real pixel density, and a real tap lands on each', async () => {
       logMode(`Journey 13 (${locale})`);
       await session.navigateToPath(path);
 
@@ -841,6 +834,9 @@ describe.each(LOCALES)(
           Math.round(rect.height),
           `#${id} height, locale ${locale}`,
         ).toBeGreaterThanOrEqual(44);
+        // Fails, naming what is on top or where the touch went, unless a
+        // finger's tap reaches the control.
+        await session.interaction.click(el);
       }
     });
 
@@ -913,22 +909,9 @@ describe.each(LOCALES)(
         await session.interaction.clear(size);
         await session.interaction.type(size, shape.size);
 
-        // `#cg-speed` is a <select>, and `Interaction` deliberately offers only
-        // click/type/clear -- so this one control goes through the driver. Two
-        // things make that safe rather than a shortcut: the value is READ BACK
-        // (a set that silently did nothing would leave the shuffle animating
-        // while the layout below was measured mid-flight), and JavaScript needs
-        // no visibility, so the phone skips expanding the sound section that the
-        // desktop leg has to open first.
-        const speed = await session.driver.executeScript<string>(
-          `var s = document.getElementById('cg-speed');
-         s.value = 'skip';
-         s.dispatchEvent(new Event('change', { bubbles: true }));
-         return s.value;`,
-        );
-        expect(speed, `the shuffle animation was skipped (${locale})`).toBe(
-          'skip',
-        );
+        // Skip the animation with real taps, so the layout below is not
+        // measured mid-deal; `select` reads the value back.
+        await skipTheAnimation();
 
         const go = await session.driver.findElement('#cg-go');
         await session.interaction.click(go);

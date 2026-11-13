@@ -98,11 +98,6 @@ export class StaleElementError extends Error {
   }
 }
 
-const INPUT_THEN_CHANGE = [
-  "this.dispatchEvent(new Event('input', { bubbles: true }));",
-  "this.dispatchEvent(new Event('change', { bubbles: true }));",
-].join('\n');
-
 /**
  * One element on the page, by the handle the page gave for it. Each call is
  * one function run with the element as `this`.
@@ -114,25 +109,6 @@ export class PageElement {
     /** The selector that found it, to name it in an error. */
     readonly selector: string,
   ) {}
-
-  async click(): Promise<void> {
-    await this.call('this.click();');
-  }
-
-  async clear(): Promise<void> {
-    await this.call(`this.value = '';\n${INPUT_THEN_CHANGE}`);
-  }
-
-  /**
-   * Appends `text` to the value and fires `input` then `change`.
-   * NOT YET THE SAME as Android (#838): no key events, no real typing.
-   */
-  async sendKeys(text: string): Promise<void> {
-    await this.call(
-      `this.value = this.value + arguments[0];\n${INPUT_THEN_CHANGE}`,
-      [text],
-    );
-  }
 
   async text(): Promise<string> {
     const value = await this.call('return this.innerText;');

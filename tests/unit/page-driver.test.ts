@@ -217,42 +217,12 @@ function lastCall(page: ReturnType<typeof fakePage>) {
   return params;
 }
 
-const done = { result: { type: 'undefined' }, wasThrown: false };
 const valued = (value: unknown) => ({
   result: { type: typeof value, value },
   wasThrown: false,
 });
 
 describe('a PageElement: each call is one function run on the element itself', () => {
-  it('click calls the element’s own click()', async () => {
-    const { page, element } = elementOn({ 'Runtime.callFunctionOn': [done] });
-    await element.click();
-    expect(lastCall(page).functionDeclaration).toContain('this.click();');
-  });
-
-  it('clear empties the value, then fires input and change', async () => {
-    const { page, element } = elementOn({ 'Runtime.callFunctionOn': [done] });
-    await element.clear();
-    const source = lastCall(page).functionDeclaration;
-    expect(source).toContain("this.value = '';");
-    expect(
-      source.indexOf("new Event('input', { bubbles: true })"),
-    ).toBeLessThan(source.indexOf("new Event('change', { bubbles: true })"));
-  });
-
-  it('sendKeys appends the text, then fires input and change', async () => {
-    const { page, element } = elementOn({ 'Runtime.callFunctionOn': [done] });
-    await element.sendKeys('Ana');
-    const call = lastCall(page);
-    expect(call.functionDeclaration).toContain(
-      'this.value = this.value + arguments[0];',
-    );
-    expect(call.functionDeclaration).toContain(
-      "new Event('change', { bubbles: true })",
-    );
-    expect(call.arguments).toEqual([{ value: 'Ana' }]);
-  });
-
   it('text returns innerText', async () => {
     const { page, element } = elementOn({
       'Runtime.callFunctionOn': [valued('Groups')],
@@ -323,9 +293,9 @@ describe('a PageElement: each call is one function run on the element itself', (
         new Refusal('Missing injected script for given objectId'),
       ],
     });
-    const click = element.click();
-    await expect(click).rejects.toBeInstanceOf(StaleElementError);
-    await expect(click).rejects.toThrow(
+    const read = element.text();
+    await expect(read).rejects.toBeInstanceOf(StaleElementError);
+    await expect(read).rejects.toThrow(
       'the element #cg-go found is gone from the page (it reloaded or was replaced)',
     );
   });
@@ -334,14 +304,14 @@ describe('a PageElement: each call is one function run on the element itself', (
     const { element } = elementOn({
       'Runtime.callFunctionOn': [new Refusal('something else')],
     });
-    await expect(element.click()).rejects.toBeInstanceOf(InspectorError);
+    await expect(element.text()).rejects.toBeInstanceOf(InspectorError);
   });
 
   it('an exception the element’s function threw is a PageScriptError', async () => {
     const { element } = elementOn({
       'Runtime.callFunctionOn': [recorded('thrown error')],
     });
-    await expect(element.click()).rejects.toBeInstanceOf(PageScriptError);
+    await expect(element.text()).rejects.toBeInstanceOf(PageScriptError);
   });
 });
 

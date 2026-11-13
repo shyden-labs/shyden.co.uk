@@ -375,8 +375,6 @@ const PAGE = `<!doctype html>
   .fail-list li { color: var(--failed); }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .mode-banner { border-radius: 6px; padding: 0.6rem 0.7rem; margin-bottom: 0.6rem; font-size: 0.82rem; line-height: 1.4; }
-  .mode-banner.dom-dispatch { background: #3a2a00; border: 1px solid var(--skipped); color: #ffd876; }
-  @media (prefers-color-scheme: light) { .mode-banner.dom-dispatch { background: #fff6d9; color: #6b4e00; } }
   .mode-banner.native { background: rgba(46,160,67,0.12); border: 1px solid var(--passed); }
   .empty { color: var(--muted); font-style: italic; }
   .report-link { display: inline-block; margin-top: 0.5rem; font-size: 0.8rem; }
@@ -436,7 +434,7 @@ const PAGE = `<!doctype html>
     var html = '<h2>' + esc(label) + ' <span class="badge ' + badgeClass + '">' + esc(badge) + '</span></h2>';
 
     if (g.mode && g.mode.mode) {
-      html += '<div class="mode-banner ' + (g.mode.mode === 'dom-dispatch' ? 'dom-dispatch' : 'native') + '">' + esc(g.mode.description) + '</div>';
+      html += '<div class="mode-banner native">' + esc(g.mode.description) + '</div>';
     }
 
     if (g.notRun) {
