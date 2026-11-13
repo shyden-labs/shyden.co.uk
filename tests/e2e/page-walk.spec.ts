@@ -5,6 +5,7 @@ import { PUBLISHED_ROUTES } from './published-paths';
 import { measuredViewport, atViewport } from '../viewport-at';
 import { WIDTH_CHECK_HEIGHT, type PageCheck, type Visit } from './page-checks';
 import { RIBBON_CHECK } from './checks/ribbon';
+import { REPORT_FORM_CHECKS } from './checks/report-form';
 import { THAI_CHECK } from './checks/thai';
 import { CHROME_CHECKS } from './checks/chrome';
 import { HOMEPAGE_WIDTH_CHECKS } from './checks/homepage';
@@ -67,6 +68,7 @@ const WALK: readonly PageCheck[] = [
   THAI_CHECK,
   SEAM_CHECK,
   RIBBON_CHECK,
+  ...REPORT_FORM_CHECKS,
   TOUCHING_CHECK,
   ...SWITCHER_OPEN_CHECKS,
   ...PALETTE_CHECKS,
