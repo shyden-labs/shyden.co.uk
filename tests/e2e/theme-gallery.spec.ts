@@ -2,11 +2,9 @@ import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { PUBLISHED_ROUTES } from './published-paths';
 import { refuseFullscreen, withGroups } from './helpers';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
-import { expectNoHorizontalScroll } from '../viewport';
 import { atViewport } from '../viewport-at';
 
 /**
@@ -14,8 +12,9 @@ import { atViewport } from '../viewport-at';
  * narrowest width the site supports and a laptop's. The assertion is the one
  * a theme can break on any page: it renders its theme, and nothing scrolls
  * sideways. The captures are what the operator reviews on the evidence page.
+ * The page sweep itself is made on each page's walk (checks/theme-gallery.ts,
+ * #1086); the interactive states stay here.
  */
-const WIDTHS = [320, 1280];
 
 // File level: `recorded` sets `video`, which Playwright refuses inside a
 // describe ("Cannot use({ video }) in a describe group, because it forces a
@@ -26,19 +25,8 @@ for (const theme of THEMES) {
   test.describe(`${theme} theme`, () => {
     test.use({ colorScheme: theme });
 
-    // One test per page, width and theme (#421): every page in a locale was
-    // one test, so the 404 rode along with the English pages' budget.
-    for (const width of WIDTHS)
-      for (const path of PUBLISHED_ROUTES)
-        test(`${path} at ${width}px: renders the theme, with no sideways scroll`, async ({
-          page,
-        }) => {
-          const took = await atViewport(page, { width, height: 900 });
-          await page.goto(path);
-          await expectTheme(page, theme);
-          await expectNoHorizontalScroll(page);
-          await shoot(page, `${path}, ${theme}, ${took.width}px`);
-        });
+    // Each page renders this theme with no sideways scroll at 320 and 1280px:
+    // read on its walk, checks/theme-gallery.ts (#1086).
 
     test.describe('interactive states', () => {
       test('the header: the phone menu, the language list and the focused switch', async ({
