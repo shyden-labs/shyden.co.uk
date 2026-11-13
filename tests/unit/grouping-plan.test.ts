@@ -21,7 +21,6 @@ const plan = (over: Partial<Plan> = {}): Plan => ({
   mode: { kind: 'perGroup', size: 4 },
   leftovers: 'spread',
   sexMode: 'off',
-  pinned: [],
   ...over,
 });
 
@@ -38,11 +37,6 @@ const roster = (
 const bySex = (boys: number, girls: number): Student[] =>
   roster(boys + girls, (n) => ({ sex: n <= boys ? 'M' : 'F' }));
 
-const pinnedOf = (students: Student[], ...groups: number[][]): Student[][] =>
-  groups.map((numbers) =>
-    numbers.map((n) => students.find((s) => s.number === n) as Student),
-  );
-
 const ten = roster(10);
 
 describe('plannedGroups: the deal’s groups, before it runs (#743)', () => {
@@ -55,41 +49,6 @@ describe('plannedGroups: the deal’s groups, before it runs (#743)', () => {
       '10 with 2 absent, by fours: the absent are not dealt',
       plan({ students: roster(10, (n) => ({ absent: n > 8 })) }),
       2,
-    ],
-    [
-      '10 by threes with one group of 3 pinned',
-      plan({
-        students: ten,
-        mode: { kind: 'perGroup', size: 3 },
-        pinned: pinnedOf(ten, [1, 2, 3]),
-      }),
-      3,
-    ],
-    [
-      'every present student pinned: the pinned groups alone',
-      plan({
-        students: ten,
-        pinned: pinnedOf(ten, [1, 2, 3, 4, 5], [6, 7, 8, 9, 10]),
-      }),
-      2,
-    ],
-    [
-      '10 into 4 groups with one pinned',
-      plan({
-        students: ten,
-        mode: { kind: 'groupCount', count: 4 },
-        pinned: pinnedOf(ten, [1, 2]),
-      }),
-      4,
-    ],
-    [
-      'more groups pinned than asked for: the deal refuses',
-      plan({
-        students: ten,
-        mode: { kind: 'groupCount', count: 2 },
-        pinned: pinnedOf(ten, [1, 2], [3, 4]),
-      }),
-      null,
     ],
     [
       'single-sex groups by threes, 7 boys and 5 girls',
@@ -147,18 +106,13 @@ describe('plannedGroups: the deal’s groups, before it runs (#743)', () => {
 });
 
 describe('plannedGroups: what the waiting board shows (#743)', () => {
-  it('puts each pinned group’s members in its card, ahead of the empty ones', () => {
+  it('shows one empty card per group the deal will make', () => {
     const planned = plannedGroups(
       plan({
         students: ten,
         mode: { kind: 'perGroup', size: 3 },
-        pinned: pinnedOf(ten, [1, 2, 3]),
       }),
     );
-    expect(planned?.map((g) => g.map((s) => s.number))).toEqual([
-      [1, 2, 3],
-      [],
-      [],
-    ]);
+    expect(planned?.map((g) => g.map((s) => s.number))).toEqual([[], [], []]);
   });
 });

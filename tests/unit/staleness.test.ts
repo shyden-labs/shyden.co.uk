@@ -93,8 +93,9 @@ describe('staleReason', () => {
   // in #cg-count, the page's only population control this stage, via
   // `readRoster` (classroom-groups.ts) -- see Snapshot's own doc comment.
   // This test only pins staleReason's own comparison against an arbitrary
-  // literal; classroom-groups.spec.ts's "changing the number of students
-  // marks them out of date, naming the change" is what proves the live
+  // literal; classroom-groups.spec.ts's "a changed size or count marks the
+  // groups out of date, a class name does not, shuffling clears it" is what
+  // proves the live
   // page actually drives this branch.
   it('names the roster change', () => {
     const now: Snapshot = { ...base, roster: 'something changed' };

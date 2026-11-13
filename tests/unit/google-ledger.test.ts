@@ -460,3 +460,26 @@ describe('dailyLimit: a raised limit is a recorded decision (AC5)', () => {
     expect(Object.keys(ledgerOn(disk))).toEqual([DAY]);
   });
 });
+
+describe('takeLock never spins on a lock it cannot create (#390 F25)', () => {
+  it('waits between tries, and gives up at the ceiling naming why, when create keeps failing with no lock there', async () => {
+    let creates = 0;
+    const port: LedgerFiles = {
+      read: () => undefined,
+      create: () => {
+        creates += 1;
+        // A guard against the old busy loop: never thousands of tries.
+        if (creates > 10_000) throw new Error('takeLock spun without waiting');
+        return false;
+      },
+      write: () => {},
+      rename: () => {},
+      remove: () => {},
+    };
+    const fake = fakeClock(new Set());
+    await expect(
+      takeLock(port, LOCK, ME, fake.clock, 10 * LOCK_POLL_MS),
+    ).rejects.toThrow(/could not create the read-back lock/);
+    expect(fake.waits()).toBeGreaterThan(0);
+  });
+});

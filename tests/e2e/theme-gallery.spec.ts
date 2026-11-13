@@ -1,19 +1,20 @@
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
-import { PUBLISHED_ROUTES } from './published-paths';
 import { refuseFullscreen, withGroups } from './helpers';
 import { THEMES } from '../palette';
 import { expectTheme } from '../themes';
-import { expectNoHorizontalScroll } from '../viewport';
+import { atViewport } from '../viewport-at';
 
 /**
  * Every built page in both themes (#142 §6.7), in every locale, at the
  * narrowest width the site supports and a laptop's. The assertion is the one
  * a theme can break on any page: it renders its theme, and nothing scrolls
  * sideways. The captures are what the operator reviews on the evidence page.
+ * The page sweep itself is made on each page's walk (checks/theme-gallery.ts,
+ * #1086); the interactive states stay here.
  */
-const WIDTHS = [320, 1280];
 
 // File level: `recorded` sets `video`, which Playwright refuses inside a
 // describe ("Cannot use({ video }) in a describe group, because it forces a
@@ -24,57 +25,48 @@ for (const theme of THEMES) {
   test.describe(`${theme} theme`, () => {
     test.use({ colorScheme: theme });
 
-    // One test per page, width and theme (#421): every page in a locale was
-    // one test, so the 404 rode along with the English pages' budget.
-    for (const width of WIDTHS)
-      for (const path of PUBLISHED_ROUTES)
-        test(
-          `${path} at ${width}px: renders the theme, with no sideways scroll`,
-          { tag: '@emulated-viewport' },
-          async ({ page }) => {
-            await page.setViewportSize({ width, height: 900 });
-            await page.goto(path);
-            await expectTheme(page, theme);
-            await expectNoHorizontalScroll(page);
-            await shoot(page, `${path}, ${theme}, ${width}px`);
-          },
-        );
+    // Each page renders this theme with no sideways scroll at 320 and 1280px:
+    // read on its walk, checks/theme-gallery.ts (#1086).
 
     test.describe('interactive states', () => {
-      test(
-        'the header: the phone menu, the language list and the focused switch',
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width: 390, height: 844 });
-          await page.goto('/');
-          await expectTheme(page, theme);
-          const menu = page.locator('header details.menu > summary');
-          await tapOn(menu);
-          await expect(page.locator('header nav a').first()).toBeVisible();
-          await shoot(page, `${theme}: the phone menu, open`);
-          await tapOn(menu);
+      test('the header: the phone menu, the language list and the focused switch', async ({
+        page,
+      }) => {
+        await atViewport(page, { width: 390, height: 844 });
+        await page.goto('/');
+        await expectTheme(page, theme);
+        const menu = page.locator('header details.menu > summary');
+        await tapOn(menu);
+        await expect(page.locator('header nav a').first()).toBeVisible();
+        await shoot(page, `${theme}: the phone menu, open`);
+        await tapOn(menu);
 
-          const languages = page.locator('header details.lang-switch');
-          await tapOn(languages.locator('summary'));
-          await expect(languages.locator('a.entry').first()).toBeVisible();
-          await shoot(
-            page,
-            `${theme}: the language list, open beside the compact label`,
-            languages,
-          );
-          await tapOn(languages.locator('summary'));
+        const languages = page.locator('header details.lang-switch');
+        await tapOn(languages.locator('summary'));
+        await expect(languages.locator('a.entry').first()).toBeVisible();
+        await shoot(
+          page,
+          `${theme}: the language list, open beside the compact label`,
+          languages,
+        );
+        await tapOn(languages.locator('summary'));
+        // WebKit keeps keyboard focus on a clicked <summary>: no Tab or
+        // Shift+Tab, with or without Option, moves it (measured in CI on
+        // webkit and mobile-safari, #1034). A tap on the heading, as a
+        // visitor clicks away, starts the walk from the page instead.
+        await tapOn(page.locator('h1').first());
 
-          const toggle = page.locator('header [data-theme-toggle]');
-          await page.keyboard.press('Shift');
-          await toggle.focus();
-          await expect(toggle).toBeFocused();
-          await shoot(
-            page,
-            `${theme}: the theme switch, focused`,
-            page.locator('header'),
-          );
-        },
-      );
+        const toggle = page.locator('header [data-theme-toggle]');
+        // The switch sits just before the language list (#142 §5), so the
+        // walk to it from the page goes back.
+        await tabTo(toggle, 'backwards');
+        await expect(toggle).toBeFocused();
+        await shoot(
+          page,
+          `${theme}: the theme switch, focused`,
+          page.locator('header'),
+        );
+      });
 
       test(
         '/classroom-groups: results, the roster, the docked bar, print and the full-screen board',

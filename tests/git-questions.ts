@@ -49,7 +49,7 @@ export const STRAY_SNAPSHOT =
 export const NEW_BASELINE =
   'tests/e2e/__screenshots__/a-new-page-desktop-linux.png';
 
-/** Every source file on disk, from the one walk: what stranded-docblocks asks git about. */
+/** Every source file on disk, from the one walk. */
 export const walkedSource = (): string[] =>
   filesUnder('.', (path) => SOURCE_FILE.test(path));
 

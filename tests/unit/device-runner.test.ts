@@ -241,6 +241,196 @@ describe('playwrightVerdict: what a Playwright group proved', () => {
   });
 });
 
+// #1020: macOS WebKit can abort while a page closes, inside its own Screen
+// Time observer. The run stays red (never a skip, never a retry), but the
+// reason names which failures were that crash, by its exact text, so a red
+// desktop group is not read as the site being wrong.
+describe("playwrightVerdict: naming macOS WebKit's Screen Time crash (#1020)", () => {
+  const CRASH =
+    "browserContext.close: Test ended.\nBrowser logs:\n\n<launching>\n*** Terminating app due to uncaught exception 'NSInternalInconsistencyException', reason: 'Cannot remove an observer <WKScreenTimeConfigurationObserver 0x7b7> for the key path \"configuration.enforcesChildRestrictions\"'";
+  const result = (
+    status: string,
+    message?: string,
+    where: 'error' | 'errors' = 'errors',
+  ) => ({
+    status,
+    ...(message === undefined
+      ? {}
+      : where === 'error'
+        ? { error: { message } }
+        : { errors: [{ message }] }),
+  });
+  const spec = (
+    title: string,
+    projectName: string,
+    status: string,
+    results: unknown[],
+  ) => ({
+    title,
+    tests: [{ projectName, status, results }],
+  });
+  const report = (
+    specs: unknown[],
+    counts: Partial<Record<string, unknown>> = {},
+  ) => ({
+    ...stats(counts),
+    suites: [
+      {
+        title: 'homepage.spec.ts',
+        specs: [],
+        suites: [{ title: 'layout', specs }],
+      },
+    ],
+  });
+  const judge = (code: number, r: unknown) =>
+    playwrightVerdict({
+      name: 'desktop',
+      code,
+      report: r,
+      reportFile: 'r.json',
+    });
+  const NAMED =
+    "; 1 of them crashed inside macOS WebKit's own Screen Time teardown, not the site (#1020): ";
+
+  it('names a failed test whose browser logs carry the crash, and stays failed', () => {
+    expect(
+      judge(
+        1,
+        report(
+          [
+            spec('no scroll at 390px', 'webkit', 'unexpected', [
+              result('failed', CRASH),
+            ]),
+          ],
+          { unexpected: 1 },
+        ),
+      ),
+    ).toMatchObject({
+      status: 'failed',
+      reason: `1 test(s) failed${NAMED}[webkit] no scroll at 390px (process exit code 1)`,
+    });
+  });
+
+  it('reads the crash from a result’s single error too', () => {
+    expect(
+      judge(
+        1,
+        report(
+          [
+            spec('t', 'webkit', 'unexpected', [
+              result('failed', CRASH, 'error'),
+            ]),
+          ],
+          { unexpected: 1 },
+        ),
+      ).reason,
+    ).toBe(`1 test(s) failed${NAMED}[webkit] t (process exit code 1)`);
+  });
+
+  it('names a test that crashed and then passed on a retry, still failed', () => {
+    expect(
+      judge(
+        0,
+        report(
+          [
+            spec('t', 'webkit', 'flaky', [
+              result('failed', CRASH),
+              result('passed'),
+            ]),
+          ],
+          { flaky: 1 },
+        ),
+      ),
+    ).toMatchObject({
+      status: 'failed',
+      reason: `1 test(s) passed only on a retry -- a retry is not a fix, so this group is failed${NAMED}[webkit] t`,
+    });
+  });
+
+  it('leaves a failure without the crash unnamed', () => {
+    expect(
+      judge(
+        1,
+        report(
+          [
+            spec('t', 'webkit', 'unexpected', [
+              result('failed', 'expected 0 got 5'),
+            ]),
+          ],
+          { unexpected: 1 },
+        ),
+      ).reason,
+    ).toBe('1 test(s) failed (process exit code 1)');
+  });
+
+  it('does not name a near-miss: another observer the same exception names', () => {
+    const other = CRASH.replace(
+      'WKScreenTimeConfigurationObserver',
+      'NSKeyValueObservance',
+    );
+    expect(
+      judge(
+        1,
+        report([spec('t', 'webkit', 'unexpected', [result('failed', other)])], {
+          unexpected: 1,
+        }),
+      ).reason,
+    ).toBe('1 test(s) failed (process exit code 1)');
+  });
+
+  it('does not name a test that passed, whatever its results say', () => {
+    expect(
+      judge(
+        0,
+        report([spec('t', 'webkit', 'expected', [result('passed', CRASH)])]),
+      ).reason,
+    ).toBeUndefined();
+  });
+
+  // A `test.fail()` test that failed as declared is `expected`, and keeps its
+  // errors: it is not a red, so its crash is not one of the group's failures.
+  it('does not name an expected failure beside a real one', () => {
+    expect(
+      judge(
+        1,
+        report(
+          [
+            spec('declared', 'webkit', 'expected', [result('failed', CRASH)]),
+            spec('real', 'chromium', 'unexpected', [
+              result('failed', 'timeout'),
+            ]),
+          ],
+          { unexpected: 1 },
+        ),
+      ).reason,
+    ).toBe('1 test(s) failed (process exit code 1)');
+  });
+
+  it('names only the crashed ones among several failures, counting them', () => {
+    expect(
+      judge(
+        1,
+        report(
+          [
+            spec('a', 'webkit', 'unexpected', [result('failed', CRASH)]),
+            spec('b', 'chromium', 'unexpected', [result('failed', 'timeout')]),
+            spec('c', 'webkit', 'unexpected', [result('failed', CRASH)]),
+          ],
+          { unexpected: 3 },
+        ),
+      ).reason,
+    ).toBe(
+      "3 test(s) failed; 2 of them crashed inside macOS WebKit's own Screen Time teardown, not the site (#1020): [webkit] a, [webkit] c (process exit code 1)",
+    );
+  });
+
+  it('names nothing in a report that carries no suites', () => {
+    expect(judge(1, stats({ unexpected: 1 })).reason).toBe(
+      '1 test(s) failed (process exit code 1)',
+    );
+  });
+});
+
 /** A vitest JSON report's top-level counts, clean unless one is given. */
 const vitestReport = (counts: Record<string, unknown> = {}) => ({
   numPassedTests: 30,

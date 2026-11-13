@@ -3,9 +3,10 @@ import { LOCALES, localisePath } from '../src/lib/i18n';
 
 /**
  * The page that moved (#635): each old address and where it must land. One
- * home for the dev and prod sanity suites, so the two cannot disagree. The
- * redirect is `functions/_middleware.js`, which a preview of `dist/` never
- * runs, so only the deployed sites can answer it.
+ * home for the dev and prod sanity suites and the functions suite, so they
+ * cannot disagree. The redirect is `functions/_middleware.js`: the functions
+ * suite proves it before the merge (#394), the sanity suites on each deployed
+ * site.
  */
 export const LEGACY_REDIRECTS: readonly (readonly [string, string])[] =
   // Every locale, derived: a hand-written pair of samples would miss the

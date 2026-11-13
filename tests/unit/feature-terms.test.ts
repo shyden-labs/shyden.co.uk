@@ -19,8 +19,9 @@ import type { Locale } from '../../src/lib/i18n/locales';
  * Copy that names a feature of the classroom-groups tool, held to the words
  * its locale approved for that feature (#319).
  *
- * `warnings.PINNED_MIXED_SEX` explains a warning a teacher has just been
- * shown: "that is what the pin asked for, not a mistake to fix". zh said
+ * The pin warning (removed with the pinned path, #390 F20) explained a
+ * warning a teacher had just been shown: "that is what the pin asked for, not
+ * a mistake to fix". zh said
  * "what the tag asked for", vi "the request in the post", th "what the pin's
  * description says", with a transliteration that also means a PIN code. Each
  * was translated, non-blank and slot-perfect, so every structural guard
@@ -35,9 +36,8 @@ import type { Locale } from '../../src/lib/i18n/locales';
  * -- the roster column, the Keep together and Keep apart controls, the state
  * counts, the CSV headers -- in the forms the language inflects them into:
  * Indonesian changes a root under a prefix, so `pisah` is `terpisah`,
- * `dipisahkan`, `memisahkan` and `pemisahan`. The pin has no control yet, so
- * its one word per locale was approved on #319 itself, and any future pin
- * control is held to it. Changing an entry needs a fresh operator read, like
+ * `dipisahkan`, `memisahkan` and `pemisahan`. Changing an entry needs a fresh
+ * operator read, like
  * every pinned value.
  *
  * `mix` and `leftovers` (#390) take their words from those features' own
@@ -54,7 +54,6 @@ import type { Locale } from '../../src/lib/i18n/locales';
  */
 const GLOSSARY: Record<Exclude<Locale, 'en'>, Glossary> = {
   id: {
-    pin: ['kunci'],
     together: ['bersama', 'disatukan', 'menyatukan'],
     apart: [
       'terpisah',
@@ -74,7 +73,6 @@ const GLOSSARY: Record<Exclude<Locale, 'en'>, Glossary> = {
     coin: ['koin'],
   },
   zh: {
-    pin: ['固定'],
     together: ['一起', '同组'],
     apart: ['分开'],
     absent: ['缺席'],
@@ -88,7 +86,6 @@ const GLOSSARY: Record<Exclude<Locale, 'en'>, Glossary> = {
     coin: ['金币'],
   },
   vi: {
-    pin: ['ghim'],
     together: ['cùng nhau', 'cùng nhóm'],
     apart: ['tách biệt', 'khác nhóm'],
     absent: ['vắng mặt'],
@@ -102,7 +99,6 @@ const GLOSSARY: Record<Exclude<Locale, 'en'>, Glossary> = {
     coin: ['xu'],
   },
   th: {
-    pin: ['ปักหมุด'],
     together: ['ด้วยกัน', 'กลุ่มเดียวกัน'],
     apart: ['แยก', 'คนละกลุ่ม'],
     absent: ['ไม่มา', 'ขาด'],
@@ -141,7 +137,6 @@ const featuresNamedIn = (
 
 /** A glossary approving one word per feature, for the fixtures below. */
 const ONE_WORD: Glossary = {
-  pin: ['ghim'],
   together: ['cùng nhau'],
   apart: ['tách biệt'],
   absent: ['vắng mặt'],
@@ -155,16 +150,8 @@ const ONE_WORD: Glossary = {
   coin: ['xu'],
 };
 
-/** What zh `warnings.PINNED_MIXED_SEX` said until #319. */
-const PINNED_MIXED_SEX_ZH_BEFORE =
-  '{names} 被归为一组，但组内成员并非全为同一性别，因此该组并未像其他组那样按性别划分。这正是该标签的要求，并非需要更正的错误。';
-
 describe('featuresNamed: the features a piece of English copy names', () => {
   it.each<[string, FeatureTerm[]]>([
-    ['Unpin a group, or ask for more groups.', ['pin', 'group']],
-    ['Your pins already fill the groups you asked for.', ['pin', 'group']],
-    ['{names} are pinned together as one group.', ['pin', 'together', 'group']],
-    ['Pinning a group keeps it as it is.', ['pin', 'group']],
     ['There are too many together-letters here.', ['together']],
     ['{names} all need to be kept apart.', ['apart']],
     ['Mark absences and pairings in Student details.', ['absent']],
@@ -187,7 +174,7 @@ describe('featuresNamed: the features a piece of English copy names', () => {
   it.each([
     // A slot is a placeholder the page fills, not a word the copy uses.
     '{absent} of {typed}',
-    // "keeping" holds the letters p-i-n, and is not a pin.
+    // Words that merely hold a feature's letters name no feature.
     'Keep everyone apartment-free while keeping score.',
     'Spin the wheel at the pinnacle.',
     'He left absently.',
@@ -205,9 +192,9 @@ describe('featuresNamed: the features a piece of English copy names', () => {
 describe('checkFeatureTerms: copy against the words its locale approved', () => {
   it('copy carrying an approved word for every feature it names passes', () => {
     const copy = unit(
-      'errors.PINNED_APART_CLASH',
-      '{names} are to be kept apart, but a pinned group puts them in one group.',
-      '{names} cần được tách biệt, nhưng một nhóm được ghim lại xếp các em vào cùng một nhóm.',
+      'rosterClashMessage',
+      '{names} are to be kept apart, but they are in one group.',
+      '{names} cần được tách biệt, nhưng các em đang ở cùng một nhóm.',
     );
     const named = featuresNamedIn([copy]);
     expect(
@@ -220,12 +207,12 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
 
   it('copy naming a feature with none of its approved words is returned, naming the feature', () => {
     const copy = unit(
-      'warnings.PINNED_MIXED_SEX',
-      'That is what the pin asked for, not a mistake to fix.',
-      'Đó chính là yêu cầu trong bài đăng, không phải lỗi cần sửa.',
+      'rosterAbsentConsequence',
+      'A student marked absent is left out of the groups.',
+      'Học sinh được đánh dấu nghỉ học sẽ không được xếp vào nhóm.',
     );
     expect(checkFeatureTerms([copy], 'vi', ONE_WORD)).toEqual([
-      { ...copy, missing: ['pin'] },
+      { ...copy, missing: ['absent'] },
     ]);
   });
 
@@ -266,13 +253,13 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
 
   it('names every missing feature, in the order the features are declared', () => {
     const copy = unit(
-      'warnings.PINNED_MIXED_SEX',
-      '{names} are pinned together as one group.',
-      '{names} được xếp lại thành một bài đăng.',
+      'groupedNote',
+      '{names} are absent, so they are kept together in one group.',
+      '{names} nghỉ học, nên được xếp lại thành một bài đăng.',
     );
     expect(
       checkFeatureTerms([copy], 'vi', ONE_WORD).map(({ missing }) => missing),
-    ).toEqual([['pin', 'together', 'group']]);
+    ).toEqual([['together', 'absent', 'group']]);
   });
 
   it('copy whose English names no feature is never returned, whatever its rendering', () => {
@@ -335,18 +322,18 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
   });
 
   it('a slot in the rendering carries no word, even one spelled like an approved word', () => {
-    const copy = unit('x', 'Unpin {name}', 'Bỏ {ghim}');
+    const copy = unit('x', 'Mark {name} absent', 'Đánh dấu {vắng mặt}');
     expect(
       checkFeatureTerms([copy], 'vi', ONE_WORD).map(({ missing }) => missing),
-    ).toEqual([['pin']]);
+    ).toEqual([['absent']]);
   });
 
   it('an approved word left with no letters approves nothing', () => {
-    const copy = unit('x', 'Unpin it', '… anything at all');
-    const hollow: Glossary = { ...ONE_WORD, pin: ['…'] };
+    const copy = unit('x', 'Mark it absent', '… anything at all');
+    const hollow: Glossary = { ...ONE_WORD, absent: ['…'] };
     expect(
       checkFeatureTerms([copy], 'vi', hollow).map(({ missing }) => missing),
-    ).toEqual([['pin']]);
+    ).toEqual([['absent']]);
   });
 
   it('a label is held to the same words as a sentence', () => {
@@ -359,8 +346,8 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
     ).toEqual([['printWhatGroups', ['group']]]);
   });
 
-  it('Chinese is searched without word breaks: 固定 inside 取消固定 counts', () => {
-    const copy = unit('zh', 'Unpin that group', '请取消固定那个组');
+  it('Chinese is searched without word breaks: 一起 inside 待在一起 counts', () => {
+    const copy = unit('zh', 'Keep them together', '让他们待在一起吧');
     const named = featuresNamedIn([copy]);
     expect(
       searched(checkFeatureTerms([copy], 'zh', GLOSSARY.zh), {
@@ -370,8 +357,8 @@ describe('checkFeatureTerms: copy against the words its locale approved', () => 
     ).toEqual([]);
   });
 
-  it('Thai is searched without word breaks: ปักหมุด inside เลิกปักหมุด counts', () => {
-    const copy = unit('th', 'Unpin that group', 'เลิกปักหมุดกลุ่มนั้น');
+  it('Thai is searched without word breaks: ขาด inside ขาดเรียน counts', () => {
+    const copy = unit('th', 'Mark them absent', 'ทำเครื่องหมายว่าขาดเรียน');
     const named = featuresNamedIn([copy]);
     expect(
       searched(checkFeatureTerms([copy], 'th', GLOSSARY.th), {
@@ -441,31 +428,6 @@ describe('on the live catalogues', () => {
     },
   );
 
-  it.each(TRANSLATED_LOCALES)(
-    '%s: the pin has exactly one approved word (AC2)',
-    (locale) => {
-      expect(glossaryOf(locale).pin).toHaveLength(1);
-    },
-  );
-
-  it('zh PINNED_MIXED_SEX seeded back to "the tag" is flagged for the pin', () => {
-    const units = backTranslationUnits('zh');
-    const seeded = units.map((one) =>
-      one.key === 'warnings.PINNED_MIXED_SEX [howMany=other]'
-        ? { ...one, translation: PINNED_MIXED_SEX_ZH_BEFORE }
-        : one,
-    );
-    // Watch the seed apply: exactly one unit differs, and it is this one.
-    expect(
-      seeded.filter((one, index) => one !== units[index]).map(({ key }) => key),
-    ).toEqual(['warnings.PINNED_MIXED_SEX [howMany=other]']);
-
-    const verdict = checkFeatureTerms(seeded, 'zh', GLOSSARY.zh).find(
-      ({ key }) => key === 'warnings.PINNED_MIXED_SEX [howMany=other]',
-    );
-    expect(verdict?.missing).toContain('pin');
-  });
-
   it.each<[string, string, string, FeatureTerm]>([
     ['zh', 'soundOff', '畅所欲言', 'sound'],
     ['vi', 'soundOff', 'Hãy lên tiếng', 'sound'],
@@ -517,25 +479,4 @@ describe('on the live catalogues', () => {
       expect(verdict?.missing).toContain(feature);
     },
   );
-
-  it('the corrected zh PINNED_MIXED_SEX is not flagged, and says 固定', () => {
-    const units = backTranslationUnits('zh');
-    const corrected = nonEmpty(
-      units.filter(({ key }) => key.startsWith('warnings.PINNED_MIXED_SEX')),
-      'zh warnings.PINNED_MIXED_SEX',
-    );
-    expect(corrected.map(({ translation }) => translation)).not.toContain(
-      PINNED_MIXED_SEX_ZH_BEFORE,
-    );
-    expect(
-      corrected.every(({ translation }) => translation.includes('固定')),
-    ).toBe(true);
-    const named = featuresNamedIn(corrected);
-    expect(
-      searched(
-        checkFeatureTerms(corrected, 'zh', GLOSSARY.zh).map(({ key }) => key),
-        { of: named, what: 'features the corrected copy names' },
-      ),
-    ).toEqual([]);
-  });
 });

@@ -288,8 +288,8 @@ describe.each(LOCALES)(
       // own inline script), so that would pass even with persistence
       // completely unwired. The direction that actually proves persistence
       // is open-survives-reload -- the identical reasoning
-      // classroom-groups-controls.spec.ts's own "the opened state survives
-      // a reload" test already states for the emulated suite.
+      // classroom-groups-controls.spec.ts's own How to use journey already
+      // states for the emulated suite.
       await session.navigateToPath(path); // the "reload" -- a fresh navigation, so both handles above are now stale; both are re-found below.
       toggle = await session.driver.findElement('#cg-howto-toggle');
       body = await session.driver.findElement('#cg-howto-body');

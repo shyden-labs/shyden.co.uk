@@ -28,7 +28,7 @@ fetches one.
 - **Cloudflare Pages** hosting, deployed by `wrangler` from CI.
 - Fonts self-hosted via `@fontsource`; sound effects self-hosted in
   `src/assets/sfx/`. **No third-party requests at runtime.**
-- Node **26**, the exact release in `.github/node/Dockerfile`, which Dependabot bumps. Formatting by Prettier.
+- Node **26**, the exact release in `docker/node/Dockerfile`, which Dependabot bumps. Formatting by Prettier.
 
 ## Development
 
@@ -66,7 +66,7 @@ re-approves — that failure is the review, and it is the point.
 | Command                | What it covers                                                                                              |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `npm run test:unit`    | Vitest — pure logic, i18n completeness, pipeline wiring                                                     |
-| `npm run test:e2e`     | Playwright, 6 projects (five browsers plus `content`), against a built `dist/`                              |
+| `npm run test:e2e`     | Playwright, 5 projects (one per browser engine), against a built `dist/`                                    |
 | `npm test`             | both of the above                                                                                           |
 | `npm run test:devices` | Real-device gauntlet — emulated + real Android Chrome (CDP) + real iOS Safari (WebDriver) against one build |
 | `npm run dashboard`    | Live read-only view of a gauntlet run at http://localhost:4322                                              |
@@ -165,9 +165,10 @@ in CI, so "deployed to dev" only meant `wrangler` had not errored.
 
 - Cloudflare Pages project `shyden-site`. Build: `npm run build`, output `dist`,
   Node 24.
-- Custom domain `shyden.co.uk`; `shytalk.shyden.co.uk` points at ShyTalk.
-- The outbound ShyTalk link is env-derived (`PUBLIC_SHYTALK_URL`) so a dev build
-  never links to production. Both sanity suites assert this.
+- Custom domain `shyden.co.uk`. The products have their own: `shytalk.app` and
+  `yaweloidle.com`.
+- The outbound product links are env-derived (`PUBLIC_SHYTALK_URL`,
+  `PUBLIC_YAWELO_IDLE_URL`) so a dev build never links to production. Both sanity suites assert this.
 
 ## Conventions
 

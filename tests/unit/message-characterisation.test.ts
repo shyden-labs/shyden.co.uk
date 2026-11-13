@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { stringLeaves } from '../../src/lib/catalogue-leaves';
-import { ERROR_CODES, type GroupingError } from '../../src/lib/grouping';
-import { getStrings, renderError } from '../../src/lib/i18n';
+import { getStrings } from '../../src/lib/i18n';
 import { en } from '../../src/lib/i18n/en';
 import {
   isMessageTemplate,
@@ -115,10 +114,6 @@ const TWO_NAMES_AFTER_DECISION: Record<
     en: ['but are not all the same sex', 'but are not the same sex'],
     id: ['tidak semuanya berjenis', 'tidak berjenis'],
   },
-  'warnings.PINNED_MIXED_SEX': {
-    en: ['but are not all the same sex', 'but are not the same sex'],
-    id: ['tidak semuanya berjenis', 'tidak berjenis'],
-  },
 };
 
 const namesOf = (params: MessageParams) =>
@@ -169,18 +164,7 @@ describe('messages render what the function-era catalogues rendered (#136)', () 
       it(`${locale}: ${path}`, () => {
         const strings = getStrings(locale);
         for (const c of cases) {
-          const actual =
-            path === 'errors.PINNED_TOO_MANY_GROUPS'
-              ? // Its choice of sentence moved out of the catalogue and into
-                // renderError, so it is proved through renderError.
-                renderError(
-                  {
-                    code: ERROR_CODES.pinnedTooManyGroups,
-                    ...c.params,
-                  } as GroupingError,
-                  strings,
-                )
-              : messageAt(strings, path)(withHowMany(path, c.params));
+          const actual = messageAt(strings, path)(withHowMany(path, c.params));
           expect(actual, JSON.stringify(c.params)).toBe(
             withTwoNamesDecision(
               withListDecision(c[locale], c.params, locale),

@@ -14,6 +14,7 @@ import {
   shardDeadlineMs,
   shardOf,
   shardTimes,
+  projectTotals,
 } from '../../scripts/e2e-shards.mjs';
 import {
   RUN_WHEN_DOCS_ONLY,
@@ -1090,5 +1091,53 @@ describe('the tests a timed-out shard was running (#938)', () => {
     expect(() => runningAtTimeout(report([undated]))).toThrow(
       'a.spec.ts:9 › a group › undated holds a result with no start time (#938)',
     );
+  });
+});
+
+describe('projectTotals: each browser`s own total, printed and not judged (#1049)', () => {
+  const counts = (passed: number, failed = 0, skipped = 0) => ({
+    passed,
+    failed,
+    skipped,
+  });
+
+  it('adds a project across the shards and prints one line per browser', () => {
+    const accounts = [
+      account(1, 10, {
+        projectCounts: {
+          chromium: counts(3),
+          webkit: counts(2, 1),
+        },
+      }),
+      account(2, 10, {
+        projectCounts: { chromium: counts(2), webkit: counts(2) },
+      }),
+    ];
+    expect(projectTotals(accounts)).toEqual([
+      'chromium: 5 passed, 0 failed, 0 skipped (total 5)',
+      'webkit: 4 passed, 1 failed, 0 skipped (total 5)',
+    ]);
+  });
+
+  it('says so when no shard recorded per-browser counts', () => {
+    expect(projectTotals([account(1, 10)])).toEqual([
+      'no shard recorded per-browser totals',
+    ]);
+  });
+
+  it('records the counts in the shard account when it has them', () => {
+    const projectCounts = { chromium: counts(1) };
+    const recorded = shardAccount({
+      argv: ['--shard=1/2'],
+      enumerated: 1,
+      executed: 1,
+      playwrightExitCode: 0,
+      listingStatus: 0,
+      seconds: 1,
+      listedUnits: {},
+      ranUnits: {},
+      projectCounts,
+    });
+    expect(recorded?.account.projectCounts).toEqual(projectCounts);
   });
 });

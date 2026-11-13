@@ -3,51 +3,6 @@ import { ENGINES, engineUse } from './tests/engines';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 /**
- * Specs that assert HTTP responses and DOM text, and never render.
- *
- * A sitemap's URLs, a canonical tag, a locale's copy reaching its page:
- * `textContent` is spec-defined, so these bytes do not vary by engine. Running
- * them on all five projects cost four extra runs each and returned nothing the
- * first run had not already proven.
- *
- * The boundary is mechanical, not editorial -- a spec is content-only exactly
- * when it neither drives the viewport nor reads layout -- so it is enforced
- * rather than trusted: tests/guards/browser-matrix.test.ts fails if anything
- * listed here does either (`tests/unit/engine-dependence.ts` names what counts
- * and reads it from the parse tree, never from comments), if a name here stops
- * matching a real file, or if any engine project stops ignoring these.
- *
- * `site-meta.spec.ts` is deliberately NOT here. It mixes three content
- * assertions with a parameterised 404 layout test that does resize, and the
- * layout half has to keep running everywhere.
- *
- * `rendered-text.spec.ts` is not here either (#198). Whether two words come out
- * touching is a question about where the browser put them, and the answer
- * depends on width: below 720px the nav is hidden and the header's last text
- * box is a different one. Listed here, it ran at 1280px only, and a real phone
- * was the first place it ever failed. A spec can read layout without resizing,
- * which is why the boundary asks about reading as well as driving.
- *
- * The skip link's WCAG 2.4.1 tests left `head-and-sitemap.spec.ts` for
- * `skip-link.spec.ts` for the same reason (#198). They read layout
- * (`toBeInViewport`) and ask which engine they are on (`browserName`), and
- * while listed here they ran on one engine, though their comment promised
- * WebKit.
- */
-export const CONTENT_ONLY_SPECS = [
-  'head-and-sitemap.spec.ts',
-  'seo.spec.ts',
-  'baseurl-guard.spec.ts',
-  'locale-parity.spec.ts',
-  'copy-reaches-a-page.spec.ts',
-  'theme-script.spec.ts',
-];
-
-const contentOnly = new RegExp(
-  `(?:${CONTENT_ONLY_SPECS.map((s) => s.replace(/\./g, '\\.')).join('|')})$`,
-);
-
-/**
  * The visual-regression suite, scoped to its own single-engine project (#33).
  *
  * It cannot join `content`: that project's specs are guarded as ones which
@@ -224,7 +179,7 @@ export default defineConfig({
    * `'none'` refuses outright and writes nothing, and it is the only value for
    * which `applySuggestedRebaselines` returns early instead of being willing
    * to rewrite expectations during a normal run. Baselines change exactly one
-   * way: `npm run test:visual:update`, reviewed as a diff in a PR.
+   * way: `visual-capture.yml` (#654), reviewed as a diff in a PR.
    */
   updateSnapshots: 'none',
   expect: {
@@ -341,27 +296,13 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
-    // Bytes and DOM text are identical on every engine, so running these five
-    // times bought four repeats of a result the first run already had. Once is
-    // enough. See CONTENT_ONLY_SPECS.
-    {
-      name: 'content',
-      use: { ...devices['Desktop Chrome'] },
-      testMatch: contentOnly,
-      // Most of these specs open a page, but `copy-reaches-a-page.spec.ts`
-      // only reads built files, so a run of this project alone can record no
-      // navigation with the collector healthy. The json report carries this
-      // mark, and `navTimingVerdict` in `scripts/test-e2e.mjs` leaves the
-      // project out of the count it judges (#355).
-      metadata: { requiresNavigation: false },
-    },
-    // Everything that renders, on every engine it has to render on. A collapsed
-    // nav wrapper once pushed the header links off-screen and only a real
-    // engine could see it -- this half of the matrix is not negotiable.
+    // Every spec on every engine (#1067; Shyden 2026-11-05: one suite, run
+    // unchanged on every browser). A collapsed nav wrapper once pushed the
+    // header links off-screen and only a real engine could see it.
     ...ENGINES.map(({ name, device }) => ({
       name,
       use: engineUse(devices[device], process.env),
-      testIgnore: [contentOnly, visualOnly],
+      testIgnore: [visualOnly],
     })),
     ...(process.env.VISUAL === '1' ? [VISUAL_PROJECT] : []),
     ...(process.env.VISUAL_MEASURE === '1' ? [VISUAL_MEASURE_PROJECT] : []),

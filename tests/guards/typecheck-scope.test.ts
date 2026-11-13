@@ -38,10 +38,7 @@ const scripts = (): string[] =>
  * and wider than the compiler does: a directive in a block comment, or below
  * the first statement, is flagged although TypeScript ignores it.
  *
- * Matched WITHOUT comment syntax: spelling `//` here makes this file read as
- * a comment stripper to `one-home.test.ts`, which is right to ask -- naming
- * comment syntax is how a second stripper starts. The directive's own name is
- * enough, and it appears nowhere else.
+ * Matched by the directive's own name, which appears nowhere else.
  */
 const optsOut = (text: string): boolean => /@ts-nocheck/.test(text);
 
@@ -87,10 +84,8 @@ describe('typecheck reads the scripts that deploy this site (#228)', () => {
     expect(swallows('scripts'), 'the matcher itself is live').toBe(true);
     expect(swallows('dist'), 'and it does not match everything').toBe(false);
     // `.some()` rather than a filter answered against `[]`: the list comes
-    // from a file, so an empty-array absence over it reads as a discovery
-    // population and `absence-liveness` flags it -- correctly, since an
-    // unreadable config would also produce no patterns. A boolean says the
-    // same thing and cannot be satisfied by silence.
+    // from a file, and an unreadable config would also produce no patterns.
+    // A boolean says the same thing and cannot be satisfied by silence.
     expect(
       (config.exclude ?? []).some(swallows),
       'an exclude pattern swallows scripts/',

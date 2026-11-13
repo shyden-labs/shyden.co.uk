@@ -1,3 +1,5 @@
+import { tabKey } from '../tab-key';
+import { tabTo } from '../tab-to';
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -7,15 +9,9 @@ import {
   requestsEveryEngineMakes,
   urlMatching,
 } from './recorders';
-import { atLeast44, expectNoHorizontalScroll } from '../viewport';
-import { formTextsUnderAA, resolvedColour } from './helpers';
 import { searched } from '../source-files';
-import {
-  PREFIXED_LOCALES,
-  getSiteStrings,
-  getStrings,
-} from '../../src/lib/i18n';
-import { FOOTER_PAGE_IDS, pagePath } from '../../src/lib/report';
+import { getSiteStrings, getStrings } from '../../src/lib/i18n';
+import { pagePath } from '../../src/lib/report';
 
 test.use(recorded);
 
@@ -26,7 +22,7 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
   await page.goto(pagePath('home', 'vi'));
   const t = getSiteStrings('vi').report;
   const summary = page.locator('[data-report] summary');
-  await summary.focus();
+  await tabTo(summary);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
   for (const label of [t.quoteLabel, t.suggestionLabel, t.noteLabel]) {
@@ -34,14 +30,10 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
     await expect(page.getByLabel(label, { exact: true })).toBeFocused();
   }
   const send = page.getByRole('button', { name: t.send });
-  if (browserName === 'webkit') {
-    // Safari leaves buttons out of the Tab sequence unless the visitor opts
-    // in ("Press Tab to highlight each item"), so a Tab here would assert a
-    // browser preference, not our markup (skip-link.spec.ts, chrome.spec.ts).
-    // The fields above are in its sequence and were walked; the button is
-    // held to being focusable.
-    await send.focus();
-  } else await page.keyboard.press('Tab');
+  // Safari leaves buttons out of a plain Tab walk unless the visitor opts in
+  // ("Press Tab to highlight each item"); Option+Tab, its own way of reaching
+  // every control, takes the next step there (tabKey).
+  await page.keyboard.press(tabKey(browserName));
   await expect(send).toBeFocused();
   // The hints are joined by aria-describedby (spec 3.4).
   await expect(
@@ -79,76 +71,8 @@ test('the disclosure opens from the keyboard and walks its fields in order', asy
   );
 });
 
-// Every locale that carries the form (#423): the 44px half measures its
-// localised labels, and this read Thai alone.
-for (const locale of PREFIXED_LOCALES)
-  test(`${locale}: every control is at least 44px, every text meets AA, every field has a 3:1 boundary`, async ({
-    page,
-  }) => {
-    await page.goto(pagePath('yeetalk-calculators', locale));
-    const t = getSiteStrings(locale).report;
-    await tapOn(page.locator('[data-report] summary'));
-    for (const target of [
-      page.locator('[data-report] summary'),
-      page.getByLabel(t.quoteLabel, { exact: true }),
-      page.getByLabel(t.suggestionLabel, { exact: true }),
-      page.getByLabel(t.noteLabel, { exact: true }),
-      page.getByRole('button', { name: t.send }),
-    ])
-      await atLeast44(target);
-    const { failing, read } = await formTextsUnderAA(
-      page.locator('[data-report]'),
-      page.getByRole('button', { name: t.send }),
-    );
-    expect(
-      searched(failing, { of: read, what: `${locale} form texts` }),
-    ).toEqual([]);
-    // WCAG 1.4.11: each field's boundary is --border-strong, the token
-    // contrast.test.ts scores at 3:1. #133 shipped --border (1.17:1) on every
-    // control. Resolved by the browser, so both sides are computed rgb.
-    const strong = await resolvedColour(page, 'var(--border-strong)');
-    for (const label of [t.quoteLabel, t.suggestionLabel, t.noteLabel])
-      await expect(page.getByLabel(label, { exact: true })).toHaveCSS(
-        'border-top-color',
-        strong,
-      );
-  });
-
-for (const locale of PREFIXED_LOCALES)
-  for (const pageId of FOOTER_PAGE_IDS)
-    test(
-      `${pagePath(pageId, locale)}: no sideways scroll at 320px with the form open`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 800 });
-        await page.goto(pagePath(pageId, locale));
-        await tapOn(page.locator('[data-report] summary'));
-        await expect(page.locator('[data-report]')).toHaveAttribute('open', '');
-        await expectNoHorizontalScroll(page);
-        // Page-level scrollWidth is not containment (CLAUDE.md): nothing in the
-        // form may escape the footer's own column.
-        const column = await page.locator('footer .inner').boundingBox();
-        expect(column, 'the footer column has a box').not.toBeNull();
-        const boxes = await page
-          .locator(
-            '[data-report] form > *:not(.visually-hidden):not(input[type="hidden"]):not(datalist)',
-          )
-          .evaluateAll((els) =>
-            els.map((el) => ({
-              right: el.getBoundingClientRect().right,
-              name: el.tagName,
-            })),
-          );
-        for (const box of boxes)
-          expect(box.right, box.name).toBeLessThanOrEqual(
-            column!.x + column!.width + 0.5,
-          );
-        // Liveness by content, after the invariant: the widest controls were measured.
-        expect(boxes.map(({ name }) => name)).toEqual(
-          expect.arrayContaining(['INPUT', 'TEXTAREA', 'BUTTON']),
-        );
-      },
-    );
+// The form's targets, contrast and 320px fit, opened by a real tap, are read
+// on each footed page's walk: checks/report-form.ts (#1086).
 
 test('/vi/classroom-groups submits in place: failed shows, takes focus, and the roster survives', async ({
   page,
@@ -302,3 +226,19 @@ for (const [outcome, key] of [
     await expect(page.locator('[data-report-status]:visible')).toHaveCount(1);
     await shoot(page, `The ${outcome} message, in place`, shown);
   });
+
+test('typing into the report form keeps what was typed (moved from the phone file, #1049)', async ({
+  page,
+}) => {
+  // The phone's datalist crash (#807) showed on exactly this sequence; the Chrome-process half
+  // stays in tests/device/real-device.spec.ts. English draws no report form; Indonesian does.
+  await page.goto('/id/');
+  const report = page.locator('[data-report]');
+  const quote = report.locator('#report-quote');
+  await tabTo(report.locator('summary'));
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(quote).toBeFocused();
+  await page.keyboard.type('Tem', { delay: 120 });
+  await expect(quote).toHaveValue('Tem');
+});

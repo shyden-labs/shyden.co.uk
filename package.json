@@ -21,8 +21,6 @@
     "test:e2e": "node scripts/test-e2e.mjs",
     "test:functions": "playwright test --config=playwright.functions.config.ts",
     "test:sanity": "SANITY_ON_BUILD=1 playwright test -c playwright.dev.config.ts && SANITY_ON_BUILD=1 playwright test -c playwright.prod.config.ts",
-    "test:visual": "node scripts/visual.mjs",
-    "test:visual:update": "node scripts/visual.mjs --update",
     "test:ios": "vitest run --configLoader native --config vitest.ios.config.ts --reporter=verbose",
     "test:devices": "node scripts/test-devices.mjs",
     "i18n:translate": "node scripts/i18n-translate.mjs",
@@ -42,21 +40,21 @@
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
-    "astro": "^7.3.6",
-    "swagger-ui-dist": "5.33.3"
+    "astro": "^7.4.7",
+    "swagger-ui-dist": "5.34.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "ast-v8-to-istanbul": "1.0.7",
     "prettier": "3.9.10",
     "prettier-plugin-astro": "1.1.2",
     "typescript": "^6.0.3",
-    "vite": "8.3.5",
-    "vitest": "5.0.5",
-    "wrangler": "4.155.0",
+    "vite": "8.3.6",
+    "vitest": "5.1.0",
+    "wrangler": "4.158.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
@@ -66,7 +64,7 @@
     "@scarf/scarf@1.4.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true,
-    "workerd@1.20261023.1": true
+    "workerd@1.20261104.1": true
   },
   "scarfSettings": {
     "enabled": false

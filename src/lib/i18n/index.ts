@@ -278,47 +278,6 @@ export function renderError(
     // through.
     case ERROR_CODES.sexSeparateSearchGaveUp:
       return e.SEX_SEPARATE_SEARCH_GAVE_UP;
-    // Task 9. Carries `students: number[]`, exactly like togetherApartClash
-    // above -- same reason (identity is the number) and the same fix.
-    case ERROR_CODES.pinnedSplitsUnit:
-      return e.PINNED_SPLITS_UNIT({
-        names: error.students.map(resolveStudent),
-      });
-    case ERROR_CODES.pinnedApartClash:
-      return e.PINNED_APART_CLASH({
-        names: error.students.map(resolveStudent),
-      });
-    // Carries a single `number`, exactly like duplicateNumber, but --
-    // unlike duplicateNumber -- resolved through `resolveStudent` before the
-    // copy sees it: this fires after matching against the current roster,
-    // so the number is a real, current student, not an ambiguous raw
-    // digit (see ERROR_CODES.pinnedInTwoGroups's doc comment).
-    case ERROR_CODES.pinnedInTwoGroups:
-      return e.PINNED_IN_TWO_GROUPS({ name: resolveStudent(error.number) });
-    // Fix round 1, F-1/F-2. Carries three numbers, never a student list --
-    // no resolver needed, unlike most codes above (same shape as
-    // sexSeparateImpossible's single `groupsRequested`, just three fields
-    // instead of one). Replaces the two situations that used to share
-    // `tooManyGroups` on the pinned path -- see
-    // ERROR_CODES.pinnedTooManyGroups's doc comment in grouping.ts.
-    case ERROR_CODES.pinnedTooManyGroups: {
-      // Which of three sentences applies used to be decided inside the
-      // English function, by subtraction. Arithmetic is not copy, so it is
-      // decided here and every locale's template selects on the outcome.
-      const poolGroupsNeeded = error.requestedGroups - error.pinnedGroupCount;
-      return e.PINNED_TOO_MANY_GROUPS({
-        requestedGroups: error.requestedGroups,
-        pinnedGroupCount: error.pinnedGroupCount,
-        remainingStudents: error.remainingStudents,
-        poolGroupsNeeded,
-        situation:
-          poolGroupsNeeded < 0
-            ? 'over'
-            : poolGroupsNeeded === 0
-              ? 'full'
-              : 'short',
-      });
-    }
   }
 }
 
@@ -351,16 +310,8 @@ export function renderWarning(
         names: warning.students.map(resolveStudent),
         sex: warning.sex,
       });
-    // Task 9. Carries `students: number[]`, same resolver pattern as
-    // sexSpillover above -- no `sex` field to pass through, see
-    // WARNING_CODES.pinnedMixedSex's doc comment in grouping.ts.
-    case WARNING_CODES.pinnedMixedSex:
-      return w.PINNED_MIXED_SEX({
-        names: warning.students.map(resolveStudent),
-        howMany: howMany(warning.students),
-      });
     // Whole-branch review, I-2. Carries `students: number[]`, same resolver
-    // pattern as sexSpillover/pinnedMixedSex above -- no `sex` field to pass
+    // pattern as sexSpillover above -- no `sex` field to pass
     // through, see WARNING_CODES.sexBothTooSmall's doc comment in
     // grouping.ts.
     case WARNING_CODES.sexBothTooSmall:

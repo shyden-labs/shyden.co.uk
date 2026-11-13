@@ -105,11 +105,5 @@ export const captureOptions = (path: string) => ({
  *
  * Still `'off'` outside an evidence run, so an ordinary `npm run test:e2e`
  * never pays for a recording however many specs opt in.
- *
- * Which specs may declare this is neither a judgement nor a list:
- * `tests/guards/evidence-recording.test.ts` DERIVES it from each spec's own
- * source -- a spec that acts must record, and a spec that records must act --
- * and fails in both directions. The declaration is only ever one half of a
- * pair, and the source is the authority.
  */
 export const recorded = { video: DIR ? ('on' as const) : ('off' as const) };

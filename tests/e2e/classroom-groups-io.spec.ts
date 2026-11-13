@@ -2,7 +2,6 @@ import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
 import { recordErrors } from './recorders';
-import { atLeast44 } from '../viewport';
 import { otherLocales, toolPath } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import {
@@ -41,57 +40,140 @@ const openIo = async (page: import('@playwright/test').Page) => {
   await tapOn(page.locator('#cg-io-toggle'));
 };
 
+// The merged journeys below check many things in one visit, so the touch
+// target check is soft: one small button does not hide the checks after it.
+// Same assertions as `atLeast44` (tests/viewport.ts), which stops at the first.
+const atLeast44Soft = async (
+  locator: import('@playwright/test').Locator,
+  what: string,
+): Promise<void> => {
+  const box = await locator.boundingBox();
+  expect.soft(box, `${what} has a box`).not.toBeNull();
+  if (box === null) return;
+  expect
+    .soft(Math.round(box.width), `${what} width`)
+    .toBeGreaterThanOrEqual(44);
+  expect
+    .soft(Math.round(box.height), `${what} height`)
+    .toBeGreaterThanOrEqual(44);
+};
+
+const UNSAVED = 'unsaved changes — export to keep them';
+
 test.describe('Import / export', () => {
-  test('a bad file changes nothing on screen, and lists every problem', async ({
+  // One page with three unnamed students, walked once: the unsaved header is
+  // read before anything is pressed, export clears it (the other half of
+  // stage 3's `dirty` rule: setRoster(next, { saved: true })), a bad file
+  // changes nothing, and a good file over the roster always warns.
+  test('over three students: export clears the header, a bad file changes nothing, a good one warns', async ({
     page,
   }) => {
     await rosterOf(page, 3);
     await openIo(page);
+    await expect.soft(page.locator('#cg-io .state')).toHaveText(UNSAVED);
+    await downloadName(page, 'Export class list');
+    await expect
+      .soft(page.locator('#cg-io .state'))
+      .toHaveText('nothing to save yet');
     await upload(
       page,
       'bad.csv',
       'number,name,sex\n1,Ana,F\n2,Budi,Male\n1,Citra,F\n',
     );
-    await expect(
-      page.getByText(
-        "Row 2 — sex 'Male' not understood. Use M, F, or leave blank.",
-      ),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Row 3 — number 1 is already used by row 1.'),
-    ).toBeVisible();
-    await expect(page.locator('.cg-student')).toHaveCount(3); // untouched
+    await expect
+      .soft(
+        page.getByText(
+          "Row 2 — sex 'Male' is not understood. Use M, F, or leave blank.",
+        ),
+      )
+      .toBeVisible();
+    await expect
+      .soft(page.getByText('Row 3 — number 1 is already used by row 1.'))
+      .toBeVisible();
+    await expect.soft(page.locator('.cg-student')).toHaveCount(3); // untouched
+    await upload(page, 'three.csv', 'number\n1\n2\n3\n');
+    await expect
+      .soft(
+        page.getByText(
+          'This will replace your current class list — 3 students, 0 named.',
+        ),
+      )
+      .toBeVisible();
+    await expect.soft(page.locator('.cg-student')).toHaveCount(3); // not yet replaced
   });
 
-  // The refusal must not outlive the file that caused it. A teacher who
+  // One empty page, walked once. The template is read first (nothing has
+  // been pressed, so no roster exists); a refusal must not outlive the file
+  // that caused it, and the confirmation belongs to ONE file; a teacher who
   // fixes their spreadsheet and re-imports should not be reading last
   // attempt's problems under this attempt's result.
-  test('a later good file clears the problems from a bad one', async ({
+  test('importing onto an empty page: template, refusals, success message and the header', async ({
     page,
   }) => {
+    const reported = recordErrors(page);
     await page.goto('/classroom-groups');
     await openIo(page);
-    await upload(page, 'bad.csv', 'number\nabc\n');
-    await expect(
-      page.getByText("Row 1 — number 'abc' is not a whole number."),
-    ).toBeVisible();
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
-    await expect(page.getByText(/is not a whole number/)).toHaveCount(0);
-    await expect(page.locator('.cg-student')).toHaveCount(1);
-  });
+    const template = await downloadText(page, 'Download template');
+    expect.soft(template).toContain('# 1,Ana,F,,A,');
+    // Every line that is not the header is a comment, so importing it
+    // unedited adds nobody. The header is found by its own content rather
+    // than by position, because the `# Class:` prompt line comes first.
+    const body = template
+      .split('\n')
+      .filter((l) => l.trim() !== '')
+      .filter((l) => l !== 'number,name,sex,absent,together,apart');
+    expect.soft(body.every((l) => l.startsWith('#'))).toBe(true);
 
-  test('importing over a roster always warns, even when the counts match', async ({
-    page,
-  }) => {
-    await rosterOf(page, 3);
+    await upload(page, 'bad.csv', 'number\nabc\n');
+    await expect
+      .soft(page.getByText("Row 1 — number 'abc' is not a whole number."))
+      .toBeVisible();
+    await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
+    await expect.soft(page.getByText(/is not a whole number/)).toHaveCount(0);
+    await expect.soft(page.locator('.cg-student')).toHaveCount(1);
+    // A successful import must SAY so -- everything else about it is
+    // inference (the roster lands in a section that is still collapsed, and
+    // the header quietly changes). A teacher who picked the wrong file needs
+    // to be told a file landed at all. And in the singular for one.
+    await expect.soft(page.getByText('Imported 1 student.')).toBeVisible();
+    await expect
+      .soft(page.locator('#cg-io .state'))
+      .toHaveText('nothing to save yet');
+    // Still the one file's message, until the next file speaks.
+    await expect.soft(page.getByText('Imported 1 student.')).toBeVisible();
+    await upload(page, 'bad.csv', 'number\nabc\n');
+    await expect.soft(page.getByText(/^Imported /)).toHaveCount(0);
+    await expect
+      .soft(page.getByText("Row 1 — number 'abc' is not a whole number."))
+      .toBeVisible();
+
+    // …and editing after an import makes it dirty again, which is what
+    // proves the flag was CLEARED rather than switched off for good. Student
+    // details is still COLLAPSED -- an import fills it but does not open it,
+    // and a hidden input cannot be typed into. Opening it is the same thing
+    // a teacher does, not a workaround.
+    await tapOn(page.locator('#cg-students-toggle'));
+    await typeInto(
+      page.locator('.cg-student').first().getByLabel('Name'),
+      'Anna',
+    );
+    await expect.soft(page.locator('#cg-io .state')).toHaveText(UNSAVED);
+    await downloadName(page, 'Export class list');
+
+    // A fresh page for the empty-roster import: no roster means nothing to
+    // lose, so no warning -- the warning exists to protect work, not to add
+    // a step.
+    await page.reload();
     await openIo(page);
-    await upload(page, 'three.csv', 'number\n1\n2\n3\n');
-    await expect(
-      page.getByText(
-        'This will replace your current class list — 3 students, 0 named.',
-      ),
-    ).toBeVisible();
-    await expect(page.locator('.cg-student')).toHaveCount(3); // not yet replaced
+    await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
+    await expect.soft(page.locator('.cg-student')).toHaveCount(2);
+    await expect.soft(page.getByText(/This will replace/)).toHaveCount(0);
+    await expect.soft(page.getByText('Imported 2 students.')).toBeVisible();
+    await expect.soft(page.locator('.cg-student')).toHaveCount(2);
+    await expect
+      .soft(page.locator('#cg-io .state'))
+      .toHaveText('nothing to save yet');
+    await reported.expectNone('importing and exporting report nothing');
   });
 
   // The warning names how much was typed BY HAND, which is the part a
@@ -136,52 +218,6 @@ test.describe('Import / export', () => {
     await expect(page.getByText(/This will replace/)).toHaveCount(0);
   });
 
-  // No roster on screen means nothing to lose, so no warning -- the warning
-  // exists to protect work, not to add a step.
-  test('importing onto an empty page needs no confirmation', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
-    await expect(page.locator('.cg-student')).toHaveCount(2);
-    await expect(page.getByText(/This will replace/)).toHaveCount(0);
-  });
-
-  // A successful import must SAY so -- everything else about it is
-  // inference (the roster lands in a section that is still collapsed, and
-  // the header quietly changes). A teacher who picked the wrong file needs
-  // to be told a file landed at all.
-  test('a successful import says how many students landed', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
-    await expect(page.getByText('Imported 2 students.')).toBeVisible();
-  });
-
-  test('and says it in the singular for one', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'one.csv', 'number,name\n1,Ana\n');
-    await expect(page.getByText('Imported 1 student.')).toBeVisible();
-  });
-
-  // The confirmation belongs to ONE file. A later refusal must not sit
-  // underneath a message saying the last one worked.
-  test('a later bad file clears the success message', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
-    await expect(page.getByText('Imported 1 student.')).toBeVisible();
-    await upload(page, 'bad.csv', 'number\nabc\n');
-    await expect(page.getByText(/^Imported /)).toHaveCount(0);
-    await expect(
-      page.getByText("Row 1 — number 'abc' is not a whole number."),
-    ).toBeVisible();
-  });
-
   test('the export button for groups appears only once groups exist', async ({
     page,
   }) => {
@@ -197,68 +233,56 @@ test.describe('Import / export', () => {
     ).toBeVisible();
   });
 
-  test('the template is the roster once there is one', async ({ page }) => {
-    await buildRoster(page, [
-      ['F', 'Ana'],
-      ['M', 'Budi'],
-    ]);
-    await openIo(page);
-    const text = await downloadText(page, 'Download template');
-    expect(text).toContain('1,Ana,F,,,');
-    expect(text).toContain('2,Budi,M,,,');
-    // and it is a real roster, not the example rows
-    expect(text).not.toContain('# 1,Ana');
-  });
-
-  test('the template with no roster is example COMMENT rows only', async ({
+  test('two named students: the template and the export are the roster on screen', async ({
     page,
   }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    const text = await downloadText(page, 'Download template');
-    expect(text).toContain('# 1,Ana,F,,A,');
-    // Every line that is not the header is a comment, so importing it
-    // unedited adds nobody. The header is found by its own content rather
-    // than by position, because the `# Class:` prompt line comes first.
-    const body = text
-      .split('\n')
-      .filter((l) => l.trim() !== '')
-      .filter((l) => l !== 'number,name,sex,absent,together,apart');
-    expect(body.every((l) => l.startsWith('#'))).toBe(true);
-  });
-
-  test('the exported class list is the roster on screen', async ({ page }) => {
     await buildRoster(page, [
       ['F', 'Ana'],
       ['M', 'Budi'],
     ]);
     await openIo(page);
+    const template = await downloadText(page, 'Download template');
+    expect.soft(template).toContain('1,Ana,F,,,');
+    expect.soft(template).toContain('2,Budi,M,,,');
+    // and it is a real roster, not the example rows
+    expect.soft(template).not.toContain('# 1,Ana');
     const text = await downloadText(page, 'Export class list');
-    expect(text).toBe(
-      'number,name,sex,absent,together,apart\n1,Ana,F,,,\n2,Budi,M,,,\n',
-    );
+    expect
+      .soft(text)
+      .toBe('number,name,sex,absent,together,apart\n1,Ana,F,,,\n2,Budi,M,,,\n');
   });
 
-  test('the filename carries the class and the date', async ({ page }) => {
+  // S-08. The warning is a HEADER, not a toast: it is still there after the
+  // page has had every chance to settle. Condition-based -- this waits for
+  // the page to go quiet, never for a fixed number of milliseconds. Read
+  // first, before the exports below clear it.
+  test('with two students the unsaved header is permanent, and the class name makes the filename', async ({
+    page,
+  }) => {
     await rosterOf(page, 2);
+    await expect.soft(page.locator('#cg-io .state')).toHaveText(UNSAVED);
+    await page.waitForLoadState('networkidle');
+    // A full animation frame plus the tool's own longest deal step: if
+    // anything on this page were going to clear the header on a timer, it
+    // would have by now.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
+    );
+    await expect.soft(page.locator('#cg-io .state')).toHaveText(UNSAVED);
+
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     const name = await downloadName(page, 'Export class list');
-    expect(name).toMatch(/^7B-class-list-\d{4}-\d{2}-\d{2}\.csv$/);
-  });
+    expect.soft(name).toMatch(/^7B-class-list-\d{4}-\d{2}-\d{2}\.csv$/);
 
-  test('a class name with a slash still produces a usable filename', async ({
-    page,
-  }) => {
-    await rosterOf(page, 2);
     await typeInto(page.getByLabel('Class (optional)'), 'Year 7 / Set B');
-    await openIo(page);
-    const name = await downloadName(page, 'Export class list');
-    expect(name).toBe(`Year-7-Set-B-class-list-${todayISO()}.csv`);
+    const slashed = await downloadName(page, 'Export class list');
+    expect.soft(slashed).toBe(`Year-7-Set-B-class-list-${todayISO()}.csv`);
     // and the class name itself is untouched
-    await expect(page.getByLabel('Class (optional)')).toHaveValue(
-      'Year 7 / Set B',
-    );
+    await expect
+      .soft(page.getByLabel('Class (optional)'))
+      .toHaveValue('Year 7 / Set B');
   });
 
   // C-30's last surface: the results heading. The filename was sanitised
@@ -280,29 +304,6 @@ test.describe('Import / export', () => {
     );
   });
 
-  // S-08. The warning is a HEADER, not a toast: it is still there after the
-  // page has had every chance to settle. Condition-based -- this waits for
-  // the page to go quiet, never for a fixed number of milliseconds.
-  test('the unsaved-changes warning is permanent, not a toast that fades', async ({
-    page,
-  }) => {
-    await rosterOf(page, 2);
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
-    await page.waitForLoadState('networkidle');
-    // A full animation frame plus the tool's own longest deal step: if
-    // anything on this page were going to clear the header on a timer, it
-    // would have by now.
-    await page.evaluate(
-      () =>
-        new Promise((resolve) => requestAnimationFrame(() => resolve(null))),
-    );
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
-  });
-
   test('the exported groups file is one row per student', async ({ page }) => {
     await rosterOf(page, 4);
     await typeInto(page.getByLabel('Students in each group'), '2');
@@ -314,51 +315,6 @@ test.describe('Import / export', () => {
     expect(lines[0]).toBe(`# Groups made ${todayISO()}`);
     expect(lines[1]).toBe('group,number,name');
     expect(lines).toHaveLength(6); // comment + header + 4 students
-  });
-
-  test('exporting clears the unsaved-changes warning', async ({ page }) => {
-    // The other half of stage 3's `dirty` rule: setRoster(next, { saved: true }).
-    await rosterOf(page, 3);
-    await openIo(page);
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
-    await downloadName(page, 'Export class list');
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'nothing to save yet',
-    );
-  });
-
-  test('a successful import clears it too', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n2,Budi\n');
-    await expect(page.locator('.cg-student')).toHaveCount(2);
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'nothing to save yet',
-    );
-  });
-
-  // …and editing after an import makes it dirty again, which is what proves
-  // the flag was CLEARED rather than switched off for good.
-  test('editing after an import marks it unsaved again', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'nothing to save yet',
-    );
-    // Student details is still COLLAPSED -- an import fills it but does not
-    // open it, and a hidden input cannot be typed into. Opening it is the
-    // same thing a teacher does, not a workaround.
-    await tapOn(page.locator('#cg-students-toggle'));
-    await typeInto(
-      page.locator('.cg-student').first().getByLabel('Name'),
-      'Anna',
-    );
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
   });
 
   // A round trip through the real controls: export, then import the exact
@@ -383,28 +339,26 @@ test.describe('Import / export', () => {
       page.locator('.cg-student').nth(2).getByLabel('Name'),
     ).toHaveValue('Wong, Mei');
   });
-
-  test('no console errors while importing and exporting', async ({ page }) => {
-    const reported = recordErrors(page);
-    await page.goto('/classroom-groups');
-    await openIo(page);
-    await upload(page, 'ok.csv', 'number,name\n1,Ana\n');
-    await downloadName(page, 'Export class list');
-    await reported.expectNone('importing and exporting report nothing');
-  });
 });
 
 test.describe('Import / export — Indonesian', () => {
-  test('the section carries its own controls, translated', async ({ page }) => {
+  test('the Indonesian section is translated, refuses an English file and imports an Indonesian one', async ({
+    page,
+  }) => {
     await page.goto('/id/classroom-groups');
     await tapOn(page.locator('#cg-io-toggle'));
-    await expect(
-      page.getByRole('button', { name: 'Ekspor daftar kelas' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Unduh templat' }),
-    ).toBeVisible();
-    await expect(page.getByText('Impor daftar kelas')).toBeVisible();
+    await expect
+      .soft(page.getByRole('button', { name: 'Ekspor daftar kelas' }))
+      .toBeVisible();
+    await expect
+      .soft(page.getByRole('button', { name: 'Unduh templat' }))
+      .toBeVisible();
+    await expect.soft(page.getByText('Impor daftar kelas')).toBeVisible();
+    await upload(page, 'english.csv', 'number,name\n1,Ana\n');
+    await expect.soft(page.getByText(/bahasa Inggris/)).toBeVisible();
+    await expect.soft(page.locator('.cg-student')).toHaveCount(0);
+    await upload(page, 'ok.csv', 'nomor,nama\n1,Ana\n2,Budi\n');
+    await expect.soft(page.getByText('2 siswa diimpor.')).toBeVisible();
   });
 
   test('an Indonesian page exports an Indonesian file', async ({ page }) => {
@@ -423,25 +377,6 @@ test.describe('Import / export — Indonesian', () => {
         '1,Ana,P,,,\n' +
         '2,Budi,L,,,\n',
     );
-  });
-
-  test('a successful Indonesian import says so in Indonesian', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await tapOn(page.locator('#cg-io-toggle'));
-    await upload(page, 'ok.csv', 'nomor,nama\n1,Ana\n2,Budi\n');
-    await expect(page.getByText('2 siswa diimpor.')).toBeVisible();
-  });
-
-  test('an English file dropped on the Indonesian page is refused in Indonesian', async ({
-    page,
-  }) => {
-    await page.goto('/id/classroom-groups');
-    await tapOn(page.locator('#cg-io-toggle'));
-    await upload(page, 'english.csv', 'number,name\n1,Ana\n');
-    await expect(page.getByText(/bahasa Inggris/)).toBeVisible();
-    await expect(page.locator('.cg-student')).toHaveCount(0);
   });
 
   test('and the refusal names the Indonesian filename on export', async ({
@@ -522,38 +457,27 @@ test.describe('exporting in both languages', () => {
   // rendered letter -- otherwise an Indonesian 'P' arrives on the English
   // page as a sex it does not recognise. The letters differ between the two
   // pages, which is exactly why this is worth pinning.
-  test('a sex survives the crossing, in the receiving page own letters', async ({
+  //
+  // A page opened NORMALLY must not shout into the channel -- otherwise a
+  // teacher with two tabs open has one silently overwrite the other. It is
+  // opened first, before any handover exists.
+  test('one handover: nothing asks before it, the roster crosses, nothing is stored', async ({
     page,
     context,
   }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
     await tapOn(page.locator('#cg-io-toggle'));
-    const [, newPage] = await Promise.all([
-      page.waitForEvent('download'),
-      context.waitForEvent('page'),
-      handoverTo(page, 'Bahasa Indonesia'),
-    ]);
-    await newPage.waitForLoadState();
-    await tapOn(newPage.locator('#cg-students-toggle'));
-    await expect(
-      newPage.locator('.cg-student').first().getByLabel('Jenis kelamin'),
-    ).toHaveValue('F');
-    // …and the Indonesian page shows it as P, its own letter for the same fact.
-    await expect(
-      newPage
-        .locator('.cg-student')
-        .first()
-        .getByLabel('Jenis kelamin')
-        .locator('option:checked'),
-    ).toHaveText('P');
-  });
+    const other = await context.newPage();
+    // An ABSOLUTE url, built from the page under test. `context.newPage()`
+    // carries no `baseURL` over a CDP connection to a real phone, so a
+    // relative path there is "Cannot navigate to invalid URL" -- found on
+    // real Android, where every other page in this suite comes from the
+    // `page` fixture and never hits it.
+    await other.goto(new URL('/id/classroom-groups', page.url()).href);
+    await tapOn(other.locator('#cg-students-toggle'));
+    await expect.soft(other.locator('.cg-student')).toHaveCount(0);
+    await expect.soft(page.locator('.cg-student')).toHaveCount(1);
 
-  test('nothing is written to storage and nothing is in a URL', async ({
-    page,
-    context,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
@@ -561,29 +485,28 @@ test.describe('exporting in both languages', () => {
     ]);
     await newPage.waitForLoadState();
     await tapOn(newPage.locator('#cg-students-toggle'));
-    await expect(newPage.locator('.cg-student')).toHaveCount(1);
+    await expect.soft(newPage.locator('.cg-student')).toHaveCount(1);
+    await expect
+      .soft(newPage.locator('.cg-student').first().getByLabel('Jenis kelamin'))
+      .toHaveValue('F');
+    // …and the Indonesian page shows it as P, its own letter for the same fact.
+    await expect
+      .soft(
+        newPage
+          .locator('.cg-student')
+          .first()
+          .getByLabel('Jenis kelamin')
+          .locator('option:checked'),
+      )
+      .toHaveText('P');
+    // The source keeps the roster until the new tab acknowledges.
+    await expect.soft(page.locator('.cg-student')).toHaveCount(1); // still there
+    await expect
+      .soft(page.getByText('Your class list is now open in Bahasa Indonesia.'))
+      .toBeVisible();
     for (const p of [page, newPage])
       await expectNothingStored(p, 'after the handover', 'Ana');
-  });
-
-  test('the source keeps the roster until the new tab acknowledges', async ({
-    page,
-    context,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await tapOn(page.locator('#cg-io-toggle'));
-    const [, newPage] = await Promise.all([
-      page.waitForEvent('download'),
-      context.waitForEvent('page'),
-      handoverTo(page, 'Bahasa Indonesia'),
-    ]);
-    await newPage.waitForLoadState();
-    await tapOn(newPage.locator('#cg-students-toggle'));
-    await expect(newPage.locator('.cg-student')).toHaveCount(1);
-    await expect(page.locator('.cg-student')).toHaveCount(1); // still there
-    await expect(
-      page.getByText('Your class list is now open in Bahasa Indonesia.'),
-    ).toBeVisible();
+    await expect.soft(newPage.locator('.cg-student')).toHaveCount(1);
   });
 
   test('a blocked tab is reported and the roster is kept', async ({
@@ -619,7 +542,15 @@ test.describe('exporting in both languages', () => {
   // A tab that opens but never asks -- the other half of "the handover must
   // never lose data by failing silently". Condition-based: this waits for
   // the sentence to appear, never for a fixed number of milliseconds.
-  test('a tab that never asks is reported, and the roster is kept', async ({
+  //
+  // The sender answers ONE window, the tab it opened. Any other document on
+  // this origin can post a `cg-ack` -- here the page itself does -- and
+  // believing it would report a handover as done while the tab that was
+  // opened never even asked. Nothing staged a stranger until #390 IO1, so
+  // the `event.source` check could be deleted with the whole spec green.
+  // The timeout sentence arriving is what proves the forged ack was refused:
+  // a believed ack settles the handover and the timeout never speaks.
+  test('a tab that never asks is reported, and an acknowledgement from any other window is ignored', async ({
     page,
     context,
   }) => {
@@ -635,47 +566,30 @@ test.describe('exporting in both languages', () => {
       page.waitForEvent('download'),
       handoverTo(page, 'Bahasa Indonesia'),
     ]);
-    await expect(
-      page.getByText(
-        'The second tab never asked for the class list. Your class list is ' +
-          'still here — close that tab and try again.',
-      ),
-    ).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.cg-student')).toHaveCount(1);
-  });
-
-  // The sender answers ONE window, the tab it opened. Any other document on
-  // this origin can post a `cg-ack` -- here the page itself does -- and
-  // believing it would report a handover as done while the tab that was
-  // opened never even asked. Nothing staged a stranger until #390 IO1, so
-  // the `event.source` check could be deleted with the whole spec green.
-  // The timeout sentence arriving is what proves the forged ack was refused:
-  // a believed ack settles the handover and the timeout never speaks.
-  test('an acknowledgement from any window but the opened tab is ignored', async ({
-    page,
-    context,
-  }) => {
-    await context.addInitScript(() => {
-      window.open = () => ({ closed: false }) as unknown as Window;
-    });
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await tapOn(page.locator('#cg-io-toggle'));
-    await Promise.all([
-      page.waitForEvent('download'),
-      handoverTo(page, 'Bahasa Indonesia'),
-    ]);
     await page.evaluate(() =>
       window.postMessage({ kind: 'cg-ack' }, window.location.origin),
     );
-    await expect(
-      page.getByText(
-        'The second tab never asked for the class list. Your class list is ' +
-          'still here — close that tab and try again.',
-      ),
-    ).toBeVisible({ timeout: 15000 });
-    await expect(
-      page.getByText('Your class list is now open in Bahasa Indonesia.'),
-    ).toHaveCount(0);
+    await expect
+      .soft(
+        page.getByText(
+          'The second tab never asked for the class list. Your class list is ' +
+            'still here — close that tab and try again.',
+        ),
+      )
+      .toBeVisible({ timeout: 15000 });
+    await expect
+      .soft(page.getByText('Your class list is now open in Bahasa Indonesia.'))
+      .toHaveCount(0);
+    await expect.soft(page.locator('.cg-student')).toHaveCount(1);
+    // The same sentence is still what the teacher is left reading.
+    await expect
+      .soft(
+        page.getByText(
+          'The second tab never asked for the class list. Your class list is ' +
+            'still here — close that tab and try again.',
+        ),
+      )
+      .toBeVisible({ timeout: 15000 });
   });
 
   // A page opened NORMALLY must not shout into the channel -- otherwise a
@@ -712,24 +626,6 @@ test.describe('exporting in both languages', () => {
       ),
     ).toBeVisible();
   });
-
-  test('a page opened normally does not ask for anybody roster', async ({
-    page,
-    context,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await tapOn(page.locator('#cg-io-toggle'));
-    const other = await context.newPage();
-    // An ABSOLUTE url, built from the page under test. `context.newPage()`
-    // carries no `baseURL` over a CDP connection to a real phone, so a
-    // relative path there is "Cannot navigate to invalid URL" -- found on
-    // real Android, where every other page in this suite comes from the
-    // `page` fixture and never hits it.
-    await other.goto(new URL('/id/classroom-groups', page.url()).href);
-    await tapOn(other.locator('#cg-students-toggle'));
-    await expect(other.locator('.cg-student')).toHaveCount(0);
-    await expect(page.locator('.cg-student')).toHaveCount(1);
-  });
 });
 
 /**
@@ -746,111 +642,88 @@ test.describe('exporting in both languages', () => {
  * so there is no stored choice to read back outside one.
  */
 test.describe('the handover destination is chosen, not assumed', () => {
-  test('keeps the list shut until it is asked for', async ({ page }) => {
+  test('the language list opens on demand, names every other language and is touchable', async ({
+    page,
+    context,
+  }) => {
     await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
     await openIo(page);
     // `.first()`, because there is one button per other language now (four,
     // since #22) and a bare locator would be a strict-mode violation rather
     // than an assertion. The list is one `<details>`, so shut is shut for all.
-    await expect(page.locator('.cg-io-both-target').first()).toBeHidden();
-    await tapOn(page.locator('#cg-io-both-toggle'));
-    await expect(page.locator('.cg-io-both-target').first()).toBeVisible();
-  });
-
-  test('offers one button per other language, named in that language', async ({
-    page,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await openIo(page);
-    await tapOn(page.locator('#cg-io-both-toggle'));
+    await expect.soft(page.locator('.cg-io-both-target').first()).toBeHidden();
+    // `.cg-io-both` shipped under the 44px floor once already; the rule that
+    // fixed it selects by CONTAINER so a new button cannot be missed. These
+    // buttons are new, and inside a `<details>` -- assert, do not assume.
+    const summary = page.locator('#cg-io-both-toggle');
+    await atLeast44Soft(summary, '#cg-io-both-toggle');
+    await tapOn(summary);
+    await expect.soft(page.locator('.cg-io-both-target').first()).toBeVisible();
 
     // Derived from LOCALES: this asserted a count of 1 and the single name
     // 'Bahasa Indonesia', which was a fact about there being two languages
     // rather than about the picker. Every other language, each checked.
     const others = otherLocales('en');
     const choices = page.locator('.cg-io-both-target');
-    await expect(choices).toHaveCount(others.length);
+    await expect.soft(choices).toHaveCount(others.length);
     for (const locale of others) {
       // Its OWN name, and `lang` so a screen reader says it in that language
       // rather than spelling it out in English -- the same rule the header
-      // switcher follows (tests/e2e/language-switcher.spec.ts).
+      // switcher follows (tests/e2e/checks/switcher-open.ts).
       const choice = choices.filter({
         hasText: LOCALE_METADATA[locale].nativeName,
       });
-      await expect(choice, `a button for ${locale}`).toHaveCount(1);
-      await expect(choice).toHaveAttribute('lang', locale);
+      await expect.soft(choice, `a button for ${locale}`).toHaveCount(1);
+      await expect.soft(choice).toHaveAttribute('lang', locale);
     }
-  });
-
-  test('draws the flag from the page own sprite, not a second copy', async ({
-    page,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await openIo(page);
-    await tapOn(page.locator('#cg-io-both-toggle'));
 
     // `<use href="#flag-id">` resolving against a symbol the page defines is
     // what proves the picker and the header switcher draw the SAME shapes.
     // A broken reference renders nothing at all and reads as a spacing bug.
-    for (const locale of otherLocales('en')) {
+    for (const locale of others) {
       const flag = `#flag-${LOCALE_METADATA[locale].flag}`;
-      await expect(
-        page
-          .locator('.cg-io-both-target')
-          .filter({ hasText: LOCALE_METADATA[locale].nativeName })
-          .locator('svg.flag use'),
-        `${locale} draws ${flag}`,
-      ).toHaveAttribute('href', flag);
-      await expect(page.locator(`symbol${flag}`)).toHaveCount(1);
+      await expect
+        .soft(
+          page
+            .locator('.cg-io-both-target')
+            .filter({ hasText: LOCALE_METADATA[locale].nativeName })
+            .locator('svg.flag use'),
+          `${locale} draws ${flag}`,
+        )
+        .toHaveAttribute('href', flag);
+      await expect.soft(page.locator(`symbol${flag}`)).toHaveCount(1);
     }
-  });
 
-  test('gives every language button a real touch target', async ({ page }) => {
-    // `.cg-io-both` shipped under the 44px floor once already; the rule that
-    // fixed it selects by CONTAINER so a new button cannot be missed. These
-    // buttons are new, and inside a `<details>` -- assert, do not assume.
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await openIo(page);
-    const summary = page.locator('#cg-io-both-toggle');
-    await atLeast44(summary, '#cg-io-both-toggle');
-    await tapOn(summary);
-    const choices = page.locator('.cg-io-both-target');
     // `.all()` resolves to [] when nothing matches -- it neither waits nor
-    // fails -- so without this count the loop below runs zero times and a
-    // WCAG touch-target test passes having measured nothing. Proven, not
+    // fails -- so without the count above the loop below runs zero times and
+    // a WCAG touch-target test passes having measured nothing. Proven, not
     // assumed: pointing this locator at a class that does not exist left the
     // test green (#87). Derived from LOCALES rather than hardcoded, because
     // one button is rendered per OTHER locale and that number is going to
     // change.
-    await expect(choices).toHaveCount(otherLocales('en').length);
+    await expect.soft(choices).toHaveCount(otherLocales('en').length);
     for (const choice of await choices.all()) {
-      await atLeast44(choice);
+      await atLeast44Soft(choice, 'a language button');
     }
-  });
 
-  test('does not drop the keyboard where the list just closed', async ({
-    page,
-    context,
-  }) => {
     // The list closes once the tab is open, which takes the button that was
     // just pressed out of the document's focus order with it. Left alone the
     // browser drops focus onto `<body>` and a teacher tabbing through the
-    // section restarts at the top of the page (WCAG 2.4.3).
-    await buildRosterAtPath(page, '/classroom-groups', [['F', 'Ana']]);
-    await openIo(page);
+    // section restarts at the top of the page (WCAG 2.4.3). The list is
+    // already open, so the language is pressed directly.
     await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
-      handoverTo(page, 'Bahasa Indonesia'),
+      tapOn(page.getByRole('button', { name: 'Bahasa Indonesia' })),
     ]);
     // `document.activeElement`, not `toBeFocused`. The handover has just
     // moved the BROWSER's focus to the new tab, so this page is not the
     // focused one and `toBeFocused` reports `inactive` in Firefox whatever
     // the document says. What matters is where this document's focus sits
     // when the teacher comes back to it.
-    expect(await page.evaluate(() => document.activeElement?.id)).toBe(
-      'cg-io-both-toggle',
-    );
+    expect
+      .soft(await page.evaluate(() => document.activeElement?.id))
+      .toBe('cg-io-both-toggle');
   });
 
   // Every other language, derived. Pressing only Bahasa Indonesia, the FIRST
@@ -970,7 +843,7 @@ test.describe('the handover cannot be overheard', () => {
     await expect(receiver.locator('.cg-student')).toHaveCount(0);
   });
 
-  test('a receiver with work of its own is warned before it is replaced', async ({
+  test('a second handover opens a tab of its own, and work in another tab is untouched', async ({
     page,
     context,
   }) => {
@@ -999,6 +872,11 @@ test.describe('the handover cannot be overheard', () => {
       ],
       new URL('/id/classroom-groups', receiver.url()).href,
     );
+    // The teacher goes back to the first tab to send the second class. A
+    // phone shows one tab at a time, and a handover pressed in a tab that is
+    // not on screen opened its window and download in only 3 of 10 runs on
+    // the real Android (#1060).
+    await page.bringToFront();
     const [, second] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
@@ -1051,25 +929,24 @@ test.describe('review findings — import', () => {
 
   // I5. `if (className !== '')` left the previous class's name in place, so
   // 8C's list printed under 7B and exported as 7B-class-list-….csv.
-  test('importing a file with no class name clears the old one', async ({
+  test('an import with no class name clears the old one, and one that has a name takes it', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     await upload(page, 'unnamed.csv', 'number,name\n1,Gita\n2,Hani\n');
-    await expect(page.locator('.cg-student')).toHaveCount(2);
-    await expect(page.getByLabel('Class (optional)')).toHaveValue('');
+    await expect.soft(page.locator('.cg-student')).toHaveCount(2);
+    await expect.soft(page.getByLabel('Class (optional)')).toHaveValue('');
     // …and the next export is not filed under the class that is gone.
     const name = await downloadName(page, 'Export class list');
-    expect(name).not.toContain('7B');
-  });
+    expect.soft(name).not.toContain('7B');
 
-  test('and an import that HAS a name takes it', async ({ page }) => {
-    await page.goto('/classroom-groups');
+    // A fresh page, so the named file lands on an empty roster as it did.
+    await page.reload();
     await typeInto(page.getByLabel('Class (optional)'), '7B');
     await openIo(page);
     await upload(page, 'named.csv', '# Class: 8C\nnumber,name\n1,Gita\n');
-    await expect(page.getByLabel('Class (optional)')).toHaveValue('8C');
+    await expect.soft(page.getByLabel('Class (optional)')).toHaveValue('8C');
   });
 });

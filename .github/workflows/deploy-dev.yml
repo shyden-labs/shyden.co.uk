@@ -91,8 +91,7 @@ jobs:
   # No `runs-on` and no `timeout-minutes`: GitHub refuses both on a calling
   # job, and every job it calls carries its own. A called workflow's token can
   # only be narrowed, so this job grants what ci.yml's jobs ask for -- `issues:
-  # read` for the dependabot-label check -- and
-  # tests/guards/pipeline-wiring.test.ts fails if they part.
+  # read` for the dependabot-label check.
   test:
     name: Comprehensive web tests
     if: github.event_name != 'push'
@@ -119,6 +118,8 @@ jobs:
     environment:
       name: dev
       url: https://dev.shyden.co.uk
+    outputs:
+      before: ${{ steps.before.outputs.id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,10 +127,21 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
+      # What dev serves now, so a deploy that fails its live check can fall
+      # back to it (#748), the same step as deploy-prod.yml's.
+      - name: Record the live deployment, to fall back to
+        id: before
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          id="$(node scripts/pages.mjs live shyden-site-dev)"
+          echo "id=${id}" >> "$GITHUB_OUTPUT"
+          echo "Dev serves ${id} before this deploy."
       - run: npm ci
       - name: Build (dev — outbound ShyTalk and Yawelo Idle links → DEV, never prod)
         env:
-          PUBLIC_SHYTALK_URL: https://dev.shytalk.shyden.co.uk
+          PUBLIC_SHYTALK_URL: https://dev.shytalk.app
           PUBLIC_YAWELO_IDLE_URL: https://dev.yawelo-idle.shyden.co.uk
         run: npm run build
       # Before anything is deployed, the dev token proves it reaches the dev
@@ -141,6 +153,15 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/token-reach.mjs
+      # The Workers runtime this project runs is set to the date the
+      # functions suite tests, and read back, before anything deploys (#907;
+      # Shyden's ruling 2026-11-07). It fails naming both dates, or naming any
+      # setting the update changed besides the runtime.
+      - name: The dev project runs the Workers date the functions suite tests
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/pages-runtime.mjs shyden-site-dev
       - name: Deploy dist/ to Cloudflare Pages (dev project)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -153,9 +174,25 @@ jobs:
   # and playwright.dev.config.ts were both written for exactly this and were
   # referenced by NOTHING in CI, so a dev deploy serving a blank page would
   # have gone green and gated nothing.
+  # The Playwright image the verify job runs in (#444), picked as ci.yml's
+  # browser jobs pick it, so nothing downloads browsers on the way to
+  # `dev-verified`.
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
   verify-dev:
     name: Verify dev + dev-verified
-    needs: deploy-dev
+    needs: [deploy-dev, image]
     # One of the two gates above skips on every event, by design, and a job
     # with no condition carries an implicit `success()` the runner judges over
     # EVERY upstream job — so without this, verify skipped on every run: 866bc23
@@ -167,7 +204,12 @@ jobs:
     if: >-
       !cancelled() && needs.deploy-dev.result == 'success'
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    # The slowest of the last 15 green runs took 179 s, browser download
+    # included (read 2026-11-11); the image removes the download.
+    timeout-minutes: 8
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
     # It reads DEV_BASIC_AUTH_PASSWORD, so it names `dev`, the environment
     # holding it: the repository holds no secrets (read 2026-10-04, #390
     # F163), and a repository secret would reach a workflow on any branch
@@ -187,7 +229,6 @@ jobs:
         with:
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Sanity-check the live dev site
         env:
           # The dev site is behind Basic auth; the username half is ignored by
@@ -204,14 +245,8 @@ jobs:
         # and the integration it exists to force.
         if: github.ref_name == 'develop'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -f state=success \
-            -f context=dev-verified \
-            -f "description=Dev deployed + verified (run ${{ github.run_id }})" \
-            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "Posted dev-verified=success on ${{ github.sha }}"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/commit-status.mjs dev-verified "Dev deployed + verified (run ${GITHUB_RUN_ID})"
 
   # ---- Tell the operator when a develop deploy failed (#725) --------------
   # Run 38219259063 failed on Cloudflare's own 524 and nothing said so: dev
@@ -229,9 +264,35 @@ jobs:
   # No environment: it reads no secret but its own token, which may read the
   # run's jobs and logs and write issues, nothing else. It runs no npm
   # package code, so no `npm ci`.
+  # ---- A deploy that fails its live check falls back (#748) ---------------
+  # The same fall-back as production's, without an approval (Shyden's ruling,
+  # 2026-10-14): dev serves the deployment recorded before this deploy again.
+  fall-back:
+    name: Fall back to the deployment before this deploy
+    needs: [deploy-dev, verify-dev]
+    if: >-
+      !cancelled() && needs.deploy-dev.result == 'success' &&
+      needs.verify-dev.result == 'failure'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment:
+      name: dev
+      url: https://dev.shyden.co.uk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Serve the deployment live before this deploy again
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BEFORE: ${{ needs.deploy-dev.outputs.before }}
+        run: node scripts/pages.mjs restore shyden-site-dev "${BEFORE}"
+
   report-failure:
     name: Report a failed deploy
-    needs: [gate, test, deploy-dev, verify-dev]
+    needs: [gate, test, deploy-dev, verify-dev, fall-back]
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 5

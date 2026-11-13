@@ -1,5 +1,12 @@
-import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { shrinkPng } from './png-shrink';
 import { dirname, join } from 'node:path';
 import { expect } from 'vitest';
 import {
@@ -88,39 +95,27 @@ const CSS_MAX_PX = 912;
 /**
  * Resample a capture down to CSS scale, in place. Returns whether it ran.
  *
- * `sips` is a macOS built-in rather than a dependency, and this file is
- * already macOS-only by construction -- it needs `xcrun devicectl` and a physical
- * iPhone on USB, neither of which exists anywhere else. Node has no image
- * resize of its own, and adding one would be an operator decision.
+ * Done in-process (`png-shrink.ts`, on Node's own `zlib`), so the resample is
+ * the same on a Mac and on CI's Linux runner (#1069); it was `sips`, a macOS
+ * built-in, which left it untested anywhere automated.
  *
  * DEGRADES, never fails: a capture at the wrong scale is still evidence, while
  * a journey that threw here would lose the assertion it was documenting. The
- * caller keeps the original bytes when this returns false.
+ * shrunk copy is written beside the capture and renamed over it, so a failed
+ * write leaves the original bytes exactly as they were.
  *
- * Only shrinks. `sips -Z` resamples to fit a MAXIMUM dimension, which would
- * happily UPSCALE a small image -- the 1x1 fixture in the unit tests would
- * become 912x912 -- so the size is read first and the resample is skipped
- * when there is nothing to shrink.
+ * Only shrinks: a capture already within CSS scale is left alone.
  */
 export const shrinkToCssScale = (path: string): boolean => {
+  const copy = `${path}.shrinking`;
   try {
-    const read = execFileSync(
-      'sips',
-      ['-g', 'pixelWidth', '-g', 'pixelHeight', path],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    );
-    const longest = Math.max(
-      ...[...read.matchAll(/pixel(?:Width|Height):\s*(\d+)/g)].map((m) =>
-        Number(m[1]),
-      ),
-    );
-    if (!Number.isFinite(longest) || longest <= CSS_MAX_PX) return false;
-
-    execFileSync('sips', ['-Z', String(CSS_MAX_PX), path], {
-      stdio: ['ignore', 'ignore', 'ignore'],
-    });
+    const smaller = shrinkPng(readFileSync(path), CSS_MAX_PX);
+    if (smaller === undefined) return false;
+    writeFileSync(copy, smaller);
+    renameSync(copy, path);
     return true;
   } catch {
+    rmSync(copy, { force: true });
     return false;
   }
 };

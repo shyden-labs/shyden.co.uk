@@ -1,6 +1,7 @@
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
+import { eachWidth } from '../each-width';
 import type { Page } from '@playwright/test';
 import { docsPaths } from '../site-pages';
 import { searched } from '../source-files';
@@ -21,35 +22,6 @@ test.use(recorded);
 
 const WIDTHS = [320, 1280] as const;
 const THEMES = ['light', 'dark'] as const;
-/**
- * Each docs page's recorded floors, spelled once here so the floor reader can
- * find them (literal-floors.test.ts); a page with no entry fails its tests.
- */
-const FLOORS: Readonly<
-  Record<
-    string,
-    {
-      readonly texts: string;
-      readonly controls: string;
-      readonly typed: string;
-      readonly painted: string;
-    }
-  >
-> = {
-  '/api/docs/': {
-    texts: 'api-docs/public-texts',
-    controls: 'api-docs/public-controls',
-    typed: 'api-docs/public-typed-fields',
-    painted: 'api-docs/public-painted-controls',
-  },
-  '/api/docs/private/': {
-    texts: 'api-docs/private-texts',
-    controls: 'api-docs/private-controls',
-    typed: 'api-docs/private-typed-fields',
-    painted: 'api-docs/private-painted-controls',
-  },
-};
-
 /**
  * Opens every operation and its Try it out, then sends each, as a visitor
  * exploring would. A preview of dist/ runs no Pages Function, so the API's
@@ -145,17 +117,16 @@ const controlSizes = (page: Page) =>
 test.describe('the API docs meet the site bar (#781)', () => {
   for (const path of docsPaths())
     for (const theme of THEMES)
-      for (const width of WIDTHS)
-        test(
-          `${path} in the ${theme} theme at ${width}px`,
-          { tag: '@emulated-viewport' },
-          async ({ page }) => {
-            await page.emulateMedia({ colorScheme: theme });
-            await page.setViewportSize({ width, height: 900 });
+      // Its widths inside one test (#1086; Shyden 2026-11-13): a real phone
+      // keeps its own width (#1046), so it walks this once.
+      test(`${path} in the ${theme} theme at every width`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: theme });
+        await eachWidth(
+          page,
+          WIDTHS.map((width) => ({ width, height: 900 })),
+          async (took) => {
             await page.goto(path);
             await openEverything(page, path);
-            const floors = FLOORS[path];
-            if (!floors) throw new Error(`${path} has no floors in FLOORS`);
 
             const box = await page.evaluate(() => {
               const mount = document.querySelector('#swagger');
@@ -168,7 +139,10 @@ test.describe('the API docs meet the site bar (#781)', () => {
             expect(
               box,
               'nothing pushes the page or the mount sideways',
-            ).toEqual({ page: 0, mount: 0 });
+            ).toEqual({
+              page: 0,
+              mount: 0,
+            });
 
             const probes = await textsToRead(page);
             const dim: string[] = [];
@@ -215,7 +189,11 @@ test.describe('the API docs meet the site bar (#781)', () => {
               }),
             ).toEqual([]);
 
-            await shoot(page, `${path}, ${theme}, ${width}px, everything open`);
+            await shoot(
+              page,
+              `${path}, ${theme}, ${took.width}px, everything open`,
+            );
           },
         );
+      });
 });

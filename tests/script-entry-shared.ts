@@ -23,6 +23,25 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
+  // Without a context and a description it prints its usage and refuses
+  // (#444).
+  'commit-status.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/commit-status.mjs',
+  },
+  // Without a command and a project it prints its usage and refuses (#748).
+  'pages.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/pages.mjs',
+  },
+  // Without a directory to scan it prints its usage and refuses (#1040).
+  'placeholders.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/placeholders.mjs',
+  },
   // Without its three paths it prints its usage and refuses.
   'build-evidence-page.mjs': {
     args: [],
@@ -106,13 +125,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: ['--no-such-flag'],
     status: 1,
     says: 'usage: test-devices.mjs [--ios] (got --no-such-flag)',
-  },
-  // With no `docker` on PATH it refuses rather than compare nothing (#202).
-  'visual.mjs': {
-    args: [],
-    env: { PATH: '/nonexistent' },
-    status: 1,
-    says: 'docker is not available',
   },
   // The three that did all their work at module scope until #276. Each refuses
   // on `argv` alone, before it reads the cache or the catalogue, so the probe

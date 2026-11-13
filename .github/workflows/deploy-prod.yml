@@ -30,6 +30,22 @@ permissions:
   contents: read
 
 jobs:
+  # The Playwright image the smoke job runs in (#444), picked as ci.yml's
+  # browser jobs pick it, so nothing downloads browsers on the way to
+  # `prod-verified`. It holds no secret and needs no approval.
+  image:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - id: pick
+        run: node scripts/playwright-image.mjs
+
   deploy-prod:
     name: Deploy to Prod (needs approval)
     runs-on: ubuntu-26.04
@@ -37,6 +53,8 @@ jobs:
     environment:
       name: prod
       url: https://shyden.co.uk
+    outputs:
+      before: ${{ steps.before.outputs.id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,30 +62,37 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
+      # What production serves now, so a release that fails its live check
+      # can fall back to it (#748). Read first: if it cannot be read, nothing
+      # is deployed, because there would be nothing to fall back to. The
+      # assignment, not the echo, carries the command's exit status.
+      - name: Record the live deployment, to fall back to
+        id: before
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          id="$(node scripts/pages.mjs live shyden-site)"
+          echo "id=${id}" >> "$GITHUB_OUTPUT"
+          echo "Production serves ${id} before this release."
       - run: npm ci
       - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
         run: npm run build
       - name: Guard — fail if a [[placeholder]] leaked into shipped text
-        # -I: skip binary files. woff/woff2 fonts contain the bytes `[[`; a
-        # placeholder leak is a TEXT concern, so scanning binaries false-fails.
-        #
-        # Matches the placeholder SHAPE — `[[` … `]]` with no `]` between —
-        # rather than a bare `[[`. A bare `[[` is ordinary JavaScript: the
-        # minified bundle contains `new Map([[k,v],[k,v]])`, which blocked a
-        # release on 2026-08-05 with nothing wrong with the site. This is the
-        # second false positive of the same kind (see the `-I` note above), and
-        # both had the same cause — matching a fragment instead of the thing.
-        #
-        # It stays safe against that syntax because `[^]]` cannot cross the
-        # first `]`, so `[[k,v],` never completes the pattern. Verified against
-        # a real build: 0 matches, while an injected `[[companyNo]]` and an
-        # injected `[[reg office]]` are both caught.
-        run: |
-          if grep -rnIE '\[\[[^]]{1,60}\]\]' dist/; then
-            echo "::error::A [[…]] placeholder reached dist/ — refusing to ship to prod."
-            exit 1
-          fi
-          echo "No bracket placeholders in dist/ (text)."
+        # scripts/placeholders.mjs (#1040): the `[[…]]` shape in every text
+        # file under dist/, skipping binaries and vendored Swagger UI, whose
+        # minified arrays (`[[e,r]]`) stopped the 2026-11-05 release. Its unit
+        # test pins both what it catches and what it passes.
+        run: node scripts/placeholders.mjs dist
+      # The Workers runtime this project runs is set to the date the
+      # functions suite tests, and read back, before anything deploys (#907;
+      # Shyden's ruling 2026-11-07). It fails naming both dates, or naming any
+      # setting the update changed besides the runtime.
+      - name: The prod project runs the Workers date the functions suite tests
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/pages-runtime.mjs shyden-site
       - name: Deploy dist/ to Cloudflare Pages (prod project)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -90,9 +115,14 @@ jobs:
   # asking "was this SHA ever live?".
   smoke-and-verify:
     name: Post-prod smoke + prod-verified
-    needs: deploy-prod
+    needs: [deploy-prod, image]
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    # Measured 56 s on the last release (run 42014524980), browser download
+    # included; the image removes the download.
+    timeout-minutes: 6
+    container:
+      image: ${{ needs.image.outputs.ref }}
+      options: --user 1001 --ipc=host
     # The report health check is private on production (#782), and the Access
     # service token that signs in for it lives in `prod`, behind Shyden's
     # approval like every production credential: so this job asks for that
@@ -128,7 +158,6 @@ jobs:
         with:
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Smoke and verify the live prod site
         env:
           WEB_BASE_URL: https://shyden.co.uk
@@ -141,11 +170,86 @@ jobs:
       # that did not render.
       - name: Post prod-verified status on the released commit
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -f state=success \
-            -f context=prod-verified \
-            -f "description=Prod deployed + browser-verified (run ${{ github.run_id }})" \
-            -f "target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "Posted prod-verified=success on ${{ github.sha }}"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/commit-status.mjs prod-verified "Prod deployed + browser-verified (run ${GITHUB_RUN_ID})"
+
+  # ---- A release that fails its live check falls back (#748) --------------
+  # Only when the release deployed AND its live check failed: a bare
+  # `failure()` is also true when `deploy-prod` was refused at its approval and
+  # deployed nothing. It runs in `prod-rollback`, behind Shyden's approval
+  # (his ruling, 2026-10-14), and serves again the deployment recorded before
+  # the release, confirming it is live. The notice below goes out without
+  # waiting for this approval; `report-fall-back` adds the outcome.
+  fall-back:
+    name: Fall back to the deployment before this release (needs approval)
+    needs: [deploy-prod, smoke-and-verify]
+    if: >-
+      !cancelled() && needs.deploy-prod.result == 'success' &&
+      needs.smoke-and-verify.result == 'failure'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    environment:
+      name: prod-rollback
+      url: https://shyden.co.uk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Serve the deployment live before this release again
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BEFORE: ${{ needs.deploy-prod.outputs.before }}
+        run: node scripts/pages.mjs restore shyden-site "${BEFORE}"
+
+  # ---- Every failed production run tells Shyden at once (#748) -------------
+  # One issue, the same script as the dev deploy's (#725): the failing job,
+  # step and error line, and, when a fall-back waits, what it will restore and
+  # the run to approve it in. It never waits on the fall-back's approval.
+  report-failure:
+    name: Report a failed release
+    needs: [deploy-prod, smoke-and-verify]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Open or comment on the failed-release issue, if a job failed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          DEPLOY_PIPELINE: prod
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/deploy-failure.mjs
+
+  # The fall-back's outcome, commented on the same issue once it has run:
+  # production serves the earlier deployment again and `main` differs from
+  # it, or the fall-back was refused or failed.
+  report-fall-back:
+    name: Report the fall-back
+    needs: [deploy-prod, smoke-and-verify, fall-back]
+    if: always() && needs.fall-back.result != 'skipped'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Comment the fall-back's outcome on the failed-release issue
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          DEPLOY_PIPELINE: prod
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/deploy-failure.mjs

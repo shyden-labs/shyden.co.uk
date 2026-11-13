@@ -35,6 +35,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { messageOf } from './errors.mjs';
+import { countByProject } from './even-totals.mjs';
 import {
   appendFileSync,
   mkdirSync,
@@ -175,20 +176,51 @@ export const LIST_MAX_BUFFER = 256 * 1024 * 1024;
  * ) => import('node:child_process').SpawnSyncReturns<string>} Spawn
  */
 
+const RULE = '='.repeat(72);
+
 /**
  * The unfiltered `playwright test --list` this run is reconciled against, or,
  * for a capture shard, the list of the selection it was handed (#774).
+ * Throws, naming the exit and quoting Playwright's stderr, when the listing
+ * did not exit 0 (#1053).
  *
  * @param {readonly string[]} argv
  * @param {Spawn} spawn
  * @param {{ selection?: boolean }} [options]
  */
 export function listSuite(argv = [], spawn = spawnSync, options = {}) {
-  return spawn(
+  const listing = spawn(
     'npx',
     ['playwright', 'test', '--list', ...enumerationArgs(argv, options)],
     { encoding: 'utf8', maxBuffer: LIST_MAX_BUFFER },
   );
+  // THE LISTING'S OWN FAILURE, before anything derived from it is trusted.
+  // A listing that died while still printing a footer is indistinguishable
+  // from a suite that genuinely had that many tests, and one that printed
+  // nothing reached the shard plan first, which said only "0 spec files"
+  // (#1053). Fatal even on a narrowed run: a number that cannot be believed
+  // is worse than no number, because it prints like one.
+  if (listing.status !== 0) {
+    /** @type {(Error & { code?: string }) | undefined} */
+    const error = listing.error;
+    // No status means the child never exited on its own: Node killed it, and
+    // said why in `error` and `signal`, never in stderr (#438).
+    const ended =
+      listing.status === null
+        ? `was stopped before it exited (${
+            [error?.code ?? error?.message, listing.signal]
+              .filter(Boolean)
+              .join(', ') || 'no error or signal reported'
+          })`
+        : `exited ${listing.status}`;
+    throw new Error(
+      `\n${RULE}\n  E2E RECONCILIATION FAILED — the suite could not be enumerated\n\n` +
+        `  \`playwright test --list\` ${ended}. Whatever it printed\n` +
+        '  cannot be held against this run.\n\n' +
+        `${(listing.stderr ?? '').trim() || '  (it printed nothing on stderr)'}\n${RULE}\n`,
+    );
+  }
+  return listing;
 }
 
 /**
@@ -331,28 +363,15 @@ export function countExecuted(stats = {}) {
   return expected + unexpected + flaky + skipped;
 }
 
-const RULE = '='.repeat(72);
-
 /**
- * The verdict, and the exit code the process should carry.
- *
- * Typed explicitly because this is a `.mjs` file: a destructured parameter is
- * inferred from its own shape, so `listing` was first inferred REQUIRED
- * (breaking all seven existing call sites) and then, once defaulted, inferred
- * as `null | undefined` (rejecting the only values it is meant to take).
- * Neither showed up in the suite -- esbuild strips types without checking them.
+ * The verdict, and the exit code the process should carry. A listing that
+ * failed never gets here: `listSuite` throws first (#1053).
  *
  * @param {{
  *   enumerated: number | null,
  *   executed: number | null,
  *   filtered: boolean,
  *   playwrightExitCode: number,
- *   listing?: {
- *     status: number | null,
- *     stderr?: string,
- *     signal?: string | null,
- *     error?: Error & { code?: string },
- *   } | null,
  * }} verdict
  */
 export function reconcile({
@@ -360,39 +379,7 @@ export function reconcile({
   executed,
   filtered,
   playwrightExitCode,
-  // Defaulted, not merely optional-by-convention: a destructured parameter
-  // without a default is inferred as REQUIRED, so adding this key made every
-  // existing call site a type error while the suite stayed green -- esbuild
-  // strips types without checking them (#115).
-  listing = null,
 }) {
-  // THE LISTING'S OWN FAILURE, before anything derived from it is trusted.
-  // `spawnSync` reported it all along and nothing read it, so a listing that
-  // died while still printing a footer was indistinguishable from a suite that
-  // genuinely had that many tests. Fatal even on a narrowed run: a number that
-  // cannot be believed is worse than no number, because it prints like one.
-  if (listing && listing.status !== 0) {
-    // No status means the child never exited on its own: Node killed it, and
-    // said why in `error` and `signal`, never in stderr (#438).
-    const ended =
-      listing.status === null
-        ? `was stopped before it exited (${
-            [listing.error?.code ?? listing.error?.message, listing.signal]
-              .filter(Boolean)
-              .join(', ') || 'no error or signal reported'
-          })`
-        : `exited ${listing.status}`;
-    return {
-      exitCode: 1,
-      partial: false,
-      message:
-        `\n${RULE}\n  E2E RECONCILIATION FAILED — the suite could not be enumerated\n\n` +
-        `  \`playwright test --list\` ${ended}. Whatever it printed\n` +
-        '  cannot be held against this run.\n\n' +
-        `${(listing.stderr ?? '').trim() || '  (it printed nothing on stderr)'}\n${RULE}\n`,
-    };
-  }
-
   if (filtered) {
     return {
       exitCode: playwrightExitCode,
@@ -586,6 +573,8 @@ function main() {
     let executed = null;
     /** @type {Record<string, number> | null} */
     let ranUnits = null;
+    /** @type {Record<string, { passed: number, failed: number, skipped: number }> | undefined} */
+    let projectCounts;
     let parsed = null;
     /** @type {unknown} */
     let unreadable = null;
@@ -593,6 +582,7 @@ function main() {
       parsed = JSON.parse(readFileSync(reportPath, 'utf8'));
       executed = countExecuted(parsed.stats);
       ranUnits = ranByUnit(parsed);
+      projectCounts = countByProject(parsed);
     } catch (cause) {
       unreadable = cause;
     }
@@ -610,6 +600,7 @@ function main() {
       seconds,
       listedUnits: listedByUnit(listing.stdout ?? ''),
       ranUnits,
+      projectCounts,
     });
     const accountDir = process.env.E2E_ACCOUNT_DIR;
     if (recorded && accountDir) {
@@ -687,7 +678,6 @@ function main() {
       executed,
       filtered,
       playwrightExitCode: run.status ?? 1,
-      listing,
     });
     // A shard is narrowed on purpose and judged elsewhere, so it says that
     // instead of reconcile()'s PARTIAL notice, which says nothing judges it.

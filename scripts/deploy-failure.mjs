@@ -17,6 +17,13 @@
  * list it cannot read means a new issue: a second notice beats none. Only a
  * notice GitHub refuses, or one opened without its assignee, exits 1.
  *
+ * `DEPLOY_PIPELINE` is `dev` (the default: `deploy-dev.yml`, on `develop`) or
+ * `prod` (`deploy-prod.yml`, on `main`, #748). Each has its own notice title.
+ * The notice also says what the fall-back to the deployment live before the
+ * change does (`fallBackOf`): waiting for its approval, done, or failed. A
+ * fall-back that ran sends a notice even where nothing else failed, so the
+ * outcome reaches the issue the failure opened.
+ *
  * Reads `NEEDS`, `GITHUB_REF_NAME`, `GITHUB_API_URL`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`,
  * `GITHUB_RUN_ID` and `GITHUB_SHA` (all set by Actions) and `GITHUB_TOKEN`,
  * which needs `actions: read` and `issues: write`. `DEPLOY_FAILURE_TIMEOUT_MS`
@@ -25,16 +32,19 @@
  * on an argument, 1 on any failure.
  */
 import { die, messageOf } from './errors.mjs';
+import { githubJson } from './json-answer.mjs';
 import { endpoint, setting } from './settings.mjs';
 import {
   NOTICE_ASSIGNEE,
   NOTICE_AUTHOR,
-  NOTICE_TITLE,
+  PIPELINES,
   failedNeeds,
   failureOf,
+  fallBackOf,
   lastErrorLine,
   noticeBody,
   openNoticeOf,
+  reportNeeded,
 } from '../src/lib/deploy-failure.ts';
 
 /** Each GitHub request gives up after this long. */
@@ -50,35 +60,14 @@ const github = () => {
   const api = endpoint('GITHUB_API_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const token = setting('GITHUB_TOKEN', /^\S+$/);
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'shyden-deploy-failure',
-  };
+  const client = githubJson(token, 'shyden-deploy-failure', timeoutMs);
   /**
-   * The answer's text, once GitHub answered 2xx. Redirects are followed, as
-   * a job log answers with one to its storage.
-   *
    * @param {string} path
    * @param {unknown} [body]
    * @returns {Promise<string>}
    */
-  const text = async (path, body) => {
-    const response = await fetch(`${api}/repos/${repository}${path}`, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers:
-        body === undefined
-          ? headers
-          : { ...headers, 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs()),
-    });
-    const answer = await response.text();
-    if (!response.ok)
-      throw new Error(`GitHub answered HTTP ${response.status}`);
-    return answer;
-  };
+  const text = (path, body) =>
+    client.text(`${api}/repos/${repository}${path}`, body);
   /**
    * @param {string} path
    * @param {unknown} [body]
@@ -98,20 +87,30 @@ const github = () => {
 const report = async () => {
   /** @type {string[]} */
   const unread = [];
+  const named = process.env.DEPLOY_PIPELINE ?? 'dev';
+  if (named !== 'dev' && named !== 'prod')
+    die('DEPLOY_PIPELINE is neither dev nor prod');
+  /** @type {'dev' | 'prod'} */
+  const pipeline = named;
+  const { ref: deploysFrom, title } = PIPELINES[pipeline];
   const ref = setting('GITHUB_REF_NAME', /^\S+$/);
+  /** @type {import('../src/lib/deploy-failure.ts').FallBack} */
+  let fallBack = { state: 'none' };
   try {
-    const failed = failedNeeds(JSON.parse(process.env.NEEDS ?? ''));
-    if (failed.length === 0) {
-      console.log('Nothing failed: no notice.');
+    const needs = JSON.parse(process.env.NEEDS ?? '');
+    if (!reportNeeded(needs)) {
+      console.log('Nothing failed and no fall-back ran: no notice.');
       return;
     }
-    console.log(`Failed: ${failed.join(', ')}.`);
+    console.log(`Failed: ${failedNeeds(needs).join(', ') || 'nothing'}.`);
+    fallBack = fallBackOf(needs, pipeline);
+    console.log(`Fall-back: ${fallBack.state}.`);
   } catch (error) {
     // Unreadable is never "nothing failed": the notice goes, saying so.
     unread.push(`the run's needs (${messageOf(error)})`);
   }
-  if (ref !== 'develop') {
-    console.log(`A failure on ${ref}, not develop: no notice.`);
+  if (ref !== deploysFrom) {
+    console.log(`A failure on ${ref}, not ${deploysFrom}: no notice.`);
     return;
   }
 
@@ -147,6 +146,8 @@ const report = async () => {
     failure,
     errorLine,
     unread,
+    pipeline,
+    fallBack,
   });
 
   /** @type {number | undefined} */
@@ -156,6 +157,7 @@ const report = async () => {
       await json(
         `/issues?state=open&creator=${encodeURIComponent(NOTICE_AUTHOR)}&per_page=100`,
       ),
+      title,
     );
   } catch (error) {
     console.log(
@@ -169,7 +171,7 @@ const report = async () => {
     return;
   }
   const opened = await json('/issues', {
-    title: NOTICE_TITLE,
+    title,
     body,
     assignees: [NOTICE_ASSIGNEE],
   });

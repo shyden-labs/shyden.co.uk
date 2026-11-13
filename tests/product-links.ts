@@ -2,22 +2,24 @@ import { expect, type Page } from '@playwright/test';
 import { searched } from './source-files';
 
 /**
- * The products the homepage links out to, each by the word its hosts carry
+ * The products the homepage links out to, each by the words its hosts carry
  * and the build variable that points it at an environment (#403).
  */
 export const PRODUCTS = [
   {
     name: 'ShyTalk',
-    hostWord: 'shytalk',
+    hostWords: ['shytalk'],
     variable: 'PUBLIC_SHYTALK_URL',
-    prod: 'shytalk.shyden.co.uk',
-    dev: 'dev.shytalk.shyden.co.uk',
+    prod: 'shytalk.app',
+    dev: 'dev.shytalk.app',
   },
   {
     name: 'Yawelo Idle',
-    hostWord: 'yawelo-idle',
+    // The production domain has no hyphen; the dev host still does, until the
+    // Yawelo Idle project moves it (#1084).
+    hostWords: ['yawelo-idle', 'yaweloidle'],
     variable: 'PUBLIC_YAWELO_IDLE_URL',
-    prod: 'yawelo-idle.shyden.co.uk',
+    prod: 'yaweloidle.com',
     dev: 'dev.yawelo-idle.shyden.co.uk',
   },
 ] as const;
@@ -42,12 +44,12 @@ export type Product = (typeof PRODUCTS)[number];
  * that never leaves the site, so the test failed before it read an outbound
  * link at all. `el.href` is always absolute, and a fragment on this site
  * resolves to this site's own host, which never names a product. dev-sanity's
- * selector, `a[href*="shytalk.shyden.co.uk"]`, had the opposite hole: it could
+ * selector, an href match on the old ShyTalk host, had the opposite hole: it could
  * not see a link to any other ShyTalk host, which is the leak it exists for.
  *
- * Hosts are READ, never fetched: the production Yawelo Idle host has no DNS
- * record yet, by the operator's choice (2026-10-04, #403), and nothing here
- * depends on it resolving.
+ * Hosts are READ, never fetched: the new production domains had no DNS record
+ * when the links moved, by the operator's choice (2026-11-08, #1084), and
+ * nothing here depends on them resolving.
  *
  * DERIVED, not pinned to a count. dev-sanity once read `toHaveCount(1)` on the
  * dev URL; the Aurora merge added a hero call-to-action, the count became 2,
@@ -85,5 +87,7 @@ async function outboundHosts(page: Page, product: Product): Promise<string[]> {
     .evaluateAll((els) =>
       els.map((el) => new URL((el as HTMLAnchorElement).href).host),
     );
-  return hosts.filter((found) => found.includes(product.hostWord));
+  return hosts.filter((found) =>
+    product.hostWords.some((word) => found.includes(word)),
+  );
 }

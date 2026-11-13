@@ -67,6 +67,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
 
@@ -254,13 +255,19 @@ function tagOutput(tag, child) {
  * @param {string} tag
  * @param {string} command
  * @param {readonly string[]} args
- * @param {{ env?: NodeJS.ProcessEnv, cwd?: string }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv, cwd?: string, detached?: boolean }} [options]
  */
-function spawnTagged(tag, command, args, { env, cwd = ROOT } = {}) {
+function spawnTagged(
+  tag,
+  command,
+  args,
+  { env, cwd = ROOT, detached = false } = {},
+) {
   const child = spawn(command, args, {
     cwd,
     env: env ?? process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached,
   });
   tagOutput(tag, child);
   return child;
@@ -355,6 +362,80 @@ export function pidsListeningOnPort(port) {
     );
     if (spawned.status === 1 && !spawned.stdout) return [];
     throw error;
+  }
+}
+
+/** How long a run waits for another server to give up its preview port. */
+export const PORT_WAIT_CEILING_MS = 600_000;
+
+/**
+ * Whether the run may take `port` now (#390 F44). It is never taken from
+ * anyone: a holder is named and waited for, and the run fails at the
+ * ceiling naming it. Pure; `waitForPortFree` asks the system who holds it.
+ *
+ * @param {number} port
+ * @param {{ pid: number, command: string }[]} holders
+ * @param {number} waitedMs
+ * @param {number} ceilingMs
+ * @returns {{ free: true } | { free: false, say: string }}
+ */
+export function portWait(port, holders, waitedMs, ceilingMs) {
+  if (holders.length === 0) return { free: true };
+  const named = holders.map((h) => `pid ${h.pid} (${h.command})`).join(', ');
+  const ceiling = `${Math.round(ceilingMs / 1000)} s`;
+  if (waitedMs >= ceilingMs)
+    throw new Error(
+      `port ${port} is still held by ${named} after ${ceiling}; stop that server, or wait for its run to end, then start again`,
+    );
+  return {
+    free: false,
+    say: `port ${port} is held by ${named}; waiting for it to close, up to ${ceiling}`,
+  };
+}
+
+/**
+ * Each process listening on `port`, with its command line, for a message.
+ *
+ * @param {number} port
+ * @returns {{ pid: number, command: string }[]}
+ */
+function portHolders(port) {
+  return pidsListeningOnPort(port).map((pid) => {
+    let command = 'unknown';
+    try {
+      command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+        encoding: 'utf8',
+      }).trim();
+    } catch {
+      // Gone between the two reads: the next poll will not list it.
+    }
+    return { pid, command };
+  });
+}
+
+/**
+ * Waits for `port` to be free, saying who holds it once, and fails at
+ * `PORT_WAIT_CEILING_MS` naming the holder.
+ *
+ * @param {number} port
+ * @returns {Promise<void>}
+ */
+export async function waitForPortFree(port) {
+  const startedAt = Date.now();
+  let said = '';
+  for (;;) {
+    const verdict = portWait(
+      port,
+      portHolders(port),
+      Date.now() - startedAt,
+      PORT_WAIT_CEILING_MS,
+    );
+    if (verdict.free) return;
+    if (verdict.say !== said) {
+      process.stdout.write(`==> ${verdict.say}\n`);
+      said = verdict.say;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
 }
 
@@ -633,7 +714,7 @@ function findIphone() {
  * it to the config's `grepInvert`, character for character. It was once two hand-typed copies,
  * and this one missed `@requires-download-bytes` for as long as that tag existed (#308).
  */
-const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport|@requires-isolated-context';
+const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport';
 
 /**
  * `android-chrome`'s `grepInvert`
@@ -647,17 +728,9 @@ const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport|@requires-isolated-context';
  * chromium's own testDir does not reach, carries neither tag (checked by hand), so
  * restricting this listing to tests/e2e does not undercount.
  *
- * Two tags, one count, on purpose: both exist for the identical reason (something
- * this suite's tests need is physically impossible to give them on ONE real device --
- * a resizable screen, or a fresh per-test browser context) and both are excluded from
- * the SAME `grepInvert`, so the Android group's own "skipped by design" number must be
- * their sum to stay honestly self-consistent with what actually ran (see
- * printSummaryTable / playwrightVerdict, which add this to Playwright's own
- * `stats.skipped` for the real run). Splitting them into two separately-reported
- * numbers was considered and rejected: nothing downstream (the dashboard, this
- * script's own exit-code logic) currently needs to tell them apart, and a single
- * `--grep` pattern kept in exact lock-step with the config's own `grepInvert` is one
- * fewer place for the two to silently drift apart than two separate queries would be.
+ * One tag now (#1047): `@javascript-blocked` tests run on the phone, with JavaScript blocked
+ * through Chrome's own settings, so only the screen-size tests are excluded by design. The
+ * pattern stays in exact lock-step with the config's own `grepInvert`.
  *
  * Never hardcoded: measured live against this exact source tree, every run, so a
  * future test gaining or losing either tag cannot make this number rot. `--list`'s own
@@ -742,7 +815,7 @@ function countAt(report, at, description) {
  *
  * @param {{ name: string, code: number | null, passed: number, failed: number,
  *   skippedByDesign: number, reportSaysOk: boolean, reportSays: string,
- *   failures: string, retried?: number }} counts
+ *   failures: string, retried?: number, retriedNote?: string }} counts
  */
 function judged({
   name,
@@ -754,6 +827,7 @@ function judged({
   reportSays,
   failures,
   retried = 0,
+  retriedNote = '',
 }) {
   const processSaysOk = code === 0;
   const reason =
@@ -763,7 +837,7 @@ function judged({
       : !processSaysOk
         ? `${failures} (process exit code ${code})`
         : retried > 0
-          ? `${retried} test(s) passed only on a retry -- a retry is not a fix, so this group is failed`
+          ? `${retried} test(s) passed only on a retry -- a retry is not a fix, so this group is failed${retriedNote}`
           : passed === 0
             ? 'no test passed, so this group proved nothing -- a run that measured nothing is not a pass'
             : undefined;
@@ -818,6 +892,7 @@ export function playwrightVerdict({
   const passed = count('expected');
   const retried = count('flaky');
   const unexpected = count('unexpected');
+  const crashNote = screenTimeCrashNote(report);
   return judged({
     name,
     code,
@@ -826,9 +901,59 @@ export function playwrightVerdict({
     skippedByDesign: count('skipped') + extraSkipped,
     reportSaysOk: unexpected === 0,
     reportSays: `${unexpected} failed`,
-    failures: `${unexpected} test(s) failed`,
+    failures: `${unexpected} test(s) failed${crashNote}`,
     retried,
+    retriedNote: crashNote,
   });
+}
+
+/**
+ * The exact text macOS WebKit aborts with when its own Screen Time observer
+ * is removed during a page's teardown (#1020): `-[WKScreenTimeConfigurationObserver
+ * stopObserving]` from `-[WKWebView dealloc]`. It is WebKit's crash, not the
+ * site's, and nothing outside WebKit can switch it off: `ScreenTimeEnabled` is
+ * not one of the preferences WebKit reads from `defaults` (measured 2026-11-04).
+ */
+const SCREEN_TIME_CRASH =
+  'Cannot remove an observer <WKScreenTimeConfigurationObserver';
+
+/**
+ * Names each failed or retried test whose browser logs carry WebKit's Screen
+ * Time crash, as a note for the group's reason. The group stays failed: the
+ * note only says which red is WebKit's own (#1020). Empty when there are none.
+ *
+ * @param {unknown} report a Playwright JSON report
+ */
+function screenTimeCrashNote(report) {
+  /** @type {string[]} */
+  const crashed = [];
+  /** @param {any} suite */
+  const walk = (suite) => {
+    for (const spec of suite?.specs ?? []) {
+      for (const test of spec.tests ?? []) {
+        if (test.status !== 'unexpected' && test.status !== 'flaky') continue;
+        const messages = (test.results ?? []).flatMap(
+          (/** @type {any} */ r) => [
+            r.error?.message,
+            ...(r.errors ?? []).map((/** @type {any} */ e) => e?.message),
+          ],
+        );
+        if (
+          messages.some(
+            (/** @type {unknown} */ m) =>
+              typeof m === 'string' && m.includes(SCREEN_TIME_CRASH),
+          )
+        )
+          crashed.push(`[${test.projectName}] ${spec.title}`);
+      }
+    }
+    for (const child of suite?.suites ?? []) walk(child);
+  };
+  walk(report);
+  return crashed.length === 0
+    ? ''
+    : `; ${crashed.length} of them crashed inside macOS WebKit's own Screen Time teardown, ` +
+        `not the site (#1020): ${crashed.join(', ')}`;
 }
 
 /**
@@ -1216,6 +1341,36 @@ function printSummaryTable(groups, totalDurationMs) {
   process.stdout.write('\n');
 }
 
+/**
+ * Every target's total, one line each, and whether they are even (#1049): the
+ * same suite ran on every target, so the totals must match and nothing may be
+ * skipped. Reads each group's report only when that group ran this run, so a
+ * report a earlier run left behind is never counted.
+ *
+ * @param {any[]} groups
+ * @param {number} excludedByDesign
+ */
+function judgeTotals(groups, excludedByDesign) {
+  /** @param {string} name */
+  const reportOf = (name) =>
+    groups.some((g) => g.name === name && g.status !== 'not-run')
+      ? /** @type {Record<string, any> | null} */ (
+          reportAt(
+            REPORT_FILES[/** @type {'desktop' | 'android' | 'ios'} */ (name)],
+            `${name}'s report`,
+          )
+        )
+      : null;
+  return evenTotals(
+    deviceTargets({
+      desktop: reportOf('desktop'),
+      android: reportOf('android'),
+      ios: reportOf('ios'),
+      excludedByDesign,
+    }),
+  );
+}
+
 // ── main ─────────────────────────────────────────────────────────────────
 
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -1252,11 +1407,14 @@ export function exitCodeFor(signal) {
 const cleanup = once(async () => {
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
-    await killByPort(PORT).catch((error) =>
+    try {
+      if (previewChild.pid !== undefined)
+        process.kill(-previewChild.pid, 'SIGTERM');
+    } catch (error) {
       process.stderr.write(
-        `cleanup: failed to free port ${PORT}: ${messageOf(error)}\n`,
-      ),
-    );
+        `cleanup: failed to stop the preview server: ${messageOf(error)}\n`,
+      );
+    }
   }
   await cleanupAdbTunnels();
 });
@@ -1365,10 +1523,9 @@ async function main() {
     // it.
     await startDashboard();
 
-    process.stdout.write(
-      '==> Freeing port 4321 (any stale server from a previous run)...\n',
-    );
-    await killByPort(PORT);
+    // Waited for, never taken: the server on it may be another session's
+    // or worktree's (#390 F44).
+    await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
     const build = await runTagged('build', 'npm', ['run', 'build']);
@@ -1381,13 +1538,14 @@ async function main() {
     process.stdout.write(
       '==> Starting the shared preview server (npm run preview -- --host 0.0.0.0)...\n',
     );
-    previewChild = spawnTagged('preview', 'npm', [
-      'run',
+    // Its own process group: cleanup stops npm AND the server it started,
+    // and nothing else that happens to use the port (#390 F44).
+    previewChild = spawnTagged(
       'preview',
-      '--',
-      '--host',
-      '0.0.0.0',
-    ]);
+      'npm',
+      ['run', 'preview', '--', '--host', '0.0.0.0'],
+      { detached: true },
+    );
     await waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
       timeoutMs: 30_000,
       describe: `the shared preview server to answer on :${PORT}`,
@@ -1441,7 +1599,12 @@ async function main() {
     writeDashboardFinal({ aborted: null, groups });
 
     printSummaryTable(groups, Date.now() - startedAt);
-    const anyBad = groups.some((g) => g.status !== 'passed');
+    const totals = judgeTotals(groups, excludedByDesign);
+    process.stdout.write(
+      `Totals per target:\n${totals.lines.map((l) => `  ${l}`).join('\n')}\n`,
+    );
+    if (!totals.ok) process.stdout.write(`\nFAILED: ${totals.reason}\n\n`);
+    const anyBad = groups.some((g) => g.status !== 'passed') || !totals.ok;
     process.exitCode = anyBad ? 1 : 0;
   } catch (fatal) {
     process.stderr.write(`\nABORTED: ${messageOf(fatal)}\n\n`);

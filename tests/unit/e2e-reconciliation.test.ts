@@ -8,6 +8,7 @@ import {
   NAV_TIMING_REPORTER,
   enumerationArgs,
   enumerationMode,
+  listSuite,
 } from '../../scripts/test-e2e.mjs';
 import { searched } from '../source-files';
 
@@ -165,61 +166,6 @@ describe('the reconciliation itself', () => {
     expect(result.message).toMatch(/enumerat|suite size|executed|ran/i);
   });
 
-  it('names the listing’s own failure instead of deriving from its output', () => {
-    // `spawnSync` reported the failure all along and nothing read it: a
-    // listing that dies while still printing a footer is indistinguishable
-    // from a suite that genuinely has that many tests. Same shape as the
-    // `gh run list --commit` hazard -- an empty result reads exactly like a
-    // real absence, and only one of those is good news.
-    const result = reconcile({
-      enumerated: 2094,
-      executed: 2094,
-      filtered: false,
-      playwrightExitCode: 0,
-      listing: { status: 1, stderr: 'error: cannot find module playwright' },
-    });
-
-    expect(result.exitCode, 'a broken enumeration cannot be a pass').toBe(1);
-    expect(
-      result.message,
-      'the listing’s own words are the diagnosis',
-    ).toContain('cannot find module playwright');
-  });
-
-  it('names the cause when the listing was killed rather than exiting', () => {
-    // #438: a listing past spawnSync's buffer is killed, so it has no exit
-    // status, an `error` of ENOBUFS and an empty stderr. The message read only
-    // status and stderr, and said `exited null` with nothing to go on.
-    const result = reconcile({
-      ...full,
-      executed: 2094,
-      listing: {
-        status: null,
-        signal: 'SIGTERM',
-        stderr: '',
-        error: Object.assign(new Error('spawnSync npx ENOBUFS'), {
-          code: 'ENOBUFS',
-        }),
-      },
-    });
-
-    expect(result.exitCode).toBe(1);
-    expect(result.message).toContain('ENOBUFS');
-    expect(result.message).toContain('SIGTERM');
-  });
-
-  it('still passes when the listing succeeded', () => {
-    // Liveness for the check above: it must be the FAILURE that reddens it,
-    // not the presence of a listing argument.
-    expect(
-      reconcile({
-        ...full,
-        executed: 2094,
-        listing: { status: 0, stderr: '' },
-      }).exitCode,
-    ).toBe(0);
-  });
-
   it('leaves a genuinely failing run failing', () => {
     const result = reconcile({
       ...full,
@@ -259,6 +205,69 @@ describe('the reconciliation itself', () => {
       reconcile({ ...full, enumerated: null, executed: 2094 }).exitCode,
       'an unknown total must block the run, not wave it through',
     ).toBe(1);
+  });
+});
+
+describe('the listing fails before anything reads its output (#1053)', () => {
+  /** A stood-in spawn that answers with `result` and records its call. */
+  function spawnAnswering(result: Record<string, unknown>) {
+    const calls: { command: string; args: readonly string[] }[] = [];
+    const spawn = ((command: string, args: readonly string[]) => {
+      calls.push({ command, args });
+      return {
+        pid: 1,
+        output: [],
+        stdout: '',
+        stderr: '',
+        signal: null,
+        ...result,
+      };
+    }) as unknown as Parameters<typeof listSuite>[1];
+    return { spawn, calls };
+  }
+
+  it('names the exit status and quotes the listing’s own stderr', () => {
+    // PR #1052: a load error made every shard say "10 shards for 0 spec
+    // files", because the shard plan read the listing's empty stdout before
+    // anything read its status or stderr, which held Playwright's own words.
+    const { spawn } = spawnAnswering({
+      status: 1,
+      stderr: 'Error: Cannot use({ launchOptions }) in a describe group',
+    });
+
+    expect(() => listSuite([], spawn)).toThrow(/exited 1/);
+    expect(() => listSuite([], spawn)).toThrow(
+      'Cannot use({ launchOptions }) in a describe group',
+    );
+  });
+
+  it('names the cause when the listing was killed rather than exiting', () => {
+    // #438: a listing past spawnSync's buffer is killed, so it has no exit
+    // status, an `error` of ENOBUFS and an empty stderr.
+    const { spawn } = spawnAnswering({
+      status: null,
+      signal: 'SIGTERM',
+      error: Object.assign(new Error('spawnSync npx ENOBUFS'), {
+        code: 'ENOBUFS',
+      }),
+    });
+
+    expect(() => listSuite([], spawn)).toThrow(/ENOBUFS, SIGTERM/);
+    expect(() => listSuite([], spawn)).toThrow(/printed nothing on stderr/);
+  });
+
+  it('hands a listing that exited 0 back unchanged', () => {
+    const { spawn, calls } = spawnAnswering({
+      status: 0,
+      stdout: 'Total: 3 tests in 1 file\n',
+    });
+
+    const listing = listSuite([], spawn);
+
+    expect(listing.stdout).toBe('Total: 3 tests in 1 file\n');
+    expect(calls).toEqual([
+      { command: 'npx', args: ['playwright', 'test', '--list'] },
+    ]);
   });
 });
 

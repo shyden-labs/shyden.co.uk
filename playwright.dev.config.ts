@@ -14,7 +14,7 @@ import { onBuild } from './tests/sanity-on-build';
 // @deployed-only tests (#335).
 const password = process.env.DEV_BASIC_AUTH_PASSWORD;
 const build = onBuild(4398, {
-  PUBLIC_SHYTALK_URL: 'https://dev.shytalk.shyden.co.uk',
+  PUBLIC_SHYTALK_URL: 'https://dev.shytalk.app',
   PUBLIC_YAWELO_IDLE_URL: 'https://dev.yawelo-idle.shyden.co.uk',
 });
 

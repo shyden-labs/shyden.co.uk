@@ -10,6 +10,40 @@ import { addSeveral, openRoster, setSex } from './helpers';
 import { recorded } from './evidence';
 import { localePaths } from './locale-sampling';
 import { expectNoHorizontalScroll } from '../viewport';
+import { atViewport } from '../viewport-at';
+
+/**
+ * What one student disables (#1046, Shyden 2026-11-08: the fewest students
+ * that disable a control, and the add buttons apart). With a roster the
+ * count and the three number fields lock (`studentsBoxLocked`), and a student
+ * with no sex keeps Make groups (`rosterProblems`' no-sex) and both sex
+ * switches (`sexWhy`) disabled.
+ */
+const ONE_STUDENT_DISABLES = [
+  'cg-count',
+  'cg-go',
+  'cg-numbers-absent',
+  'cg-numbers-apart',
+  'cg-numbers-together',
+  'cg-sex-mix',
+  'cg-sex-separate',
+];
+
+/**
+ * The two controls only the roster limit disables (`roster-ui.ts`). They
+ * carry a class, not an id, so their labels end in a page index.
+ */
+const AT_THE_LIMIT = '.cg-add-several, .cg-add-student';
+const AT_THE_LIMIT_LABELS = ['button.cg-add-several', 'button.cg-add-student'];
+
+// At the roster limit the page is a hundred rows long, and on the phone the
+// controls are reached by real drags: 26.7-30.1 s for the two add buttons
+// alone (measured 2026-11-08, #1046), so those tests get slow()'s 90 s there
+// (Shyden 2026-11-08). The one-student tests keep 30 s.
+const LIMIT_IS_SLOW = 'a real drag down a hundred-row roster';
+
+const labelsOf = (reachable: readonly Affordance[]): string[] =>
+  reachable.map((a) => a.label.replace(/#\d+$/, '')).sort();
 
 test.use(recorded);
 
@@ -146,64 +180,73 @@ type Population = {
  * Every `:disabled` element on the page, partitioned, with the cursor a user
  * would actually see over each reachable one and the paint it carries.
  */
-const affordances = async (page: Page): Promise<Population> => {
+const affordances = async (
+  page: Page,
+  only: string | null = null,
+): Promise<Population> => {
   // Tag each one so the browser-side read finds the same element this
   // enumerated, without inventing an id scheme on the page itself.
-  const { labels, excluded, enabled, fill, ink } = await page.evaluate(() => {
-    const labels: string[] = [];
-    const excluded: string[] = [];
-    const enabled: { label: string; cursor: string }[] = [];
-    document.querySelectorAll<HTMLElement>(':disabled').forEach((el, i) => {
-      const tag = el.tagName.toLowerCase();
-      if (tag === 'option') {
-        excluded.push(tag);
-        return;
-      }
-      const cls =
-        typeof el.className === 'string'
-          ? el.className.trim().split(/\s+/)[0]
-          : '';
-      const label = el.id || `${tag}${cls ? `.${cls}` : ''}#${i}`;
-      el.setAttribute('data-disabled-250', label);
-      labels.push(label);
-    });
-
-    const inkProbe = document.createElement('span');
-    inkProbe.style.color = getComputedStyle(document.documentElement)
-      .getPropertyValue('--ink-soft')
-      .trim();
-    document.body.append(inkProbe);
-    const ink = getComputedStyle(inkProbe).color;
-    inkProbe.remove();
-
-    // Resolve the token through the renderer, so `#2a323f` and
-    // `rgb(42, 50, 63)` are the same value here and no parsing of ours can
-    // disagree with the browser.
-    const probe = document.createElement('span');
-    probe.style.background = getComputedStyle(document.documentElement)
-      .getPropertyValue('--disabled-fill')
-      .trim();
-    document.body.append(probe);
-    const fill = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-
-    document
-      .querySelectorAll<
-        | HTMLButtonElement
-        | HTMLInputElement
-        | HTMLSelectElement
-        | HTMLTextAreaElement
-      >('button, select, textarea, input')
-      .forEach((el) => {
-        if (el.disabled) return;
-        enabled.push({
-          label: el.id || el.tagName.toLowerCase(),
-          cursor: getComputedStyle(el).cursor,
-        });
+  const { labels, excluded, enabled, fill, ink } = await page.evaluate(
+    (only) => {
+      const labels: string[] = [];
+      const excluded: string[] = [];
+      const enabled: { label: string; cursor: string }[] = [];
+      document.querySelectorAll<HTMLElement>(':disabled').forEach((el, i) => {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'option') {
+          excluded.push(tag);
+          return;
+        }
+        const cls =
+          typeof el.className === 'string'
+            ? el.className.trim().split(/\s+/)[0]
+            : '';
+        const label = el.id || `${tag}${cls ? `.${cls}` : ''}#${i}`;
+        // Measuring only some (#1046): each control is reached by a real drag,
+        // and at the roster limit the page is a hundred rows long.
+        if (only !== null && !el.matches(only)) return;
+        el.setAttribute('data-disabled-250', label);
+        labels.push(label);
       });
 
-    return { labels, excluded, enabled, fill, ink };
-  });
+      const inkProbe = document.createElement('span');
+      inkProbe.style.color = getComputedStyle(document.documentElement)
+        .getPropertyValue('--ink-soft')
+        .trim();
+      document.body.append(inkProbe);
+      const ink = getComputedStyle(inkProbe).color;
+      inkProbe.remove();
+
+      // Resolve the token through the renderer, so `#2a323f` and
+      // `rgb(42, 50, 63)` are the same value here and no parsing of ours can
+      // disagree with the browser.
+      const probe = document.createElement('span');
+      probe.style.background = getComputedStyle(document.documentElement)
+        .getPropertyValue('--disabled-fill')
+        .trim();
+      document.body.append(probe);
+      const fill = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+
+      document
+        .querySelectorAll<
+          | HTMLButtonElement
+          | HTMLInputElement
+          | HTMLSelectElement
+          | HTMLTextAreaElement
+        >('button, select, textarea, input')
+        .forEach((el) => {
+          if (el.disabled) return;
+          enabled.push({
+            label: el.id || el.tagName.toLowerCase(),
+            cursor: getComputedStyle(el).cursor,
+          });
+        });
+
+      return { labels, excluded, enabled, fill, ink };
+    },
+    only,
+  );
 
   const reachable: Affordance[] = [];
   for (const label of labels) {
@@ -288,15 +331,13 @@ const expectNoEntryCursor = (
     of: reachable.map((a) => a.label),
     what: `disabled controls (${scenario})`,
   });
-  expect(reachable.map((a) => `${a.label}: ${a.cursor}`)).toEqual(
-    reachable.map((a) => `${a.label}: not-allowed`),
-  );
-  // Ordered AFTER the invariant on purpose. This is a validity check on the
-  // reading, and an assertion placed before a weaker one is the only one that
-  // ever runs (#156): the cursor is the thing AC7 protects.
-  expect(reachable.map((a) => `${a.label}: ${a.relation}`)).toEqual(
-    reachable.map((a) => `${a.label}: self`),
-  );
+  expect
+    .soft(reachable.map((a) => `${a.label}: ${a.cursor}`))
+    .toEqual(reachable.map((a) => `${a.label}: not-allowed`));
+  // A validity check on the reading: the cursor is the thing AC7 protects.
+  expect
+    .soft(reachable.map((a) => `${a.label}: ${a.relation}`))
+    .toEqual(reachable.map((a) => `${a.label}: self`));
 };
 
 /**
@@ -322,20 +363,20 @@ const expectDisabledPaint = (
     of: painted.map((a) => a.label),
     what: `page-painted disabled controls (${scenario})`,
   });
-  expect(painted.map((a) => `${a.label}: ${a.background}`)).toEqual(
-    painted.map((a) => `${a.label}: ${fill}`),
-  );
-  expect(painted.map((a) => `${a.label}: ${a.opacity}`)).toEqual(
-    painted.map((a) => `${a.label}: 1`),
-  );
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.background}`))
+    .toEqual(painted.map((a) => `${a.label}: ${fill}`));
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.opacity}`))
+    .toEqual(painted.map((a) => `${a.label}: 1`));
   // The ratio the contrast suite computes is `--ink-soft` on
   // `--disabled-fill`. This is what makes that pair the one a teacher
   // actually receives: without it the suite would be scoring two tokens
   // against each other while Safari painted the label in the UA's own
   // disabled grey, which is a guard measuring a pixel that does not exist.
-  expect(painted.map((a) => `${a.label}: ${a.ink}`)).toEqual(
-    painted.map((a) => `${a.label}: ${ink}`),
-  );
+  expect
+    .soft(painted.map((a) => `${a.label}: ${a.ink}`))
+    .toEqual(painted.map((a) => `${a.label}: ${ink}`));
 };
 
 type Reason = {
@@ -401,17 +442,19 @@ const expectAReasonWithoutHover = (
     of: seen.map((r) => r.label),
     what: `disabled controls needing a reason (${scenario})`,
   });
-  expect(
-    seen.map((r) => `${r.label}: ${r.names} → ${r.resolves || '(unwired)'}`),
-  ).toEqual(
-    seen.map(
-      (r) =>
-        `${r.label}: ${r.names} → ${r.names
-          .split(' ')
-          .map((id) => `${id}=visible`)
-          .join(' ')}`,
-    ),
-  );
+  expect
+    .soft(
+      seen.map((r) => `${r.label}: ${r.names} → ${r.resolves || '(unwired)'}`),
+    )
+    .toEqual(
+      seen.map(
+        (r) =>
+          `${r.label}: ${r.names} → ${r.names
+            .split(' ')
+            .map((id) => `${id}=visible`)
+            .join(' ')}`,
+      ),
+    );
 };
 
 test.describe('a disabled control affords that it is disabled', () => {
@@ -431,9 +474,8 @@ test.describe('a disabled control affords that it is disabled', () => {
     // liveness control doing exactly its job. Stated positively instead, so
     // a control that STOPS being UA-painted turns this red rather than
     // slipping past an assertion that was never reached.
-    // The population inside the verdict (#446): absence-liveness could not
-    // see through `const { reachable } = await affordances(page)` until AC6,
-    // so this absence went unjudged, held up only by the call above.
+    // The population inside the verdict (#446), so an empty `reachable`
+    // cannot pass in silence.
     expect(
       searched(
         reachable.filter((a) => !a.uaPainted).map((a) => a.label),
@@ -446,41 +488,81 @@ test.describe('a disabled control affords that it is disabled', () => {
     expectAReasonWithoutHover(await reasons(page), 'default');
   });
 
-  // One test per theme (#419): a hundred-row roster under two themes was one
-  // budget.
-  for (const theme of THEMES)
-    test(`${theme}: roster at the limit — the add buttons and Make groups too`, async ({
-      page,
-    }) => {
-      // On the phone each disabled control is reached by a real drag, about a
-      // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
-      // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
-      test.slow(
-        onRealDevice(),
-        'a real drag to each of ~100 disabled controls',
-      );
-      await openRoster(page);
-      // `openRoster` already added one, so this lands exactly ON the limit
-      // rather than asking the page to clamp an overshoot.
-      await addSeveral(page, MAX_ROSTER - 1);
-      await openEveryDisclosure(page);
+  test('one student — what is disabled, what the UA paints, and the cursor apart from the enabled controls, then both themes', async ({
+    page,
+  }) => {
+    await openRoster(page);
+    await openEveryDisclosure(page);
+
+    const { reachable, enabled } = await affordances(page);
+
+    // The fill carve-out, asserted rather than assumed. Without this the
+    // `uaPainted` branch could grow to swallow a control that SHOULD be
+    // painted, and `expectDisabledPaint` would quietly stop covering it.
+    const carvedOut = reachable.filter((a) => a.uaPainted).map((a) => a.label);
+    searched(carvedOut, {
+      of: carvedOut,
+      what: 'UA-painted disabled controls',
+    });
+    expect.soft(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
+
+    // The no-entry cursor marks the disabled controls apart from the enabled
+    // ones, both read from the SAME snapshot, so the contrast is one screen a
+    // teacher is looking at rather than two page states.
+    const leaked = enabled
+      .filter((control) => control.cursor === 'not-allowed')
+      .map((control) => control.label);
+    expect
+      .soft(
+        searched(leaked, {
+          of: enabled.map((control) => control.label),
+          what: 'enabled controls',
+        }),
+      )
+      .toEqual([]);
+    expectNoEntryCursor(reachable, 'one student, against the enabled controls');
+
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const { reachable, fill, ink } = await affordances(page);
+      expect.soft(labelsOf(reachable)).toEqual(ONE_STUDENT_DISABLES);
+      expectNoEntryCursor(reachable, `one student, ${theme}`);
+      expectDisabledPaint(reachable, fill, ink, `one student, ${theme}`);
+      // `reasons` reads the tags `affordances` just wrote, so it runs after.
+      expectAReasonWithoutHover(await reasons(page), 'one student');
+    }
+  });
+
+  test('roster at the limit — the add buttons, in both themes', async ({
+    page,
+  }) => {
+    test.slow(onRealDevice(), LIMIT_IS_SLOW);
+    await openRoster(page);
+    // `openRoster` already added one, so this lands exactly ON the limit
+    // rather than asking the page to clamp an overshoot.
+    // Every section first: the toggles sit at the top, and the add buttons
+    // end the last real tap on screen, so no drag runs down 100 rows.
+    await openEveryDisclosure(page);
+    await addSeveral(page, MAX_ROSTER - 1);
+    for (const theme of THEMES) {
+      await emulateTheme(page, theme);
+      const { reachable, fill, ink } = await affordances(page, AT_THE_LIMIT);
+      expect.soft(labelsOf(reachable)).toEqual(AT_THE_LIMIT_LABELS);
       expectNoEntryCursor(reachable, `at-limit, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `at-limit, ${theme}`);
-      // `reasons` reads the tags `affordances` just wrote, so it runs after.
       expectAReasonWithoutHover(await reasons(page), 'at-limit');
-    });
+    }
+  });
 
-  for (const theme of THEMES)
-    test(`${theme}: the disabled placeholder option is excluded deliberately, and it exists`, async ({
-      page,
-    }) => {
-      await openRoster(page);
-      // Choosing a sex is what disables that row's "—" option (roster-ui.ts).
-      // Without this the exclusion branch never fires, and a detector branch
-      // that has never matched anything is itself vacuous (#118).
-      await setSex(page, 0, 'M');
+  test('the disabled placeholder option is excluded deliberately, and it exists, in both themes', async ({
+    page,
+  }) => {
+    await openRoster(page);
+    // Choosing a sex is what disables that row's "—" option (roster-ui.ts).
+    // Without this the exclusion branch never fires, and a detector branch
+    // that has never matched anything is itself vacuous (#118).
+    await setSex(page, 0, 'M');
+    for (const theme of THEMES) {
       await emulateTheme(page, theme);
       const { reachable, excluded, fill, ink } = await affordances(page);
       searched(excluded, {
@@ -489,79 +571,34 @@ test.describe('a disabled control affords that it is disabled', () => {
       });
       // Exactly one row, so exactly one placeholder — and nothing BUT an
       // `<option>` may sit in the excluded set.
-      expect(excluded).toEqual(['option']);
+      expect.soft(excluded).toEqual(['option']);
       expectNoEntryCursor(reachable, `a sex chosen, ${theme}`);
       expectDisabledPaint(reachable, fill, ink, `a sex chosen, ${theme}`);
-    });
-
-  test('only checkbox, radio and file inputs are left to the UA to paint', async ({
-    page,
-  }) => {
-    // On the phone each disabled control is reached by a real drag, about a
-    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
-    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
-    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
-    // The fill carve-out, asserted rather than assumed. Without this the
-    // `uaPainted` branch could grow to swallow a control that SHOULD be
-    // painted, and `expectDisabledPaint` would quietly stop covering it.
-    await openRoster(page);
-    await addSeveral(page, MAX_ROSTER - 1);
-    await openEveryDisclosure(page);
-
-    const { reachable } = await affordances(page);
-    const carvedOut = reachable.filter((a) => a.uaPainted).map((a) => a.label);
-    searched(carvedOut, {
-      of: carvedOut,
-      what: 'UA-painted disabled controls',
-    });
-    expect(carvedOut).toEqual(['cg-sex-mix', 'cg-sex-separate']);
-  });
-
-  test('the no-entry cursor marks the disabled controls apart from the enabled ones', async ({
-    page,
-  }) => {
-    // On the phone each disabled control is reached by a real drag, about a
-    // hundred of them at the roster limit: measured 45.9 s and 44.1 s on the
-    // Android (2026-11-03, #996), so the phone gets slow()'s 90 s.
-    test.slow(onRealDevice(), 'a real drag to each of ~100 disabled controls');
-    await openRoster(page);
-    await addSeveral(page, MAX_ROSTER - 1);
-    await openEveryDisclosure(page);
-
-    const { reachable, enabled } = await affordances(page);
-
-    // The NEW invariant first. A test stops at its first failed expectation
-    // (#156), so an assertion ordered after one this file already makes
-    // would only ever be evaluated while that one holds.
-    const leaked = enabled
-      .filter((control) => control.cursor === 'not-allowed')
-      .map((control) => control.label);
-    expect(
-      searched(leaked, {
-        of: enabled.map((control) => control.label),
-        what: 'enabled controls',
-      }),
-    ).toEqual([]);
-
-    // ...and the other half, read from the SAME snapshot, so the contrast is
-    // one screen a teacher is looking at rather than two page states.
-    expectNoEntryCursor(reachable, 'at-limit, against the enabled controls');
+    }
   });
 
   // Every locale (#390 F135): a fit test, and each language's disabled
   // reasons and labels are its own widths. One test per page, because a
-  // hundred-row roster five times over would share one budget.
-  for (const path of localePaths('/classroom-groups'))
-    test(
-      `at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
+  // hundred-row roster five times over would share one budget. The add
+  // buttons disable only at the limit, so they are measured apart (#1046).
+  for (const atLimit of [false, true])
+    for (const path of localePaths('/classroom-groups'))
+      test(`at 320px every disabled control keeps a 44px target, and the page does not scroll sideways -- ${atLimit ? 'the add buttons at the limit' : 'one student'} -- ${path}`, async ({
+        page,
+      }) => {
+        test.slow(atLimit && onRealDevice(), LIMIT_IS_SLOW);
+        const took = await atViewport(page, { width: 320, height: 900 });
         await openRoster(page, path);
-        await addSeveral(page, MAX_ROSTER - 1);
         await openEveryDisclosure(page);
+        if (atLimit) await addSeveral(page, MAX_ROSTER - 1);
 
-        const { reachable } = await affordances(page);
+        const { reachable } = await affordances(
+          page,
+          atLimit ? AT_THE_LIMIT : null,
+        );
+        expect(labelsOf(reachable)).toEqual(
+          atLimit ? AT_THE_LIMIT_LABELS : ONE_STUDENT_DISABLES,
+        );
 
         // UA-painted inputs are carved out for the reason the fill carve-out
         // exists: the raw checkbox is not what a finger lands on. `.switch`'s
@@ -580,13 +617,12 @@ test.describe('a disabled control affords that it is disabled', () => {
         expect(
           searched(small, {
             of: measured.map((a) => a.label),
-            what: 'disabled controls at 320px',
+            what: `disabled controls at ${took.width}px`,
           }),
         ).toEqual([]);
 
         // The instrument classroom-groups-controls.spec.ts already uses, so
         // the second home cannot disagree with the first about what counts.
         await expectNoHorizontalScroll(page);
-      },
-    );
+      });
 });

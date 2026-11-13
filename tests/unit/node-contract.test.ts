@@ -7,7 +7,7 @@ import { withoutIniComments, withoutYamlComments } from './source-text';
 /**
  * The Node version this repo runs on is stated ONCE, and everything agrees.
  *
- * `.github/node/Dockerfile` is the single source of truth (#990): one exact
+ * `docker/node/Dockerfile` is the single source of truth (#990): one exact
  * release, which Dependabot bumps, read by the one setup action every CI job
  * uses, so CI cannot drift. But that pin is invisible to npm:
  * a contributor on volta, asdf, fnm, or a system Node installs
@@ -36,7 +36,7 @@ import { withoutIniComments, withoutYamlComments } from './source-text';
 
 const WORKFLOWS = '.github/workflows';
 
-const PIN = '.github/node/Dockerfile';
+const PIN = 'docker/node/Dockerfile';
 const SETUP_ACTION = '.github/actions/setup-node/action.yml';
 
 /**
@@ -46,7 +46,10 @@ const SETUP_ACTION = '.github/actions/setup-node/action.yml';
 const actionPattern = (): RegExp => {
   const action = withoutYamlComments(readFileSync(SETUP_ACTION, 'utf8'));
   const sed = action.match(
-    /sed -nE 's\/(.+?)\/\\1\/p' \.github\/node\/Dockerfile/,
+    new RegExp(
+      String.raw`sed -nE 's\/(.+?)\/\\1\/p' ` +
+        PIN.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'),
+    ),
   );
   if (sed?.[1] === undefined)
     throw new Error(`${SETUP_ACTION} no longer reads ${PIN} with sed -nE`);
@@ -171,7 +174,7 @@ describe('the Node version contract is stated once and agreed everywhere', () =>
   // One exact release, so CI's Node changes only in the pull request that
   // bumps it (#982, global rule 2026-10-29). The literal moves with each bump.
   it('names the exact release every project runs (#982, #990)', () => {
-    expect(exactNodeVersion(readFileSync(PIN, 'utf8'))).toBe('26.12.1');
+    expect(exactNodeVersion(readFileSync(PIN, 'utf8'))).toBe('26.13.0');
   });
 
   const DIGEST =

@@ -69,8 +69,8 @@ export const expectNoHorizontalScroll = async (
 };
 
 /**
- * The element inside `#cardId` reaching furthest past the card's padding
- * edge, and by how much: the containment question `horizontalOverflow`
+ * The element inside `#cardId` reaching furthest past either padding edge
+ * of the card, left or right, and by how much: the containment question `horizontalOverflow`
  * cannot answer, since content can overflow a card by 34.5px while the
  * document stays still. Two copies in `classroom-groups-controls.spec.ts`
  * disagreed about what counts as rendered (#390 F110).
@@ -88,15 +88,35 @@ export const spillPastCard = (
     if (card === null) throw new Error(`no #${id} to measure against`);
     const box = card.getBoundingClientRect();
     const style = getComputedStyle(card);
-    const inner =
+    // Both edges (#1103, #390 F53): a child pushed past the left edge
+    // spills as surely as one past the right.
+    const innerRight =
       box.right -
       parseFloat(style.paddingRight) -
       parseFloat(style.borderRightWidth);
+    const innerLeft =
+      box.left +
+      parseFloat(style.paddingLeft) +
+      parseFloat(style.borderLeftWidth);
     let over = 0;
     let who = '';
+    // Clipped to nothing paints nothing: `.visually-hidden` (clip-path
+    // inset(50%), margin -1px) sits 1px past the left edge and shows no
+    // pixel there (#1103).
+    const clippedAway = (el: Element): boolean => {
+      for (
+        let at: Element | null = el;
+        at && at !== card;
+        at = at.parentElement
+      )
+        if (getComputedStyle(at).clipPath.startsWith('inset(50%')) return true;
+      return false;
+    };
     for (const el of card.querySelectorAll('*')) {
       if (el.getClientRects().length === 0) continue;
-      const spill = el.getBoundingClientRect().right - inner;
+      if (clippedAway(el)) continue;
+      const rect = el.getBoundingClientRect();
+      const spill = Math.max(rect.right - innerRight, innerLeft - rect.left);
       if (spill > over) {
         over = spill;
         who = String(el.className).split(' ')[0] || el.tagName;
@@ -110,12 +130,7 @@ export const spillPastCard = (
  * target floor, and WCAG 2.2 SC 2.5.8's.
  *
  * Two byte-identical copies before #277 (`chrome.spec.ts` and
- * `yeetalk-calculators.spec.ts`), and a THIRD in `homepage.spec.ts` that stays where
- * it is on purpose: it sits inline inside a `.all()` loop because the
- * unproved-loop scanner in `event-collectors.test.ts` matches that exact
- * shape, and hoisting it out would make the loop invisible to a guard that
- * would then silently stop asking for a liveness proof. Its comment says so;
- * this is the cross-reference.
+ * `yeetalk-calculators.spec.ts`), and a THIRD inline in `homepage.spec.ts`'s `.all()` loop.
  *
  * TEN further sites asserted the height alone, unrounded -- a strictly
  * WEAKER claim that a 20px-wide button passes -- and #294 widened every one
@@ -150,4 +165,39 @@ export const atLeast44 = async (
   const box = await locator.boundingBox();
   expect(box, `${what} has a box`).not.toBeNull();
   rectAtLeast44(box!, what);
+};
+
+// A merged journey checks many things in one visit, so its checks can be
+// soft: one small control or one sideways scroll does not hide the checks
+// after it. Same assertions as `atLeast44`, `rectAtLeast44` and
+// `expectNoHorizontalScroll` (above), which stop at the first.
+export const rectAtLeast44Soft = (
+  rect: { readonly width: number; readonly height: number },
+  what: string,
+): void => {
+  expect
+    .soft(Math.round(rect.width), `${what} width`)
+    .toBeGreaterThanOrEqual(44);
+  expect
+    .soft(Math.round(rect.height), `${what} height`)
+    .toBeGreaterThanOrEqual(44);
+};
+
+export const atLeast44Soft = async (
+  locator: Locator,
+  what: string,
+): Promise<void> => {
+  const box = await locator.boundingBox();
+  expect.soft(box, `${what} has a box`).not.toBeNull();
+  if (box) rectAtLeast44Soft(box, what);
+};
+
+export const expectNoScrollSoft = async (
+  page: Page,
+  note: string,
+): Promise<void> => {
+  const overflow = await horizontalOverflow(page);
+  expect
+    .soft(overflow, `${note} scrolls sideways by ${overflow}px`)
+    .toBeLessThanOrEqual(0);
 };

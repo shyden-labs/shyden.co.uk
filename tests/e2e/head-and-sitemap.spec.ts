@@ -2,8 +2,6 @@ import { test, expect } from './fixtures';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { LOCALES, localisePath } from '../../src/lib/i18n/index';
 import { filesUnder, searched } from '../source-files';
-import { PUBLISHED_ROUTES } from './published-paths';
-import { docsPaths } from '../site-pages';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 
@@ -98,20 +96,7 @@ test.describe('the sitemap', () => {
   });
 });
 
-test.describe('the API docs head (#781)', () => {
-  for (const path of docsPaths())
-    test(`${path} asks not to be indexed, and claims no other language`, async ({
-      page,
-    }) => {
-      await page.goto(path);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
-        'content',
-        'noindex',
-      );
-      await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
-      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    });
-});
+// The API docs head (#781) is read on each docs page's walk: checks/head.ts (#1086).
 
 test.describe('each API spec is served only inside its own page (#781)', () => {
   // The private spec has no URL of its own: it reaches visitors only inside
@@ -135,68 +120,25 @@ test.describe('each API spec is served only inside its own page (#781)', () => {
     });
 });
 
-test.describe('the 404 head', () => {
-  test('asks not to be indexed, and points nowhere that does not exist', async ({
-    page,
-  }) => {
-    // Cloudflare serves this one file for ANY unknown path, so it has no URL
-    // of its own to be canonical about. It used to declare
-    // canonical=/404/ and hreflang=id → /id/404/, neither of which is a page.
-    await page.goto('/definitely-not-a-page');
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
-      'content',
-      'noindex',
-    );
-    await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
-    await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
-    await expect(page.locator('meta[property="og:url"]')).toHaveCount(0);
-  });
+// The 404 head, and a real page's, are read on their walks: checks/head.ts (#1086).
 
-  test('real pages still declare theirs', async ({ page }) => {
-    // The opt-out must not have leaked into every other page.
-    await page.goto('/classroom-groups');
-    await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
-    await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
-    // One per locale plus `x-default`, derived: this read 3 while the site
-    // shipped two languages, and 3 is not a fact about the page — it is
-    // LOCALES.length + 1, and it was going to be wrong on the next language.
-    await expect(page.locator('link[rel="alternate"]')).toHaveCount(
-      LOCALES.length + 1,
-    );
-  });
-});
+// Every published page's viewport meta is read on its walk: checks/head.ts (#1086).
 
-/**
- * The viewport every page has to declare, as `BaseLayout.astro` does.
- *
- * Without it a mobile browser lays the page out at a legacy desktop width
- * (980px on the Android phone, measured on `about:blank`, which has no tag),
- * and the visitor sees every page zoomed out. No test asserted it before #233.
- *
- * `interactive-widget=resizes-content` (#807, operator 2026-10-18): Android
- * Chrome's keyboard otherwise covers the bottom of the page without shrinking
- * it, and `/classroom-groups`' docked Make Groups bar sat hidden behind the
- * keyboard while a teacher typed (bar at 703 px, 471 px left visible, measured
- * on the phone). Safari ignores the key.
- */
-const DEVICE_WIDTH =
-  'width=device-width, initial-scale=1, interactive-widget=resizes-content';
-
-test.describe('every published page', () => {
-  // One test per published page (#422); `the published routes are the
-  // sitemap's` in rendered-text.spec.ts holds the list to the build.
-  for (const path of PUBLISHED_ROUTES)
-    test(`${path}: declares exactly one viewport, at the device width`, async ({
-      page,
-    }) => {
-      await page.goto(path);
-      // `i`: HTML compares meta names without regard to case, so a second tag
-      // spelled `Viewport` is still a second viewport.
-      const contents = await page
-        .locator('meta[name="viewport" i]')
-        .evaluateAll((metas) =>
-          metas.map((meta) => meta.getAttribute('content')),
-        );
-      expect(contents).toEqual([DEVICE_WIDTH]);
-    });
+// Moved from tests/device/real-device.spec.ts (#1049): the fixture is built apart from the
+// `browser`/`context` overrides, so every target measures that it still resolves `baseURL`.
+test('the bare request fixture resolves a relative URL against baseURL', async ({
+  request,
+}) => {
+  // Moved from tests/device/real-device.spec.ts (#1049): the fixture is built apart from the
+  // `browser`/`context` overrides, so every target measures that it still resolves `baseURL`.
+  const res = await request.get('/sitemap-0.xml');
+  expect(
+    res.ok(),
+    `expected the bare \`request\` fixture to resolve '/sitemap-0.xml' against baseURL and ` +
+      `return 2xx -- got HTTP ${res.status()}`,
+  ).toBe(true);
+  expect(
+    await res.text(),
+    'expected a <loc> entry for a known page in the sitemap body, not an empty or unrelated response',
+  ).toContain('<loc>https://shyden.co.uk/classroom-groups/</loc>');
 });

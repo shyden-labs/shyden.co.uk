@@ -4,9 +4,7 @@
  * A synchronous call to a wedged phone blocks the event loop that would have
  * fired the test timeout, so the gauntlet hangs with nothing to say why. Here
  * a call that runs past its deadline is stopped, and the error names the
- * command. `scripts/adb.mjs` and `scripts/devicectl.mjs` are its callers;
- * `tests/guards/device-tool-homes.test.ts` refuses any other file that runs
- * either tool.
+ * command. `scripts/adb.mjs` and `scripts/devicectl.mjs` are its callers.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -36,8 +34,31 @@ export function runWithDeadline(file, args, { timeoutMs, whenSilent }) {
     throw new Error(
       timedOut
         ? `${command} gave no answer within ${timeoutMs} ms: ${whenSilent}`
-        : `${command} failed: ${messageOf(error)}`,
+        : `${command} failed${printed(error)}`,
       { cause: error },
     );
   }
+}
+
+/**
+ * What a failed command said, in its own words: its exit status and each
+ * stream it printed on. A phone run once failed on "uiautomator dump failed:
+ * Command failed" and nothing more, because these were dropped (#1027).
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
+function printed(error) {
+  if (!(error instanceof Error) || !('status' in error))
+    return `: ${messageOf(error)}`;
+  const fields = /** @type {Record<string, unknown>} */ (
+    /** @type {unknown} */ (error)
+  );
+  const streams = ['stderr', 'stdout']
+    .map((name) => [name, String(fields[name] ?? '').trim()])
+    .filter(([, text]) => text !== '')
+    .map(([name, text]) => `${name} ${JSON.stringify(text)}`);
+  return ` with exit status ${error.status}: ${
+    streams.length === 0 ? 'it printed nothing' : streams.join(' ')
+  }`;
 }

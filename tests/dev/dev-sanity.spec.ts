@@ -1,3 +1,4 @@
+import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
@@ -122,7 +123,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'functions/_middleware.js serves the dev robots.txt, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves functions/_middleware.js serves this robots.txt before the merge (#394); only the deployed site proves dev.shyden.co.uk itself serves it',
     },
   },
   async ({ request }) => {
@@ -172,7 +173,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'the Basic-auth gate is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves the Basic-auth gate, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself is gated',
     },
   },
   async () => {
@@ -196,7 +197,7 @@ for (const [from, to] of LEGACY_REDIRECTS)
       annotation: {
         type: 'deployed-only',
         description:
-          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+          'the functions suite proves the redirect, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself answers it',
       },
     },
     async () => {
@@ -229,8 +230,8 @@ for (const product of PRODUCTS)
 test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
   test('Student details builds a roster', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: /Add student/ }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: /Add student/ }));
     await expect(page.locator('.cg-student')).toHaveCount(1);
     // The roster's own controls, not just a row: a partial bundle can render
     // the table and wire nothing.
@@ -241,7 +242,7 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
 
   test('Import / export offers its controls', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await expect(
       page.getByRole('button', { name: 'Export class list' }),
     ).toBeVisible();
@@ -255,14 +256,13 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
     await makeGroups(page, '8', '4');
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeVisible();
-    await page
-      .locator('#cg-print-panel')
-      .getByRole('button', { name: 'Cancel' })
-      .click();
+    await tapOn(
+      page.locator('#cg-print-panel').getByRole('button', { name: 'Cancel' }),
+    );
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -277,7 +277,7 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
   for (const locale of LOCALES.filter((l) => l !== 'en')) {
     test(`the ${locale} tool carries its own copy`, async ({ page }) => {
       await page.goto(localisePath('/classroom-groups', locale));
-      await page.locator('#cg-io-toggle').click();
+      await tapOn(page.locator('#cg-io-toggle'));
       await expect(
         page.getByRole('button', {
           name: getStrings(locale).ioExportClassList,
@@ -326,13 +326,13 @@ test(
     const t = getSiteStrings('vi').report;
     const home = localisePath('/', 'vi');
     await page.goto(home);
-    await page.locator('[data-report] summary').click();
+    await tapOn(page.locator('[data-report] summary'));
     await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
     await typeInto(
       page.getByLabel(t.noteLabel, { exact: true }),
       `automated dev check ${process.env.GITHUB_SHA ?? 'local'}`,
     );
-    await page.getByRole('button', { name: t.send }).click();
+    await tapOn(page.getByRole('button', { name: t.send }));
     await expect(page).toHaveURL(
       (url) => url.pathname === home && url.hash === '#report-sent',
     );
@@ -358,12 +358,12 @@ test(
   },
   async ({ page }) => {
     await page.goto('/api/docs/');
-    await page.locator('#swagger .opblock-summary-control').first().click();
-    await page.locator('#swagger .try-out__btn').click();
+    await tapOn(page.locator('#swagger .opblock-summary-control').first());
+    await tapOn(page.locator('#swagger .try-out__btn'));
     await typeInto(page.getByPlaceholder('quote', { exact: true }), 'x');
     // The honeypot: dev answers sent and stores nothing.
     await typeInto(page.getByPlaceholder('website', { exact: true }), 'a bot');
-    await page.locator('#swagger .btn.execute').click();
+    await tapOn(page.locator('#swagger .btn.execute'));
     const live = page.locator('#swagger .live-responses-table .response');
     await expect(live).toHaveCount(1);
     await expect(live.locator('.response-col_status')).toHaveText('200');
