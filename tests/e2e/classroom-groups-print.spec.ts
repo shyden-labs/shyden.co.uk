@@ -475,7 +475,9 @@ test.describe('the printed class list', () => {
 
   // Q-16/Q-17: the two What-to-print choices actually exclude each other's
   // section. Without this a sheet asked for one could quietly carry both.
-  test('Class list and Group results each print only their own section', async ({
+  // Both is the third choice of the same sheet, so it is the journey's third
+  // step rather than a test that made the same groups again (#1086).
+  test('Class list and Group results each print only their own section, and Both prints both', async ({
     page,
   }) => {
     await giveEveryoneASex(page);
@@ -502,11 +504,8 @@ test.describe('the printed class list', () => {
     // design spec section 4. The absent tick box governs the class list
     // only, which is why this holds with it ON.
     await expect.soft(page.locator('.print-groups')).not.toContainText('Dewi');
-  });
 
-  test('Both prints both', async ({ page }) => {
-    await giveEveryoneASex(page);
-    await tapOn(page.getByRole('button', { name: 'Make Groups' }));
+    await page.emulateMedia({ media: 'screen' });
     await sheet(page, {
       what: 'Both',
       absent: true,

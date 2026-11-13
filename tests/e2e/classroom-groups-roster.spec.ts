@@ -1,4 +1,3 @@
-import type { Locator, Page } from '@playwright/test';
 import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
@@ -12,7 +11,12 @@ import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
 import { contrast, parseColour } from '../wcag';
 import { getStrings, localeFromPath } from '../../src/lib/i18n';
-import { expectNoHorizontalScroll, horizontalOverflow } from '../viewport';
+import {
+  atLeast44Soft,
+  expectNoHorizontalScroll,
+  expectNoScrollSoft,
+  rectAtLeast44Soft,
+} from '../viewport';
 import {
   addSeveral,
   contrastRatio,
@@ -26,35 +30,6 @@ import {
 import { atViewport } from '../viewport-at';
 
 test.use(recorded);
-
-// The merged journeys below check many things in one visit, so their checks
-// are soft: one small control or one sideways scroll does not hide the checks
-// after it. Same assertions as `atLeast44`, `rectAtLeast44` and
-// `expectNoHorizontalScroll` (tests/viewport.ts), which stop at the first.
-const rectAtLeast44Soft = (
-  rect: { readonly width: number; readonly height: number },
-  what: string,
-): void => {
-  expect
-    .soft(Math.round(rect.width), `${what} width`)
-    .toBeGreaterThanOrEqual(44);
-  expect
-    .soft(Math.round(rect.height), `${what} height`)
-    .toBeGreaterThanOrEqual(44);
-};
-
-const atLeast44Soft = async (locator: Locator, what: string): Promise<void> => {
-  const box = await locator.boundingBox();
-  expect.soft(box, `${what} has a box`).not.toBeNull();
-  if (box) rectAtLeast44Soft(box, what);
-};
-
-const expectNoScrollSoft = async (page: Page, note: string): Promise<void> => {
-  const overflow = await horizontalOverflow(page);
-  expect
-    .soft(overflow, `${note} scrolls sideways by ${overflow}px`)
-    .toBeLessThanOrEqual(0);
-};
 
 /**
  * Stage 3, Task 2: the roster table. Traceability: R-01, R-02, R-09, R-10,
