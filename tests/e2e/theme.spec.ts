@@ -560,7 +560,16 @@ test.describe('nothing moves when the theme changes (#386)', () => {
             content:
               '*, *::before, *::after { animation: none !important; transition: none !important; }',
           });
-          await page.evaluate(() => document.fonts.ready);
+          // Every face the page declares is loaded before the first reading.
+          // `fonts.ready` only waits for faces already requested, and text in
+          // a closed <details> requests none. On the Android phone /api/docs'
+          // licence <pre>s (Space Mono, in closed <details>) grew 20-41px in
+          // height, never in position, between the dark and light readings
+          // (#1150): the shape of text laid out in a fallback face and then
+          // in its own. Loading each face is an event to wait on, not a sleep.
+          await page.evaluate(() =>
+            Promise.all([...document.fonts].map((face) => face.load())),
+          );
           await emulateTheme(page, 'dark');
           const dark = await boxes(page);
           await tapOn(toggle(page));
