@@ -1894,8 +1894,14 @@ test.describe('the on-screen keyboard', () => {
     await page.addInitScript(() => {
       const view = new EventTarget();
       let hidden = 0;
+      // Every edge a real visual viewport has, not only the two the page
+      // reads: the touch harness reads the left edge and the width to plan a
+      // drag, and without them it sent NaN, which the phone's Chrome refused
+      // (`Input.dispatchTouchEvent: Invalid parameters`, Android, 2026-11-13).
       Object.defineProperties(view, {
         offsetTop: { get: () => 0 },
+        offsetLeft: { get: () => 0 },
+        width: { get: () => innerWidth },
         height: { get: () => innerHeight - hidden },
       });
       // `visualViewport` is a [Replaceable] attribute, so the page script
