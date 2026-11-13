@@ -3,6 +3,7 @@ import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
+import { eachWidth } from '../each-width';
 import { recorded, shoot } from './evidence';
 import { recordErrors } from './recorders';
 import { searched } from '../source-files';
@@ -1691,52 +1692,58 @@ test.describe('an unset roster dropdown says which column it is for', () => {
   // table, so both layouts are measured, and 600px and 430px sit inside the
   // card band that used to be the table's.
   const TRUNCATION_WIDTHS = [320, 375, 390, 430, 600, 768, 1024, 1280];
+  // Its widths inside one test since #1086 (Shyden 2026-11-13): a real phone
+  // keeps its own width (#1046), so it walks this once.
   for (const path of localePaths('/classroom-groups'))
-    for (const width of TRUNCATION_WIDTHS)
-      test(`no dropdown ever truncates its own column name -- ${path} at ${width}px`, async ({
+    test(`no dropdown ever truncates its own column name -- ${path} at every width`, async ({
+      page,
+    }) => {
+      await eachWidth(
         page,
-      }) => {
-        await atViewport(page, { width, height: 900 });
-        await openRoster(page, path);
-        const row = page.locator('.cg-student').first();
-        const boxes = await row.evaluate((el) =>
-          [...el.querySelectorAll('select')].map((select) => {
-            const style = getComputedStyle(select);
-            const probe = document.createElement('span');
-            probe.style.cssText =
-              'position:absolute;visibility:hidden;white-space:pre';
-            probe.style.font = style.font;
-            probe.textContent = select.selectedOptions[0]?.textContent ?? '';
-            document.body.appendChild(probe);
-            const textWidth = probe.getBoundingClientRect().width;
-            probe.remove();
-            const chrome =
-              parseFloat(style.paddingLeft) +
-              parseFloat(style.paddingRight) +
-              parseFloat(style.borderLeftWidth) +
-              parseFloat(style.borderRightWidth);
-            return {
-              label: select.getAttribute('aria-label') ?? '(unlabelled)',
-              shows: select.selectedOptions[0]?.textContent ?? '',
-              box: Math.round(select.getBoundingClientRect().width),
-              needs: Math.round(textWidth + chrome),
-            };
-          }),
-        );
-
-        const findings = boxes
-          .filter((box) => box.needs > box.box)
-          .map(
-            (box) =>
-              `${box.label}: shows "${box.shows}" in ${box.box}px, needs ${box.needs}px`,
+        TRUNCATION_WIDTHS.map((width) => ({ width, height: 900 })),
+        async () => {
+          await openRoster(page, path);
+          const row = page.locator('.cg-student').first();
+          const boxes = await row.evaluate((el) =>
+            [...el.querySelectorAll('select')].map((select) => {
+              const style = getComputedStyle(select);
+              const probe = document.createElement('span');
+              probe.style.cssText =
+                'position:absolute;visibility:hidden;white-space:pre';
+              probe.style.font = style.font;
+              probe.textContent = select.selectedOptions[0]?.textContent ?? '';
+              document.body.appendChild(probe);
+              const textWidth = probe.getBoundingClientRect().width;
+              probe.remove();
+              const chrome =
+                parseFloat(style.paddingLeft) +
+                parseFloat(style.paddingRight) +
+                parseFloat(style.borderLeftWidth) +
+                parseFloat(style.borderRightWidth);
+              return {
+                label: select.getAttribute('aria-label') ?? '(unlabelled)',
+                shows: select.selectedOptions[0]?.textContent ?? '',
+                box: Math.round(select.getBoundingClientRect().width),
+                needs: Math.round(textWidth + chrome),
+              };
+            }),
           );
-        expect(
-          searched(findings, {
-            of: boxes.map((box) => box.label),
-            what: 'roster dropdowns measured',
-          }),
-        ).toEqual([]);
-      });
+
+          const findings = boxes
+            .filter((box) => box.needs > box.box)
+            .map(
+              (box) =>
+                `${box.label}: shows "${box.shows}" in ${box.box}px, needs ${box.needs}px`,
+            );
+          expect(
+            searched(findings, {
+              of: boxes.map((box) => box.label),
+              what: 'roster dropdowns measured',
+            }),
+          ).toEqual([]);
+        },
+      );
+    });
 });
 
 test.describe('the roster dropdowns are still reachable by thumb (#249)', () => {
