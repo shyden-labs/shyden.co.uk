@@ -296,7 +296,7 @@ jobs:
       # The report says what each test did and when: how a shard that ended
       # itself names what it was running, read again after the job (#938).
       - name: Keep the failing shard's Playwright report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-report-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
