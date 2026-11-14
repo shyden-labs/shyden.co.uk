@@ -697,6 +697,16 @@ function isAndroidPresent() {
  * syntax transform that Node's strip-only mode does not support. The session
  * can import a plain module, so the listing and its parsing live in one.
  */
+/** Whether the iOS group will drive a booted simulator (IOS_UDID names one). */
+function iosOnSimulator() {
+  try {
+    return pickSimulator(listBootedSimulators(), process.env.IOS_UDID) !== null;
+  } catch {
+    // findIphone reports an unreadable listing as the group's absence.
+    return false;
+  }
+}
+
 function findIphone() {
   // A booted simulator only when IOS_UDID names it (#1157); otherwise the
   // USB iPhone, exactly as before.
@@ -1002,6 +1012,30 @@ export function vitestVerdict({ name, code, report, reportFile }) {
     reportSays: `${failed} failed and success ${success}`,
     failures: `${failed} test(s) and ${failedFiles} file(s) failed`,
   });
+}
+
+/**
+ * Runs the chosen groups together, except `last`, which starts only once
+ * every other group has finished; results keep `groupNames`' order. Shyden's
+ * ruling on #1157 (2026-11-14): a simulator shares the Mac's CPU, so when iOS
+ * runs on one it goes last and shares the Mac with nothing.
+ *
+ * @param {string[]} groupNames
+ * @param {Record<string, () => Promise<Record<string, unknown>>>} runners
+ * @param {{ last?: string }} [options]
+ * @returns {Promise<Record<string, unknown>[]>}
+ */
+export async function runGroups(groupNames, runners, { last } = {}) {
+  const first = groupNames.filter((name) => name !== last);
+  /** @type {Record<string, Record<string, unknown>>} */
+  const byName = {};
+  const together = await Promise.all(
+    first.map((name) => contained(name, runners[name])),
+  );
+  first.forEach((name, i) => (byName[name] = together[i]));
+  if (last !== undefined && groupNames.includes(last))
+    byName[last] = await contained(last, runners[last]);
+  return groupNames.map((name) => byName[name]);
 }
 
 /**
@@ -1596,12 +1630,14 @@ async function main() {
       android: () => runAndroidGroup(excludedByDesign),
       ios: runIosGroup,
     };
+    const last = iosOnSimulator() ? 'ios' : undefined;
     process.stdout.write(
-      `==> Launching ${groupNames.join(', ')} concurrently...\n\n`,
+      last === undefined || !groupNames.includes(last)
+        ? `==> Launching ${groupNames.join(', ')} concurrently...\n\n`
+        : `==> Launching ${groupNames.filter((n) => n !== last).join(', ')} concurrently; ` +
+            `ios runs on a simulator, so it starts once they finish (#1157)...\n\n`,
     );
-    const groups = await Promise.all(
-      groupNames.map((name) => contained(name, runners[name])),
-    );
+    const groups = await runGroups(groupNames, runners, { last });
 
     await cleanup();
 

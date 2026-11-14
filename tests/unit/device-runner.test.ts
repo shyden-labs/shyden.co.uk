@@ -14,6 +14,7 @@ import {
   vitestVerdict,
   waitUntil,
   deviceRunGroups,
+  runGroups,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -673,5 +674,109 @@ describe('deviceRunGroups: every group, or the iPhone alone (#623)', () => {
     expect(deviceRunGroups(['--ios', '--ios'])).toBe(
       'usage: test-devices.mjs [--ios] (got --ios --ios)',
     );
+  });
+});
+
+/**
+ * Shyden's ruling on #1157 (2026-11-14): a simulator shares the Mac's CPU, so
+ * when the iOS group's device is a simulator it starts only after every other
+ * group has finished. With the real iPhone the groups stay concurrent.
+ */
+describe('runGroups: who runs together, and who runs last', () => {
+  function recorder() {
+    const events: string[] = [];
+    const gates: Record<string, () => void> = {};
+    const group = (name: string) => () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        events.push(`start ${name}`);
+        gates[name] = () => {
+          events.push(`end ${name}`);
+          resolve({ name, status: 'passed' });
+        };
+      });
+    return { events, gates, group };
+  }
+  const flush = () => new Promise((r) => setImmediate(r));
+
+  it('starts every group at once when none is held back', async () => {
+    const r = recorder();
+    const done = runGroups(['desktop', 'android', 'ios'], {
+      desktop: r.group('desktop'),
+      android: r.group('android'),
+      ios: r.group('ios'),
+    });
+    await flush();
+    expect(r.events).toEqual(['start desktop', 'start android', 'start ios']);
+    r.gates.ios!();
+    r.gates.android!();
+    r.gates.desktop!();
+    expect((await done).map((g) => g.name)).toEqual([
+      'desktop',
+      'android',
+      'ios',
+    ]);
+  });
+
+  it('starts the held-back group only after every other group has finished', async () => {
+    const r = recorder();
+    const done = runGroups(
+      ['desktop', 'android', 'ios'],
+      {
+        desktop: r.group('desktop'),
+        android: r.group('android'),
+        ios: r.group('ios'),
+      },
+      { last: 'ios' },
+    );
+    await flush();
+    expect(r.events).toEqual(['start desktop', 'start android']);
+    r.gates.desktop!();
+    await flush();
+    expect(r.events).not.toContain('start ios');
+    r.gates.android!();
+    await flush();
+    expect(r.events).toEqual([
+      'start desktop',
+      'start android',
+      'end desktop',
+      'end android',
+      'start ios',
+    ]);
+    r.gates.ios!();
+    expect((await done).map((g) => g.name)).toEqual([
+      'desktop',
+      'android',
+      'ios',
+    ]);
+  });
+
+  it('still runs the held-back group after one of the others fails', async () => {
+    const groups = await runGroups(
+      ['desktop', 'ios'],
+      {
+        desktop: async () => {
+          throw new Error('report unreadable');
+        },
+        ios: async () => ({ name: 'ios', status: 'passed' }),
+      },
+      { last: 'ios' },
+    );
+    expect(groups.map((g) => [g.name, g.status])).toEqual([
+      ['desktop', 'failed'],
+      ['ios', 'passed'],
+    ]);
+  });
+
+  it('runs a held-back group that was not chosen for this run not at all', async () => {
+    const r = recorder();
+    const done = runGroups(
+      ['desktop'],
+      { desktop: r.group('desktop'), ios: r.group('ios') },
+      { last: 'ios' },
+    );
+    await flush();
+    r.gates.desktop!();
+    expect((await done).map((g) => g.name)).toEqual(['desktop']);
+    expect(r.events).toEqual(['start desktop', 'end desktop']);
   });
 });
