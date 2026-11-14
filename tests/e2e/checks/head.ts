@@ -1,5 +1,10 @@
 import { expect } from '../fixtures';
-import { LOCALES } from '../../../src/lib/i18n/index';
+import { LOCALES, localeFromPath } from '../../../src/lib/i18n/index';
+import {
+  PREVIEW_HEIGHT,
+  PREVIEW_WIDTH,
+  linkPreviewFor,
+} from '../../../src/lib/preview-image';
 import { docsPaths } from '../../site-pages';
 import { NOT_FOUND_PATH, PUBLISHED_ROUTES } from '../published-paths';
 import { DEFAULT_THEME, type PageCheck } from '../page-checks';
@@ -61,10 +66,38 @@ export const HEAD_CHECKS: readonly PageCheck[] = [
         .toHaveAttribute('content', 'https://shyden.co.uk/');
       await expect
         .soft(page.locator('meta[property="og:image"]'))
-        .toHaveAttribute('content', 'https://shyden.co.uk/og-default.png');
+        .toHaveAttribute(
+          'content',
+          'https://shyden.co.uk/previews/en/home.png',
+        );
       await expect
         .soft(page.locator('meta[name="twitter:card"]'))
         .toHaveAttribute('content', 'summary_large_image');
+    },
+  },
+  {
+    // #1158: a pasted link shows a picture of the page it opens, not the
+    // flat green placeholder every page named before.
+    name: 'names a link preview of this page, which the site serves',
+    routes: () => PUBLISHED_ROUTES,
+    themes: [DEFAULT_THEME],
+    run: async ({ page, route }) => {
+      const image = linkPreviewFor(route, localeFromPath(route));
+      await expect
+        .soft(page.locator('meta[property="og:image"]'))
+        .toHaveAttribute('content', `https://shyden.co.uk${image}`);
+      await expect
+        .soft(page.locator('meta[property="og:image:width"]'))
+        .toHaveAttribute('content', String(PREVIEW_WIDTH));
+      await expect
+        .soft(page.locator('meta[property="og:image:height"]'))
+        .toHaveAttribute('content', String(PREVIEW_HEIGHT));
+      await expect
+        .soft(page.locator('meta[property="og:image:alt"]'))
+        .toHaveAttribute('content', /\S/);
+      const served = await page.request.get(image);
+      expect.soft(served.status(), `${image} is served`).toBe(200);
+      expect.soft(served.headers()['content-type']).toBe('image/png');
     },
   },
   {
