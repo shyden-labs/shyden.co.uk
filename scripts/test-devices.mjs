@@ -55,6 +55,7 @@ import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
+import { listBootedSimulators, pickSimulator } from './simctl.mjs';
 import { startWda } from './wda.mjs';
 import {
   closeSync,
@@ -697,13 +698,25 @@ function isAndroidPresent() {
  * can import a plain module, so the listing and its parsing live in one.
  */
 function findIphone() {
+  // A booted simulator only when IOS_UDID names it (#1157); otherwise the
+  // USB iPhone, exactly as before.
+  try {
+    const simulator = pickSimulator(
+      listBootedSimulators(),
+      process.env.IOS_UDID,
+    );
+    if (simulator !== null) return { device: simulator, simulator: true };
+  } catch (error) {
+    return { absence: messageOf(error) };
+  }
   let raw;
   try {
     raw = listDevices();
   } catch (error) {
     return { absence: messageOf(error) };
   }
-  return pickIphone(raw, process.env.IOS_UDID);
+  const picked = pickIphone(raw, process.env.IOS_UDID);
+  return 'absence' in picked ? picked : { ...picked, simulator: false };
 }
 
 // ── one-off discovery: how many tests does grepInvert exclude by design? ──
@@ -1174,7 +1187,10 @@ async function runIosGroup() {
   const reportFile = REPORT_FILES.ios;
   let wda;
   try {
-    wda = await startWda({ udid: found.device.udid });
+    wda = await startWda({
+      udid: found.device.udid,
+      simulator: found.simulator === true,
+    });
   } catch (error) {
     const reason = `WebDriverAgent did not start: ${messageOf(error)}`;
     process.stdout.write(`[${name}] ${reason}\n`);

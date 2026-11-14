@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { pickSimulator } from '../../scripts/simctl.mjs';
+import {
+  pickSimulator,
+  SIMULATOR_LIST_ARGS,
+  simulatorSafariArgs,
+  simulatorStartPage,
+} from '../../scripts/simctl.mjs';
 
 /**
  * The device run uses a simulator only when `IOS_UDID` names a booted one
@@ -54,4 +59,29 @@ describe('pickSimulator', () => {
     expect(() => pickSimulator('{"devices": []}', SIM)).toThrow(
       'expected `xcrun simctl list devices booted -j` to list devices by runtime -- got {"devices": []}',
     ));
+});
+
+describe('the simulator reads and launches (#1157)', () => {
+  it('lists only booted simulators, as JSON', () =>
+    expect(SIMULATOR_LIST_ARGS).toEqual([
+      'simctl',
+      'list',
+      'devices',
+      'booted',
+      '-j',
+    ]));
+
+  // Measured 2026-11-14: `openurl about:blank` is refused (LaunchServices
+  // error 115), and a Safari relaunched with no page was not listed to the
+  // Web Inspector within 30 s; one opened on a real page attached in 4.7 s.
+  it('opens Safari on a real page, through openurl', () =>
+    expect(simulatorSafariArgs('SIM-1', 'http://127.0.0.1:4321/')).toEqual([
+      'simctl',
+      'openurl',
+      'SIM-1',
+      'http://127.0.0.1:4321/',
+    ]));
+
+  it("starts on the Mac's own dev server, which a simulator reaches on loopback", () =>
+    expect(simulatorStartPage(4321)).toBe('http://127.0.0.1:4321/'));
 });

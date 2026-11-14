@@ -5,6 +5,12 @@
  * addresses it can reach, and hands the journeys a `PageDriver` on it.
  * Every precondition asserts its end state and throws a named cause.
  *
+ * When `IOS_UDID` names a booted simulator (#1157) the same session runs on
+ * it: Safari opens on the Mac's own dev server through `simctl openurl` (a
+ * simulator cannot open `about:blank` that way), the inspector dials the
+ * simulator's `webinspectord_sim` socket, and the Mac's loopback is the one
+ * address asked.
+ *
  * It replaced a `safaridriver` session (Shyden's ruling on #838, 2026-10-18):
  * Safari's automation mode holds the phone in Guided Access, which kills or
  * refuses WebDriverAgent, the taps #838 adds. Design:
@@ -19,7 +25,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { nodeDialer, openInspector, type Inspector } from './inspector/connect';
+import {
+  nodeDialer,
+  nodeSimulatorDialer,
+  openInspector,
+  openSimulatorInspector,
+  type Inspector,
+} from './inspector/connect';
 import { COMMAND_CEILING_MS } from './inspector/protocol';
 import {
   describeInteractionMode,
@@ -36,6 +48,12 @@ import {
   listDevices,
   pickIphone,
 } from '../../../scripts/devicectl.mjs';
+import {
+  listBootedSimulators,
+  openSimulatorSafari,
+  pickSimulator,
+  simulatorStartPage,
+} from '../../../scripts/simctl.mjs';
 
 const DEV_SERVER_PORT = 4321;
 
@@ -45,6 +63,8 @@ interface IosDevice {
   readonly udid: string;
   readonly name: string;
   readonly osVersion: string;
+  /** A booted iOS simulator that `IOS_UDID` named (#1157), not a USB iPhone. */
+  readonly simulator: boolean;
 }
 
 /**
@@ -56,9 +76,13 @@ interface IosDevice {
  * it, and called devicectl with no deadline (#390).
  */
 function findIosDevice(): IosDevice {
+  // A simulator only when IOS_UDID names a booted one (#1157); otherwise
+  // the USB iPhone, exactly as before.
+  const simulator = pickSimulator(listBootedSimulators(), process.env.IOS_UDID);
+  if (simulator !== null) return { ...simulator, simulator: true };
   const picked = pickIphone(listDevices(), process.env.IOS_UDID);
   if ('absence' in picked) throw new Error(picked.absence);
-  return picked.device;
+  return { ...picked.device, simulator: false };
 }
 
 // ── Precondition 3: the PHONE, asked directly, can reach a Mac address ────
@@ -95,7 +119,10 @@ interface LanCandidate {
  * interface list, asked fresh every run, and only the device's own answer
  * (`deviceCanReach`, below) about which of them it can use.
  */
-function listCandidateAddresses(): readonly LanCandidate[] {
+function listCandidateAddresses(device: IosDevice): readonly LanCandidate[] {
+  // A simulator shares the Mac's network, so its loopback is the Mac's own
+  // (#1157); it is still asked, through the page, like any other candidate.
+  if (device.simulator) return [{ interfaceName: 'lo0', address: '127.0.0.1' }];
   const interfaces = networkInterfaces();
   const candidates: LanCandidate[] = [];
   for (const [interfaceName, addresses] of Object.entries(interfaces)) {
@@ -197,8 +224,9 @@ async function deviceCanReach(
  */
 async function resolveReachableBaseUrl(
   driver: PageDriver,
+  device: IosDevice,
 ): Promise<{ baseUrl: string; interfaceName: string; address: string }> {
-  const candidates = listCandidateAddresses();
+  const candidates = listCandidateAddresses(device);
   if (candidates.length === 0) {
     throw new Error(
       'expected this Mac to have at least one non-internal IPv4 network interface -- ' +
@@ -314,12 +342,23 @@ const START_PAGE = 'about:blank';
 
 /** Opens Safari on the start page and attaches to it; the attached inspector, closed on any failure after. */
 async function attachToSafari(device: IosDevice): Promise<Inspector> {
-  launchSafari(device.udid, START_PAGE);
-  const inspector = await openInspector({
-    url: (url) => url === START_PAGE,
-    expectedUdid: device.udid,
-    dial: nodeDialer(),
-  });
+  let inspector: Inspector;
+  if (device.simulator) {
+    const start = simulatorStartPage(DEV_SERVER_PORT);
+    openSimulatorSafari(device.udid, start);
+    inspector = await openSimulatorInspector({
+      url: (url) => url === start,
+      udid: device.udid,
+      dial: nodeSimulatorDialer(),
+    });
+  } else {
+    launchSafari(device.udid, START_PAGE);
+    inspector = await openInspector({
+      url: (url) => url === START_PAGE,
+      expectedUdid: device.udid,
+      dial: nodeDialer(),
+    });
+  }
   try {
     await inspector.page.targetCreated(COMMAND_CEILING_MS);
   } catch (error) {
@@ -352,7 +391,7 @@ export async function startIosSession(): Promise<DeviceSession> {
 
   let resolved: { baseUrl: string; interfaceName: string; address: string };
   try {
-    resolved = await resolveReachableBaseUrl(driver);
+    resolved = await resolveReachableBaseUrl(driver, device);
   } catch (error) {
     inspector.close();
     throw error;

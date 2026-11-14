@@ -56,7 +56,7 @@ function harness({
       spawns.push([file, ...args]);
       return child as unknown as ChildProcess;
     }),
-    findXctestrun: vi.fn(() => (built ? XCTESTRUN : null)),
+    findXctestrun: vi.fn((): string | null => (built ? XCTESTRUN : null)),
     hasSource: vi.fn(() => true),
     alive: vi.fn(() => aliveNow),
     answers: vi.fn(async (_url: string): Promise<void> => {}),
