@@ -49,6 +49,12 @@ async function waitForServer(server) {
 }
 
 async function main() {
+  if (process.argv.length > 2) {
+    console.error(
+      'usage: node scripts/capture-previews.mjs (it takes no arguments)',
+    );
+    process.exit(2);
+  }
   const { shots, viewport } = await previewPaths();
   const server = spawn(
     'npx',

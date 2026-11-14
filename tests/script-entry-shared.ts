@@ -246,4 +246,11 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: visual-capture.mjs',
   },
+  // It takes no arguments, so any argument is refused with its usage before
+  // it builds anything or starts a server (#1158).
+  'capture-previews.mjs': {
+    args: ['--refuse-me'],
+    status: 2,
+    says: 'usage: node scripts/capture-previews.mjs',
+  },
 };
