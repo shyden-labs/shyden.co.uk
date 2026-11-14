@@ -74,6 +74,19 @@ describe('the Web Inspector daemon, as a failure names it', () => {
         ].join('\n'),
       ),
     ).toBe('webinspectord pids 51798, 53035; MobileSafari pid 74631'));
+  // Measured 2026-11-14 (ps -axo pid,command): a simulator's processes run
+  // from a runtime path holding a space, so the name is the path's end, not
+  // its first word. Reading the first word saw neither, while both ran.
+  it('finds both when their paths hold a space, as a simulator runtime does', () =>
+    expect(
+      daemonState(
+        [
+          '85433 /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.yTTENJ/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Cryptexes/App/usr/libexec/webinspectord',
+          '83167 /var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.yTTENJ/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/Applications/MobileSafari.app/MobileSafari',
+          '72320 /private/var/run/x/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/Applications/MobileSafari.app/PlugIns/SafariWidgetExtension.appex/SafariWidgetExtension',
+        ].join('\n'),
+      ),
+    ).toBe('webinspectord pids 85433; MobileSafari pid 83167'));
   it('says when neither the daemon nor Safari is running', () =>
     expect(daemonState('376 /System/Library/mds')).toBe(
       'no webinspectord running (launchd_sim starts it on first connect); MobileSafari not running',

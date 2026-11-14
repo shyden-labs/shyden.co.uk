@@ -25,14 +25,20 @@ function psLines(ps: string): PsLine[] {
   });
 }
 
-const executable = (command: string): string =>
-  command.split(/\s+/)[0].split('/').pop() ?? '';
+/**
+ * Whether `command` runs the program `name`: the name as a whole path
+ * component, followed by a space or the end. Not the command's first word: a
+ * simulator's programs run from `…/Runtimes/iOS 27.0.simruntime/…`, a path
+ * holding a space, and the first word saw neither webinspectord nor
+ * MobileSafari while both ran (measured 2026-11-14).
+ */
+const runs = (command: string, name: string): boolean =>
+  new RegExp(`(?:^|/)${name}(?:\\s|$)`).test(command);
 
 /** The pid of the one `launchd_sim` whose command names `udid`. */
 export function launchdSimPid(ps: string, udid: string): number {
   const found = psLines(ps).filter(
-    (line) =>
-      executable(line.command) === 'launchd_sim' && line.command.includes(udid),
+    (line) => runs(line.command, 'launchd_sim') && line.command.includes(udid),
   );
   if (found.length === 0)
     throw new Error(
@@ -67,9 +73,7 @@ export function inspectorSocket(lsof: string): string {
 export function daemonState(ps: string): string {
   const lines = psLines(ps);
   const pidsOf = (name: string) =>
-    lines
-      .filter((line) => executable(line.command) === name)
-      .map((line) => line.pid);
+    lines.filter((line) => runs(line.command, name)).map((line) => line.pid);
   const daemons = pidsOf('webinspectord');
   const safari = pidsOf('MobileSafari');
   const daemon =

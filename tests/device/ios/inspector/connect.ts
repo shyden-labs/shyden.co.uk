@@ -200,10 +200,12 @@ async function attachToSafari(
 }
 
 /**
- * A page load held the simulator's first reply 16.0-18.6 s (measured
- * 2026-11-14, #1157), past the phone's 15 s.
+ * A page load held the simulator's first reply 16.0-18.6 s, and a Safari
+ * launched cold by `openurl` was first listed after 16.9 s at load 9.5; the
+ * device run's cold launch at load ~33 was not listed within 30 s (all
+ * measured 2026-11-14, #1157). So 60 s, past the phone's 15 s.
  */
-const SIMULATOR_LISTING_CEILING_MS = 30_000;
+const SIMULATOR_LISTING_CEILING_MS = 60_000;
 
 export interface SimulatorDialer {
   socket(udid: string): Promise<ByteTransport>;

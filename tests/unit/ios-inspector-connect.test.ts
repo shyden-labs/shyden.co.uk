@@ -357,7 +357,10 @@ describe('opening the inspector on a simulator', () => {
     expect(inspector.page.targetId).toBe('page-39');
   });
 
-  it('waits 30 s for Safari, past the phone’s 15 s, since a page load held the first reply 18.6 s', async () => {
+  // Measured 2026-11-14: a page load held the first reply 18.6 s, and a Safari
+  // launched cold by openurl was first listed after 16.9 s at load 9.5, while
+  // the device run's cold launch at load ~33 was not listed within 30 s.
+  it('waits 60 s for Safari, since a cold launch on a busy Mac took past 30 s', async () => {
     const { dial } = simulatorDialer({ silent: true });
     let settled = false;
     const opening = openSimulatorInspector({
@@ -368,9 +371,9 @@ describe('opening the inspector on a simulator', () => {
       settled = true;
     });
     const verdict = expect(opening).rejects.toThrow(
-      'Safari did not appear to the Web Inspector within 30 s',
+      'Safari did not appear to the Web Inspector within 60 s',
     );
-    await vi.advanceTimersByTimeAsync(29_999);
+    await vi.advanceTimersByTimeAsync(59_999);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await verdict;
@@ -389,7 +392,7 @@ describe('opening the inspector on a simulator', () => {
     const verdict = expect(opening).rejects.toThrow(
       /\(it saw no application\).*: no webinspectord running$/,
     );
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     await verdict;
     expect(transports.every((transport) => transport.closed)).toBe(true);
   });
