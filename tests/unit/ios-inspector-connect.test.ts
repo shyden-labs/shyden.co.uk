@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeBinaryPlist } from '../device/ios/inspector/bplist';
-import { type Dialer, openInspector } from '../device/ios/inspector/connect';
+import {
+  type Dialer,
+  openInspector,
+  openSimulatorInspector,
+  type SimulatorDialer,
+} from '../device/ios/inspector/connect';
 import {
   encodeLengthFrame,
   encodeUsbmuxFrame,
@@ -87,20 +92,40 @@ const listingOf = (url: string): Buffer =>
     },
   });
 
+interface PageScript {
+  listings?: readonly Buffer[];
+  held?: 'no target' | 'silent target';
+  enableRefused?: string;
+}
+
+/** The Web Inspector's replies, write by write, on the connection that reaches it. */
+function wirReplies(options: PageScript): Buffer[][] {
+  return [
+    WIR.slice(0, SAFARI_AT + 1).map(len),
+    (options.listings ?? [LISTING]).map(len),
+    options.held === 'no target' ? [] : [len(TARGET)],
+    options.held
+      ? []
+      : [
+          len(pageData('{"result":{},"id":2}')),
+          len(
+            fromTarget(
+              options.enableRefused === undefined
+                ? { result: {}, id: 1 }
+                : { error: { message: options.enableRefused }, id: 1 },
+            ),
+          ),
+        ],
+  ];
+}
+
 /**
  * `listings`: what Safari lists, in order (the recorded listing by default).
  * `held`: another inspector holds the page, as measured on 2026-10-26 (#811
  * step 6): no target at all (row 5), or a target that answers nothing (row 1).
  * `enableRefused`: the page answers `Page.enable` with an error.
  */
-function dialer(
-  options: {
-    peerDer?: Buffer;
-    listings?: readonly Buffer[];
-    held?: 'no target' | 'silent target';
-    enableRefused?: string;
-  } = {},
-): {
+function dialer(options: PageScript & { peerDer?: Buffer } = {}): {
   dial: Dialer;
   transports: ScriptedTransport[];
   layers: TlsLayer[];
@@ -113,24 +138,7 @@ function dialer(
     [[mux(MUX[0])]],
     [[mux(MUX[1])]],
     [[mux(MUX[2])], [len(LOCKDOWN[0])], [len(LOCKDOWN[1])], [len(LOCKDOWN[2])]],
-    [
-      [mux(MUX[3])],
-      WIR.slice(0, SAFARI_AT + 1).map(len),
-      (options.listings ?? [LISTING]).map(len),
-      options.held === 'no target' ? [] : [len(TARGET)],
-      options.held
-        ? []
-        : [
-            len(pageData('{"result":{},"id":2}')),
-            len(
-              fromTarget(
-                options.enableRefused === undefined
-                  ? { result: {}, id: 1 }
-                  : { error: { message: options.enableRefused }, id: 1 },
-              ),
-            ),
-          ],
-    ],
+    [[mux(MUX[3])], ...wirReplies(options)],
   ];
   const dial: Dialer = {
     usbmux: () => {
@@ -299,6 +307,113 @@ describe('opening the inspector on the phone', () => {
     const inspector = await openInspector({ url: onPage, dial });
     inspector.close();
     expect(asked(transports).at(-1)).toBe('3: _rpc_forwardDidClose:');
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+});
+
+/** The simulator's route (#1157 AC1): one local socket, the phone's messages, no usbmuxd, lockdown or TLS. */
+const SIMULATOR = '1955585D-532E-4881-9E5F-593D91EE1062';
+
+function simulatorDialer(
+  options: PageScript & { silent?: boolean; daemon?: string } = {},
+): {
+  dial: SimulatorDialer;
+  transports: ScriptedTransport[];
+  asked: string[];
+} {
+  const transports: ScriptedTransport[] = [];
+  const closings: ByteTransport[] = [];
+  const asked: string[] = [];
+  const dial: SimulatorDialer = {
+    socket: (udid) => {
+      asked.push(`socket ${udid}`);
+      const transport = new ScriptedTransport(
+        options.silent ? [] : wirReplies(options),
+        closings,
+      );
+      transports.push(transport);
+      return Promise.resolve(transport);
+    },
+    daemonState: () => options.daemon ?? 'webinspectord pids 51798, 53035',
+  };
+  return { dial, transports, asked };
+}
+
+describe('opening the inspector on a simulator', () => {
+  it('reaches the Web Inspector over the one socket, ending with Page.enable', async () => {
+    const { dial, transports, asked: dialled } = simulatorDialer();
+    const inspector = await openSimulatorInspector({
+      url: onPage,
+      udid: SIMULATOR,
+      dial,
+    });
+    expect(dialled).toEqual([`socket ${SIMULATOR}`]);
+    expect(asked(transports)).toEqual([
+      '0: _rpc_reportIdentifier:',
+      '0: _rpc_forwardGetListing:',
+      '0: _rpc_forwardSocketSetup:',
+      '0: _rpc_forwardSocketData:',
+    ]);
+    expect(inspector.page.targetId).toBe('page-39');
+  });
+
+  it('waits 30 s for Safari, past the phone’s 15 s, since a page load held the first reply 18.6 s', async () => {
+    const { dial } = simulatorDialer({ silent: true });
+    let settled = false;
+    const opening = openSimulatorInspector({
+      url: onPage,
+      udid: SIMULATOR,
+      dial,
+    }).finally(() => {
+      settled = true;
+    });
+    const verdict = expect(opening).rejects.toThrow(
+      'Safari did not appear to the Web Inspector within 30 s',
+    );
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await verdict;
+  });
+
+  it('a silence names the Web Inspector daemons seen, since the daemon can drop a connection without closing it', async () => {
+    const { dial, transports } = simulatorDialer({
+      silent: true,
+      daemon: 'no webinspectord running',
+    });
+    const opening = openSimulatorInspector({
+      url: onPage,
+      udid: SIMULATOR,
+      dial,
+    });
+    const verdict = expect(opening).rejects.toThrow(
+      /\(it saw no application\).*: no webinspectord running$/,
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+    await verdict;
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('a failure after attaching detaches before it closes the socket', async () => {
+    const { dial, transports } = simulatorDialer({
+      enableRefused: 'Page is busy',
+    });
+    await expect(
+      openSimulatorInspector({ url: onPage, udid: SIMULATOR, dial }),
+    ).rejects.toThrow('Page.enable failed on the page: Page is busy');
+    expect(asked(transports).at(-1)).toBe('0: _rpc_forwardDidClose:');
+    expect(transports.every((transport) => transport.closed)).toBe(true);
+  });
+
+  it('closing detaches from the page and closes the socket', async () => {
+    const { dial, transports } = simulatorDialer();
+    const inspector = await openSimulatorInspector({
+      url: onPage,
+      udid: SIMULATOR,
+      dial,
+    });
+    inspector.close();
+    expect(asked(transports).at(-1)).toBe('0: _rpc_forwardDidClose:');
     expect(transports.every((transport) => transport.closed)).toBe(true);
   });
 });

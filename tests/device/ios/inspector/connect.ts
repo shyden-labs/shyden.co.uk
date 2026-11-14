@@ -17,8 +17,10 @@
  * page held for the next.
  *
  * The sockets come from a Dialer, so the whole route is unit-tested on the
- * recorded frames; `nodeDialer` is the only code here that opens one.
+ * recorded frames; `nodeDialer` and `nodeSimulatorDialer` are the only code
+ * here that open one.
  */
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createConnection, type Socket } from 'node:net';
 import { connect as tlsConnect, type ConnectionOptions } from 'node:tls';
@@ -31,6 +33,7 @@ import {
 import { queryType, startService, startSession } from './lockdown';
 import { pinnedTlsOptions, verifyPinnedPeer } from './pin';
 import { PageProtocol } from './protocol';
+import { daemonState, inspectorSocket, launchdSimPid } from './simulator';
 import {
   connectPort,
   listDevices,
@@ -155,23 +158,125 @@ export async function openInspector(options: {
       service.ssl,
       opened,
     );
-    const wir = new WirSession(link, {
-      connection: randomUUID().toUpperCase(),
-      sender: randomUUID().toUpperCase(),
-    });
-    wir.identify();
-    const safari = await wir.safari(LISTING_CEILING_MS);
-    const [page] = await wir.pages(safari, options.url, LISTING_CEILING_MS);
-    wir.attach(safari, page.pageId);
-    attached = wir;
-    const protocol = new PageProtocol(wir);
-    await namingTheHolder(protocol.targetCreated(TARGET_CEILING_MS));
-    await namingTheHolder(protocol.command('Page.enable'));
-    return { page: protocol, close: closeAll };
+    const page = await attachToSafari(
+      link,
+      options.url,
+      LISTING_CEILING_MS,
+      (wir) => {
+        attached = wir;
+      },
+    );
+    return { page, close: closeAll };
   } catch (error) {
     closeAll();
     throw error;
   }
+}
+
+/**
+ * Over a link that reaches the Web Inspector: find Safari and the page this
+ * run opened, attach, and turn the page agent on. `held` hears of the attach
+ * at once, so a failure after it can detach before closing.
+ */
+async function attachToSafari(
+  link: FrameLink,
+  url: (url: string) => boolean,
+  listingCeilingMs: number,
+  held: (wir: WirSession) => void,
+): Promise<PageProtocol> {
+  const wir = new WirSession(link, {
+    connection: randomUUID().toUpperCase(),
+    sender: randomUUID().toUpperCase(),
+  });
+  wir.identify();
+  const safari = await wir.safari(listingCeilingMs);
+  const [page] = await wir.pages(safari, url, listingCeilingMs);
+  wir.attach(safari, page.pageId);
+  held(wir);
+  const protocol = new PageProtocol(wir);
+  await namingTheHolder(protocol.targetCreated(TARGET_CEILING_MS));
+  await namingTheHolder(protocol.command('Page.enable'));
+  return protocol;
+}
+
+/**
+ * A page load held the simulator's first reply 16.0-18.6 s (measured
+ * 2026-11-14, #1157), past the phone's 15 s.
+ */
+const SIMULATOR_LISTING_CEILING_MS = 30_000;
+
+export interface SimulatorDialer {
+  socket(udid: string): Promise<ByteTransport>;
+  /** Every Web Inspector daemon running, for a silence to name. */
+  daemonState(): string;
+}
+
+/**
+ * Opening the inspector on a booted simulator (#1157 AC1): one local socket
+ * speaking the phone's messages, with no usbmuxd, lockdown or TLS. The
+ * daemon was seen twice dropping a connection without closing the socket,
+ * so only a ceiling sees that, and it names the daemons running.
+ */
+export async function openSimulatorInspector(options: {
+  url: (url: string) => boolean;
+  udid: string;
+  dial: SimulatorDialer;
+}): Promise<Inspector> {
+  let transport: ByteTransport | undefined;
+  let attached: WirSession | undefined;
+  const closeAll = (): void => {
+    attached?.detach();
+    attached = undefined;
+    transport?.close();
+  };
+  try {
+    transport = await options.dial.socket(options.udid);
+    const page = await attachToSafari(
+      new FrameLink(transport, 'length'),
+      options.url,
+      SIMULATOR_LISTING_CEILING_MS,
+      (wir) => {
+        attached = wir;
+      },
+    );
+    return { page, close: closeAll };
+  } catch (error) {
+    closeAll();
+    if (error instanceof CeilingError)
+      throw new CeilingError(
+        `${error.message}: ${options.dial.daemonState()}`,
+        { cause: error },
+      );
+    throw error;
+  }
+}
+
+const PROCESS_READ_TIMEOUT_MS = 5_000;
+const read = (file: string, args: string[]): string =>
+  execFileSync(file, args, {
+    encoding: 'utf8',
+    timeout: PROCESS_READ_TIMEOUT_MS,
+  });
+
+/** The real socket: the one the simulator's launchd_sim holds open. */
+export function nodeSimulatorDialer(): SimulatorDialer {
+  const ps = (): string => read('ps', ['-axo', 'pid,command']);
+  return {
+    socket: (udid) =>
+      new Promise((resolve, reject) => {
+        const pid = launchdSimPid(ps(), udid);
+        const path = inspectorSocket(
+          read('lsof', ['-a', '-U', '-p', `${pid}`]),
+        );
+        const socket = createConnection(path);
+        socket.once('error', reject);
+        socket.once('connect', () => {
+          socket.off('error', reject);
+          resolve(socketTransport(socket));
+        });
+      }),
+    daemonState: () => daemonState(ps()),
+  };
 }
 
 /** The real sockets: usbmuxd's on this Mac, and TLS over a tunnel it opened. */
