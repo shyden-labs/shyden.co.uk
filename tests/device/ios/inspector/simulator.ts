@@ -58,12 +58,23 @@ export function inspectorSocket(lsof: string): string {
   return path;
 }
 
-/** Every `webinspectord` running, for a failure to name. */
+/**
+ * Every `webinspectord` and `MobileSafari` running, for a failure to name.
+ * On a simulator the daemon is started on demand by `launchd_sim`, so its
+ * absence alone is not a cause; Safari still launching after `openurl` under
+ * load is (measured 2026-11-14: 30 s passed with no Safari at load ~10-40).
+ */
 export function daemonState(ps: string): string {
-  const pids = psLines(ps)
-    .filter((line) => executable(line.command) === 'webinspectord')
-    .map((line) => line.pid);
-  return pids.length === 0
-    ? 'no webinspectord running'
-    : `webinspectord pids ${pids.join(', ')}`;
+  const lines = psLines(ps);
+  const pidsOf = (name: string) =>
+    lines
+      .filter((line) => executable(line.command) === name)
+      .map((line) => line.pid);
+  const daemons = pidsOf('webinspectord');
+  const safari = pidsOf('MobileSafari');
+  const daemon =
+    daemons.length === 0
+      ? 'no webinspectord running (launchd_sim starts it on first connect)'
+      : `webinspectord pids ${daemons.join(', ')}`;
+  return `${daemon}; ${safari.length === 0 ? 'MobileSafari not running' : `MobileSafari pid ${safari.join(', ')}`}`;
 }

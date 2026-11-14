@@ -69,11 +69,13 @@ describe('the Web Inspector daemon, as a failure names it', () => {
           '51798 /usr/libexec/webinspectord',
           `53035 /Library/Developer/CoreSimulator/Volumes/iOS_27A/usr/libexec/webinspectord`,
           `82474 launchd_sim ${SOCKET}`,
+          '74631 /var/run/com.apple.security.cryptexd/mnt/x/RuntimeRoot/Applications/MobileSafari.app/MobileSafari',
+          '72320 /var/run/x/MobileSafari.app/PlugIns/SafariWidgetExtension.appex/SafariWidgetExtension',
         ].join('\n'),
       ),
-    ).toBe('webinspectord pids 51798, 53035'));
-  it('says when none is running', () =>
+    ).toBe('webinspectord pids 51798, 53035; MobileSafari pid 74631'));
+  it('says when neither the daemon nor Safari is running', () =>
     expect(daemonState('376 /System/Library/mds')).toBe(
-      'no webinspectord running',
+      'no webinspectord running (launchd_sim starts it on first connect); MobileSafari not running',
     ));
 });
