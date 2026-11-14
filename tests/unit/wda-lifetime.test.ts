@@ -346,3 +346,102 @@ describe('startWda', () => {
     });
   });
 });
+
+/**
+ * On a booted simulator (#1157) WDA builds unsigned for the simulator, into
+ * its own derived data, and answers on the Mac's own loopback: a simulator
+ * shares the host's network, so there is no devicectl tunnel to read.
+ * Measured 2026-11-14: `build-for-testing` for `platform=iOS Simulator`
+ * succeeded in 84 s with no signing and left
+ * `WebDriverAgentRunner_iphonesimulator27.2-arm64.xctestrun`.
+ */
+describe('startWda on a simulator', () => {
+  const SIM = '1955585D-532E-4881-9E5F-593D91EE1062';
+  const SIM_PRODUCTS = `${CACHE}/${WDA_PIN}/dd-sim/Build/Products`;
+  const SIM_XCTESTRUN = `${SIM_PRODUCTS}/WebDriverAgentRunner_iphonesimulator27.2-arm64.xctestrun`;
+  const start = (h: ReturnType<typeof harness>) =>
+    startWda({ udid: SIM, simulator: true, cacheDir: CACHE, ...h.deps });
+
+  it("resolves with the Mac's loopback URL and reads no tunnel", async () => {
+    const h = harness();
+    h.deps.findXctestrun.mockReturnValue(SIM_XCTESTRUN);
+    const started = start(h);
+    await flush();
+    h.child.print(READY);
+    const wda = await started;
+    expect(wda.url).toBe('http://127.0.0.1:8100');
+    expect(h.deps.answers).toHaveBeenCalledWith('http://127.0.0.1:8100');
+    expect(h.runs.some((r) => r.includes('devicectl'))).toBe(false);
+  });
+
+  it('builds unsigned for the simulator, into its own derived data', async () => {
+    const h = harness();
+    h.deps.findXctestrun
+      .mockReturnValueOnce(null)
+      .mockReturnValue(SIM_XCTESTRUN);
+    const started = start(h);
+    await flush();
+    h.child.print(READY);
+    await started;
+    expect(h.runs.find((r) => r.includes('build-for-testing'))).toEqual([
+      'xcodebuild',
+      'build-for-testing',
+      '-project',
+      `${CACHE}/${WDA_PIN}/src/WebDriverAgent.xcodeproj`,
+      '-scheme',
+      'WebDriverAgentRunner',
+      '-destination',
+      `platform=iOS Simulator,id=${SIM}`,
+      '-derivedDataPath',
+      `${CACHE}/${WDA_PIN}/dd-sim`,
+    ]);
+  });
+
+  it("looks for the simulator's xctestrun in the simulator's products", async () => {
+    const h = harness();
+    h.deps.findXctestrun.mockReturnValue(SIM_XCTESTRUN);
+    const started = start(h);
+    await flush();
+    h.child.print(READY);
+    await started;
+    expect(h.deps.findXctestrun).toHaveBeenCalledWith(
+      SIM_PRODUCTS,
+      'iphonesimulator',
+    );
+    expect(h.spawns).toEqual([
+      [
+        'xcodebuild',
+        'test-without-building',
+        '-xctestrun',
+        SIM_XCTESTRUN,
+        '-destination',
+        `id=${SIM}`,
+      ],
+    ]);
+  });
+
+  it("looks for the iPhone's xctestrun in the iPhone's products", async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    await started;
+    expect(h.deps.findXctestrun).toHaveBeenCalledWith(
+      `${CACHE}/${WDA_PIN}/dd/Build/Products`,
+      'iphoneos',
+    );
+  });
+
+  it('fails naming the loopback URL, and stops WDA, when it does not answer', async () => {
+    const h = harness();
+    h.deps.findXctestrun.mockReturnValue(SIM_XCTESTRUN);
+    h.deps.answers.mockRejectedValue(new Error('fetch failed ECONNREFUSED'));
+    const started = start(h);
+    await flush();
+    h.child.print(READY);
+    await expect(started).rejects.toThrow(
+      'WebDriverAgent is up on the simulator but http://127.0.0.1:8100 did not answer: fetch failed ECONNREFUSED',
+    );
+    expect(h.child.signals).toContain('SIGTERM');
+  });
+});

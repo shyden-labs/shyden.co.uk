@@ -69,13 +69,21 @@ function run(file, args, { timeoutMs }) {
   });
 }
 
-/** @param {string} productsDir @returns {string | null} */
-function findXctestrun(productsDir) {
+/**
+ * @param {string} productsDir
+ * @param {'iphoneos' | 'iphonesimulator'} platform
+ * @returns {string | null}
+ */
+function findXctestrun(productsDir, platform) {
   if (!existsSync(productsDir)) return null;
   const found = nonEmpty(
     readdirSync(productsDir),
     `entries in ${productsDir}, which a WebDriverAgent build leaves its products in`,
-  ).find((name) => /^WebDriverAgentRunner_iphoneos.*\.xctestrun$/.test(name));
+  ).find(
+    (name) =>
+      name.startsWith(`WebDriverAgentRunner_${platform}`) &&
+      name.endsWith('.xctestrun'),
+  );
   return found === undefined ? null : path.join(productsDir, found);
 }
 
@@ -95,11 +103,12 @@ function alive(udid) {
 /**
  * @param {{
  *   udid: string,
+ *   simulator?: boolean,
  *   cacheDir?: string,
  *   ceilingMs?: number,
  *   run?: (file: string, args: string[], options: { timeoutMs: number }) => Promise<string>,
  *   spawn?: (file: string, args: string[]) => import('node:child_process').ChildProcess,
- *   findXctestrun?: (productsDir: string) => string | null,
+ *   findXctestrun?: (productsDir: string, platform: 'iphoneos' | 'iphonesimulator') => string | null,
  *   hasSource?: (srcDir: string) => boolean,
  *   alive?: (udid: string) => string | null | Promise<string | null>,
  *   answers?: (url: string) => Promise<void>,
@@ -108,6 +117,7 @@ function alive(udid) {
  */
 export async function startWda({
   udid,
+  simulator = false,
   cacheDir = DEFAULT_WDA_CACHE,
   ceilingMs = WDA_READY_CEILING_MS,
   run: runCommand = run,
@@ -127,7 +137,10 @@ export async function startWda({
 
   const root = path.join(cacheDir, WDA_PIN);
   const srcDir = path.join(root, 'src');
-  const derivedData = path.join(root, 'dd');
+  // A simulator build is unsigned and has its own products, so it never
+  // displaces the iPhone's signed build (#1157).
+  const derivedData = path.join(root, simulator ? 'dd-sim' : 'dd');
+  const platform = simulator ? 'iphonesimulator' : 'iphoneos';
   const products = path.join(derivedData, 'Build', 'Products');
 
   if (!hasSource(srcDir)) {
@@ -139,7 +152,7 @@ export async function startWda({
     });
   }
 
-  let xctestrun = find(products);
+  let xctestrun = find(products, platform);
   if (xctestrun === null) {
     await runCommand(
       'xcodebuild',
@@ -150,20 +163,24 @@ export async function startWda({
         '-scheme',
         'WebDriverAgentRunner',
         '-destination',
-        `id=${udid}`,
+        simulator ? `platform=iOS Simulator,id=${udid}` : `id=${udid}`,
         '-derivedDataPath',
         derivedData,
-        '-allowProvisioningUpdates',
-        'DEVELOPMENT_TEAM=F3XX4PM3MF',
-        'CODE_SIGN_STYLE=Automatic',
-        'PRODUCT_BUNDLE_IDENTIFIER=uk.co.shyden.wda',
+        ...(simulator
+          ? []
+          : [
+              '-allowProvisioningUpdates',
+              'DEVELOPMENT_TEAM=F3XX4PM3MF',
+              'CODE_SIGN_STYLE=Automatic',
+              'PRODUCT_BUNDLE_IDENTIFIER=uk.co.shyden.wda',
+            ]),
       ],
       { timeoutMs: WDA_BUILD_CEILING_MS },
     );
-    xctestrun = find(products);
+    xctestrun = find(products, platform);
     if (xctestrun === null)
       throw new Error(
-        `WebDriverAgent built, but no WebDriverAgentRunner_iphoneos*.xctestrun is in ${products}`,
+        `WebDriverAgent built, but no WebDriverAgentRunner_${platform}*.xctestrun is in ${products}`,
       );
   }
 
@@ -253,6 +270,20 @@ export async function startWda({
         );
     },
   };
+
+  if (simulator) {
+    // A simulator shares the Mac's network: WDA listens on its loopback.
+    handle.url = `http://127.0.0.1:${WDA_PORT}`;
+    try {
+      await answers(handle.url);
+    } catch (error) {
+      await handle.stop();
+      throw new Error(
+        `WebDriverAgent is up on the simulator but ${handle.url} did not answer: ${messageOf(error)}`,
+      );
+    }
+    return handle;
+  }
 
   // The tunnel is read only now, after the ready line. Measured 2026-11-02:
   // an address read before xcodebuild started answered EHOSTUNREACH once WDA
