@@ -48,30 +48,34 @@ async function waitForServer(server) {
   throw new Error(`astro preview did not answer on ${ORIGIN} within 30 s`);
 }
 
-const { shots, viewport } = await previewPaths();
-const server = spawn(
-  'npx',
-  ['astro', 'preview', '--port', String(PORT), '--host', 'localhost'],
-  { stdio: 'ignore' },
-);
-try {
-  await waitForServer(server);
-  const browser = await chromium.launch();
+async function main() {
+  const { shots, viewport } = await previewPaths();
+  const server = spawn(
+    'npx',
+    ['astro', 'preview', '--port', String(PORT), '--host', 'localhost'],
+    { stdio: 'ignore' },
+  );
   try {
-    const page = await browser.newPage({ viewport, colorScheme: 'light' });
-    for (const { path, image } of shots) {
-      const response = await page.goto(`${ORIGIN}${path}`);
-      if (!response?.ok())
-        throw new Error(`${path} answered ${response?.status()}`);
-      await page.evaluate(() => document.fonts.ready);
-      const file = `public${image}`;
-      mkdirSync(dirname(file), { recursive: true });
-      await page.screenshot({ path: file, animations: 'disabled' });
-      console.log(`${path} -> ${file}`);
+    await waitForServer(server);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage({ viewport, colorScheme: 'light' });
+      for (const { path, image } of shots) {
+        const response = await page.goto(`${ORIGIN}${path}`);
+        if (!response?.ok())
+          throw new Error(`${path} answered ${response?.status()}`);
+        await page.evaluate(() => document.fonts.ready);
+        const file = `public${image}`;
+        mkdirSync(dirname(file), { recursive: true });
+        await page.screenshot({ path: file, animations: 'disabled' });
+        console.log(`${path} -> ${file}`);
+      }
+    } finally {
+      await browser.close();
     }
   } finally {
-    await browser.close();
+    server.kill();
   }
-} finally {
-  server.kill();
 }
+
+if (import.meta.main) await main();
