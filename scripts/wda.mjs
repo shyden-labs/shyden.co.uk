@@ -221,11 +221,14 @@ export async function startWda({
     };
     child.stdout?.on('data', onData);
     child.stderr?.on('data', onData);
+    const target = simulator
+      ? `is the simulator ${udid} booted, with nothing else holding it`
+      : 'is the iPhone unlocked';
     exitedPromise.then(({ code, signal }) =>
       finish(() =>
         reject(
           new Error(
-            `WebDriverAgent's xcodebuild exited (code ${code}, signal ${signal}) before its ready line; is the iPhone unlocked and its signing profile current? Last lines:\n${lastLines()}`,
+            `WebDriverAgent's xcodebuild exited (code ${code}, signal ${signal}) before its ready line; ${target}${simulator ? '' : ' and its signing profile current'}? Last lines:\n${lastLines()}`,
           ),
         ),
       ),
@@ -236,7 +239,7 @@ export async function startWda({
           child.kill('SIGTERM');
           reject(
             new Error(
-              `WebDriverAgent printed no ready line within ${ceilingMs / 1000} s (WDA_READY_CEILING_MS); is the iPhone unlocked? Last lines:\n${lastLines()}`,
+              `WebDriverAgent printed no ready line within ${ceilingMs / 1000} s (WDA_READY_CEILING_MS); ${target}? Last lines:\n${lastLines()}`,
             ),
           );
         }),

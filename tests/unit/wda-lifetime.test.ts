@@ -361,6 +361,7 @@ describe('startWda on a simulator', () => {
   const SIM_XCTESTRUN = `${SIM_PRODUCTS}/WebDriverAgentRunner_iphonesimulator27.2-arm64.xctestrun`;
   const start = (h: ReturnType<typeof harness>) =>
     startWda({ udid: SIM, simulator: true, cacheDir: CACHE, ...h.deps });
+  afterEach(() => vi.useRealTimers());
 
   it("resolves with the Mac's loopback URL and reads no tunnel", async () => {
     const h = harness();
@@ -430,6 +431,42 @@ describe('startWda on a simulator', () => {
       `${CACHE}/${WDA_PIN}/dd/Build/Products`,
       'iphoneos',
     );
+  });
+
+  it('at the ceiling, names the simulator, never an iPhone to unlock', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.deps.findXctestrun.mockReturnValue(SIM_XCTESTRUN);
+    const started = start(h);
+    const verdict = started.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(WDA_READY_CEILING_MS);
+    const message = await verdict;
+    expect(message).toMatch(
+      new RegExp(
+        `no ready line within 180 s[\\s\\S]*is the simulator ${SIM} booted`,
+      ),
+    );
+    expect(message).not.toMatch(/iPhone/);
+  });
+
+  it('when xcodebuild exits early, names the simulator, never an iPhone or its signing', async () => {
+    const h = harness();
+    h.deps.findXctestrun.mockReturnValue(SIM_XCTESTRUN);
+    const started = start(h);
+    await flush();
+    h.child.emit('exit', 65, null);
+    const message = await started.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    expect(message).toMatch(
+      new RegExp(`before its ready line; is the simulator ${SIM} booted`),
+    );
+    expect(message).not.toMatch(/iPhone|signing/);
   });
 
   it('fails naming the loopback URL, and stops WDA, when it does not answer', async () => {
