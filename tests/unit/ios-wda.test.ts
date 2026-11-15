@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  httpFor,
   toScreenPoint,
   WdaError,
   WdaSession,
@@ -199,6 +200,43 @@ describe('WdaError', () => {
         .message,
     ).toBe(
       'WebDriverAgent POST /session/S1/actions answered 404: invalid session id',
+    );
+  });
+});
+
+/**
+ * #1166: a failed request named its cause only as "fetch failed" and always
+ * claimed a 10 s silence, so on 2026-11-16 a refused or reset connection read
+ * exactly like a WebDriverAgent that had stopped. `fetch` is a stand-in here.
+ */
+describe('httpFor: a failed request says why', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('says it had no answer within the ceiling when the request timed out', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    await expect(
+      httpFor('http://127.0.0.1:8100')('GET', '/status'),
+    ).rejects.toThrow(
+      'WebDriverAgent GET /status answered 0: no answer within 10 s; is WebDriverAgent still running?',
+    );
+  });
+
+  it('names each cause in the chain, and claims no timeout, when the connection failed', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8100'), {
+          code: 'ECONNREFUSED',
+        }),
+      });
+    });
+    await expect(
+      httpFor('http://127.0.0.1:8100')('GET', '/status'),
+    ).rejects.toThrow(
+      'WebDriverAgent GET /status answered 0: the request failed: fetch failed <- ECONNREFUSED connect ECONNREFUSED 127.0.0.1:8100',
     );
   });
 });
