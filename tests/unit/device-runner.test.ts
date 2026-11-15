@@ -14,6 +14,7 @@ import {
   vitestVerdict,
   waitUntil,
   deviceRunGroups,
+  adbCleanupCalls,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -673,5 +674,18 @@ describe('deviceRunGroups: every group, or the iPhone alone (#623)', () => {
     expect(deviceRunGroups(['--ios', '--ios'])).toBe(
       'usage: test-devices.mjs [--ios] (got --ios --ios)',
     );
+  });
+});
+
+describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)', () => {
+  it('makes no adb call for an iOS-only run, so the USB phones stay free for another session', () => {
+    expect(adbCleanupCalls(['ios'])).toEqual([]);
+  });
+
+  it('removes both tunnels when the Android group is in the run', () => {
+    expect(adbCleanupCalls(['desktop', 'android', 'ios'])).toEqual([
+      ['forward', '--remove-all'],
+      ['reverse', '--remove-all'],
+    ]);
   });
 });

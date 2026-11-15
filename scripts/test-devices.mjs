@@ -1350,15 +1350,28 @@ async function runIosGroup() {
 
 // ── cleanup: always runs, whatever happened above ───────────────────────
 
-async function cleanupAdbTunnels() {
-  // Measured directly: `adb reverse --remove-all` / `adb forward --remove-all`
-  // both exit 0 against a device with nothing mapped -- safe no-ops, so
-  // these run unconditionally, not gated on whether the Android group
-  // actually attempted anything.
-  for (const args of [
+/**
+ * The `adb` calls the end-of-run cleanup makes: both tunnels removed when the
+ * Android group is in the run, and none at all otherwise. An iOS-only run
+ * (`--ios`, on a simulator) touches no USB device, so it must not remove
+ * another session's Android tunnels (#1163). `adb forward/reverse
+ * --remove-all` exit 0 on a device with nothing mapped, so an Android run
+ * makes them whatever its group did.
+ *
+ * @param {readonly string[]} groupNames
+ * @returns {string[][]}
+ */
+export function adbCleanupCalls(groupNames) {
+  if (!groupNames.includes('android')) return [];
+  return [
     ['forward', '--remove-all'],
     ['reverse', '--remove-all'],
-  ]) {
+  ];
+}
+
+/** @param {readonly string[]} groupNames */
+async function cleanupAdbTunnels(groupNames) {
+  for (const args of adbCleanupCalls(groupNames)) {
     try {
       adb(args);
     } catch (error) {
@@ -1463,6 +1476,10 @@ function judgeTotals(groups, excludedByDesign) {
 /** @type {import('node:child_process').ChildProcess | null} */
 let previewChild = null;
 
+/** The groups this run launches, set once its arguments are read; cleanup reads it. */
+/** @type {readonly string[]} */
+let runGroupNames = [];
+
 /**
  * Runs `task` on the first call only, and answers every call with that run's
  * promise. Cleanup was guarded by a flag set as it began, so Ctrl+C during the
@@ -1502,7 +1519,7 @@ const cleanup = once(async () => {
       );
     }
   }
-  await cleanupAdbTunnels();
+  await cleanupAdbTunnels(runGroupNames);
 });
 
 /**
@@ -1553,6 +1570,7 @@ export function deviceRunGroups(args) {
 async function main() {
   const groupNames = deviceRunGroups(process.argv.slice(2));
   if (typeof groupNames === 'string') die(groupNames);
+  runGroupNames = groupNames;
 
   cleanUpOnSignal();
 
