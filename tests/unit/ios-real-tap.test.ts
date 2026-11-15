@@ -308,6 +308,22 @@ describe('RealTapInteraction.click: real scrolling', () => {
     );
   });
 
+  // #1157 AC3 asks a run log to show that a passing test swiped for real;
+  // each test's console lines are grouped under its name in the run log.
+  it('prints each real swipe, naming the element and how far it dragged', async () => {
+    const f = fakes({ prepare: inTurn(below, prepared()) });
+    const lines: string[] = [];
+    const spy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((line: string) => void lines.push(line));
+    try {
+      await interaction(f).click(element('#cg-size'));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(lines).toEqual(['  [real swipe] up toward #cg-size, 448 points']);
+  });
+
   it('swipes down for an element above the view', async () => {
     const f = fakes({
       prepare: inTurn(

@@ -508,7 +508,7 @@ export class RealTapInteraction implements Interaction {
         continue;
       }
       const before = prepared.rect.y;
-      await this.swipeToward(prepared);
+      await this.swipeToward(prepared, element.selector);
       prepared = await this.prepare(element);
       if (prepared.rect.y === before) break;
     }
@@ -589,9 +589,13 @@ export class RealTapInteraction implements Interaction {
 
   /**
    * One real drag up or down the middle of the visible page, moving the
-   * element's centre toward the middle of the view.
+   * element's centre toward the middle of the view. Each drag is printed, so
+   * a run log shows under each test's name that it swiped (#1157 AC3).
    */
-  private async swipeToward({ rect, vv, viewHeight }: Prepared): Promise<void> {
+  private async swipeToward(
+    { rect, vv, viewHeight }: Prepared,
+    selector: string,
+  ): Promise<void> {
     const need =
       (rect.y + rect.height / 2 - (vv.offsetTop + viewHeight / 2)) * vv.scale;
     const reach = viewHeight * vv.scale * SWIPE_SHARE;
@@ -603,6 +607,9 @@ export class RealTapInteraction implements Interaction {
     await this.wda.swipe(
       { x, y: middle + distance / 2 },
       { x, y: middle - distance / 2 },
+    );
+    console.log(
+      `  [real swipe] ${distance > 0 ? 'up' : 'down'} toward ${selector}, ${Math.round(Math.abs(distance))} points`,
     );
   }
 
