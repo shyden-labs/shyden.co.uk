@@ -47,7 +47,12 @@ export type ScriptPort = Pick<
 >;
 export type TapPort = Pick<
   WdaSession,
-  'tap' | 'keys' | 'swipe' | 'buttonsLabelled' | 'source'
+  | 'tap'
+  | 'keys'
+  | 'swipe'
+  | 'buttonsLabelled'
+  | 'buttonsLabelledOnScreen'
+  | 'source'
 >;
 
 /**
@@ -520,9 +525,13 @@ export class RealTapInteraction implements Interaction {
     return prepared;
   }
 
-  /** A real tap on the Done button of Safari's bar above the keyboard, then the keyboard gone. */
+  /**
+   * A real tap on the Done button of Safari's bar above the keyboard, then the
+   * keyboard gone. Done is found by its box on the screen, not by
+   * WebDriverAgent's visibility, which is wrong for this bar on iOS 27 (#1157).
+   */
   private async closeKeyboard(element: PageElement): Promise<void> {
-    const buttons = await this.wda.buttonsLabelled('Done');
+    const buttons = await this.wda.buttonsLabelledOnScreen('Done', this.screen);
     if (buttons.length !== 1)
       throw new TapNotLandedError(
         element.selector,

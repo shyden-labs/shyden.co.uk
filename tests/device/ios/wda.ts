@@ -231,10 +231,34 @@ export class WdaSession {
    * (measured 2026-10-31).
    */
   async buttonsLabelled(label: string): Promise<Rect[]> {
+    return this.buttonBoxes(label, ' AND visible == 1');
+  }
+
+  /**
+   * The native buttons with that label whose box lies wholly on `screen`,
+   * whatever WebDriverAgent's own visibility says. On the iOS 27 simulator
+   * the keyboard bar's Done is drawn (a tick at the bar's right end) yet
+   * reported visible="false", so `buttonsLabelled` finds none (#1157); the
+   * box is what a finger can reach.
+   */
+  async buttonsLabelledOnScreen(label: string, screen: Rect): Promise<Rect[]> {
+    return (await this.buttonBoxes(label, '')).filter(
+      (box) =>
+        box.width > 0 &&
+        box.height > 0 &&
+        box.x >= screen.x &&
+        box.y >= screen.y &&
+        box.x + box.width <= screen.x + screen.width &&
+        box.y + box.height <= screen.y + screen.height,
+    );
+  }
+
+  /** The boxes of the native buttons labelled `label`, narrowed by `andAlso`. */
+  private async buttonBoxes(label: string, andAlso: string): Promise<Rect[]> {
     const quoted = label.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     const found = (await this.http('POST', `/session/${this.id}/elements`, {
       using: 'predicate string',
-      value: `type == 'XCUIElementTypeButton' AND label == "${quoted}" AND visible == 1`,
+      value: `type == 'XCUIElementTypeButton' AND label == "${quoted}"${andAlso}`,
     })) as Record<string, string>[];
     return Promise.all(
       found.map(

@@ -171,6 +171,44 @@ describe('WdaSession', () => {
     ]);
   });
 
+  // iOS 27 simulator (#1157, 2026-11-16): the keyboard bar's Done, drawn as
+  // a tick at (341, 519) and plainly on the screenshot, is reported
+  // visible="false" by WebDriverAgent, so a visible == 1 query finds none.
+  it('buttonsLabelledOnScreen finds a drawn button WebDriverAgent calls not visible, and leaves out one off the screen', async () => {
+    const { calls, http } = recorder({
+      'POST /session/S1/elements': [{ ELEMENT: 'E1' }, { ELEMENT: 'E2' }],
+      'GET /session/S1/element/E1/rect': {
+        x: 341,
+        y: 519,
+        width: 40,
+        height: 38,
+      },
+      'GET /session/S1/element/E2/rect': {
+        x: 34,
+        y: 1023,
+        width: 334,
+        height: 46,
+      },
+    });
+    const wda = await WdaSession.open(http);
+    expect(
+      await wda.buttonsLabelledOnScreen('Done', {
+        x: 0,
+        y: 0,
+        width: 402,
+        height: 874,
+      }),
+    ).toEqual([{ x: 341, y: 519, width: 40, height: 38 }]);
+    expect(calls[1]).toEqual([
+      'POST',
+      '/session/S1/elements',
+      {
+        using: 'predicate string',
+        value: 'type == \'XCUIElementTypeButton\' AND label == "Done"',
+      },
+    ]);
+  });
+
   it('windowRect reads the screen in points', async () => {
     const { http } = recorder({ 'GET /session/S1/window/rect': SCREEN });
     const wda = await WdaSession.open(http);

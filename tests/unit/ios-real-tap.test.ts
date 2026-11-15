@@ -81,6 +81,8 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
   const keys: string[] = [];
   const swipes: [Point, Point][] = [];
   let menu = [{ x: 85, y: 551, width: 250, height: 36 }];
+  let onScreen: typeof menu | undefined;
+  const onScreenOf: unknown[] = [];
   const answers = new Map<string, Handler>([
     ['prepare', () => prepared()],
     ['landing', () => landed()],
@@ -134,8 +136,13 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
       swipes.push([from, to]);
     },
     async buttonsLabelled(label: string) {
-      log.push(`menu:${label}`);
+      log.push(`visible-menu:${label}`);
       return menu;
+    },
+    async buttonsLabelledOnScreen(label: string, screen: unknown) {
+      log.push(`menu:${label}`);
+      onScreenOf.push(screen);
+      return onScreen ?? menu;
     },
     async source() {
       log.push('source');
@@ -151,6 +158,8 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
     swipes,
     answers,
     setMenu: (m: typeof menu) => (menu = m),
+    setOnScreen: (m: typeof menu) => (onScreen = m),
+    onScreenOf,
   };
 }
 
@@ -632,7 +641,7 @@ describe('RealTapInteraction.select', () => {
       'prepare',
       'tap',
       'landing',
-      'menu:Skip the animation',
+      'visible-menu:Skip the animation',
       'tap',
       'field',
     ]);
@@ -752,6 +761,23 @@ describe('RealTapInteraction.click: the keyboard is in the way', () => {
     f.setMenu([{ x: 355, y: 538, width: 40, height: 38 }]);
     await interaction(f).click(element('#cg-count'));
     expect(f.log.slice(0, 3)).toEqual(['prepare', 'menu:Done', 'tap']);
+  });
+
+  // iOS 27 simulator (#1157): WebDriverAgent calls the bar's drawn Done not
+  // visible, so the visible-only query finds none; the one on screen is tapped.
+  it('taps the Done drawn on the screen even when WebDriverAgent calls it not visible', async () => {
+    const f = fakes({ prepare: inTurn(hidden, prepared()) });
+    f.setMenu([]);
+    f.setOnScreen([{ x: 341, y: 519, width: 40, height: 38 }]);
+    await interaction(f).click(element('#cg-go'));
+    expect(f.log.slice(0, 4)).toEqual([
+      'prepare',
+      'menu:Done',
+      'tap',
+      'keyboard-gone',
+    ]);
+    expect(f.taps[0]).toEqual({ x: 361, y: 538 });
+    expect(f.onScreenOf).toEqual([SCREEN]);
   });
 
   it('fails naming the keyboard when the phone shows no single Done button', async () => {
