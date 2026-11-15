@@ -139,7 +139,13 @@ export class WdaSession {
     readonly id: string,
   ) {}
 
-  /** Attaches to the Safari already open, never relaunching it. */
+  /**
+   * Attaches to the Safari already open, never relaunching it. WDA would wait
+   * up to 10 s for Safari to go idle before each touch; on the iOS 27
+   * simulator that made a tap take up to 10 s on an idle page (#1157), and
+   * every tap's landing is checked through the inspector anyway, so the wait
+   * is turned off.
+   */
   static async open(http: Http): Promise<WdaSession> {
     const value = await http('POST', '/session', {
       capabilities: {
@@ -147,6 +153,7 @@ export class WdaSession {
           bundleId: 'com.apple.mobilesafari',
           forceAppLaunch: false,
           shouldWaitForQuiescence: false,
+          waitForIdleTimeout: 0,
         },
       },
     });

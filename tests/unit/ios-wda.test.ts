@@ -64,7 +64,12 @@ function recorder(answers: Record<string, unknown> = {}) {
 }
 
 describe('WdaSession', () => {
-  it('attaches to the open Safari without relaunching it', async () => {
+  // waitForIdleTimeout (#1157), measured 2026-11-16 on the iOS 27 simulator:
+  // with WDA's default 10 s wait for Safari to go idle, a tap took 0.6-10+ s
+  // on an idle page and 14 journeys failed at the 10 s ceiling; with it at 0,
+  // 21 of 23 taps took 0.38-0.66 s. Every tap's landing is checked through
+  // the inspector, so the wait adds nothing.
+  it('attaches to the open Safari without relaunching it, and without waiting for it to go idle before each touch', async () => {
     const { calls, http } = recorder();
     await WdaSession.open(http);
     expect(calls[0]).toEqual([
@@ -76,6 +81,7 @@ describe('WdaSession', () => {
             bundleId: 'com.apple.mobilesafari',
             forceAppLaunch: false,
             shouldWaitForQuiescence: false,
+            waitForIdleTimeout: 0,
           },
         },
       },
