@@ -4,6 +4,8 @@ import {
   CANARY_REMOVE_SCRIPT,
   CANARY_SCRIPT,
   FIELD_SCRIPT,
+  FIELD_TYPED_SCRIPT,
+  TYPED_CEILING_MS,
   KEYBOARD_GONE_SCRIPT,
   KEYBOARD_SCRIPT,
   LANDING_SCRIPT,
@@ -64,6 +66,7 @@ const NAMES = new Map<string, string>([
   [PREPARE_SCRIPT, 'prepare'],
   [LANDING_SCRIPT, 'landing'],
   [FIELD_SCRIPT, 'field'],
+  [FIELD_TYPED_SCRIPT, 'field-typed'],
   [KEYBOARD_SCRIPT, 'keyboard'],
   [KEYBOARD_GONE_SCRIPT, 'keyboard-gone'],
   [OPTION_SCRIPT, 'option'],
@@ -82,6 +85,7 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
     ['prepare', () => prepared()],
     ['landing', () => landed()],
     ['field', () => ({ value: '', focused: false })],
+    ['field-typed', ([, expected]) => expected],
     ['keyboard', () => true],
     ['keyboard-gone', () => true],
     ['option', () => 'Skip the animation'],
@@ -448,7 +452,24 @@ describe('RealTapInteraction.type and clear', () => {
       'landing',
       'keys',
       'keyboard',
-      'field',
+      'field-typed',
+    ]);
+  });
+
+  it("waits for the field to hold the typed text, since a simulator's keyboard is still typing when WebDriverAgent answers", async () => {
+    let waited: unknown[] = [];
+    const f = fakes({
+      field: () => ({ value: '3', focused: true }),
+      'field-typed': (args) => {
+        waited = args;
+        return '312';
+      },
+    });
+    await interaction(f).type(element('#cg-count'), '12');
+    expect(waited).toEqual([
+      element('#cg-count'),
+      '312',
+      TYPED_CEILING_MS + 2 * 100,
     ]);
   });
 
@@ -475,7 +496,10 @@ describe('RealTapInteraction.type and clear', () => {
   });
 
   it('fails when the keyboard left a different value than was typed', async () => {
-    const f = fakes({ field: () => ({ value: 'Ana', focused: true }) });
+    const f = fakes({
+      field: () => ({ value: '', focused: true }),
+      'field-typed': () => 'Ana',
+    });
     await expect(interaction(f).type(element('#name'), 'ana')).rejects.toThrow(
       /typed "ana" into #name, which now holds "Ana"/,
     );
@@ -492,8 +516,28 @@ describe('RealTapInteraction.type and clear', () => {
     expect(f.keys).toEqual(['\b\b']);
   });
 
+  it('clear waits for the field to empty, since the backspaces may still be arriving', async () => {
+    let waited: unknown[] = [];
+    const f = fakes({
+      field: () => ({ value: '20', focused: true }),
+      'field-typed': (args) => {
+        waited = args;
+        return '';
+      },
+    });
+    await interaction(f).clear(element('#cg-count'));
+    expect(waited).toEqual([
+      element('#cg-count'),
+      '',
+      TYPED_CEILING_MS + 2 * 100,
+    ]);
+  });
+
   it('clear fails when the field is not empty afterwards', async () => {
-    const f = fakes({ field: () => ({ value: '2', focused: true }) });
+    const f = fakes({
+      field: () => ({ value: '2', focused: true }),
+      'field-typed': () => '2',
+    });
     await expect(interaction(f).clear(element('#cg-count'))).rejects.toThrow(
       /cleared #cg-count, which still holds "2"/,
     );

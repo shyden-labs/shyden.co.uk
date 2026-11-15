@@ -109,6 +109,14 @@ export interface Calibration {
 export const TAP_LANDING_CEILING_MS = 2_000;
 /** The keyboard takes ~0.9 s to come back after WDA types (measured 2026-10-31). */
 export const KEYBOARD_SETTLE_CEILING_MS = 3_000;
+/**
+ * How long a field may take to hold what was typed, beyond one key per
+ * 100 ms (WebDriverAgent's typing rate). On a simulator WebDriverAgent's
+ * keys call answers while the keys are still arriving: asked for "12" it
+ * answered in 0.5 s with "1" typed (measured 2026-11-15, #1157).
+ */
+export const TYPED_CEILING_MS = 2_000;
+const MS_PER_KEY = 100;
 /** Real drags allowed to bring an element into view: the longest page is about six views. */
 export const MAX_SWIPES = 12;
 /** One drag moves at most this share of the view, so the target is never flung past. */
@@ -278,6 +286,18 @@ var el = arguments[0];
 return { value: el.value, focused: document.activeElement === el };`;
 
 /**
+ * Async: waits up to arguments[2] ms for arguments[0]'s value to be
+ * arguments[1], and answers the value it holds then.
+ */
+export const FIELD_TYPED_SCRIPT = `
+var el = arguments[0], expected = arguments[1], ceiling = arguments[2];
+var done = arguments[arguments.length - 1], started = Date.now();
+(function look() {
+  if (el.value === expected || Date.now() - started >= ceiling) return done(el.value);
+  requestAnimationFrame(look);
+})();`;
+
+/**
  * Covers the view with one top-most transparent layer that records the
  * first touch on it and swallows it, so measuring never moves the focus or
  * presses anything beneath.
@@ -397,10 +417,10 @@ export class RealTapInteraction implements Interaction {
     if (!before.focused) await this.click(element);
     await this.wda.keys(text);
     await this.keyboardBack(element);
-    const after = await this.field(element);
-    if (after.value !== before.value + text)
+    const after = await this.typed(element, before.value + text, text.length);
+    if (after !== before.value + text)
       throw new Error(
-        `typed "${text}" into ${element.selector}, which now holds "${after.value}" (it held "${before.value}")`,
+        `typed "${text}" into ${element.selector}, which now holds "${after}" (it held "${before.value}")`,
       );
   }
 
@@ -412,10 +432,10 @@ export class RealTapInteraction implements Interaction {
       await this.wda.keys('\b'.repeat(before.value.length));
       await this.keyboardBack(element);
     }
-    const after = await this.field(element);
-    if (after.value !== '')
+    const after = await this.typed(element, '', before.value.length);
+    if (after !== '')
       throw new Error(
-        `cleared ${element.selector}, which still holds "${after.value}"`,
+        `cleared ${element.selector}, which still holds "${after}"`,
       );
   }
 
@@ -585,6 +605,19 @@ export class RealTapInteraction implements Interaction {
       throw new Error(
         `the keyboard did not come back and settle within ${KEYBOARD_SETTLE_CEILING_MS / 1000} s after typing into ${element.selector}`,
       );
+  }
+
+  /** The field's value once it is `expected`, or whatever it holds when the keys stop arriving. */
+  private typed(
+    element: PageElement,
+    expected: string,
+    keys: number,
+  ): Promise<string> {
+    return this.page.executeAsyncScript<string>(FIELD_TYPED_SCRIPT, [
+      element,
+      expected,
+      TYPED_CEILING_MS + keys * MS_PER_KEY,
+    ]);
   }
 
   private field(
