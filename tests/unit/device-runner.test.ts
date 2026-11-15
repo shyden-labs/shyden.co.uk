@@ -15,6 +15,7 @@ import {
   waitUntil,
   deviceRunGroups,
   runGroups,
+  adbCleanupCalls,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -778,5 +779,18 @@ describe('runGroups: who runs together, and who runs last', () => {
     r.gates.desktop!();
     expect((await done).map((g) => g.name)).toEqual(['desktop']);
     expect(r.events).toEqual(['start desktop', 'end desktop']);
+  });
+});
+
+describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)', () => {
+  it('makes no adb call for an iOS-only run, so the USB phones stay free for another session', () => {
+    expect(adbCleanupCalls(['ios'])).toEqual([]);
+  });
+
+  it('removes both tunnels when the Android group is in the run', () => {
+    expect(adbCleanupCalls(['desktop', 'android', 'ios'])).toEqual([
+      ['forward', '--remove-all'],
+      ['reverse', '--remove-all'],
+    ]);
   });
 });
