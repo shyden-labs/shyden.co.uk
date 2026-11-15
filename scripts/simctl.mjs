@@ -43,13 +43,49 @@ export function simulatorSafariArgs(udid, url) {
   return ['simctl', 'openurl', udid, url];
 }
 
-/** Opens `url` in the simulator's Safari. @param {string} udid @param {string} url @returns {string} */
+/** @param {string} udid @returns {string[]} */
+export function simulatorSafariQuitArgs(udid) {
+  return ['simctl', 'terminate', udid, 'com.apple.mobilesafari'];
+}
+
+/**
+ * Whether closing Safari failed only because it was not running: simctl
+ * exits 3 with "found nothing to terminate" (measured 2026-11-16).
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function nothingToTerminate(error) {
+  return (
+    error instanceof Error && /found nothing to terminate/.test(error.message)
+  );
+}
+
+// openurl just after a boot timed out at load 122-489 (2026-11-14).
+const SIMCTL_SAFARI = {
+  timeoutMs: 60_000,
+  whenSilent: 'is the simulator still booting, or the Mac overloaded?',
+};
+
+/**
+ * Opens `url` in a freshly started Safari on the simulator. A Safari left
+ * from an earlier device run was not listed to the Web Inspector again (run 9,
+ * 2026-11-16: 80 skipped); one closed first and started by openurl was, every
+ * time, on the page in 3 s (#1157).
+ *
+ * @param {string} udid @param {string} url @returns {string}
+ */
 export function openSimulatorSafari(udid, url) {
-  return runWithDeadline('xcrun', simulatorSafariArgs(udid, url), {
-    // openurl just after a boot timed out at load 122-489 (2026-11-14).
-    timeoutMs: 60_000,
-    whenSilent: 'is the simulator still booting, or the Mac overloaded?',
-  });
+  try {
+    runWithDeadline('xcrun', simulatorSafariQuitArgs(udid), SIMCTL_SAFARI);
+  } catch (error) {
+    if (!nothingToTerminate(error)) throw error;
+  }
+  return runWithDeadline(
+    'xcrun',
+    simulatorSafariArgs(udid, url),
+    SIMCTL_SAFARI,
+  );
 }
 
 const RUNTIME = /SimRuntime\.iOS-(\d+)-(\d+)$/;

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   pickSimulator,
   SIMULATOR_LIST_ARGS,
+  nothingToTerminate,
   simulatorSafariArgs,
+  simulatorSafariQuitArgs,
   simulatorStartPage,
 } from '../../scripts/simctl.mjs';
 
@@ -81,6 +83,35 @@ describe('the simulator reads and launches (#1157)', () => {
       'SIM-1',
       'http://127.0.0.1:4321/',
     ]));
+
+  // #1157, measured 2026-11-16: after one device run ended, the next found no
+  // Safari listed to the Web Inspector (run 9: 80 skipped), and a Safari
+  // closed and opened again was listed every time. A cold openurl starts
+  // Safari on the page in 3 s.
+  it('closes Safari before opening the page, so each run attaches to a fresh one', () =>
+    expect(simulatorSafariQuitArgs('SIM-1')).toEqual([
+      'simctl',
+      'terminate',
+      'SIM-1',
+      'com.apple.mobilesafari',
+    ]));
+
+  it('accepts a Safari that was not running, and nothing else, when closing it', () => {
+    expect(
+      nothingToTerminate(
+        new Error(
+          'xcrun simctl terminate SIM-1 com.apple.mobilesafari failed: status 3, stderr "An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):\nSimulator device failed to terminate com.apple.mobilesafari.\nfound nothing to terminate"',
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      nothingToTerminate(
+        new Error(
+          'xcrun simctl terminate SIM-1 com.apple.mobilesafari gave no answer within 60000 ms: is the simulator still booting, or the Mac overloaded?',
+        ),
+      ),
+    ).toBe(false);
+  });
 
   it("starts on the Mac's own dev server, which a simulator reaches on loopback", () =>
     expect(simulatorStartPage(4321)).toBe('http://127.0.0.1:4321/'));
