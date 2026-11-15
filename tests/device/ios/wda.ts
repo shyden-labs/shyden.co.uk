@@ -58,6 +58,25 @@ export class WdaError extends Error {
   }
 }
 
+/**
+ * An error and each `cause` beneath it, as `message <- CODE message`. Node's
+ * `fetch` says only "fetch failed" and keeps the refusal or reset in `cause`
+ * (#1166).
+ */
+function causeChain(error: unknown): string {
+  const parts: string[] = [];
+  for (let at: unknown = error; at !== undefined && at !== null;) {
+    const { code, cause } = at as { code?: unknown; cause?: unknown };
+    parts.push(
+      [typeof code === 'string' ? code : '', messageOf(at)]
+        .filter(Boolean)
+        .join(' '),
+    );
+    at = cause;
+  }
+  return parts.join(' <- ');
+}
+
 /** The real HTTP client, over `fetch`, with a ceiling on every call. */
 export function httpFor(baseUrl: string): Http {
   return async (method, path, body) => {
@@ -74,7 +93,9 @@ export function httpFor(baseUrl: string): Http {
         method,
         path,
         0,
-        `no answer within ${WDA_COMMAND_CEILING_MS / 1000} s (${messageOf(error)}); is WebDriverAgent still running?`,
+        error instanceof Error && error.name === 'TimeoutError'
+          ? `no answer within ${WDA_COMMAND_CEILING_MS / 1000} s; is WebDriverAgent still running?`
+          : `the request failed: ${causeChain(error)}`,
       );
     }
     const text = await response.text();
