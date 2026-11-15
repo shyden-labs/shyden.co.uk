@@ -12,6 +12,8 @@ import {
   OPTION_SCRIPT,
   MAX_SWIPES,
   PREPARE_SCRIPT,
+  SWIPE_SETTLE_CEILING_MS,
+  SWIPE_SETTLE_SCRIPT,
   RealTapInteraction,
   runTapCanary,
   TapNotLandedError,
@@ -64,6 +66,7 @@ type Handler = (args: unknown[]) => unknown;
 
 const NAMES = new Map<string, string>([
   [PREPARE_SCRIPT, 'prepare'],
+  [SWIPE_SETTLE_SCRIPT, 'swipe-settle'],
   [LANDING_SCRIPT, 'landing'],
   [FIELD_SCRIPT, 'field'],
   [FIELD_TYPED_SCRIPT, 'field-typed'],
@@ -85,6 +88,7 @@ function fakes(handlers: Partial<Record<string, Handler>> = {}) {
   const onScreenOf: unknown[] = [];
   const answers = new Map<string, Handler>([
     ['prepare', () => prepared()],
+    ['swipe-settle', () => true],
     ['landing', () => landed()],
     ['field', () => ({ value: '', focused: false })],
     ['field-typed', ([, expected]) => expected],
@@ -296,7 +300,14 @@ describe('RealTapInteraction.click: real scrolling', () => {
   it('brings an element below the view up with a real swipe up the middle of the screen', async () => {
     const f = fakes({ prepare: inTurn(below, prepared()) });
     await interaction(f).click(element());
-    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+    expect(f.log).toEqual([
+      'prepare',
+      'swipe',
+      'swipe-settle',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
     const [[from, to]] = f.swipes;
     expect(
       [from.x, to.x],
@@ -322,6 +333,42 @@ describe('RealTapInteraction.click: real scrolling', () => {
       spy.mockRestore();
     }
     expect(lines).toEqual(['  [real swipe] up toward #cg-size, 448 points']);
+  });
+
+  // #1157, iOS 27 simulator, 2026-11-16: a real drag scrolls the page late.
+  // Traced per frame, the page drew nothing for 2.3 s after the swipe began
+  // and then moved; measured at once it had "not moved", and 21 journeys of
+  // run 8 failed "a real swipe no longer moves the page".
+  it('waits for the page to move after a real swipe, up to its ceiling, before measuring again', async () => {
+    let settleArgs: unknown[] = [];
+    const f = fakes({
+      prepare: inTurn(below, prepared()),
+      'swipe-settle': (args) => {
+        settleArgs = args;
+        return true;
+      },
+    });
+    const target = element('#cg-size');
+    await interaction(f).click(target);
+    expect(f.log.slice(0, 4)).toEqual([
+      'prepare',
+      'swipe',
+      'swipe-settle',
+      'prepare',
+    ]);
+    expect(settleArgs).toEqual([target, 1200, SWIPE_SETTLE_CEILING_MS]);
+    expect(SWIPE_SETTLE_CEILING_MS).toBe(5_000);
+  });
+
+  it('fails naming the wait when the page has not moved within the ceiling after a swipe', async () => {
+    const f = fakes({
+      prepare: () => below,
+      'swipe-settle': () => false,
+    });
+    await expect(interaction(f).click(element('#cg-size'))).rejects.toThrow(
+      '#cg-size did not come into view: the page had not moved 5 s after a real swipe toward it; the box is at y 1200, the view is 746 tall',
+    );
+    expect(f.swipes).toHaveLength(1);
   });
 
   it('swipes down for an element above the view', async () => {
@@ -350,7 +397,14 @@ describe('RealTapInteraction.click: real scrolling', () => {
       ),
     });
     await interaction(f).click(element('#cg-count'));
-    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+    expect(f.log).toEqual([
+      'prepare',
+      'swipe',
+      'swipe-settle',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
   });
 
   it('swipes an uncovered element at the foot of the view toward the middle before tapping it', async () => {
@@ -364,7 +418,14 @@ describe('RealTapInteraction.click: real scrolling', () => {
       ),
     });
     await interaction(f).click(element());
-    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+    expect(f.log).toEqual([
+      'prepare',
+      'swipe',
+      'swipe-settle',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
   });
 
   it('taps an uncovered element at the foot of the view where it is when the page cannot scroll further', async () => {
@@ -374,7 +435,14 @@ describe('RealTapInteraction.click: real scrolling', () => {
       landing: () => landed({ clientY: 710 }),
     });
     await interaction(f).click(element());
-    expect(f.log).toEqual(['prepare', 'swipe', 'prepare', 'tap', 'landing']);
+    expect(f.log).toEqual([
+      'prepare',
+      'swipe',
+      'swipe-settle',
+      'prepare',
+      'tap',
+      'landing',
+    ]);
   });
 
   it('fails as covered when the page cannot scroll the element out from under the bar', async () => {
@@ -753,6 +821,7 @@ describe('RealTapInteraction.click: the keyboard is in the way', () => {
     expect(f.log).toEqual([
       'prepare',
       'swipe',
+      'swipe-settle',
       'prepare',
       'menu:Done',
       'tap',

@@ -183,6 +183,34 @@ export class TapNotLandedError extends Error {
  * records the next touch: on the element, or where it went instead.
  * Nothing here scrolls: a finger does that.
  */
+/**
+ * How long a real swipe is given to move the page. On the iOS 27 simulator a
+ * drag scrolled late: traced per frame, the page drew nothing for 2.3 s after
+ * the swipe began, then moved (#1157, 2026-11-16).
+ */
+export const SWIPE_SETTLE_CEILING_MS = 5_000;
+
+/**
+ * Waits, after a real swipe, for the element's box to leave `arguments[1]`
+ * (its y before the swipe) and then to stay put for three frames, or for the
+ * ceiling `arguments[2]`; answers whether it moved. Nothing here scrolls.
+ */
+export const SWIPE_SETTLE_SCRIPT = `
+var el = arguments[0], before = arguments[1], ceiling = arguments[2], done = arguments[arguments.length - 1];
+var started = Date.now(), moved = false, last = null, still = 0;
+(function wait() {
+  var y = el.getBoundingClientRect().y;
+  if (!moved) moved = y !== before;
+  if (moved) {
+    still = y === last ? still + 1 : 0;
+    last = y;
+    if (still >= 3) return done(true);
+  }
+  if (Date.now() - started >= ceiling) return done(moved);
+  requestAnimationFrame(wait);
+})();
+`;
+
 export const PREPARE_SCRIPT = `
 var el = arguments[0], token = arguments[1], done = arguments[arguments.length - 1];
 var vv = window.visualViewport;
@@ -490,6 +518,7 @@ export class RealTapInteraction implements Interaction {
    */
   private async bringIntoView(element: PageElement): Promise<Prepared> {
     let prepared = await this.prepare(element);
+    let stalled = false;
     for (let swipes = 0; this.mustMove(prepared); swipes++) {
       if (swipes === MAX_SWIPES)
         throw new TapNotLandedError(
@@ -509,13 +538,25 @@ export class RealTapInteraction implements Interaction {
       }
       const before = prepared.rect.y;
       await this.swipeToward(prepared, element.selector);
+      // Measured at once, a late scroll reads as none (#1157): the page is
+      // given its ceiling to move before it is measured again.
+      const moved = await this.page.executeAsyncScript<boolean>(
+        SWIPE_SETTLE_SCRIPT,
+        [element, before, SWIPE_SETTLE_CEILING_MS],
+      );
       prepared = await this.prepare(element);
+      if (!moved) {
+        stalled = true;
+        break;
+      }
       if (prepared.rect.y === before) break;
     }
     if (!prepared.inView)
       throw new TapNotLandedError(
         element.selector,
-        `${element.selector} did not come into view: a real swipe no longer moves the page toward it; the box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall`,
+        stalled
+          ? `${element.selector} did not come into view: the page had not moved ${SWIPE_SETTLE_CEILING_MS / 1000} s after a real swipe toward it; the box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall`
+          : `${element.selector} did not come into view: a real swipe no longer moves the page toward it; the box is at y ${prepared.rect.y}, the view is ${prepared.viewHeight} tall`,
       );
     if (prepared.hit !== null)
       throw new TapNotLandedError(
