@@ -499,6 +499,93 @@ async function waitForHttpOk(url, { timeoutMs, describe }) {
   );
 }
 
+/** How many of a child's last lines a failure quotes. */
+const RECENT_LINES = 20;
+
+/**
+ * Keeps the last {@link RECENT_LINES} complete lines a child writes, from
+ * stdout and stderr in the order they arrive, so a child that exits early
+ * can be quoted (#1160). A partial line is not kept.
+ *
+ * @param {{ stdout: import('node:stream').Readable | null, stderr: import('node:stream').Readable | null }} child
+ * @returns {string[]} live: it fills as the child writes
+ */
+export function recentLines(child) {
+  /** @type {string[]} */
+  const lines = [];
+  for (const stream of [child.stdout, child.stderr]) {
+    if (!stream) continue;
+    let buffer = '';
+    stream.on('data', (/** @type {Buffer | string} */ data) => {
+      buffer += data.toString('utf8');
+      const parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+      lines.push(...parts);
+      if (lines.length > RECENT_LINES)
+        lines.splice(0, lines.length - RECENT_LINES);
+    });
+  }
+  return lines;
+}
+
+/**
+ * Waits for `ready`, but fails at once when `child` exits first, naming its
+ * exit and quoting its last lines: `astro preview` exits at once when another
+ * preview already runs, printing that server's PID and URL, and a run that
+ * waited for the port instead named only its own timeout (#1160).
+ *
+ * @template T
+ * @param {import('node:events').EventEmitter} child
+ * @param {Promise<T>} ready
+ * @param {readonly string[]} lines from {@link recentLines}
+ * @param {string} describe
+ * @returns {Promise<T>}
+ */
+export async function untilReadyOrExit(child, ready, lines, describe) {
+  /** @type {(code: number | null, signal: string | null) => void} */
+  let onExit = () => {};
+  /** @type {Promise<never>} */
+  const exited = new Promise((_, reject) => {
+    onExit = (code, signal) => {
+      const how = code === null ? `signal ${signal}` : `code ${code}`;
+      const said =
+        lines.length > 0
+          ? `Its last lines:\n${lines.join('\n')}`
+          : 'It printed nothing.';
+      reject(
+        new Error(`${describe} exited (${how}) before it answered. ${said}`),
+      );
+    };
+    child.once('exit', onExit);
+  });
+  try {
+    return await Promise.race([ready, exited]);
+  } finally {
+    child.off('exit', onExit);
+  }
+}
+
+/**
+ * Sends SIGTERM to the child's whole process group (it was started
+ * detached). A group already gone (ESRCH) is the outcome wanted, not a
+ * failure to report (#1160); any other error is passed on.
+ *
+ * @param {{ pid?: number }} child
+ * @param {(pid: number, signal: NodeJS.Signals) => unknown} [kill]
+ * @returns {'stopped' | 'already gone' | 'no pid'}
+ */
+export function stopProcessGroup(child, kill = process.kill.bind(process)) {
+  if (child.pid === undefined) return 'no pid';
+  try {
+    kill(-child.pid, 'SIGTERM');
+    return 'stopped';
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ESRCH')
+      return 'already gone';
+    throw error;
+  }
+}
+
 /**
  * In-memory map, mirrored to DASHBOARD_GROUPS_FILE on every write. An
  * in-memory object mutated synchronously (never read-modify-write off
@@ -1458,8 +1545,7 @@ const cleanup = once(async () => {
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
     try {
-      if (previewChild.pid !== undefined)
-        process.kill(-previewChild.pid, 'SIGTERM');
+      stopProcessGroup(previewChild);
     } catch (error) {
       process.stderr.write(
         `cleanup: failed to stop the preview server: ${messageOf(error)}\n`,
@@ -1596,10 +1682,15 @@ async function main() {
       ['run', 'preview', '--', '--host', '0.0.0.0'],
       { detached: true },
     );
-    await waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
-      timeoutMs: 30_000,
-      describe: `the shared preview server to answer on :${PORT}`,
-    });
+    await untilReadyOrExit(
+      previewChild,
+      waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
+        timeoutMs: 30_000,
+        describe: `the shared preview server to answer on :${PORT}`,
+      }),
+      recentLines(previewChild),
+      'the shared preview server',
+    );
 
     // Brief step 2(d): abort the WHOLE run rather than let three groups
     // measure the wrong bytes.
