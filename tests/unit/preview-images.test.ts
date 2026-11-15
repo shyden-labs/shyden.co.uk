@@ -16,8 +16,7 @@ import { decodePng } from '../device/ios/png-shrink';
  */
 const FEWEST_COLOURS = 32;
 
-const distinctColours = (path: string): number => {
-  const image = decodePng(readFileSync(path));
+const distinctColours = (image: ReturnType<typeof decodePng>): number => {
   const seen = new Set<number>();
   for (let i = 0; i < image.pixels.length; i += image.channels)
     seen.add(
@@ -36,9 +35,14 @@ describe('every page has a link preview that shows it (#1158)', () => {
   it.each(PREVIEW_IMAGES)('%s is a 1200x630 picture of the page', (image) => {
     const path = `public${image}`;
     expect(existsSync(path), `${path} is missing`).toBe(true);
-    const { width, height } = decodePng(readFileSync(path));
-    expect([width, height]).toEqual([PREVIEW_WIDTH, PREVIEW_HEIGHT]);
-    expect(distinctColours(path)).toBeGreaterThanOrEqual(FEWEST_COLOURS);
+    // One decode serves both checks: decoding a 1200x630 PNG twice took a
+    // test past the 1 s limit on a busy machine (#1162).
+    const decoded = decodePng(readFileSync(path));
+    expect([decoded.width, decoded.height]).toEqual([
+      PREVIEW_WIDTH,
+      PREVIEW_HEIGHT,
+    ]);
+    expect(distinctColours(decoded)).toBeGreaterThanOrEqual(FEWEST_COLOURS);
   });
 
   it('the flat placeholder it replaced is gone', () => {
