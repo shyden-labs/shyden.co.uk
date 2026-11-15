@@ -70,7 +70,7 @@ describe('WdaSession', () => {
   // on an idle page and 14 journeys failed at the 10 s ceiling; with it at 0,
   // 21 of 23 taps took 0.38-0.66 s. Every tap's landing is checked through
   // the inspector, so the wait adds nothing.
-  it('attaches to the open Safari without relaunching it, and without waiting for it to go idle before each touch', async () => {
+  it('attaches to the open Safari without relaunching it, and without waiting for it to go idle or stable around each touch', async () => {
     const { calls, http } = recorder();
     await WdaSession.open(http);
     expect(calls[0]).toEqual([
@@ -87,13 +87,25 @@ describe('WdaSession', () => {
         },
       },
     ]);
+    // animationCoolOffTimeout (#1157), measured 2026-11-16 on the iOS 27
+    // simulator, six real swipes per run on /id/classroom-groups: with WDA's
+    // default 2 s wait for Safari to be stable after each touch, the first
+    // swipe that scrolled never answered and every request after it timed
+    // out (8 of 12 over two runs); at 0, none did (12 of 12, 1.2-2.5 s).
+    // It is a setting, not a capability, so it is set once the session is open.
+    expect(calls[1]).toEqual([
+      'POST',
+      '/session/S1/appium/settings',
+      { settings: { animationCoolOffTimeout: 0 } },
+    ]);
+    expect(calls).toHaveLength(2);
   });
 
   it('tap sends one touch pointer: move, down, 50 ms pause, up, and nothing else (WDA answers 404 to a release)', async () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.tap({ x: 60.4, y: 108.6 });
-    expect(calls.slice(1)).toEqual([
+    expect(calls.slice(2)).toEqual([
       [
         'POST',
         '/session/S1/actions',
@@ -120,7 +132,7 @@ describe('WdaSession', () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.swipe({ x: 210, y: 600.4 }, { x: 210, y: 300.6 });
-    expect(calls[1]).toEqual([
+    expect(calls[2]).toEqual([
       'POST',
       '/session/S1/actions',
       {
@@ -146,7 +158,7 @@ describe('WdaSession', () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.keys('Ana');
-    expect(calls[1]).toEqual([
+    expect(calls[2]).toEqual([
       'POST',
       '/session/S1/wda/keys',
       { value: ['Ana'], frequency: 10 },
@@ -167,7 +179,7 @@ describe('WdaSession', () => {
     expect(await wda.buttonsLabelled('Skip "the" animation')).toEqual([
       { x: 85, y: 551, width: 250, height: 36 },
     ]);
-    expect(calls[1]).toEqual([
+    expect(calls[2]).toEqual([
       'POST',
       '/session/S1/elements',
       {
@@ -206,7 +218,7 @@ describe('WdaSession', () => {
         height: 874,
       }),
     ).toEqual([{ x: 341, y: 519, width: 40, height: 38 }]);
-    expect(calls[1]).toEqual([
+    expect(calls[2]).toEqual([
       'POST',
       '/session/S1/elements',
       {
@@ -226,7 +238,7 @@ describe('WdaSession', () => {
     const { calls, http } = recorder();
     const wda = await WdaSession.open(http);
     await wda.close();
-    expect(calls[1]).toEqual(['DELETE', '/session/S1', undefined]);
+    expect(calls[2]).toEqual(['DELETE', '/session/S1', undefined]);
   });
 
   it('refuses a session answer with no id, naming what came back', async () => {

@@ -162,10 +162,13 @@ export class WdaSession {
 
   /**
    * Attaches to the Safari already open, never relaunching it. WDA would wait
-   * up to 10 s for Safari to go idle before each touch; on the iOS 27
-   * simulator that made a tap take up to 10 s on an idle page (#1157), and
-   * every tap's landing is checked through the inspector anyway, so the wait
-   * is turned off.
+   * up to 10 s for Safari to go idle before each touch, and up to 2 s for it
+   * to be stable after one. On the iOS 27 simulator the first made a tap take
+   * up to 10 s on an idle page, and the second left WDA answering nothing
+   * after the first swipe that scrolled (#1157). Every tap's landing and every
+   * swipe's movement are read back through the inspector, so both waits are
+   * turned off: the first as a capability, the second as a setting, which
+   * WDA reads only once a session is open.
    */
   static async open(http: Http): Promise<WdaSession> {
     const value = await http('POST', '/session', {
@@ -183,6 +186,9 @@ export class WdaSession {
       throw new Error(
         `WebDriverAgent opened no session id; it answered ${JSON.stringify(value)}`,
       );
+    await http('POST', `/session/${id}/appium/settings`, {
+      settings: { animationCoolOffTimeout: 0 },
+    });
     return new WdaSession(http, id);
   }
 
