@@ -23,6 +23,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createConnection, type Socket } from 'node:net';
+import { loadavg } from 'node:os';
 import { connect as tlsConnect, type ConnectionOptions } from 'node:tls';
 import {
   type ByteTransport,
@@ -33,7 +34,12 @@ import {
 import { queryType, startService, startSession } from './lockdown';
 import { pinnedTlsOptions, verifyPinnedPeer } from './pin';
 import { PageProtocol } from './protocol';
-import { daemonState, inspectorSocket, launchdSimPid } from './simulator';
+import {
+  daemonState,
+  inspectorSocket,
+  launchdSimPid,
+  readProcess,
+} from './simulator';
 import {
   connectPort,
   listDevices,
@@ -253,11 +259,10 @@ export async function openSimulatorInspector(options: {
   }
 }
 
-const PROCESS_READ_TIMEOUT_MS = 5_000;
 const read = (file: string, args: string[]): string =>
-  execFileSync(file, args, {
-    encoding: 'utf8',
-    timeout: PROCESS_READ_TIMEOUT_MS,
+  readProcess(file, args, {
+    exec: (program, argv, options) => execFileSync(program, argv, options),
+    loadAverage: () => loadavg()[0],
   });
 
 /** The real socket: the one the simulator's launchd_sim holds open. */

@@ -3,6 +3,8 @@ import {
   daemonState,
   inspectorSocket,
   launchdSimPid,
+  PROCESS_READ_CEILING_MS,
+  readProcess,
 } from '../device/ios/inspector/simulator';
 
 /** Finding a booted simulator's Web Inspector socket from `ps` and `lsof` (#1157 AC1). */
@@ -91,4 +93,57 @@ describe('the Web Inspector daemon, as a failure names it', () => {
     expect(daemonState('376 /System/Library/mds')).toBe(
       'no webinspectord running (launchd_sim starts it on first connect); MobileSafari not running',
     ));
+});
+
+describe('reading ps and lsof under load', () => {
+  const timedOut = (): never => {
+    throw Object.assign(new Error('spawnSync ps ETIMEDOUT'), {
+      code: 'ETIMEDOUT',
+    });
+  };
+
+  it('waits 30 s for the program: 5 s ran out twice at loads near 150-190 (#1157)', () => {
+    const asked: { timeout?: number }[] = [];
+    readProcess('ps', ['-axo', 'pid,command'], {
+      exec: (_file, _args, options) => {
+        asked.push(options);
+        return 'out';
+      },
+      loadAverage: () => 1,
+    });
+    expect(PROCESS_READ_CEILING_MS).toBe(30_000);
+    expect(asked).toEqual([{ encoding: 'utf8', timeout: 30_000 }]);
+  });
+
+  it('answers what the program printed', () => {
+    expect(
+      readProcess('ps', [], {
+        exec: () => 'pid command',
+        loadAverage: () => 1,
+      }),
+    ).toBe('pid command');
+  });
+
+  it('names the command, the ceiling and the load when the program does not answer', () => {
+    expect(() =>
+      readProcess('ps', ['-axo', 'pid,command'], {
+        exec: timedOut,
+        loadAverage: () => 156.47,
+      }),
+    ).toThrow(
+      "ps -axo pid,command did not answer within 30 s; the machine's load average is 156.5",
+    );
+  });
+
+  it('passes any other failure on unchanged', () => {
+    const other = new Error('spawnSync ps ENOENT');
+    expect(() =>
+      readProcess('ps', [], {
+        exec: () => {
+          throw other;
+        },
+        loadAverage: () => 1,
+      }),
+    ).toThrow(other);
+  });
 });

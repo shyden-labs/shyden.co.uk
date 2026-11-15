@@ -82,3 +82,39 @@ export function daemonState(ps: string): string {
       : `webinspectord pids ${daemons.join(', ')}`;
   return `${daemon}; ${safari.length === 0 ? 'MobileSafari not running' : `MobileSafari pid ${safari.join(', ')}`}`;
 }
+
+/**
+ * How long `ps` or `lsof` may take. 5 s ran out twice during device runs, at
+ * load averages near 150-190 that other sessions' work had raised (#1157,
+ * 2026-11-15 12:11 and 23:32 WIB); the same `ps` took 0.16 s at load 57.
+ */
+export const PROCESS_READ_CEILING_MS = 30_000;
+
+export interface ProcessReader {
+  exec: (
+    file: string,
+    args: string[],
+    options: { encoding: 'utf8'; timeout: number },
+  ) => string;
+  loadAverage: () => number;
+}
+
+/** What `file args` printed; a program that does not answer is named with the machine's load. */
+export function readProcess(
+  file: string,
+  args: string[],
+  { exec, loadAverage }: ProcessReader,
+): string {
+  try {
+    return exec(file, args, {
+      encoding: 'utf8',
+      timeout: PROCESS_READ_CEILING_MS,
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'ETIMEDOUT') throw error;
+    throw new Error(
+      `${[file, ...args].join(' ')} did not answer within ${PROCESS_READ_CEILING_MS / 1000} s; the machine's load average is ${loadAverage().toFixed(1)}`,
+      { cause: error },
+    );
+  }
+}
