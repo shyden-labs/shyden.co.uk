@@ -345,11 +345,11 @@ async function attachToSafari(device: IosDevice): Promise<Inspector> {
   let inspector: Inspector;
   if (device.simulator) {
     const start = simulatorStartPage(DEV_SERVER_PORT);
-    openSimulatorSafari(device.udid, start);
     inspector = await openSimulatorInspector({
       url: (url) => url === start,
       udid: device.udid,
       dial: nodeSimulatorDialer(),
+      openSafari: () => openSimulatorSafari(device.udid, start),
     });
   } else {
     launchSafari(device.udid, START_PAGE);

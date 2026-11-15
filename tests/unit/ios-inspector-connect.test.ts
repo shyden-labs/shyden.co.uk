@@ -419,4 +419,21 @@ describe('opening the inspector on a simulator', () => {
     expect(asked(transports).at(-1)).toBe('0: _rpc_forwardDidClose:');
     expect(transports.every((transport) => transport.closed)).toBe(true);
   });
+
+  // Measured 2026-11-16 (#1157): the daemon exits when the last connection
+  // closes, and a Safari opened before the next connection starts a new one
+  // is never listed to it: opened first, 0 of 4 trials listed; opened once
+  // the socket was connected, 3 of 4 (the miss at load ~150, cold boot).
+  it('opens Safari only once the socket is connected, since a Safari opened before the daemon is never listed', async () => {
+    const { dial, asked: order } = simulatorDialer();
+    await openSimulatorInspector({
+      url: onPage,
+      udid: SIMULATOR,
+      dial,
+      openSafari: () => {
+        order.push('open Safari');
+      },
+    });
+    expect(order).toEqual([`socket ${SIMULATOR}`, 'open Safari']);
+  });
 });

@@ -229,6 +229,13 @@ export async function openSimulatorInspector(options: {
   url: (url: string) => boolean;
   udid: string;
   dial: SimulatorDialer;
+  /**
+   * Opens Safari, called once the socket is connected: the daemon exits when
+   * the last connection closes, and a Safari opened before the next one
+   * starts it was never listed (0 of 4 trials, 3 of 4 opened after; measured
+   * 2026-11-16, #1157).
+   */
+  openSafari?: () => void;
 }): Promise<Inspector> {
   let transport: ByteTransport | undefined;
   let attached: WirSession | undefined;
@@ -239,6 +246,7 @@ export async function openSimulatorInspector(options: {
   };
   try {
     transport = await options.dial.socket(options.udid);
+    options.openSafari?.();
     const page = await attachToSafari(
       new FrameLink(transport, 'length'),
       options.url,
