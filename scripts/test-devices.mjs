@@ -7,6 +7,7 @@
  * section 7 ("Parallelism"), for the shape this implements:
  *
  *   build once -> serve dist on 0.0.0.0:4321 -> desktop   (5 projects)   N workers
+ *                                                (in a Linux container, #1027)
  *                                             -> android   (real Chrome)  1 worker
  *                                             -> ios       (real Safari)  1 session
  *
@@ -51,6 +52,7 @@
  *    always runs, via `finally` and a signal handler -- see `cleanup()`.
  */
 import { execFileSync, spawn } from 'node:child_process';
+import { desktopContainerArgv, desktopImage } from './desktop-container.mjs';
 import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
@@ -1108,35 +1110,43 @@ async function runDesktopGroup() {
   const name = 'desktop';
   const reportFile = REPORT_FILES.desktop;
   const startedAt = Date.now();
+  // In a Linux container, not on macOS, whose engines hand a <select> to a
+  // native menu no real key press reaches (#1027; scripts/desktop-container.mjs).
+  const image = desktopImage(ROOT);
+  const passed = Object.fromEntries(
+    ['EVIDENCE_DIR', 'NAV_TIMING_FILE'].flatMap((key) =>
+      process.env[key] ? [[key, process.env[key]]] : [],
+    ),
+  );
   const { code } = await runTagged(
     name,
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.config.ts',
-      // list,json: unchanged from before this task -- terminal output and
-      // the JSON summary this script itself reads are exactly as they
-      // were. html + the jsonl reporter are ADDITIONS for the dashboard
-      // only (task brief step 3: "keep the existing --reporter=list,json
-      // behaviour alongside the new one"). Neither playwright.config.ts
-      // nor playwright.device.config.ts needed a change to support this --
-      // Playwright's CLI resolves a non-built-in reporter id via
-      // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
-      // `resolveReporter`), so a relative path on this same flag is enough;
-      // measured directly against this exact invocation shape before being
-      // trusted, not assumed.
-      '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-      // Two workers, not Playwright's default of half the cores (3 on the
-      // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
-      // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
-      // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
-      // by Shyden 2026-11-02).
-      '--workers=2',
-    ],
-    {
+    'docker',
+    desktopContainerArgv({
+      root: ROOT,
+      image,
+      playwrightArgs: [
+        '--config=playwright.config.ts',
+        // list,json: unchanged from before this task -- terminal output and
+        // the JSON summary this script itself reads are exactly as they
+        // were. html + the jsonl reporter are ADDITIONS for the dashboard
+        // only (task brief step 3: "keep the existing --reporter=list,json
+        // behaviour alongside the new one"). Neither playwright.config.ts
+        // nor playwright.device.config.ts needed a change to support this --
+        // Playwright's CLI resolves a non-built-in reporter id via
+        // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
+        // `resolveReporter`), so a relative path on this same flag is enough;
+        // measured directly against this exact invocation shape before being
+        // trusted, not assumed.
+        '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+        // Two workers, not Playwright's default of half the cores (3 on the
+        // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
+        // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
+        // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
+        // by Shyden 2026-11-02).
+        '--workers=2',
+      ],
       env: {
-        ...process.env,
+        ...passed,
         PW_REUSE_SERVER: '1',
         PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
         DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
@@ -1152,7 +1162,7 @@ async function runDesktopGroup() {
         PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
         PLAYWRIGHT_HTML_OPEN: 'never',
       },
-    },
+    }),
   );
   return {
     ...playwrightVerdict({
