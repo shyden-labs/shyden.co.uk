@@ -2,4 +2,4 @@
 # its version; Dependabot's docker ecosystem keeps it current, and
 # scripts/playwright-image.mjs uses it whenever its version is the installed
 # @playwright/test's (and resolves that version's digest when it is not).
-FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+FROM mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
