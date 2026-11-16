@@ -631,7 +631,7 @@ export class RealTapInteraction implements Interaction {
   }
 
   /**
-   * One real drag up or down the middle of the visible page, moving the
+   * One real drag up or down the middle of the screen, moving the
    * element's centre toward the middle of the view. Each drag is printed, so
    * a run log shows under each test's name that it swiped (#1157 AC3).
    */
@@ -646,7 +646,13 @@ export class RealTapInteraction implements Interaction {
       Math.sign(need) *
       Math.max(MIN_SWIPE_POINTS, Math.min(Math.abs(need), reach));
     const x = this.screen.x + this.screen.width - SWIPE_EDGE_INSET;
-    const middle = this.calibration.origin.y + (viewHeight * vv.scale) / 2;
+    // The screen's middle, never the measured origin: an origin measured with
+    // the keyboard up is stale once it closes, and put a drag's start on
+    // Safari's address capsule, where a drag up opens the tab overview and
+    // every later touch lands on it (#1169). The middle of the screen is page
+    // with or without a keyboard (measured 2026-10-31), and a drag moves the
+    // page by its length wherever on the page it starts.
+    const middle = this.screen.y + this.screen.height / 2;
     await this.wda.swipe(
       { x, y: middle + distance / 2 },
       { x, y: middle - distance / 2 },

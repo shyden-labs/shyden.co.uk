@@ -319,6 +319,29 @@ describe('RealTapInteraction.click: real scrolling', () => {
     );
   });
 
+  // #1169: an origin measured with the keyboard up (y 330 on the simulator)
+  // put a drag's start on Safari's address capsule at the foot of the
+  // screen, and a drag up from there opens the tab overview, which takes
+  // every later touch. A drag is placed by the screen alone.
+  it('drags around the middle of the screen even when the measured origin is stale', async () => {
+    const f = fakes({ prepare: inTurn(below, prepared()) });
+    await new RealTapInteraction(
+      f.page,
+      f.wda,
+      { ...CALIBRATION, origin: { x: 0, y: 330 } },
+      SCREEN,
+    ).click(element());
+    const [[from, to]] = f.swipes;
+    expect((from.y + to.y) / 2, 'centred on the screen').toBeCloseTo(
+      SCREEN.height / 2,
+      0,
+    );
+    expect(
+      Math.max(from.y, to.y),
+      'clear of the capsule in the bottom fifth',
+    ).toBeLessThan(SCREEN.height * 0.8);
+  });
+
   // #1157 AC3 asks a run log to show that a passing test swiped for real;
   // each test's console lines are grouped under its name in the run log.
   it('prints each real swipe, naming the element and how far it dragged', async () => {
