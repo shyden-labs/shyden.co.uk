@@ -429,10 +429,8 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
       "แถว {row} — ไม่เข้าใจค่า '{value}' สำหรับการขาดเรียน ใช้ {accepted} หรือทิ้งว่างไว้",
     csvProblemDuplicateNumber:
       'แถว {row} — หมายเลข {value} ถูกใช้แล้วโดยแถว {firstRow}',
-    csvProblemNoNumberColumn:
-      'ไฟล์นี้ไม่มีคอลัมน์หมายเลข นักเรียนทุกคนต้องมีหมายเลข',
-    csvProblemNumberBlank:
-      'แถว {row} — ไม่ได้ใส่หมายเลข นักเรียนทุกคนต้องมีหมายเลข',
+    csvProblemNoNumberColumn: 'ไฟล์นี้ไม่มีคอลัมน์หมายเลข นักเรียนทุกคนต้องมีหมายเลข',
+    csvProblemNumberBlank: 'แถว {row} — ไม่ได้ใส่หมายเลข นักเรียนทุกคนต้องมีหมายเลข',
     csvProblemNumberNotWhole: "แถว {row} — หมายเลข '{value}' ไม่ใช่จำนวนเต็ม",
     'errors.BOTH_RULES_NO_ARRANGEMENT':
       'ไม่มีวิธีใดที่จะจัดนักเรียนในชั้นของคุณให้เข้าอยู่ใน {groupsTried} กลุ่มได้ โดยยังคงทำตามตัวอักษร "ด้วยกัน" และตัวอักษร "แยก" ทั้งหมดในเวลาเดียวกัน การค้นหาไม่สามารถระบุได้ว่ากฎประเภทใดเป็นปัญหา ดังนั้นลองใช้วิธีแก้ไขอย่างใดอย่างหนึ่งต่อไปนี้: ขยายขนาดกลุ่มให้ใหญ่ขึ้น หรือให้ตัวอักษร "ด้วยกัน" กับนักเรียนจำนวนน้อยลง หรือสร้างกลุ่มเพิ่มเติม หรือยกเลิกกฎ "แยก" หนึ่งข้อ',
@@ -459,8 +457,7 @@ export const VERIFIED: Record<Locale, Record<string, string>> = {
     // #603's sheet, read by the operator on 2026-10-07 (every short label no
     // check could judge, https://claude.ai/artifact/AgCDjpCJ2AQkKmdSC4cznm).
     // Values are as they stand AFTER the twelve changes he agreed there.
-    absentNumbersHelp:
-      'เลขประจำตัวนักเรียนของผู้ที่ขาดเรียน คั่นด้วยเครื่องหมายจุลภาค',
+    absentNumbersHelp: 'เลขประจำตัวนักเรียนของผู้ที่ขาดเรียน คั่นด้วยเครื่องหมายจุลภาค',
     absentNumbersLabel: 'เลขประจำตัวนักเรียน',
     boardExit: 'ปิดโหมดเต็มหน้าจอ',
     classLabel: 'ชั้นเรียน (ไม่บังคับ)',
