@@ -40,21 +40,21 @@
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
-    "astro": "^7.4.7",
+    "astro": "^7.4.12",
     "swagger-ui-dist": "5.34.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "5.1.0",
-    "ast-v8-to-istanbul": "1.0.7",
-    "prettier": "3.9.10",
+    "ast-v8-to-istanbul": "1.0.8",
+    "prettier": "3.10.1",
     "prettier-plugin-astro": "1.1.2",
     "typescript": "^6.0.3",
-    "vite": "8.3.6",
+    "vite": "8.3.8",
     "vitest": "5.1.0",
-    "wrangler": "4.158.0",
+    "wrangler": "4.161.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
@@ -64,7 +64,7 @@
     "@scarf/scarf@1.4.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true,
-    "workerd@1.20261104.1": true
+    "workerd@1.20261110.1": true
   },
   "scarfSettings": {
     "enabled": false
