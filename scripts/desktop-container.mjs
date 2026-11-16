@@ -168,4 +168,15 @@ export function desktopImage(root) {
   );
 }
 
-if (argv[2] === '--inside') await inside(argv.slice(3));
+/** Run directly, it is the container's entry: `--inside <playwright args>`. */
+async function main() {
+  if (argv[2] !== '--inside') {
+    console.error(
+      'usage: node scripts/desktop-container.mjs --inside <playwright test args> (run by scripts/test-devices.mjs inside the container)',
+    );
+    exit(1);
+  }
+  await inside(argv.slice(3));
+}
+
+if (import.meta.main) await main();

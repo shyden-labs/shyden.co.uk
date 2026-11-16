@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createServer, type Server } from 'node:net';
-import { connect } from 'node:net';
+import { connect, createServer, type Server } from 'node:net';
 import { forwardPort } from '../../scripts/desktop-container.mjs';
 
 /**
