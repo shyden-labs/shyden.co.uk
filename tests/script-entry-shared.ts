@@ -253,4 +253,11 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: node scripts/capture-previews.mjs',
   },
+  // Without `--inside` it is not the container's entry, so it refuses with
+  // its usage before it installs anything or opens a port (#1027).
+  'desktop-container.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/desktop-container.mjs',
+  },
 };
