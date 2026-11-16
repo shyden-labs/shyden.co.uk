@@ -64,7 +64,7 @@
     "@scarf/scarf@1.4.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true,
-    "workerd@1.20261104.1": true
+    "workerd@1.20261110.1": true
   },
   "scarfSettings": {
     "enabled": false
