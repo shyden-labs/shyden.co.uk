@@ -561,7 +561,9 @@ export class RealTapInteraction implements Interaction {
     if (prepared.hit !== null)
       throw new TapNotLandedError(
         element.selector,
-        `${element.selector} is covered: a finger at its centre would touch ${prepared.hit}`,
+        stalled
+          ? `${element.selector} is covered by ${prepared.hit}: the page had not moved ${SWIPE_SETTLE_CEILING_MS / 1000} s after a real swipe toward it`
+          : `${element.selector} is covered: a finger at its centre would touch ${prepared.hit}`,
       );
     return prepared;
   }

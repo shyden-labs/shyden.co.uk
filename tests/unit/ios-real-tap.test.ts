@@ -462,6 +462,25 @@ describe('RealTapInteraction.click: real scrolling', () => {
     ).toHaveLength(1);
   });
 
+  // #1168, measured 2026-11-16: on the Thai page #cg-count opens under the
+  // bar (field y 637.9-681.9, bar from 644.2, view 714), the swipe toward it
+  // did not move the page, and the run said only "covered" -- which read as
+  // a layout fault when the cause was the stalled swipe of #1169.
+  it('says the page had not moved when a swipe stalls with the element still under the bar', async () => {
+    const f = fakes({
+      prepare: () =>
+        prepared({
+          rect: { x: 100, y: 638, width: 100, height: 44 },
+          hit: 'p.actions',
+        }),
+      'swipe-settle': () => false,
+    });
+    await expect(interaction(f).click(element('#cg-count'))).rejects.toThrow(
+      '#cg-count is covered by p.actions: the page had not moved 5 s after a real swipe toward it',
+    );
+    expect(f.taps).toEqual([]);
+  });
+
   it('fails naming the element when the page stops moving before it comes into view', async () => {
     const f = fakes({ prepare: () => below });
     await expect(interaction(f).click(element())).rejects.toThrow(
