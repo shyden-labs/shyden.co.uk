@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * `npm run test:devices` -- one build, one shared server, three device
- * groups at once: the existing emulated Playwright suite (5 projects), the
+ * groups at once: the desktop Playwright suite (3 engines), the
  * real Android phone over CDP, and the real iPhone over its Web Inspector. See
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 7 ("Parallelism"), for the shape this implements:
  *
- *   build once -> serve dist on 0.0.0.0:4321 -> desktop   (5 projects)   N workers
+ *   build once -> serve dist on 0.0.0.0:4321 -> desktop   (3 engines)    N workers
  *                                                (in a Linux container, #1027)
  *                                             -> android   (real Chrome)  1 worker
  *                                             -> ios       (real Safari)  1 session

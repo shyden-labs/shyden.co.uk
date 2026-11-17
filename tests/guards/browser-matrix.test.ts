@@ -114,7 +114,7 @@ const ONCE_CONTENT_ONLY = [
 ];
 
 describe('every engine runs the whole suite (#1067)', () => {
-  it('runs each once content-only spec on all five engines', () => {
+  it('runs each once content-only spec on every engine', () => {
     // Asked of what a project MATCHES, as Playwright resolves it (#33, #194).
     const projects = resolvedProjects(config, 'playwright.config.ts');
     for (const spec of ONCE_CONTENT_ONLY)
@@ -132,7 +132,7 @@ describe('every engine runs the whole suite (#1067)', () => {
     ).toEqual([]);
   });
 
-  it('has the five engines as its projects, and no other', () => {
+  it('has the engines as its projects, and no other', () => {
     expect(
       (config.projects ?? [])
         .map((p) => p.name)

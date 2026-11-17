@@ -1657,12 +1657,10 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   // scrolling the page silently rewrites the class size. CSS cannot reach it.
   test('scrolling the page does not change a focused number field', async ({
     page,
-    isMobile,
   }) => {
-    // A touch device has no wheel to guard against, and WebKit's mobile
-    // emulation rejects mouse.wheel outright. The behaviour under test only
-    // exists where a wheel does.
-    test.skip(!!isMobile || onRealDevice(), 'no mouse wheel on a touch device');
+    // A touch device has no wheel to guard against. The behaviour under test
+    // only exists where a wheel does.
+    test.skip(onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
     await tapOn(count);
