@@ -98,6 +98,8 @@ jobs:
     permissions:
       contents: read
       issues: read
+      # ci.yml's sonarcloud job reads the pull request's scan check (#851).
+      checks: read
     uses: ./.github/workflows/ci.yml
     # The one secret ci.yml takes: its sonarcloud job's token, a
     # repository-level secret (#851). By name, never `inherit`.

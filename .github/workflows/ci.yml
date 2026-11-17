@@ -235,6 +235,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      # A dev deploy dispatched from a feature branch reads this commit's
+      # pull request `sonarcloud` check (see the last step).
+      checks: read
     steps:
       - name: The SonarCloud token is set
         env:
@@ -275,6 +278,13 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+          # SonarCloud's free plan answers 403 to a gate read on any branch
+          # but develop or a pull request (run 44103680992). A dev deploy
+          # dispatched from a feature branch therefore passes on the verdict
+          # its pull request's `sonarcloud` check gave this same commit, and
+          # fails, saying so, when there is none (Shyden, 2026-11-17).
+          SONAR_REUSE_PULL_REQUEST_SCAN: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'develop' }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/sonar-verdict.mjs .scannerwork/report-task.txt
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
