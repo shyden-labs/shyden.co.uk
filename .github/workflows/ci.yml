@@ -32,11 +32,6 @@ name: CI
 on:
   pull_request:
   workflow_call:
-    # deploy-dev.yml's dispatched-branch path calls this file; the coverage
-    # job's SonarCloud scan needs the token there too (#851).
-    secrets:
-      SONAR_TOKEN:
-        required: false
   workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
@@ -226,7 +221,9 @@ jobs:
     runs-on: ubuntu-26.04
     # The token lives in this environment, not at repository level (#241):
     # it allows every branch and needs no approval. A Dependabot pull request
-    # reads the Dependabot secret of the same name instead.
+    # reads the Dependabot secret of the same name instead. When deploy-dev.yml
+    # calls this file for a dispatched branch, this job still reads the token
+    # from its own environment, so the caller passes no secret.
     environment: sonarcloud
     # The scan, plus up to 5 minutes' wait for the verdict
     # (SONAR_CEILING_SECONDS' default).

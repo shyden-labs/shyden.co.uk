@@ -154,8 +154,9 @@ async function judge(path) {
     await sleep(STEP_MS);
   }
   if (task.status !== 'SUCCESS') {
+    const why = task.errorMessage ? ` (${task.errorMessage})` : '';
     fail(
-      `task ${report.ceTaskId} ended ${task.status}${task.errorMessage ? ` (${task.errorMessage})` : ''}; no verdict to read`,
+      `task ${report.ceTaskId} ended ${task.status}${why}; no verdict to read`,
     );
   }
   if (task.analysisId === undefined) {
@@ -181,12 +182,12 @@ async function judge(path) {
  * @returns {Promise<number>}
  */
 export async function main(args) {
-  const [path, ...rest] = args;
-  if (path === undefined || rest.length > 0) {
+  if (args.length !== 1) {
     throw new Error(
       'usage: node scripts/sonar-verdict.mjs <.scannerwork/report-task.txt>',
     );
   }
+  const [path] = args;
   try {
     const { ok, lines, dashboardUrl } = await judge(path);
     summary(`The scan ran. ${lines.join('; ')}\n\n${dashboardUrl}`);
