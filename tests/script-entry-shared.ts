@@ -72,6 +72,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
   },
   // With nowhere to hand its verdict on, it refuses rather than decide
   // nothing, which would leave the browser jobs to a missing output (#582).
+  // With no report to read there is no verdict, so it refuses (#851).
+  'sonar-verdict.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/sonar-verdict.mjs',
+  },
   'docs-only.mjs': {
     args: [],
     env: { GITHUB_OUTPUT: undefined },

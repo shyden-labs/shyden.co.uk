@@ -26,6 +26,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
  */
 
 const STEP_MS = 5000;
+const SONARCLOUD = 'https://sonarcloud.io';
 
 /**
  * @param {string} message
@@ -53,8 +54,16 @@ export function parseReportTask(text) {
   const get = (key) =>
     values.get(key) ??
     fail(`the scan's report-task.txt has no ${key}; the scan did not finish`);
+  const serverUrl = get('serverUrl');
+  // The token goes only to SonarCloud. report-task.txt is a file in the
+  // workspace, so its server is checked rather than trusted (#851).
+  if (serverUrl !== SONARCLOUD) {
+    fail(
+      `the scan's report-task.txt names the server ${serverUrl}, not ${SONARCLOUD}; the token is sent nowhere else`,
+    );
+  }
   return {
-    serverUrl: get('serverUrl'),
+    serverUrl,
     ceTaskId: get('ceTaskId'),
     dashboardUrl: get('dashboardUrl'),
   };

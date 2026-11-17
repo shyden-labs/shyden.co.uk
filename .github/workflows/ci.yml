@@ -179,24 +179,58 @@ jobs:
       - run: npm run test:integration
 
   # One overall coverage figure for the unit suite, its threshold in
-  # vitest.config.ts (global rule 2026-10-30: one percentage per repo).
-  #
-  # Then SonarCloud's quality gate, blocking (#851; Shyden's ruling of
-  # 2026-10-18, every project: a scan that does not run fails, and the gate's
-  # result is read, failing the job when it fails). The scan reads the lcov
-  # file the coverage run writes, and `scripts/sonar-verdict.mjs` reads the
-  # gate of THAT scan's analysis, green only on OK. build-and-test needs this
-  # job, so a failed gate is a failed required check. Setup (project, token as
-  # an Actions AND a Dependabot secret): shyden-labs/repo-template's
-  # docs/sonarcloud.md, done for this repository on 2026-11-17.
+  # vitest.config.ts (global rule 2026-10-30: one percentage per repo). It
+  # also hands its lcov file to the sonarcloud job below, and holds no secret.
   coverage:
     needs: [image, scope]
     # Skipped on a docs-only pull request (#582), like every job that builds.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # 10 for the coverage run, plus the scan and up to 5 minutes' wait for
-    # SonarCloud's verdict (SONAR_CEILING_SECONDS' default).
-    timeout-minutes: 20
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  # SonarCloud's quality gate, blocking (#851; Shyden's ruling of 2026-10-18,
+  # every project: a scan that does not run fails, and the gate's result is
+  # read, failing the job when it fails). build-and-test needs this job, so a
+  # failed gate is a failed required check.
+  #
+  # Its own job, because the token must never share one with the branch's
+  # code running: `npm ci` runs every dependency's install script and the
+  # tests run the branch's code, and either could rewrite a later step or the
+  # scan's report and send the token elsewhere (a Dependabot pull request
+  # gets the Dependabot secret). So this job checks out afresh, runs no npm,
+  # takes the lcov file alone from `coverage`, and `scripts/sonar-verdict.mjs`
+  # (node built-ins only) sends the token to https://sonarcloud.io and
+  # nowhere else. Setup (project, token as an Actions AND a Dependabot
+  # secret): shyden-labs/repo-template's docs/sonarcloud.md, done for this
+  # repository on 2026-11-17.
+  sonarcloud:
+    needs: [scope, coverage]
+    if: needs.scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-26.04
+    # The token lives in this environment, not at repository level (#241):
+    # it allows every branch and needs no approval. A Dependabot pull request
+    # reads the Dependabot secret of the same name instead.
+    environment: sonarcloud
+    # The scan, plus up to 5 minutes' wait for the verdict
+    # (SONAR_CEILING_SECONDS' default).
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -213,11 +247,11 @@ jobs:
           persist-credentials: false
           # SonarCloud reads history to tell new code from old.
           fetch-depth: 0
-      - uses: ./.github/actions/setup-node
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          cache: npm
-      - run: npm ci
-      - run: npm run test:coverage
+          name: lcov
+          path: coverage
+      - uses: ./.github/actions/setup-node
       - name: Scan
         uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         env:
@@ -227,6 +261,7 @@ jobs:
           # .astro pages, styles and config files are the e2e suite's, so they
           # are left out of the coverage figure here too.
           args: >
+            -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.organization=shyden-labs
             -Dsonar.projectKey=shyden-labs_shyden.co.uk
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
@@ -540,6 +575,7 @@ jobs:
         scope,
         checks,
         coverage,
+        sonarcloud,
         e2e,
         capture,
         sanity-on-build,

@@ -51,6 +51,23 @@ describe('parseReportTask', () => {
   );
 });
 
+describe('the server the token is sent to', () => {
+  it.each([
+    ['https://evil.example'],
+    ['http://sonarcloud.io'],
+    ['https://sonarcloud.io.evil.example'],
+    ['https://sonarcloud.io/'],
+  ])('refuses %s, which is not https://sonarcloud.io exactly', (url) => {
+    const text = REPORT.replace(
+      'serverUrl=https://sonarcloud.io',
+      `serverUrl=${url}`,
+    );
+    expect(() => parseReportTask(text)).toThrow(
+      `sonar-verdict: the scan's report-task.txt names the server ${url}, not https://sonarcloud.io; the token is sent nowhere else`,
+    );
+  });
+});
+
 describe('verdict', () => {
   it('passes OK', () => {
     expect(verdict({ status: 'OK', conditions: [] })).toEqual({

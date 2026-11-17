@@ -1020,9 +1020,16 @@ describe('neither bot can push, commit or amend (#889)', () => {
 /**
  * SonarCloud's quality gate, blocking (#851; Shyden's ruling of 2026-10-18,
  * every project: a scan that does not run fails, and the gate's result is
- * read, failing the job when it fails). The scan rides the `coverage` job,
- * which `build-and-test` already needs, so a failed gate is a failed required
- * check with no new context for branch protection to name.
+ * read, failing the job when it fails).
+ *
+ * The token never shares a job with the pull request's own code running:
+ * `npm ci` runs every dependency's install script and the tests run the
+ * branch's code, either of which could rewrite a later step's script or the
+ * scan's report and send the token elsewhere (a Dependabot pull request
+ * receives the Dependabot secret). So `coverage` measures with no secret and
+ * hands over the lcov file alone, and `sonarcloud` checks out afresh, runs no
+ * npm, and scans. build-and-test needs it, so a failed gate is a failed
+ * required check with no new context for branch protection to name.
  */
 describe('every pull request is scanned by SonarCloud and fails on its gate (#851)', () => {
   type Step = {
@@ -1033,55 +1040,93 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
     with?: Record<string, unknown>;
     env?: Record<string, unknown>;
   };
-  const coverageJob = () => {
-    const parsed = parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
-      jobs: Record<string, { steps: Step[] }>;
-    };
-    return parsed.jobs['coverage'];
+  type Job = { needs?: string | string[]; if?: string; steps: Step[] };
+  const jobs = () =>
+    (
+      parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
+        jobs: Record<string, Job>;
+      }
+    ).jobs;
+  const needsOf = (job: Job) => [job.needs ?? []].flat();
+  const stepIndex = (
+    steps: Step[],
+    found: (s: Step) => boolean,
+    what: string,
+  ) => {
+    const index = steps.findIndex(found);
+    expect(index, `${what} is a step of the job`).toBeGreaterThanOrEqual(0);
+    return index;
   };
 
-  it('the coverage job measures, scans this project, then reads THAT scan’s gate, in that order, with nothing able to skip or swallow a step', () => {
-    const steps = coverageJob().steps;
-    const at = (found: (s: Step) => boolean, what: string) => {
-      const index = steps.findIndex(found);
-      expect(
-        index,
-        `${what} is a step of the coverage job`,
-      ).toBeGreaterThanOrEqual(0);
-      return index;
-    };
-    const token = at(
+  it('the coverage job holds no secret, and hands over the lcov file alone', () => {
+    const coverage = jobs()['coverage'];
+    expect(
+      JSON.stringify(coverage),
+      'a secret in the coverage job',
+    ).not.toMatch(/secrets\./);
+    const steps = coverage.steps;
+    const measure = stepIndex(
+      steps,
+      (s) => s.run?.trim() === 'npm run test:coverage',
+      'npm run test:coverage',
+    );
+    const upload = stepIndex(
+      steps,
+      (s) =>
+        /^actions\/upload-artifact@[0-9a-f]{40}$/.test(s.uses ?? '') &&
+        s.with?.path === 'coverage/lcov.info',
+      'the upload of coverage/lcov.info',
+    );
+    expect(measure < upload).toBe(true);
+  });
+
+  it('the sonarcloud job runs none of the branch’s code, then scans this project and reads THAT scan’s gate, with nothing able to skip or swallow a step', () => {
+    const all = jobs();
+    const job = all['sonarcloud'];
+    expect(job, 'a sonarcloud job in ci.yml').toBeDefined();
+    expect(needsOf(job)).toContain('coverage');
+    expect(job.if).toBe(all['coverage'].if);
+    const steps = job.steps;
+    expect(
+      steps.filter((s) => /\bnpm\b|\bnpx\b/.test(s.run ?? '')),
+      'a step that runs npm',
+    ).toEqual([]);
+    const download = stepIndex(
+      steps,
+      (s) => /^actions\/download-artifact@[0-9a-f]{40}$/.test(s.uses ?? ''),
+      'the download of the lcov file',
+    );
+    const token = stepIndex(
+      steps,
       (s) =>
         /\[ -z "\$SONAR_TOKEN" \]/.test(s.run ?? '') &&
         /exit 1/.test(s.run ?? ''),
       'a step that fails when SONAR_TOKEN is empty',
     );
-    const measure = at(
-      (s) => s.run?.trim() === 'npm run test:coverage',
-      'npm run test:coverage',
-    );
-    const scan = at(
+    const scan = stepIndex(
+      steps,
       (s) =>
         /^SonarSource\/sonarqube-scan-action@[0-9a-f]{40}$/.test(s.uses ?? ''),
       'the SonarCloud scan, pinned to a full SHA',
     );
-    const read = at(
+    const read = stepIndex(
+      steps,
       (s) =>
         s.run?.trim() ===
         'node scripts/sonar-verdict.mjs .scannerwork/report-task.txt',
       "the read of this scan's quality gate",
     );
-    expect([token < measure, measure < scan, scan < read]).toEqual([
+    expect([download < scan, token < scan, scan < read]).toEqual([
       true,
       true,
       true,
     ]);
-
     const args = String(steps[scan].with?.args ?? '')
       .split(/\s+/)
       .filter(Boolean);
     expect(args).toEqual(
       expect.arrayContaining([
+        '-Dsonar.host.url=https://sonarcloud.io',
         '-Dsonar.organization=shyden-labs',
         '-Dsonar.projectKey=shyden-labs_shyden.co.uk',
         '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info',
@@ -1098,6 +1143,13 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
       ),
       'a step that can be skipped or swallowed',
     ).toEqual([]);
+  });
+
+  it('build-and-test needs the sonarcloud job, and a docs-only pull request skips it with the coverage it reads', async () => {
+    expect(needsOf(jobs()['build-and-test'])).toContain('sonarcloud');
+    const { SKIPPED_WHEN_DOCS_ONLY } =
+      await import('../../scripts/docs-only.mjs');
+    expect(SKIPPED_WHEN_DOCS_ONLY).toContain('sonarcloud');
   });
 
   it('the unit coverage run writes the lcov file the scan reads, and no HTML report for `astro check` to read', () => {
