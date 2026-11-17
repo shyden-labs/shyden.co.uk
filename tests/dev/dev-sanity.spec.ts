@@ -134,37 +134,36 @@ test(
   },
 );
 
-// The homepage's Yawelo Idle preview plays from the shared media host itself,
-// the real files, not the suite's stand-ins (#835).
-test(
-  "the homepage's Yawelo Idle preview plays from the media host",
-  {
-    tag: '@deployed-only',
-    annotation: {
-      type: 'deployed-only',
-      description:
-        'the video host sends Cross-Origin-Resource-Policy: same-site, which admits a page on shyden.co.uk and refuses a preview on localhost',
-    },
-  },
-  async ({ page }) => {
-    await page.goto('/');
-    const video = page.locator('#yawelo-idle video');
-    await expect(video).toBeVisible();
-    // Muted, so no engine's autoplay rule refuses a play that is not a tap.
-    await video.evaluate((v: HTMLVideoElement) => {
-      v.muted = true;
-      return v.play();
-    });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeGreaterThan(0.5);
-    expect(
-      await video.evaluate(
-        (v: HTMLVideoElement) => new URL(v.currentSrc).origin,
-      ),
-    ).toBe('https://media.shyden.co.uk');
-  },
-);
+// The homepage's Yawelo Idle preview plays from Yawelo Idle's DEV media host
+// itself, the real files, not the suite's stand-ins (#835, #1193). The host
+// sends `Cross-Origin-Resource-Policy: cross-origin`, so this runs on the
+// pull request's own build too. The dev build points it at the dev host; a
+// poster or video from the production host is the cross-environment leak the
+// product links below are checked for.
+test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host", async ({
+  page,
+}) => {
+  await page.goto('/');
+  const video = page.locator('#yawelo-idle video');
+  await expect(video).toBeVisible();
+  // Muted, so no engine's autoplay rule refuses a play that is not a tap.
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.muted = true;
+    return v.play();
+  });
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThan(0.5);
+  expect(
+    await video.evaluate((v: HTMLVideoElement) => ({
+      video: new URL(v.currentSrc).origin,
+      poster: new URL(v.poster).origin,
+    })),
+  ).toEqual({
+    video: 'https://dev-media.yaweloidle.com',
+    poster: 'https://dev-media.yaweloidle.com',
+  });
+});
 
 test(
   'an unauthenticated request is challenged with 401',
