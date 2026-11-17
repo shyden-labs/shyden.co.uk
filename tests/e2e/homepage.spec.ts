@@ -114,12 +114,12 @@ const expectBadgesClearAA = async (badges: Locator): Promise<void> => {
       .toBeGreaterThanOrEqual(4.5);
 };
 
-// The Yawelo Idle preview video, #835. Its files come from the shared media
-// host (yawelo-idle#713), which the shared fixture answers from tests/e2e/stand-ins/ (see
-// yawelo-media.ts), so these read the page's markup and behaviour; the real
-// host is played on the deployed dev site. Literal URLs and types, never the
+// The Yawelo Idle preview video, #835. Its files come from Yawelo Idle's own
+// media host (#1193), which the shared fixture answers from tests/e2e/stand-ins/
+// (see yawelo-media.ts), so these read the page's markup and behaviour; the
+// real dev host is played by the dev sanity suite. Literal URLs and types, never the
 // page's own constant: a value compared with its source asserts nothing.
-const PROMO = 'https://media.shyden.co.uk/yawelo-idle-promo';
+const PROMO = 'https://media.yaweloidle.com/yawelo-idle-promo';
 // MP4 first (Shyden, 2026-10-20): with WebM first the real iPhone stuck on
 // the poster. The codec lists let an engine that cannot play one skip it.
 const PROMO_SOURCES = [
@@ -1402,7 +1402,7 @@ test.describe('the Yawelo Idle preview video', () => {
       [...origins].sort(),
       'the hosts a homepage load reaches: this site, and the video host by name',
     ).toEqual(
-      [new URL(page.url()).origin, 'https://media.shyden.co.uk'].sort(),
+      [new URL(page.url()).origin, 'https://media.yaweloidle.com'].sort(),
     );
   });
 });
