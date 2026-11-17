@@ -148,7 +148,7 @@ jobs:
       - name: Build (dev — outbound ShyTalk and Yawelo Idle links → DEV, never prod)
         env:
           PUBLIC_SHYTALK_URL: https://dev.shytalk.app
-          PUBLIC_YAWELO_IDLE_URL: https://dev.yawelo-idle.shyden.co.uk
+          PUBLIC_YAWELO_IDLE_URL: https://dev.yaweloidle.com
         run: npm run build
       # Before anything is deployed, the dev token proves it reaches the dev
       # account and nothing else (#415): a token that could reach production
