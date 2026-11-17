@@ -127,3 +127,17 @@ export async function goResponse(url, env, { nowMs, randomBytes }) {
     },
   });
 }
+
+/**
+ * The Pages Function behind `functions/go/yawelo.js` and
+ * `functions/go/shytalk.js`: `goResponse` with the real clock and the real
+ * randomness. One file per project, because tracked paths are plain names
+ * (no `[project].js`); a project with no file answers Pages' own 404.
+ *
+ * @param {{ request: Request, env: Record<string, string | undefined> }} context
+ */
+export const onGoRequest = ({ request, env }) =>
+  goResponse(new URL(request.url), env, {
+    nowMs: Date.now(),
+    randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
+  });

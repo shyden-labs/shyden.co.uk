@@ -5,6 +5,7 @@ import {
   DEV_PASS_TARGETS,
   goResponse,
   mintDevPass,
+  onGoRequest,
 } from '../../functions/_lib/dev-pass.js';
 
 /**
@@ -172,5 +173,30 @@ describe('goResponse: /go/<project> on the dev site (#1192)', () => {
   it('answers 404 for /go itself and for anything below a project', async () => {
     expect((await go('/go')).status).toBe(404);
     expect((await go('/go/yawelo/extra')).status).toBe(404);
+  });
+});
+
+describe('onGoRequest: the route files hand it the real clock and randomness (#1192)', () => {
+  it('mints a pass that expires 60 s from now, with a different nonce each time', async () => {
+    const request = () =>
+      onGoRequest({ request: new Request(`${DEV}/go/yawelo`), env: ENV });
+    const before = Math.floor(Date.now() / 1000);
+    const passes = await Promise.all([request(), request()]).then((all) =>
+      all.map(
+        (r) =>
+          read(
+            new URL(r.headers.get('Location') ?? '').searchParams.get(
+              'dev_pass',
+            ) ?? '',
+            YAWELO_SECRET,
+          ).payload,
+      ),
+    );
+    const after = Math.floor(Date.now() / 1000);
+    for (const pass of passes) {
+      expect(pass.exp).toBeGreaterThanOrEqual(before + 60);
+      expect(pass.exp).toBeLessThanOrEqual(after + 60);
+    }
+    expect(passes[0].nonce).not.toBe(passes[1].nonce);
   });
 });
