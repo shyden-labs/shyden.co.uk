@@ -6,6 +6,7 @@ describe('the directories guards scan are derived, not listed', () => {
     // Anti-vacuity: an empty derivation would make every guard a no-op.
 
     expect(specDirs()).toContain('tests/e2e');
+    // A setup project's file counts: tests/device holds only the Android preflight (#1178).
     expect(specDirs()).toContain('tests/device');
   });
 
