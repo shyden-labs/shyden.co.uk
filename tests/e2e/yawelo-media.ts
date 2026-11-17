@@ -2,21 +2,21 @@ import { readFileSync } from 'node:fs';
 import type { BrowserContext, Route } from '@playwright/test';
 
 /**
- * The homepage's Yawelo Idle video (#835) comes from the shared media host
- * (Cloudflare R2, yawelo-idle#713) in every build. That host sends
- * `Cross-Origin-Resource-Policy: same-site`, which
- * admits shyden.co.uk and dev.shyden.co.uk and refuses the suite's
- * `localhost` preview, so here every request for it is answered from
+ * The homepage's Yawelo Idle video (#835) comes from Yawelo Idle's own media
+ * host (#1193): media.yaweloidle.com in the production build, which this
+ * suite measures. The files are Yawelo Idle's and change under the same
+ * names (yawelo-idle#1015), so here every request for them is answered from
  * `tests/e2e/stand-ins/`: two-second synthetic clips with the real files'
  * codecs (H.264 High + AAC, VP9 + Opus), so each engine picks the file it
- * would pick in production, and a plain poster. The page is unchanged; only
- * the answers are. The real host is played on the deployed dev site, which is
- * same-site (`tests/dev/dev-sanity.spec.ts`).
+ * would pick in production, and a plain poster. The suite measures this
+ * page, not that host, and never reaches the network for it. The page is
+ * unchanged; only the answers are. The real dev host is played by the dev
+ * sanity suite (`tests/dev/dev-sanity.spec.ts`).
  */
-export const YAWELO_MEDIA_ORIGIN = 'https://media.shyden.co.uk';
+export const YAWELO_MEDIA_ORIGIN = 'https://media.yaweloidle.com';
 
 const MEDIA =
-  /^https:\/\/media\.shyden\.co\.uk\/(yawelo-idle-promo(?:-poster)?\.(mp4|webm|jpg))$/;
+  /^https:\/\/media\.yaweloidle\.com\/(yawelo-idle-promo(?:-poster)?\.(mp4|webm|jpg))$/;
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   mp4: 'video/mp4',
@@ -36,7 +36,7 @@ const answer = async (route: Route): Promise<void> => {
   });
 };
 
-const HOST = /^https:\/\/media\.shyden\.co\.uk\//;
+const HOST = /^https:\/\/media\.yaweloidle\.com\//;
 
 /** Answers the media host from the stand-ins for as long as `use` runs. */
 export async function servingYaweloMedia(
