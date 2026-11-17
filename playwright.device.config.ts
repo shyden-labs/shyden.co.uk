@@ -13,19 +13,16 @@ process.env.PW_REAL_DEVICE = '1';
  */
 const ANDROID_SUITE = {
   dependencies: ['android-preflight'],
-  // `testDir` is './tests' (not './tests/e2e') so this project can also reach
-  // tests/device/real-device.spec.ts, but that widens the sweep to every other
-  // directory under tests/ too. An allowlist is deliberate, not a style choice: a
+  // The phone runs exactly the engines' e2e files and nothing of its own (#1178): the
+  // harness's own checks run in its fixtures, not as tests, so its total is theirs.
+  // `testDir` is './tests', which reaches every directory under tests/. An allowlist is deliberate, not a style choice: a
   // denylist that only named the preflight file let this project try to collect
   // tests/unit/*.test.ts (Vitest, crashes -- there is no Vitest runtime under
   // Playwright) and tests/dev/dev-sanity.spec.ts (targets the deployed dev site
   // under its own playwright.dev.config.ts; running it here would mix that
   // environment's assertions into a local-build run). Measured by running
   // `--list` against the denylist version, not assumed.
-  testMatch: [
-    /tests\/e2e\/.*\.spec\.ts$/,
-    /tests\/device\/real-device\.spec\.ts$/,
-  ],
+  testMatch: [/tests\/e2e\/.*\.spec\.ts$/],
   // The visual suite stays out, and ONLY the visual suite (#194). A
   // baseline belongs to one project on one platform, so a phone can never
   // hold one CI would read: claimed here, the suite failed eight times by

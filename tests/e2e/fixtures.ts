@@ -8,7 +8,17 @@ import {
   type Page,
   type APIRequestContext,
 } from '@playwright/test';
-import { checkChromeForeground } from '../device/chrome-foreground';
+import {
+  CHROME_PACKAGE,
+  checkChromeForeground,
+} from '../device/chrome-foreground';
+import { adb, renderedScreen } from '../../scripts/adb.mjs';
+import {
+  type ClockProbe,
+  chromeRelaunchFailure,
+  clockProbeFailure,
+  emulatedScreenFailure,
+} from '../device/harness-checks';
 import { openTabsAsAVisitor } from '../device/visitor-tab';
 import {
   DEVICE_DOWNLOAD_BEHAVIOUR,
@@ -167,6 +177,31 @@ let currentTestInitScriptDisposals: InitScriptDisposable[] = [];
 let currentTestDeclaresClock = false;
 
 /**
+ * The harness's once-per-worker checks (#1178) run on the worker's first test, which is the
+ * first point where the site's own origin is known (`baseURL` is a test option). Plain module
+ * state: a worker is its own process, so each worker starts at `false`.
+ */
+let workerChecked = false;
+/** The origin the worker's tests ran against, kept for the clock worker's closing check. */
+let workerBaseURL: string | undefined;
+
+/** Chrome's pid on the phone, as `pidof` prints it ('' when Chrome is not running). */
+const chromePid = (): string => adb(['shell', 'pidof', CHROME_PACKAGE]).trim();
+
+/** Whether `page` runs on Playwright's fake clock, read on the page itself (#854). */
+const clockOnPage = (page: Page): Promise<ClockProbe> =>
+  page.evaluate(() => ({
+    fakeClock:
+      typeof (globalThis as { __pwClock?: unknown }).__pwClock !== 'undefined',
+    nativeFrames: requestAnimationFrame.toString().includes('[native code]'),
+  }));
+
+/** Throws `failure`, when there is one, so the fixture fails the test naming it. */
+const failWith = (failure: string | null): void => {
+  if (failure !== null) throw new Error(failure);
+};
+
+/**
  * Every fixture below that needs `baseURL` calls this instead of trusting it -- a bare `!`
  * assertion crashes with a generic, unnamed "Cannot read properties of undefined" if it is
  * ever wrong, and silently falling back to the unresolved URL (what the `goto`/`request`
@@ -204,7 +239,7 @@ const realDeviceTest = base.extend<
 >({
   installsAClock: [false, { scope: 'worker', option: true }],
   browser: [
-    async ({}, use) => {
+    async ({ installsAClock }, use) => {
       const browser = await chromium.connectOverCDP(CDP_URL);
       // Attached over plain CDP, Playwright points the phone's downloads at a folder on the
       // Mac, and every one of them ends `canceled` (#308). This points them at the phone's
@@ -221,6 +256,18 @@ const realDeviceTest = base.extend<
       // (#1047): every worker puts it back before the first test.
       await setChromeJavaScript(true);
       await use(browser);
+      // The clock worker's tests installed a clock on the phone's one context, so a new page
+      // must show it: that proves the probe, and so every other worker's "no clock" (#854).
+      const context = browser.contexts()[0];
+      if (installsAClock && context && workerBaseURL) {
+        const probe = await context.newPage();
+        try {
+          await probe.goto(new URL('/', workerBaseURL).href);
+          failWith(clockProbeFailure(await clockOnPage(probe), 'installed'));
+        } finally {
+          await probe.close();
+        }
+      }
       emptyDeviceDownloads();
       // Disconnects the client. It does not close Chrome on the phone.
       await browser.close();
@@ -248,8 +295,34 @@ const realDeviceTest = base.extend<
       storageTypes: 'all',
     });
     await cdp.detach();
+    if (!workerChecked) {
+      workerChecked = true;
+      workerBaseURL = resolvedBaseURL;
+      // A page of the site's own, with its viewport meta, as the tests see it.
+      await scratch.goto(new URL('/classroom-groups', resolvedBaseURL).href);
+      // What the device itself says its screen is: adb cannot be fooled by an emulated profile.
+      failWith(
+        emulatedScreenFailure(
+          await scratch.evaluate(() => ({
+            ua: navigator.userAgent,
+            touchPoints: navigator.maxTouchPoints,
+            dpr: devicePixelRatio,
+            cssWidth: innerWidth,
+          })),
+          renderedScreen(
+            adb(['shell', 'wm', 'size']),
+            adb(['shell', 'wm', 'density']),
+          ),
+        ),
+      );
+      // This worker's connection is new, so no earlier worker's clock may be on its pages.
+      if (!installsAClock)
+        failWith(clockProbeFailure(await clockOnPage(scratch), 'none'));
+    }
     await scratch.close();
     await context.clearCookies();
+    // Chrome crashing in a test (#807) is named in that test, not in the next one to connect.
+    const chromeAtStart = chromePid();
 
     // Fresh bucket for THIS test -- see currentTestInitScriptDisposals's own comment for why
     // plain module state is safe here.
@@ -324,6 +397,7 @@ const realDeviceTest = base.extend<
       // Leave the context open -- it belongs to the device, not to the test.
       for (const page of context.pages()) await page.close().catch(() => {});
     }
+    failWith(chromeRelaunchFailure(chromeAtStart, chromePid()));
   },
 
   page: async ({ context, baseURL, colorScheme }, use, testInfo) => {

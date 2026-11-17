@@ -813,9 +813,8 @@ const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport';
  * every run: `--list --grep=<the same pattern>` against ANY project sharing
  * android-chrome's `tests/e2e/*.spec.ts` scope directly SELECTS the tagged set
  * (chromium is a convenient, arbitrary choice -- one project, no filtering of its
- * own). `tests/device/real-device.spec.ts`, the one file android-chrome matches that
- * chromium's own testDir does not reach, carries neither tag (checked by hand), so
- * restricting this listing to tests/e2e does not undercount.
+ * own). android-chrome matches tests/e2e alone (#1178), so restricting this listing to
+ * tests/e2e does not undercount.
  *
  * One tag now (#1047): `@javascript-blocked` tests run on the phone, with JavaScript blocked
  * through Chrome's own settings, so only the screen-size tests are excluded by design. The

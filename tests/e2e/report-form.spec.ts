@@ -230,8 +230,9 @@ for (const [outcome, key] of [
 test('typing into the report form keeps what was typed (moved from the phone file, #1049)', async ({
   page,
 }) => {
-  // The phone's datalist crash (#807) showed on exactly this sequence; the Chrome-process half
-  // stays in tests/device/real-device.spec.ts. English draws no report form; Indonesian does.
+  // The phone's datalist crash (#807) showed on exactly this sequence; the phone's context
+  // fixture checks Chrome is the same process at every test's end (#1178). English draws no
+  // report form; Indonesian does.
   await page.goto('/id/');
   const report = page.locator('[data-report]');
   const quote = report.locator('#report-quote');

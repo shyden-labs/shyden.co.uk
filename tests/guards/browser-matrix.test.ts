@@ -361,6 +361,32 @@ describe('the real-device config (#194)', () => {
     expect(selects(android, 'evidence-page.spec.ts a tick')).toBe(true);
   });
 
+  it('claims no spec the engines do not also run: the phone has no tests of its own (#1178)', () => {
+    // Shyden 2026-11-17: every target runs the same tests with the same total. A file only a
+    // phone project claims is a test only the phone runs; the harness's own checks belong in
+    // its fixtures (tests/device/harness-checks.ts), where they are not counted as tests.
+    const names: string[] = ENGINES.map((engine) => engine.name);
+    const engines = resolvedProjects(config, 'playwright.config.ts').filter(
+      (p) => names.includes(p.name),
+    );
+    expect(engines.map((p) => p.name).sort()).toEqual([...names].sort());
+    const phoneSuite = projects.filter((p) =>
+      p.name.startsWith('android-chrome'),
+    );
+    const claimed = specFilesUnder('tests').filter((spec) =>
+      phoneSuite.some((p) => claims(p, spec)),
+    );
+    const phoneOnly = claimed.filter(
+      (spec) => !engines.every((p) => claims(p, spec)),
+    );
+    expect(
+      searched(phoneOnly, {
+        of: claimed,
+        what: 'specs a phone project claims',
+      }),
+    ).toEqual([]);
+  });
+
   it('writes no baseline a phone run was never asked for', () => {
     // The second door the main config closed (`refuses to write a baseline
     // nobody asked for`, above), still open here: Playwright's default

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { searched } from '../source-files';
 import {
@@ -59,15 +58,10 @@ const JAVASCRIPT_BLOCKED_TAG = '@javascript-blocked';
  * method of `.clock` carries `@installs-a-clock`, which runs it in the phone's
  * `android-chrome-clock` project (playwright.device.config.ts), and a tagged test that calls
  * none is stale. On the phone an untagged call is also refused at run time
- * (tests/device/clock-declaration.ts); this catches it at the pull request instead.
- *
- * ONE EXCEPTION, granted by the operator on 2026-10-18: the real-device test that proves that
- * refusal makes an untagged call on purpose. It is named by file and title, and the corpus test
- * below pins the list to exactly this one entry and checks it still names such a test.
+ * (tests/device/clock-declaration.ts); this catches it at the pull request instead. There is no
+ * exception: the one the operator granted on 2026-10-18, for the phone-only test of that refusal,
+ * went with the test (#1178), whose cases tests/unit/clock-declaration.test.ts holds.
  */
-const CLOCK_EXCEPTIONS: readonly string[] = [
-  'tests/device/real-device.spec.ts > a clock installed by an untagged test is refused, naming why (#854)',
-];
 
 function useInTestMessage(
   file: string,
@@ -164,10 +158,6 @@ function tagInTitleMessage(
   );
 }
 
-/** Whether `decl` in `file` is the operator's one granted clock exception. */
-const excepted = (file: string, decl: Declaration): boolean =>
-  CLOCK_EXCEPTIONS.includes(`${file} > ${decl.title}`);
-
 /** Whether a test's own body calls `newContext()`: a call, read by the parser, so a comment or a string naming it opens nothing. */
 function opensAContext(decl: Declaration): boolean {
   let opens = false;
@@ -247,7 +237,7 @@ function read(file: string, text: string): Reading {
     else if (!covered && tagged) findings.push(staleTagMessage(file, decl));
     const clocked = usesAClock(decl);
     const clockTagged = decl.tags.includes(CLOCK_TAG);
-    if (clocked && !clockTagged && !excepted(file, decl))
+    if (clocked && !clockTagged)
       findings.push(untaggedClockMessage(file, decl));
     else if (!clocked && clockTagged)
       findings.push(staleClockTagMessage(file, decl));
@@ -266,22 +256,6 @@ const analyze = (file: string, text: string): readonly string[] =>
 describe('a real device has one browser context', () => {
   it('every test run without JavaScript is tagged @javascript-blocked, no tag is stale, and none calls newContext()', () => {
     expectNothingFound(read, declarationsRead('tests read'));
-  });
-
-  it("allows the operator's one clock exception, and no other (#854)", () => {
-    expect(CLOCK_EXCEPTIONS).toEqual([
-      'tests/device/real-device.spec.ts > a clock installed by an untagged test is refused, naming why (#854)',
-    ]);
-  });
-
-  it('the clock exception still names a test that makes an untagged clock call (#854)', () => {
-    const [file, title] = CLOCK_EXCEPTIONS[0].split(' > ');
-    const named = declarationsIn(
-      parseSource(readFileSync(file, 'utf8'), file),
-    ).filter((decl) => decl.kind === 'test' && decl.title === title);
-    expect(named.map((decl) => decl.title)).toEqual([title]);
-    expect(usesAClock(named[0])).toBe(true);
-    expect(named[0].tags).not.toContain(CLOCK_TAG);
   });
 });
 
@@ -649,38 +623,6 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     ]);
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('stale');
-  });
-
-  it("excepts the operator's granted test by its file and title (#854)", () => {
-    const [file, title] = CLOCK_EXCEPTIONS[0].split(' > ');
-    const { judged, findings } = read(
-      file,
-      [
-        "import { test, expect } from '../e2e/fixtures';",
-        '',
-        `test('${title}', async ({ page }) => {`,
-        '  await expect(page.clock.install()).rejects.toThrow();',
-        '});',
-        '',
-      ].join('\n'),
-    );
-    expect(
-      searched(findings, { of: judged, what: 'tests the scanner judged' }),
-    ).toEqual([]);
-  });
-
-  it('excepts that title nowhere else (#854)', () => {
-    const [, title] = CLOCK_EXCEPTIONS[0].split(' > ');
-    const findings = scanned([
-      "import { test, expect } from './fixtures';",
-      '',
-      `test('${title}', async ({ page }) => {`,
-      '  await page.clock.install();',
-      '});',
-      '',
-    ]);
-    expect(findings).toHaveLength(1);
-    expect(findings[0]).toContain('clock method');
   });
 
   it("flags @installs-a-clock written in a test's title, which the phone's grep reads as the tag (#854)", () => {

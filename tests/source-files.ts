@@ -94,11 +94,9 @@ export const tsFilesUnder = (dir: string): string[] =>
   filesUnder(dir, (path) => /\.tsx?$/.test(path));
 
 /**
- * Every Playwright spec at or below `dir`.
- *
- * `specDirs()` is built from this rather than from its own recursion: a
- * directory "holds specs" exactly when this returns a file in it, so the two
- * can no longer disagree about what a spec is.
+ * Every Playwright spec at or below `dir`. `specDirs()` (tests/spec-dirs.ts) also counts a
+ * setup project's file, so a directory holding only the Android preflight is still scanned
+ * (#1178).
  */
 export const specFilesUnder = (dir: string): string[] =>
   filesUnder(dir, (path) => path.endsWith('.spec.ts'));
