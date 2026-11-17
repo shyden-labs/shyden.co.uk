@@ -1,7 +1,8 @@
+import { createHmac } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import { LEGACY_REDIRECTS } from '../legacy-redirect';
 import { robotsDirectives } from '../robots-directives';
-import { BASE_URL } from './local.mjs';
+import { BASE_URL, DEV_PASS_SECRET_YAWELO } from './local.mjs';
 
 // The non-prod gate, `functions/_middleware.js`, proven before the merge
 // (#394). `wrangler pages dev` serves dist/ with the real Functions on
@@ -43,6 +44,11 @@ test('a visitor without the password meets the gate', async () => {
     const target = new URL(moved.headers.get('location') ?? '', BASE_URL);
     expect.soft(target.pathname + target.hash, from).toBe(to);
   }
+
+  // The dev pass (#1192) is minted behind the gate, never before it.
+  const pass = await fetch(`${BASE_URL}/go/yawelo`, { redirect: 'manual' });
+  expect.soft(pass.status).toBe(401);
+  expect.soft(pass.headers.get('location')).toBeNull();
 });
 
 test('a visitor with the password is let through, marked noindex', async ({
@@ -52,4 +58,34 @@ test('a visitor with the password is let through, marked noindex', async ({
   expect.soft(page.status()).toBe(200);
   expect.soft(page.headers()['x-robots-tag']).toBe(NO_INDEX);
   expect.soft(page.headers()['www-authenticate']).toBeUndefined();
+
+  // The dev pass (#1192), on workerd: a 302 to Yawelo Idle's dev site with a
+  // pass signed by its secret, read back with node's own HMAC.
+  const pass = await request.get('/go/yawelo', { maxRedirects: 0 });
+  expect.soft(pass.status()).toBe(302);
+  expect.soft(pass.headers()['cache-control']).toBe('no-store');
+  expect.soft(pass.headers()['referrer-policy']).toBe('no-referrer');
+  const location = new URL(pass.headers()['location'] ?? '');
+  expect.soft(location.origin).toBe('https://dev.yaweloidle.com');
+  const [payload, signature] = (
+    location.searchParams.get('dev_pass') ?? ''
+  ).split('.');
+  expect
+    .soft(signature)
+    .toBe(
+      createHmac('sha256', DEV_PASS_SECRET_YAWELO)
+        .update(payload)
+        .digest('base64url'),
+    );
+  const { host, exp } = JSON.parse(
+    Buffer.from(payload, 'base64url').toString('utf8'),
+  ) as { host: string; exp: number };
+  expect.soft(host).toBe('dev.yaweloidle.com');
+  expect.soft(exp - Date.now() / 1000).toBeGreaterThan(0);
+  expect.soft(exp - Date.now() / 1000).toBeLessThanOrEqual(60);
+
+  // ShyTalk's secret is not bound here: it fails closed, unsigned nowhere.
+  const missing = await request.get('/go/shytalk', { maxRedirects: 0 });
+  expect.soft(missing.status()).toBe(503);
+  expect.soft(missing.headers()['location']).toBeUndefined();
 });
