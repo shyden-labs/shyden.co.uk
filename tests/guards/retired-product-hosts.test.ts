@@ -4,16 +4,15 @@ import { filesUnder, searched } from '../source-files';
 
 /**
  * The products moved to their own domains (Shyden, 2026-11-08, #1084). The old
- * ShyTalk hosts and Yawelo Idle's old production host stay out of everything
- * that ships or configures a build. Yawelo Idle's dev host is not retired: it
- * has `dev.` in front, which the pattern refuses to read as the production host.
+ * ShyTalk hosts and both old Yawelo Idle hosts, production and dev, stay out
+ * of everything that ships or configures a build. Yawelo Idle's dev host moved
+ * to dev.yaweloidle.com once it answered (#1191).
  *
  * The one exception, ruled by Shyden: the promo video's closing frame still
  * shows Yawelo Idle's old address, and its written description says what the
  * video shows. Goes when Yawelo Idle re-cuts the video.
  */
-const RETIRED =
-  /shytalk\.shyden\.co\.uk|(?<![\w.-])yawelo-idle\.shyden\.co\.uk/;
+const RETIRED = /shytalk\.shyden\.co\.uk|yawelo-idle\.shyden\.co\.uk/;
 
 const TEXT = /\.(astro|css|js|json|md|mjs|ts|txt|yml)$/;
 const text = (path: string) => TEXT.test(path);
@@ -45,11 +44,11 @@ const retiredHostsIn = (file: string): string[] =>
     );
 
 describe('retired product hosts', () => {
-  it('reads each name it means to refuse, and not the dev host still in use', () => {
+  it('reads each name it means to refuse', () => {
     expect(RETIRED.test('https://shytalk.shyden.co.uk')).toBe(true);
     expect(RETIRED.test('https://dev.shytalk.shyden.co.uk')).toBe(true);
     expect(RETIRED.test('https://yawelo-idle.shyden.co.uk')).toBe(true);
-    expect(RETIRED.test('https://dev.yawelo-idle.shyden.co.uk')).toBe(false);
+    expect(RETIRED.test('https://dev.yawelo-idle.shyden.co.uk')).toBe(true);
   });
 
   it('no shipped file or build config names one', () => {
