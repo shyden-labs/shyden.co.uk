@@ -7,11 +7,11 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
  *
  * It cannot join `content`: that project's specs are guarded as ones which
  * never drive the viewport, and a baseline needs a desktop width AND a mobile
- * one. It must not join the five engines either -- that would demand five sets
+ * one. It must not join the three engines either -- that would demand three sets
  * of baselines for a question about OUR css, not about WebKit's.
  */
 // Anchored on a path boundary, not just the suffix. `/visual\.spec\.ts$/`
-// also claims `audiovisual.spec.ts` -- and because the five engines IGNORE
+// also claims `audiovisual.spec.ts` -- and because the engines IGNORE
 // this pattern, a spec so named would silently stop running everywhere.
 // Same substring trap as `/glory-points` matching `/id/glory-points` in
 // #21 Stage 4; caught here by the guard rather than in production.

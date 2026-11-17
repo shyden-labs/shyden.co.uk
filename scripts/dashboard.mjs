@@ -392,7 +392,7 @@ const PAGE = `<!doctype html>
 
 <script>
 (function () {
-  var GROUP_LABEL = { desktop: 'Desktop (emulated, 5 projects)', android: 'Android (real device)', ios: 'iOS (real device)' };
+  var GROUP_LABEL = { desktop: 'Desktop (3 engines)', android: 'Android (real device)', ios: 'iOS (real device)' };
   var grid = document.getElementById('grid');
   var sub = document.getElementById('sub');
   var abortBox = document.getElementById('abort');
