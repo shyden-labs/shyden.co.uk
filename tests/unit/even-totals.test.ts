@@ -150,18 +150,17 @@ describe('deviceTargets', () => {
     expect(names).toEqual(['chromium', 'webkit']);
   });
 
-  it('makes android one target without its set-up project, and counts the tests excluded by design as skipped', () => {
+  it('makes android one target without its set-up project', () => {
     const [target] = deviceTargets({
       desktop: null,
       android,
       ios: null,
-      excludedByDesign: 400,
     });
     expect(target).toEqual({
       target: 'android',
       passed: 2,
       failed: 1,
-      skipped: 400,
+      skipped: 0,
     });
   });
 

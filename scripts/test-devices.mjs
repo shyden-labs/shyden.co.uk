@@ -795,66 +795,6 @@ function findIphone() {
   return pickIphone(raw, process.env.IOS_UDID);
 }
 
-// ── one-off discovery: how many tests does grepInvert exclude by design? ──
-
-/**
- * The `--grep` pattern that SELECTS what `android-chrome`'s `grepInvert` excludes. Declared
- * once and used for the listing and both messages; tests/guards/excluded-by-design.test.ts holds
- * it to the config's `grepInvert`, character for character. It was once two hand-typed copies,
- * and this one missed `@requires-download-bytes` for as long as that tag existed (#308).
- */
-const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport';
-
-/**
- * `android-chrome`'s `grepInvert`
- * (playwright.device.config.ts) excludes tagged tests before Playwright's own JSON
- * reporter ever sees them -- they are not "skipped", they are never collected, so the
- * real run's own report has no number for them at all. This asks separately, freshly,
- * every run: `--list --grep=<the same pattern>` against ANY project sharing
- * android-chrome's `tests/e2e/*.spec.ts` scope directly SELECTS the tagged set
- * (chromium is a convenient, arbitrary choice -- one project, no filtering of its
- * own). android-chrome matches tests/e2e alone (#1178), so restricting this listing to
- * tests/e2e does not undercount.
- *
- * One tag now (#1047): `@javascript-blocked` tests run on the phone, with JavaScript blocked
- * through Chrome's own settings, so only the screen-size tests are excluded by design. The
- * pattern stays in exact lock-step with the config's own `grepInvert`.
- *
- * Never hardcoded: measured live against this exact source tree, every run, so a
- * future test gaining or losing either tag cannot make this number rot. `--list`'s own
- * JSON reporter marks every listed test `skipped` (nothing ran) -- measured directly
- * before being trusted, not assumed.
- */
-async function countExcludedByDesign() {
-  const outFile = path.join(TEST_RESULTS_DIR, 'excluded-by-design-count.json');
-  const { code } = await runTagged(
-    'discover',
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.config.ts',
-      '--project=chromium',
-      '--list',
-      `--grep=${EXCLUDED_BY_DESIGN_GREP}`,
-      '--reporter=json',
-    ],
-    { env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: outFile } },
-  );
-  if (code !== 0) {
-    throw new Error(
-      `expected \`playwright test --list --grep=${EXCLUDED_BY_DESIGN_GREP}\` to exit 0 ` +
-        `(it only lists tests, never runs them) -- got code ${code}. Cannot compute the Android group's ` +
-        'skipped-by-design count.',
-    );
-  }
-  return countAt(
-    readJson(outFile, 'the excluded-by-design discovery listing'),
-    ['stats', 'skipped'],
-    'the excluded-by-design discovery listing',
-  );
-}
-
 // ── the three groups ────────────────────────────────────────────────────
 
 /**
@@ -962,15 +902,9 @@ function neverWritten(name, code, reportFile) {
  * (`null` when none was written). `reportFile` only names the report.
  *
  * @param {{ name: string, code: number | null, report: unknown,
- *   reportFile: string, extraSkipped?: number }} group
+ *   reportFile: string }} group
  */
-export function playwrightVerdict({
-  name,
-  code,
-  report,
-  reportFile,
-  extraSkipped = 0,
-}) {
+export function playwrightVerdict({ name, code, report, reportFile }) {
   if (report === null) return neverWritten(name, code, reportFile);
   const description = `${name}'s Playwright report`;
   /** @param {string} key */
@@ -986,7 +920,7 @@ export function playwrightVerdict({
     code,
     passed,
     failed: unexpected + retried,
-    skippedByDesign: count('skipped') + extraSkipped,
+    skippedByDesign: count('skipped'),
     reportSaysOk: unexpected === 0,
     reportSays: `${unexpected} failed`,
     failures: `${unexpected} test(s) failed${crashNote}`,
@@ -1174,12 +1108,7 @@ async function runDesktopGroup() {
   };
 }
 
-/**
- * @param {number} excludedByDesign a COUNT, from `countExcludedByDesign()`,
- *   passed on as `extraSkipped` (which defaults to 0). Annotating it as a
- *   list from the name alone was wrong; the call site settled it.
- */
-async function runAndroidGroup(excludedByDesign) {
+async function runAndroidGroup() {
   const name = 'android';
   const startedAt = Date.now();
   const absence = isAndroidPresent();
@@ -1229,7 +1158,6 @@ async function runAndroidGroup(excludedByDesign) {
       code,
       report: reportAt(reportFile, `${name}'s Playwright JSON report`),
       reportFile: path.relative(ROOT, reportFile),
-      extraSkipped: excludedByDesign,
     }),
     durationMs: Date.now() - startedAt,
   };
@@ -1457,9 +1385,8 @@ function printSummaryTable(groups, totalDurationMs) {
  * report a earlier run left behind is never counted.
  *
  * @param {any[]} groups
- * @param {number} excludedByDesign
  */
-function judgeTotals(groups, excludedByDesign) {
+function judgeTotals(groups) {
   /** @param {string} name */
   const reportOf = (name) =>
     groups.some((g) => g.name === name && g.status !== 'not-run')
@@ -1475,7 +1402,6 @@ function judgeTotals(groups, excludedByDesign) {
       desktop: reportOf('desktop'),
       android: reportOf('android'),
       ios: reportOf('ios'),
-      excludedByDesign,
     }),
   );
 }
@@ -1679,23 +1605,10 @@ async function main() {
       '==> Confirmed: the shared server serves the page this run just built, byte for byte.\n',
     );
 
-    // The Android group's own count, asked only when that group runs.
-    let excludedByDesign = 0;
-    if (groupNames.includes('android')) {
-      process.stdout.write(
-        '==> Counting excluded-by-design exclusions (static, source-only fact)...\n',
-      );
-      excludedByDesign = await countExcludedByDesign();
-      process.stdout.write(
-        `==> ${excludedByDesign} test(s) excluded by design ` +
-          `(${EXCLUDED_BY_DESIGN_GREP.split('|').join(' or ')}) for the Android group.\n`,
-      );
-    }
-
     /** @type {Record<string, () => Promise<Record<string, unknown>>>} */
     const runners = {
       desktop: runDesktopGroup,
-      android: () => runAndroidGroup(excludedByDesign),
+      android: runAndroidGroup,
       ios: runIosGroup,
     };
     process.stdout.write(
@@ -1717,7 +1630,7 @@ async function main() {
     writeDashboardFinal({ aborted: null, groups });
 
     printSummaryTable(groups, Date.now() - startedAt);
-    const totals = judgeTotals(groups, excludedByDesign);
+    const totals = judgeTotals(groups);
     process.stdout.write(
       `Totals per target:\n${totals.lines.map((l) => `  ${l}`).join('\n')}\n`,
     );

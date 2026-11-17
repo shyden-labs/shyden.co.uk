@@ -68,53 +68,44 @@ for (const theme of THEMES) {
         );
       });
 
-      test(
-        '/classroom-groups: results, the roster, the docked bar, print and the full-screen board',
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width: 1280, height: 900 });
-          // A refused requestFullscreen lands in the overlay on every engine,
-          // so the board renders the same way wherever this runs.
-          await refuseFullscreen(page);
-          await withGroups(page);
-          await expectTheme(page, theme);
-          await expect(
-            page.locator('#cg-results .group').first(),
-          ).toBeVisible();
-          await shoot(page, `${theme}: /classroom-groups with results`);
+      test('/classroom-groups: results, the roster, the docked bar, print and the full-screen board', async ({
+        page,
+      }) => {
+        // The laptop's roster table at 1280 on a desktop engine; on a phone,
+        // the phone's own width (#1179: the same test on every target).
+        await atViewport(page, { width: 1280, height: 900 });
+        // A refused requestFullscreen lands in the overlay on every engine,
+        // so the board renders the same way wherever this runs.
+        await refuseFullscreen(page);
+        await withGroups(page);
+        await expectTheme(page, theme);
+        await expect(page.locator('#cg-results .group').first()).toBeVisible();
+        await shoot(page, `${theme}: /classroom-groups with results`);
 
-          await expect(
-            page.locator('#cg-roster tbody tr').first(),
-          ).toBeVisible();
-          await shoot(page, `${theme}: the roster`, page.locator('#cg-roster'));
+        await expect(page.locator('#cg-roster tbody tr').first()).toBeVisible();
+        await shoot(page, `${theme}: the roster`, page.locator('#cg-roster'));
 
-          await page.evaluate(() => scrollTo(0, 0));
-          const bar = page.locator('p.actions');
-          await expect(bar).toHaveCSS('position', 'sticky');
-          // Docking is proved before the picture, as visual.spec proves it:
-          // sticky holds whether or not the bar has reached the fold.
-          const { bottom, fold } = await bar.evaluate((el) => ({
-            bottom: el.getBoundingClientRect().bottom,
-            fold: window.innerHeight,
-          }));
-          expect(bottom, 'the action bar rests on the fold').toBeCloseTo(
-            fold,
-            0,
-          );
-          await shoot(page, `${theme}: the action bar, docked`);
+        await page.evaluate(() => scrollTo(0, 0));
+        const bar = page.locator('p.actions');
+        await expect(bar).toHaveCSS('position', 'sticky');
+        // Docking is proved before the picture, as visual.spec proves it:
+        // sticky holds whether or not the bar has reached the fold.
+        const { bottom, fold } = await bar.evaluate((el) => ({
+          bottom: el.getBoundingClientRect().bottom,
+          fold: window.innerHeight,
+        }));
+        expect(bottom, 'the action bar rests on the fold').toBeCloseTo(fold, 0);
+        await shoot(page, `${theme}: the action bar, docked`);
 
-          await page.emulateMedia({ media: 'print' });
-          await expect(
-            page.locator('#cg-results .group').first(),
-          ).toBeVisible();
-          await shoot(page, `${theme}: the print preview`);
-          await page.emulateMedia({ media: 'screen' });
+        await page.emulateMedia({ media: 'print' });
+        await expect(page.locator('#cg-results .group').first()).toBeVisible();
+        await shoot(page, `${theme}: the print preview`);
+        await page.emulateMedia({ media: 'screen' });
 
-          await tapOn(page.getByRole('button', { name: 'Full screen' }));
-          await expect(page.locator('#cg-board')).toBeVisible();
-          await shoot(page, `${theme}: the full-screen board`);
-        },
-      );
+        await tapOn(page.getByRole('button', { name: 'Full screen' }));
+        await expect(page.locator('#cg-board')).toBeVisible();
+        await shoot(page, `${theme}: the full-screen board`);
+      });
     });
   });
 }

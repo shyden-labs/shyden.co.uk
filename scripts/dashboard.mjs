@@ -451,10 +451,10 @@ const PAGE = `<!doctype html>
     var skipped = g.final ? g.final.skippedByDesign : g.skipped;
     // g.total (live) counts only what the jsonl 'begin' event saw, i.e.
     // what Playwright/Vitest actually COLLECTED. The authoritative
-    // skippedByDesign in g.final can be larger than that: it also counts
-    // tests excluded by the emulated-viewport tag's grepInvert BEFORE
-    // collection ever happens (android-chrome only), which the live
-    // stream never saw at all. Caught live: without this, a finished
+    // skippedByDesign in g.final can be larger than that: until #1179 it
+    // also counted tests a grepInvert excluded BEFORE collection ever
+    // happened (android-chrome only), which the live stream never saw at
+    // all. Caught live: without this, a finished
     // Android run showed "223 / 176" -- done exceeding total, individually
     // correct numbers read together as nonsense. Once final data exists,
     // the displayed total is recomputed from the SAME three authoritative
