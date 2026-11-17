@@ -93,6 +93,7 @@ export const docsOnlyNeeds = (
     scope: { result: 'success', outputs: { docs_only: 'true' } },
     checks: { result: 'success', outputs: {} },
     coverage: { result: 'skipped', outputs: {} },
+    sonarcloud: { result: 'skipped', outputs: {} },
     e2e: { result: 'skipped', outputs: {} },
     'sanity-on-build': { result: 'skipped', outputs: {} },
     functions: { result: 'skipped', outputs: {} },

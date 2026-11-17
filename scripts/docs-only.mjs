@@ -55,6 +55,7 @@ export const SKIPPED_WHEN_DOCS_ONLY = Object.freeze([
   'e2e',
   'functions',
   'sanity-on-build',
+  'sonarcloud',
 ]);
 
 /** The ci.yml jobs build-and-test needs to have SUCCEEDED on a docs-only verdict. */
