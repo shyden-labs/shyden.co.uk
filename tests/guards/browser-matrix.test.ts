@@ -114,7 +114,7 @@ const ONCE_CONTENT_ONLY = [
 ];
 
 describe('every engine runs the whole suite (#1067)', () => {
-  it('runs each once content-only spec on all five engines', () => {
+  it('runs each once content-only spec on every engine', () => {
     // Asked of what a project MATCHES, as Playwright resolves it (#33, #194).
     const projects = resolvedProjects(config, 'playwright.config.ts');
     for (const spec of ONCE_CONTENT_ONLY)
@@ -132,12 +132,49 @@ describe('every engine runs the whole suite (#1067)', () => {
     ).toEqual([]);
   });
 
-  it('has the five engines as its projects, and no other', () => {
+  it('has the engines as its projects, and no other', () => {
     expect(
       (config.projects ?? [])
         .map((p) => p.name)
         .filter((n) => n !== VISUAL_PROJECT.name),
     ).toEqual(ENGINES.map((engine) => engine.name));
+  });
+});
+
+/**
+ * No desktop browser poses as a phone (#1181; Shyden 2026-11-17: emulated
+ * phones are dropped, and a phone result only ever comes from a real phone).
+ * Asked of every project both browser configs declare, so a phone profile
+ * cannot come back through either one or through a project added beside the
+ * engines. A width stepped inside a test is not a project's default and is
+ * untouched by this.
+ */
+describe('no desktop browser poses as a phone (#1181)', () => {
+  /** Narrower than this, a default view is a phone's or a tablet's. */
+  const DESKTOP_MIN_WIDTH = 1024;
+
+  function posing(projects: PlaywrightTestConfig['projects']): string[] {
+    return (projects ?? []).flatMap((p) => {
+      const use = p.use ?? {};
+      const why = [
+        use.isMobile ? 'isMobile' : '',
+        use.hasTouch ? 'hasTouch' : '',
+        use.viewport && use.viewport.width < DESKTOP_MIN_WIDTH
+          ? `a ${use.viewport.width}px-wide default view`
+          : '',
+      ].filter(Boolean);
+      return why.length ? [`${p.name}: ${why.join(', ')}`] : [];
+    });
+  }
+
+  it('the e2e config declares no project with a phone profile', () => {
+    expect(posing(config.projects)).toEqual([]);
+  });
+
+  it('the Functions config declares no project with a phone profile', async () => {
+    const functions = (await import('../../playwright.functions.config'))
+      .default;
+    expect(posing(functions.projects)).toEqual([]);
   });
 });
 

@@ -109,20 +109,6 @@ type Samples = {
 const FRAME_GAP_CEILING_MS = 250;
 
 /**
- * mobile-safari draws the frame test at pixel ratio 1, not its iPhone 13's 3
- * (Shyden, 2026-10-20, #856). CI's WebKit paints in software, so ratio 3 is 9x
- * the pixels per frame, and the gaps follow the pixels: over 80 runs each,
- * ratio 3 gave 58-314 ms in flight (8 over 250), ratio 1 gave 21-62 ms (none),
- * with tracing off (probe runs 39392029935 and 39406394146). The deal runs the
- * same code at any ratio, so a blank we cause is still caught; real-device
- * painting at ratio 3 is the real iPhone's to judge. Every other engine keeps
- * its device's own ratio.
- */
-const FRAME_TEST_PIXEL_RATIO: Readonly<Record<string, number>> = {
-  'mobile-safari': 1,
-};
-
-/**
  * Every animation frame until stopped: for each student, whether their chip
  * (laid out and not `visibility: hidden`) and their row (laid out, computed
  * opacity above 0) can be seen, and for a frame that shows a student nowhere
@@ -390,25 +376,14 @@ const animationsMade = (page: Page): Promise<Made[]> =>
 
 test.describe('the board deals by moving students into their cards', () => {
   test.describe('frame by frame', () => {
-    test.use({
-      deviceScaleFactor: async ({}, use, testInfo) =>
-        use(
-          FRAME_TEST_PIXEL_RATIO[testInfo.project.name] ??
-            testInfo.project.use.deviceScaleFactor,
-        ),
-    });
-
     test('every student is seen exactly once at every frame, chip then row', async ({
       page,
     }) => {
       await openWaitingBoard(page, String(COUNT), '4');
-      // The ratio the page really draws at, so the override cannot stop
-      // applying unseen: its project's own, or the frame test's from above.
-      // A real phone over CDP draws at its own ratio (3.5 on the Android)
-      // and no ratio can be set there, so its project must name none (#908).
-      const project = test.info().project;
-      const set =
-        FRAME_TEST_PIXEL_RATIO[project.name] ?? project.use.deviceScaleFactor;
+      // The ratio the page really draws at is its project's own. A real
+      // phone over CDP draws at its own ratio (3.5 on the Android) and no
+      // ratio can be set there, so its project must name none (#908).
+      const set = test.info().project.use.deviceScaleFactor;
       if (onRealDevice())
         expect(set, 'no ratio can be set on a real phone').toBeUndefined();
       else

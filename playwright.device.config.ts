@@ -29,7 +29,7 @@ const ANDROID_SUITE = {
   // construction and buried the run's one real failure among them. The
   // pattern is the visual project's own, imported rather than restated.
   //
-  // The content-only specs are NOT excluded, although the five engines
+  // The content-only specs are NOT excluded, although the desktop engines
   // ignore them: `rendered-text.spec.ts` reads layout, and this project is
   // the only run that measures it at phone width (#198).
   testIgnore: VISUAL_PROJECT.testMatch,

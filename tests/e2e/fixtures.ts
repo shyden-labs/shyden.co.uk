@@ -225,7 +225,7 @@ function requireBaseURL(baseURL: string | undefined): string {
  * Real-device runs are a separate Playwright invocation with its own config, so the choice
  * is made once, at module load, rather than per test. Desktop keeps `base` verbatim: an
  * override that merely *reproduced* the defaults would be one refactor away from dropping
- * the emulation options that the mobile-chrome and mobile-safari projects depend on.
+ * an option an engine's device descriptor sets.
  *
  * `installsAClock` (#854) is set only by the phone's `android-chrome-clock` project
  * (playwright.device.config.ts), which runs the tests tagged `@installs-a-clock` in a worker
