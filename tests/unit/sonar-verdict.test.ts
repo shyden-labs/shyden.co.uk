@@ -337,4 +337,96 @@ describe('main', () => {
       await expect(run()).rejects.toThrow(message);
     },
   );
+
+  // SonarCloud's free plan answers 403 to any read of a branch other than the
+  // main branch or a pull request ("Organization is not allowed to access data
+  // from non main branches", run 44103680992). A dev deploy dispatched from a
+  // feature branch therefore reuses the verdict its pull request's own
+  // `sonarcloud` check gave this exact commit (Shyden's ruling, 2026-11-17).
+  describe('a dispatched feature branch reuses its pull request’s scan of this commit', () => {
+    const CHECKS =
+      'https://api.github.com/repos/shyden-labs/shyden.co.uk/commits/abc123/check-runs?check_name=sonarcloud&filter=all&per_page=100 Bearer gh';
+    beforeEach(() => {
+      vi.stubEnv('SONAR_REUSE_PULL_REQUEST_SCAN', 'true');
+      vi.stubEnv('SONAR_PULL_REQUEST', '');
+      vi.stubEnv('GITHUB_TOKEN', 'gh');
+      vi.stubEnv('GITHUB_REPOSITORY', 'shyden-labs/shyden.co.uk');
+      vi.stubEnv('GITHUB_SHA', 'abc123');
+      vi.stubEnv('GITHUB_API_URL', '');
+    });
+    const checks = (
+      ...runs: { conclusion: string | null; completed_at: string | null }[]
+    ) =>
+      [
+        200,
+        {
+          check_runs: runs,
+        },
+      ] as [number, unknown];
+
+    it('passes when the latest pull request scan of this commit succeeded, and sends the SonarCloud token nowhere', async () => {
+      answer(
+        // Newest first, as the API may list them: the latest decides, not the last listed.
+        checks(
+          { conclusion: 'success', completed_at: '2026-11-17T11:00:00Z' },
+          { conclusion: 'failure', completed_at: '2026-11-17T10:00:00Z' },
+        ),
+      );
+      expect(await run()).toBe(0);
+      expect(fetched).toEqual([CHECKS]);
+      expect(out).toEqual([
+        'sonar-verdict: quality gate: OK on this commit’s pull request scan (abc123)\n',
+        'sonar-verdict: https://sonarcloud.io/dashboard?id=x&pullRequest=7\n',
+      ]);
+    });
+
+    it('fails when the latest pull request scan of this commit did not succeed, naming its conclusion', async () => {
+      answer(
+        checks(
+          { conclusion: 'success', completed_at: '2026-11-17T10:00:00Z' },
+          { conclusion: 'failure', completed_at: '2026-11-17T11:00:00Z' },
+        ),
+      );
+      expect(await run()).toBe(1);
+      expect(err).toEqual([
+        'sonar-verdict: quality gate: this commit’s pull request scan (abc123) concluded failure, not success\n',
+      ]);
+    });
+
+    it.each([
+      ['no pull request scan at all', []],
+      ['only a scan still running', [{ conclusion: null, completed_at: null }]],
+    ])(
+      'fails closed with %s, saying a pull request must scan it first',
+      async (_what, runs) => {
+        answer(checks(...runs));
+        await expect(run()).rejects.toThrow(
+          'sonar-verdict: no finished `sonarcloud` check on abc123; SonarCloud’s free plan reads only develop and pull requests, so open a pull request for this branch and let its CI finish before dispatching a dev deploy',
+        );
+      },
+    );
+
+    it('fails closed on an API error reading the checks', async () => {
+      answer([403, {}]);
+      await expect(run()).rejects.toThrow(
+        `sonar-verdict: GET ${CHECKS.split(' ')[0]} answered 403; no verdict to read`,
+      );
+    });
+
+    it('fails closed, naming it, when the GitHub token is missing', async () => {
+      vi.stubEnv('GITHUB_TOKEN', '');
+      await expect(run()).rejects.toThrow(
+        'sonar-verdict: GITHUB_TOKEN is empty; the job must pass github.token to read this commit’s checks',
+      );
+    });
+
+    it('scans as before when the flag is anything but true', async () => {
+      vi.stubEnv('SONAR_REUSE_PULL_REQUEST_SCAN', 'false');
+      answer(task('SUCCESS', { pullRequest: undefined }), gate('OK'));
+      expect(await run()).toBe(0);
+      expect(fetched[0]).toBe(
+        'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
+      );
+    });
+  });
 });

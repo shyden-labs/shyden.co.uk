@@ -122,6 +122,56 @@ function summary(body) {
 }
 
 /**
+ * The verdict this commit's pull request `sonarcloud` check gave, for a dev
+ * deploy dispatched from a feature branch. SonarCloud's free plan answers 403
+ * to any read of a branch but the main one or a pull request (run
+ * 44103680992), so that branch's own scan has no gate to read; its pull
+ * request's scan of the same commit does (Shyden's ruling, 2026-11-17). The
+ * check is named exactly `sonarcloud` only in ci.yml's pull request run; a
+ * called run's is `<caller job> / sonarcloud`. The latest finished one decides.
+ * Only GITHUB_TOKEN goes out, to the GitHub API.
+ *
+ * @returns {Promise<{ ok: boolean; lines: string[] }>}
+ */
+async function reusedVerdict() {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    fail(
+      'GITHUB_TOKEN is empty; the job must pass github.token to read this commit’s checks',
+    );
+  }
+  const api = process.env.GITHUB_API_URL || 'https://api.github.com';
+  const sha = String(process.env.GITHUB_SHA);
+  const body =
+    /** @type {{ check_runs?: { conclusion: string | null; completed_at: string | null }[] }} */ (
+      await get(
+        `${api}/repos/${String(process.env.GITHUB_REPOSITORY)}/commits/${sha}/check-runs?check_name=sonarcloud&filter=all&per_page=100`,
+        token,
+      )
+    );
+  const finished = (body.check_runs ?? [])
+    .filter((run) => run.completed_at !== null)
+    .sort((a, b) =>
+      String(a.completed_at).localeCompare(String(b.completed_at)),
+    );
+  const latest = finished.at(-1);
+  if (latest === undefined) {
+    fail(
+      `no finished \`sonarcloud\` check on ${sha}; SonarCloud’s free plan reads only develop and pull requests, so open a pull request for this branch and let its CI finish before dispatching a dev deploy`,
+    );
+  }
+  const scan = `this commit’s pull request scan (${sha})`;
+  return latest.conclusion === 'success'
+    ? { ok: true, lines: [`quality gate: OK on ${scan}`] }
+    : {
+        ok: false,
+        lines: [
+          `quality gate: ${scan} concluded ${String(latest.conclusion)}, not success`,
+        ],
+      };
+}
+
+/**
  * This scan's verdict, or a throw naming why there is none.
  *
  * @param {string} path
@@ -138,6 +188,9 @@ async function judge(path) {
     fail(`no report-task.txt at ${path}: the scan did not run`);
   }
   const report = parseReportTask(readFileSync(path, 'utf8'));
+  if (process.env.SONAR_REUSE_PULL_REQUEST_SCAN === 'true') {
+    return { ...(await reusedVerdict()), dashboardUrl: report.dashboardUrl };
+  }
   const ceiling = Number(process.env.SONAR_CEILING_SECONDS || 300);
   /** @type {Task} */
   let task;

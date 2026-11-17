@@ -1180,6 +1180,47 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
     ]);
   });
 
+  it('a dev deploy dispatched from a feature branch reads its pull request’s scan of the commit, and may read checks to do so', () => {
+    // Run 44103680992: SonarCloud's free plan answers 403 to a gate read on any
+    // branch but develop or a pull request, so a dispatched feature branch
+    // reuses its pull request's `sonarcloud` check (Shyden, 2026-11-17).
+    // develop itself is SonarCloud's main branch and keeps its own scan.
+    const job = jobs()['sonarcloud'] as unknown as {
+      permissions?: Record<string, string>;
+      steps: { run?: string; env?: Record<string, string> }[];
+    };
+    const read = job.steps.find(
+      (s) =>
+        s.run?.trim() ===
+        'node scripts/sonar-verdict.mjs .scannerwork/report-task.txt',
+    );
+    expect({
+      reuse: read?.env?.SONAR_REUSE_PULL_REQUEST_SCAN,
+      token: read?.env?.GITHUB_TOKEN,
+      checks: job.permissions?.checks,
+    }).toEqual({
+      reuse:
+        "${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'develop' }}",
+      token: '${{ github.token }}',
+      checks: 'read',
+    });
+    // A called workflow's GITHUB_TOKEN gets no more than its caller grants.
+    const deployDev = parseCleanYaml(
+      workflow('deploy-dev.yml'),
+      'deploy-dev.yml',
+    ) as {
+      jobs: Record<
+        string,
+        { uses?: string; permissions?: Record<string, string> }
+      >;
+    };
+    expect(
+      Object.values(deployDev.jobs)
+        .filter((j) => j.uses === './.github/workflows/ci.yml')
+        .map((j) => j.permissions?.checks),
+    ).toEqual(['read']);
+  });
+
   it('build-and-test needs the sonarcloud job, and a docs-only pull request skips it with the coverage it reads', async () => {
     expect(needsOf(jobs()['build-and-test'])).toContain('sonarcloud');
     const { SKIPPED_WHEN_DOCS_ONLY } =
