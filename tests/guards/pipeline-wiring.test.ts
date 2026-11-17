@@ -317,8 +317,21 @@ describe('the deploy pipeline runs what it claims to', () => {
 
   // GITHUB_TOKEN is not a repository secret: the runner mints it for each run,
   // scoped by the job's `permissions:`, so no environment can hold it.
+  // Secrets every environment and branch shares, kept once at repository
+  // level (Shyden, 2026-11-17, global: "secrets are allowed at repository
+  // level where it makes sense ... rather than copying the same token into
+  // every environment"). Each name here is ruled; a secret that differs per
+  // environment, or reaches a deployed system, never joins this list.
+  const REPOSITORY_LEVEL_SECRETS = [
+    // SonarCloud's analysis token: the same for every pull request, Dependabot
+    // run and dispatched dev deploy, and it reaches no deployed system (#851).
+    'SONAR_TOKEN',
+  ];
   const storedSecrets = ({ secrets }: WorkflowJob) =>
-    secrets.filter((secret) => secret !== 'GITHUB_TOKEN');
+    secrets.filter(
+      (secret) =>
+        secret !== 'GITHUB_TOKEN' && !REPOSITORY_LEVEL_SECRETS.includes(secret),
+    );
 
   it('every job that reads a secret other than GITHUB_TOKEN names an environment (#241)', () => {
     const readers = everyJob().filter(
@@ -1143,6 +1156,28 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
       ),
       'a step that can be skipped or swallowed',
     ).toEqual([]);
+  });
+
+  it('a dispatched dev deploy hands the scan its token by name, the one secret ci.yml takes', () => {
+    // Run 44016946223: a called workflow's job gets no secret its caller does
+    // not pass, so without this the dispatched path's scan ran with an empty
+    // token and the deploy stopped there.
+    const deployDev = parseCleanYaml(
+      workflow('deploy-dev.yml'),
+      'deploy-dev.yml',
+    ) as { jobs: Record<string, { uses?: string; secrets?: unknown }> };
+    const callers = Object.values(deployDev.jobs).filter(
+      (job) => job.uses === './.github/workflows/ci.yml',
+    );
+    expect(callers.map((job) => job.secrets)).toEqual([
+      { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' },
+    ]);
+    const ci = parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
+      on: { workflow_call?: { secrets?: Record<string, unknown> } };
+    };
+    expect(Object.keys(ci.on.workflow_call?.secrets ?? {})).toEqual([
+      'SONAR_TOKEN',
+    ]);
   });
 
   it('build-and-test needs the sonarcloud job, and a docs-only pull request skips it with the coverage it reads', async () => {

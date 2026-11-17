@@ -32,6 +32,10 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    # The one secret this file takes: the sonarcloud job's token (#851).
+    secrets:
+      SONAR_TOKEN:
+        required: true
   workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
@@ -219,12 +223,13 @@ jobs:
     needs: [scope, coverage]
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    # The token lives in this environment, not at repository level (#241):
-    # it allows every branch and needs no approval. A Dependabot pull request
-    # reads the Dependabot secret of the same name instead. When deploy-dev.yml
-    # calls this file for a dispatched branch, this job still reads the token
-    # from its own environment, so the caller passes no secret.
-    environment: sonarcloud
+    # SONAR_TOKEN is a repository-level secret: every pull request,
+    # Dependabot run and dispatched dev deploy uses the same token, and it
+    # reaches no deployed system (Shyden, 2026-11-17: secrets at repository
+    # level where it makes sense). A Dependabot pull request reads the
+    # Dependabot secret of the same name. deploy-dev.yml passes it by name
+    # when it calls this file, since a called workflow gets no secret its
+    # caller does not pass (run 44016946223).
     # The scan, plus up to 5 minutes' wait for the verdict
     # (SONAR_CEILING_SECONDS' default).
     timeout-minutes: 15
