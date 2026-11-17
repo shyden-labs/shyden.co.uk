@@ -24,9 +24,10 @@ export default defineConfig({
       provider: 'v8',
       // .astro pages are rendered by the e2e suite, not this one.
       include: ['{src,functions,scripts}/**/*.{ts,js,mjs}'],
-      // The figure alone: nothing reads a report file, and the default HTML
-      // report's scripts land where `astro check` reads them.
-      reporter: ['text-summary'],
+      // The figure, plus the lcov FILE SonarCloud's scan reads (#851).
+      // `lcovonly`, not `lcov`: `lcov` also writes an HTML report, whose
+      // scripts land where `astro check` reads them.
+      reporter: ['text-summary', 'lcovonly'],
       // Measured 55.4% of lines on 2026-10-30 (#992).
       thresholds: { lines: 55 },
     },

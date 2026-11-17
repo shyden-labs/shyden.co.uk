@@ -1016,3 +1016,95 @@ describe('neither bot can push, commit or amend (#889)', () => {
     expect(WRITES.test(line)).toBe(false);
   });
 });
+
+/**
+ * SonarCloud's quality gate, blocking (#851; Shyden's ruling of 2026-10-18,
+ * every project: a scan that does not run fails, and the gate's result is
+ * read, failing the job when it fails). The scan rides the `coverage` job,
+ * which `build-and-test` already needs, so a failed gate is a failed required
+ * check with no new context for branch protection to name.
+ */
+describe('every pull request is scanned by SonarCloud and fails on its gate (#851)', () => {
+  type Step = {
+    uses?: string;
+    run?: string;
+    if?: unknown;
+    'continue-on-error'?: unknown;
+    with?: Record<string, unknown>;
+    env?: Record<string, unknown>;
+  };
+  const coverageJob = () => {
+    const parsed = parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
+      jobs: Record<string, { steps: Step[] }>;
+    };
+    return parsed.jobs['coverage'];
+  };
+
+  it('the coverage job measures, scans this project, then reads THAT scan’s gate, in that order, with nothing able to skip or swallow a step', () => {
+    const steps = coverageJob().steps;
+    const at = (found: (s: Step) => boolean, what: string) => {
+      const index = steps.findIndex(found);
+      expect(
+        index,
+        `${what} is a step of the coverage job`,
+      ).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const token = at(
+      (s) =>
+        /\[ -z "\$SONAR_TOKEN" \]/.test(s.run ?? '') &&
+        /exit 1/.test(s.run ?? ''),
+      'a step that fails when SONAR_TOKEN is empty',
+    );
+    const measure = at(
+      (s) => s.run?.trim() === 'npm run test:coverage',
+      'npm run test:coverage',
+    );
+    const scan = at(
+      (s) =>
+        /^SonarSource\/sonarqube-scan-action@[0-9a-f]{40}$/.test(s.uses ?? ''),
+      'the SonarCloud scan, pinned to a full SHA',
+    );
+    const read = at(
+      (s) =>
+        s.run?.trim() ===
+        'node scripts/sonar-verdict.mjs .scannerwork/report-task.txt',
+      "the read of this scan's quality gate",
+    );
+    expect([token < measure, measure < scan, scan < read]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+
+    const args = String(steps[scan].with?.args ?? '')
+      .split(/\s+/)
+      .filter(Boolean);
+    expect(args).toEqual(
+      expect.arrayContaining([
+        '-Dsonar.organization=shyden-labs',
+        '-Dsonar.projectKey=shyden-labs_shyden.co.uk',
+        '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info',
+      ]),
+    );
+    for (const i of [token, scan, read]) {
+      expect(steps[i].env?.SONAR_TOKEN, `step ${i} reads the token`).toBe(
+        '${{ secrets.SONAR_TOKEN }}',
+      );
+    }
+    expect(
+      steps.filter(
+        (s) => s.if !== undefined || s['continue-on-error'] !== undefined,
+      ),
+      'a step that can be skipped or swallowed',
+    ).toEqual([]);
+  });
+
+  it('the unit coverage run writes the lcov file the scan reads, and no HTML report for `astro check` to read', () => {
+    const config = withoutCommentLines(
+      readFileSync('vitest.config.ts', 'utf8'),
+      '//',
+    );
+    expect(config).toMatch(/reporter:\s*\[[^\]]*'lcovonly'[^\]]*\]/);
+  });
+});

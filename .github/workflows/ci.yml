@@ -32,6 +32,11 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    # deploy-dev.yml's dispatched-branch path calls this file; the coverage
+    # job's SonarCloud scan needs the token there too (#851).
+    secrets:
+      SONAR_TOKEN:
+        required: false
   workflow_dispatch:
 # One run per pull request (#237). A push to an open PR starts a fresh run, and
 # without a group the superseded one ran on for about half an hour on a head
@@ -175,23 +180,65 @@ jobs:
 
   # One overall coverage figure for the unit suite, its threshold in
   # vitest.config.ts (global rule 2026-10-30: one percentage per repo).
+  #
+  # Then SonarCloud's quality gate, blocking (#851; Shyden's ruling of
+  # 2026-10-18, every project: a scan that does not run fails, and the gate's
+  # result is read, failing the job when it fails). The scan reads the lcov
+  # file the coverage run writes, and `scripts/sonar-verdict.mjs` reads the
+  # gate of THAT scan's analysis, green only on OK. build-and-test needs this
+  # job, so a failed gate is a failed required check. Setup (project, token as
+  # an Actions AND a Dependabot secret): shyden-labs/repo-template's
+  # docs/sonarcloud.md, done for this repository on 2026-11-17.
   coverage:
     needs: [image, scope]
     # Skipped on a docs-only pull request (#582), like every job that builds.
     if: needs.scope.outputs.docs_only != 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    # 10 for the coverage run, plus the scan and up to 5 minutes' wait for
+    # SonarCloud's verdict (SONAR_CEILING_SECONDS' default).
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
+      - name: The SonarCloud token is set
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::error title=SONAR_TOKEN is missing::Set SONAR_TOKEN as an Actions secret, and as a Dependabot secret for Dependabot pull requests (shyden-labs/repo-template docs/sonarcloud.md)."
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # SonarCloud reads history to tell new code from old.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
       - run: npm ci
       - run: npm run test:coverage
+      - name: Scan
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # Coverage is measured over what vitest.config.ts measures; the
+          # .astro pages, styles and config files are the e2e suite's, so they
+          # are left out of the coverage figure here too.
+          args: >
+            -Dsonar.organization=shyden-labs
+            -Dsonar.projectKey=shyden-labs_shyden.co.uk
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.sources=.
+            -Dsonar.tests=tests
+            -Dsonar.exclusions=tests/**,docs/**
+            -Dsonar.coverage.exclusions=**/*.astro,**/*.css,*.config.ts,*.config.mjs,playwright.*.ts,docker/**,public/**
+      - name: Read the quality gate of this scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: node scripts/sonar-verdict.mjs .scannerwork/report-task.txt
 
   # The e2e suite, split into parallel shards (#163). In one job it took 25.7
   # to 39.3 minutes (median 36.9, its last eight green runs) under a 45-minute
