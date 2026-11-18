@@ -1368,6 +1368,33 @@ function playButtonOn(
   };
 }
 
+/**
+ * What the player heard, so a Space test that fails says why: every key
+ * event on it (and whether its default was already stopped), and every play
+ * and pause, in order. It only listens; nothing is pressed or set.
+ */
+type VideoEventLog = { __videoEvents?: string[] };
+const recordVideoEvents = (video: Locator): Promise<void> =>
+  video.evaluate((v: HTMLVideoElement) => {
+    const log: string[] = [];
+    (window as unknown as VideoEventLog).__videoEvents = log;
+    for (const type of ['keydown', 'keypress', 'keyup'])
+      v.addEventListener(type, (event) => {
+        const key = (event as KeyboardEvent).key;
+        log.push(
+          `${type} ${JSON.stringify(key)}${event.defaultPrevented ? ' (stopped)' : ''}`,
+        );
+      });
+    for (const type of ['play', 'pause'])
+      v.addEventListener(type, () => log.push(type));
+  });
+/** 'playing' or 'paused', then every event the player heard, in order. */
+const playState = (video: Locator): Promise<string> =>
+  video.evaluate((v: HTMLVideoElement) => {
+    const events = (window as unknown as VideoEventLog).__videoEvents ?? [];
+    return `${v.paused ? 'paused' : 'playing'}; heard: ${events.join(', ') || 'nothing'}`;
+  });
+
 test.describe('the Yawelo Idle preview video', () => {
   test(
     'Space on the focused player plays it, and Space again pauses it',
@@ -1386,12 +1413,13 @@ test.describe('the Yawelo Idle preview video', () => {
       await page.goto('/');
       const video = page.locator('#yawelo-idle video');
       await tabTo(video);
+      await recordVideoEvents(video);
       await page.keyboard.press('Space');
       await expect
-        .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+        .poll(() => playState(video), {
           message: 'Space on the focused player started playback',
         })
-        .toBe(false);
+        .toMatch(/^playing;/);
       if (engineHonoursMedia)
         await expect
           .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
@@ -1400,10 +1428,10 @@ test.describe('the Yawelo Idle preview video', () => {
           .toBeGreaterThan(0.2);
       await page.keyboard.press('Space');
       await expect
-        .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+        .poll(() => playState(video), {
           message: 'Space again paused it: one press, one toggle',
         })
-        .toBe(true);
+        .toMatch(/^paused;/);
     },
   );
 
