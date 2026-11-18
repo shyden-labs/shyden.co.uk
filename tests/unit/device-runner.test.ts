@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { serversClosedAfterEach } from '../http-stand-in';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,17 +47,28 @@ async function serving(
 const servers = serversClosedAfterEach();
 
 describe('waitUntil: the timeout bounds the whole wait', () => {
+  // On the test clock (#1205): paid in real time, this waited its whole
+  // deadline inside the 1 s limit.
   it('abandons a predicate that never settles at the deadline', async () => {
-    const started = Date.now();
-    await expect(
-      waitUntil(() => new Promise(() => {}), {
+    vi.useFakeTimers();
+    try {
+      let outcome: unknown = 'still waiting';
+      const waiting = waitUntil(() => new Promise(() => {}), {
         timeoutMs: 50,
         describe: 'a request the server accepted and never answered',
-      }),
-    ).rejects.toThrow(
-      'Timed out after 50ms waiting for: a request the server accepted and never answered',
-    );
-    expect(Date.now() - started).toBeLessThan(1_000);
+      }).catch((error: unknown) => {
+        outcome = error;
+      });
+      await vi.advanceTimersByTimeAsync(49);
+      expect(outcome, 'gave up before its deadline').toBe('still waiting');
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect((outcome as Error).message).toContain(
+        'Timed out after 50ms waiting for: a request the server accepted and never answered',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('answers the predicate’s own value, not a boolean', async () => {
