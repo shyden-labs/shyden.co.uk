@@ -17,6 +17,9 @@ import {
   type ScriptPort,
 } from '../device/ios/interaction';
 import type { PageElement } from '../device/ios/page-driver';
+// Imported with the file, not inside a test: its module graph took 36-106 ms
+// to load in the first test that asked for it, and past 1 s under load (#1203).
+import { wdaUrlFrom } from '../device/ios/session';
 import type { Point } from '../device/ios/wda';
 
 /**
@@ -559,14 +562,12 @@ describe('runTapCanary', () => {
 });
 
 describe('wdaUrlFrom', () => {
-  it('refuses to start without WDA_URL, naming who starts WDA', async () => {
-    const { wdaUrlFrom } = await import('../device/ios/session');
+  it('refuses to start without WDA_URL, naming who starts WDA', () => {
     expect(() => wdaUrlFrom({})).toThrow(
       /WDA_URL is not set: WebDriverAgent is started by scripts\/test-devices\.mjs/,
     );
   });
-  it('hands on the URL the runner set', async () => {
-    const { wdaUrlFrom } = await import('../device/ios/session');
+  it('hands on the URL the runner set', () => {
     expect(wdaUrlFrom({ WDA_URL: 'http://[fd97::1]:8100' })).toBe(
       'http://[fd97::1]:8100',
     );
