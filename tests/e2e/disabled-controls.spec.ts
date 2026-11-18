@@ -251,15 +251,13 @@ const affordances = async (
   const reachable: Affordance[] = [];
   for (const label of labels) {
     const control = page.locator(`[data-disabled-250="${label}"]`);
-    // `page.mouse.move` does NOT scroll, unlike `hover()`, and `block:
-    // 'center'` rather than the default because this page has a STICKY
-    // header (Header.astro:49): a control scrolled to the top sits under it
-    // and the header legitimately wins the hit test. Both were measured
-    // artefacts of the first probe (run 35521737392, every reading void).
-    // On the phone a real finger drag brings it to the middle (#996), and
-    // there is no pointer to move: the reading below needs none.
-    if (onRealDevice()) await scrollToOn(control);
-    else await control.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    // `page.mouse.move` does NOT scroll, unlike `hover()`. This page has a
+    // STICKY header (Header.astro): a control scrolled under it loses the hit
+    // test to the header, which voided every reading of the first probe (run
+    // 35521737392). `scrollToOn` turns the real wheel (#1004), or drags a
+    // real finger on the phone (#996), until the control sits clear of the
+    // view's edges with nothing over it.
+    await scrollToOn(control);
     const box = await control.boundingBox();
     if (box === null) continue; // not rendered; nothing a pointer can reach
 

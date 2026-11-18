@@ -1,5 +1,11 @@
 import { tabTo } from '../tab-to';
-import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
+import {
+  scrollOver,
+  scrollToOn,
+  setCheckedOn,
+  tapAt,
+  tapOn,
+} from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { onRealDevice } from '../device/device-downloads';
@@ -242,16 +248,16 @@ test.describe('homepage content', () => {
     await shoot(page, 'the ShyTalk phone frame draws its bezel');
 
     // AC1 of #599: the band scrolls away with the page.
-    const bottom = await page.evaluate(async () => {
-      const clip = document.querySelector('.marquee-clip');
-      if (!clip) throw new Error('band missing');
-      window.scrollTo(
-        0,
-        clip.getBoundingClientRect().bottom + window.scrollY + 1,
-      );
-      await new Promise((done) => requestAnimationFrame(done));
-      return clip.getBoundingClientRect().bottom;
-    });
+    // Scrolled the way a visitor does, the real wheel or a finger over the
+    // band, one pixel past its bottom edge (#1004).
+    const clip = page.locator('.marquee-clip');
+    await scrollToOn(clip);
+    const before = await clip.boundingBox();
+    if (before === null) throw new Error('band missing');
+    await scrollOver(clip, Math.ceil(before.y + before.height) + 1);
+    const bottom = await clip.evaluate(
+      (el) => el.getBoundingClientRect().bottom,
+    );
     expect
       .soft(bottom, 'the band is still on screen after scrolling past it')
       .toBeLessThanOrEqual(0);
@@ -1099,22 +1105,22 @@ test.describe('the language band sits under the header (#599)', () => {
         // sticky header, and wherever the two meet the header is the topmost
         // thing. `elementFromPoint` is what a click would hit, so it reads the
         // painted stacking order, which a bounding box cannot.
-        const hit = await page.evaluate(async () => {
+        // The band's top edge brought halfway up under the header by the
+        // real wheel or a finger over the band (#1004).
+        const band = page.locator('.marquee-clip');
+        await scrollToOn(band);
+        const bandBox = await band.boundingBox();
+        const headerBox = await page.locator('header').boundingBox();
+        if (bandBox === null || headerBox === null)
+          throw new Error('header or band missing');
+        await scrollOver(
+          band,
+          Math.round(bandBox.y - headerBox.y - headerBox.height / 2),
+        );
+        const hit = await page.evaluate(() => {
           const headerEl = document.querySelector('header');
           const clipEl = document.querySelector('.marquee-clip');
           if (!headerEl || !clipEl) throw new Error('header or band missing');
-          const headerHeight = headerEl.getBoundingClientRect().height;
-          // The band's top edge halfway up under the header.
-          window.scrollTo(
-            0,
-            clipEl.getBoundingClientRect().top +
-              window.scrollY -
-              headerHeight / 2,
-          );
-          const frame = () =>
-            new Promise((done) => requestAnimationFrame(done));
-          await frame();
-          await frame();
           const h = headerEl.getBoundingClientRect();
           const c = clipEl.getBoundingClientRect();
           const top = Math.max(h.top, c.top);

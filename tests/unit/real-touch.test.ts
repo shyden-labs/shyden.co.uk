@@ -15,8 +15,10 @@ import {
   planSwipe,
   type Prepared,
   scrollOver,
+  scrollToOn,
   SPARE_SWIPES,
   swipeCeiling,
+  tapOn,
   waitUntilStill,
   whyNotTappable,
 } from '../real-touch';
@@ -111,6 +113,204 @@ describe('whyNotTappable', () => {
     expect(
       whyNotTappable('#go', at(400, { hit: 'span#mutant-cover' }), 0, 6),
     ).toBe('#go is covered: a finger there would touch span#mutant-cover');
+  });
+  it('names the real wheel where the input is a wheel (#1004)', () => {
+    expect(whyNotTappable('#go', at(3000), 11, 11, 'wheel')).toBe(
+      '#go did not come into view after 11 real wheel turns (the point is at y 3000, the view is 800 tall)',
+    );
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'wheel')).toMatch(
+      /^#go did not come into view: a real wheel turn no longer moves it/,
+    );
+  });
+});
+
+describe('the desktop engines scroll with the real wheel (#1004)', () => {
+  const VIEW = { width: 1280, height: 720 };
+
+  /**
+   * A page holding one 40 px tall element at `top` in the document, scrolled
+   * to `startY`. The real wheel moves `scrollY` within the page's length; any
+   * other way of scrolling is recorded, so a test can say it was never taken.
+   */
+  function fakeDesktop(
+    top: number,
+    { startY = 0, length = 4000, wheelMoves = true } = {},
+  ) {
+    const sent: unknown[] = [];
+    let scrollY = startY;
+    const maxScroll = length - VIEW.height;
+    const rect = () => ({ x: 600, y: top - scrollY, width: 80, height: 40 });
+    const page = {
+      mouse: {
+        move: async (x: number, y: number) => {
+          sent.push(['move', x, y]);
+        },
+        wheel: async (dx: number, dy: number) => {
+          sent.push(['wheel', dx, dy]);
+          if (wheelMoves)
+            scrollY = Math.min(maxScroll, Math.max(0, scrollY + dy));
+        },
+      },
+    };
+    const target = {
+      page: () => page,
+      waitFor: async () => undefined,
+      evaluate: async (
+        _fn: unknown,
+        arg?: { offset?: { x: number; y: number } },
+      ) => {
+        const r = rect();
+        if (arg === undefined)
+          return [r.x, r.y, r.width, r.height, 0, VIEW.height, 0, scrollY].join(
+            ',',
+          );
+        const point = {
+          x: r.x + (arg.offset ? arg.offset.x : r.width / 2),
+          y: r.y + (arg.offset ? arg.offset.y : r.height / 2),
+        };
+        return {
+          point,
+          viewTop: 0,
+          viewHeight: VIEW.height,
+          viewWidth: VIEW.width,
+          inView: point.y >= 0 && point.y <= VIEW.height,
+          hit: null,
+          keyboard: false,
+        };
+      },
+      click: async (options: unknown) => {
+        sent.push(['click', options]);
+      },
+      hover: async () => {
+        sent.push(['hover']);
+      },
+      scrollIntoViewIfNeeded: async () => {
+        sent.push(['scrollIntoViewIfNeeded']);
+      },
+      toString: () => 'locator(#far)',
+    };
+    return {
+      target: target as unknown as Locator,
+      sent,
+      centreY: () => rect().y + 20,
+    };
+  }
+
+  const kinds = (sent: unknown[]) => sent.map((s) => (s as unknown[])[0]);
+  const wheelsOf = (sent: unknown[]) =>
+    sent.filter((s) => (s as unknown[])[0] === 'wheel') as [
+      'wheel',
+      number,
+      number,
+    ][];
+
+  /** Runs the helper to its end on the fake clock, keeping a rejection. */
+  const settle = async <T>(work: Promise<T>): Promise<T> => {
+    const settled = work.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await vi.runAllTimersAsync();
+    const outcome = await settled;
+    if ('error' in outcome) throw outcome.error;
+    return outcome.value;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  const setUp = () => {
+    vi.stubEnv('PW_REAL_DEVICE', '');
+    vi.useFakeTimers();
+  };
+
+  const clearOfTheEdges = (y: number) => {
+    expect(y).toBeGreaterThanOrEqual(VIEW.height * 0.1);
+    expect(y).toBeLessThanOrEqual(VIEW.height * 0.9);
+  };
+
+  it('scrollToOn brings an element below the view in with real wheel turns, never by protocol', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(2500);
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(wheelsOf(sent).every(([, dx, dy]) => dx === 0 && dy > 0)).toBe(true);
+    expect(kinds(sent)).not.toContain('scrollIntoViewIfNeeded');
+    clearOfTheEdges(centreY());
+  });
+
+  it('scrollToOn turns the wheel the other way for an element above the view', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(200, { startY: 2000 });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(wheelsOf(sent).every(([, , dy]) => dy < 0)).toBe(true);
+    clearOfTheEdges(centreY());
+  });
+
+  it('scrollToOn sends no input for an element already in view', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(300);
+    await settle(scrollToOn(target));
+    expect(sent).toEqual([]);
+  });
+
+  it('turns the wheel with the mouse over the view, before each turn', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    const k = kinds(sent);
+    k.forEach((kind, i) => {
+      if (kind === 'wheel') expect(k[i - 1]).toBe('move');
+    });
+    for (const s of sent.filter((s) => (s as unknown[])[0] === 'move')) {
+      const [, x, y] = s as [string, number, number];
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(VIEW.width);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(VIEW.height);
+    }
+  });
+
+  it('tapOn wheels the element in, then clicks it with the real mouse once', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(tapOn(target, { position: { x: 4, y: 4 } }));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(sent.at(-1)).toEqual(['click', { position: { x: 4, y: 4 } }]);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
+  it('fails naming the element when a real wheel turn no longer moves it', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500, { wheelMoves: false });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /^locator\(#far\) did not come into view: a real wheel turn no longer moves it/,
+    );
+    expect(kinds(sent)).not.toContain('scrollIntoViewIfNeeded');
+    expect(kinds(sent)).not.toContain('click');
+  });
+
+  it('scrollOver turns the wheel over the centre of an element in view, without hover()', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(300);
+    await settle(scrollOver(target, 240));
+    expect(sent).toEqual([
+      ['move', 640, 320],
+      ['wheel', 0, 240],
+    ]);
+  });
+
+  it('scrollOver wheels an element below the view in first', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(scrollOver(target, 240));
+    expect(kinds(sent)).not.toContain('hover');
+    expect(sent.at(-1)).toEqual(['wheel', 0, 240]);
+    expect(wheelsOf(sent).length).toBeGreaterThan(1);
   });
 });
 
@@ -233,13 +433,6 @@ describe('scrollOver', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.useRealTimers();
-  });
-
-  it('turns the real wheel over the element where there is a mouse', async () => {
-    vi.stubEnv('PW_REAL_DEVICE', '');
-    const { target, sent } = fakeTarget();
-    await scrollOver(target, 240);
-    expect(sent).toEqual([['hover'], ['wheel', 0, 240]]);
   });
 
   it('drags a real finger from the element the opposite way on the phone', async () => {

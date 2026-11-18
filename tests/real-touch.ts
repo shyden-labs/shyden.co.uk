@@ -16,8 +16,9 @@ import { onRealDevice } from './device/device-downloads';
  * iPhone run does the same through WebDriverAgent
  * (`tests/device/ios/interaction.ts`).
  *
- * Everywhere else (the five desktop engines and their emulated phones), a tap
- * is Playwright's real `click()`, as before (#1004 covers their scrolling).
+ * On the desktop engines, real mouse wheel turns bring the element into view
+ * the same way, never a protocol or page-script scroll (#1004), and the tap
+ * is then Playwright's real `click()`.
  */
 
 /** Drags allowed beyond the ones the distance itself needs. */
@@ -92,18 +93,28 @@ export function planSwipe(p: Prepared): {
   };
 }
 
+/** What moves the page: a finger's drag on the phone, the mouse wheel elsewhere. */
+export type ScrollInput = 'swipe' | 'wheel';
+
+const INPUT_NAMES: Record<ScrollInput, { one: string; many: string }> = {
+  swipe: { one: 'a real swipe', many: 'real swipes' },
+  wheel: { one: 'a real wheel turn', many: 'real wheel turns' },
+};
+
 /** Why a tap cannot be made once the drags have stopped, or null when it can. */
 export function whyNotTappable(
   selector: string,
   p: Prepared,
   swipes: number,
   ceiling: number,
+  input: ScrollInput = 'swipe',
 ): string | null {
   const where = `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+  const named = INPUT_NAMES[input];
   if (!p.inView)
     return swipes >= ceiling
-      ? `${selector} did not come into view after ${ceiling} real swipes ${where}`
-      : `${selector} did not come into view: a real swipe no longer moves it ${where}`;
+      ? `${selector} did not come into view after ${ceiling} ${named.many} ${where}`
+      : `${selector} did not come into view: ${named.one} no longer moves it ${where}`;
   if (p.hit !== null)
     return `${selector} is covered: a finger there would touch ${p.hit}`;
   return null;
@@ -310,31 +321,53 @@ function closeKeyboard(): boolean {
   return shown;
 }
 
-/** Drags the page with real touches until the point can be tapped, or fails naming why. */
+/**
+ * One real turn of the mouse wheel that moves the point toward the middle of
+ * the view, as far as a drag would (#1004). The mouse is moved over the view
+ * first, near its right-hand edge, so the turn scrolls what a visitor's
+ * pointer there would scroll.
+ */
+async function wheelTurn(page: Page, p: Prepared): Promise<void> {
+  const { from, to } = planSwipe(p);
+  await page.mouse.move(from.x, Math.round(p.viewTop + p.viewHeight / 2));
+  await page.mouse.wheel(0, from.y - to.y);
+}
+
+/**
+ * Moves the page with real input until the point can be tapped, or fails
+ * naming why: real touch drags on the phone, real wheel turns elsewhere.
+ */
 async function bringIntoView(
   target: Locator,
   offset: { x: number; y: number } | undefined,
   forATap: boolean,
+  input: ScrollInput = 'swipe',
 ): Promise<Prepared> {
   const page = target.page();
   const selector = String(target);
   let p = await prepare(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
-  if (p.keyboard && closeKeyboard()) p = await prepare(target, offset);
+  if (input === 'swipe' && p.keyboard && closeKeyboard())
+    p = await prepare(target, offset);
+  // The wheel also moves a point something covers (a sticky header) toward
+  // the middle, for a scroll as for a tap; only a tap fails on a cover.
   const moves = (q: Prepared) =>
-    forATap ? mustMove(q) : mustMove({ ...q, hit: null });
+    forATap || input === 'wheel' ? mustMove(q) : mustMove({ ...q, hit: null });
   const ceiling = swipeCeiling(p);
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    const { from, to } = planSwipe(p);
-    await drag(
-      page,
-      from,
-      to,
-      Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
-    );
+    if (input === 'wheel') await wheelTurn(page, p);
+    else {
+      const { from, to } = planSwipe(p);
+      await drag(
+        page,
+        from,
+        to,
+        Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
+      );
+    }
     swipes++;
     p = await prepare(target, offset);
     if (Math.abs(p.point.y - before) < STILL_PX) break;
@@ -344,6 +377,7 @@ async function bringIntoView(
     forATap ? p : { ...p, hit: null },
     swipes,
     ceiling,
+    input,
   );
   if (why !== null) throw new TapNotPossibleError(why);
   return p;
@@ -373,13 +407,19 @@ export interface TapOptions {
   byEffect?: boolean;
 }
 
-/** A real tap on the phone, a real click everywhere else. */
+/**
+ * A real tap on the phone. Everywhere else, real wheel turns bring the
+ * element into view (#1004), then Playwright's real `click()`, which keeps
+ * its own checks that the element is enabled, still and not covered.
+ */
 export async function tapOn(
   target: Locator,
   options: TapOptions = {},
 ): Promise<void> {
   if (!onRealDevice()) {
-    await target.click(options);
+    await target.waitFor({ state: 'visible' });
+    await bringIntoView(target, options.position, false, 'wheel');
+    await target.click(options.position ? { position: options.position } : {});
     return;
   }
   await target.waitFor({ state: 'visible' });
@@ -527,28 +567,35 @@ export async function doubleTapOn(target: Locator): Promise<void> {
 }
 
 /**
- * Brings an element into view with no tap: real drags on the phone,
- * Playwright's `scrollIntoViewIfNeeded()` everywhere else.
+ * Brings an element into view with no tap: real drags on the phone, real
+ * wheel turns everywhere else (#1004).
  */
 export async function scrollToOn(target: Locator): Promise<void> {
-  if (!onRealDevice()) {
-    await target.scrollIntoViewIfNeeded();
-    return;
-  }
   await target.waitFor({ state: 'visible' });
-  await bringIntoView(target, undefined, false);
+  await bringIntoView(
+    target,
+    undefined,
+    false,
+    onRealDevice() ? 'swipe' : 'wheel',
+  );
 }
 
 /**
  * Scrolls the page by `dy` px with the target under the input, the way that
  * target's visitor does (#1048): the real mouse wheel over it on a desktop
- * engine, a real finger dragged from its centre the opposite way on the phone
- * (a finger pulled up the screen sends the page down).
+ * engine, once real wheel turns have brought it into view (#1004), and a real
+ * finger dragged from its centre the opposite way on the phone (a finger
+ * pulled up the screen sends the page down).
  */
 export async function scrollOver(target: Locator, dy: number): Promise<void> {
   if (!onRealDevice()) {
-    await target.hover();
-    await target.page().mouse.wheel(0, dy);
+    const { point } = await bringIntoView(target, undefined, false, 'wheel');
+    const page = target.page();
+    await page.mouse.move(Math.round(point.x), Math.round(point.y));
+    await page.mouse.wheel(0, dy);
+    // The wheel returns before the page has finished scrolling: the caller
+    // reads where it came to rest.
+    await prepare(target, undefined);
     return;
   }
   const box = await target.boundingBox();
