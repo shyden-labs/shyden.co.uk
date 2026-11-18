@@ -32,7 +32,8 @@ export const PICKER_CEILING_MS = 5_000;
  */
 export const PICKER_SETTLE_MS = 300;
 const PICKER_POLL_MS = 250;
-const FOCUS_POLL_MS = 50;
+/** How long the focused-window poll waits between reads. */
+export const FOCUS_POLL_MS = 50;
 
 /** Swipes through a long list before the option counts as missing. */
 const MAX_SWIPES = 8;

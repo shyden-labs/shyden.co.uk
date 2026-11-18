@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseUiDump } from '../device/ui-dump';
 import {
+  FOCUS_POLL_MS,
   PICKER_SETTLE_MS,
   pickerOption,
   pickerList,
@@ -125,17 +126,32 @@ describe('choosing from the picker reads the window, not the whole screen (#1086
     };
   };
 
+  // Every wait here is on the test clock (#1205): the settle and the focus
+  // polls are real time on the phone, 300 ms and 50 ms a read, and paid in
+  // real time they took two of these tests to 304 ms and 103 ms.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  /** Runs a choice to its end, advancing the test clock through its waits. */
+  const done = async (choosing: Promise<void>) => {
+    await vi.runAllTimersAsync();
+    await choosing;
+  };
+
   it('the first choice from a list reads the screen once, and taps the row', async () => {
     const { choose, dumps, taps } = await phone();
-    await choose('Fast');
+    await done(choose('Fast'));
     expect(dumps()).toBe(1);
     expect(taps()).toEqual([['shell', 'input', 'tap', '720', '1587']]);
   });
 
   it('a later choice from the same list taps the row it knows, with no screen read', async () => {
     const { choose, dumps, taps } = await phone();
-    await choose('Fast');
-    await choose('Skip the animation');
+    await done(choose('Fast'));
+    await done(choose('Skip the animation'));
     expect(dumps()).toBe(1);
     expect(taps()).toHaveLength(2);
     expect(taps()[1]).not.toEqual(taps()[0]);
@@ -143,56 +159,53 @@ describe('choosing from the picker reads the window, not the whole screen (#1086
 
   it('a known row waits for the dialog to take touches before its tap', async () => {
     const { choose, taps } = await phone();
-    await choose('Fast');
-    vi.useFakeTimers();
-    try {
-      const choosing = choose('Fast');
-      await vi.advanceTimersByTimeAsync(PICKER_SETTLE_MS - 1);
-      expect(taps()).toHaveLength(1);
-      await vi.advanceTimersByTimeAsync(1);
-      await choosing;
-      expect(taps()).toHaveLength(2);
-    } finally {
-      vi.useRealTimers();
-    }
+    await done(choose('Fast'));
+    const choosing = choose('Fast');
+    await vi.advanceTimersByTimeAsync(PICKER_SETTLE_MS - 1);
+    expect(taps()).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(taps()).toHaveLength(2);
+    await done(choosing);
   });
 
   it('a different list is read again', async () => {
     const { choose, dumps } = await phone();
-    await choose('Fast');
-    await choose('Fast', ['Fast', 'Normal', 'Skip the animation', 'Slow']);
+    await done(choose('Fast'));
+    await done(
+      choose('Fast', ['Fast', 'Normal', 'Skip the animation', 'Slow']),
+    );
     expect(dumps()).toBe(2);
   });
 
   it('a list the screen shows only part of is never remembered: its rows move', async () => {
     const { choose, dumps } = await phone();
     const longer = [...LABELS, 'Slow'];
-    await choose('Fast', longer);
-    await choose('Fast', longer);
+    await done(choose('Fast', longer));
+    await done(choose('Fast', longer));
     expect(dumps()).toBe(2);
   });
 
   it('returns only once the window has gone back, so the next tap meets the page', async () => {
+    // The dialog stays up for two reads after the tap on its row, one focus
+    // poll apart: the choice must not return before the second.
     const { choose, taps } = await phone({ closesAfter: 2 });
-    let done = false;
+    let returned = false;
     const choosing = choose('Fast').then(() => {
-      done = true;
+      returned = true;
     });
-    await choosing;
-    expect(done).toBe(true);
+    await vi.advanceTimersByTimeAsync(FOCUS_POLL_MS);
     expect(taps()).toHaveLength(1);
+    expect(returned, 'returned while the dialog was still up').toBe(false);
+    await vi.advanceTimersByTimeAsync(FOCUS_POLL_MS);
+    await choosing;
+    expect(returned).toBe(true);
   });
 
   it('fails naming the select when the tap opened no picker', async () => {
-    vi.useFakeTimers();
-    try {
-      const { choose, ceiling, taps } = await phone({ opens: false });
-      const choosing = choose('Fast').catch((error: Error) => error.message);
-      await vi.advanceTimersByTimeAsync(ceiling + 1_000);
-      expect(await choosing).toMatch(/sel: a real tap did not open Chrome/);
-      expect(taps()).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
+    const { choose, ceiling, taps } = await phone({ opens: false });
+    const choosing = choose('Fast').catch((error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(ceiling + 1_000);
+    expect(await choosing).toMatch(/sel: a real tap did not open Chrome/);
+    expect(taps()).toEqual([]);
   });
 });
