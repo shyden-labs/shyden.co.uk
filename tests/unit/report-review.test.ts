@@ -296,6 +296,12 @@ describe('the engine client has one home (AC4)', () => {
       server.listen(0, '127.0.0.1', resolve),
     );
     url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // The process's first request pays a one-time start (Node loads its fetch
+    // on first use: 29 ms against 2-4 ms for every later one, 2026-11-18),
+    // which under heavy load took the first test past its 1 s limit (#1203).
+    // Paid here, outside every test, and forgotten.
+    await call(`${url}/languages`);
+    requests.length = 0;
   });
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
