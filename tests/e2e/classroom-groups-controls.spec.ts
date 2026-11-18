@@ -1,6 +1,5 @@
 import { chooseOption } from '../real-select';
-import { scrollToOn, setCheckedOn, tapOn } from '../real-touch';
-import { onRealDevice } from '../device/device-downloads';
+import { scrollOver, scrollToOn, setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -1658,9 +1657,6 @@ test.describe('classroom groups — what a teacher actually sees', () => {
   test('scrolling the page does not change a focused number field', async ({
     page,
   }) => {
-    // A touch device has no wheel to guard against. The behaviour under test
-    // only exists where a wheel does.
-    test.skip(onRealDevice(), 'no mouse wheel on a touch device');
     await page.goto('/classroom-groups');
     const count = page.locator('#cg-count');
     await tapOn(count);
@@ -1673,15 +1669,21 @@ test.describe('classroom groups — what a teacher actually sees', () => {
     const before = await count.inputValue();
     expect(before).not.toBe('');
     await scrollToOn(count);
-    const box = await count.boundingBox();
-    expect(
-      box,
-      'the number field has a box to hold the pointer over',
-    ).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.wheel(0, 240);
+    // Each target scrolls with its own real input over the field (#1048):
+    // the wheel where there is a mouse, a finger on the phone. The page must
+    // really move, or the value staying put proves nothing about scrolling;
+    // the field gives the wheel up so the page still scrolls.
+    const top = await page.evaluate(() => window.scrollY);
+    await scrollOver(count, 240);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), {
+        message: 'the page scrolled under the input',
+      })
+      .toBeGreaterThan(top);
     await expect(count).toHaveValue(before);
-    await page.mouse.wheel(0, -240);
+    // The first scroll may have carried the field off the view.
+    await scrollToOn(count);
+    await scrollOver(count, -240);
     await expect(count).toHaveValue(before);
   });
 });
@@ -1828,9 +1830,10 @@ test.describe('a full roster at the narrow end', () => {
  * 807). The viewport tag's `interactive-widget=resizes-content` shrinks the
  * page above the keyboard instead (operator decision 2026-10-18).
  *
- * Only a device with an on-screen keyboard can answer this: the desktop
- * engines and the emulated phones open none, so the test asks the device
- * whether one opened and skips, saying so, when it did not.
+ * Only a device with an on-screen keyboard can cover the bar: the desktop
+ * engines open none. The test runs on every target all the same, records
+ * whether a keyboard opened, and asserts the bar is in view either way
+ * (Shyden, 2026-11-05, #1048).
  */
 test.describe('the on-screen keyboard', () => {
   test('leaves Make Groups on screen while a teacher types', async ({
@@ -1847,20 +1850,19 @@ test.describe('the on-screen keyboard', () => {
     await page.keyboard.type('3');
     // A keyboard rises a few hundred milliseconds after the field takes focus
     // (about 300 ms on the test phone); three seconds is the stated ceiling.
-    const keyboardOpened = await page
+    const keyboard = await page
       .waitForFunction(
         (before) => (visualViewport?.height ?? innerHeight) < before,
         visibleBefore,
         { timeout: 3_000 },
       )
       .then(
-        () => true,
-        () => false,
+        () => 'a keyboard opened',
+        () => 'no keyboard opened',
       );
-    test.skip(
-      !keyboardOpened,
-      'no on-screen keyboard opened on this device, so nothing can cover the bar',
-    );
+    test
+      .info()
+      .annotations.push({ type: 'on-screen keyboard', description: keyboard });
 
     await expect(page.locator('#cg-size')).toBeFocused();
     await expect
