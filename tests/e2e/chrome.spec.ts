@@ -79,6 +79,11 @@ test.describe('header + footer', () => {
       await expect(
         footer.locator('a[href="mailto:support@shyden.co.uk"]'),
       ).toBeVisible();
+      await shoot(
+        page,
+        `${locale} footer: the support email, and no company`,
+        footer,
+      );
     });
 
   test(

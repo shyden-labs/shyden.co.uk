@@ -222,17 +222,12 @@ async function writtenAfter(
 ): Promise<void> {
   const before = (await counters(page)).writes;
   await act();
-  // Two waits, so a failure names its half. One wait for both read "the store
-  // never confirmed it" in #363, where the page had never written at all.
   await expect
-    .poll(async () => (await counters(page)).writes, `the page wrote ${what}`)
-    .toBeGreaterThan(before);
-  await expect
-    .poll(
-      async () => (await counters(page)).inflight,
-      `the store confirmed ${what}`,
-    )
-    .toBe(0);
+    .poll(async () => {
+      const now = await counters(page);
+      return now.writes > before && now.inflight === 0;
+    }, `the page wrote ${what} and the store confirmed it`)
+    .toBe(true);
 }
 
 /** One tick, then wait for the page to write it and the store to confirm it, as a person would. */

@@ -342,6 +342,26 @@
     "dbba087c37daede6b0501f800efca647c16b0997": {
       "kind": "none",
       "reason": "A daily count of waiting reports, run by a workflow; no page imports it."
+    },
+    "cfecc39465f0b11699807816a8dca86f56fe75f5": {
+      "kind": "visible",
+      "journeys": [
+        "homepage content > the hero leads with ShyTalk and every section is present",
+        "header + footer > en: the footer names no company, and still reaches a person",
+        "header + footer > id: the footer names no company, and still reaches a person",
+        "header + footer > zh: the footer names no company, and still reaches a person",
+        "header + footer > vi: the footer names no company, and still reaches a person",
+        "header + footer > th: the footer names no company, and still reaches a person"
+      ]
+    },
+    "21dec514e1bffa5e7b13d2315aaab9a1f1355031": {
+      "kind": "visible",
+      "journeys": [
+        "light at 390px: every text run over the ribbon clears AA, on every page",
+        "light at 1280px: every text run over the ribbon clears AA, on every page",
+        "dark at 390px: every text run over the ribbon clears AA, on every page",
+        "dark at 1280px: every text run over the ribbon clears AA, on every page"
+      ]
     }
   }
 }

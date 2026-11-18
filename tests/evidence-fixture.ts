@@ -1,19 +1,8 @@
-import {
-  imageSize,
-  renderEvidencePage,
-} from '../scripts/build-evidence-page.mjs';
+import { renderEvidencePage } from '../scripts/build-evidence-page.mjs';
 
-/**
- * A 1x1 transparent RGBA PNG whose chunk CRCs and compressed data all check,
- * so no capture on a fixture page is a broken image. The one it replaced
- * failed both: Chromium drew it, Firefox refused it (#363).
- * `tests/unit/evidence-fixture.test.ts` decodes it strictly.
- */
-const PIXEL_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
-  'base64',
-);
-const PIXEL = `data:image/png;base64,${PIXEL_BYTES.toString('base64')}`;
+/** A real 1x1 PNG, so no capture on a fixture page is a broken image. */
+const PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
 
 /**
  * An evidence page exactly as the builder renders it for a ticket with these
@@ -72,11 +61,5 @@ export const evidencePageOf = (
       ...extra,
     },
     shots: new Map(manifest.map((entry) => [entry.file, PIXEL])),
-    // The size read the way the real build reads it, so each capture reserves
-    // its box: without it, one that decodes late moves everything below it
-    // while a click is in progress (#96, #363).
-    dims: new Map(
-      manifest.map((entry) => [entry.file, imageSize(PIXEL_BYTES)]),
-    ),
   });
 };
