@@ -540,6 +540,44 @@ export async function scrollToOn(target: Locator): Promise<void> {
 }
 
 /**
+ * Scrolls the page by `dy` px with the target under the input, the way that
+ * target's visitor does (#1048): the real mouse wheel over it on a desktop
+ * engine, a real finger dragged from its centre the opposite way on the phone
+ * (a finger pulled up the screen sends the page down).
+ */
+export async function scrollOver(target: Locator, dy: number): Promise<void> {
+  if (!onRealDevice()) {
+    await target.hover();
+    await target.page().mouse.wheel(0, dy);
+    return;
+  }
+  const box = await target.boundingBox();
+  if (box === null)
+    throw new TapNotPossibleError(
+      `${String(target)} has no box to put a finger on`,
+    );
+  const from = {
+    x: Math.round(box.x + box.width / 2),
+    y: Math.round(box.y + box.height / 2),
+  };
+  await drag(target.page(), from, { x: from.x, y: from.y - dy });
+}
+
+/**
+ * Goes Back the way the visitor does (#1048): the phone's own Back key on the
+ * phone, the browser's history Back everywhere else. It waits only for the
+ * navigation to commit: a page restored from the back-forward cache fires no
+ * `load`, which held a `goBack()` to its 30 s timeout on the phone (#807).
+ */
+export async function backOn(page: Page): Promise<void> {
+  if (!onRealDevice()) {
+    await page.goBack({ waitUntil: 'commit' });
+    return;
+  }
+  adb(['shell', 'input', 'keyevent', 'KEYCODE_BACK']);
+}
+
+/**
  * Sets a checkbox or radio the way a finger does: a tap when it is not
  * already as wanted, then the state read back. Elsewhere, Playwright's real
  * `check()`/`uncheck()`/`setChecked()`.

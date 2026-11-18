@@ -5,6 +5,9 @@ The **Shyden Labs** website, plus two free tools it hosts.
 Live at [shyden.co.uk](https://shyden.co.uk). Staged at `dev.shyden.co.uk`, which
 sits behind Basic auth and disallows crawling.
 
+**Progress page:** [the road to the next release](https://claude.ai/artifact/8sxnyuzzqwyh3LeN25RDdH),
+refreshed from the project board at the end of each work session.
+
 ## What's on the site
 
 | Route                  | What it is                                                                                                                 | Ships JS |

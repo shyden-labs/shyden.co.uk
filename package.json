@@ -41,7 +41,7 @@
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
     "astro": "^7.4.12",
-    "swagger-ui-dist": "5.34.1"
+    "swagger-ui-dist": "5.35.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
@@ -54,7 +54,7 @@
     "typescript": "^6.0.3",
     "vite": "8.3.8",
     "vitest": "5.1.0",
-    "wrangler": "4.161.0",
+    "wrangler": "4.162.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
@@ -64,7 +64,7 @@
     "@scarf/scarf@1.4.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true,
-    "workerd@1.20261110.1": true
+    "workerd@1.20261113.1": true
   },
   "scarfSettings": {
     "enabled": false

@@ -1,7 +1,8 @@
 /**
  * Every target runs the same suite, so every target's total (passed + failed +
  * skipped) must be the same and nothing may be skipped (#1049). Pure: no
- * process, no file. The phone run fails on it; CI only prints it until #1056.
+ * process, no file. The phone run fails on it, and so does CI's build-and-test
+ * (#1056).
  */
 
 /**
@@ -92,26 +93,24 @@ const NOT_A_TARGET = new Set(['android-preflight']);
 
 /**
  * The targets of a phone run: one per desktop browser project, one for the
- * Android phone (its projects added together, its tests excluded by design
- * counted as skipped) and one for the iPhone. A group with no report is left
+ * Android phone (its projects added together) and one for the iPhone. A group with no report is left
  * out; the run's verdict already fails it by name.
  *
  * @param {{
  *   desktop: Record<string, any> | null,
  *   android: Record<string, any> | null,
  *   ios: Record<string, any> | null,
- *   excludedByDesign?: number,
  * }} reports
  * @returns {Target[]}
  */
-export function deviceTargets({ desktop, android, ios, excludedByDesign = 0 }) {
+export function deviceTargets({ desktop, android, ios }) {
   /** @type {Target[]} */
   const targets = [];
   if (desktop)
     for (const [name, counts] of Object.entries(countByProject(desktop)))
       if (!NOT_A_TARGET.has(name)) targets.push({ target: name, ...counts });
   if (android) {
-    const sum = { passed: 0, failed: 0, skipped: excludedByDesign };
+    const sum = { passed: 0, failed: 0, skipped: 0 };
     for (const [name, counts] of Object.entries(countByProject(android))) {
       if (NOT_A_TARGET.has(name)) continue;
       sum.passed += counts.passed;

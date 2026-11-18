@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import { VISUAL_PROJECT } from './playwright.config';
 import { CLOCK_TAG } from './tests/device/clock-declaration';
+import { PHONE_RUN_LEAVES_OUT } from './tests/group-tags';
 
 // Set here rather than only in the runner so that a bare `npx playwright test
 // --config=playwright.device.config.ts` behaves identically to the scripted run. Playwright
@@ -33,25 +34,22 @@ const ANDROID_SUITE = {
   // ignore them: `rendered-text.spec.ts` reads layout, and this project is
   // the only run that measures it at phone width (#198).
   testIgnore: VISUAL_PROJECT.testMatch,
-  // A real phone has one screen: `page.setViewportSize`/`test.use({ viewport })`
-  // would "succeed" against CDP and report numbers describing nothing physical
-  // (see tests/guards/viewport-tagging.test.ts, which is what keeps every such
-  // test actually carrying this tag). Scoped to this project alone -- the
-  // preflight project runs exactly one setup file that never touches the
-  // viewport, and must not be affected by a grep option meant for the suite.
+  // No test is kept off the phone by tag (#1179): every shared test runs
+  // here, at the phone's own width where it asks for one (tests/viewport-at.ts).
+  // The visual baselines, the one fixed-width suite, stay out through the
+  // testIgnore above (#194).
   //
-  // `@javascript-blocked` is NOT excluded (#1047): those tests need JavaScript switched off,
+  // `@javascript-blocked` tests run here too (#1047): those tests need JavaScript switched off,
   // which `test.use({ javaScriptEnabled: false })` cannot do on the phone's one adopted
   // context. The `context` fixture (tests/e2e/fixtures.ts) blocks it instead through
   // Chrome's own Site settings, by real taps (tests/device/chrome-javascript-setting.ts), and
   // puts it back after the test.
-  // Downloads are NOT excluded (#308). The tests that read a download's bytes
-  // were, on the belief that the phone could not give them back: every
+  // Downloads run here too (#308). The tests that read a download's bytes
+  // were once excluded, on the belief that the phone could not give them back: every
   // download read "canceled". The cause was Playwright, which attached over
   // plain CDP and pointed the phone's downloads at a folder on the MAC. The
   // real-device fixture now points them at a folder on the phone
   // (tests/device/device-downloads.ts), and the bytes are read back over adb.
-  grepInvert: /@emulated-viewport/,
 };
 
 // `installsAClock` is the phone fixtures' worker option (tests/e2e/fixtures.ts, #854).
@@ -78,6 +76,10 @@ export default defineConfig<Record<never, never>, { installsAClock: boolean }>({
   // eight untracked `-android-chrome-darwin` files in the repo. Baselines
   // change one way only, in the pinned container (see playwright.config.ts).
   updateSnapshots: 'none',
+  // The phone group runs every shared test and its own @phone ones; a test
+  // tagged @desktop says, with its reason, that its behaviour differs on a
+  // desktop browser (#1182, tests/group-tags.ts).
+  grepInvert: PHONE_RUN_LEAVES_OUT,
   projects: [
     { name: 'android-preflight', testMatch: /android-preflight\.setup\.ts/ },
     // Listed before `android-chrome`, and so run first: Playwright cannot take a clock back out

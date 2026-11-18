@@ -9,7 +9,15 @@ import { readdirSync, rmSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { nonEmpty } from '../../scripts/errors.mjs';
 import { testedCompatibilityDate } from '../../scripts/pages-runtime.mjs';
-import { DATABASE_ID, PASSWORD, PERSIST, PORT, SECRET, d1 } from './local.mjs';
+import {
+  DATABASE_ID,
+  DEV_PASS_SECRET_YAWELO,
+  PASSWORD,
+  PERSIST,
+  PORT,
+  SECRET,
+  d1,
+} from './local.mjs';
 
 // This script is measured for coverage, and nothing it starts is (#913): the
 // build loads src/ through Vite (#914's), and wrangler is not our code. Node
@@ -69,6 +77,9 @@ const server = spawn(
     'REPORT_LIMITS=on',
     '--binding',
     `REPORT_COUNTER_SECRET=${SECRET}`,
+    // #1192: Yawelo Idle's dev-pass secret only; ShyTalk's stays unset.
+    '--binding',
+    `DEV_PASS_SECRET_YAWELO=${DEV_PASS_SECRET_YAWELO}`,
   ],
   {
     stdio: 'inherit',

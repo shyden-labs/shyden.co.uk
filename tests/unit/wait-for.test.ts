@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { waitFor } from '../device/ios/page-driver';
 
 /**
@@ -76,38 +76,55 @@ describe('waitFor', () => {
     expect({ value, polls }).toEqual({ value: 'found', polls: 3 });
   });
 
+  // On the test clock (#1205): paid in real time, each of these waited its
+  // whole 300 ms timeout, and under heavy load that is a third of the 1 s
+  // limit before anything is checked.
   it('gives up at its timeout even while a poll has not settled', async () => {
-    const began = performance.now();
-
-    const outcome = await waitFor(() => new Promise<never>(() => undefined), {
-      timeout: 300,
-      describe: 'a session that has stopped answering',
-    }).catch((error: unknown) => error);
-
-    const elapsed = Math.round(performance.now() - began);
-    expect(elapsed, `the wait gave up after ${elapsed} ms`).toBeLessThan(1_000);
-    expect(outcome).toBeInstanceOf(Error);
-    expect((outcome as Error).message).toContain(
-      'Timed out after 300ms waiting for: a session that has stopped answering.',
-    );
+    vi.useFakeTimers();
+    try {
+      let outcome: unknown = 'still waiting';
+      const waiting = waitFor(() => new Promise<never>(() => undefined), {
+        timeout: 300,
+        describe: 'a session that has stopped answering',
+      }).catch((error: unknown) => {
+        outcome = error;
+      });
+      await vi.advanceTimersByTimeAsync(299);
+      expect(outcome, 'gave up before its timeout').toBe('still waiting');
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect(outcome).toBeInstanceOf(Error);
+      expect((outcome as Error).message).toContain(
+        'Timed out after 300ms waiting for: a session that has stopped answering.',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports a retryable error that never clears at the timeout, naming it', async () => {
-    await expect(
-      waitFor(
-        async () => {
-          throw new TypeError('fetch failed');
-        },
-        {
-          timeout: 300,
-          interval: 50,
-          describe: 'a server that never starts',
-          retryable: () => true,
-        },
-      ),
-    ).rejects.toThrow(
-      'Timed out after 300ms waiting for: a server that never starts. Last observed: threw fetch failed',
-    );
+    vi.useFakeTimers();
+    try {
+      const verdict = expect(
+        waitFor(
+          async () => {
+            throw new TypeError('fetch failed');
+          },
+          {
+            timeout: 300,
+            interval: 50,
+            describe: 'a server that never starts',
+            retryable: () => true,
+          },
+        ),
+      ).rejects.toThrow(
+        'Timed out after 300ms waiting for: a server that never starts. Last observed: threw fetch failed',
+      );
+      await vi.advanceTimersByTimeAsync(300);
+      await verdict;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -128,15 +145,17 @@ describe('waitFor, polled past its deadline', () => {
     process.removeAllListeners('warning');
     process.on('warning', listen);
     try {
-      // The second poll starts about 80 ms after a 20 ms deadline.
+      // The second poll starts about 25 ms after a 5 ms deadline. Real time,
+      // not the test clock: the warning is Node's own, and a fake timer never
+      // raises it (#1205 kept this wait as short as it can be).
       await expect(
         waitFor(async () => false, {
-          timeout: 20,
-          interval: 100,
+          timeout: 5,
+          interval: 30,
           describe: 'a condition that never holds',
         }),
       ).rejects.toThrow(
-        'Timed out after 20ms waiting for: a condition that never holds.',
+        'Timed out after 5ms waiting for: a condition that never holds.',
       );
       // A warning raised here must be heard, or an empty list could come
       // from a listener that hears nothing at all.

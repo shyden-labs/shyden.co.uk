@@ -114,12 +114,12 @@ const expectBadgesClearAA = async (badges: Locator): Promise<void> => {
       .toBeGreaterThanOrEqual(4.5);
 };
 
-// The Yawelo Idle preview video, #835. Its files come from the shared media
-// host (yawelo-idle#713), which the shared fixture answers from tests/e2e/stand-ins/ (see
-// yawelo-media.ts), so these read the page's markup and behaviour; the real
-// host is played on the deployed dev site. Literal URLs and types, never the
+// The Yawelo Idle preview video, #835. Its files come from Yawelo Idle's own
+// media host (#1193), which the shared fixture answers from tests/e2e/stand-ins/
+// (see yawelo-media.ts), so these read the page's markup and behaviour; the
+// real dev host is played by the dev sanity suite. Literal URLs and types, never the
 // page's own constant: a value compared with its source asserts nothing.
-const PROMO = 'https://media.shyden.co.uk/yawelo-idle-promo';
+const PROMO = 'https://media.yaweloidle.com/yawelo-idle-promo';
 // MP4 first (Shyden, 2026-10-20): with WebM first the real iPhone stuck on
 // the poster. The codec lists let an engine that cannot play one skip it.
 const PROMO_SOURCES = [
@@ -1344,33 +1344,42 @@ test.describe('the Yawelo Idle preview video', () => {
     page,
     browserName,
   }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+    // Runs on every engine (Shyden, 2026-11-18, #1048). Every engine asserts
+    // what our code controls: the video says preload="none", and pressing
+    // play starts playback. CI's Linux WebKit fetches a rendition on load
+    // despite preload="none" and never advances the clock after play()
+    // (measured 2026-10-20), so the fetch and the clock, which are the
+    // engine's, are asserted where the engine honours them; the real
+    // iPhone's Safari is covered by the release device run.
+    const engineHonoursMedia = browserName !== 'webkit';
+    if (!engineHonoursMedia)
+      test.info().annotations.push({
+        type: 'media',
+        description:
+          "Linux WebKit: the early fetch and the clock are the engine's, not asserted (Shyden, 2026-11-18)",
+      });
     const seen = recordRequests(page);
     await page.goto('/');
     // Liveness: the recorder heard the poster, which loads with the page.
     await expect
       .poll(() => seen.matching(urlMatching(/yawelo-idle-promo-poster\.jpg$/)))
       .toEqual([`${PROMO}-poster.jpg`]);
+    const video = page.locator('#yawelo-idle video');
+    await expect.soft(video).toHaveAttribute('preload', 'none');
     const heard = requestsEveryEngineMakes(seen.all);
-    expect
-      .soft(
-        searched(seen.matching(urlMatching(/yawelo-idle-promo\.(mp4|webm)$/)), {
-          of: heard,
-          what: 'requests the homepage made',
-        }),
-        'preload="none": no rendition is fetched until the visitor plays it',
-      )
-      .toEqual([]);
+    const early = searched(
+      seen.matching(urlMatching(/yawelo-idle-promo\.(mp4|webm)$/)),
+      { of: heard, what: 'requests the homepage made' },
+    );
+    if (engineHonoursMedia)
+      expect
+        .soft(
+          early,
+          'preload="none": no rendition is fetched until the visitor plays it',
+        )
+        .toEqual([]);
 
     // Now play it.
-    const video = page.locator('#yawelo-idle video');
     await expect.soft(video).toBeVisible();
     // Muted, so no engine's autoplay rule refuses a play that is not a tap;
     // what is under test is that a source loads and time moves.
@@ -1378,9 +1387,16 @@ test.describe('the Yawelo Idle preview video', () => {
       v.muted = true;
       return v.play();
     });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeGreaterThan(0.2);
+    expect(
+      await video.evaluate((v: HTMLVideoElement) => v.paused),
+      'pressing play started playback',
+    ).toBe(false);
+    if (engineHonoursMedia)
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+          message: 'the clock moves once the preview plays',
+        })
+        .toBeGreaterThan(0.2);
     const chosen = await video.evaluate((v: HTMLVideoElement) => v.currentSrc);
     test
       .info()
@@ -1402,7 +1418,7 @@ test.describe('the Yawelo Idle preview video', () => {
       [...origins].sort(),
       'the hosts a homepage load reaches: this site, and the video host by name',
     ).toEqual(
-      [new URL(page.url()).origin, 'https://media.shyden.co.uk'].sort(),
+      [new URL(page.url()).origin, 'https://media.yaweloidle.com'].sort(),
     );
   });
 });

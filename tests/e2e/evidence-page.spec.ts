@@ -1,3 +1,4 @@
+import { tabKey } from '../tab-key';
 import { tabTo } from '../tab-to';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
@@ -1413,12 +1414,6 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     page,
     browserName,
   }, testInfo) => {
-    test.skip(
-      browserName === 'webkit',
-      'Safari omits plain links from the Tab sequence unless the visitor opts in, ' +
-        'so a Tab walk here would assert a browser preference, not our markup. ' +
-        'The link takes focus on every engine in the test above.',
-    );
     await openEvidencePage(page, testInfo, {
       order: 'resolve-then-confirm',
       html: HTML_WITH_ADDED,
@@ -1430,7 +1425,8 @@ test.describe('a verdict covers the journeys it was given on (#197)', () => {
     });
     await expect(link).toBeVisible();
     await tabTo(approveButton(page));
-    await page.keyboard.press('Shift+Tab');
+    // Option+Shift+Tab on WebKit, whose plain Tab skips links (#1048).
+    await page.keyboard.press(tabKey(browserName, 'backwards'));
     await expect(
       link,
       'the notice sits just before the verdict buttons in the Tab order',

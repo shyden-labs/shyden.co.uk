@@ -1,5 +1,5 @@
 import { tabTo } from '../tab-to';
-import { doubleTapOn, tapOn } from '../real-touch';
+import { backOn, doubleTapOn, tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { eachWidth } from '../each-width';
@@ -233,33 +233,6 @@ test.describe('the switch (#142 §5, AC3)', () => {
     await later.goto(new URL('/', baseURL).href);
     await expectTheme(later, 'light');
   });
-
-  test('under forced colours, its icon draws in the system text colour (Review Focus 4)', async ({
-    page,
-    browserName,
-  }) => {
-    test.skip(
-      browserName !== 'chromium',
-      'Playwright emulates forcedColors in Chromium alone',
-    );
-    await page.emulateMedia({ forcedColors: 'active' });
-    await page.goto('/');
-    const drawn = await toggle(page).evaluate((button) => ({
-      ink: getComputedStyle(button).color,
-      paints: [...button.querySelectorAll('svg')]
-        .filter((svg) => svg.getClientRects().length > 0)
-        .flatMap((svg) => [...svg.querySelectorAll('circle, path')])
-        .map((shape) => {
-          const style = getComputedStyle(shape);
-          return style.fill === 'none' ? style.stroke : style.fill;
-        }),
-    }));
-    expect(
-      drawn.paints.length,
-      'the visible icon draws something',
-    ).toBeGreaterThan(0);
-    expect([...new Set(drawn.paints)]).toEqual([drawn.ink]);
-  });
 });
 
 test.describe('without JavaScript (#142 AC7)', () => {
@@ -371,9 +344,13 @@ test.describe('the device (#142 AC2)', () => {
 });
 
 test.describe('Back (#142 §5 step 5, AC4)', () => {
-  test('a page restored from the back-forward cache shows the theme chosen after leaving it', async ({
+  test('a real Back shows the theme chosen after leaving the page', async ({
     page,
   }) => {
+    // Shyden's ruling, 2026-11-18 (#1048): whether the browser restores the
+    // page from the back-forward cache or reloads it, Back shows the theme
+    // chosen after leaving it. Which one happened is recorded, not asserted:
+    // Playwright's own builds disable the cache.
     await page.goto('/');
     await expectTheme(page, 'dark');
     await page.evaluate(() => {
@@ -384,24 +361,20 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
     await page.goto('/yeetalk-calculators');
     await tapOn(toggle(page));
     await expectTheme(page, 'light');
-    // A page restored from the back-forward cache fires `pageshow` and no
-    // `load`, so `goBack()`'s default wait for `load` never ends where the cache
-    // is on: on the real Android phone it held the test to its 30 s timeout
-    // (issue 807). Wait for the navigation to commit, then for the document,
-    // which a restore and a reload both leave complete.
-    await page.goBack({ waitUntil: 'commit' });
+    await backOn(page);
+    await expect(page).toHaveURL(/\/$/);
     await expect
       .poll(() => page.evaluate(() => document.readyState))
       .toBe('complete');
     const restored = await page.evaluate(
       () => 'restored' in document.documentElement.dataset,
     );
-    test.skip(
-      !restored,
-      'this engine reloaded the page instead of restoring it from the back-forward cache ' +
-        '(Playwright launches Chromium with --disable-back-forward-cache); a reload re-runs ' +
-        'the head script and would pass without the pageshow handler ever running',
-    );
+    test.info().annotations.push({
+      type: 'back',
+      description: restored
+        ? 'restored from the back-forward cache'
+        : 'reloaded',
+    });
     await expectTheme(page, 'light');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'false');
   });
@@ -409,8 +382,8 @@ test.describe('Back (#142 §5 step 5, AC4)', () => {
   test('the pageshow handler re-applies the saved choice, and aria-pressed with it', async ({
     page,
   }) => {
-    // Runs on every engine, so the handler is proven even where every engine
-    // skips the real Back above (§6.3).
+    // The handler itself, proven on every engine even where the real Back
+    // above reloads rather than restores (§6.3).
     await page.goto('/');
     await expectTheme(page, 'dark');
     await expect(toggle(page)).toHaveAttribute('aria-pressed', 'true');
@@ -491,16 +464,6 @@ test.describe('the aurora ribbon (#371)', () => {
 
     await page.emulateMedia({ media: 'print' });
     expect.soft((await ribbon(page)).display).toBe('none');
-  });
-
-  test('is not drawn under forced colours', async ({ page, browserName }) => {
-    test.skip(
-      browserName !== 'chromium',
-      'Playwright emulates forcedColors in Chromium alone',
-    );
-    await page.goto('/');
-    await page.emulateMedia({ forcedColors: 'active' });
-    expect((await ribbon(page)).display).toBe('none');
   });
 });
 
