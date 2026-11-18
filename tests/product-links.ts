@@ -15,12 +15,12 @@ export const PRODUCTS = [
   },
   {
     name: 'Yawelo Idle',
-    // The production domain has no hyphen; the dev host still does, until the
-    // Yawelo Idle project moves it (#1084).
+    // Both hosts have no hyphen since #1191. The old spelling stays a host
+    // word, so a link still pointing at an old host is selected and refused.
     hostWords: ['yawelo-idle', 'yaweloidle'],
     variable: 'PUBLIC_YAWELO_IDLE_URL',
     prod: 'yaweloidle.com',
-    dev: 'dev.yawelo-idle.shyden.co.uk',
+    dev: 'dev.yaweloidle.com',
   },
 ] as const;
 
