@@ -4,6 +4,7 @@ import {
   GROUP_ONLY,
   PHONE_RUN_LEAVES_OUT,
   groupOnlyFindings,
+  offTargetFindings,
   type ListedTest,
 } from '../group-tags';
 
@@ -81,5 +82,97 @@ describe('what each run leaves out', () => {
     expect(PHONE_RUN_LEAVES_OUT.test('a test @desktop')).toBe(true);
     expect(PHONE_RUN_LEAVES_OUT.test('a test @phone')).toBe(false);
     expect(PHONE_RUN_LEAVES_OUT.test('a test')).toBe(false);
+  });
+});
+
+describe('offTargetFindings: nothing but a group tag keeps a test off a target (#1200)', () => {
+  const all: ListedTest[] = [
+    listed([], undefined, 'a.spec.ts › shared one'),
+    listed([], undefined, 'a.spec.ts › shared two'),
+    listed(['@phone'], 'the on-screen keyboard', 'b.spec.ts › phone only'),
+    listed(['@desktop'], 'a hardware keyboard', 'b.spec.ts › desktop only'),
+  ];
+  const ids = (...names: string[]) => new Set(names);
+
+  it('passes targets that run every test their group runs', () => {
+    expect(
+      offTargetFindings(all, [
+        {
+          name: 'chromium',
+          group: 'desktop',
+          ran: ids(
+            'a.spec.ts › shared one',
+            'a.spec.ts › shared two',
+            'b.spec.ts › desktop only',
+          ),
+        },
+        {
+          name: 'android',
+          group: 'phone',
+          ran: ids(
+            'a.spec.ts › shared one',
+            'a.spec.ts › shared two',
+            'b.spec.ts › phone only',
+          ),
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('refuses a shared test a target does not run, naming the target and the test', () => {
+    expect(
+      offTargetFindings(all, [
+        {
+          name: 'webkit',
+          group: 'desktop',
+          ran: ids('a.spec.ts › shared one', 'b.spec.ts › desktop only'),
+        },
+      ]),
+    ).toEqual([
+      'webkit does not run a.spec.ts › shared two, and no group tag keeps it off',
+    ]);
+  });
+
+  it("refuses a target that drops its own group's tests", () => {
+    expect(
+      offTargetFindings(all, [
+        {
+          name: 'android',
+          group: 'phone',
+          ran: ids('a.spec.ts › shared one', 'a.spec.ts › shared two'),
+        },
+      ]),
+    ).toEqual([
+      'android does not run b.spec.ts › phone only, and no group tag keeps it off',
+    ]);
+  });
+
+  it("refuses a target that runs the other group's tests", () => {
+    expect(
+      offTargetFindings(all, [
+        {
+          name: 'firefox',
+          group: 'desktop',
+          ran: ids(
+            'a.spec.ts › shared one',
+            'a.spec.ts › shared two',
+            'b.spec.ts › desktop only',
+            'b.spec.ts › phone only',
+          ),
+        },
+      ]),
+    ).toEqual(['firefox runs b.spec.ts › phone only, which is tagged @phone']);
+  });
+
+  it('refuses a target that runs nothing at all', () => {
+    expect(
+      offTargetFindings(all, [
+        { name: 'chromium', group: 'desktop', ran: ids() },
+      ]),
+    ).toEqual([
+      'chromium does not run a.spec.ts › shared one, and no group tag keeps it off',
+      'chromium does not run a.spec.ts › shared two, and no group tag keeps it off',
+      'chromium does not run b.spec.ts › desktop only, and no group tag keeps it off',
+    ]);
   });
 });

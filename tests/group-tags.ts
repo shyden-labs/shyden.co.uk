@@ -76,3 +76,40 @@ export function groupOnlyFindings(tests: readonly ListedTest[]): string[] {
   }
   return findings;
 }
+
+/** One target of a run: a desktop engine, or the phone (its projects together). */
+export interface Target {
+  name: string;
+  group: 'phone' | 'desktop';
+  /** The ids of the tests this target's run lists. */
+  ran: ReadonlySet<string>;
+}
+
+/**
+ * Nothing but a group tag keeps a test off a target (#1200): each target runs
+ * every test except those tagged for the other group, and none of those. A
+ * project `grep`, `grepInvert`, `testIgnore` or `testMatch` that drops a test,
+ * or takes one in, shows up here as a test missing or extra on that target.
+ */
+export function offTargetFindings(
+  all: readonly ListedTest[],
+  targets: readonly Target[],
+): string[] {
+  const findings: string[] = [];
+  for (const target of targets) {
+    const otherTag = target.group === 'phone' ? DESKTOP_TAG : PHONE_TAG;
+    for (const test of all) {
+      const otherGroupOnly = tagged(test, otherTag);
+      const runs = target.ran.has(test.id);
+      if (!otherGroupOnly && !runs)
+        findings.push(
+          `${target.name} does not run ${test.id}, and no group tag keeps it off`,
+        );
+      else if (otherGroupOnly && runs)
+        findings.push(
+          `${target.name} runs ${test.id}, which is tagged ${otherTag}`,
+        );
+    }
+  }
+  return findings;
+}

@@ -1,80 +1,71 @@
-import { spawnSync } from 'node:child_process';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { ENGINES } from '../engines';
 import {
   DESKTOP_TAG,
   GROUP_ONLY,
   PHONE_TAG,
   groupOnlyFindings,
+  offTargetFindings,
   type ListedTest,
+  type Target,
 } from '../group-tags';
 import { searched } from '../source-files';
+import { listSuite, wholeSuite } from '../suite-listing';
 
 /**
  * Every e2e test as Playwright itself lists it, tags and annotations included
  * (inherited from a describe as well as written on the test), checked against
- * the group rule (#1182). The desktop config's own `grepInvert` would hide the
- * @phone tests, so the listing overrides it with a pattern that matches
- * nothing: this reads the whole suite, not one group's share of it.
+ * the group rule (#1182), and every target's own listing checked against it
+ * (#1200).
  */
 
 /**
  * Every group-only test today, with its tag and reason, read from the suite
- * (AC3). A new group-only test is added here, so a reviewer reads its reason.
+ * (#1182 AC3). A new group-only test is added here, so a reviewer reads its
+ * reason.
  */
 const GROUP_ONLY_TESTS: readonly { id: string; tag: string; reason: string }[] =
   [];
 
-interface JsonSuite {
-  title: string;
-  specs: {
-    title: string;
-    file: string;
-    tags: string[];
-    tests: { annotations: ListedTest['annotations'] }[];
-  }[];
-  suites?: JsonSuite[];
-}
+/** The phone's projects: one target, split only by whether a test installs a clock. */
+const PHONE_PROJECTS = ['android-chrome-clock', 'android-chrome'];
 
-function collect(
-  suite: JsonSuite,
-  path: string[],
-  into: Map<string, ListedTest>,
-): void {
-  const here = suite.title === '' ? path : [...path, suite.title];
-  for (const spec of suite.specs)
-    for (const test of spec.tests) {
-      const id = [spec.file, ...here.slice(1), spec.title].join(' › ');
-      // One entry per test, however many browsers list it.
-      into.set(id, { id, tags: spec.tags, annotations: test.annotations });
-    }
-  for (const child of suite.suites ?? []) collect(child, here, into);
-}
+/** The most the three listings below may take before the hook fails, naming itself. */
+const LISTING_CEILING_MS = 60_000;
 
 let tests: ListedTest[];
+let targets: Target[];
 
 beforeAll(() => {
-  const run = spawnSync(
-    'npx',
-    [
-      'playwright',
-      'test',
-      '-c',
-      'playwright.config.ts',
-      '--list',
-      '--reporter=json',
-      '--grep-invert=(?!)',
-    ],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  );
-  if (run.status !== 0)
-    throw new Error(
-      `playwright --list exited ${run.status}:\n${run.stderr}${run.stdout.slice(0, 2000)}`,
-    );
-  const listing = JSON.parse(run.stdout) as { suites: JsonSuite[] };
-  const byId = new Map<string, ListedTest>();
-  for (const suite of listing.suites) collect(suite, [], byId);
+  const desktop = listSuite('playwright.config.ts');
+  const phone = listSuite('playwright.device.config.ts');
+  // The universe is every test either config lists, so a spec one config
+  // ignores still counts as missing there.
+  const byId = new Map(wholeSuite().map((test) => [test.id, test]));
+  for (const { project, ...test } of phone)
+    if (PHONE_PROJECTS.includes(project) && !byId.has(test.id))
+      byId.set(test.id, test);
   tests = [...byId.values()];
-});
+  const ran = (listed: typeof desktop, projects: readonly string[]) =>
+    new Set(
+      listed.filter((t) => projects.includes(t.project)).map((t) => t.id),
+    );
+  targets = [
+    ...ENGINES.map(({ name }) => ({
+      name,
+      group: 'desktop' as const,
+      ran: ran(desktop, [name]),
+    })),
+    {
+      name: 'android',
+      group: 'phone' as const,
+      ran: ran(phone, PHONE_PROJECTS),
+    },
+  ];
+  // Three `playwright --list` runs, each collecting every spec file. One fit
+  // inside Vitest's 10 s default (#1182); three are given a stated ceiling,
+  // not yet set from a measurement of the three together (#1200).
+}, LISTING_CEILING_MS);
 
 const tagOf = (test: ListedTest): string | undefined =>
   test.tags
@@ -104,5 +95,23 @@ describe('device groups, read from the listed suite (#1182)', () => {
     expect(searched(found, { of: tests, what: 'listed e2e tests' })).toEqual(
       GROUP_ONLY_TESTS,
     );
+  });
+});
+
+describe('nothing but a group tag keeps a test off a target (#1200)', () => {
+  it('lists every desktop engine and the phone as a target', () => {
+    expect(targets.map((t) => t.name)).toEqual([
+      ...ENGINES.map(({ name }) => name),
+      'android',
+    ]);
+  });
+
+  it('runs on each target every test its group runs, and nothing tagged for the other', () => {
+    expect(
+      searched(offTargetFindings(tests, targets), {
+        of: tests,
+        what: 'listed e2e tests',
+      }),
+    ).toEqual([]);
   });
 });
