@@ -1,7 +1,8 @@
 /**
  * Every target runs the same suite, so every target's total (passed + failed +
  * skipped) must be the same and nothing may be skipped (#1049). Pure: no
- * process, no file. The phone run fails on it; CI only prints it until #1056.
+ * process, no file. The phone run fails on it, and so does CI's build-and-test
+ * (#1056).
  */
 
 /**
