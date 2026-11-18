@@ -14,6 +14,7 @@ import {
   shardDeadlineMs,
   shardOf,
   shardTimes,
+  projectTotalFindings,
   projectTotals,
 } from '../../scripts/e2e-shards.mjs';
 import {
@@ -1091,6 +1092,58 @@ describe('the tests a timed-out shard was running (#938)', () => {
     expect(() => runningAtTimeout(report([undated]))).toThrow(
       'a.spec.ts:9 › a group › undated holds a result with no start time (#938)',
     );
+  });
+});
+
+describe('projectTotalFindings: build-and-test refuses an uneven or skipping suite (#1056)', () => {
+  const counts = (passed: number, failed = 0, skipped = 0) => ({
+    passed,
+    failed,
+    skipped,
+  });
+  const shards = (
+    ...each: Record<string, ReturnType<typeof counts>>[]
+  ): unknown[] =>
+    each.map((projectCounts, i) => account(i + 1, 10, { projectCounts }));
+
+  it('finds nothing when every browser ran the same total and skipped none', () => {
+    expect(
+      projectTotalFindings(
+        shards(
+          { chromium: counts(3), firefox: counts(3), webkit: counts(2, 1) },
+          { chromium: counts(2), firefox: counts(2), webkit: counts(2) },
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('refuses a browser that ran a different total, naming every total', () => {
+    expect(
+      projectTotalFindings(
+        shards({ chromium: counts(5), firefox: counts(5), webkit: counts(4) }),
+      ),
+    ).toEqual([
+      'the browsers did not run the same suite: uneven totals: chromium: 5, firefox: 5, webkit: 4 ' +
+        '(chromium: 5 passed, 0 failed, 0 skipped (total 5); firefox: 5 passed, 0 failed, 0 skipped (total 5); ' +
+        'webkit: 4 passed, 0 failed, 0 skipped (total 4))',
+    ]);
+  });
+
+  it('refuses a skipped test even where the totals agree', () => {
+    expect(
+      projectTotalFindings(
+        shards({ chromium: counts(5), webkit: counts(4, 0, 1) }),
+      ),
+    ).toEqual([
+      'the browsers did not run the same suite: skipped tests: webkit: 1 skipped ' +
+        '(chromium: 5 passed, 0 failed, 0 skipped (total 5); webkit: 4 passed, 0 failed, 1 skipped (total 5))',
+    ]);
+  });
+
+  it('refuses shards that recorded no per-browser counts at all', () => {
+    expect(projectTotalFindings([account(1, 10)])).toEqual([
+      'the browsers did not run the same suite: no target reported a total',
+    ]);
   });
 });
 

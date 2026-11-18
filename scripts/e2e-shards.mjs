@@ -27,7 +27,7 @@
  *   NEEDS_JSON='${{ toJSON(needs) }}' node scripts/e2e-shards.mjs \
  *     <e2e account files> --capture <capture account files>
  */
-import { totalLine } from './even-totals.mjs';
+import { evenTotals, totalLine } from './even-totals.mjs';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { messageOf } from './errors.mjs';
 import { isRecord } from '../src/lib/is-record.ts';
@@ -664,14 +664,12 @@ function loadAccount(file) {
 const RULE = '='.repeat(72);
 
 /**
- * Each browser's own total across the shards, one line each (#1049). Printed
- * only: CI does not fail on an uneven total until #1056. `content` is not a
- * browser and is left out.
+ * Each browser's own counts, added across the shards, in name order.
  *
  * @param {readonly unknown[]} accounts
- * @returns {string[]}
+ * @returns {import('./even-totals.mjs').Target[]}
  */
-export function projectTotals(accounts) {
+function projectTargets(accounts) {
   /** @type {Map<string, { passed: number, failed: number, skipped: number }>} */
   const sums = new Map();
   for (const value of accounts) {
@@ -686,10 +684,37 @@ export function projectTotals(accounts) {
       sums.set(name, sum);
     }
   }
-  if (sums.size === 0) return ['no shard recorded per-browser totals'];
   return [...sums]
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([target, counts]) => totalLine({ target, ...counts }));
+    .map(([target, counts]) => ({ target, ...counts }));
+}
+
+/**
+ * Each browser's own total across the shards, one line each (#1049).
+ *
+ * @param {readonly unknown[]} accounts
+ * @returns {string[]}
+ */
+export function projectTotals(accounts) {
+  const targets = projectTargets(accounts);
+  if (targets.length === 0) return ['no shard recorded per-browser totals'];
+  return targets.map(totalLine);
+}
+
+/**
+ * Every desktop browser runs the same suite, so each must run the same total
+ * and skip nothing; build-and-test refuses the run otherwise (#1056). CI runs
+ * the desktop group alone, so these are compared with each other.
+ *
+ * @param {readonly unknown[]} accounts
+ * @returns {string[]}
+ */
+export function projectTotalFindings(accounts) {
+  const verdict = evenTotals(projectTargets(accounts));
+  if (verdict.ok) return [];
+  const shown =
+    verdict.lines.length > 0 ? ` (${verdict.lines.join('; ')})` : '';
+  return [`the browsers did not run the same suite: ${verdict.reason}${shown}`];
 }
 
 function main() {
@@ -763,6 +788,7 @@ function main() {
                 `${file} does not exist, so it holds no shard's account`,
             ),
           ...accountFindings(present.map((file) => loadAccount(file))),
+          ...projectTotalFindings(present.map((file) => loadAccount(file))),
         ]),
   ];
   // Every run, refused or not: a shard running long matters most in a run
@@ -772,7 +798,7 @@ function main() {
     console.log(`\n${RULE}\n  E2E SHARD TIMES\n${RULE}\n${times}\n`);
     const totals = projectTotals(present.map((file) => loadAccount(file)));
     console.log(
-      `\n${RULE}\n  E2E TOTALS PER BROWSER (printed, not judged: #1056)\n${RULE}\n${totals.join('\n')}\n`,
+      `\n${RULE}\n  E2E TOTALS PER BROWSER (judged: #1056)\n${RULE}\n${totals.join('\n')}\n`,
     );
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
