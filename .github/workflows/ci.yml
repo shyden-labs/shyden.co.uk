@@ -273,7 +273,7 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.tests=tests
             -Dsonar.exclusions=tests/**,docs/**
-            -Dsonar.coverage.exclusions=**/*.astro,**/*.css,*.config.ts,*.config.mjs,playwright.*.ts,docker/**,public/**
+            -Dsonar.coverage.exclusions=scripts/test-devices.mjs,**/*.astro,**/*.css,*.config.ts,*.config.mjs,playwright.*.ts,docker/**,public/**
       - name: Read the quality gate of this scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

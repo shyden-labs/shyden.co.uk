@@ -121,28 +121,23 @@ describe('iosEvidenceReportOf: where the iOS report goes for the evidence page (
 
 describe('playwrightVerdict: what a Playwright group proved', () => {
   const REPORT = '/repo/test-results/desktop-report.json';
-  const judge = (code: number | null, report: unknown, extraSkipped?: number) =>
+  const judge = (code: number | null, report: unknown) =>
     playwrightVerdict({
       name: 'desktop',
       code,
       report,
       reportFile: REPORT,
-      extraSkipped,
     });
 
-  it('passes a clean report from a clean exit', () => {
-    expect(judge(0, stats(), 7)).toEqual({
+  it('passes a clean report from a clean exit, counting its skips as the report does (#1179)', () => {
+    expect(judge(0, stats())).toEqual({
       name: 'desktop',
       status: 'passed',
       passed: 40,
       failed: 0,
-      skippedByDesign: 12,
+      skippedByDesign: 5,
       reason: undefined,
     });
-  });
-
-  it('counts no extra skips when none is given', () => {
-    expect(judge(0, stats()).skippedByDesign).toBe(5);
   });
 
   it('fails a report with failures, saying how many', () => {
