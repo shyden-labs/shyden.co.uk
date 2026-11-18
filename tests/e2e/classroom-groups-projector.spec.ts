@@ -58,6 +58,13 @@ const bar = (page: import('@playwright/test').Page) =>
 const expectFaded = (page: import('@playwright/test').Page) =>
   expect.soft(bar(page)).toHaveClass(/faded/, { timeout: 15000 });
 
+/** Fails, naming why, on an engine with no element fullscreen to race (#1048). */
+const expectElementFullscreen = async (page: import('@playwright/test').Page) =>
+  expect(
+    await page.evaluate(() => 'requestFullscreen' in Element.prototype),
+    'this engine has no element fullscreen (Element.prototype.requestFullscreen), so there is no grant to race',
+  ).toBe(true);
+
 /**
  * Wait until the page can actually be clicked again after leaving the board.
  *
@@ -261,15 +268,10 @@ test.describe('the projector view', () => {
   test('a grant that lands during the next showing leaves that showing open', async ({
     page,
   }) => {
-    // An iPhone has no element fullscreen at all, and neither has
-    // Playwright's mobile-safari: no `Element.prototype.requestFullscreen`
-    // (run 39066325735), so there is no grant to race and its board is the
-    // overlay. Asked of the engine, not of a project name, so an engine that
-    // has the call and refuses it still runs this and fails below.
-    test.skip(
-      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
-      'no element fullscreen on this engine (iPhone Safari): no grant to race',
-    );
+    // Every target this suite runs on (the desktop engines and Android
+    // Chrome) has element fullscreen; an iPhone has none, and runs its own
+    // journeys (#1048). An engine without it fails here, naming why.
+    await expectElementFullscreen(page);
     await holdFirstGrantUntilTheNext(page);
     await withGroups(page);
     await tapOn(page.getByRole('button', { name: 'Full screen' }));
@@ -319,10 +321,7 @@ test.describe('the projector view', () => {
   test('a reopen cannot reach the page while the last showing is still being undone', async ({
     page,
   }) => {
-    test.skip(
-      !(await page.evaluate(() => 'requestFullscreen' in Element.prototype)),
-      'no element fullscreen on this engine (iPhone Safari): no grant to race',
-    );
+    await expectElementFullscreen(page);
     await holdTheTidyUpExit(page);
     await withGroups(page);
     const open = page.getByRole('button', { name: 'Full screen' });

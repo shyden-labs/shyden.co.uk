@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Locator, Page } from '@playwright/test';
+
+const adbCalls: string[][] = [];
+vi.mock('../../scripts/adb.mjs', () => ({
+  adb: (args: string[]) => {
+    adbCalls.push(args);
+    return '';
+  },
+}));
 import {
+  backOn,
   landingVerdict,
   mustMove,
   planSwipe,
   type Prepared,
+  scrollOver,
   SPARE_SWIPES,
   swipeCeiling,
   waitUntilStill,
@@ -188,5 +199,115 @@ describe('landingVerdict', () => {
     expect(
       landingVerdict({ at: null, stray: null, clicked: false }, 2_001, 2_000),
     ).toBe('no touch reached it within 2 s');
+  });
+});
+
+describe('scrollOver', () => {
+  /** A locator whose page records each input it is sent. */
+  function fakeTarget() {
+    const sent: unknown[] = [];
+    const cdp = {
+      send: async (method: string, params: unknown) => {
+        sent.push([method, params]);
+      },
+    };
+    const page = {
+      context: () => ({ newCDPSession: async () => cdp }),
+      mouse: {
+        wheel: async (dx: number, dy: number) => {
+          sent.push(['wheel', dx, dy]);
+        },
+      },
+    };
+    const target = {
+      page: () => page,
+      hover: async () => {
+        sent.push(['hover']);
+      },
+      boundingBox: async () => ({ x: 100, y: 300, width: 80, height: 40 }),
+      toString: () => 'locator(#cg-count)',
+    };
+    return { target: target as unknown as Locator, sent };
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  it('turns the real wheel over the element where there is a mouse', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '');
+    const { target, sent } = fakeTarget();
+    await scrollOver(target, 240);
+    expect(sent).toEqual([['hover'], ['wheel', 0, 240]]);
+  });
+
+  it('drags a real finger from the element the opposite way on the phone', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent } = fakeTarget();
+    const done = scrollOver(target, 200);
+    await vi.runAllTimersAsync();
+    await done;
+    const touches = sent as [
+      string,
+      { type: string; touchPoints: { x: number; y: number }[] },
+    ][];
+    expect(
+      touches.every(([method]) => method === 'Input.dispatchTouchEvent'),
+    ).toBe(true);
+    expect(touches[0]![1]).toEqual({
+      type: 'touchStart',
+      touchPoints: [{ x: 140, y: 320 }],
+    });
+    expect(touches.at(-2)![1]).toEqual({
+      type: 'touchMove',
+      touchPoints: [{ x: 140, y: 120 }],
+    });
+    expect(touches.at(-1)![1]).toEqual({ type: 'touchEnd', touchPoints: [] });
+  });
+
+  it('fails naming the element when it has no box to put a finger on', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    const { target } = fakeTarget();
+    (target as unknown as { boundingBox: () => Promise<null> }).boundingBox =
+      async () => null;
+    await expect(scrollOver(target, 200)).rejects.toThrow(
+      'locator(#cg-count) has no box to put a finger on',
+    );
+  });
+});
+
+describe('backOn', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    adbCalls.length = 0;
+  });
+
+  const fakePage = () => {
+    const sent: unknown[] = [];
+    const page = {
+      goBack: async (options: unknown) => {
+        sent.push(['goBack', options]);
+        return null;
+      },
+    };
+    return { page: page as unknown as Page, sent };
+  };
+
+  it("goes Back through the browser's own history where there is no phone", async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '');
+    const { page, sent } = fakePage();
+    await backOn(page);
+    expect(sent).toEqual([['goBack', { waitUntil: 'commit' }]]);
+    expect(adbCalls).toEqual([]);
+  });
+
+  it("presses the phone's own Back key on the phone", async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    const { page, sent } = fakePage();
+    await backOn(page);
+    expect(adbCalls).toEqual([['shell', 'input', 'keyevent', 'KEYCODE_BACK']]);
+    expect(sent).toEqual([]);
   });
 });
