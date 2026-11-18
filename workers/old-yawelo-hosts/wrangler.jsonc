@@ -1,0 +1,23 @@
+// The old Yawelo Idle hosts' 301s (#1191 AC3). Lives in the account that
+// holds the shyden.co.uk zone; deploying takes the production host over as a
+// custom domain from the Worker `yawelo-idle-site`, and puts a route in front
+// of the Pages project `yawelo-idle-dev-hosts` for the dev host.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "shyden-old-yawelo-hosts",
+  "main": "index.js",
+  "account_id": "9315582c39b627dca58dfa83602db385",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "yawelo-idle.shyden.co.uk", "custom_domain": true },
+    // The dev host is a proxied CNAME to a Pages project in Shyden Labs Dev,
+    // which a custom domain cannot take over (code 100117, measured
+    // 2026-11-18); a zone route runs this Worker in front of it instead.
+    {
+      "pattern": "dev.yawelo-idle.shyden.co.uk/*",
+      "zone_name": "shyden.co.uk",
+    },
+  ],
+}
