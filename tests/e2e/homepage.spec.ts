@@ -2,6 +2,8 @@ import { tabTo } from '../tab-to';
 import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { onRealDevice } from '../device/device-downloads';
+import { DESKTOP_TAG, GROUP_ONLY } from '../group-tags';
 import { eachWidth } from '../each-width';
 import { BAND_WIDTHS } from './checks/homepage';
 import { recorded, shoot } from './evidence';
@@ -1339,7 +1341,72 @@ test.describe('pause motion', () => {
   // checks/homepage.ts (#1086).
 });
 
+/**
+ * Where each player draws its ▶ before the preview has played (#1054,
+ * measured from each engine's player in CI run 44231547544, a 384×217 box):
+ * Chromium's and Firefox's at the left end of the control bar, a fixed
+ * distance from the box's bottom-left corner; Linux WebKit's in the centre.
+ * The phones' players draw theirs in the centre too.
+ */
+function playButtonOn(
+  browserName: string,
+  box: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; where: string } {
+  const fromBottomLeft = (right: number, up: number, where: string) => ({
+    x: box.x + right,
+    y: box.y + box.height - up,
+    where,
+  });
+  if (!onRealDevice() && browserName === 'chromium')
+    return fromBottomLeft(25, 48, "Chromium's control bar");
+  if (!onRealDevice() && browserName === 'firefox')
+    return fromBottomLeft(23, 20, "Firefox's control bar");
+  return {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+    where: 'the centre of the player',
+  };
+}
+
 test.describe('the Yawelo Idle preview video', () => {
+  test(
+    'Space on the focused player plays it, and Space again pauses it',
+    {
+      tag: DESKTOP_TAG,
+      annotation: {
+        type: GROUP_ONLY,
+        description: 'a hardware keyboard: the phones have no Space key',
+      },
+    },
+    async ({ page, browserName }) => {
+      // Shyden, 2026-11-18 (#1054): both real presses, each proven. Linux
+      // WebKit's own player ignored Space (measured), so the page handles the
+      // key itself (src/lib/videoKeys.ts).
+      const engineHonoursMedia = browserName !== 'webkit';
+      await page.goto('/');
+      const video = page.locator('#yawelo-idle video');
+      await tabTo(video);
+      await page.keyboard.press('Space');
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+          message: 'Space on the focused player started playback',
+        })
+        .toBe(false);
+      if (engineHonoursMedia)
+        await expect
+          .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+            message: 'the clock moves once Space plays the preview',
+          })
+          .toBeGreaterThan(0.2);
+      await page.keyboard.press('Space');
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+          message: 'Space again paused it: one press, one toggle',
+        })
+        .toBe(true);
+    },
+  );
+
   test('nothing of the video downloads before it is played, and pressing play plays the preview', async ({
     page,
     browserName,
@@ -1379,18 +1446,20 @@ test.describe('the Yawelo Idle preview video', () => {
         )
         .toEqual([]);
 
-    // Now play it.
+    // Now play it, the way a visitor does: a real press on the player's own
+    // ▶ (#1054). No script play() and nothing set from the test, so an
+    // engine's autoplay rule refusing a real press fails here, by name.
     await expect.soft(video).toBeVisible();
-    // Muted, so no engine's autoplay rule refuses a play that is not a tap;
-    // what is under test is that a source loads and time moves.
-    await video.evaluate((v: HTMLVideoElement) => {
-      v.muted = true;
-      return v.play();
-    });
-    expect(
-      await video.evaluate((v: HTMLVideoElement) => v.paused),
-      'pressing play started playback',
-    ).toBe(false);
+    await scrollToOn(video);
+    const box = await video.boundingBox();
+    if (!box) throw new Error('the preview video has no box to press');
+    const play = playButtonOn(browserName, box);
+    await tapAt(page, play.x, play.y);
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+        message: `a real press on ▶ (${play.where}) started playback`,
+      })
+      .toBe(false);
     if (engineHonoursMedia)
       await expect
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
