@@ -33,6 +33,7 @@ import {
 import { refuseUndeclaredClock } from '../device/clock-declaration';
 import { servingYaweloMedia } from './yawelo-media';
 import { setChromeJavaScript } from '../device/chrome-javascript-setting';
+import { closeAllBut, keepATab } from '../device/keep-a-tab';
 
 /** A test carrying this tag needs JavaScript switched off (#1047). */
 const JAVASCRIPT_BLOCKED_TAG = '@javascript-blocked';
@@ -169,6 +170,10 @@ const INIT_SCRIPT_PATCHED = Symbol('shyden-context-addinitscript-patch');
  */
 let currentTestInitScriptDisposals: InitScriptDisposable[] = [];
 
+// One blank tab kept open for the whole run: closing Chrome's last tab puts the Launcher in
+// front, and the next test's foreground check fails on it (#1215, tests/device/keep-a-tab.ts).
+let keptTab: Page | undefined;
+
 /**
  * Whether the running test declares the clock it installs (`installsAClock`, #854), set at the
  * top of every test's `context` fixture and read by the clock guard installed once on the
@@ -288,6 +293,7 @@ const realDeviceTest = base.extend<
     openTabsAsAVisitor(context);
 
     const resolvedBaseURL = requireBaseURL(baseURL);
+    keptTab = await keepATab(context, keptTab);
     const scratch = await context.newPage();
     const cdp = await context.newCDPSession(scratch);
     await cdp.send('Storage.clearDataForOrigin', {
@@ -395,7 +401,8 @@ const realDeviceTest = base.extend<
       await disposeAll(currentTestInitScriptDisposals.splice(0));
     } finally {
       // Leave the context open -- it belongs to the device, not to the test.
-      for (const page of context.pages()) await page.close().catch(() => {});
+      keptTab = await keepATab(context, keptTab);
+      await closeAllBut(context, keptTab);
     }
     failWith(chromeRelaunchFailure(chromeAtStart, chromePid()));
   },
