@@ -1344,33 +1344,42 @@ test.describe('the Yawelo Idle preview video', () => {
     page,
     browserName,
   }) => {
-    // Measured, not assumed (Shyden ruled 2026-10-20): CI's Linux WebKit
-    // fetches the MP4 on load despite preload="none" and never advances the
-    // clock after play(), while the real iPhone's Safari loads nothing before
-    // the tap and plays in real time. The iPhone run carries this test (#888).
-    test.skip(
-      browserName === 'webkit',
-      "CI's Linux WebKit is not Safari for media; the real iPhone runs this",
-    );
+    // Runs on every engine (Shyden, 2026-11-18, #1048). Every engine asserts
+    // what our code controls: the video says preload="none", and pressing
+    // play starts playback. CI's Linux WebKit fetches a rendition on load
+    // despite preload="none" and never advances the clock after play()
+    // (measured 2026-10-20), so the fetch and the clock, which are the
+    // engine's, are asserted where the engine honours them; the real
+    // iPhone's Safari is covered by the release device run.
+    const engineHonoursMedia = browserName !== 'webkit';
+    if (!engineHonoursMedia)
+      test.info().annotations.push({
+        type: 'media',
+        description:
+          "Linux WebKit: the early fetch and the clock are the engine's, not asserted (Shyden, 2026-11-18)",
+      });
     const seen = recordRequests(page);
     await page.goto('/');
     // Liveness: the recorder heard the poster, which loads with the page.
     await expect
       .poll(() => seen.matching(urlMatching(/yawelo-idle-promo-poster\.jpg$/)))
       .toEqual([`${PROMO}-poster.jpg`]);
+    const video = page.locator('#yawelo-idle video');
+    await expect.soft(video).toHaveAttribute('preload', 'none');
     const heard = requestsEveryEngineMakes(seen.all);
-    expect
-      .soft(
-        searched(seen.matching(urlMatching(/yawelo-idle-promo\.(mp4|webm)$/)), {
-          of: heard,
-          what: 'requests the homepage made',
-        }),
-        'preload="none": no rendition is fetched until the visitor plays it',
-      )
-      .toEqual([]);
+    const early = searched(
+      seen.matching(urlMatching(/yawelo-idle-promo\.(mp4|webm)$/)),
+      { of: heard, what: 'requests the homepage made' },
+    );
+    if (engineHonoursMedia)
+      expect
+        .soft(
+          early,
+          'preload="none": no rendition is fetched until the visitor plays it',
+        )
+        .toEqual([]);
 
     // Now play it.
-    const video = page.locator('#yawelo-idle video');
     await expect.soft(video).toBeVisible();
     // Muted, so no engine's autoplay rule refuses a play that is not a tap;
     // what is under test is that a source loads and time moves.
@@ -1378,9 +1387,16 @@ test.describe('the Yawelo Idle preview video', () => {
       v.muted = true;
       return v.play();
     });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeGreaterThan(0.2);
+    expect(
+      await video.evaluate((v: HTMLVideoElement) => v.paused),
+      'pressing play started playback',
+    ).toBe(false);
+    if (engineHonoursMedia)
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
+          message: 'the clock moves once the preview plays',
+        })
+        .toBeGreaterThan(0.2);
     const chosen = await video.evaluate((v: HTMLVideoElement) => v.currentSrc);
     test
       .info()
