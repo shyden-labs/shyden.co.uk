@@ -1381,16 +1381,17 @@ test.describe('the Yawelo Idle preview video', () => {
 
     // Now play it.
     await expect.soft(video).toBeVisible();
-    // Muted, so no engine's autoplay rule refuses a play that is not a tap;
-    // what is under test is that a source loads and time moves.
-    await video.evaluate((v: HTMLVideoElement) => {
-      v.muted = true;
-      return v.play();
-    });
-    expect(
-      await video.evaluate((v: HTMLVideoElement) => v.paused),
-      'pressing play started playback',
-    ).toBe(false);
+    // A visitor's real press on the player, as a click or a finger tap, and
+    // nothing set from the test (#1054): the video stays unmuted, as the page
+    // ships it. An engine whose autoplay rule refuses a play a real press
+    // started fails here, named, rather than being played by a script.
+    await tapOn(video);
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused), {
+        message:
+          'a real press on the player started playback (still paused: this engine refused a play a real press started)',
+      })
+      .toBe(false);
     if (engineHonoursMedia)
       await expect
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), {
