@@ -197,10 +197,11 @@ const yaweloIdleFeatures = [
   </section>
 </BaseLayout>
 <script>
-  import { onVideoKey } from '../../lib/videoKeys';
+  import { onVideoKey, onVideoKeyUp } from '../../lib/videoKeys';
 
   const video = document.querySelector<HTMLVideoElement>('#yawelo-idle video');
   video?.addEventListener('keydown', (event) => onVideoKey(event, video));
+  video?.addEventListener('keyup', (event) => onVideoKeyUp(event));
 </script>
 <style
   define:vars={{

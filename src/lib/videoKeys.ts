@@ -27,11 +27,14 @@ export interface PlayableVideo {
 
 const TOGGLE_KEYS: ReadonlySet<string> = new Set([' ', 'Enter']);
 
+/** Space or Enter with no modifier held: the keys the page takes. */
+const takes = (event: VideoKey): boolean =>
+  TOGGLE_KEYS.has(event.key) &&
+  !(event.altKey || event.ctrlKey || event.metaKey || event.shiftKey);
+
 /** Handles one keydown on the video; true when the page took the key. */
 export function onVideoKey(event: VideoKey, video: PlayableVideo): boolean {
-  if (!TOGGLE_KEYS.has(event.key)) return false;
-  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
-    return false;
+  if (!takes(event)) return false;
   event.preventDefault();
   if (event.repeat) return true;
   if (video.paused) {
@@ -40,5 +43,17 @@ export function onVideoKey(event: VideoKey, video: PlayableVideo): boolean {
   } else {
     video.pause();
   }
+  return true;
+}
+
+/**
+ * Handles one keyup on the video; true when the page took the key. Chromium's
+ * player toggles on the keyup of Space (measured, CI run 44392126826: the
+ * video played and paused again on one press), so the keyup of a key the page
+ * took is kept from the browser too. It toggles nothing itself.
+ */
+export function onVideoKeyUp(event: VideoKey): boolean {
+  if (!takes(event)) return false;
+  event.preventDefault();
   return true;
 }

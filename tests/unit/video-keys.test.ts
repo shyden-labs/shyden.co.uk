@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { onVideoKey, type VideoKey } from '../../src/lib/videoKeys';
+import {
+  onVideoKey,
+  onVideoKeyUp,
+  type VideoKey,
+} from '../../src/lib/videoKeys';
 
 // Space and Enter on the focused preview video start and stop it on every
 // browser (Shyden, 2026-11-18, #1054): Linux WebKit's own player ignores Space.
@@ -91,4 +95,37 @@ describe('onVideoKey', () => {
     // The handler the page attached settles the refusal without throwing.
     await expect(caught.mock.results[0]?.value).resolves.toBeUndefined();
   });
+});
+
+// Measured on Chromium (CI run 44392126826): its player toggles on the keyup
+// of Space, so with keydown taken the video played and paused at once
+// ("keydown \" \" (stopped), keyup \" \", play, pause"). The keyup of a key
+// the page took is kept from the browser too, and toggles nothing.
+describe('onVideoKeyUp', () => {
+  it.each([[' '], ['Enter']])(
+    'the keyup of %j is kept from the browser',
+    (name) => {
+      const key = press(name);
+      expect(onVideoKeyUp(key)).toBe(true);
+      expect(key.preventDefault).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([['altKey'], ['ctrlKey'], ['metaKey'], ['shiftKey']] as const)(
+    'the keyup of Space with %s held is left to the browser',
+    (modifier) => {
+      const key = press(' ', { [modifier]: true });
+      expect(onVideoKeyUp(key)).toBe(false);
+      expect(key.preventDefault).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([['k'], ['Tab']])(
+    'the keyup of %s is left to the browser',
+    (name) => {
+      const key = press(name);
+      expect(onVideoKeyUp(key)).toBe(false);
+      expect(key.preventDefault).not.toHaveBeenCalled();
+    },
+  );
 });
