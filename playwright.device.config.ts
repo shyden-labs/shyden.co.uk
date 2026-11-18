@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import { VISUAL_PROJECT } from './playwright.config';
 import { CLOCK_TAG } from './tests/device/clock-declaration';
+import { PHONE_RUN_LEAVES_OUT } from './tests/group-tags';
 
 // Set here rather than only in the runner so that a bare `npx playwright test
 // --config=playwright.device.config.ts` behaves identically to the scripted run. Playwright
@@ -75,6 +76,10 @@ export default defineConfig<Record<never, never>, { installsAClock: boolean }>({
   // eight untracked `-android-chrome-darwin` files in the repo. Baselines
   // change one way only, in the pinned container (see playwright.config.ts).
   updateSnapshots: 'none',
+  // The phone group runs every shared test and its own @phone ones; a test
+  // tagged @desktop says, with its reason, that its behaviour differs on a
+  // desktop browser (#1182, tests/group-tags.ts).
+  grepInvert: PHONE_RUN_LEAVES_OUT,
   projects: [
     { name: 'android-preflight', testMatch: /android-preflight\.setup\.ts/ },
     // Listed before `android-chrome`, and so run first: Playwright cannot take a clock back out
