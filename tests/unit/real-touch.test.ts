@@ -19,6 +19,7 @@ import {
   SPARE_SWIPES,
   swipeCeiling,
   tapOn,
+  waitUntilMoved,
   waitUntilStill,
   whyNotTappable,
 } from '../real-touch';
@@ -134,12 +135,25 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
    */
   function fakeDesktop(
     top: number,
-    { startY = 0, length = 4000, wheelMoves = true } = {},
+    {
+      startY = 0,
+      length = 4000,
+      wheelMoves = true,
+      landsAfterSamples = 0,
+    } = {},
   ) {
     const sent: unknown[] = [];
     let scrollY = startY;
+    // A turn whose scroll the engine applies only after this many samples
+    // have read the page (CI's WebKit lands a turn late, #1004).
+    let pending: { dy: number; samples: number } | null = null;
     const maxScroll = length - VIEW.height;
     const rect = () => ({ x: 600, y: top - scrollY, width: 80, height: 40 });
+    const land = () => {
+      if (pending === null || pending.samples > 0) return;
+      scrollY = Math.min(maxScroll, Math.max(0, scrollY + pending.dy));
+      pending = null;
+    };
     const page = {
       mouse: {
         move: async (x: number, y: number) => {
@@ -147,8 +161,8 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
         },
         wheel: async (dx: number, dy: number) => {
           sent.push(['wheel', dx, dy]);
-          if (wheelMoves)
-            scrollY = Math.min(maxScroll, Math.max(0, scrollY + dy));
+          if (wheelMoves) pending = { dy, samples: landsAfterSamples };
+          land();
         },
       },
     };
@@ -159,6 +173,10 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
         _fn: unknown,
         arg?: { offset?: { x: number; y: number } },
       ) => {
+        if (arg === undefined && pending !== null) {
+          pending.samples--;
+          land();
+        }
         const r = rect();
         if (arg === undefined)
           return [r.x, r.y, r.width, r.height, 0, VIEW.height, 0, scrollY].join(
@@ -294,6 +312,24 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(kinds(sent)).not.toContain('click');
   });
 
+  it('one wheel turn covers the whole distance to an element far down a long page (Shyden, 2026-11-19)', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(20_000, { length: 30_000 });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    clearOfTheEdges(centreY());
+  });
+
+  it('waits for a wheel turn the engine lands late, and turns the wheel once', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(2500, {
+      landsAfterSamples: 12,
+    });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    clearOfTheEdges(centreY());
+  });
+
   it('scrollOver turns the wheel over the centre of an element in view, without hover()', async () => {
     setUp();
     const { target, sent } = fakeDesktop(300);
@@ -324,6 +360,40 @@ const testClock = () => {
     },
   };
 };
+
+describe('waitUntilMoved', () => {
+  it('returns as soon as a sample differs from the one before the input', async () => {
+    const shapes = ['a', 'a', 'a', 'b'];
+    let read = 0;
+    const result = await waitUntilMoved(async () => shapes[read++]!, 'a', {
+      gapMs: 16,
+      ceilingMs: 1_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: true, waitedMs: 3 * 16 });
+    expect(read).toBe(4);
+  });
+
+  it('reads once and returns at once when the page has already moved', async () => {
+    let read = 0;
+    const result = await waitUntilMoved(async () => (read++, 'b'), 'a', {
+      gapMs: 16,
+      ceilingMs: 1_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: true, waitedMs: 0 });
+    expect(read).toBe(1);
+  });
+
+  it('gives up at the ceiling, on its own clock, when nothing moves', async () => {
+    const result = await waitUntilMoved(async () => 'a', 'a', {
+      gapMs: 16,
+      ceilingMs: 100,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: false, waitedMs: 112 });
+  });
+});
 
 describe('waitUntilStill', () => {
   it('is still once six samples in a row match the one before', async () => {

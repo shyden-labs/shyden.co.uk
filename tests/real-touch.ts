@@ -179,6 +179,48 @@ export async function waitUntilStill(
   }
 }
 
+/** How long a wheel turn's scroll may take to start (CI's WebKit lands it late, #1004). */
+export const MOVE_CEILING_MS = 1_000;
+
+/**
+ * Samples a shape until it differs from `from`, the shape before an input, or
+ * the ceiling passes on the given clock.
+ */
+export async function waitUntilMoved(
+  sample: () => Promise<string>,
+  from: string,
+  {
+    gapMs,
+    ceilingMs,
+    clock,
+  }: { gapMs: number; ceilingMs: number; clock: WaitClock },
+): Promise<{ moved: boolean; waitedMs: number }> {
+  const started = clock.now();
+  for (;;) {
+    const waitedMs = clock.now() - started;
+    if ((await sample()) !== from) return { moved: true, waitedMs };
+    if (waitedMs >= ceilingMs) return { moved: false, waitedMs };
+    await clock.sleep(gapMs);
+  }
+}
+
+/** Where the element and the page are: what a still or moved check compares. */
+const shapeOf = (target: Locator): Promise<string> =>
+  target.evaluate((el) => {
+    const vv = window.visualViewport;
+    const b = el.getBoundingClientRect();
+    return [
+      b.x,
+      b.y,
+      b.width,
+      b.height,
+      vv ? vv.offsetTop : 0,
+      vv ? vv.height : window.innerHeight,
+      window.scrollX,
+      window.scrollY,
+    ].join(',');
+  });
+
 /**
  * Waits for the element AND the page to come to rest (a sticky element holds
  * still while the page behind it still coasts, and a tap then only stops the
@@ -189,24 +231,11 @@ async function prepare(
   target: Locator,
   offset: { x: number; y: number } | undefined,
 ): Promise<Prepared> {
-  const { still, waitedMs } = await waitUntilStill(
-    () =>
-      target.evaluate((el) => {
-        const vv = window.visualViewport;
-        const b = el.getBoundingClientRect();
-        return [
-          b.x,
-          b.y,
-          b.width,
-          b.height,
-          vv ? vv.offsetTop : 0,
-          vv ? vv.height : window.innerHeight,
-          window.scrollX,
-          window.scrollY,
-        ].join(',');
-      }),
-    { gapMs: STILL_GAP_MS, ceilingMs: STILL_CEILING_MS, clock: ownClock },
-  );
+  const { still, waitedMs } = await waitUntilStill(() => shapeOf(target), {
+    gapMs: STILL_GAP_MS,
+    ceilingMs: STILL_CEILING_MS,
+    clock: ownClock,
+  });
   if (!still)
     throw new TapNotPossibleError(
       `${String(target)} and the page did not come to rest: ${STILL_SAMPLES} matching samples ${STILL_GAP_MS} ms apart were not seen within ${waitedMs} ms`,
@@ -327,10 +356,28 @@ function closeKeyboard(): boolean {
  * first, near its right-hand edge, so the turn scrolls what a visitor's
  * pointer there would scroll.
  */
-async function wheelTurn(page: Page, p: Prepared): Promise<void> {
-  const { from, to } = planSwipe(p);
-  await page.mouse.move(from.x, Math.round(p.viewTop + p.viewHeight / 2));
-  await page.mouse.wheel(0, from.y - to.y);
+/**
+ * One wheel turn covering the whole distance that brings the point to the
+ * middle of the view, like a trackpad flick (Shyden, 2026-11-19, #1004); then
+ * waits for the engine to start the scroll, which CI's WebKit does late.
+ */
+async function wheelTurn(target: Locator, p: Prepared): Promise<void> {
+  const page = target.page();
+  const need = needOf(p);
+  const before = await shapeOf(target);
+  await page.mouse.move(
+    Math.round(p.viewWidth * 0.9),
+    Math.round(p.viewTop + p.viewHeight / 2),
+  );
+  await page.mouse.wheel(
+    0,
+    Math.sign(need) * Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need))),
+  );
+  await waitUntilMoved(() => shapeOf(target), before, {
+    gapMs: STILL_GAP_MS,
+    ceilingMs: MOVE_CEILING_MS,
+    clock: ownClock,
+  });
 }
 
 /**
@@ -358,7 +405,7 @@ async function bringIntoView(
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    if (input === 'wheel') await wheelTurn(page, p);
+    if (input === 'wheel') await wheelTurn(target, p);
     else {
       const { from, to } = planSwipe(p);
       await drag(
