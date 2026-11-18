@@ -39,7 +39,8 @@ export const LOCALE_PAGES = LOCALES.flatMap((locale) =>
  * src/pages has no entry and fails until someone decides what it may carry.
  */
 const OWN_SCRIPTS: Record<string, readonly string[]> = {
-  '/': [],
+  // The preview video's Space and Enter handler (#1054), inlined by the build.
+  '/': ['inline module in body'],
   '/yeetalk-calculators': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
   [NOT_FOUND_PATH]: [],

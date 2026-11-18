@@ -140,9 +140,10 @@ const yaweloIdleFeatures = [
         </Button>
       </p>
     </div>
-    {/* Tap to play, poster first, no script (ruled 2026-10-16): nothing of
-        the video downloads until it is played, and the width and height
-        hold its 16:9 box before a byte arrives. */}
+    {/* Tap to play, poster first (ruled 2026-10-16): nothing of the video
+        downloads until it is played, and the width and height hold its 16:9
+        box before a byte arrives. Its one script handles Space and Enter
+        (Shyden, 2026-11-18, #1054), and fetches nothing until a press. */}
     <figure class="promo">
       <video
         controls
@@ -195,6 +196,25 @@ const yaweloIdleFeatures = [
     </p>
   </section>
 </BaseLayout>
+<script>
+  import { onVideoKey, onVideoKeyUp } from '../../lib/videoKeys';
+
+  const video = document.querySelector<HTMLVideoElement>('#yawelo-idle video');
+  // On the window, on the way down: the player inside the video would
+  // otherwise see the key first (src/lib/videoKeys.ts).
+  if (video) {
+    window.addEventListener(
+      'keydown',
+      (event) => event.target === video && onVideoKey(event, video),
+      { capture: true },
+    );
+    window.addEventListener(
+      'keyup',
+      (event) => event.target === video && onVideoKeyUp(event),
+      { capture: true },
+    );
+  }
+</script>
 <style
   define:vars={{
     shytalkShy: SHYTALK_MARK.shy,

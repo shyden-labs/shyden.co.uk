@@ -2068,8 +2068,14 @@ test.describe('the no-scroll rule, measured', () => {
         text: script.textContent ?? '',
       })),
     );
-    expect(scripts, 'the homepage carries the theme script alone').toEqual([
+    // Since #1054 the preview video's key handler is inlined beside it
+    // (Shyden, 2026-11-18): still nothing fetched to run, pinned below.
+    expect(
+      scripts,
+      'the homepage carries the theme script and the video key handler, both inline',
+    ).toEqual([
       { src: '', text: THEME_SCRIPT_SOURCE },
+      { src: '', text: expect.stringContaining('#yawelo-idle video') },
     ]);
     const heard = requestsEveryEngineMakes(seen.all);
     expect(

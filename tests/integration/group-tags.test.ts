@@ -25,7 +25,14 @@ import { listSuite, wholeSuite } from '../suite-listing';
  * reason.
  */
 const GROUP_ONLY_TESTS: readonly { id: string; tag: string; reason: string }[] =
-  [];
+  [
+    {
+      // Shyden, 2026-11-18 (#1054): Space proven on every desktop browser.
+      id: 'tests/e2e/homepage.spec.ts › the Yawelo Idle preview video › Space on the focused player plays it, and Space again pauses it',
+      reason: 'a hardware keyboard: the phones have no Space key',
+      tag: '@desktop',
+    },
+  ];
 
 /** The phone's projects: one target, split only by whether a test installs a clock. */
 const PHONE_PROJECTS = ['android-chrome-clock', 'android-chrome'];
