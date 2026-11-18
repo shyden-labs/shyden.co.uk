@@ -200,8 +200,20 @@ const yaweloIdleFeatures = [
   import { onVideoKey, onVideoKeyUp } from '../../lib/videoKeys';
 
   const video = document.querySelector<HTMLVideoElement>('#yawelo-idle video');
-  video?.addEventListener('keydown', (event) => onVideoKey(event, video));
-  video?.addEventListener('keyup', (event) => onVideoKeyUp(event));
+  // On the window, on the way down: the player inside the video would
+  // otherwise see the key first (src/lib/videoKeys.ts).
+  if (video) {
+    window.addEventListener(
+      'keydown',
+      (event) => event.target === video && onVideoKey(event, video),
+      { capture: true },
+    );
+    window.addEventListener(
+      'keyup',
+      (event) => event.target === video && onVideoKeyUp(event),
+      { capture: true },
+    );
+  }
 </script>
 <style
   define:vars={{

@@ -5,6 +5,12 @@
  * therefore owns these two keys and stops the browser's own handling, so a
  * press never toggles twice. A key with a modifier held, and every other key,
  * stays the browser's.
+ *
+ * A key the page takes is also stopped on its way down: Chromium's player,
+ * inside the video, handles the key before any listener on the video runs, so
+ * stopping its default there is too late (measured, CI run 44393520871: one
+ * Space played and paused). The page listens on the window, in the capture
+ * phase, and the player never sees a key the page took.
  */
 
 /** The parts of a `KeyboardEvent` this reads. */
@@ -16,6 +22,7 @@ export interface VideoKey {
   readonly metaKey: boolean;
   readonly shiftKey: boolean;
   preventDefault(): void;
+  stopPropagation(): void;
 }
 
 /** The parts of an `HTMLMediaElement` this drives. */
@@ -36,6 +43,7 @@ const takes = (event: VideoKey): boolean =>
 export function onVideoKey(event: VideoKey, video: PlayableVideo): boolean {
   if (!takes(event)) return false;
   event.preventDefault();
+  event.stopPropagation();
   if (event.repeat) return true;
   if (video.paused) {
     // A refused play leaves the video paused, which the visitor sees.
@@ -55,5 +63,6 @@ export function onVideoKey(event: VideoKey, video: PlayableVideo): boolean {
 export function onVideoKeyUp(event: VideoKey): boolean {
   if (!takes(event)) return false;
   event.preventDefault();
+  event.stopPropagation();
   return true;
 }

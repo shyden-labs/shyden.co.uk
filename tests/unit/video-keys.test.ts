@@ -18,6 +18,7 @@ const press = (key: string, extra: Partial<VideoKey> = {}): VideoKey => ({
   metaKey: false,
   shiftKey: false,
   preventDefault: vi.fn(),
+  stopPropagation: vi.fn(),
   ...extra,
 });
 
@@ -128,4 +129,35 @@ describe('onVideoKeyUp', () => {
       expect(key.preventDefault).not.toHaveBeenCalled();
     },
   );
+});
+
+// Measured on Chromium (CI run 44393520871): with both keydown and keyup's
+// defaults stopped, one Space still played and paused the video. Chromium's
+// player inside the video handles the key before a listener on the video
+// runs. The page takes the key on its way down instead, and stops it there,
+// so the player never sees a key the page took.
+describe('a key the page takes goes no further', () => {
+  it('Space down and up stop on their way to the player', () => {
+    const down = press(' ');
+    const up = press(' ');
+    onVideoKey(down, video(true));
+    onVideoKeyUp(up);
+    expect(down.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(up.stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
+  it('a held Space repeating stops too', () => {
+    const down = press(' ', { repeat: true });
+    onVideoKey(down, video(false));
+    expect(down.stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
+  it('a key the page leaves travels on', () => {
+    const down = press('k');
+    const up = press(' ', { ctrlKey: true });
+    onVideoKey(down, video(true));
+    onVideoKeyUp(up);
+    expect(down.stopPropagation).not.toHaveBeenCalled();
+    expect(up.stopPropagation).not.toHaveBeenCalled();
+  });
 });

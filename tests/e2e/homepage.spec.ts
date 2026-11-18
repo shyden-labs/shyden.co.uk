@@ -1370,21 +1370,31 @@ function playButtonOn(
 
 /**
  * What the player heard, so a Space test that fails says why: every key
- * event on it (and whether its default was already stopped), and every play
- * and pause, in order. It only listens; nothing is pressed or set.
+ * event bound for it (whether the page stopped it, and whether it reached the
+ * video), and every play and pause, in order. It only listens; nothing is
+ * pressed or set.
  */
 type VideoEventLog = { __videoEvents?: string[] };
 const recordVideoEvents = (video: Locator): Promise<void> =>
   video.evaluate((v: HTMLVideoElement) => {
     const log: string[] = [];
     (window as unknown as VideoEventLog).__videoEvents = log;
-    for (const type of ['keydown', 'keypress', 'keyup'])
-      v.addEventListener(type, (event) => {
-        const key = (event as KeyboardEvent).key;
-        log.push(
-          `${type} ${JSON.stringify(key)}${event.defaultPrevented ? ' (stopped)' : ''}`,
-        );
-      });
+    // On the window on the way down, after the page's own listener there
+    // (src/lib/videoKeys.ts), and again if the key reaches the video itself.
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      window.addEventListener(
+        type,
+        (event) => {
+          if (event.target !== v) return;
+          const key = (event as KeyboardEvent).key;
+          log.push(
+            `${type} ${JSON.stringify(key)}${event.defaultPrevented ? ' (stopped)' : ''}`,
+          );
+        },
+        { capture: true },
+      );
+      v.addEventListener(type, () => log.push(`${type} reached the video`));
+    }
     for (const type of ['play', 'pause'])
       v.addEventListener(type, () => log.push(type));
   });
