@@ -3,7 +3,7 @@ import { scrollToOn, setCheckedOn, tapAt, tapOn } from '../real-touch';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { onRealDevice } from '../device/device-downloads';
-import { DESKTOP_TAG, GROUP_ONLY } from '../group-tags';
+import { GROUP_ONLY } from '../group-tags';
 import { eachWidth } from '../each-width';
 import { BAND_WIDTHS } from './checks/homepage';
 import { recorded, shoot } from './evidence';
@@ -1372,7 +1372,7 @@ test.describe('the Yawelo Idle preview video', () => {
   test(
     'Space on the focused player plays it, and Space again pauses it',
     {
-      tag: DESKTOP_TAG,
+      tag: '@desktop',
       annotation: {
         type: GROUP_ONLY,
         description: 'a hardware keyboard: the phones have no Space key',
