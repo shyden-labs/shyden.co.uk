@@ -23,7 +23,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       // .astro pages are rendered by the e2e suite, not this one.
-      include: ['{src,functions,scripts}/**/*.{ts,js,mjs}'],
+      include: ['{src,functions,scripts,workers}/**/*.{ts,js,mjs}'],
       // The figure, plus the lcov FILE SonarCloud's scan reads (#851).
       // `lcovonly`, not `lcov`: `lcov` also writes an HTML report, whose
       // scripts land where `astro check` reads them.

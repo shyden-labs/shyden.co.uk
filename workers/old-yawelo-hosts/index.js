@@ -1,14 +1,18 @@
 /**
  * The old Yawelo Idle hosts, moved for good to yaweloidle.com
  * (yawelo-idle#1013; shyden-labs/shyden.co.uk#1191 AC3, approved by Shyden
- * 2026-11-18). Each old host answers 301 to the same path and query on its
- * new host. Deployed by hand: `npx wrangler deploy` from this folder.
+ * 2026-11-18). Each old host answers 308 to the same path and query on its
+ * new host: permanent, and a POST keeps its method and body (Shyden,
+ * 2026-11-18, one code for every host). Deployed by hand:
+ * `npx wrangler deploy` from this folder.
  */
 
 /** Old host → its new origin. @type {Readonly<Record<string, string>>} */
 export const MOVES = {
   'yawelo-idle.shyden.co.uk': 'https://yaweloidle.com',
   'dev.yawelo-idle.shyden.co.uk': 'https://dev.yaweloidle.com',
+  'dev-api.yawelo-idle.shyden.co.uk': 'https://dev-api.yaweloidle.com',
+  'dev-holding.yawelo-idle.shyden.co.uk': 'https://dev-holding.yaweloidle.com',
 };
 
 /**
@@ -28,6 +32,6 @@ export default {
   async fetch(request) {
     const location = redirectFor(request.url);
     if (location === null) return new Response('Not found', { status: 404 });
-    return new Response(null, { status: 301, headers: { location } });
+    return new Response(null, { status: 308, headers: { location } });
   },
 };
