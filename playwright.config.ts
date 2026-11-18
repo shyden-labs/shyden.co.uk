@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { ENGINES, engineUse } from './tests/engines';
+import { DESKTOP_RUN_LEAVES_OUT } from './tests/group-tags';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 /**
@@ -295,6 +296,10 @@ export default defineConfig({
     // pinned by the seam guards in `tests/guards/evidence-page.test.ts`.
     video: 'off',
   },
+  // The desktop group runs every shared test and its own @desktop ones; a
+  // test tagged @phone says, with its reason, that its behaviour differs on a
+  // phone (#1182, tests/group-tags.ts).
+  grepInvert: DESKTOP_RUN_LEAVES_OUT,
   projects: [
     // Every spec on every engine (#1067; Shyden 2026-11-05: one suite, run
     // unchanged on every browser). A collapsed nav wrapper once pushed the
