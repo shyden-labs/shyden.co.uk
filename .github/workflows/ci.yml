@@ -236,8 +236,11 @@ jobs:
     permissions:
       contents: read
       # A dev deploy dispatched from a feature branch reads this commit's
-      # pull request `sonarcloud` check (see the last step).
+      # pull request `sonarcloud` check, and one dispatched on develop finds
+      # the pull request that landed the commit and reads its head's (see
+      # the last step; #1221).
       checks: read
+      pull-requests: read
     steps:
       - name: The SonarCloud token is set
         env:
@@ -282,8 +285,11 @@ jobs:
           # but develop or a pull request (run 44103680992). A dev deploy
           # dispatched from a feature branch therefore passes on the verdict
           # its pull request's `sonarcloud` check gave this same commit, and
-          # fails, saying so, when there is none (Shyden, 2026-11-17).
-          SONAR_REUSE_PULL_REQUEST_SCAN: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'develop' }}
+          # fails, saying so, when there is none (Shyden, 2026-11-17). On
+          # develop, whose own scan has no gate (NONE, #1221), it reads the
+          # head of the pull request that landed the commit (Shyden,
+          # 2026-11-19).
+          SONAR_REUSE_PULL_REQUEST_SCAN: ${{ github.event_name == 'workflow_dispatch' }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/sonar-verdict.mjs .scannerwork/report-task.txt
 
