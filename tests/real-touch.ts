@@ -240,6 +240,14 @@ async function prepare(
     throw new TapNotPossibleError(
       `${String(target)} and the page did not come to rest: ${STILL_SAMPLES} matching samples ${STILL_GAP_MS} ms apart were not seen within ${waitedMs} ms`,
     );
+  return measure(target, offset);
+}
+
+/** The point to tap and what a finger there would touch, read once. */
+function measure(
+  target: Locator,
+  offset: { x: number; y: number } | undefined,
+): Promise<Prepared> {
   return target.evaluate(
     (el, { offset }) => {
       const vv = window.visualViewport;
@@ -392,15 +400,23 @@ async function bringIntoView(
 ): Promise<Prepared> {
   const page = target.page();
   const selector = String(target);
+  // The wheel also moves a point something covers (a sticky header) toward
+  // the middle, for a scroll as for a tap; only a tap fails on a cover.
+  const moves = (q: Prepared) =>
+    forATap || input === 'wheel' ? mustMove(q) : mustMove({ ...q, hit: null });
+  // On a desktop engine a point already in view needs no turn: one read
+  // decides it, and Playwright's click keeps its own wait for a still,
+  // uncovered element. Waiting for rest on every tap tripled the WebKit
+  // suite's longest tests (#1004).
+  if (input === 'wheel') {
+    const first = await measure(target, offset);
+    if (!moves(first)) return first;
+  }
   let p = await prepare(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
   if (input === 'swipe' && p.keyboard && closeKeyboard())
     p = await prepare(target, offset);
-  // The wheel also moves a point something covers (a sticky header) toward
-  // the middle, for a scroll as for a tap; only a tap fails on a cover.
-  const moves = (q: Prepared) =>
-    forATap || input === 'wheel' ? mustMove(q) : mustMove({ ...q, hit: null });
   const ceiling = swipeCeiling(p);
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
@@ -639,9 +655,16 @@ export async function scrollOver(target: Locator, dy: number): Promise<void> {
     const { point } = await bringIntoView(target, undefined, false, 'wheel');
     const page = target.page();
     await page.mouse.move(Math.round(point.x), Math.round(point.y));
+    const before = await shapeOf(target);
     await page.mouse.wheel(0, dy);
-    // The wheel returns before the page has finished scrolling: the caller
-    // reads where it came to rest.
+    // The wheel returns before the page has scrolled, and CI's WebKit starts
+    // the scroll late (#1004): wait for it to start, then for it to come to
+    // rest, so the caller reads where it landed.
+    await waitUntilMoved(() => shapeOf(target), before, {
+      gapMs: STILL_GAP_MS,
+      ceilingMs: MOVE_CEILING_MS,
+      clock: ownClock,
+    });
     await prepare(target, undefined);
     return;
   }

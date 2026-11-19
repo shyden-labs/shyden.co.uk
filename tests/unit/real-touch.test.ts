@@ -147,6 +147,7 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     // A turn whose scroll the engine applies only after this many samples
     // have read the page (CI's WebKit lands a turn late, #1004).
     let pending: { dy: number; samples: number } | null = null;
+    let shapeSamples = 0;
     const maxScroll = length - VIEW.height;
     const rect = () => ({ x: 600, y: top - scrollY, width: 80, height: 40 });
     const land = () => {
@@ -173,6 +174,7 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
         _fn: unknown,
         arg?: { offset?: { x: number; y: number } },
       ) => {
+        if (arg === undefined) shapeSamples++;
         if (arg === undefined && pending !== null) {
           pending.samples--;
           land();
@@ -211,6 +213,7 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
       target: target as unknown as Locator,
       sent,
       centreY: () => rect().y + 20,
+      shapeSamples: () => shapeSamples,
     };
   }
 
@@ -273,6 +276,14 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     const { target, sent } = fakeDesktop(300);
     await settle(scrollToOn(target));
     expect(sent).toEqual([]);
+  });
+
+  it('an element already in view is measured once, with no wait for the page to rest', async () => {
+    setUp();
+    const { target, sent, shapeSamples } = fakeDesktop(300);
+    await settle(tapOn(target));
+    expect(shapeSamples()).toBe(0);
+    expect(kinds(sent)).toEqual(['click']);
   });
 
   it('turns the wheel with the mouse over the view, before each turn', async () => {
@@ -338,6 +349,13 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
       ['move', 640, 320],
       ['wheel', 0, 240],
     ]);
+  });
+
+  it('scrollOver returns only once a wheel turn the engine lands late has moved the page', async () => {
+    setUp();
+    const { target, centreY } = fakeDesktop(300, { landsAfterSamples: 12 });
+    await settle(scrollOver(target, 240));
+    expect(centreY()).toBe(320 - 240);
   });
 
   it('scrollOver wheels an element below the view in first', async () => {
