@@ -48,10 +48,22 @@ export interface Prepared {
   viewWidth: number;
   /** The point is inside the view. */
   inView: boolean;
+  /** The element's whole box is inside the view. */
+  boxInView: boolean;
   /** What a finger at the point would touch instead, or null. */
   hit: string | null;
   /** A field has the focus, so its on-screen keyboard may be up. */
   keyboard: boolean;
+}
+
+/**
+ * On a desktop engine, true while the element is not wholly in view (a click
+ * would then scroll it by protocol) or is covered. Unlike a finger, a click
+ * needs no margin from the view's edges: a fixed bar's button sits in one
+ * (#1004).
+ */
+export function wheelMustMove(p: Prepared): boolean {
+  return !p.boxInView || p.hit !== null;
 }
 
 /** True while the point is out of view, too near an edge, or covered. */
@@ -273,6 +285,11 @@ function measure(
         point.x <= v.left + v.width &&
         point.y >= v.top &&
         point.y <= v.top + v.height;
+      const boxInView =
+        r.left >= v.left &&
+        r.right <= v.left + v.width &&
+        r.top >= v.top &&
+        r.bottom <= v.top + v.height;
       let hit: string | null = null;
       if (inView) {
         const top = document.elementFromPoint(point.x, point.y);
@@ -299,6 +316,7 @@ function measure(
         viewHeight: v.height,
         viewWidth: v.width,
         inView,
+        boxInView,
         hit,
         keyboard: typing,
       };
@@ -403,7 +421,11 @@ async function bringIntoView(
   // The wheel also moves a point something covers (a sticky header) toward
   // the middle, for a scroll as for a tap; only a tap fails on a cover.
   const moves = (q: Prepared) =>
-    forATap || input === 'wheel' ? mustMove(q) : mustMove({ ...q, hit: null });
+    input === 'wheel'
+      ? wheelMustMove(q)
+      : forATap
+        ? mustMove(q)
+        : mustMove({ ...q, hit: null });
   // On a desktop engine a point already in view needs no turn: one read
   // decides it, and Playwright's click keeps its own wait for a still,
   // uncovered element. Waiting for rest on every tap tripled the WebKit

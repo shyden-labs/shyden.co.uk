@@ -17,6 +17,7 @@ import {
   scrollOver,
   scrollToOn,
   SPARE_SWIPES,
+  wheelMustMove,
   swipeCeiling,
   tapOn,
   waitUntilMoved,
@@ -37,9 +38,24 @@ const at = (y: number, extra: Partial<Prepared> = {}): Prepared => ({
   viewHeight: 800,
   viewWidth: 400,
   inView: y >= 0 && y <= 800,
+  boxInView: y >= 20 && y <= 780,
   hit: null,
   keyboard: false,
   ...extra,
+});
+
+describe('wheelMustMove (#1004)', () => {
+  it('leaves a whole, uncovered element inside an edge where it is: a click needs no centring', () => {
+    expect(wheelMustMove(at(30))).toBe(false);
+    expect(wheelMustMove(at(770))).toBe(false);
+  });
+  it('moves an element not wholly in view, which a click would scroll by protocol', () => {
+    expect(wheelMustMove(at(10))).toBe(true);
+    expect(wheelMustMove(at(1200))).toBe(true);
+  });
+  it('moves a covered element, wherever it is', () => {
+    expect(wheelMustMove(at(400, { hit: 'div.bar' }))).toBe(true);
+  });
 });
 
 describe('mustMove', () => {
@@ -194,6 +210,7 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
           viewHeight: VIEW.height,
           viewWidth: VIEW.width,
           inView: point.y >= 0 && point.y <= VIEW.height,
+          boxInView: r.y >= 0 && r.y + r.height <= VIEW.height,
           hit: null,
           keyboard: false,
         };
@@ -283,6 +300,13 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     const { target, sent, shapeSamples } = fakeDesktop(300);
     await settle(tapOn(target));
     expect(shapeSamples()).toBe(0);
+    expect(kinds(sent)).toEqual(['click']);
+  });
+
+  it('clicks an element wholly in view by the top edge (a fixed bar) without turning the wheel', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(10);
+    await settle(tapOn(target));
     expect(kinds(sent)).toEqual(['click']);
   });
 
