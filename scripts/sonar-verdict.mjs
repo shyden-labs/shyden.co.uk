@@ -18,6 +18,7 @@
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { testedHeadOf, toPull } from './deploy-gate.mjs';
 
 /**
  * @typedef {{ status: string; metricKey: string; comparator?: string; errorThreshold?: string; actualValue?: string }} Condition
@@ -141,11 +142,33 @@ async function reusedVerdict() {
     );
   }
   const api = process.env.GITHUB_API_URL || 'https://api.github.com';
-  const sha = String(process.env.GITHUB_SHA);
+  const repo = `${api}/repos/${String(process.env.GITHUB_REPOSITORY)}`;
+  const commit = String(process.env.GITHUB_SHA);
+  // A develop commit is the squash of the pull request that landed it and has
+  // no scan of its own; that pull request's head has (#1221; Shyden,
+  // 2026-11-19). deploy-gate.mjs finds it the same way.
+  let sha = commit;
+  let landed = '';
+  if (process.env.GITHUB_REF_NAME === 'develop') {
+    const { parents } = /** @type {{ parents: { sha: string }[] }} */ (
+      await get(`${repo}/commits/${commit}`, token)
+    );
+    const pulls = /** @type {Parameters<typeof toPull>[0][]} */ (
+      await get(`${repo}/commits/${commit}/pulls?per_page=100`, token)
+    ).map(toPull);
+    const head = testedHeadOf({
+      sha: commit,
+      parents: parents.map((parent) => parent.sha),
+      pulls,
+    });
+    if ('refusal' in head) return fail(head.refusal);
+    sha = head.tested;
+    landed = head.as;
+  }
   const body =
     /** @type {{ check_runs?: { conclusion: string | null; completed_at: string | null }[] }} */ (
       await get(
-        `${api}/repos/${String(process.env.GITHUB_REPOSITORY)}/commits/${sha}/check-runs?check_name=sonarcloud&filter=all&per_page=100`,
+        `${repo}/commits/${sha}/check-runs?check_name=sonarcloud&filter=all&per_page=100`,
         token,
       )
     );
@@ -160,7 +183,9 @@ async function reusedVerdict() {
       `no finished \`sonarcloud\` check on ${sha}; SonarCloud’s free plan reads only develop and pull requests, so open a pull request for this branch and let its CI finish before dispatching a dev deploy`,
     );
   }
-  const scan = `this commit’s pull request scan (${sha})`;
+  const scan = landed
+    ? `${landed}its head’s pull request scan (${sha})`
+    : `this commit’s pull request scan (${sha})`;
   return latest.conclusion === 'success'
     ? { ok: true, lines: [`quality gate: OK on ${scan}`] }
     : {

@@ -420,6 +420,70 @@ describe('main', () => {
       );
     });
 
+    // A develop commit is the squash of the pull request that landed it, so
+    // it has no scan of its own to reuse: the landing pull request's head
+    // does (Shyden's ruling, 2026-11-19, #1221).
+    describe('a dispatch on develop reuses the scan of the pull request that landed the commit', () => {
+      const API = 'https://api.github.com/repos/shyden-labs/shyden.co.uk';
+      beforeEach(() => vi.stubEnv('GITHUB_REF_NAME', 'develop'));
+      const squash = [200, { parents: [{ sha: 'p1' }] }] as [number, unknown];
+      const landedBy = (headSha: string) =>
+        [
+          200,
+          [
+            {
+              number: 9,
+              merged_at: '2026-11-19T00:00:00Z',
+              merge_commit_sha: 'abc123',
+              head: { sha: headSha },
+              base: { ref: 'develop' },
+            },
+          ],
+        ] as [number, unknown];
+
+      it('passes on the landing pull request head’s successful scan', async () => {
+        answer(
+          squash,
+          landedBy('def456'),
+          checks({
+            conclusion: 'success',
+            completed_at: '2026-11-19T00:00:00Z',
+          }),
+        );
+        expect(await run()).toBe(0);
+        expect(fetched).toEqual([
+          `${API}/commits/abc123 Bearer gh`,
+          `${API}/commits/abc123/pulls?per_page=100 Bearer gh`,
+          `${API}/commits/def456/check-runs?check_name=sonarcloud&filter=all&per_page=100 Bearer gh`,
+        ]);
+        expect(out[0]).toBe(
+          'sonar-verdict: quality gate: OK on squash abc123 of pull request #9: its head’s pull request scan (def456)\n',
+        );
+      });
+
+      it('fails when the landing pull request head’s scan did not succeed', async () => {
+        answer(
+          squash,
+          landedBy('def456'),
+          checks({
+            conclusion: 'failure',
+            completed_at: '2026-11-19T00:00:00Z',
+          }),
+        );
+        expect(await run()).toBe(1);
+        expect(err).toEqual([
+          'sonar-verdict: quality gate: squash abc123 of pull request #9: its head’s pull request scan (def456) concluded failure, not success\n',
+        ]);
+      });
+
+      it('fails closed on a commit no pull request landed, naming why', async () => {
+        answer(squash, [200, []]);
+        await expect(run()).rejects.toThrow(
+          'sonar-verdict: abc123 has one parent and no merged pull request into develop landed it as its merge commit',
+        );
+      });
+    });
+
     it('scans as before when the flag is anything but true', async () => {
       vi.stubEnv('SONAR_REUSE_PULL_REQUEST_SCAN', 'false');
       answer(task('SUCCESS', { pullRequest: undefined }), gate('OK'));
