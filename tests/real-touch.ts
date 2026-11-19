@@ -16,8 +16,9 @@ import { onRealDevice } from './device/device-downloads';
  * iPhone run does the same through WebDriverAgent
  * (`tests/device/ios/interaction.ts`).
  *
- * Everywhere else (the five desktop engines and their emulated phones), a tap
- * is Playwright's real `click()`, as before (#1004 covers their scrolling).
+ * On the desktop engines, real mouse wheel turns bring the element into view
+ * the same way, never a protocol or page-script scroll (#1004), and the tap
+ * is then Playwright's real `click()`.
  */
 
 /** Drags allowed beyond the ones the distance itself needs. */
@@ -47,10 +48,22 @@ export interface Prepared {
   viewWidth: number;
   /** The point is inside the view. */
   inView: boolean;
+  /** The element's whole box is inside the view. */
+  boxInView: boolean;
   /** What a finger at the point would touch instead, or null. */
   hit: string | null;
   /** A field has the focus, so its on-screen keyboard may be up. */
   keyboard: boolean;
+}
+
+/**
+ * On a desktop engine, true while the element is not wholly in view (a click
+ * would then scroll it by protocol) or is covered. Unlike a finger, a click
+ * needs no margin from the view's edges: a fixed bar's button sits in one
+ * (#1004).
+ */
+export function wheelMustMove(p: Prepared): boolean {
+  return !p.boxInView || p.hit !== null;
 }
 
 /** True while the point is out of view, too near an edge, or covered. */
@@ -92,18 +105,28 @@ export function planSwipe(p: Prepared): {
   };
 }
 
+/** What moves the page: a finger's drag on the phone, the mouse wheel elsewhere. */
+export type ScrollInput = 'swipe' | 'wheel';
+
+const INPUT_NAMES: Record<ScrollInput, { one: string; many: string }> = {
+  swipe: { one: 'a real swipe', many: 'real swipes' },
+  wheel: { one: 'a real wheel turn', many: 'real wheel turns' },
+};
+
 /** Why a tap cannot be made once the drags have stopped, or null when it can. */
 export function whyNotTappable(
   selector: string,
   p: Prepared,
   swipes: number,
   ceiling: number,
+  input: ScrollInput = 'swipe',
 ): string | null {
   const where = `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+  const named = INPUT_NAMES[input];
   if (!p.inView)
     return swipes >= ceiling
-      ? `${selector} did not come into view after ${ceiling} real swipes ${where}`
-      : `${selector} did not come into view: a real swipe no longer moves it ${where}`;
+      ? `${selector} did not come into view after ${ceiling} ${named.many} ${where}`
+      : `${selector} did not come into view: ${named.one} no longer moves it ${where}`;
   if (p.hit !== null)
     return `${selector} is covered: a finger there would touch ${p.hit}`;
   return null;
@@ -168,6 +191,48 @@ export async function waitUntilStill(
   }
 }
 
+/** How long a wheel turn's scroll may take to start (CI's WebKit lands it late, #1004). */
+export const MOVE_CEILING_MS = 1_000;
+
+/**
+ * Samples a shape until it differs from `from`, the shape before an input, or
+ * the ceiling passes on the given clock.
+ */
+export async function waitUntilMoved(
+  sample: () => Promise<string>,
+  from: string,
+  {
+    gapMs,
+    ceilingMs,
+    clock,
+  }: { gapMs: number; ceilingMs: number; clock: WaitClock },
+): Promise<{ moved: boolean; waitedMs: number }> {
+  const started = clock.now();
+  for (;;) {
+    const waitedMs = clock.now() - started;
+    if ((await sample()) !== from) return { moved: true, waitedMs };
+    if (waitedMs >= ceilingMs) return { moved: false, waitedMs };
+    await clock.sleep(gapMs);
+  }
+}
+
+/** Where the element and the page are: what a still or moved check compares. */
+const shapeOf = (target: Locator): Promise<string> =>
+  target.evaluate((el) => {
+    const vv = window.visualViewport;
+    const b = el.getBoundingClientRect();
+    return [
+      b.x,
+      b.y,
+      b.width,
+      b.height,
+      vv ? vv.offsetTop : 0,
+      vv ? vv.height : window.innerHeight,
+      window.scrollX,
+      window.scrollY,
+    ].join(',');
+  });
+
 /**
  * Waits for the element AND the page to come to rest (a sticky element holds
  * still while the page behind it still coasts, and a tap then only stops the
@@ -178,28 +243,23 @@ async function prepare(
   target: Locator,
   offset: { x: number; y: number } | undefined,
 ): Promise<Prepared> {
-  const { still, waitedMs } = await waitUntilStill(
-    () =>
-      target.evaluate((el) => {
-        const vv = window.visualViewport;
-        const b = el.getBoundingClientRect();
-        return [
-          b.x,
-          b.y,
-          b.width,
-          b.height,
-          vv ? vv.offsetTop : 0,
-          vv ? vv.height : window.innerHeight,
-          window.scrollX,
-          window.scrollY,
-        ].join(',');
-      }),
-    { gapMs: STILL_GAP_MS, ceilingMs: STILL_CEILING_MS, clock: ownClock },
-  );
+  const { still, waitedMs } = await waitUntilStill(() => shapeOf(target), {
+    gapMs: STILL_GAP_MS,
+    ceilingMs: STILL_CEILING_MS,
+    clock: ownClock,
+  });
   if (!still)
     throw new TapNotPossibleError(
       `${String(target)} and the page did not come to rest: ${STILL_SAMPLES} matching samples ${STILL_GAP_MS} ms apart were not seen within ${waitedMs} ms`,
     );
+  return measure(target, offset);
+}
+
+/** The point to tap and what a finger there would touch, read once. */
+function measure(
+  target: Locator,
+  offset: { x: number; y: number } | undefined,
+): Promise<Prepared> {
   return target.evaluate(
     (el, { offset }) => {
       const vv = window.visualViewport;
@@ -225,6 +285,11 @@ async function prepare(
         point.x <= v.left + v.width &&
         point.y >= v.top &&
         point.y <= v.top + v.height;
+      const boxInView =
+        r.left >= v.left &&
+        r.right <= v.left + v.width &&
+        r.top >= v.top &&
+        r.bottom <= v.top + v.height;
       let hit: string | null = null;
       if (inView) {
         const top = document.elementFromPoint(point.x, point.y);
@@ -251,6 +316,7 @@ async function prepare(
         viewHeight: v.height,
         viewWidth: v.width,
         inView,
+        boxInView,
         hit,
         keyboard: typing,
       };
@@ -310,31 +376,83 @@ function closeKeyboard(): boolean {
   return shown;
 }
 
-/** Drags the page with real touches until the point can be tapped, or fails naming why. */
+/**
+ * One real turn of the mouse wheel that moves the point toward the middle of
+ * the view, as far as a drag would (#1004). The mouse is moved over the view
+ * first, near its right-hand edge, so the turn scrolls what a visitor's
+ * pointer there would scroll.
+ */
+/**
+ * One wheel turn covering the whole distance that brings the point to the
+ * middle of the view, like a trackpad flick (Shyden, 2026-11-19, #1004); then
+ * waits for the engine to start the scroll, which CI's WebKit does late.
+ */
+async function wheelTurn(target: Locator, p: Prepared): Promise<void> {
+  const page = target.page();
+  const need = needOf(p);
+  const before = await shapeOf(target);
+  await page.mouse.move(
+    Math.round(p.viewWidth * 0.9),
+    Math.round(p.viewTop + p.viewHeight / 2),
+  );
+  await page.mouse.wheel(
+    0,
+    Math.sign(need) * Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need))),
+  );
+  await waitUntilMoved(() => shapeOf(target), before, {
+    gapMs: STILL_GAP_MS,
+    ceilingMs: MOVE_CEILING_MS,
+    clock: ownClock,
+  });
+}
+
+/**
+ * Moves the page with real input until the point can be tapped, or fails
+ * naming why: real touch drags on the phone, real wheel turns elsewhere.
+ */
 async function bringIntoView(
   target: Locator,
   offset: { x: number; y: number } | undefined,
   forATap: boolean,
+  input: ScrollInput = 'swipe',
 ): Promise<Prepared> {
   const page = target.page();
   const selector = String(target);
+  // The wheel also moves a point something covers (a sticky header) toward
+  // the middle, for a scroll as for a tap; only a tap fails on a cover.
+  const moves = (q: Prepared) =>
+    input === 'wheel'
+      ? wheelMustMove(q)
+      : forATap
+        ? mustMove(q)
+        : mustMove({ ...q, hit: null });
+  // On a desktop engine a point already in view needs no turn: one read
+  // decides it, and Playwright's click keeps its own wait for a still,
+  // uncovered element. Waiting for rest on every tap tripled the WebKit
+  // suite's longest tests (#1004).
+  if (input === 'wheel') {
+    const first = await measure(target, offset);
+    if (!moves(first)) return first;
+  }
   let p = await prepare(target, offset);
   // A field has the focus: ask Android whether its keyboard is up (the
   // page cannot tell reliably: Chrome may shrink the window with it).
-  if (p.keyboard && closeKeyboard()) p = await prepare(target, offset);
-  const moves = (q: Prepared) =>
-    forATap ? mustMove(q) : mustMove({ ...q, hit: null });
+  if (input === 'swipe' && p.keyboard && closeKeyboard())
+    p = await prepare(target, offset);
   const ceiling = swipeCeiling(p);
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    const { from, to } = planSwipe(p);
-    await drag(
-      page,
-      from,
-      to,
-      Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
-    );
+    if (input === 'wheel') await wheelTurn(target, p);
+    else {
+      const { from, to } = planSwipe(p);
+      await drag(
+        page,
+        from,
+        to,
+        Math.abs(needOf(p)) > p.viewHeight * FLICK_BEYOND_VIEWS,
+      );
+    }
     swipes++;
     p = await prepare(target, offset);
     if (Math.abs(p.point.y - before) < STILL_PX) break;
@@ -344,6 +462,7 @@ async function bringIntoView(
     forATap ? p : { ...p, hit: null },
     swipes,
     ceiling,
+    input,
   );
   if (why !== null) throw new TapNotPossibleError(why);
   return p;
@@ -373,13 +492,19 @@ export interface TapOptions {
   byEffect?: boolean;
 }
 
-/** A real tap on the phone, a real click everywhere else. */
+/**
+ * A real tap on the phone. Everywhere else, real wheel turns bring the
+ * element into view (#1004), then Playwright's real `click()`, which keeps
+ * its own checks that the element is enabled, still and not covered.
+ */
 export async function tapOn(
   target: Locator,
   options: TapOptions = {},
 ): Promise<void> {
   if (!onRealDevice()) {
-    await target.click(options);
+    await target.waitFor({ state: 'visible' });
+    await bringIntoView(target, options.position, false, 'wheel');
+    await target.click(options.position ? { position: options.position } : {});
     return;
   }
   await target.waitFor({ state: 'visible' });
@@ -527,28 +652,42 @@ export async function doubleTapOn(target: Locator): Promise<void> {
 }
 
 /**
- * Brings an element into view with no tap: real drags on the phone,
- * Playwright's `scrollIntoViewIfNeeded()` everywhere else.
+ * Brings an element into view with no tap: real drags on the phone, real
+ * wheel turns everywhere else (#1004).
  */
 export async function scrollToOn(target: Locator): Promise<void> {
-  if (!onRealDevice()) {
-    await target.scrollIntoViewIfNeeded();
-    return;
-  }
   await target.waitFor({ state: 'visible' });
-  await bringIntoView(target, undefined, false);
+  await bringIntoView(
+    target,
+    undefined,
+    false,
+    onRealDevice() ? 'swipe' : 'wheel',
+  );
 }
 
 /**
  * Scrolls the page by `dy` px with the target under the input, the way that
  * target's visitor does (#1048): the real mouse wheel over it on a desktop
- * engine, a real finger dragged from its centre the opposite way on the phone
- * (a finger pulled up the screen sends the page down).
+ * engine, once real wheel turns have brought it into view (#1004), and a real
+ * finger dragged from its centre the opposite way on the phone (a finger
+ * pulled up the screen sends the page down).
  */
 export async function scrollOver(target: Locator, dy: number): Promise<void> {
   if (!onRealDevice()) {
-    await target.hover();
-    await target.page().mouse.wheel(0, dy);
+    const { point } = await bringIntoView(target, undefined, false, 'wheel');
+    const page = target.page();
+    await page.mouse.move(Math.round(point.x), Math.round(point.y));
+    const before = await shapeOf(target);
+    await page.mouse.wheel(0, dy);
+    // The wheel returns before the page has scrolled, and CI's WebKit starts
+    // the scroll late (#1004): wait for it to start, then for it to come to
+    // rest, so the caller reads where it landed.
+    await waitUntilMoved(() => shapeOf(target), before, {
+      gapMs: STILL_GAP_MS,
+      ceilingMs: MOVE_CEILING_MS,
+      clock: ownClock,
+    });
+    await prepare(target, undefined);
     return;
   }
   const box = await target.boundingBox();

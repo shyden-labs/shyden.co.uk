@@ -1,5 +1,5 @@
 import { tabTo } from '../tab-to';
-import { tapOn } from '../real-touch';
+import { scrollOver, tapOn } from '../real-touch';
 import { test, expect } from './fixtures';
 import { recorded, shoot } from './evidence';
 import { refuseFullscreen, withGroups } from './helpers';
@@ -85,7 +85,14 @@ for (const theme of THEMES) {
         await expect(page.locator('#cg-roster tbody tr').first()).toBeVisible();
         await shoot(page, `${theme}: the roster`, page.locator('#cg-roster'));
 
-        await page.evaluate(() => scrollTo(0, 0));
+        // Back to the top the way a visitor goes, the real wheel or a finger
+        // over the heading, by at least the whole distance scrolled (#1004).
+        const scrolled = await page.evaluate(() => window.scrollY);
+        await scrollOver(page.locator('h1').first(), -Math.ceil(scrolled));
+        expect(
+          await page.evaluate(() => window.scrollY),
+          'the page is back at its top',
+        ).toBe(0);
         const bar = page.locator('p.actions');
         await expect(bar).toHaveCSS('position', 'sticky');
         // Docking is proved before the picture, as visual.spec proves it:
