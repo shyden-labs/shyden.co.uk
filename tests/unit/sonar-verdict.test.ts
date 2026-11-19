@@ -349,6 +349,10 @@ describe('main', () => {
     beforeEach(() => {
       vi.stubEnv('SONAR_REUSE_PULL_REQUEST_SCAN', 'true');
       vi.stubEnv('SONAR_PULL_REQUEST', '');
+      // A feature branch, whatever branch the suite itself runs on: on a CI
+      // run of develop, GITHUB_REF_NAME is develop, which takes the landing
+      // pull request path instead (#1221, dispatch run 44483162617).
+      vi.stubEnv('GITHUB_REF_NAME', '1221-a-feature-branch');
       vi.stubEnv('GITHUB_TOKEN', 'gh');
       vi.stubEnv('GITHUB_REPOSITORY', 'shyden-labs/shyden.co.uk');
       vi.stubEnv('GITHUB_SHA', 'abc123');
