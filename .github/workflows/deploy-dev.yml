@@ -155,13 +155,16 @@ jobs:
           PUBLIC_YAWELO_MEDIA_URL: https://dev-media.yaweloidle.com
         run: npm run build
       # Before anything is deployed, the dev token proves it reaches the dev
-      # account and nothing else (#415): a token that could reach production
-      # never deploys. One request, no retry; any answer but exactly the dev
-      # account stops the job here.
-      - name: The dev token reaches the dev account alone
+      # account and nothing else (#415), and the account id stored beside it
+      # is that dev account (#501). Which account is the dev one comes from a
+      # repository variable outside the dev environment (Shyden's ruling,
+      # 2026-11-20), so production's token and id pasted into dev together are
+      # refused. One request, no retry; any other answer stops the job here.
+      - name: The dev token and its account id are the dev account's, and nothing else
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEV_CLOUDFLARE_ACCOUNT_ID: ${{ vars.DEV_CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/token-reach.mjs
       # The Workers runtime this project runs is set to the date the
       # functions suite tests, and read back, before anything deploys (#907;

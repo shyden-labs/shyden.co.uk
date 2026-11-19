@@ -196,13 +196,18 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/dependabot-labels.mjs',
   },
-  // Without a token and an account it has nothing to prove, so it refuses
-  // with the usage before any request reaches Cloudflare (#415).
+  // Without a token, an account and the dev account it has nothing to prove,
+  // so it refuses with the usage before any request reaches Cloudflare
+  // (#415, #501).
   'token-reach.mjs': {
     args: [],
-    env: { CLOUDFLARE_API_TOKEN: undefined, CLOUDFLARE_ACCOUNT_ID: undefined },
+    env: {
+      CLOUDFLARE_API_TOKEN: undefined,
+      CLOUDFLARE_ACCOUNT_ID: undefined,
+      DEV_CLOUDFLARE_ACCOUNT_ID: undefined,
+    },
     status: 1,
-    says: 'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
+    says: 'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… DEV_CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
   },
   // It takes no arguments, and refuses one before it reads the lockfile or
   // asks mcr.microsoft.com anything (#454).
