@@ -3,7 +3,9 @@ import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { recorded, shoot } from './evidence';
+import { recorded } from './evidence';
+// Scratch (#1230): no screenshots, to measure their lasting cost.
+const shoot = async (..._args: unknown[]): Promise<void> => {};
 import { getStrings, renderError, type Locale } from '../../src/lib/i18n/index';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { CSV_LOCALES } from '../../src/lib/csv-locale';
