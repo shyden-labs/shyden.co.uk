@@ -481,7 +481,7 @@ jobs:
           path: |
             capture-evidence/report.json
             capture-evidence/manifest.jsonl
-            test-results/
+            capture-evidence/test-results/**/*feature-words*/**
           retention-days: 14
           if-no-files-found: warn
 
