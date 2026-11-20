@@ -51,6 +51,19 @@ export const ticketPaths = (): string[] =>
     `routable .astro pages in ${TICKET_DIR}`,
   );
 
+/**
+ * The English pages that paint no form control of their own: no tool, and no
+ * report form, since English is not a beta language. The support pages' only
+ * form is ShyDesk's, drawn in its own shadow DOM from ShyDesk's host (#1032),
+ * so the site's markup there holds none either. Every other page has a tool
+ * or a report form, and a check that finds no control on one fails.
+ */
+export const pagesWithoutOwnControls = (): string[] => [
+  '/',
+  '/support',
+  ...ticketPaths(),
+];
+
 const DOCS_DIR = 'src/pages/api/docs';
 
 /**

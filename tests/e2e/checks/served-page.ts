@@ -1,7 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect } from '../fixtures';
 import { searched } from '../../source-files';
-import { docsPaths, sitePaths, TITLE_FOR, ticketPaths } from '../../site-pages';
+import {
+  docsPaths,
+  sitePaths,
+  TITLE_FOR,
+  ticketPaths,
+  pagesWithoutOwnControls,
+} from '../../site-pages';
 import { THEME_SCRIPT_SOURCE } from '../../themes';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../../typed-fields';
 import { LOCALES, localisePath, type Locale } from '../../../src/lib/i18n';
@@ -180,10 +186,9 @@ export const SERVED_PAGE_CHECKS: readonly PageCheck[] = [
     themes: [DEFAULT_THEME],
     run: async ({ page, route }) => {
       const controls = await page.evaluate(measureTypedFields);
-      if (route === '/') {
-        // The one page with no typed field: no tool, and no report form,
-        // since English is not a beta language. That empty answer is only
-        // worth something if the page rendered.
+      if (pagesWithoutOwnControls().includes(route)) {
+        // A page with no typed field of its own (`pagesWithoutOwnControls`).
+        // That empty answer is only worth something if the page rendered.
         await expect.soft(page.locator('main h1')).toBeVisible();
         // The elements the measurement ran over (#610): a page that lost its
         // content would answer "no typed field" just the same.
@@ -194,9 +199,9 @@ export const SERVED_PAGE_CHECKS: readonly PageCheck[] = [
           .soft(
             searched(controls, {
               of: examined,
-              what: 'elements on the English homepage',
+              what: `elements on ${route}`,
             }),
-            'the English homepage has no typed field',
+            `${route} has no typed field of its own`,
           )
           .toEqual([]);
       } else {

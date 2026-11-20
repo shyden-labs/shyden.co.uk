@@ -31,12 +31,13 @@ test.describe('the sitemap', () => {
     // check that the sitemap is complete; a hand-written
     // list of three pages could only agree with itself, and a fourth page
     // the sitemap left out would have been invisible to all of them (#390
-    // F126). The 404 and the API docs (#781) are the pages deliberately left
-    // out. Read here, not at module scope: the web server rebuilds dist/
-    // after this file loads.
+    // F126). The 404, the API docs (#781) and the support ticket page, a
+    // private link (#1032), are the pages deliberately left out. Read here,
+    // not at module scope: the web server rebuilds dist/ after this file loads.
     const built = filesUnder('dist', (path) => /\.html$/.test(path))
       .filter((path) => path !== 'dist/404.html')
       .filter((path) => !path.startsWith('dist/api/docs/'))
+      .filter((path) => !path.startsWith('dist/support/ticket/'))
       .map((path) => path.replace(/^dist/, '').replace(/\/?index\.html$/, ''));
     expect(locs.sort()).toEqual(built.sort());
 
