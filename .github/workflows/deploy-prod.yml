@@ -164,6 +164,19 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: npx playwright test --config=playwright.prod.config.ts
+      - name: Keep the failing check's screenshots
+        # A failure in the step above otherwise says only "Test timeout", and
+        # the fall-back then replaces the page it failed on (#1233).
+        # Screenshots alone: error-context.md carries the error, and a failed
+        # API call's error lists the headers it sent, credentials among them.
+        # GitHub masks a secret in this log, never inside an artifact.
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-sanity-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/**/*.png
+          retention-days: 14
+          if-no-files-found: warn
 
       # Reached only if BOTH the smoke and the browser run passed: a failing
       # step fails the job, so `prod-verified` is never posted for a release
