@@ -397,7 +397,10 @@ function closeKeyboard(): boolean {
  * on, sending nothing, and returns what it saw, so the failure says whether
  * the engine started the scroll late or never (#1235).
  */
-async function wheelTurn(target: Locator, p: Prepared): Promise<string | null> {
+async function wheelTurn(
+  target: Locator,
+  p: Prepared,
+): Promise<MissedTurn | null> {
   const page = target.page();
   const need = needOf(p);
   const before = await shapeOf(target);
@@ -420,8 +423,20 @@ async function wheelTurn(target: Locator, p: Prepared): Promise<string | null> {
   if (first.moved) return null;
   const later = await watch(LATE_WATCH_MS);
   return later.moved
-    ? `did not move it within ${MOVE_CEILING_MS} ms: it began moving ${first.waitedMs + later.waitedMs} ms after the turn`
-    : `no longer moves it: nothing moved in the ${MOVE_CEILING_MS + LATE_WATCH_MS} ms after the turn`;
+    ? {
+        late: true,
+        note: `did not move it within ${MOVE_CEILING_MS} ms: it began moving ${first.waitedMs + later.waitedMs} ms after the turn`,
+      }
+    : {
+        late: false,
+        note: `no longer moves it: nothing moved in the ${MOVE_CEILING_MS + LATE_WATCH_MS} ms after the turn`,
+      };
+}
+
+/** A wheel turn that missed its ceiling: whether it began late, in words. */
+interface MissedTurn {
+  late: boolean;
+  note: string;
 }
 
 /**
@@ -459,13 +474,18 @@ async function bringIntoView(
     p = await prepare(target, offset);
   const ceiling = swipeCeiling(p);
   let swipes = 0;
+  let missed: MissedTurn | null = null;
+  const missedWhy = (q: Prepared, turn: MissedTurn) =>
+    `${selector} did not come into view: ${INPUT_NAMES.wheel.one} ${turn.note} ${whereOf(q)}`;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
     if (input === 'wheel') {
-      const missed = await wheelTurn(target, p);
-      if (missed !== null)
+      missed = await wheelTurn(target, p);
+      // A scroll that began only after its ceiling is #1235's evidence, so it
+      // fails even where the point ended up tappable.
+      if (missed?.late)
         throw new TapNotPossibleError(
-          `${selector} did not come into view: ${INPUT_NAMES.wheel.one} ${missed} ${whereOf(await prepare(target, offset))}`,
+          missedWhy(await prepare(target, offset), missed),
         );
     } else {
       const { from, to } = planSwipe(p);
@@ -487,7 +507,13 @@ async function bringIntoView(
     ceiling,
     input,
   );
-  if (why !== null) throw new TapNotPossibleError(why);
+  // A turn that moved nothing stops the loop like any other still page: the
+  // point may already be tappable, on a page at its end (#1237). Only when it
+  // is out of view does the failure carry what the watch saw (#1235).
+  if (why !== null)
+    throw new TapNotPossibleError(
+      missed !== null && !p.inView ? missedWhy(p, missed) : why,
+    );
   return p;
 }
 
