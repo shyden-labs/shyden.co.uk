@@ -54,9 +54,10 @@ const byNumber = (n: number) => NAMES[n - 1] ?? String(n);
 /**
  * The roster every test below starts from, handed over to `locale`'s tool:
  * four students, the first two a together pair of mixed sex. Each language
- * walks it in two tests, each making half the checks: one walk took WebKit
- * 29-33 s of its 30 s budget in the capture run, where its 13 screenshots
- * alone cost about 10 s (#1230, Shyden's ruling 2026-11-20).
+ * walks it in three tests, each making a third of the checks: one walk took
+ * WebKit 29-33 s of its 30 s budget in the capture run, where its 13
+ * screenshots alone cost about 10 s, and two took up to 20 s for the second
+ * (#1230, Shyden's rulings 2026-11-20).
  */
 const openTool = async (
   page: Page,
@@ -259,7 +260,7 @@ test.describe('the sentences corrected on #319', () => {
       await expect.soft(panel).toBeHidden();
     });
 
-    test(`${locale}: stale groups and roster refusals read as approved where a teacher meets them`, async ({
+    test(`${locale}: stale groups and a clashing pair read as approved where a teacher meets them`, async ({
       page,
       context,
     }) => {
@@ -313,8 +314,19 @@ test.describe('the sentences corrected on #319', () => {
         `${locale}: a together pair kept apart is refused as it is typed`,
         clash,
       );
-      // Taken back, since the refusals below are about the pair kept together.
-      for (const row of [0, 1]) await chooseOption(apartOf(row), '');
+    });
+
+    test(`${locale}: the grouping refusals read as approved where a teacher meets them`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const { tool, rows, go, error } = await openTool(page, context, locale);
+      // The grouping options and the roster's rows, open as the walk above
+      // leaves them; the pair is kept together and nobody is kept apart.
+      await tapOn(tool.locator('#cg-grouping-toggle'));
+      await tapOn(tool.locator('#cg-students-toggle'));
+      await expect.soft(rows.first()).toBeVisible();
 
       // A mixed-sex together pair cannot make a single-sex group.
       await setCheckedOn(tool.locator('#cg-sex-separate'));
