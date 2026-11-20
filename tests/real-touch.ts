@@ -195,14 +195,21 @@ export async function waitUntilStill(
   }
 }
 
-/** How long a wheel turn's scroll may take to start (CI's WebKit lands it late, #1004). */
-export const MOVE_CEILING_MS = 1_000;
+/**
+ * How long a wheel turn's scroll may take to start. CI's WebKit lands it late
+ * (#1004): 2-184 ms over 436 turns, and once 1,039 ms, which a 1,000 ms
+ * ceiling failed (#1235, deploy-dev run 44786623542). About three times the
+ * slowest start measured.
+ */
+export const MOVE_CEILING_MS = 3_000;
 
 /**
  * How long a turn that missed its ceiling is watched, with no further input,
- * only to name whether its scroll began late or never (#1235).
+ * only to name whether its scroll began late or never (#1235). Ceiling plus
+ * watch is 6 s, what a turn that can move nothing (a page at its end, #1237)
+ * already cost.
  */
-export const LATE_WATCH_MS = 5_000;
+export const LATE_WATCH_MS = 3_000;
 
 /**
  * Samples a shape until it differs from `from`, the shape before an input, or
