@@ -786,3 +786,16 @@ describe('no test run retries (#445)', () => {
     ).toEqual([]);
   });
 });
+
+describe('a failed check against a deployed site keeps its trace (#1233)', () => {
+  // Without one, a dev-sanity failure printed only "Test timeout of 30000ms
+  // exceeded" and the fall-back had already replaced the page: nothing said
+  // where the test stopped (deploy-dev run 44748953636).
+  it.each(['playwright.dev.config.ts', 'playwright.prod.config.ts'])(
+    '%s records a trace for a test that fails, and keeps none that passes',
+    async (file) => {
+      const loaded = await importConfig(file, { CI: 'true' });
+      expect(loaded.use?.trace).toBe('retain-on-failure');
+    },
+  );
+});
