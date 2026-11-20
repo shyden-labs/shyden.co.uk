@@ -224,7 +224,31 @@ test(
       mimeType: 'image/png',
       buffer: ONE_PIXEL_PNG,
     });
-    await tapOn(form.getByRole('button', { name: 'Send', exact: true }));
+    // SCRATCH measurement (#1032, never merged): one real click on Turnstile.
+    const widget = form.locator('iframe[src*="challenges.cloudflare.com"]');
+    await expect(widget).toBeVisible({ timeout: 20_000 });
+    const box = await widget.boundingBox();
+    console.error('[1032-turnstile] widget box', JSON.stringify(box));
+    await tapOn(widget, {
+      position: { x: 22, y: Math.round((box?.height ?? 65) / 2) },
+    });
+    const send = form.getByRole('button', { name: 'Send', exact: true });
+    const t0 = Date.now();
+    await expect(send)
+      .toBeEnabled({ timeout: 20_000 })
+      .then(
+        () =>
+          console.error(
+            '[1032-turnstile] Send enabled after',
+            Date.now() - t0,
+            'ms',
+          ),
+        (e) => {
+          console.error('[1032-turnstile] Send still disabled after 20 s');
+          throw e;
+        },
+      );
+    await tapOn(send);
     await expect(
       form.getByText('Request sent. Keep this private link to follow it:'),
     ).toBeVisible({ timeout: 30_000 });
