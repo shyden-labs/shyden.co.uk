@@ -1240,7 +1240,7 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
   });
 });
 
-describe('a failed check against a deployed site uploads its traces (#1233)', () => {
+describe('a failed check against a deployed site uploads what it kept (#1233)', () => {
   type Step = {
     name?: string;
     run?: string;
