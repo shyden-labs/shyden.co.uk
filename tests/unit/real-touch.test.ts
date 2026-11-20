@@ -371,12 +371,23 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(wheelsOf(sent)).toHaveLength(1);
   });
 
+  // #1235's measured cause: CI's WebKit began a turn's scroll 1,039 ms after
+  // the turn (deploy-dev run 44786623542). The engine is waited for.
+  it('waits for a turn whose scroll the engine begins about 1.04 s later, and taps once', async () => {
+    setUp();
+    // 65 samples 16 ms apart: about 1,040 ms.
+    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 65 });
+    await settle(tapOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
   it('names how late a wheel turn began moving the page when it missed its ceiling', async () => {
     setUp();
-    // About 1.6 s of 16 ms samples: past the 1,000 ms ceiling, inside the watch.
-    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 100 });
+    // About 4 s of 16 ms samples: past the 3,000 ms ceiling, inside the watch.
+    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 250 });
     await expect(settle(tapOn(target))).rejects.toThrow(
-      /: a real wheel turn did not move it within 1000 ms: it began moving \d+ ms after the turn \(/,
+      /: a real wheel turn did not move it within 3000 ms: it began moving \d+ ms after the turn \(/,
     );
     expect(wheelsOf(sent)).toHaveLength(1);
     expect(kinds(sent)).not.toContain('click');
