@@ -54,7 +54,9 @@ const byNumber = (n: number) => NAMES[n - 1] ?? String(n);
 /**
  * The roster every test below starts from, handed over to `locale`'s tool:
  * four students, the first two a together pair of mixed sex. Each language
- * walks it once, making every check (#1086).
+ * walks it in two tests, each making half the checks: one walk took WebKit
+ * 29-33 s of its 30 s budget in the capture run, where its 13 screenshots
+ * alone cost about 10 s (#1230, Shyden's ruling 2026-11-20).
  */
 const openTool = async (
   page: Page,
@@ -91,13 +93,13 @@ const openTool = async (
 
 test.describe('the sentences corrected on #319', () => {
   for (const locale of LANGUAGES) {
-    test(`${locale}: every corrected sentence reads as approved where a teacher meets it`, async ({
+    test(`${locale}: the options and imports read as approved where a teacher meets them`, async ({
       page,
       context,
     }) => {
       const t = getStrings(locale);
       const columns = CSV_LOCALES[locale].columns;
-      const { tool, rows, go, error } = await openTool(page, context, locale);
+      const { tool, go, error } = await openTool(page, context, locale);
 
       // The how-to's second step names who is being split.
       await tapOn(tool.locator('#cg-howto-toggle'));
@@ -255,6 +257,22 @@ test.describe('the sentences corrected on #319', () => {
       );
       await tool.keyboard.press('Escape');
       await expect.soft(panel).toBeHidden();
+    });
+
+    test(`${locale}: stale groups and roster refusals read as approved where a teacher meets them`, async ({
+      page,
+      context,
+    }) => {
+      const t = getStrings(locale);
+      const { tool, rows, go, error } = await openTool(page, context, locale);
+
+      // Groups made from the roster as it arrived, with the grouping options
+      // open, as the first test leaves them.
+      await tapOn(tool.locator('#cg-grouping-toggle'));
+      const bunch = tool.locator('input[name="leftovers"][value="bunch"]');
+      const spread = tool.locator('input[name="leftovers"][value="spread"]');
+      await tapOn(go);
+      await expect.soft(error).toBeHidden();
 
       // Changing the leftovers choice makes those groups out of date, and the
       // notice names the choice in the words of its own label (#390).
