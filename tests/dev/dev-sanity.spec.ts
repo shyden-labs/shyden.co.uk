@@ -1,4 +1,4 @@
-import { tapOn } from '../real-touch';
+import { tapOn, scrollToOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { chooseOption } from '../real-select';
 import { test, expect } from '@playwright/test';
@@ -225,13 +225,14 @@ test(
       buffer: ONE_PIXEL_PNG,
     });
     // SCRATCH measurement (#1032, never merged): one real click on Turnstile.
-    const widget = form.locator('iframe[src*="challenges.cloudflare.com"]');
-    await expect(widget).toBeVisible({ timeout: 20_000 });
-    const box = await widget.boundingBox();
-    console.error('[1032-turnstile] widget box', JSON.stringify(box));
-    await tapOn(widget, {
-      position: { x: 22, y: Math.round((box?.height ?? 65) / 2) },
-    });
+    // Its iframe is inside Cloudflare's closed shadow root, so the checkbox is
+    // found by where it sits: 52 px above Send, 21 px in (dev screenshot).
+    const sendAt = form.getByRole('button', { name: 'Send', exact: true });
+    await scrollToOn(sendAt);
+    const sb = await sendAt.boundingBox();
+    console.error('[1032-turnstile] send box', JSON.stringify(sb));
+    if (sb)
+      await page.mouse.click(Math.round(sb.x + 21), Math.round(sb.y - 52));
     const send = form.getByRole('button', { name: 'Send', exact: true });
     const t0 = Date.now();
     await expect(send)
