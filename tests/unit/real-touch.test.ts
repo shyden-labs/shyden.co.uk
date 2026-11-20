@@ -594,7 +594,10 @@ describe('scrollOver', () => {
    * opposite way by what the finger moved, within the page's length, as
    * Chrome does; every touch point is recorded.
    */
-  function fakePhone(top: number, { startY = 0, length = 6000 } = {}) {
+  function fakePhone(
+    top: number,
+    { startY = 0, length = 6000, slop = 0 } = {},
+  ) {
     const VIEW = { width: 412, height: 800 };
     const sent: [
       string,
@@ -602,6 +605,7 @@ describe('scrollOver', () => {
     ][] = [];
     let scrollY = startY;
     let last: { x: number; y: number } | null = null;
+    let base = startY;
     const maxScroll = length - VIEW.height;
     const cdp = {
       send: async (
@@ -610,15 +614,25 @@ describe('scrollOver', () => {
       ) => {
         sent.push([method, params]);
         const p = params.touchPoints[0];
-        if (params.type === 'touchStart') last = p ?? null;
+        if (params.type === 'touchStart') {
+          last = p ?? null;
+          base = scrollY;
+        }
+        // Chrome reads the first `slop` px of a finger's travel as not yet a
+        // scroll (measured 7.86 px on the phone, #1243); the rest moves the
+        // page, within its length.
         if (params.type === 'touchMove' && last && p) {
-          scrollY = Math.min(maxScroll, Math.max(0, scrollY + (last.y - p.y)));
-          last = p;
+          const travel = last.y - p.y;
+          const past = Math.max(0, Math.abs(travel) - slop) * Math.sign(travel);
+          scrollY = Math.min(maxScroll, Math.max(0, base + past));
         }
         if (params.type === 'touchEnd') last = null;
       },
     };
-    const page = { context: () => ({ newCDPSession: async () => cdp }) };
+    const page = {
+      context: () => ({ newCDPSession: async () => cdp }),
+      evaluate: async () => scrollY,
+    };
     const rect = () => ({ x: 100, y: top - scrollY, width: 80, height: 40 });
     const target = {
       page: () => page,
@@ -656,20 +670,72 @@ describe('scrollOver', () => {
     vi.useRealTimers();
   });
 
+  const onScreen = (
+    sent: [string, { touchPoints: { x: number; y: number }[] }][],
+    height: number,
+  ) =>
+    sent
+      .flatMap(([, p]) => p.touchPoints)
+      .every(({ y }) => y >= 0 && y <= height);
+
+  // #1242/#1243: measured on the phone, a drag's first 7.86 px are Chrome's
+  // touch slop, and the band's one drag ended 24 px above the screen and left
+  // it 5.94 px on screen. Strokes stay on the screen and cover the distance.
+  it('on the phone, carries an element near the top past the top edge with strokes that stay on the screen', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(93, { slop: 8 });
+    const done = scrollOver(target, 93 + 40 + 1);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(93 + 40 - scrollY()).toBeLessThanOrEqual(0);
+  });
+
+  it('on the phone, scrolls the distance asked for, past the slop', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(1400, {
+      startY: 1000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 240);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(scrollY()).toBe(1240);
+  });
+
+  it('on the phone, stops when the page will move no further', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, scrollY } = fakePhone(5400, {
+      startY: 5000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 600);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(scrollY()).toBe(5200);
+    expect(
+      sent.filter(([, p]) => p.type === 'touchStart').length,
+    ).toBeLessThanOrEqual(3);
+  });
+
   // #1241: a caller measures the distance from where the element is, so an
   // element already on screen, even near its edge, is not moved first.
   // Measured on the phone: moving the band off the top edge left it 5.94 px
   // on screen after a drag sized from its old place.
-  it('on the phone, drags at once from an element already on screen near its top edge', async () => {
+  it('on the phone, does not move an element already on screen near its top edge before scrolling', async () => {
     vi.stubEnv('PW_REAL_DEVICE', '1');
     vi.useFakeTimers();
-    const { target, sent } = fakePhone(1010, { startY: 1000 });
+    const { target, sent, VIEW, scrollY } = fakePhone(1010, { startY: 1000 });
     const done = scrollOver(target, 31);
     await vi.runAllTimersAsync();
     await done;
-    const starts = sent.filter(([, p]) => p.type === 'touchStart');
-    expect(starts).toHaveLength(1);
-    expect(starts[0]![1].touchPoints).toEqual([{ x: 140, y: 30 }]);
+    // Moved first, the element's own distance would be off by that move.
+    expect(scrollY()).toBe(1031);
+    expect(onScreen(sent, VIEW.height)).toBe(true);
   });
 
   // #1241: measured on the phone, the drag began at y -3673 (the heading's
