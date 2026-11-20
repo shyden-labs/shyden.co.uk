@@ -252,13 +252,15 @@ jobs:
         run: npx playwright test --config=playwright.dev.config.ts
       - name: Keep the failing check's screenshots
         # A failure in the step above otherwise says only "Test timeout", and
-        # the fall-back then replaces the page it failed on (#1233). The
-        # config records screenshots and error-context.md, never a trace.
+        # the fall-back then replaces the page it failed on (#1233).
+        # Screenshots alone: error-context.md carries the error, and a failed
+        # API call's error lists the headers it sent, credentials among them.
+        # GitHub masks a secret in this log, never inside an artifact.
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dev-sanity-failure-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/
+          path: test-results/**/*.png
           retention-days: 14
           if-no-files-found: warn
       - name: Post dev-verified status on the deployed commit
