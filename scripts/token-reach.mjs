@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 /**
- * The dev Cloudflare token reaches the dev account and nothing else (#415).
+ * The dev deploy's Cloudflare token reaches the dev account and nothing else
+ * (#415), and the account id stored beside it is the dev account's (#501).
  *
  * A Cloudflare Pages permission can be narrowed to an account but never to
  * one project, so dev and production live in separate accounts and the dev
  * token must be scoped to the dev account alone (operator, 2026-10-02: "dev
- * must never be able to deploy to production"). That was proved once, by
- * hand. This re-proves it on every dev deploy, before anything is deployed:
- * the token lists the accounts it can reach, and anything but exactly the dev
- * account, all of it, refuses the deploy. The operator chose this shape,
- * 2026-10-02, over probing the production project, so no production
- * identifier enters the dev workflow.
+ * must never be able to deploy to production"). Every dev deploy re-proves it
+ * before anything is deployed: the token lists the accounts it reaches, and
+ * anything but exactly the dev account refuses the deploy.
  *
- *   CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs
+ * Which account is the dev one is read from `DEV_CLOUDFLARE_ACCOUNT_ID`, a
+ * repository variable outside the `dev` environment (Shyden's ruling,
+ * 2026-11-20), never from the secrets the token sits beside. So production's
+ * token and account id pasted into `dev` together, one slip in the secrets
+ * form, are refused too. Only the dev account's id is known here, so no
+ * production identifier enters the dev workflow (#415). A variable of the
+ * same name set inside the `dev` environment would win over the repository's;
+ * none is set there (read 2026-11-20).
+ *
+ *   CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… DEV_CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs
  *
  * One request, with a time limit and no retry (operator rule, 2026-10-02):
  * a listing that does not arrive is a failed proof, not a reason to ask again.
@@ -25,6 +32,9 @@ const ACCOUNTS = 'https://api.cloudflare.com/client/v4/accounts?per_page=50';
 /** A listing that has not arrived in this long is not coming. */
 const LIMIT_MS = 30_000;
 
+/** An account id as a log line may show it: four characters, never the whole id. */
+const abbreviated = (/** @type {unknown} */ id) => `${String(id).slice(0, 4)}…`;
+
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = (value) => typeof value === 'object' && value !== null;
 
@@ -32,10 +42,16 @@ const isRecord = (value) => typeof value === 'object' && value !== null;
  * What Cloudflare's listing for a token says about its reach.
  *
  * @param {unknown} body the parsed response
- * @param {string} expectedAccountId the dev account
+ * @param {string} devAccountId the dev account, known apart from the token's secrets
+ * @param {string} storedAccountId the account id stored beside the token
  * @returns {{ ok: boolean, reason: string }}
  */
-export function reachVerdict(body, expectedAccountId) {
+export function reachVerdict(body, devAccountId, storedAccountId) {
+  if (storedAccountId !== devAccountId)
+    return {
+      ok: false,
+      reason: `the account id stored beside the token (${abbreviated(storedAccountId)}) is not the dev account (${abbreviated(devAccountId)})`,
+    };
   if (!isRecord(body) || typeof body.success !== 'boolean')
     return {
       ok: false,
@@ -75,22 +91,29 @@ export function reachVerdict(body, expectedAccountId) {
       ok: false,
       reason: `the token reaches ${reached} accounts; it must reach the dev account alone`,
     };
-  return ids[0] === expectedAccountId
+  return ids[0] === devAccountId
     ? { ok: true, reason: 'the token reaches 1 account, the dev one' }
     : {
         ok: false,
-        reason: 'the token reaches 1 account, and it is not the dev one',
+        reason: `the token reaches 1 account (${abbreviated(ids[0])}), and it is not the dev account (${abbreviated(devAccountId)})`,
       };
 }
 
+/**
+ * Runs the check from the environment and answers the exit code: 0 when the
+ * dev token's reach is proven, 1 for anything else.
+ *
+ * @returns {Promise<0 | 1>}
+ */
 export async function main() {
   const token = env.CLOUDFLARE_API_TOKEN;
-  const account = env.CLOUDFLARE_ACCOUNT_ID;
-  if (!token || !account) {
+  const stored = env.CLOUDFLARE_ACCOUNT_ID;
+  const dev = env.DEV_CLOUDFLARE_ACCOUNT_ID;
+  if (!token || !stored || !dev) {
     console.error(
-      'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
+      'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… DEV_CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
     );
-    exit(1);
+    return 1;
   }
   let body;
   try {
@@ -103,14 +126,15 @@ export async function main() {
     console.error(
       `::error::the account listing did not arrive: ${/** @type {Error} */ (error).message}`,
     );
-    exit(1);
+    return 1;
   }
-  const { ok, reason } = reachVerdict(body, account);
+  const { ok, reason } = reachVerdict(body, dev, stored);
   if (!ok) {
     console.error(`::error::the dev token's reach is not proven: ${reason}`);
-    exit(1);
+    return 1;
   }
   console.log(`dev token reach: ${reason}`);
+  return 0;
 }
 
-if (import.meta.main) await main();
+if (import.meta.main) exit(await main());
