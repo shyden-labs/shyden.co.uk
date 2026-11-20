@@ -1281,3 +1281,43 @@ describe('a failed check against a deployed site uploads what it kept (#1233)', 
     },
   );
 });
+
+describe('a failing Playwright shard keeps its traces', () => {
+  type Step = {
+    uses?: string;
+    run?: string;
+    if?: string;
+    env?: Record<string, string>;
+    with?: Record<string, unknown>;
+  };
+  // The capture shard writes its recordings inside EVIDENCE_DIR
+  // (playwright.config.ts), so its traces live there, not in test-results/
+  // (#1235: a WebKit failure in capture shard 5 left no trace to read).
+  it.each([
+    ['e2e', 'test-results/'],
+    ['capture', 'capture-evidence/test-results/'],
+  ])(
+    'ci.yml job %s uploads %s when it fails, and warns if empty',
+    (id, path) => {
+      const ci = parseCleanYaml(workflow('ci.yml'), 'ci.yml') as {
+        jobs: Record<string, { steps?: Step[] }>;
+      };
+      const steps = ci.jobs[id]?.steps ?? [];
+      const run = steps.findIndex((s) =>
+        (s.run ?? '').includes('npm run test:e2e'),
+      );
+      expect(run, `${id} runs the suite`).toBeGreaterThanOrEqual(0);
+      const keep = steps.findIndex(
+        (s) =>
+          /^actions\/upload-artifact@[0-9a-f]{40}$/.test(s.uses ?? '') &&
+          s.with?.path === path,
+      );
+      expect(keep, `an upload of ${path} after the run`).toBeGreaterThan(run);
+      expect(steps[keep].if).toBe('failure()');
+      expect(steps[keep].with?.['if-no-files-found']).toBe('warn');
+      expect(String(steps[keep].with?.name)).toMatch(
+        /\$\{\{ matrix\.shard \}\}$/,
+      );
+    },
+  );
+});
