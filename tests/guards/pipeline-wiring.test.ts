@@ -1239,3 +1239,45 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
     expect(config).toMatch(/reporter:\s*\[[^\]]*'lcovonly'[^\]]*\]/);
   });
 });
+
+// Screenshots alone: error-context.md carries the error, and a failed API
+// call's error lists the headers it sent, the Access secret among them.
+// GitHub masks a secret in a job log, never inside an artifact.
+describe('a failed check against a deployed site uploads what it kept (#1233)', () => {
+  type Step = {
+    name?: string;
+    run?: string;
+    uses?: string;
+    if?: string;
+    with?: Record<string, unknown>;
+  };
+  it.each([
+    ['deploy-dev.yml', 'playwright.dev.config.ts'],
+    ['deploy-prod.yml', 'playwright.prod.config.ts'],
+  ])(
+    '%s keeps only the screenshots when its %s run fails, and warns if there are none',
+    (file, config) => {
+      const parsed = parseCleanYaml(workflow(file), file) as {
+        jobs: Record<string, { steps?: Step[] }>;
+      };
+      const holders = Object.values(parsed.jobs).filter((job) =>
+        (job.steps ?? []).some((s) =>
+          (s.run ?? '').includes(`--config=${config}`),
+        ),
+      );
+      expect(holders, `one job of ${file} runs ${config}`).toHaveLength(1);
+      const steps = holders[0].steps ?? [];
+      const run = steps.findIndex((s) =>
+        (s.run ?? '').includes(`--config=${config}`),
+      );
+      const keep = steps.findIndex(
+        (s) =>
+          /^actions\/upload-artifact@[0-9a-f]{40}$/.test(s.uses ?? '') &&
+          s.with?.path === 'test-results/**/*.png',
+      );
+      expect(keep, 'an upload of the screenshots alone').toBeGreaterThan(run);
+      expect(steps[keep].if).toBe('failure()');
+      expect(steps[keep].with?.['if-no-files-found']).toBe('warn');
+    },
+  );
+});

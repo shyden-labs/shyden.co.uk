@@ -786,3 +786,25 @@ describe('no test run retries (#445)', () => {
     ).toEqual([]);
   });
 });
+
+describe('a failed check against a deployed site keeps a picture, never a trace (#1233)', () => {
+  // Without a picture, a dev-sanity failure printed only "Test timeout of
+  // 30000ms exceeded" and the fall-back had already replaced the page:
+  // nothing said where the test stopped (deploy-dev run 44748953636). Never a
+  // trace: it records every request's headers, these runs send the dev
+  // password and production's Access credentials, and this repository's
+  // artifacts are public.
+  it.each(['playwright.dev.config.ts', 'playwright.prod.config.ts'])(
+    '%s screenshots a test that fails and records no trace',
+    async (file) => {
+      const loaded = await importConfig(file, { CI: 'true' });
+      expect(loaded.use?.screenshot).toBe('only-on-failure');
+      expect(loaded.use?.trace ?? 'off').toBe('off');
+      expect(loaded.use?.video ?? 'off').toBe('off');
+      for (const project of loaded.projects ?? []) {
+        expect(project.use?.trace ?? 'off').toBe('off');
+        expect(project.use?.video ?? 'off').toBe('off');
+      }
+    },
+  );
+});

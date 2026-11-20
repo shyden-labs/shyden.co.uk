@@ -67,6 +67,11 @@ export default defineConfig({
     baseURL:
       build?.baseURL ?? process.env.WEB_BASE_URL ?? 'https://shyden.co.uk',
     colorScheme: 'dark',
+    // A failing test leaves its screenshot for the workflow to upload;
+    // never a trace or a video: a trace records every
+    // request's headers, these runs carry credentials, and this repository's
+    // artifacts are public (#1233).
+    screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
