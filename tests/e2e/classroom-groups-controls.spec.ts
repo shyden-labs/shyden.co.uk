@@ -560,14 +560,31 @@ test.describe('classroom groups — mobile-first layout', () => {
             // runtime population: the disclosure toggles this page rendered,
             // read off the DOM above, so a section added later is covered the
             // day it appears; collection time cannot know them (#417).
+            // Each section is opened alone and shut again on the one page
+            // (#1227): a fresh page per section started every tap from the
+            // top, so most needed a wheel turn and its wait, and on WebKit the
+            // test spent 31.2 s of its 30 s budget (run 44642704024: 21
+            // navigations 5.5 s, 511 reads 13.1 s, 20 wheel turns). Shut
+            // again, the next toggle is already in view.
+            // A section the page opens itself (How to use it) is shut by
+            // the same tap the fresh page gave it, so each step still reads
+            // the page one tap from where it loaded.
             for (const id of ids) {
-              await page.goto(path);
-              await tapOn(page.locator(`#${id}`));
+              const toggle = page.locator(`#${id}`);
+              const loaded = await toggle.getAttribute('aria-expanded');
+              const flipped = loaded === 'true' ? 'false' : 'true';
+              await tapOn(toggle);
+              await expect(toggle).toHaveAttribute('aria-expanded', flipped);
               const overflow = await horizontalOverflow(page);
               if (overflow > 0)
                 failures.push(
                   `${path} @${took.width}px with #${id} open: ${overflow}px`,
                 );
+              await tapOn(toggle);
+              await expect(toggle).toHaveAttribute(
+                'aria-expanded',
+                `${loaded}`,
+              );
             }
             // …and every section open at once, which no earlier test did.
             await page.goto(path);
