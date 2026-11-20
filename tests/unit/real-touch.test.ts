@@ -347,6 +347,18 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(kinds(sent)).not.toContain('click');
   });
 
+  // #1237: the box runs past the fold of a page already at its end, so the
+  // turn moves nothing, but the point is in view and the tap goes ahead.
+  it('taps an element whose box runs past the fold of a page at its end, after a turn that moves nothing', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(VIEW.height - 30, {
+      length: VIEW.height,
+    });
+    await settle(tapOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
   // #1235: a turn that has not moved the page by its ceiling fails, and the
   // failure says whether the scroll began later or never, watched without
   // another turn, so the next occurrence names its own cause.
