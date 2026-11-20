@@ -751,10 +751,19 @@ export async function scrollOver(target: Locator, dy: number): Promise<void> {
     throw new TapNotPossibleError(
       `${String(target)} has no box to put a finger on`,
     );
-  const from = {
-    x: Math.round(box.x + box.width / 2),
-    y: Math.round(box.y + box.height / 2),
-  };
+  // A finger starts on the screen (#1241): the element is brought into view
+  // with real swipes first, as the wheel path brings it under the mouse.
+  // Measured on the phone, a drag from the heading's centre 3,673 px above
+  // the screen left the page 64 px short of its top. Where the drag ENDS is
+  // not yet held to the screen: a distance longer than the view needs more
+  // than one stroke (#1242).
+  // Only a point off the screen is moved: the caller sized dy from where the
+  // element is, and the swipe path's edge rule would move one near an edge.
+  const seen = await measure(target, undefined);
+  const p = seen.inView
+    ? seen
+    : await bringIntoView(target, undefined, false, 'swipe');
+  const from = { x: Math.round(p.point.x), y: Math.round(p.point.y) };
   await drag(target.page(), from, { x: from.x, y: from.y - dy });
 }
 
