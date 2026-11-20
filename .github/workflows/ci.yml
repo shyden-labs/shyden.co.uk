@@ -383,7 +383,7 @@ jobs:
       # its version comment like every other action here. Named per shard,
       # because one run cannot hold two artifacts of one name (AC7).
       - name: Keep the failing shard's Playwright traces
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-traces-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
@@ -474,13 +474,14 @@ jobs:
           overwrite: true
           if-no-files-found: error
       - name: Keep this shard's report and manifest
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: capture-coverage-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
           path: |
             capture-evidence/report.json
             capture-evidence/manifest.jsonl
+            test-results/
           retention-days: 14
           if-no-files-found: warn
 

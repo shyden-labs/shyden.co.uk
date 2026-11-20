@@ -18,6 +18,7 @@ import {
 } from './helpers';
 
 test.use(recorded);
+test.use({ trace: 'on' });
 
 /**
  * The sentences corrected on #319's sheet, read where a teacher meets them.
