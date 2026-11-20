@@ -347,6 +347,29 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(kinds(sent)).not.toContain('click');
   });
 
+  // #1235: a turn that has not moved the page by its ceiling fails, and the
+  // failure says whether the scroll began later or never, watched without
+  // another turn, so the next occurrence names its own cause.
+  it('names a wheel turn whose scroll never began, after watching without another turn', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500, { wheelMoves: false });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /: a real wheel turn no longer moves it: nothing moved in the 6000 ms after the turn \(/,
+    );
+    expect(wheelsOf(sent)).toHaveLength(1);
+  });
+
+  it('names how late a wheel turn began moving the page when it missed its ceiling', async () => {
+    setUp();
+    // About 1.6 s of 16 ms samples: past the 1,000 ms ceiling, inside the watch.
+    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 100 });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /: a real wheel turn did not move it within 1000 ms: it began moving \d+ ms after the turn \(/,
+    );
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent)).not.toContain('click');
+  });
+
   it('one wheel turn covers the whole distance to an element far down a long page (Shyden, 2026-11-19)', async () => {
     setUp();
     const { target, sent, centreY } = fakeDesktop(20_000, { length: 30_000 });
