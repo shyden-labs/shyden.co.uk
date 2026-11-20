@@ -487,6 +487,18 @@ jobs:
             capture-evidence/manifest.jsonl
           retention-days: 14
           if-no-files-found: warn
+      # The capture keeps its recordings inside EVIDENCE_DIR
+      # (playwright.config.ts), so a red capture shard's traces are here, not
+      # in test-results/. A capture runs against a local preview with no
+      # credentials, so its traces hold nothing secret (#1235).
+      - name: Keep the failing capture shard's Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: capture-traces-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
+          path: capture-evidence/test-results/
+          retention-days: 14
+          if-no-files-found: warn
 
   # The deployed-site suites, against this pull request's own build (#335).
   # tests/dev and tests/prod otherwise run only after a deploy, so a stale fact

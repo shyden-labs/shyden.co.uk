@@ -114,6 +114,10 @@ const INPUT_NAMES: Record<ScrollInput, { one: string; many: string }> = {
 };
 
 /** Why a tap cannot be made once the drags have stopped, or null when it can. */
+/** Where the point is against the view, as every failure here names it. */
+const whereOf = (p: Prepared): string =>
+  `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+
 export function whyNotTappable(
   selector: string,
   p: Prepared,
@@ -121,7 +125,7 @@ export function whyNotTappable(
   ceiling: number,
   input: ScrollInput = 'swipe',
 ): string | null {
-  const where = `(the point is at y ${Math.round(p.point.y)}, the view is ${Math.round(p.viewHeight)} tall)`;
+  const where = whereOf(p);
   const named = INPUT_NAMES[input];
   if (!p.inView)
     return swipes >= ceiling
@@ -193,6 +197,12 @@ export async function waitUntilStill(
 
 /** How long a wheel turn's scroll may take to start (CI's WebKit lands it late, #1004). */
 export const MOVE_CEILING_MS = 1_000;
+
+/**
+ * How long a turn that missed its ceiling is watched, with no further input,
+ * only to name whether its scroll began late or never (#1235).
+ */
+export const LATE_WATCH_MS = 5_000;
 
 /**
  * Samples a shape until it differs from `from`, the shape before an input, or
@@ -377,20 +387,27 @@ function closeKeyboard(): boolean {
 }
 
 /**
- * One real turn of the mouse wheel that moves the point toward the middle of
- * the view, as far as a drag would (#1004). The mouse is moved over the view
- * first, near its right-hand edge, so the turn scrolls what a visitor's
- * pointer there would scroll.
- */
-/**
  * One wheel turn covering the whole distance that brings the point to the
  * middle of the view, like a trackpad flick (Shyden, 2026-11-19, #1004); then
  * waits for the engine to start the scroll, which CI's WebKit does late.
+ * The mouse is moved over the view first, near its right-hand edge, so the
+ * turn scrolls what a visitor's pointer there would scroll.
+ *
+ * Returns null when the scroll began within its ceiling. Otherwise it watches
+ * on, sending nothing, and returns what it saw, so the failure says whether
+ * the engine started the scroll late or never (#1235).
  */
-async function wheelTurn(target: Locator, p: Prepared): Promise<void> {
+async function wheelTurn(target: Locator, p: Prepared): Promise<string | null> {
   const page = target.page();
   const need = needOf(p);
   const before = await shapeOf(target);
+  const sample = () => shapeOf(target);
+  const watch = (ceilingMs: number) =>
+    waitUntilMoved(sample, before, {
+      gapMs: STILL_GAP_MS,
+      ceilingMs,
+      clock: ownClock,
+    });
   await page.mouse.move(
     Math.round(p.viewWidth * 0.9),
     Math.round(p.viewTop + p.viewHeight / 2),
@@ -399,11 +416,12 @@ async function wheelTurn(target: Locator, p: Prepared): Promise<void> {
     0,
     Math.sign(need) * Math.max(MIN_SWIPE_PX, Math.round(Math.abs(need))),
   );
-  await waitUntilMoved(() => shapeOf(target), before, {
-    gapMs: STILL_GAP_MS,
-    ceilingMs: MOVE_CEILING_MS,
-    clock: ownClock,
-  });
+  const first = await watch(MOVE_CEILING_MS);
+  if (first.moved) return null;
+  const later = await watch(LATE_WATCH_MS);
+  return later.moved
+    ? `did not move it within ${MOVE_CEILING_MS} ms: it began moving ${first.waitedMs + later.waitedMs} ms after the turn`
+    : `no longer moves it: nothing moved in the ${MOVE_CEILING_MS + LATE_WATCH_MS} ms after the turn`;
 }
 
 /**
@@ -443,8 +461,13 @@ async function bringIntoView(
   let swipes = 0;
   while (moves(p) && swipes < ceiling) {
     const before = p.point.y;
-    if (input === 'wheel') await wheelTurn(target, p);
-    else {
+    if (input === 'wheel') {
+      const missed = await wheelTurn(target, p);
+      if (missed !== null)
+        throw new TapNotPossibleError(
+          `${selector} did not come into view: ${INPUT_NAMES.wheel.one} ${missed} ${whereOf(await prepare(target, offset))}`,
+        );
+    } else {
       const { from, to } = planSwipe(p);
       await drag(
         page,
