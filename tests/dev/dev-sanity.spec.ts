@@ -1,5 +1,6 @@
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
+import { chooseOption } from '../real-select';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import {
@@ -164,6 +165,79 @@ test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host
     poster: 'https://dev-media.yaweloidle.com',
   });
 });
+
+// The support page (#1032) loads ShyDesk's piece from Non-Prod on dev, and
+// only on dev: dev ShyDesk accepts dev.shyden.co.uk alone, and live ShyDesk
+// is the production build's. Checked on the pull request's own dev build
+// too, so a missing build variable is caught before a deploy.
+test("the support page loads ShyDesk's piece from dev ShyDesk", async ({
+  page,
+}) => {
+  await page.goto('/support');
+  await expect(page.locator('shydesk-support')).toHaveAttribute(
+    'product',
+    'shyden-co-uk',
+  );
+  await expect(page.locator('script[src$="/embed.js"]')).toHaveAttribute(
+    'src',
+    'https://shydesk.shydesk-non-prod.workers.dev/embed.js',
+  );
+});
+
+// A real message from the support page reaches dev ShyDesk and shows in its
+// thread (#1032 AC5): typed with real key presses, a photo attached through
+// the file chooser a real press opened, sent with a real press. STAND-IN: the
+// photo is handed to that chooser, because the system file dialog is outside
+// the browser (as `upload` in tests/e2e/helpers.ts). Dev ShyDesk sends no
+// email (its monthly share is 0), so the private link is read off the page.
+// The field names are ShyDesk's (embed.js at shydesk `0a2abc8`).
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test(
+  'a message typed on /support reaches dev ShyDesk and shows in its thread',
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot send to it',
+    },
+  },
+  async ({ page }) => {
+    const words = `Support page check ${Date.now()}`;
+    await page.goto('/support');
+    const form = page.locator('shydesk-support');
+    await typeInto(form.getByLabel('Email'), 'support-test@shyden.co.uk');
+    await typeInto(form.getByLabel('Subject'), 'Support page check');
+    await chooseOption(form.getByLabel('Category'), 'question');
+    await typeInto(form.getByLabel('Message'), words);
+    page.on('filechooser', () => {});
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      tapOn(form.getByLabel('Photos and videos')),
+    ]);
+    await chooser.setFiles({
+      name: 'support-photo.png',
+      mimeType: 'image/png',
+      buffer: ONE_PIXEL_PNG,
+    });
+    await tapOn(form.getByRole('button', { name: 'Send', exact: true }));
+    await expect(
+      form.getByText('Request sent. Keep this private link to follow it:'),
+    ).toBeVisible({ timeout: 30_000 });
+    const link = await form
+      .getByRole('link', { name: /support\/ticket/ })
+      .getAttribute('href');
+    expect(link).toMatch(/\/support\/ticket\/?#t=/);
+    await page.goto(new URL(link ?? '', page.url()).toString());
+    await expect(page.locator('shydesk-support').getByText(words)).toBeVisible({
+      timeout: 30_000,
+    });
+  },
+);
 
 test(
   'an unauthenticated request is challenged with 401',

@@ -153,6 +153,9 @@ jobs:
           PUBLIC_SHYTALK_URL: https://dev.shytalk.app
           PUBLIC_YAWELO_IDLE_URL: https://dev.yaweloidle.com
           PUBLIC_YAWELO_MEDIA_URL: https://dev-media.yaweloidle.com
+          # The support page's ShyDesk (#1032): Non-Prod, which accepts
+          # dev.shyden.co.uk alone. Production builds name live ShyDesk.
+          PUBLIC_SHYDESK_URL: https://shydesk.shydesk-non-prod.workers.dev
         run: npm run build
       # Before anything is deployed, the dev token proves it reaches the dev
       # account and nothing else (#415): a token that could reach production
