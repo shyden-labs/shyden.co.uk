@@ -29,7 +29,14 @@ export default defineConfig({
     sitemap({
       // The API docs (#781) are developer pages in English only, kept out of
       // search engines with noindex, so they stay out of the sitemap too.
-      filter: (page) => !new URL(page).pathname.startsWith('/api/docs/'),
+      // The support ticket page (#1032) is a private link: noindex, so out too.
+      filter: (page) => {
+        const { pathname } = new URL(page);
+        return (
+          !pathname.startsWith('/api/docs/') &&
+          !pathname.startsWith('/support/ticket')
+        );
+      },
       i18n: {
         defaultLocale: 'en',
         locales: {

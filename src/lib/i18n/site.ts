@@ -79,6 +79,16 @@ export const siteEn = {
     backHome: 'Back to the homepage',
   },
 
+  // The support page (#1032). Copy approved by Shyden, 2026-11-20.
+  support: {
+    title: 'Support — Shyden',
+    description:
+      'Send Shyden Labs a question, a problem or an idea about any product.',
+    heading: 'Support',
+    intro:
+      'Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.',
+  },
+
   calculators: {
     title: 'YeeTalk Calculators — Shyden',
     description:
@@ -245,6 +255,15 @@ export const siteId: SiteStrings = {
     backHome: 'Kembali ke beranda',
   },
 
+  support: {
+    title: 'Dukungan — Shyden',
+    description:
+      'Kirim pertanyaan, masalah, atau ide tentang produk apa pun kepada Shyden Labs.',
+    heading: 'Dukungan',
+    intro:
+      'Ada pertanyaan, masalah, atau ide tentang produk Shyden Labs? Kirim pesan di sini dan balasannya dikirim lewat email.',
+  },
+
   calculators: {
     title: 'Kalkulator YeeTalk — Shyden',
     description:
@@ -391,6 +410,14 @@ export const siteZh: SiteStrings = {
     heading: '页面未找到',
     body: '该页面不存在。',
     backHome: '返回首页',
+  },
+
+  support: {
+    title: '支持 — Shyden',
+    description: '请向 Shyden Labs 提交关于任何产品的疑问、问题或想法。',
+    heading: '支持',
+    intro:
+      '对 Shyden Labs 的任何产品有疑问、问题或建议吗？请在此发送消息，回复将通过电子邮件发送。',
   },
   calculators: {
     title: 'YeeTalk 计算器 — Shyden',
@@ -539,6 +566,15 @@ export const siteVi: SiteStrings = {
     body: 'Trang đó không tồn tại.',
     backHome: 'Quay lại trang chủ',
   },
+
+  support: {
+    title: 'Hỗ trợ — Shyden',
+    description:
+      'Hãy gửi cho Shyden Labs một câu hỏi, một vấn đề hoặc một ý tưởng liên quan đến bất kỳ sản phẩm nào.',
+    heading: 'Hỗ trợ',
+    intro:
+      'Bạn có thắc mắc, vấn đề hay ý tưởng nào về bất kỳ sản phẩm nào của Shyden Labs không? Hãy gửi tin nhắn tại đây, câu trả lời sẽ được gửi qua email.',
+  },
   calculators: {
     title: 'Máy tính YeeTalk — Shyden',
     description:
@@ -685,6 +721,14 @@ export const siteTh: SiteStrings = {
     heading: 'ไม่พบหน้า',
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
+  },
+
+  support: {
+    title: 'การสนับสนุน — Shyden',
+    description: 'ส่งคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ไปยัง Shyden Labs',
+    heading: 'การสนับสนุน',
+    intro:
+      'มีคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ของ Shyden Labs ไหม? ส่งข้อความที่นี่ แล้วคำตอบจะส่งถึงทางอีเมล',
   },
   calculators: {
     title: 'เครื่องคำนวณ YeeTalk — Shyden',

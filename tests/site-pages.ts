@@ -35,6 +35,22 @@ export const pageNames = (dir: string = PAGES_DIR): string[] =>
 export const sitePaths = (): string[] =>
   pageNames().map((name) => (name === 'index' ? '/' : `/${name}`));
 
+const TICKET_DIR = 'src/pages/support';
+
+/**
+ * The support ticket page (#1032): English only, out of the sitemap and not
+ * indexed, because ShyDesk emails one address per product and the address
+ * carries a private token after `#t=`. Derived from its folder, like
+ * `docsPaths`.
+ */
+export const ticketPaths = (): string[] =>
+  nonEmpty(
+    readdirSync(TICKET_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.astro'))
+      .map((entry) => `/support/${entry.name.replace(/\.astro$/, '')}/`),
+    `routable .astro pages in ${TICKET_DIR}`,
+  );
+
 const DOCS_DIR = 'src/pages/api/docs';
 
 /**
@@ -72,6 +88,7 @@ export const HEADING_FOR: Record<string, (locale: Locale) => string> = {
   '/yeetalk-calculators': (locale) =>
     getSiteStrings(locale).calculators.heading,
   '/classroom-groups': (locale) => getStrings(locale).heading,
+  '/support': (locale) => getSiteStrings(locale).support.heading,
 };
 
 /**
@@ -104,6 +121,7 @@ export const TITLE_FOR: Record<string, (locale: Locale) => string> = {
   '/': (locale) => getSiteStrings(locale).home.title,
   '/yeetalk-calculators': (locale) => getSiteStrings(locale).calculators.title,
   '/classroom-groups': (locale) => `${getStrings(locale).title} — Shyden`,
+  '/support': (locale) => getSiteStrings(locale).support.title,
 };
 
 /** One route per page per locale, with the heading each should render. */

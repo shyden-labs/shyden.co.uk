@@ -275,7 +275,11 @@
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "Row {row} — 无法识别性别 '{value}'。请使用 {accepted}，或留空。",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "行 {row} — 未提供 '{value}'，系统无法识别。请使用 {accepted}，或留空。",
     "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。",
-    "Row {row} — number '{value}' is too low. Numbers start at 1.": "行 {row} — 数字 '{value}' 太小。数字从 1 开始。"
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "行 {row} — 数字 '{value}' 太小。数字从 1 开始。",
+    "Support — Shyden": "支持 — Shyden",
+    "Send Shyden Labs a question, a problem or an idea about any product.": "请向Shyden Labs提交关于任何产品的疑问、问题或想法。",
+    "Support": "支持",
+    "Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.": "对Shyden Labs的任何产品有疑问、问题或建议吗？请在此发送消息，我们将通过电子邮件回复您。"
   },
   "vi": {
     "Classroom Group Creator": "Trình tạo nhóm trong lớp học",
@@ -553,7 +557,11 @@
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "Dòng {row} — giới tính '{value}' không được nhận diện. Vui lòng sử dụng {accepted} hoặc để trống.",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "Dòng {row} — nếu thiếu '{value}' thì hệ thống sẽ không nhận diện được. Hãy sử dụng {accepted} hoặc để trống.",
     "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "Chỉ cần nhập hoặc tải lên danh sách học sinh là bạn sẽ có ngay các nhóm học sinh công bằng và ngẫu nhiên chỉ trong vài giây. Được thiết kế dành riêng cho giáo viên, miễn phí vĩnh viễn.",
-    "Row {row} — number '{value}' is too low. Numbers start at 1.": "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1."
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "Dòng {row} — số '{value}' quá nhỏ. Các số bắt đầu từ 1.",
+    "Support — Shyden": "Hỗ trợ — Shyden",
+    "Send Shyden Labs a question, a problem or an idea about any product.": "Hãy gửi cho Shyden Labs một câu hỏi, một vấn đề hoặc một ý tưởng liên quan đến bất kỳ sản phẩm nào.",
+    "Support": "Hỗ trợ",
+    "Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.": "Bạn có thắc mắc, vấn đề hay ý tưởng nào về bất kỳ sản phẩm nào của Shyden Labs không? Hãy gửi tin nhắn tại đây và chúng tôi sẽ trả lời qua email."
   },
   "th": {
     "Classroom Group Creator": "เครื่องมือสร้างกลุ่มในห้องเรียน",
@@ -831,7 +839,11 @@
     "Row {row} — sex '{value}' is not understood. Use {accepted}, or leave blank.": "แถว {row} — ไม่เข้าใจค่า '{value}' สำหรับเพศ ใช้ {accepted} หรือทิ้งว่างไว้",
     "Row {row} — absent '{value}' is not understood. Use {accepted}, or leave blank.": "แถว {row} — ไม่เข้าใจค่า '{value}' ที่ขาดไป โปรดใช้ {accepted} หรือทิ้งว่างไว้",
     "Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.": "พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป",
-    "Row {row} — number '{value}' is too low. Numbers start at 1.": "แถว {row} — ตัวเลข '{value}' ต่ำเกินไป ตัวเลขเริ่มต้นที่ 1"
+    "Row {row} — number '{value}' is too low. Numbers start at 1.": "แถว {row} — ตัวเลข '{value}' ต่ำเกินไป ตัวเลขเริ่มต้นที่ 1",
+    "Support — Shyden": "การสนับสนุน — Shyden",
+    "Send Shyden Labs a question, a problem or an idea about any product.": "ส่งคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ไปยัง Shyden Labs",
+    "Support": "การสนับสนุน",
+    "Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.": "มีคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ของShyden Labs ใดก็ตาม? ส่งข้อความมาที่นี่ และเราจะตอบกลับทางอีเมล"
   },
   "id": {
     "Classroom Group Creator": "Pembuat Kelompok Kelas",
