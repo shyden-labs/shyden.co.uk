@@ -66,26 +66,54 @@ export function decodePng(png: Buffer): Image {
     );
 
   const pixels = Buffer.alloc(height * stride);
+  // The row above the first is all zeros, as the format says. Each row picks
+  // its filter once, so the per-byte loop holds no filter test: a branch per
+  // byte made coverage instrumentation slow a 1200x630 decode ninefold and
+  // ran a unit test past 1 s on CI (#1245).
+  const zeros = Buffer.alloc(stride);
   for (let y = 0; y < height; y++) {
     const filter = raw[y * (stride + 1)];
     const line = y * (stride + 1) + 1;
     const row = y * stride;
-    const above = row - stride;
-    for (let i = 0; i < stride; i++) {
-      const a = i >= channels ? pixels[row + i - channels] : 0;
-      const b = y > 0 ? pixels[above + i] : 0;
-      const c = y > 0 && i >= channels ? pixels[above + i - channels] : 0;
-      let predictor: number;
-      if (filter === 0) predictor = 0;
-      else if (filter === 1) predictor = a;
-      else if (filter === 2) predictor = b;
-      else if (filter === 3) predictor = (a + b) >> 1;
-      else if (filter === 4) predictor = paeth(a, b, c);
-      else throw new Error(`corrupt PNG: row ${y} has filter ${filter}`);
-      pixels[row + i] = (raw[line + i] + predictor) & 0xff;
-    }
+    const up = y > 0 ? pixels.subarray(row - stride, row) : zeros;
+    const out = pixels.subarray(row, row + stride);
+    const into = raw.subarray(line, line + stride);
+    unfilterRow(filter, into, up, out, channels, y);
   }
   return { width, height, channels, pixels };
+}
+
+/** Undoes one row's filter into `out`, from the row above (`up`). */
+function unfilterRow(
+  filter: number,
+  into: Buffer,
+  up: Buffer,
+  out: Buffer,
+  channels: number,
+  y: number,
+): void {
+  const n = into.length;
+  const first = Math.min(channels, n);
+  if (filter === 0) {
+    into.copy(out);
+  } else if (filter === 1) {
+    for (let i = 0; i < first; i++) out[i] = into[i];
+    for (let i = channels; i < n; i++)
+      out[i] = (into[i] + out[i - channels]) & 0xff;
+  } else if (filter === 2) {
+    for (let i = 0; i < n; i++) out[i] = (into[i] + up[i]) & 0xff;
+  } else if (filter === 3) {
+    for (let i = 0; i < first; i++) out[i] = (into[i] + (up[i] >> 1)) & 0xff;
+    for (let i = channels; i < n; i++)
+      out[i] = (into[i] + ((out[i - channels] + up[i]) >> 1)) & 0xff;
+  } else if (filter === 4) {
+    for (let i = 0; i < first; i++) out[i] = (into[i] + up[i]) & 0xff;
+    for (let i = channels; i < n; i++)
+      out[i] =
+        (into[i] + paeth(out[i - channels], up[i], up[i - channels])) & 0xff;
+  } else {
+    throw new Error(`corrupt PNG: row ${y} has filter ${filter}`);
+  }
 }
 
 const chunk = (type: string, body: Buffer): Buffer => {
