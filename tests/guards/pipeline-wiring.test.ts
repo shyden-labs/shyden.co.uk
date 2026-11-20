@@ -1240,6 +1240,9 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
   });
 });
 
+// Screenshots alone: error-context.md carries the error, and a failed API
+// call's error lists the headers it sent, the Access secret among them.
+// GitHub masks a secret in a job log, never inside an artifact.
 describe('a failed check against a deployed site uploads what it kept (#1233)', () => {
   type Step = {
     name?: string;
@@ -1252,7 +1255,7 @@ describe('a failed check against a deployed site uploads what it kept (#1233)', 
     ['deploy-dev.yml', 'playwright.dev.config.ts'],
     ['deploy-prod.yml', 'playwright.prod.config.ts'],
   ])(
-    '%s keeps test-results/ when its %s run fails, and warns if there is nothing to keep',
+    '%s keeps only the screenshots when its %s run fails, and warns if there are none',
     (file, config) => {
       const parsed = parseCleanYaml(workflow(file), file) as {
         jobs: Record<string, { steps?: Step[] }>;
@@ -1270,9 +1273,9 @@ describe('a failed check against a deployed site uploads what it kept (#1233)', 
       const keep = steps.findIndex(
         (s) =>
           /^actions\/upload-artifact@[0-9a-f]{40}$/.test(s.uses ?? '') &&
-          s.with?.path === 'test-results/',
+          s.with?.path === 'test-results/**/*.png',
       );
-      expect(keep, 'an upload of test-results/').toBeGreaterThan(run);
+      expect(keep, 'an upload of the screenshots alone').toBeGreaterThan(run);
       expect(steps[keep].if).toBe('failure()');
       expect(steps[keep].with?.['if-no-files-found']).toBe('warn');
     },
