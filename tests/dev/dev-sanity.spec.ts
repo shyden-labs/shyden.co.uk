@@ -207,6 +207,15 @@ test(
     },
   },
   async ({ page }) => {
+    // The form, Turnstile and the send used most of the default 30 s on
+    // deploy-dev run 44883439826 (#1032), leaving the ticket page's own 30 s
+    // wait no room. Each stage's time is printed so the next run measures it.
+    test.setTimeout(90_000);
+    const started = Date.now();
+    const stage = (name: string) =>
+      process.stdout.write(
+        `[support journey] ${name} at ${((Date.now() - started) / 1000).toFixed(1)} s\n`,
+      );
     const words = `Support page check ${Date.now()}`;
     await page.goto('/support');
     const form = page.locator('shydesk-support');
@@ -224,10 +233,12 @@ test(
       mimeType: 'image/png',
       buffer: ONE_PIXEL_PNG,
     });
+    stage('form filled');
     await tapOn(form.getByRole('button', { name: 'Send', exact: true }));
     await expect(
       form.getByText('Request sent. Keep this private link to follow it:'),
     ).toBeVisible({ timeout: 30_000 });
+    stage('request sent');
     // ShyDesk names the link "Private link" (its aria-label), not its URL.
     const link = await form
       .getByRole('link', { name: 'Private link', exact: true })
@@ -237,6 +248,7 @@ test(
     await expect(page.locator('shydesk-support').getByText(words)).toBeVisible({
       timeout: 30_000,
     });
+    stage('thread shown');
   },
 );
 
