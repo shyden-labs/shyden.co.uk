@@ -207,6 +207,11 @@ test(
     },
   },
   async ({ page }) => {
+    // Real typing, an upload, Cloudflare Turnstile and ShyDesk's send ran past
+    // the default 30 s on deploy-dev run 44873128025 (#1032): "Request sent"
+    // showed, then the test ended before it could read the ticket link. This
+    // journey alone gets 120 s; the next run's printed duration sets it.
+    test.setTimeout(120_000);
     const words = `Support page check ${Date.now()}`;
     await page.goto('/support');
     const form = page.locator('shydesk-support');
