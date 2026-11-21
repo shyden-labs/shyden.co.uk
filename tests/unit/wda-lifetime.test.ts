@@ -60,6 +60,7 @@ function harness({
     hasSource: vi.fn(() => true),
     alive: vi.fn(() => aliveNow),
     answers: vi.fn(async (_url: string): Promise<void> => {}),
+    announce: vi.fn((_text: string) => {}),
   };
   return {
     child,
@@ -194,6 +195,49 @@ describe('startWda', () => {
     await expect(started).rejects.toThrow(
       /exited \(code 65, signal null\) before its ready line[\s\S]*TEST EXECUTE FAILED/,
     );
+  });
+
+  it('names the passcode prompt when iOS times out enabling automation mode', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(
+      'The test runner failed to initialize for UI testing. (Underlying Error: Timed out while enabling automation mode.)',
+    );
+    h.child.emit('exit', 65, null);
+    const error = await started.then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(error?.message).toMatch(
+      /the iPhone asked for its passcode to allow UI automation, and nobody entered it/,
+    );
+    expect(error?.message).not.toMatch(/unlocked/);
+  });
+
+  it('tells the operator to enter the passcode before it starts WDA', async () => {
+    const h = harness();
+    const order: string[] = [];
+    const announce = vi.fn((text: string) => order.push(`announce ${text}`));
+    h.deps.spawn.mockImplementation((file: string) => {
+      order.push(`spawn ${file}`);
+      return h.child as unknown as ChildProcess;
+    });
+    const started = startWda({
+      udid: UDID,
+      cacheDir: CACHE,
+      ...h.deps,
+      announce,
+    });
+    await flush();
+    h.child.print(READY);
+    await started;
+    expect(order).toEqual([
+      expect.stringMatching(
+        /^announce .*if the iPhone asks for its passcode to allow UI automation, enter it now/,
+      ),
+      'spawn xcodebuild',
+    ]);
   });
 
   it('refuses when a runner is already alive for this iPhone', async () => {
