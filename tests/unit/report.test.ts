@@ -38,16 +38,18 @@ const siteLeafKeys = (locale: Locale, section: string) =>
     .map(([key]) => key);
 
 describe('the page table', () => {
-  it('knows the three pages with a footer, and the 404 besides', () => {
+  it('knows the four pages with a footer, and the 404 besides', () => {
     expect(FOOTER_PAGE_IDS).toEqual([
       'home',
       'yeetalk-calculators',
       'classroom-groups',
+      'support',
     ]);
     expect(PAGE_IDS).toEqual([
       'home',
       'yeetalk-calculators',
       'classroom-groups',
+      'support',
       'not-found',
     ]);
     expect(isPageId('home')).toBe(true);
@@ -166,7 +168,8 @@ describe('a page offers its own sections plus the chrome', () => {
 
   it('every page carries every chrome entry, bare strings and the report section included', () => {
     const chrome = Object.keys(getSiteStrings('vi')).filter(
-      (section) => !['home', 'calculators', 'notFound'].includes(section),
+      (section) =>
+        !['home', 'calculators', 'notFound', 'support'].includes(section),
     );
     expect(chrome).toEqual(
       expect.arrayContaining([

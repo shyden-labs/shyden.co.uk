@@ -4,7 +4,7 @@ import { searched } from '../../source-files';
 import { THEMES } from '../../palette';
 import { PUBLISHED_ROUTES } from '../published-paths';
 import { PAINTED, offPalette, readPalette } from '../palette-readings';
-import { docsPaths } from '../../site-pages';
+import { docsPaths, pagesWithoutOwnControls } from '../../site-pages';
 import type { PageCheck } from '../page-checks';
 import { resolvedColour } from '../helpers';
 
@@ -82,20 +82,20 @@ export const PALETTE_CHECKS: readonly PageCheck[] = [
 
       const { allowed, examined, readings } = await readPalette(page);
 
-      if (route === '/') {
+      if (pagesWithoutOwnControls().includes(route)) {
         expect
           .soft(
             allowed.length,
-            'the homepage served no palette, so nothing was measured at all',
+            `${route} served no palette, so nothing was measured at all`,
           )
           .toBeGreaterThan(0);
         expect
           .soft(
             searched(readings, {
               of: examined,
-              what: 'elements on the homepage the selector ran over',
+              what: `elements on ${route} the selector ran over`,
             }),
-            'the homepage paints no form controls',
+            `${route} paints no form controls of its own`,
           )
           .toHaveLength(0);
         await shoot(

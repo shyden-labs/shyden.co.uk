@@ -1287,6 +1287,30 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Same meaning; 行 {row} read as 'The {row}', as the sibling csvProblem lines read"
+      },
+      "支持 — Shyden": {
+        "english": "Support — Shyden",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "请向 Shyden Labs 提交关于任何产品的疑问、问题或想法。": {
+        "english": "Please submit any questions, issues, or ideas about any of Shyden Labs' products.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "支持": {
+        "english": "support",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "对 Shyden Labs 的任何产品有疑问、问题或建议吗？请在此发送消息，回复将通过电子邮件发送。": {
+        "english": "Have any questions, problems, or suggestions about any Shyden Labs products? Please send a message here, and a reply will be sent via email.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
       }
     },
     "th": {
@@ -1458,11 +1482,7 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "ปกติ": {
-        "english": "normal",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
+      "ปกติ": { "english": "normal", "writers": ["DeepL"], "verdict": "agrees" },
       "เร็ว": { "english": "fast", "writers": ["DeepL"], "verdict": "agrees" },
       "ข้ามส่วนแอนิเมชัน": {
         "english": "Skip the animation section.",
@@ -1646,11 +1666,7 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "ทั้งสอง": {
-        "english": "both",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
+      "ทั้งสอง": { "english": "both", "writers": ["DeepL"], "verdict": "agrees" },
       "แสดงเพศ และตัวอักษร \"ด้วยกัน\"/\"แยก\"": {
         "english": "Displays gender and the letters \"together\"/\"separate\".",
         "writers": ["DeepL"],
@@ -1666,11 +1682,7 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "กลุ่ม": {
-        "english": "group",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
+      "กลุ่ม": { "english": "group", "writers": ["DeepL"], "verdict": "agrees" },
       "เต็มหน้าจอ": {
         "english": "Full screen",
         "writers": ["DeepL"],
@@ -2099,11 +2111,7 @@
         "writers": ["DeepL"],
         "verdict": "agrees"
       },
-      "พิมพ์": {
-        "english": "print",
-        "writers": ["DeepL"],
-        "verdict": "agrees"
-      },
+      "พิมพ์": { "english": "print", "writers": ["DeepL"], "verdict": "agrees" },
       "ในรายชื่อนักเรียน": {
         "english": "In the list of students.",
         "writers": ["DeepL"],
@@ -2624,6 +2632,30 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "Same meaning: too low, numbers start at 1"
+      },
+      "การสนับสนุน — Shyden": {
+        "english": "Support — Shyden",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "ส่งคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ไปยัง Shyden Labs": {
+        "english": "Send any questions, problems, or feedback about any product to Shyden Labs.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "การสนับสนุน": {
+        "english": "Support",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "มีคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ของ Shyden Labs ไหม? ส่งข้อความที่นี่ แล้วคำตอบจะส่งถึงทางอีเมล": {
+        "english": "Do you have any questions, problems, or comments about any Shyden Labs products? Send a message here, and you'll receive a response via email.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
       }
     },
     "id": {
@@ -4023,6 +4055,30 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "Same meaning; too small for too low"
+      },
+      "Dukungan — Shyden": {
+        "english": "Support — Shyden",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Kirim pertanyaan, masalah, atau ide tentang produk apa pun kepada Shyden Labs.": {
+        "english": "Send any questions, issues, or ideas about any product to Shyden Labs.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Dukungan": {
+        "english": "Support",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Ada pertanyaan, masalah, atau ide tentang produk Shyden Labs? Kirim pesan di sini dan balasannya dikirim lewat email.": {
+        "english": "Have questions, problems, or ideas about Shyden Labs products? Send a message here and we'll reply via email.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
       }
     },
     "vi": {
@@ -5389,6 +5445,30 @@
         "writers": ["DeepL"],
         "verdict": "agrees",
         "note": "Same meaning; too small for too low"
+      },
+      "Hỗ trợ — Shyden": {
+        "english": "Support — Shyden",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Hãy gửi cho Shyden Labs một câu hỏi, một vấn đề hoặc một ý tưởng liên quan đến bất kỳ sản phẩm nào.": {
+        "english": "Send Shyden Labs a question, a problem, or an idea related to any of our products.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "Google adds \"our\"; the Vietnamese says only \"any product\" (bất kỳ sản phẩm nào)"
+      },
+      "Hỗ trợ": {
+        "english": "Support",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Bạn có thắc mắc, vấn đề hay ý tưởng nào về bất kỳ sản phẩm nào của Shyden Labs không? Hãy gửi tin nhắn tại đây, câu trả lời sẽ được gửi qua email.": {
+        "english": "Do you have any questions, concerns, or ideas about any Shyden Labs product? Please send a message here, and the answer will be sent to you via email.",
+        "writers": ["edited after DeepL"],
+        "verdict": "agrees",
+        "note": "read beside the English, 2026-11-20 (#1032)"
       }
     }
   },

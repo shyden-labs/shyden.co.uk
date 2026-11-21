@@ -1,7 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect } from '../fixtures';
 import { searched } from '../../source-files';
-import { docsPaths, sitePaths, TITLE_FOR } from '../../site-pages';
+import {
+  docsPaths,
+  sitePaths,
+  TITLE_FOR,
+  ticketPaths,
+  pagesWithoutOwnControls,
+} from '../../site-pages';
 import { THEME_SCRIPT_SOURCE } from '../../themes';
 import { IOS_ZOOM_FLOOR_PX, measureTypedFields } from '../../typed-fields';
 import { LOCALES, localisePath, type Locale } from '../../../src/lib/i18n';
@@ -43,6 +49,10 @@ const OWN_SCRIPTS: Record<string, readonly string[]> = {
   '/': ['inline module in body'],
   '/yeetalk-calculators': ['external module in body'],
   '/classroom-groups': ['inline classic in body', 'external module in body'],
+  // ShyDesk's support piece (#1032): one classic script from ShyDesk's host,
+  // deferred, never a module (it finds its host from document.currentScript).
+  '/support': ['external classic in body'],
+  '/support/ticket/': ['external classic in body'],
   [NOT_FOUND_PATH]: [],
   // #781: the Swagger UI library the page loads into <head>, then the page's
   // own module, in document order.
@@ -56,6 +66,7 @@ export const BUILT = [
     sitePaths().map((route) => ({ route, path: localisePath(route, locale) })),
   ),
   ...docsPaths().map((route) => ({ route, path: route })),
+  ...ticketPaths().map((route) => ({ route, path: route })),
   { route: NOT_FOUND_PATH, path: NOT_FOUND_PATH },
 ];
 
@@ -175,10 +186,9 @@ export const SERVED_PAGE_CHECKS: readonly PageCheck[] = [
     themes: [DEFAULT_THEME],
     run: async ({ page, route }) => {
       const controls = await page.evaluate(measureTypedFields);
-      if (route === '/') {
-        // The one page with no typed field: no tool, and no report form,
-        // since English is not a beta language. That empty answer is only
-        // worth something if the page rendered.
+      if (pagesWithoutOwnControls().includes(route)) {
+        // A page with no typed field of its own (`pagesWithoutOwnControls`).
+        // That empty answer is only worth something if the page rendered.
         await expect.soft(page.locator('main h1')).toBeVisible();
         // The elements the measurement ran over (#610): a page that lost its
         // content would answer "no typed field" just the same.
@@ -189,9 +199,9 @@ export const SERVED_PAGE_CHECKS: readonly PageCheck[] = [
           .soft(
             searched(controls, {
               of: examined,
-              what: 'elements on the English homepage',
+              what: `elements on ${route}`,
             }),
-            'the English homepage has no typed field',
+            `${route} has no typed field of its own`,
           )
           .toEqual([]);
       } else {

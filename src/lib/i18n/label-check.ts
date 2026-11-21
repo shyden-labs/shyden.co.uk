@@ -322,6 +322,7 @@ const SITE_PAGES: Record<keyof SiteStrings, string> = {
   home: '/',
   calculators: '/yeetalk-calculators',
   notFound: 'the 404 page',
+  support: '/support',
 };
 
 /**
