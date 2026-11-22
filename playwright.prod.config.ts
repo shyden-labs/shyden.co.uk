@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { ENGINES, engineUse } from './tests/engines';
 import { onBuild } from './tests/sanity-on-build';
 
 // Post-deploy PROD config: runs tests/prod/*.spec.ts against the REAL deployed
@@ -73,5 +74,13 @@ export default defineConfig({
     // artifacts are public (#1233).
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Each result line names its engine, so every engine's total is read off
+  // the log (#1250).
+  reporter: [['list']],
+  // Every engine on every release (#1250), as the dev check runs them
+  // (#1032 AC5): a release that breaks one engine is caught on the live site.
+  projects: ENGINES.map(({ name, device }) => ({
+    name,
+    use: engineUse(devices[device], process.env),
+  })),
 });
