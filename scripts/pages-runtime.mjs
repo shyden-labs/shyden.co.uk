@@ -14,7 +14,8 @@
  * only reads the date and makes the two calls.
  */
 import { readFileSync } from 'node:fs';
-import { die, messageOf } from './errors.mjs';
+import { exit } from 'node:process';
+import { messageOf } from './errors.mjs';
 import { setting } from './settings.mjs';
 import { compatibilityDateOf, syncRuntime } from '../src/lib/pages-runtime.ts';
 
@@ -74,15 +75,31 @@ const run = async (project) => {
   console.log(`${project}: ${said}.`);
 };
 
-if (import.meta.main) {
-  const [project, ...rest] = process.argv.slice(2);
+/**
+ * Runs the sync for the project `argv` names and answers the exit code: 0
+ * once production runs the tested date, 1 when it does not or a call fails,
+ * 2 for a usage mistake, before any request.
+ *
+ * @param {readonly string[]} argv
+ * @returns {Promise<0 | 1 | 2>}
+ */
+export async function main(argv) {
+  const [project, ...rest] = argv;
   if (
     project === undefined ||
     rest.length > 0 ||
     !/^[a-z0-9-]+$/.test(project)
   ) {
     console.error('usage: node scripts/pages-runtime.mjs <pages-project-name>');
-    process.exit(2);
+    return 2;
   }
-  await run(project).catch((error) => die(`${project}: ${messageOf(error)}`));
+  try {
+    await run(project);
+    return 0;
+  } catch (error) {
+    console.error(`✗ ${project}: ${messageOf(error)}`);
+    return 1;
+  }
 }
+
+if (import.meta.main) exit(await main(process.argv.slice(2)));

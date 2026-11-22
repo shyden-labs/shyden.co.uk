@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { handleReport, matchingKeys } from '../../src/lib/report';
 import { counterKey } from '../../src/lib/report-limits';
+import { retiredBefore } from '../../src/lib/report-store';
 import { scriptedDatabase, storedOn } from '../report-fakes';
 import { post, quote, valid } from '../report-endpoint-shared';
 
@@ -55,6 +56,7 @@ describe('a counted report binds exactly its own values, never the address (AC3)
       ID,
       DAY,
       key,
+      retiredBefore(DAY),
     ]);
   });
 
