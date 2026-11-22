@@ -50,13 +50,13 @@ export const postStatus = async ({
  * @returns {Promise<0 | 1 | 2>}
  */
 export const main = async (args) => {
-  const [context, description, ...rest] = args;
-  if (context === undefined || description === undefined || rest.length > 0) {
+  if (args.length !== 2) {
     console.error(
       'usage: node scripts/commit-status.mjs <context> <description>',
     );
     return 2;
   }
+  const [context, description] = args;
   const server = endpoint('GITHUB_SERVER_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);

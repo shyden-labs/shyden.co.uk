@@ -84,12 +84,8 @@ const run = async (project) => {
  * @returns {Promise<0 | 1 | 2>}
  */
 export async function main(argv) {
-  const [project, ...rest] = argv;
-  if (
-    project === undefined ||
-    rest.length > 0 ||
-    !/^[a-z0-9-]+$/.test(project)
-  ) {
+  const [project = ''] = argv;
+  if (argv.length !== 1 || !/^[a-z0-9-]+$/.test(project)) {
     console.error('usage: node scripts/pages-runtime.mjs <pages-project-name>');
     return 2;
   }

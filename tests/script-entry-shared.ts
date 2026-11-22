@@ -30,6 +30,20 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 2,
     says: 'usage: node scripts/commit-status.mjs',
   },
+  // Without a project to set it prints its usage and refuses before any
+  // request reaches Cloudflare (#907, #1258).
+  'pages-runtime.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/pages-runtime.mjs',
+  },
+  // It takes no arguments, and refuses one before it reads the run or asks
+  // GitHub anything (#725, #1258).
+  'deploy-failure.mjs': {
+    args: ['--no-such-flag'],
+    status: 2,
+    says: 'usage: node scripts/deploy-failure.mjs',
+  },
   // Without a command and a project it prints its usage and refuses (#748).
   'pages.mjs': {
     args: [],
