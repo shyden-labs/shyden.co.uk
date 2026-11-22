@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { THEMES } from '../../palette';
 import { privacyPaths } from '../../site-pages';
-import { expectNoHorizontalScroll } from '../../viewport';
+import { expectNoHorizontalScroll, rectAtLeast44Soft } from '../../viewport';
 import { contrastRatio } from '../helpers';
 import { searched } from '../../source-files';
 import { BAND_WIDTHS } from './homepage';
@@ -65,14 +65,12 @@ export const PRIVACY_PAGE_CHECKS: readonly PageCheck[] = [
       const links = await page.locator('footer a').all();
       expect.soft(links.length, `${at}: footer links`).toBeGreaterThan(0);
       for (const link of links) {
-        const box = await link.boundingBox();
-        const name = await link.textContent();
-        expect
-          .soft(box?.width ?? 0, `${at}: ${name} width`)
-          .toBeGreaterThanOrEqual(44);
-        expect
-          .soft(box?.height ?? 0, `${at}: ${name} height`)
-          .toBeGreaterThanOrEqual(44);
+        // Rounded to the device pixel, as every 44px check here is: Firefox
+        // measured a declared 44px link at 43.9998 at 375px (#1082).
+        rectAtLeast44Soft(
+          (await link.boundingBox()) ?? { width: 0, height: 0 },
+          `${at}: ${await link.textContent()}`,
+        );
       }
     },
   },

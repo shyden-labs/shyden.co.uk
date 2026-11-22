@@ -1,0 +1,23 @@
+---
+import LegalPage from '../../../components/pages/LegalPage.astro';
+import { PREFIXED_LOCALES } from '../../../lib/i18n';
+import { PRIVACY } from '../../../lib/legal/privacy';
+import { pageLocales } from '../../../lib/report';
+
+/**
+ * The privacy page in each prefixed locale it is written in: Indonesian
+ * alone (#1082), where this text governs for residents of Indonesia. The
+ * legal-pages rule keeps zh, vi and th to the English page, so they get no
+ * route. English keeps its own at `src/pages/privacy/index.astro`.
+ */
+export function getStaticPaths() {
+  return PREFIXED_LOCALES.flatMap((locale) => {
+    const doc = PRIVACY[locale];
+    return doc ? [{ params: { locale }, props: { locale, doc } }] : [];
+  });
+}
+
+const { locale, doc } = Astro.props;
+---
+
+<LegalPage doc={doc} lang={locale} locales={pageLocales('privacy')} />

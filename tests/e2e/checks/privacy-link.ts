@@ -4,10 +4,11 @@ import { LOCALES, getSiteStrings, type Locale } from '../../../src/lib/i18n';
 import type { PageCheck } from '../page-checks';
 
 /**
- * The footer of every page links to the English privacy page (#1080 AC3), and
- * a page in any other language says beside the link, in that language, that
- * the page is in English only (the global legal-pages rule of 2026-11-08;
- * Indonesian too until #1082's copy, Shyden 2026-11-22). The language comes
+ * The footer of every page links to the privacy page in its own language
+ * where one exists, English or Indonesian (#1080 AC3, #1082 AC4), and a page
+ * in any other language links to the English one and says beside the link,
+ * in that language, that the page is in English only (the global legal-pages
+ * rule of 2026-11-08). The language comes
  * from the page's own `<html lang>`, so the 404 and the English-only pages
  * are judged by what they render.
  */
@@ -22,10 +23,13 @@ export const PRIVACY_LINK_CHECKS: readonly PageCheck[] = [
       const t = getSiteStrings(lang as Locale).legal;
       const footer = page.locator('footer');
       const link = footer.getByRole('link', { name: t.privacy, exact: true });
-      await expect.soft(link, route).toHaveAttribute('href', '/privacy/');
+      const own = lang === 'en' || lang === 'id';
+      await expect
+        .soft(link, route)
+        .toHaveAttribute('href', lang === 'id' ? '/id/privacy/' : '/privacy/');
       await expect.soft(link, route).toBeVisible();
       const note = footer.locator('[data-english-only]');
-      if (lang === 'en') await expect.soft(note, route).toHaveCount(0);
+      if (own) await expect.soft(note, route).toHaveCount(0);
       else await expect.soft(note, route).toHaveText(t.englishOnly);
     },
   },

@@ -41,6 +41,7 @@ paths:
                     - yeetalk-calculators
                     - classroom-groups
                     - support
+                    - privacy
                     - not-found
                 quote:
                   type: string

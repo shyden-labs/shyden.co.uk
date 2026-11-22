@@ -6,7 +6,11 @@ import { formTextsUnderAA, resolvedColour } from '../helpers';
 import { searched } from '../../source-files';
 import { PREFIXED_LOCALES, getSiteStrings } from '../../../src/lib/i18n';
 import type { Locale } from '../../../src/lib/i18n';
-import { FOOTER_PAGE_IDS, pagePath } from '../../../src/lib/report';
+import {
+  FOOTER_PAGE_IDS,
+  pageLocales,
+  pagePath,
+} from '../../../src/lib/report';
 import { DEFAULT_THEME, type PageCheck } from '../page-checks';
 
 /**
@@ -20,7 +24,9 @@ import { DEFAULT_THEME, type PageCheck } from '../page-checks';
  */
 
 const FOOTED = PREFIXED_LOCALES.flatMap((locale) =>
-  FOOTER_PAGE_IDS.map((id) => ({ locale, path: pagePath(id, locale) })),
+  FOOTER_PAGE_IDS.filter((id) => pageLocales(id).includes(locale)).map(
+    (id) => ({ locale, path: pagePath(id, locale) }),
+  ),
 );
 const localeOf = (route: string): Locale => {
   const found = FOOTED.find(({ path }) => path === route);
