@@ -355,7 +355,10 @@ test.describe('Import / export — Indonesian', () => {
       .toBeVisible();
     await expect.soft(page.getByText('Impor daftar kelas')).toBeVisible();
     await upload(page, 'english.csv', 'number,name\n1,Ana\n');
-    await expect.soft(page.getByText(/bahasa Inggris/)).toBeVisible();
+    // In <main>: the footer's English-only note (#1080) says "bahasa Inggris" too.
+    await expect
+      .soft(page.locator('main').getByText(/bahasa Inggris/))
+      .toBeVisible();
     await expect.soft(page.locator('.cg-student')).toHaveCount(0);
     await upload(page, 'ok.csv', 'nomor,nama\n1,Ana\n2,Budi\n');
     await expect.soft(page.getByText('2 siswa diimpor.')).toBeVisible();

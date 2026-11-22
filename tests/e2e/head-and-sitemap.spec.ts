@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import { LOCALE_METADATA } from '../../src/lib/i18n/metadata';
 import { LOCALES, localisePath } from '../../src/lib/i18n/index';
 import { filesUnder, searched } from '../source-files';
+import { privacyPaths } from '../site-pages';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 
@@ -73,6 +74,9 @@ test.describe('the sitemap', () => {
       'no <url> blocks — the parse is broken',
     ).toBeGreaterThan(0);
     const short = (url: string) => url.replace('https://shyden.co.uk', '');
+    // The English-only privacy page (#1080) has no translation to declare;
+    // privacy.spec.ts holds it to no alternates at all.
+    const englishOnly = new Set(privacyPaths());
     const wrong = blocks
       .map((block) => ({
         loc: short(/<loc>([^<]*)<\/loc>/.exec(block)?.[1] ?? '?'),
@@ -80,6 +84,7 @@ test.describe('the sitemap', () => {
           .map((m) => m[1])
           .sort(),
       }))
+      .filter((u) => !englishOnly.has(u.loc))
       .filter((u) => u.langs.join() !== EXPECTED_ALTERNATES.join())
       .map((u) => `${u.loc} -> ${u.langs.join(',') || 'NONE'}`);
     expect(

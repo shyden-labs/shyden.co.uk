@@ -8,7 +8,7 @@ import {
 import { layoutWidthsFrom } from '../layout-widths';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
-import { docsPaths, ticketPaths } from '../site-pages';
+import { docsPaths, privacyPaths, ticketPaths } from '../site-pages';
 import { recorded, shoot } from './evidence';
 import { atViewport } from '../viewport-at';
 
@@ -187,7 +187,8 @@ const survey = (locale: Locale, localised: boolean) => {
   const rows: string[] = [];
   const thin: string[] = [];
   // Wordmark, menu or nav, theme switch, language switcher; an English-only
-  // page (the API docs, #781) has no switcher by decision, so three.
+  // page (the API docs #781, the ticket page, the privacy page) has no
+  // switcher by decision, so three.
   const least = localised ? 4 : 3;
   // The theme switch by its own name (#142): a row without it has not
   // measured the room AC5 asks for.
@@ -240,11 +241,11 @@ test.describe('the header row has room for everything in it (#329)', () => {
     test(`${path}: no header item overlaps another, at any width`, async ({
       page,
     }) => {
-      // The API docs and the support ticket page (#1032) are English only,
-      // with no language switcher in their header.
+      // The API docs, the support ticket page (#1032) and the privacy page
+      // (#1080) are English only, with no language switcher in their header.
       const header = survey(
         locale,
-        ![...docsPaths(), ...ticketPaths()].includes(path),
+        ![...docsPaths(), ...ticketPaths(), ...privacyPaths()].includes(path),
       );
       // runtime population: the widths this page's own CSS can lay out,
       // read from the media queries it serves, so only the loaded page

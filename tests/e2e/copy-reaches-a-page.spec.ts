@@ -1,7 +1,12 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { deployedRoutes, docsPaths, ticketPaths } from '../site-pages';
+import {
+  deployedRoutes,
+  docsPaths,
+  privacyPaths,
+  ticketPaths,
+} from '../site-pages';
 import {
   LOCALES,
   PREFIXED_LOCALES,
@@ -188,6 +193,15 @@ const ABSENCE_RULES: ReadonlyArray<{
       'of the PAGE, so the English label does render. That correction came ' +
       'from this rule failing its own reverse-check, not from review.',
   },
+  {
+    locales: ['en'],
+    paths: ['legal.englishOnly'],
+    why:
+      'The footer note "This page is available in English only." goes beside ' +
+      'the privacy link on pages in another language (#1080). An English ' +
+      'page needs no such note, so the English sentence is never served; the ' +
+      'key exists only because every catalogue has the same shape.',
+  },
 ];
 
 const ALLOWED = new Map<string, string>(
@@ -361,6 +375,7 @@ test.describe('no built page names the dissolved company (#370)', () => {
         ...deployedRoutes().map(({ path }) => join('dist', path, 'index.html')),
         ...docsPaths().map((path) => join('dist', path, 'index.html')),
         ...ticketPaths().map((path) => join('dist', path, 'index.html')),
+        ...privacyPaths().map((path) => join('dist', path, 'index.html')),
         join('dist', '404.html'),
       ].sort(),
     );
