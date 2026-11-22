@@ -8,7 +8,7 @@ import {
 import { layoutWidthsFrom } from '../layout-widths';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
-import { docsPaths } from '../site-pages';
+import { docsPaths, ticketPaths } from '../site-pages';
 import { recorded, shoot } from './evidence';
 import { atViewport } from '../viewport-at';
 
@@ -240,7 +240,12 @@ test.describe('the header row has room for everything in it (#329)', () => {
     test(`${path}: no header item overlaps another, at any width`, async ({
       page,
     }) => {
-      const header = survey(locale, !docsPaths().includes(path));
+      // The API docs and the support ticket page (#1032) are English only,
+      // with no language switcher in their header.
+      const header = survey(
+        locale,
+        ![...docsPaths(), ...ticketPaths()].includes(path),
+      );
       // runtime population: the widths this page's own CSS can lay out,
       // read from the media queries it serves, so only the loaded page
       // knows them (#422).

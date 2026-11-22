@@ -1,0 +1,39 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ShydeskPiece from '../ShydeskPiece.astro';
+import { getSiteStrings, type Locale } from '../../lib/i18n';
+
+/**
+ * The support page (#1032): a heading, one line, and ShyDesk's contact form.
+ *
+ * The form is ShyDesk's shared support piece, drawn from ShyDesk's own host
+ * (Shyden's ruling, 2026-11-20: embed only); this page owns the words around
+ * it, in every locale. The piece shows English until ShyDesk translates it,
+ * and is told the page's language so it can follow when it does.
+ */
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const t = getSiteStrings(lang).support;
+---
+
+<BaseLayout title={t.title} description={t.description} lang={lang}>
+  <section class="wrap">
+    <h1>{t.heading}</h1>
+    <p class="intro">{t.intro}</p>
+    <ShydeskPiece view="contact" lang={lang} />
+  </section>
+</BaseLayout>
+
+<style>
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 4rem var(--space);
+  }
+  .intro {
+    margin-bottom: 2rem;
+  }
+</style>

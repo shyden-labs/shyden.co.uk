@@ -1,5 +1,7 @@
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
+import { chooseOption } from '../real-select';
+import { supportTestAddress } from './support-address';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import {
@@ -142,6 +144,7 @@ test(
 // product links below are checked for.
 test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host", async ({
   page,
+  browserName,
 }) => {
   await page.goto('/');
   const video = page.locator('#yawelo-idle video');
@@ -152,8 +155,15 @@ test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host
     return v.play();
   });
   await expect
-    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-    .toBeGreaterThan(0.5);
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused))
+    .toBe(false);
+  // CI's Linux WebKit never advances the clock after play() (measured
+  // 2026-10-20; the e2e suite's ruling, Shyden 2026-11-18, #1048), so the
+  // clock is the engine's and is asserted where the engine moves it.
+  if (browserName !== 'webkit')
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0.5);
   expect(
     await video.evaluate((v: HTMLVideoElement) => ({
       video: new URL(v.currentSrc).origin,
@@ -164,6 +174,98 @@ test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host
     poster: 'https://dev-media.yaweloidle.com',
   });
 });
+
+// The support page (#1032) loads ShyDesk's piece from Non-Prod on dev, and
+// only on dev: dev ShyDesk accepts dev.shyden.co.uk alone, and live ShyDesk
+// is the production build's. Checked on the pull request's own dev build
+// too, so a missing build variable is caught before a deploy.
+test("the support page loads ShyDesk's piece from dev ShyDesk", async ({
+  page,
+}) => {
+  await page.goto('/support');
+  await expect(page.locator('shydesk-support')).toHaveAttribute(
+    'product',
+    'shyden-co-uk',
+  );
+  await expect(page.locator('script[src$="/embed.js"]')).toHaveAttribute(
+    'src',
+    'https://shydesk.shydesk-non-prod.workers.dev/embed.js',
+  );
+});
+
+// A real message from the support page reaches dev ShyDesk and shows in its
+// thread (#1032 AC5): typed with real key presses, a photo attached through
+// the file chooser a real press opened, sent with a real press. STAND-IN: the
+// photo is handed to that chooser, because the system file dialog is outside
+// the browser (as `upload` in tests/e2e/helpers.ts). Dev ShyDesk sends no
+// email (its monthly share is 0), so the private link is read off the page.
+// The field names are ShyDesk's (embed.js at shydesk `0a2abc8`).
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test(
+  'a message typed on /support reaches dev ShyDesk and shows in its thread',
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot send to it',
+    },
+  },
+  async ({ page }, testInfo) => {
+    // The form, Turnstile and the send used most of the default 30 s on
+    // deploy-dev run 44883439826 (#1032), leaving the ticket page's own 30 s
+    // wait no room. Measured on Chromium in deploy-dev run 44885513312: sent
+    // at 30.4 s, thread shown at 32.9 s. Each stage's time is printed per
+    // engine, so a slower engine names the stage it spent.
+    test.setTimeout(90_000);
+    const started = Date.now();
+    const engine = testInfo.project.name;
+    const stage = (name: string) =>
+      process.stdout.write(
+        `[support journey ${engine}] ${name} at ${((Date.now() - started) / 1000).toFixed(1)} s\n`,
+      );
+    const words = `Support page check ${engine} ${started}`;
+    await page.goto('/support');
+    const form = page.locator('shydesk-support');
+    await typeInto(
+      form.getByLabel('Email'),
+      supportTestAddress(engine, started),
+    );
+    await typeInto(form.getByLabel('Subject'), 'Support page check');
+    await chooseOption(form.getByLabel('Category'), 'question');
+    await typeInto(form.getByLabel('Message'), words);
+    page.on('filechooser', () => {});
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      tapOn(form.getByLabel('Photos and videos')),
+    ]);
+    await chooser.setFiles({
+      name: 'support-photo.png',
+      mimeType: 'image/png',
+      buffer: ONE_PIXEL_PNG,
+    });
+    stage('form filled');
+    await tapOn(form.getByRole('button', { name: 'Send', exact: true }));
+    await expect(
+      form.getByText('Request sent. Keep this private link to follow it:'),
+    ).toBeVisible({ timeout: 30_000 });
+    stage('request sent');
+    // ShyDesk names the link "Private link" (its aria-label), not its URL.
+    const link = await form
+      .getByRole('link', { name: 'Private link', exact: true })
+      .getAttribute('href');
+    expect(link).toMatch(/\/support\/ticket\/?#t=/);
+    await page.goto(new URL(link ?? '', page.url()).toString());
+    await expect(page.locator('shydesk-support').getByText(words)).toBeVisible({
+      timeout: 30_000,
+    });
+    stage('thread shown');
+  },
+);
 
 test(
   'an unauthenticated request is challenged with 401',

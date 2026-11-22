@@ -1,0 +1,45 @@
+---
+import { embedScriptUrl, SHYDESK_PRODUCT, shydeskOrigin } from '../lib/shydesk';
+
+/**
+ * ShyDesk's shared support piece (#1032), as ShyDesk's contract asks
+ * (shydesk `0a2abc8`, docs/embedding.md): `embed.js` as a CLASSIC deferred
+ * script, never a module, because it finds its own host through
+ * `document.currentScript`; and one `<shydesk-support>`. The host is the
+ * build's (`src/lib/shydesk.ts`). `is:inline` keeps Astro from bundling a
+ * script that must load from ShyDesk's origin.
+ *
+ * The piece draws in its own shadow DOM, which page CSS cannot reach; it
+ * inherits `--shydesk-*` custom properties, set here from the site's theme
+ * tokens so it follows light and dark. Global, not scoped: the element is
+ * defined by ShyDesk's script, and its inherited properties must apply
+ * whatever scope Astro stamps.
+ */
+interface Props {
+  view: 'contact' | 'ticket';
+  lang: string;
+}
+
+const { view, lang } = Astro.props;
+const origin = shydeskOrigin(import.meta.env.PUBLIC_SHYDESK_URL);
+---
+
+<shydesk-support
+  product={SHYDESK_PRODUCT}
+  view={view}
+  lang={lang}
+></shydesk-support>
+<script is:inline src={embedScriptUrl(origin)} defer></script>
+
+<style is:global>
+  shydesk-support {
+    display: block;
+    --shydesk-font: var(--font-body);
+    --shydesk-text: var(--ink);
+    --shydesk-background: var(--surface);
+    --shydesk-accent: var(--accent);
+    --shydesk-accent-text: var(--on-accent);
+    --shydesk-border: var(--border-strong);
+    --shydesk-error: var(--danger);
+  }
+</style>

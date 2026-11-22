@@ -48,6 +48,7 @@ export const FOOTER_PAGE_IDS = [
   'home',
   'yeetalk-calculators',
   'classroom-groups',
+  'support',
 ] as const;
 export type FooterPageId = (typeof FOOTER_PAGE_IDS)[number];
 
@@ -93,7 +94,7 @@ interface PageEntry {
   readonly unshown?: ReadonlySet<string>;
 }
 
-/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, YeetalkCalculatorsPage `.calculators`, ClassroomGroupsPage `getStrings`, 404.astro `.notFound`. */
+/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, YeetalkCalculatorsPage `.calculators`, ClassroomGroupsPage `getStrings`, SupportPage `.support`, 404.astro `.notFound`. */
 const PAGES: Record<PageId, PageEntry> = {
   home: {
     route: '/',
@@ -113,6 +114,15 @@ const PAGES: Record<PageId, PageEntry> = {
     route: '/classroom-groups',
     localised: true,
     toolCatalogue: true,
+    chrome: true,
+  },
+  // The support page (#1032): its heading and line are translated copy; the
+  // form below them is ShyDesk's, drawn from ShyDesk's host, not this site's.
+  support: {
+    route: '/support',
+    localised: true,
+    siteSection: 'support',
+    toolCatalogue: false,
     chrome: true,
   },
   'not-found': {
