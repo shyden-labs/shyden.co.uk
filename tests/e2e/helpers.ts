@@ -623,9 +623,17 @@ export const contrastRatio = async (target: Locator): Promise<number> => {
     // Every background from the element itself -- it may paint its own --
     // outward, nearest first. Not just the first: a translucent layer is
     // composited over what is behind it, which `paintedGround` does (#390
-    // F127).
+    // F127). A shadow root's top element has no parentElement, so the walk
+    // steps out to its host and on through the page behind it (#1032:
+    // ShyDesk's form draws in a shadow DOM, and stopping there scored its
+    // dark-theme text against the white canvas, at 1.13:1).
     const grounds: string[] = [];
-    for (let at: Element | null = el; at; at = at.parentElement) {
+    const outward = (at: Element): Element | null => {
+      if (at.parentElement) return at.parentElement;
+      const root = at.getRootNode();
+      return root instanceof ShadowRoot ? root.host : null;
+    };
+    for (let at: Element | null = el; at; at = outward(at)) {
       const c = getComputedStyle(at).backgroundColor;
       if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') grounds.push(c);
     }
