@@ -258,7 +258,7 @@ function toolStrings(locale: Locale): ReportableString[] {
   );
 }
 
-/** Every line a legal page shows, headings and date included, as plain forms. */
+/** Every line a legal page shows, headings, date and link words included, as plain forms. */
 function legalStrings(page: PageId, doc: LegalDocument): ReportableString[] {
   const lines = [
     doc.title,
@@ -266,6 +266,11 @@ function legalStrings(page: PageId, doc: LegalDocument): ReportableString[] {
     doc.updated,
     ...doc.sections.map(({ heading }) => heading),
     ...legalTexts(doc),
+    // A link's words stand alone on the page too, so they can be quoted alone.
+    ...[...doc.lead, ...doc.sections.flatMap(({ blocks }) => blocks)]
+      .flatMap((block) => (block.kind === 'p' ? [block.parts] : block.items))
+      .flat()
+      .flatMap((part) => (typeof part === 'string' ? [] : [part.text])),
   ];
   return lines.map((text, at) => ({
     key: `legal.${page}[${at}]`,

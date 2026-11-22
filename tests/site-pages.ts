@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { nonEmpty } from './source-files';
 import {
   LOCALES,
+  localeFromPath,
   localisePath,
   getSiteStrings,
   getStrings,
@@ -63,7 +64,9 @@ export const pagesWithoutOwnControls = (): string[] => [
   '/',
   '/support',
   ...ticketPaths(),
-  ...privacyPaths(),
+  // The English privacy page alone: the Indonesian one is a beta locale's
+  // page, so its footer carries the report form's fields (#1082).
+  ...privacyPaths().filter((path) => localeFromPath(path) === 'en'),
 ];
 
 /**

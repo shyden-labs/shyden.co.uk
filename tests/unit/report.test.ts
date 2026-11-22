@@ -91,7 +91,14 @@ describe('the page table', () => {
       PRIVACY_ID.updated,
       ...PRIVACY_ID.sections.map(({ heading }) => heading),
       ...legalTexts(PRIVACY_ID),
+      // A link's words stand alone on the page, so a reader can quote them
+      // alone ("bahasa Inggris", report-completeness on /id/privacy/).
+      ...[...PRIVACY_ID.lead, ...PRIVACY_ID.sections.flatMap((s) => s.blocks)]
+        .flatMap((block) => (block.kind === 'p' ? [block.parts] : block.items))
+        .flat()
+        .flatMap((part) => (typeof part === 'string' ? [] : [part.text])),
     ];
+    expect(lines).toContain('bahasa Inggris');
     expect(lines.length).toBeGreaterThan(20);
     expect(
       searched(
