@@ -20,6 +20,8 @@ import { expectTheSwitchPersists } from '../themes';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 import { robotsDirectives } from '../robots-directives';
 import { expectNotFoundServed } from '../not-found-served';
+import { atLeast44Soft, expectNoScrollSoft } from '../viewport';
+import { contrastRatio } from '../e2e/helpers';
 
 // Runs against the REAL deployed dev site behind Basic auth. baseURL +
 // httpCredentials are supplied by playwright.dev.config.ts (env-driven).
@@ -264,6 +266,71 @@ test(
       timeout: 30_000,
     });
     stage('thread shown');
+  },
+);
+
+// AC5's other half (#1032): the support form as dev ShyDesk draws it, in its
+// shadow DOM, takes a 44 px touch on every control, adds no sideways scroll
+// at 320 px and paints its text at AA, in the light theme and the dark. The
+// e2e suite cannot see it: its production build loads live ShyDesk, which
+// does not serve yet. One visit per theme; each width is a step.
+test(
+  'the support form fits 320 px, takes a 44 px touch and reads at AA in both themes',
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot draw its form',
+    },
+  },
+  async ({ page }) => {
+    test.setTimeout(60_000);
+    const form = page.locator('shydesk-support');
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await test.step(`${colorScheme} theme at 320 px`, async () => {
+        await page.setViewportSize({ width: 320, height: 900 });
+        await page.emulateMedia({ colorScheme });
+        await page.goto('/support');
+        await expect(
+          form.getByRole('button', { name: 'Send', exact: true }),
+        ).toBeVisible({ timeout: 20_000 });
+        // No saved choice, so the page follows the system's scheme.
+        expect(
+          await page.evaluate(
+            () => matchMedia('(prefers-color-scheme: dark)').matches,
+          ),
+          `the page is showing its ${colorScheme} theme`,
+        ).toBe(colorScheme === 'dark');
+        await expectNoScrollSoft(page, `/support at 320 px, ${colorScheme}`);
+
+        const controls = await form
+          .locator('input:not([type="hidden"]), select, textarea, button')
+          .filter({ visible: true })
+          .all();
+        expect(controls.length, 'controls drawn in the form').toBeGreaterThan(
+          0,
+        );
+        for (const [i, control] of controls.entries())
+          await atLeast44Soft(
+            control,
+            `${colorScheme}: control ${i} (${await control.evaluate((el) => el.outerHTML.slice(0, 80))})`,
+          );
+
+        const texts = await form
+          .locator('label, legend, button, p, h1, h2, h3, a, span')
+          .filter({ visible: true, hasText: /\S/ })
+          .all();
+        expect(texts.length, 'text drawn in the form').toBeGreaterThan(0);
+        for (const text of texts)
+          expect
+            .soft(
+              await contrastRatio(text),
+              `${colorScheme}: "${(await text.innerText()).slice(0, 40)}" contrast`,
+            )
+            .toBeGreaterThanOrEqual(4.5);
+      });
+    }
   },
 );
 
