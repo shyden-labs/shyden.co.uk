@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { ENGINES, engineUse } from './tests/engines';
 import { onBuild } from './tests/sanity-on-build';
 
 // Post-deploy sanity config: runs tests/dev/*.spec.ts against the REAL
@@ -39,9 +40,9 @@ export default defineConfig({
     httpCredentials: password ? { username: 'dev', password } : undefined,
   },
   // Every engine on every dev deploy (#1032 AC5, Shyden 2026-11-22).
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
+  // The e2e suite's own three, WebKit into the silent audio sink (#919).
+  projects: ENGINES.map(({ name, device }) => ({
+    name,
+    use: engineUse(devices[device], process.env),
+  })),
 });

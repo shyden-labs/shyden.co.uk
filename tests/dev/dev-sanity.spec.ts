@@ -144,6 +144,7 @@ test(
 // product links below are checked for.
 test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host", async ({
   page,
+  browserName,
 }) => {
   await page.goto('/');
   const video = page.locator('#yawelo-idle video');
@@ -154,8 +155,15 @@ test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host
     return v.play();
   });
   await expect
-    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-    .toBeGreaterThan(0.5);
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused))
+    .toBe(false);
+  // CI's Linux WebKit never advances the clock after play() (measured
+  // 2026-10-20; the e2e suite's ruling, Shyden 2026-11-18, #1048), so the
+  // clock is the engine's and is asserted where the engine moves it.
+  if (browserName !== 'webkit')
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0.5);
   expect(
     await video.evaluate((v: HTMLVideoElement) => ({
       video: new URL(v.currentSrc).origin,
