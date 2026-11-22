@@ -89,10 +89,10 @@ export const siteEn = {
       'Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.',
   },
 
-  // The footer's link to the privacy page (#1080), on every page. The page
-  // itself is English only and its text is never translated; `englishOnly`
-  // is the one line other languages carry beside the link (the global
-  // legal-pages rule, 2026-11-08), Indonesian included until #1082.
+  // The footer's link to the privacy page (#1080), on every page. The page is
+  // written in English and Indonesian alone (#1082), never in a catalogue;
+  // `englishOnly` is the one line zh, vi and th carry beside the link (the
+  // global legal-pages rule, 2026-11-08). en and id never show it.
   legal: {
     privacy: 'Privacy',
     englishOnly: 'This page is available in English only.',

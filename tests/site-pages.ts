@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { nonEmpty } from './source-files';
 import {
   LOCALES,
+  localeFromPath,
   localisePath,
   getSiteStrings,
   getStrings,
@@ -63,16 +64,19 @@ export const pagesWithoutOwnControls = (): string[] => [
   '/',
   '/support',
   ...ticketPaths(),
-  ...privacyPaths(),
+  // The English privacy page alone: the Indonesian one is a beta locale's
+  // page, so its footer carries the report form's fields (#1082).
+  ...privacyPaths().filter((path) => localeFromPath(path) === 'en'),
 ];
 
 /**
- * The privacy page (#1080), as a request path. English only and in the
- * sitemap, so it is not one of `sitePaths()`, which every locale serves.
- * Named, not read from its folder: the tests declare the page they expect,
- * and `privacy-page.test.ts` holds the route files to exactly this one.
+ * The privacy page as request paths: English (#1080) and Indonesian (#1082),
+ * the only languages a legal page is written in, so they are not among
+ * `sitePaths()`, which every locale serves. Named, not read from a folder:
+ * the tests declare the pages they expect, and `privacy-page.test.ts` holds
+ * the route files to exactly these two.
  */
-export const privacyPaths = (): string[] => ['/privacy/'];
+export const privacyPaths = (): string[] => ['/privacy/', '/id/privacy/'];
 
 const DOCS_DIR = 'src/pages/api/docs';
 

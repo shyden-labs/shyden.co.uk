@@ -1,22 +1,29 @@
 ---
 // One legal document, rendered (#1080). The text is data (`src/lib/legal/`),
-// kept out of every catalogue, so the page is English only: no language
-// switcher, no hreflang, and no other locale's route.
+// kept out of every catalogue, written in English and Indonesian alone
+// (#1082): the two are each other's alternates, and no other locale has a
+// route. The header offers no switcher, whose other links would answer 404;
+// each text links to the other in its opening.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import LegalBlocks from '../LegalBlocks.astro';
 import type { LegalDocument } from '../../lib/legal/privacy';
+import type { Locale } from '../../lib/i18n';
 
 interface Props {
   doc: LegalDocument;
+  lang: Locale;
+  /** Every locale the document is written in. */
+  locales: readonly Locale[];
 }
-const { doc } = Astro.props;
+const { doc, lang, locales } = Astro.props;
 ---
 
 <BaseLayout
   title={doc.title}
   description={doc.description}
-  lang="en"
+  lang={lang}
   localised={false}
+  locales={locales}
 >
   <article class="legal-doc">
     <h1>{doc.heading}</h1>

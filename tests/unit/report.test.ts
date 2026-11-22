@@ -7,6 +7,7 @@ import {
   matchingKeys,
   normalise,
   pageIdFromPath,
+  pageLocales,
   pagePath,
   reportOptions,
   reportIdStem,
@@ -24,6 +25,7 @@ import {
 import { isMessageTemplate } from '../../src/lib/i18n/message';
 import { catalogueLeaves } from '../../src/lib/catalogue-leaves';
 import { renderedOn } from '../../src/lib/i18n/label-check';
+import { PRIVACY_ID, legalTexts } from '../../src/lib/legal/privacy';
 import { nonEmpty, searched } from '../source-files';
 
 const ELLIPSIS = String.fromCharCode(0x2026);
@@ -38,18 +40,20 @@ const siteLeafKeys = (locale: Locale, section: string) =>
     .map(([key]) => key);
 
 describe('the page table', () => {
-  it('knows the four pages with a footer, and the 404 besides', () => {
+  it('knows the five pages with a footer, and the 404 besides', () => {
     expect(FOOTER_PAGE_IDS).toEqual([
       'home',
       'yeetalk-calculators',
       'classroom-groups',
       'support',
+      'privacy',
     ]);
     expect(PAGE_IDS).toEqual([
       'home',
       'yeetalk-calculators',
       'classroom-groups',
       'support',
+      'privacy',
       'not-found',
     ]);
     expect(isPageId('home')).toBe(true);
@@ -67,6 +71,41 @@ describe('the page table', () => {
     ['/classroom-groups', 'classroom-groups'],
   ])('reads %s as %s', (path, page) => {
     expect(pageIdFromPath(path)).toBe(page);
+  });
+
+  // #1082: the privacy page exists in English and Indonesian alone.
+  it('serves the privacy page in en and id alone, every other page in every locale', () => {
+    expect(pageLocales('privacy')).toEqual(['en', 'id']);
+    for (const page of PAGE_IDS.filter((p) => p !== 'privacy'))
+      expect(pageLocales(page), page).toEqual(LOCALES);
+    expect(pageIdFromPath('/id/privacy/')).toBe('privacy');
+    expect(pageIdFromPath('/privacy/')).toBe('privacy');
+    expect(pagePath('privacy', 'id')).toBe('/id/privacy/');
+  });
+
+  it('offers every line of the Indonesian privacy page to report', () => {
+    const offered = new Set(reportOptions('privacy', 'id'));
+    const lines = [
+      PRIVACY_ID.title,
+      PRIVACY_ID.heading,
+      PRIVACY_ID.updated,
+      ...PRIVACY_ID.sections.map(({ heading }) => heading),
+      ...legalTexts(PRIVACY_ID),
+      // A link's words stand alone on the page, so a reader can quote them
+      // alone ("bahasa Inggris", report-completeness on /id/privacy/).
+      ...[...PRIVACY_ID.lead, ...PRIVACY_ID.sections.flatMap((s) => s.blocks)]
+        .flatMap((block) => (block.kind === 'p' ? [block.parts] : block.items))
+        .flat()
+        .flatMap((part) => (typeof part === 'string' ? [] : [part.text])),
+    ];
+    expect(lines).toContain('bahasa Inggris');
+    expect(lines.length).toBeGreaterThan(20);
+    expect(
+      searched(
+        lines.filter((line) => !offered.has(line)),
+        { of: lines, what: 'Indonesian privacy lines' },
+      ),
+    ).toEqual([]);
   });
 
   it('reads an unknown path as no page', () => {

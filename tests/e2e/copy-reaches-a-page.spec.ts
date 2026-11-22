@@ -194,13 +194,14 @@ const ABSENCE_RULES: ReadonlyArray<{
       'from this rule failing its own reverse-check, not from review.',
   },
   {
-    locales: ['en'],
+    locales: ['en', 'id'],
     paths: ['legal.englishOnly'],
     why:
       'The footer note "This page is available in English only." goes beside ' +
-      'the privacy link on pages in another language (#1080). An English ' +
-      'page needs no such note, so the English sentence is never served; the ' +
-      'key exists only because every catalogue has the same shape.',
+      'the privacy link on pages in a language the privacy page is not ' +
+      'written in (#1080). It is written in English and Indonesian (#1082), ' +
+      'so neither needs the note and neither sentence is served; the key ' +
+      'exists only because every catalogue has the same shape.',
   },
 ];
 

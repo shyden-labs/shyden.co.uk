@@ -2,6 +2,7 @@ import { expect } from '../fixtures';
 import { PREFIXED_LOCALES } from '../../../src/lib/i18n';
 import {
   FOOTER_PAGE_IDS,
+  pageLocales,
   pagePath,
   reportOptions,
   type FooterPageId,
@@ -16,7 +17,9 @@ import { DEFAULT_THEME, type PageCheck } from '../page-checks';
  */
 
 const FOOTED = PREFIXED_LOCALES.flatMap((locale) =>
-  FOOTER_PAGE_IDS.map((id) => ({ locale, id, path: pagePath(id, locale) })),
+  FOOTER_PAGE_IDS.filter((id) => pageLocales(id).includes(locale)).map(
+    (id) => ({ locale, id, path: pagePath(id, locale) }),
+  ),
 );
 
 const footed = (route: string): { locale: Locale; id: FooterPageId } => {
