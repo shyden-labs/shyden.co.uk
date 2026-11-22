@@ -1,12 +1,13 @@
 # The back-translation engine (#95): LibreTranslate, reading id, zh, vi and th
-# back into English for .github/workflows/back-translation.yml.
+# back into English for `npm run reports:review` and
+# `scripts/i18n-second-read.mjs`. CI no longer runs it: the advisory workflow
+# was cut on Shyden's ruling of 2026-11-08 (#1071).
 #
-# Pinned here rather than in the workflow because Dependabot reads no image
-# out of a workflow file: this is the one place it can bump the digest, and
-# the tag beside it is what makes that bump reviewable. Both are held by
+# Pinned here because this is the one place Dependabot can bump the digest,
+# and the tag beside it is what makes that bump reviewable. Both are held by
 # tests/guards/supply-chain.test.ts.
 #
-# Run it locally the same way CI does:
+# Run it locally:
 #
 #   docker build -t back-translation-engine docker/libretranslate
 #   docker run -p 5000:5000 back-translation-engine
