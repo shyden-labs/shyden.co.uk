@@ -277,7 +277,7 @@ test(
 test(
   'the support form fits 320 px, takes a 44 px touch and reads at AA in both themes',
   {
-    tag: '@deployed-only',
+    tag: ['@deployed-only', '@emulated-viewport'],
     annotation: {
       type: 'deployed-only',
       description:
