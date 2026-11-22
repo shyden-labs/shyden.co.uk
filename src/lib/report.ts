@@ -15,6 +15,7 @@ import {
   getSiteStrings,
   isBetaLocale,
   isLocale,
+  LOCALES,
   localisePath,
   rawCatalogue,
   type Locale,
@@ -49,6 +50,7 @@ export const FOOTER_PAGE_IDS = [
   'yeetalk-calculators',
   'classroom-groups',
   'support',
+  'privacy',
 ] as const;
 export type FooterPageId = (typeof FOOTER_PAGE_IDS)[number];
 
@@ -125,6 +127,13 @@ const PAGES: Record<PageId, PageEntry> = {
     toolCatalogue: false,
     chrome: true,
   },
+  // #1082 stub: the privacy page's entry, filled in with its code.
+  privacy: {
+    route: '/privacy',
+    localised: true,
+    toolCatalogue: false,
+    chrome: true,
+  },
   'not-found': {
     route: '/404',
     localised: false,
@@ -135,6 +144,9 @@ const PAGES: Record<PageId, PageEntry> = {
     unshown: new Set(['site.notFound.title', 'site.notFound.description']),
   },
 };
+
+/** #1082 stub: the locales a page is served in. */
+export const pageLocales = (_page: PageId): readonly Locale[] => LOCALES;
 
 export const isPageId = (value: unknown): value is PageId =>
   typeof value === 'string' && (PAGE_IDS as readonly string[]).includes(value);

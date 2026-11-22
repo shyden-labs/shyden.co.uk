@@ -201,6 +201,16 @@ export const PRIVACY_EN: LegalDocument = {
   ],
 };
 
+/** #1082 stub: the Indonesian copy, written with its code. */
+export const PRIVACY_ID: LegalDocument = {
+  title: '',
+  description: '',
+  heading: '',
+  updated: '',
+  lead: [],
+  sections: [],
+};
+
 const words = (run: readonly Inline[]): string =>
   run.map((part) => (typeof part === 'string' ? part : part.text)).join('');
 

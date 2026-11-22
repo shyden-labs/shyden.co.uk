@@ -67,12 +67,13 @@ export const pagesWithoutOwnControls = (): string[] => [
 ];
 
 /**
- * The privacy page (#1080), as a request path. English only and in the
- * sitemap, so it is not one of `sitePaths()`, which every locale serves.
- * Named, not read from its folder: the tests declare the page they expect,
- * and `privacy-page.test.ts` holds the route files to exactly this one.
+ * The privacy page as request paths: English (#1080) and Indonesian (#1082),
+ * the only languages a legal page is written in, so they are not among
+ * `sitePaths()`, which every locale serves. Named, not read from a folder:
+ * the tests declare the pages they expect, and `privacy-page.test.ts` holds
+ * the route files to exactly these two.
  */
-export const privacyPaths = (): string[] => ['/privacy/'];
+export const privacyPaths = (): string[] => ['/privacy/', '/id/privacy/'];
 
 const DOCS_DIR = 'src/pages/api/docs';
 
