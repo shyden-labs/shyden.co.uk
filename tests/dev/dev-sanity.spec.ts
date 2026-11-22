@@ -1,4 +1,5 @@
 import { tapOn } from '../real-touch';
+import { PRIVACY_EN } from '../../src/lib/legal/privacy';
 import { typeInto } from '../real-typing';
 import { chooseOption } from '../real-select';
 import { supportTestAddress } from './support-address';
@@ -547,3 +548,12 @@ test(
     );
   },
 );
+
+// #1080: the English privacy page every footer links to.
+test('the privacy page is served on dev', async ({ page }) => {
+  expect((await page.goto('/privacy/'))?.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    PRIVACY_EN.heading,
+  );
+  await expect(page.locator('main')).toContainText(PRIVACY_EN.updated);
+});

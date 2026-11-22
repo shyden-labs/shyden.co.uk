@@ -83,7 +83,9 @@ export const INTENTIONAL_JOINS: Array<{
   },
   {
     left: /\S$/,
-    right: /^[.,。，]$/,
+    // Alone, or followed by a space and the next sentence (#1080's
+    // "…privacy policy. ShyDesk's own…"); never by a letter.
+    right: /^[.,。，](\s|$)/,
     why: 'punctuation closing a sentence that ended in a link',
   },
   {

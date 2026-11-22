@@ -48,6 +48,10 @@ const reportPage = pageIdFromPath(Astro.url.pathname);
     <p>
       <a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a>
     </p>
+    <p class="legal-links">
+      <a href="/privacy/">{t.legal.privacy}</a>
+      {lang !== 'en' && <span data-english-only>{t.legal.englishOnly}</span>}
+    </p>
   </div>
 </footer>
 <style>
@@ -68,5 +72,13 @@ const reportPage = pageIdFromPath(Astro.url.pathname);
     min-width: 44px;
     min-height: 44px;
     color: var(--accent);
+  }
+  /* The gap, never a space in the markup: a flex container drops the
+     whitespace between its items (CLAUDE.md, the display: flex rule). */
+  .legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.75rem;
   }
 </style>

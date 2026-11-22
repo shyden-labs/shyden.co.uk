@@ -1,0 +1,7 @@
+---
+// Route only: the privacy page (#1080), English alone, served at /privacy/.
+import LegalPage from '../../components/pages/LegalPage.astro';
+import { PRIVACY_EN } from '../../lib/legal/privacy';
+---
+
+<LegalPage doc={PRIVACY_EN} />

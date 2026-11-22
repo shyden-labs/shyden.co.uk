@@ -1,0 +1,59 @@
+---
+// One legal document, rendered (#1080). The text is data (`src/lib/legal/`),
+// kept out of every catalogue, so the page is English only: no language
+// switcher, no hreflang, and no other locale's route.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LegalBlocks from '../LegalBlocks.astro';
+import type { LegalDocument } from '../../lib/legal/privacy';
+
+interface Props {
+  doc: LegalDocument;
+}
+const { doc } = Astro.props;
+---
+
+<BaseLayout
+  title={doc.title}
+  description={doc.description}
+  lang="en"
+  localised={false}
+>
+  <article class="legal-doc">
+    <h1>{doc.heading}</h1>
+    <p class="updated">{doc.updated}</p>
+    <LegalBlocks blocks={doc.lead} />
+    {doc.sections.map((section) => (
+      <section>
+        <h2>{section.heading}</h2>
+        <LegalBlocks blocks={section.blocks} />
+      </section>
+    ))}
+  </article>
+</BaseLayout>
+<style is:global>
+  /* Global: LegalBlocks' paragraphs and lists carry its scope, not this
+     page's. Every rule is held under .legal-doc. */
+  .legal-doc {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 4rem var(--space);
+    line-height: 1.6;
+  }
+  .legal-doc h2 {
+    margin-top: 2.5rem;
+  }
+  .legal-doc p,
+  .legal-doc ul {
+    max-width: 70ch;
+  }
+  .legal-doc li + li {
+    margin-top: 0.5rem;
+  }
+  .legal-doc a {
+    color: var(--accent);
+    overflow-wrap: anywhere;
+  }
+  .legal-doc .updated {
+    color: var(--ink-soft);
+  }
+</style>

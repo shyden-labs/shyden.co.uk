@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { LOCALES, localisePath } from '../../src/lib/i18n';
-import { docsPaths, sitePaths, ticketPaths } from '../site-pages';
+import { docsPaths, privacyPaths, sitePaths, ticketPaths } from '../site-pages';
 
 /** The not-found path every published-page sweep visits. */
 export const NOT_FOUND_PATH = '/definitely-not-a-page';
@@ -20,6 +20,7 @@ export const PUBLISHED_ROUTES: readonly string[] = [
   ),
   ...docsPaths(),
   ...ticketPaths(),
+  ...privacyPaths(),
   NOT_FOUND_PATH,
 ];
 
