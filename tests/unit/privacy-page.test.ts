@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  PRIVACY,
   PRIVACY_EN,
   PRIVACY_ID,
   legalTexts,
@@ -123,10 +124,11 @@ describe('the privacy pages (#1080, #1082)', () => {
   });
 
   // AC5 (#1082): legal pages exist in English and Indonesian alone (global
-  // rule, 2026-11-08). A route for any other locale fails here.
+  // rule, 2026-11-08). A copy or a route for any other locale fails here.
   it('only the English and Indonesian routes serve it', () => {
+    expect(Object.keys(PRIVACY).sort()).toEqual(['en', 'id']);
     expect(filesUnder('src/pages', (path) => /privacy/i.test(path))).toEqual([
-      'src/pages/id/privacy/index.astro',
+      'src/pages/[locale]/privacy/index.astro',
       'src/pages/privacy/index.astro',
     ]);
   });

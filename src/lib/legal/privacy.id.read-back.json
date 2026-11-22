@@ -1,1 +1,138 @@
-[]
+[
+  {
+    "id": "Privasi — Shyden",
+    "back": "Privacy — Shyden"
+  },
+  {
+    "id": "Apa yang disimpan shyden.co.uk tentang pengunjung, mengapa, dan berapa lama.",
+    "back": "What shyden.co.uk stores about visitors, why, and for how long."
+  },
+  {
+    "id": "Privasi",
+    "back": "Privacy"
+  },
+  {
+    "id": "Terakhir diperbarui 22 November 2026.",
+    "back": "Last updated November 22, 2026."
+  },
+  {
+    "id": "Singkatnya",
+    "back": "In short"
+  },
+  {
+    "id": "Laporan terjemahan",
+    "back": "Translation report"
+  },
+  {
+    "id": "Batas harian laporan",
+    "back": "Daily report limit"
+  },
+  {
+    "id": "Formulir dukungan",
+    "back": "Support form"
+  },
+  {
+    "id": "Hosting dan catatan permintaan",
+    "back": "Hosting and request logs"
+  },
+  {
+    "id": "Hanya disimpan di peramban Anda",
+    "back": "Only stored in your browser"
+  },
+  {
+    "id": "Mengapa data ini digunakan",
+    "back": "Why this data is used"
+  },
+  {
+    "id": "Situs lain",
+    "back": "Other sites"
+  },
+  {
+    "id": "Hak Anda",
+    "back": "Your Rights"
+  },
+  {
+    "id": "Perubahan",
+    "back": "Change"
+  },
+  {
+    "id": "Halaman ini menjelaskan apa yang disimpan shyden.co.uk tentang pengunjung, mengapa, dan berapa lama. Situs ini dijalankan oleh Shyden Labs dari Indonesia, dan Shyden Labs bertanggung jawab atas data yang dijelaskan di sini.",
+    "back": "This page explains what shyden.co.uk stores about visitors, why, and for how long. This site is operated by Shyden Labs from Indonesia, and Shyden Labs is responsible for the data described here."
+  },
+  {
+    "id": "Halaman ini juga tersedia dalam bahasa Inggris. Bagi penduduk Indonesia, teks bahasa Indonesia ini yang berlaku; bagi semua orang lainnya, teks bahasa Inggris yang berlaku.",
+    "back": "This page is also available in English. For residents of Indonesia, the Indonesian text applies; for all others, the English text applies."
+  },
+  {
+    "id": "Tanpa cookie, tanpa analitik, tanpa iklan, dan tanpa pelacakan.",
+    "back": "No cookies, no analytics, no ads, and no tracking."
+  },
+  {
+    "id": "Tanpa akun. Tidak ada yang meminta nama atau alamat email, kecuali formulir dukungan.",
+    "back": "No accounts. Nothing asks for your name or email address, except for the support form."
+  },
+  {
+    "id": "Pembuat Kelompok Kelas tidak pernah menyimpan atau mengirim daftar kelas.",
+    "back": "The Class Group Creator never saves or sends class lists."
+  },
+  {
+    "id": "Halaman dalam bahasa Indonesia, Mandarin, Vietnam, dan Thai memiliki formulir untuk melaporkan kesalahan terjemahan. Sebuah laporan menyimpan kata-kata yang dikutip, usulan kata-kata, catatan opsional, halaman dan bahasa asalnya, serta waktu laporan itu tiba. Laporan tidak menyimpan nama, alamat email, atau alamat internet, jadi mohon jangan menuliskan data pribadi di catatan.",
+    "back": "The Indonesian, Mandarin, Vietnamese, and Thai pages have forms for reporting translation errors. A report stores the quoted words, suggested words, optional notes, the page and language of origin, and the time the report was submitted. Reports do not store names, email addresses, or internet addresses, so please do not include personal information in the notes."
+  },
+  {
+    "id": "Laporan dihapus setelah sekitar satu tahun: begitu sebuah laporan berumur satu tahun, laporan itu dihapus saat laporan berikutnya tiba.",
+    "back": "Reports are deleted after about a year: once a report is one year old, it is deleted when the next report arrives."
+  },
+  {
+    "id": "Agar formulir tidak dibanjiri, setiap sambungan internet hanya dapat mengirim sejumlah laporan terbatas per hari. Untuk menghitungnya, situs mengubah alamat sambungan dan tanggal menjadi sebuah kode yang, tanpa kunci rahasia, tidak dapat diurai kembali menjadi alamat tersebut. Alamat itu sendiri tidak pernah disimpan, dan hitungan setiap hari dihapus saat laporan pertama dari hari yang lebih baru tiba.",
+    "back": "To prevent the form from being overloaded, each internet connection can only send a limited number of reports per day. To calculate them, the site converts the connection address and date into a code that, without a secret key, cannot be decoded back into the address. The address itself is never stored, and each day's count is cleared when the first report from a newer day arrives."
+  },
+  {
+    "id": "Halaman dukungan menggunakan ShyDesk, layanan dukungan yang dijalankan Shyden Labs untuk semua produknya. Formulir ini meminta alamat email, subjek, kategori, dan pesan, serta dapat menerima foto dan video pendek.",
+    "back": "The support page uses ShyDesk, a support service run by Shyden Labs for all its products. This form asks for an email address, subject, category, and message, and can accept photos and short videos."
+  },
+  {
+    "id": "Pesan, balasannya, dan alamat email disimpan hingga satu tahun setelah percakapan ditutup. Foto dan video dihapus 30 hari setelah percakapan ditutup. Jika percakapan dibuka kembali, hitungan waktunya berhenti berjalan. Apa pun yang tercakup oleh kewajiban hukum untuk menyimpannya, atau yang dilaporkan kepada pihak berwenang, disimpan selama kewajiban itu berlaku.",
+    "back": "Messages, replies, and email addresses are retained for up to one year after the conversation is closed. Photos and videos are deleted 30 days after the conversation is closed. If the conversation is reopened, the time count stops. Anything covered by a legal obligation to retain, or reported to authorities, is retained for as long as that obligation lasts."
+  },
+  {
+    "id": "Alamat internet Anda diperiksa oleh Cloudflare Turnstile, yang mencegah spam otomatis, dan digunakan untuk menghitung permintaan agar tidak ada yang dapat membanjiri formulir. Hitungan tersebut dihapus dalam waktu sekitar satu jam.",
+    "back": "Your internet address is checked by Cloudflare Turnstile, which prevents automated spam, and is used to count requests to prevent anyone from flooding the form. The count is cleared within about an hour."
+  },
+  {
+    "id": "Balasan diberitahukan melalui email. Email itu hanya berisi nama produk dan tautan pribadi ke percakapan, tidak pernah isi pesannya. Email dikirim melalui server email Sparked Host di Prancis.",
+    "back": "Replies are notified via email. The email only contains the product name and a personal link to the conversation, never the message itself. The email is sent through Sparked Host's email server in France."
+  },
+  {
+    "id": "Siapa pun yang memiliki tautan pribadi itu dapat membaca seluruh percakapan dan membalasnya, jadi jangan bagikan tautan itu kepada orang lain.",
+    "back": "Anyone who has that private link can read the entire conversation and reply to it, so don't share the link with anyone else."
+  },
+  {
+    "id": "Situs dan ShyDesk berjalan di Cloudflare, yang menyimpan laporan, hitungan, dan percakapan dukungan. Data ShyDesk disimpan di wilayah Asia-Pasifik Cloudflare. Cloudflare menangani setiap permintaan ke keduanya dan menyimpan catatannya sendiri tentang permintaan tersebut, berdasarkan kebijakan privasi Cloudflare. Catatan permintaan milik ShyDesk sendiri, yang mencakup alamat internet Anda, peramban Anda, dan perkiraan lokasi, disimpan selama 3 hari.",
+    "back": "Both the site and ShyDesk run on Cloudflare, which stores reports, counts, and support conversations. ShyDesk data is stored in Cloudflare's Asia-Pacific region. Cloudflare handles each request to both sites and keeps its own logs of those requests, in accordance with Cloudflare's privacy policy. ShyDesk's own request logs, which include your internet address, browser, and approximate location, are retained for three days."
+  },
+  {
+    "id": "Beberapa pilihan disimpan di peramban Anda, di perangkat Anda, dan tidak pernah dikirim ke mana pun: tema terang atau gelap, dan pada Pembuat Kelompok Kelas, apakah petunjuknya terbuka dan apakah suara aktif. Menghapus data situs ini di peramban Anda akan menghapus pilihan tersebut.",
+    "back": "Some choices are stored in your browser, on your device, and never sent anywhere else: light or dark theme, and in the Classroom Group Creator, whether hints are open, and whether sound is on. Clearing this site's data in your browser will remove these choices."
+  },
+  {
+    "id": "Daftar kelas tetap berada di halaman yang terbuka dan di file apa pun yang Anda simpan darinya. Daftar itu tidak pernah dikirim ke situs atau disimpan olehnya.",
+    "back": "The class list remains on the open page and in any files you save from it. It is never sent to the site or stored by it."
+  },
+  {
+    "id": "Laporan hanya digunakan untuk memperbaiki terjemahan, dan formulir dukungan hanya untuk menjawab Anda. Hitungan dan catatan hanya digunakan agar situs dan formulir tetap berfungsi dan untuk mencegah penyalahgunaan. Semuanya didasarkan pada kepentingan yang sah, berdasarkan Pasal 20 ayat (2) huruf f Undang-Undang Pelindungan Data Pribadi Indonesia (UU 27/2022), dan tidak ada yang dijual atau dibagikan untuk iklan.",
+    "back": "Reports are used only to improve translations, and support forms are used only to respond to you. Counts and records are used only to keep the site and forms running and to prevent abuse. All data is based on legitimate interests, as stipulated in Article 20 paragraph (2) letter f of the Indonesian Personal Data Protection Law (Law 27/2022), and nothing is sold or shared for advertising."
+  },
+  {
+    "id": "Tautan ke ShyTalk, Yawelo Idle, dan situs lain mengarah ke layanan yang memiliki halaman privasinya sendiri.",
+    "back": "Links to ShyTalk, Yawelo Idle, and other sites lead to services that have their own privacy pages."
+  },
+  {
+    "id": "Anda dapat menanyakan apa yang disimpan tentang Anda, meminta agar data itu diperbaiki atau dihapus, atau menolak penggunaannya. Laporan terjemahan tidak menyimpan apa pun yang mengidentifikasi pengirimnya, sehingga laporan itu hanya dapat ditemukan dari kata-katanya: kutip kata-kata itu. Kirim permintaan apa pun melalui halaman dukungan. Anda juga dapat mengajukan pengaduan kepada otoritas pelindungan data di tempat Anda tinggal.",
+    "back": "You can ask what is stored about you, request that it be corrected or deleted, or object to its use. Translation reports don't store anything that identifies the sender, so they can only be found by their words: quote them. Submit any requests through the support page. You can also file a complaint with your local data protection authority."
+  },
+  {
+    "id": "Perubahan pada halaman ini diumumkan di sini, dengan tanggal baru, sebelum berlaku.",
+    "back": "Changes to this page are posted here, with the new date, before they come into effect."
+  }
+]

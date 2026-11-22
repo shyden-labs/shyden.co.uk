@@ -100,9 +100,10 @@ test('the sitemap lists the two privacy pages as each other’s alternates, and 
     .filter((body) => body.includes('privacy'))
     .map((body) => ({
       loc: /<loc>([^<]*)<\/loc>/.exec(body)?.[1],
-      alternates: [
-        ...body.matchAll(/hreflang="([^"]+)"\s+href="([^"]+)"/g),
-      ].map(([, lang, href]) => `${lang} ${href}`),
+      alternates: [...body.matchAll(/hreflang="([^"]+)"\s+href="([^"]+)"/g)]
+        .map(([, lang, href]) => `${lang} ${href}`)
+        // The integration writes them in no meaningful order.
+        .sort(),
     }));
   const pair = [`en-GB ${ORIGIN}/privacy/`, `id-ID ${ORIGIN}/id/privacy/`];
   expect(privacy).toEqual([
