@@ -31,6 +31,7 @@ type SanityConfig = (typeof CONFIGS)[number]['config'];
 
 interface ListedTest {
   config: SanityConfig;
+  project: string;
   file: string;
   title: string;
   tags: string[];
@@ -46,7 +47,7 @@ interface JsonSpec {
   title: string;
   file: string;
   tags: string[];
-  tests: { annotations: ListedTest['annotations'] }[];
+  tests: { projectName: string; annotations: ListedTest['annotations'] }[];
 }
 
 interface JsonSuite {
@@ -66,6 +67,7 @@ function collect(
     for (const test of spec.tests)
       into.push({
         config,
+        project: test.projectName,
         file: spec.file,
         title: [...here, spec.title].join(' › '),
         tags: spec.tags,
@@ -137,8 +139,10 @@ function listing(config: SanityConfig, onBuild: boolean): Listing {
   return result;
 }
 
+// Each engine's copy of a test is its own test (#1032: the dev config runs
+// three engines).
 const idOf = (test: ListedTest): string =>
-  `${test.config} › ${test.file} › ${test.title}`;
+  `${test.config} › ${test.project} › ${test.file} › ${test.title}`;
 
 /** Every test tagged `@deployed-only`, from the runs a deploy makes. */
 const deployedOnlyTests = (): ListedTest[] =>
