@@ -22,6 +22,7 @@ import { robotsDirectives } from '../robots-directives';
 import { expectNotFoundServed } from '../not-found-served';
 import { atLeast44Soft, expectNoScrollSoft } from '../viewport';
 import { contrastRatio } from '../e2e/helpers';
+import { eachWidth } from '../each-width';
 
 // Runs against the REAL deployed dev site behind Basic auth. baseURL +
 // httpCredentials are supplied by playwright.dev.config.ts (env-driven).
@@ -277,7 +278,7 @@ test(
 test(
   'the support form fits 320 px, takes a 44 px touch and reads at AA in both themes',
   {
-    tag: ['@deployed-only', '@emulated-viewport'],
+    tag: '@deployed-only',
     annotation: {
       type: 'deployed-only',
       description:
@@ -288,9 +289,8 @@ test(
     test.setTimeout(60_000);
     const form = page.locator('shydesk-support');
     for (const colorScheme of ['light', 'dark'] as const) {
-      await test.step(`${colorScheme} theme at 320 px`, async () => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await page.emulateMedia({ colorScheme });
+      await page.emulateMedia({ colorScheme });
+      await eachWidth(page, [{ width: 320, height: 900 }], async (took) => {
         await page.goto('/support');
         await expect(
           form.getByRole('button', { name: 'Send', exact: true }),
@@ -302,7 +302,10 @@ test(
           ),
           `the page is showing its ${colorScheme} theme`,
         ).toBe(colorScheme === 'dark');
-        await expectNoScrollSoft(page, `/support at 320 px, ${colorScheme}`);
+        await expectNoScrollSoft(
+          page,
+          `/support at ${took.width} px, ${colorScheme}`,
+        );
 
         const controls = await form
           .locator('input:not([type="hidden"]), select, textarea, button')
