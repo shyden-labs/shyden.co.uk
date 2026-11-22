@@ -31,7 +31,7 @@
  * stand-in that never answers. Imports nothing from `node_modules`. Exits 2
  * on an argument, 1 on any failure.
  */
-import { die, messageOf } from './errors.mjs';
+import { messageOf } from './errors.mjs';
 import { githubJson } from './json-answer.mjs';
 import { endpoint, setting } from './settings.mjs';
 import {
@@ -89,7 +89,7 @@ const report = async () => {
   const unread = [];
   const named = process.env.DEPLOY_PIPELINE ?? 'dev';
   if (named !== 'dev' && named !== 'prod')
-    die('DEPLOY_PIPELINE is neither dev nor prod');
+    throw new Error('DEPLOY_PIPELINE is neither dev nor prod');
   /** @type {'dev' | 'prod'} */
   const pipeline = named;
   const { ref: deploysFrom, title } = PIPELINES[pipeline];
@@ -195,14 +195,32 @@ const report = async () => {
   // GitHub drops an assignee it will not accept and still answers 201, so
   // an unassigned notice is read back here: it would reach no one.
   if (!assigned)
-    die(`Opened #${number}, but it is not assigned to ${NOTICE_ASSIGNEE}`);
+    throw new Error(
+      `Opened #${number}, but it is not assigned to ${NOTICE_ASSIGNEE}`,
+    );
   console.log(`Opened #${number}, assigned to ${NOTICE_ASSIGNEE}.`);
 };
 
-if (import.meta.main) {
-  if (process.argv.length > 2) {
+/**
+ * Reports the run the environment names and answers the exit code: 0 once
+ * the notice is sent or none is due, 1 when it could not be sent, 2 for an
+ * argument, which it never takes.
+ *
+ * @param {readonly string[]} argv
+ * @returns {Promise<0 | 1 | 2>}
+ */
+export async function main(argv) {
+  if (argv.length > 0) {
     console.error('usage: node scripts/deploy-failure.mjs');
-    process.exit(2);
+    return 2;
   }
-  await report().catch((error) => die(messageOf(error)));
+  try {
+    await report();
+    return 0;
+  } catch (error) {
+    console.error(`✗ ${messageOf(error)}`);
+    return 1;
+  }
 }
+
+if (import.meta.main) process.exit(await main(process.argv.slice(2)));

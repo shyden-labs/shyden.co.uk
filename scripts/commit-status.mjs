@@ -12,8 +12,8 @@
  * `statuses: write`. Imports nothing from `node_modules`. Exits 2 on an
  * argument, 1 on any failure.
  */
-import { argv } from 'node:process';
-import { die, messageOf } from './errors.mjs';
+import { argv, exit } from 'node:process';
+import { messageOf } from './errors.mjs';
 import { githubJson } from './json-answer.mjs';
 import { endpoint, setting } from './settings.mjs';
 
@@ -42,14 +42,21 @@ export const postStatus = async ({
   );
 };
 
-const main = async () => {
-  const [context, description, ...rest] = argv.slice(2);
-  if (context === undefined || description === undefined || rest.length > 0) {
+/**
+ * Posts the status `args` names and answers the exit code: 0 once GitHub
+ * holds it, 1 when it refused, 2 for a usage mistake, before any request.
+ *
+ * @param {readonly string[]} args
+ * @returns {Promise<0 | 1 | 2>}
+ */
+export const main = async (args) => {
+  if (args.length !== 2) {
     console.error(
       'usage: node scripts/commit-status.mjs <context> <description>',
     );
-    process.exit(2);
+    return 2;
   }
+  const [context, description] = args;
   const server = endpoint('GITHUB_SERVER_URL');
   const repository = setting('GITHUB_REPOSITORY', /^[\w.-]+\/[\w.-]+$/);
   const run = setting('GITHUB_RUN_ID', /^\d+$/);
@@ -66,9 +73,11 @@ const main = async () => {
       timeoutMs: REQUEST_TIMEOUT_MS,
     });
   } catch (error) {
-    die(`${context}: ${messageOf(error)}`);
+    console.error(`✗ ${context}: ${messageOf(error)}`);
+    return 1;
   }
   console.log(`Posted ${context}=success on ${sha}`);
+  return 0;
 };
 
-if (import.meta.main) await main();
+if (import.meta.main) exit(await main(argv.slice(2)));
