@@ -89,6 +89,15 @@ export const siteEn = {
       'Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.',
   },
 
+  // The footer's link to the privacy page (#1080), on every page. The page
+  // itself is English only and its text is never translated; `englishOnly`
+  // is the one line other languages carry beside the link (the global
+  // legal-pages rule, 2026-11-08), Indonesian included until #1082.
+  legal: {
+    privacy: 'Privacy',
+    englishOnly: 'This page is available in English only.',
+  },
+
   calculators: {
     title: 'YeeTalk Calculators — Shyden',
     description:
@@ -264,6 +273,11 @@ export const siteId: SiteStrings = {
       'Ada pertanyaan, masalah, atau ide tentang produk Shyden Labs? Kirim pesan di sini dan balasannya dikirim lewat email.',
   },
 
+  legal: {
+    privacy: 'Privasi',
+    englishOnly: 'Halaman ini hanya tersedia dalam bahasa Inggris.',
+  },
+
   calculators: {
     title: 'Kalkulator YeeTalk — Shyden',
     description:
@@ -418,6 +432,11 @@ export const siteZh: SiteStrings = {
     heading: '支持',
     intro:
       '对 Shyden Labs 的任何产品有疑问、问题或建议吗？请在此发送消息，回复将通过电子邮件发送。',
+  },
+
+  legal: {
+    privacy: '隐私',
+    englishOnly: '本页面仅提供英文版本。',
   },
   calculators: {
     title: 'YeeTalk 计算器 — Shyden',
@@ -575,6 +594,11 @@ export const siteVi: SiteStrings = {
     intro:
       'Bạn có thắc mắc, vấn đề hay ý tưởng nào về bất kỳ sản phẩm nào của Shyden Labs không? Hãy gửi tin nhắn tại đây, câu trả lời sẽ được gửi qua email.',
   },
+
+  legal: {
+    privacy: 'Quyền riêng tư',
+    englishOnly: 'Trang này chỉ có sẵn bằng tiếng Anh.',
+  },
   calculators: {
     title: 'Máy tính YeeTalk — Shyden',
     description:
@@ -729,6 +753,11 @@ export const siteTh: SiteStrings = {
     heading: 'การสนับสนุน',
     intro:
       'มีคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ของ Shyden Labs ไหม? ส่งข้อความที่นี่ แล้วคำตอบจะส่งถึงทางอีเมล',
+  },
+
+  legal: {
+    privacy: 'ความเป็นส่วนตัว',
+    englishOnly: 'หน้านี้มีเฉพาะภาษาอังกฤษเท่านั้น',
   },
   calculators: {
     title: 'เครื่องคำนวณ YeeTalk — Shyden',

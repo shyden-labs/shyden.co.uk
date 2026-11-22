@@ -1311,6 +1311,16 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "隐私": {
+        "english": "privacy",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "本页面仅提供英文版本。": {
+        "english": "This page is available in English only.",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
       }
     },
     "th": {
@@ -2656,6 +2666,16 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "ความเป็นส่วนตัว": {
+        "english": "privacy",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "หน้านี้มีเฉพาะภาษาอังกฤษเท่านั้น": {
+        "english": "This page is available in English only.",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
       }
     },
     "id": {
@@ -4079,6 +4099,16 @@
         "writers": ["no DeepL draft"],
         "verdict": "agrees",
         "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Privasi": {
+        "english": "Privacy",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees"
+      },
+      "Halaman ini hanya tersedia dalam bahasa Inggris.": {
+        "english": "This page is available in English only.",
+        "writers": ["no DeepL draft"],
+        "verdict": "agrees"
       }
     },
     "vi": {
@@ -5469,6 +5499,17 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees",
         "note": "read beside the English, 2026-11-20 (#1032)"
+      },
+      "Quyền riêng tư": {
+        "english": "Privacy",
+        "writers": ["DeepL"],
+        "verdict": "agrees"
+      },
+      "Trang này chỉ có sẵn bằng tiếng Anh.": {
+        "english": "This page is only available in English.",
+        "writers": ["DeepL"],
+        "verdict": "agrees",
+        "note": "word order only: the same sentence"
       }
     }
   },

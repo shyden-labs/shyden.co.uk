@@ -103,10 +103,16 @@ const xDefault = new URL(localisePath(Astro.url.pathname, 'en'), siteOrigin)
       ) : (
         <>
           <link rel="canonical" href={canonical} />
-          {alternates.map((a) => (
-            <link rel="alternate" hreflang={a.code} href={a.href} />
-          ))}
-          <link rel="alternate" hreflang="x-default" href={xDefault} />
+          {/* An English-only page has no translations to point at (#1080):
+              its alternates would name URLs that answer 404. */}
+          {localised && (
+            <>
+              {alternates.map((a) => (
+                <link rel="alternate" hreflang={a.code} href={a.href} />
+              ))}
+              <link rel="alternate" hreflang="x-default" href={xDefault} />
+            </>
+          )}
         </>
       )
     }

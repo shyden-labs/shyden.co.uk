@@ -27,6 +27,7 @@ import {
 } from './checks/rendered-text';
 import { ACCENT_CHECK, PALETTE_CHECKS } from './checks/palette';
 import { RECORDER_CHECKS } from './checks/recorders';
+import { PRIVACY_LINK_CHECKS } from './checks/privacy-link';
 
 /**
  * One walk per page, per theme, making every read-only check (#1086).
@@ -66,6 +67,7 @@ const WALK: readonly PageCheck[] = [
   ...NOT_FOUND_CHECKS,
   ...SERVED_PAGE_CHECKS,
   ...REPORT_PRESENCE_CHECKS,
+  ...PRIVACY_LINK_CHECKS,
   ...CHROME_CHECKS,
   ...HOMEPAGE_WIDTH_CHECKS,
   ...YEETALK_WIDTH_CHECKS,

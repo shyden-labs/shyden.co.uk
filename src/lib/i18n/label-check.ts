@@ -319,6 +319,8 @@ const SITE_PAGES: Record<keyof SiteStrings, string> = {
   skipToContent: CHROME,
   language: CHROME,
   report: CHROME,
+  // The footer's privacy link (#1080), on every page.
+  legal: CHROME,
   home: '/',
   calculators: '/yeetalk-calculators',
   notFound: 'the 404 page',

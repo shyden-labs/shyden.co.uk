@@ -55,14 +55,24 @@ export const ticketPaths = (): string[] =>
  * The English pages that paint no form control of their own: no tool, and no
  * report form, since English is not a beta language. The support pages' only
  * form is ShyDesk's, drawn in its own shadow DOM from ShyDesk's host (#1032),
- * so the site's markup there holds none either. Every other page has a tool
+ * so the site's markup there holds none either, and the privacy page (#1080)
+ * is text alone. Every other page has a tool
  * or a report form, and a check that finds no control on one fails.
  */
 export const pagesWithoutOwnControls = (): string[] => [
   '/',
   '/support',
   ...ticketPaths(),
+  ...privacyPaths(),
 ];
+
+/**
+ * The privacy page (#1080), as a request path. English only and in the
+ * sitemap, so it is not one of `sitePaths()`, which every locale serves.
+ * Named, not read from its folder: the tests declare the page they expect,
+ * and `privacy-page.test.ts` holds the route files to exactly this one.
+ */
+export const privacyPaths = (): string[] => ['/privacy/'];
 
 const DOCS_DIR = 'src/pages/api/docs';
 
