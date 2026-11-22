@@ -1,5 +1,6 @@
 import { tapOn } from '../real-touch';
 import { PRIVACY_EN, PRIVACY_ID } from '../../src/lib/legal/privacy';
+import { localisePath } from '../../src/lib/i18n';
 import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
@@ -265,7 +266,9 @@ for (const [what, path] of [
 test('the Indonesian privacy page is served on production', async ({
   page,
 }) => {
-  expect((await page.goto('/id/privacy/'))?.status()).toBe(200);
+  expect((await page.goto(localisePath('/privacy/', 'id')))?.status()).toBe(
+    200,
+  );
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     PRIVACY_ID.heading,
   );

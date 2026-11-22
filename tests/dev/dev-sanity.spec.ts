@@ -551,7 +551,9 @@ test(
 
 // #1082: the Indonesian privacy page, which governs for residents of Indonesia.
 test('the Indonesian privacy page is served on dev', async ({ page }) => {
-  expect((await page.goto('/id/privacy/'))?.status()).toBe(200);
+  expect((await page.goto(localisePath('/privacy/', 'id')))?.status()).toBe(
+    200,
+  );
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     PRIVACY_ID.heading,
   );
