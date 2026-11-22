@@ -52,7 +52,7 @@ export const zh: Catalogue = {
   numbersNoCountMessage: '请先填写学生人数。',
   // No plural wrapper: Chinese has only the `other` category, the same shape
   // `rosterGapWarning` below already uses for its {missing} slot.
-  groupedNote: '{typed} 人中有 {grouped} 人已分组——{absent} 号缺席。',
+  groupedNote: '{typed} 人中有 {grouped} 人已分组——学号 {absent} 缺席。',
   modeLabel: '按……划分',
   modePerGroup: '每组学生人数',
   modeGroupCount: '组数',

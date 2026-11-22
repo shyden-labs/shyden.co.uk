@@ -998,11 +998,6 @@
         "writers": ["edited after DeepL"],
         "verdict": "agrees"
       },
-      "{typed} 人中有 {grouped} 人已分组——{absent} 号缺席。": {
-        "english": "Among the {typed} people, {grouped} people have been grouped—the {absent} number is absent.",
-        "writers": ["edited after DeepL"],
-        "verdict": "agrees"
-      },
       "在被分组的{grouped}名学生中，有{unset}名学生的性别未设置。请打开“学生详情”页面，为他们设置“M”或“F”，以便使用这些功能。": {
         "english": "Of the {grouped} students, {unset} students have no gender set. Please open the \"Student Details\" page and set their gender to \"M\" or \"F\" to use these features.",
         "writers": ["DeepL"],
@@ -1321,6 +1316,12 @@
         "english": "This page is available in English only.",
         "writers": ["DeepL"],
         "verdict": "agrees"
+      },
+      "{typed} 人中有 {grouped} 人已分组——学号 {absent} 缺席。": {
+        "english": "{typed} people are in {grouped} groups - student ID {absent} is absent.",
+        "writers": ["edited after DeepL"],
+        "verdict": "ambiguous",
+        "note": "The absent clause now reads as student numbers (#999). The first clause is unchanged and read 'Among the {typed} people, {grouped} people have been grouped' before; here Google took 人已分组 as 'are in groups', another sense of the same words."
       }
     },
     "th": {
