@@ -1,6 +1,7 @@
 import { tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { chooseOption } from '../real-select';
+import { supportTestAddress } from './support-address';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import {
@@ -206,20 +207,26 @@ test(
         'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot send to it',
     },
   },
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     // The form, Turnstile and the send used most of the default 30 s on
     // deploy-dev run 44883439826 (#1032), leaving the ticket page's own 30 s
-    // wait no room. Each stage's time is printed so the next run measures it.
+    // wait no room. Measured on Chromium in deploy-dev run 44885513312: sent
+    // at 30.4 s, thread shown at 32.9 s. Each stage's time is printed per
+    // engine, so a slower engine names the stage it spent.
     test.setTimeout(90_000);
     const started = Date.now();
+    const engine = testInfo.project.name;
     const stage = (name: string) =>
       process.stdout.write(
-        `[support journey] ${name} at ${((Date.now() - started) / 1000).toFixed(1)} s\n`,
+        `[support journey ${engine}] ${name} at ${((Date.now() - started) / 1000).toFixed(1)} s\n`,
       );
-    const words = `Support page check ${Date.now()}`;
+    const words = `Support page check ${engine} ${started}`;
     await page.goto('/support');
     const form = page.locator('shydesk-support');
-    await typeInto(form.getByLabel('Email'), 'support-test@shyden.co.uk');
+    await typeInto(
+      form.getByLabel('Email'),
+      supportTestAddress(engine, started),
+    );
     await typeInto(form.getByLabel('Subject'), 'Support page check');
     await chooseOption(form.getByLabel('Category'), 'question');
     await typeInto(form.getByLabel('Message'), words);

@@ -38,5 +38,10 @@ export default defineConfig({
     // Username half is ignored by the gate; only the password matters.
     httpCredentials: password ? { username: 'dev', password } : undefined,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Every engine on every dev deploy (#1032 AC5, Shyden 2026-11-22).
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
 });
