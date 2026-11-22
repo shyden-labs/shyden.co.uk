@@ -292,9 +292,13 @@ test(
       await page.emulateMedia({ colorScheme });
       await eachWidth(page, [{ width: 320, height: 900 }], async (took) => {
         await page.goto('/support');
+        // Measured once Turnstile has passed and Send is live: WCAG's
+        // contrast rule exempts an inactive control, and before then Send
+        // read 2.96:1 (light) and 3.26:1 (dark) on every engine (run
+        // 44975475265).
         await expect(
           form.getByRole('button', { name: 'Send', exact: true }),
-        ).toBeVisible({ timeout: 20_000 });
+        ).toBeEnabled({ timeout: 20_000 });
         // No saved choice, so the page follows the system's scheme.
         expect(
           await page.evaluate(
