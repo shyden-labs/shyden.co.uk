@@ -751,11 +751,63 @@ export async function scrollOver(target: Locator, dy: number): Promise<void> {
     throw new TapNotPossibleError(
       `${String(target)} has no box to put a finger on`,
     );
-  const from = {
-    x: Math.round(box.x + box.width / 2),
-    y: Math.round(box.y + box.height / 2),
+  // A finger starts on the screen (#1241): the element is brought into view
+  // with real swipes first, as the wheel path brings it under the mouse.
+  // Measured on the phone, a drag from the heading's centre 3,673 px above
+  // the screen left the page 64 px short of its top. Only a point off the
+  // screen is moved: the caller sized dy from where the element is, and the
+  // swipe path's edge rule would move one near an edge.
+  const seen = await measure(target, undefined);
+  if (!seen.inView) await bringIntoView(target, undefined, false, 'swipe');
+  await strokesOver(target, dy);
+}
+
+/** Strokes allowed to cover one scrollOver distance on the phone. */
+const SCROLL_OVER_STROKES = 6;
+
+/**
+ * Covers dy with finger strokes that start and end on the screen (#1242).
+ * Each starts on the element where it is on screen, else at the edge the
+ * finger moves away from; after each, the page's own scroll position says how
+ * far it went, and the next stroke is what is left plus the touch slop the
+ * last one lost (measured 7.86 px on the phone, #1243). It stops when the
+ * distance is covered or the page moves no further (its end).
+ */
+async function strokesOver(target: Locator, dy: number): Promise<void> {
+  const page = target.page();
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  const settled = async () => {
+    await waitUntilStill(async () => String(await scrollY()), {
+      gapMs: STILL_GAP_MS,
+      ceilingMs: STILL_CEILING_MS,
+      clock: ownClock,
+    });
+    return scrollY();
   };
-  await drag(target.page(), from, { x: from.x, y: from.y - dy });
+  let moved = 0;
+  let slop = 0;
+  for (let stroke = 0; stroke < SCROLL_OVER_STROKES; stroke++) {
+    const left = dy - moved;
+    if (Math.abs(left) < 1) return;
+    const dir = Math.sign(left);
+    const q = await measure(target, undefined);
+    const top = q.viewTop;
+    const bottom = q.viewTop + q.viewHeight;
+    const want = Math.abs(left) + slop;
+    let fromY = q.inView ? q.point.y : dir > 0 ? bottom : top;
+    if ((dir > 0 ? fromY - top : bottom - fromY) < Math.min(want, MIN_SWIPE_PX))
+      fromY = dir > 0 ? bottom : top;
+    const room = dir > 0 ? fromY - top : bottom - fromY;
+    const length = Math.min(want, room);
+    const from = { x: Math.round(q.point.x), y: Math.round(fromY) };
+    const to = { x: from.x, y: Math.round(fromY - dir * length) };
+    const before = await scrollY();
+    await drag(page, from, to);
+    const went = (await settled()) - before;
+    if (Math.abs(went) < 1) return;
+    moved += went;
+    slop = Math.max(0, Math.abs(from.y - to.y) - Math.abs(went));
+  }
 }
 
 /**

@@ -588,15 +588,180 @@ describe('scrollOver', () => {
     return { target: target as unknown as Locator, sent };
   }
 
+  /**
+   * A phone page 800 px tall holding one 40 px element at `top` in the
+   * document, scrolled to `startY`. Each touch move scrolls the page the
+   * opposite way by what the finger moved, within the page's length, as
+   * Chrome does; every touch point is recorded.
+   */
+  function fakePhone(
+    top: number,
+    { startY = 0, length = 6000, slop = 0 } = {},
+  ) {
+    const VIEW = { width: 412, height: 800 };
+    const sent: [
+      string,
+      { type: string; touchPoints: { x: number; y: number }[] },
+    ][] = [];
+    let scrollY = startY;
+    let last: { x: number; y: number } | null = null;
+    let base = startY;
+    const maxScroll = length - VIEW.height;
+    const cdp = {
+      send: async (
+        method: string,
+        params: { type: string; touchPoints: { x: number; y: number }[] },
+      ) => {
+        sent.push([method, params]);
+        const p = params.touchPoints[0];
+        if (params.type === 'touchStart') {
+          last = p ?? null;
+          base = scrollY;
+        }
+        // Chrome reads the first `slop` px of a finger's travel as not yet a
+        // scroll (measured 7.86 px on the phone, #1243); the rest moves the
+        // page, within its length.
+        if (params.type === 'touchMove' && last && p) {
+          const travel = last.y - p.y;
+          const past = Math.max(0, Math.abs(travel) - slop) * Math.sign(travel);
+          scrollY = Math.min(maxScroll, Math.max(0, base + past));
+        }
+        if (params.type === 'touchEnd') last = null;
+      },
+    };
+    const page = {
+      context: () => ({ newCDPSession: async () => cdp }),
+      evaluate: async () => scrollY,
+    };
+    const rect = () => ({ x: 100, y: top - scrollY, width: 80, height: 40 });
+    const target = {
+      page: () => page,
+      boundingBox: async () => rect(),
+      evaluate: async (_fn: unknown, arg?: { offset?: unknown }) => {
+        const r = rect();
+        if (arg === undefined)
+          return [r.x, r.y, r.width, r.height, 0, VIEW.height, 0, scrollY].join(
+            ',',
+          );
+        const point = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        return {
+          point,
+          viewTop: 0,
+          viewHeight: VIEW.height,
+          viewWidth: VIEW.width,
+          inView: point.y >= 0 && point.y <= VIEW.height,
+          boxInView: r.y >= 0 && r.y + r.height <= VIEW.height,
+          hit: null,
+          keyboard: false,
+        };
+      },
+      toString: () => 'locator(h1)',
+    };
+    return {
+      target: target as unknown as Locator,
+      sent,
+      VIEW,
+      scrollY: () => scrollY,
+    };
+  }
+
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.useRealTimers();
   });
 
+  const onScreen = (
+    sent: [string, { touchPoints: { x: number; y: number }[] }][],
+    height: number,
+  ) =>
+    sent
+      .flatMap(([, p]) => p.touchPoints)
+      .every(({ y }) => y >= 0 && y <= height);
+
+  // #1242/#1243: measured on the phone, a drag's first 7.86 px are Chrome's
+  // touch slop, and the band's one drag ended 24 px above the screen and left
+  // it 5.94 px on screen. Strokes stay on the screen and cover the distance.
+  it('on the phone, carries an element near the top past the top edge with strokes that stay on the screen', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(93, { slop: 8 });
+    const done = scrollOver(target, 93 + 40 + 1);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(93 + 40 - scrollY()).toBeLessThanOrEqual(0);
+  });
+
+  it('on the phone, scrolls the distance asked for, past the slop', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(1400, {
+      startY: 1000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 240);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(scrollY()).toBe(1240);
+  });
+
+  it('on the phone, stops when the page will move no further', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, scrollY } = fakePhone(5400, {
+      startY: 5000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 600);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(scrollY()).toBe(5200);
+    expect(
+      sent.filter(([, p]) => p.type === 'touchStart').length,
+    ).toBeLessThanOrEqual(3);
+  });
+
+  // #1241: a caller measures the distance from where the element is, so an
+  // element already on screen, even near its edge, is not moved first.
+  // Measured on the phone: moving the band off the top edge left it 5.94 px
+  // on screen after a drag sized from its old place.
+  it('on the phone, does not move an element already on screen near its top edge before scrolling', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(1010, { startY: 1000 });
+    const done = scrollOver(target, 31);
+    await vi.runAllTimersAsync();
+    await done;
+    // Moved first, the element's own distance would be off by that move.
+    expect(scrollY()).toBe(1031);
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+  });
+
+  // #1241: measured on the phone, the drag began at y -3673 (the heading's
+  // centre, far above the screen) and the page stopped 64 px short of its top.
+  it('on the phone, brings an element above the view in first and puts the finger down on the screen', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(100, { startY: 3800 });
+    const done = scrollOver(target, -3803);
+    await vi.runAllTimersAsync();
+    await done;
+    const starts = sent
+      .filter(([, p]) => p.type === 'touchStart')
+      .flatMap(([, p]) => p.touchPoints);
+    expect(starts.length).toBeGreaterThan(0);
+    for (const { y } of starts) {
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(VIEW.height);
+    }
+    expect(scrollY()).toBe(0);
+  });
+
   it('drags a real finger from the element the opposite way on the phone', async () => {
     vi.stubEnv('PW_REAL_DEVICE', '1');
     vi.useFakeTimers();
-    const { target, sent } = fakeTarget();
+    const { target, sent } = fakePhone(300);
     const done = scrollOver(target, 200);
     await vi.runAllTimersAsync();
     await done;

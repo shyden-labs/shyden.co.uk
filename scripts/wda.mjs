@@ -42,6 +42,8 @@ export const DEFAULT_WDA_CACHE = path.join(
 );
 
 const READY = /ServerURLHere->(\S+?)<-ServerURLHere/;
+/** What xcodebuild prints when iOS's passcode prompt for UI automation goes unanswered (#1248). */
+const AUTOMATION_TIMEOUT = /Timed out while enabling automation mode/;
 
 /** @param {string} line @returns {string | null} */
 export function parseReadyLine(line) {
@@ -103,6 +105,7 @@ function alive(udid) {
  *   hasSource?: (srcDir: string) => boolean,
  *   alive?: (udid: string) => string | null | Promise<string | null>,
  *   answers?: (url: string) => Promise<void>,
+ *   announce?: (text: string) => void,
  * }} options
  * @returns {Promise<{ url: string, stop(): Promise<void> }>}
  */
@@ -118,6 +121,7 @@ export async function startWda({
     existsSync(path.join(srcDir, 'WebDriverAgent.xcodeproj')),
   alive: isAlive = alive,
   answers = wdaAnswers,
+  announce = (text) => process.stdout.write(`[ios] ${text}\n`),
 }) {
   const leftover = await isAlive(udid);
   if (leftover !== null)
@@ -167,6 +171,9 @@ export async function startWda({
       );
   }
 
+  announce(
+    'starting WebDriverAgent: if the iPhone asks for its passcode to allow UI automation, enter it now (iOS asks again once an earlier permission has lapsed, #1248)',
+  );
   const child = spawn('xcodebuild', [
     'test-without-building',
     '-xctestrun',
@@ -208,7 +215,11 @@ export async function startWda({
       finish(() =>
         reject(
           new Error(
-            `WebDriverAgent's xcodebuild exited (code ${code}, signal ${signal}) before its ready line; is the iPhone unlocked and its signing profile current? Last lines:\n${lastLines()}`,
+            `WebDriverAgent's xcodebuild exited (code ${code}, signal ${signal}) before its ready line; ${
+              lines.some((line) => AUTOMATION_TIMEOUT.test(line))
+                ? 'the iPhone asked for its passcode to allow UI automation, and nobody entered it in time: start the device run beside the phone'
+                : 'is its signing profile current?'
+            } Last lines:\n${lastLines()}`,
           ),
         ),
       ),
@@ -219,7 +230,7 @@ export async function startWda({
           child.kill('SIGTERM');
           reject(
             new Error(
-              `WebDriverAgent printed no ready line within ${ceilingMs / 1000} s (WDA_READY_CEILING_MS); is the iPhone unlocked? Last lines:\n${lastLines()}`,
+              `WebDriverAgent printed no ready line within ${ceilingMs / 1000} s (WDA_READY_CEILING_MS); is the iPhone waiting for its passcode to allow UI automation? Last lines:\n${lastLines()}`,
             ),
           );
         }),
