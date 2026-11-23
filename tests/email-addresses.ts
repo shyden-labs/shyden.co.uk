@@ -14,3 +14,17 @@ export function emailAddresses(text: string): string[] {
   );
   return [...new Set((found ?? []).map((hit) => hit.toLowerCase()))];
 }
+
+/**
+ * The HTML with every third-party licence notice taken out (#1266). Shyden,
+ * 2026-11-23: a notice is shown exactly as its authors published it, so an
+ * author's address inside one is not the site showing an address. Only a
+ * `<pre data-third-party-notice>` is taken out, each up to its own closing
+ * tag; its text is escaped, so it holds no `</pre>` of its own.
+ */
+export function outsideThirdPartyNotices(html: string): string {
+  return html.replace(
+    /<pre\b[^>]*\bdata-third-party-notice\b[^>]*>[\s\S]*?<\/pre>/gi,
+    '',
+  );
+}

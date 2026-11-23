@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emailAddresses } from '../email-addresses';
+import { emailAddresses, outsideThirdPartyNotices } from '../email-addresses';
 
 /**
  * No page shows an email address (#1266; Shyden, 2026-11-23: "we only allow
@@ -36,5 +36,48 @@ describe('an email address in served text (#1266)', () => {
         '@fontsource/inter @media (min-width: 720px) @supports @ShydenMcM @shyden.co.uk',
       ),
     ).toEqual([]);
+  });
+});
+
+/**
+ * Shyden, 2026-11-23 (#1266): third-party licence notices are shown exactly as
+ * published, so the check skips them. Only a `<pre data-third-party-notice>`
+ * is skipped; everything around it is still read.
+ */
+describe('a third-party licence notice is left out of the scan (#1266)', () => {
+  it('drops an address inside a marked notice', () => {
+    expect(
+      emailAddresses(
+        outsideThirdPartyNotices(
+          '<pre data-third-party-notice>@author A &lt;a@b.com&gt;</pre>',
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps an address beside a marked notice, before and after it', () => {
+    expect(
+      emailAddresses(
+        outsideThirdPartyNotices(
+          'x@y.io<pre data-third-party-notice>a@b.com</pre><a href="mailto:z@w.org">z@w.org</a>',
+        ),
+      ),
+    ).toEqual(['x@y.io', 'mailto:', 'z@w.org']);
+  });
+
+  it('keeps an address in a pre that carries no marker', () => {
+    expect(
+      emailAddresses(outsideThirdPartyNotices('<pre>a@b.com</pre>')),
+    ).toEqual(['a@b.com']);
+  });
+
+  it('ends each notice at its own closing tag, not at the last one', () => {
+    expect(
+      emailAddresses(
+        outsideThirdPartyNotices(
+          '<pre data-third-party-notice>a@b.com</pre>c@d.com<pre data-third-party-notice>e@f.com</pre>',
+        ),
+      ),
+    ).toEqual(['c@d.com']);
   });
 });
