@@ -10,6 +10,7 @@ import { THAI_CHECK } from './checks/thai';
 import { CHROME_CHECKS } from './checks/chrome';
 import { THEME_GALLERY_CHECKS } from './checks/theme-gallery';
 import { NO_WORKERS_DEV_CHECKS } from './checks/no-workers-dev';
+import { NO_EMAIL_ADDRESS_CHECKS } from './checks/no-email-address';
 import { YEETALK_WIDTH_CHECKS } from './checks/yeetalk';
 import { HOMEPAGE_WIDTH_CHECKS } from './checks/homepage';
 import { LANGUAGE_SWITCHER_CHECKS } from './checks/language-switcher';
@@ -75,6 +76,7 @@ const WALK: readonly PageCheck[] = [
   ...YEETALK_WIDTH_CHECKS,
   ...THEME_GALLERY_CHECKS,
   ...NO_WORKERS_DEV_CHECKS,
+  ...NO_EMAIL_ADDRESS_CHECKS,
   ...LANGUAGE_SWITCHER_CHECKS,
   ...SWITCHER_READ_CHECKS,
   ACCENT_CHECK,
