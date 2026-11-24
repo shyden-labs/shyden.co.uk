@@ -1297,7 +1297,15 @@ describe('every push to develop leaves a SonarCloud analysis of that commit (#12
       /secrets\./,
     );
     const runs = job.steps.map((s) => s.run?.trim());
-    expect(runs).toContain('npm run test:coverage');
+    // No package's install script runs: SonarCloud S6505 on PR #1282, and the
+    // coverage run measured green without them (4,798 tests, lcov written).
+    expect(runs).toEqual(
+      expect.arrayContaining([
+        'npm ci --ignore-scripts',
+        'npm run test:coverage',
+      ]),
+    );
+    expect(runs, 'an npm ci that runs install scripts').not.toContain('npm ci');
     expect(
       job.steps.some(
         (s) =>
