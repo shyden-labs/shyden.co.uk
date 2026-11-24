@@ -161,6 +161,7 @@ describe('main', () => {
     vi.stubEnv('SONAR_PULL_REQUEST', '7');
     vi.stubEnv('SONAR_CEILING_SECONDS', '');
     vi.stubEnv('GITHUB_STEP_SUMMARY', '');
+    vi.stubEnv('SONAR_BRANCH', '');
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -337,6 +338,46 @@ describe('main', () => {
       await expect(run()).rejects.toThrow(message);
     },
   );
+
+  // A push to develop scans the branch so its dashboard stays current (#1281).
+  // develop's own scan has no gate (NONE, #1221): the pull request's scan is
+  // the gate, so a branch scan proves only that its analysis was recorded.
+  describe('a branch scan proves its analysis was recorded, and reads no gate', () => {
+    beforeEach(() => {
+      vi.stubEnv('SONAR_PULL_REQUEST', '');
+      vi.stubEnv('SONAR_BRANCH', 'develop');
+    });
+
+    it('passes once the task made an analysis of that branch, reading no gate', async () => {
+      answer(
+        task('PENDING', { pullRequest: undefined, branch: 'develop' }),
+        task('SUCCESS', { pullRequest: undefined, branch: 'develop' }),
+      );
+      expect(await run()).toBe(0);
+      expect(fetched).toEqual([
+        'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
+        'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
+      ]);
+      expect(out).toEqual([
+        'sonar-verdict: analysis AN1 of develop recorded; a branch scan has no gate, its pull request’s scan is the gate (#851)\n',
+        'sonar-verdict: https://sonarcloud.io/dashboard?id=x&pullRequest=7\n',
+      ]);
+    });
+
+    it('fails closed on an analysis of another branch', async () => {
+      answer(task('SUCCESS', { pullRequest: undefined, branch: 'main' }));
+      await expect(run()).rejects.toThrow(
+        'sonar-verdict: task AX1 analysed branch main, not develop: not this push’s analysis',
+      );
+    });
+
+    it('fails closed on a task that failed, as a pull request scan does', async () => {
+      answer(task('FAILED', { errorMessage: 'boom', branch: 'develop' }));
+      await expect(run()).rejects.toThrow(
+        'sonar-verdict: task AX1 ended FAILED (boom); no verdict to read',
+      );
+    });
+  });
 
   // SonarCloud's free plan answers 403 to any read of a branch other than the
   // main branch or a pull request ("Organization is not allowed to access data

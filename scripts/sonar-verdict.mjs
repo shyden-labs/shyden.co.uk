@@ -23,7 +23,7 @@ import { testedHeadOf, toPull } from './deploy-gate.mjs';
 /**
  * @typedef {{ status: string; metricKey: string; comparator?: string; errorThreshold?: string; actualValue?: string }} Condition
  * @typedef {{ status?: string; conditions?: Condition[] }} ProjectStatus
- * @typedef {{ status: string; analysisId?: string; pullRequest?: string; errorMessage?: string }} Task
+ * @typedef {{ status: string; analysisId?: string; pullRequest?: string; branch?: string; errorMessage?: string }} Task
  */
 
 const STEP_MS = 5000;
@@ -239,6 +239,24 @@ async function judge(path) {
   }
   if (task.analysisId === undefined) {
     fail(`task ${report.ceTaskId} made no analysis; no verdict to read`);
+  }
+  // A push to develop scans the branch so its dashboard stays current
+  // (#1281). Its own scan has no gate (NONE, #1221): the pull request's scan
+  // is the gate, so this proves only that the analysis was recorded.
+  const branch = process.env.SONAR_BRANCH || '';
+  if (branch !== '') {
+    if (task.branch !== branch) {
+      fail(
+        `task ${report.ceTaskId} analysed branch ${String(task.branch)}, not ${branch}: not this push’s analysis`,
+      );
+    }
+    return {
+      ok: true,
+      lines: [
+        `analysis ${task.analysisId} of ${branch} recorded; a branch scan has no gate, its pull request’s scan is the gate (#851)`,
+      ],
+      dashboardUrl: report.dashboardUrl,
+    };
   }
   const pullRequest = process.env.SONAR_PULL_REQUEST || '';
   if (pullRequest !== '' && task.pullRequest !== pullRequest) {

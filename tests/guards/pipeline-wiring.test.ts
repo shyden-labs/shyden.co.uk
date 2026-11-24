@@ -1134,16 +1134,10 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
       true,
       true,
     ]);
-    const args = String(steps[scan].with?.args ?? '')
-      .split(/\s+/)
-      .filter(Boolean);
-    expect(args).toEqual(
-      expect.arrayContaining([
-        '-Dsonar.host.url=https://sonarcloud.io',
-        '-Dsonar.organization=shyden-labs',
-        '-Dsonar.projectKey=shyden-labs_shyden.co.uk',
-        '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info',
-      ]),
+    // The settings live once, in sonar-project.properties, which the scan
+    // action reads, so the branch scan (#1281) cannot drift from this one.
+    expect(steps[scan].with?.args, 'scanner settings passed as args').toBe(
+      undefined,
     );
     for (const i of [token, scan, read]) {
       expect(steps[i].env?.SONAR_TOKEN, `step ${i} reads the token`).toBe(
@@ -1237,6 +1231,126 @@ describe('every pull request is scanned by SonarCloud and fails on its gate (#85
       '//',
     );
     expect(config).toMatch(/reporter:\s*\[[^\]]*'lcovonly'[^\]]*\]/);
+  });
+
+  it('the scanner settings are one file, naming this project, its coverage and the copy tables left out of duplication', () => {
+    const settings = Object.fromEntries(
+      withoutCommentLines(readFileSync('sonar-project.properties', 'utf8'), '#')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => [
+          line.slice(0, line.indexOf('=')),
+          line.slice(line.indexOf('=') + 1),
+        ]),
+    );
+    expect(settings).toMatchObject({
+      'sonar.host.url': 'https://sonarcloud.io',
+      'sonar.organization': 'shyden-labs',
+      'sonar.projectKey': 'shyden-labs_shyden.co.uk',
+      'sonar.javascript.lcov.reportPaths': 'coverage/lcov.info',
+      'sonar.sources': '.',
+      'sonar.tests': 'tests',
+      'sonar.exclusions': 'tests/**,docs/**',
+    });
+    expect(settings['sonar.cpd.exclusions']).toContain(
+      'src/lib/legal/privacy.ts',
+    );
+  });
+});
+
+/**
+ * #1281: a push to develop reuses its pull request's scan as the gate (#851),
+ * so develop's own SonarCloud analysis went stale (2026-11-19, 24 commits
+ * behind on 2026-11-25). Each push now scans the branch, in the pull request
+ * scan's shape: coverage measured with no secret, the scan with no npm. Its
+ * failure is a failed job report-failure names.
+ */
+describe('every push to develop leaves a SonarCloud analysis of that commit (#1281)', () => {
+  type Step = {
+    uses?: string;
+    run?: string;
+    if?: unknown;
+    'continue-on-error'?: unknown;
+    with?: Record<string, unknown>;
+    env?: Record<string, unknown>;
+  };
+  type Job = {
+    needs?: string | string[];
+    if?: string;
+    permissions?: Record<string, string>;
+    steps: Step[];
+  };
+  const jobs = () =>
+    (
+      parseCleanYaml(workflow('deploy-dev.yml'), 'deploy-dev.yml') as {
+        jobs: Record<string, Job>;
+      }
+    ).jobs;
+  const PUSH = "github.event_name == 'push'";
+
+  it('a push-only coverage job holds no secret and hands over the lcov file alone', () => {
+    const job = jobs()['sonar-coverage'];
+    expect(job, 'a sonar-coverage job in deploy-dev.yml').toBeDefined();
+    expect(job.if).toBe(PUSH);
+    expect(JSON.stringify(job), 'a secret in the coverage job').not.toMatch(
+      /secrets\./,
+    );
+    const runs = job.steps.map((s) => s.run?.trim());
+    expect(runs).toContain('npm run test:coverage');
+    expect(
+      job.steps.some(
+        (s) =>
+          /^actions\/upload-artifact@[0-9a-f]{40}$/.test(s.uses ?? '') &&
+          s.with?.path === 'coverage/lcov.info',
+      ),
+      'the upload of coverage/lcov.info',
+    ).toBe(true);
+  });
+
+  it('a push-only scan job runs no npm, scans with the token, and proves the analysis is of develop', () => {
+    const job = jobs()['sonar-branch'];
+    expect(job, 'a sonar-branch job in deploy-dev.yml').toBeDefined();
+    expect(job.if).toBe(PUSH);
+    expect([job.needs ?? []].flat()).toEqual(['sonar-coverage']);
+    const steps = job.steps;
+    expect(
+      steps.filter((s) => /\bnpm\b|\bnpx\b/.test(s.run ?? '')),
+      'a step that runs npm',
+    ).toEqual([]);
+    const at = (found: (s: Step) => boolean) => steps.findIndex(found);
+    const download = at((s) =>
+      /^actions\/download-artifact@[0-9a-f]{40}$/.test(s.uses ?? ''),
+    );
+    const scan = at((s) =>
+      /^SonarSource\/sonarqube-scan-action@[0-9a-f]{40}$/.test(s.uses ?? ''),
+    );
+    const read = at(
+      (s) =>
+        s.run?.trim() ===
+        'node scripts/sonar-verdict.mjs .scannerwork/report-task.txt',
+    );
+    expect([download, scan, read].every((i) => i >= 0)).toBe(true);
+    expect([download < scan, scan < read]).toEqual([true, true]);
+    expect(steps[scan].with?.args).toBe(undefined);
+    expect(steps[scan].env?.SONAR_TOKEN).toBe('${{ secrets.SONAR_TOKEN }}');
+    expect(steps[read].env).toMatchObject({
+      SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}',
+      SONAR_BRANCH: 'develop',
+    });
+    expect(
+      steps.filter(
+        (s) => s.if !== undefined || s['continue-on-error'] !== undefined,
+      ),
+      'a step that can be skipped or swallowed',
+    ).toEqual([]);
+  });
+
+  it('report-failure needs both, so a failed branch scan opens the deploy failure issue', () => {
+    const needs = [jobs()['report-failure'].needs ?? []].flat();
+    expect(needs).toEqual(
+      expect.arrayContaining(['sonar-coverage', 'sonar-branch']),
+    );
   });
 });
 
