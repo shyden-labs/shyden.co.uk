@@ -265,10 +265,6 @@ test.describe('the header and its menu, at every width', () => {
             await expect.soft(links).toHaveText(labels);
             for (const a of await links.all())
               await atLeast44(a, `"${await a.textContent()}"`);
-            await atLeast44(
-              page.locator('footer a[href="mailto:support@shyden.co.uk"]'),
-              'the footer email',
-            );
             if (locale === 'en') {
               // Opened by a tap: the nav is revealed, with no JS involved.
               await expect.soft(details).toHaveJSProperty('open', true);

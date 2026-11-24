@@ -1,7 +1,12 @@
 import { expect } from '../fixtures';
 import { shoot } from '../evidence';
 import { searched } from '../../source-files';
-import { LOCALES, localisePath } from '../../../src/lib/i18n';
+import {
+  LOCALES,
+  getSiteStrings,
+  localeFromPath,
+  localisePath,
+} from '../../../src/lib/i18n';
 import { DISSOLVED_COMPANY, dissolvedIn } from '../../dissolved-company';
 import { DEFAULT_THEME, type PageCheck } from '../page-checks';
 
@@ -26,7 +31,7 @@ export const CHROME_CHECKS: readonly PageCheck[] = [
         .evaluateAll((els) => els.map((e) => e.getAttribute('href')));
       expect
         .soft(hrefs)
-        .toEqual(['/#shytalk', '/#yawelo-idle', '/#tools', '/#contact']);
+        .toEqual(['/#shytalk', '/#yawelo-idle', '/#tools', '/support']);
     },
   },
   {
@@ -52,14 +57,45 @@ export const CHROME_CHECKS: readonly PageCheck[] = [
           `${route} footer still names the company`,
         )
         .toEqual([]);
+      // No web page shows an email address (Shyden, 2026-11-23, #1266): the
+      // way to a person is the support page, which the header links.
+      await expect.soft(footer.locator('a[href^="mailto:"]')).toHaveCount(0);
+      expect
+        .soft(
+          (await footer.textContent()) ?? '',
+          `${route} footer prints an address`,
+        )
+        .not.toContain('@');
+      await shoot(page, `${route} footer: no address, and no company`, footer);
+    },
+  },
+  {
+    // #1266: support requests come only through the support form, so both
+    // ways the homepage offers to reach a person lead to it, in the page's
+    // own language: a visitor on /vi/ lands on /vi/support, not English.
+    name: 'Contact and Get in touch lead to the page’s own support page',
+    routes: () => LOCALES.map((locale) => localisePath('/', locale)),
+    themes: [DEFAULT_THEME],
+    run: async ({ page, route }) => {
+      const locale = localeFromPath(route);
+      const t = getSiteStrings(locale);
+      const support = localisePath('/support', locale);
       await expect
-        .soft(footer.locator('a[href="mailto:support@shyden.co.uk"]'))
-        .toBeVisible();
-      await shoot(
-        page,
-        `${route} footer: the support email, and no company`,
-        footer,
-      );
+        .soft(
+          page
+            .locator('header nav')
+            .getByRole('link', { name: t.nav.contact, exact: true }),
+          `${route} header Contact`,
+        )
+        .toHaveAttribute('href', support);
+      await expect
+        .soft(
+          page
+            .locator('#contact')
+            .getByRole('link', { name: t.home.getInTouch, exact: true }),
+          `${route} Get in touch`,
+        )
+        .toHaveAttribute('href', support);
     },
   },
 ];

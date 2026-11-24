@@ -214,7 +214,7 @@ test.describe('homepage content', () => {
           exact: true,
         }),
       )
-      .toHaveAttribute('href', 'mailto:support@shyden.co.uk');
+      .toHaveAttribute('href', '/support');
 
     // #390 F62. The bezel read `var(--line)`, a property defined nowhere, so
     // the whole border declaration was invalid and computed to `0px none`: the
