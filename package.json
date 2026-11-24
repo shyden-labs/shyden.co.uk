@@ -36,12 +36,12 @@
     "prepare": "node scripts/install-hooks.mjs"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.4",
+    "@astrojs/sitemap": "^3.7.6",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
-    "astro": "^7.4.12",
-    "swagger-ui-dist": "5.35.0"
+    "astro": "^7.4.13",
+    "swagger-ui-dist": "5.35.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",

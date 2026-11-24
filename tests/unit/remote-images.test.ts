@@ -212,7 +212,7 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * config schemas are 7.4.11's byte for byte, on the same internal-helpers
  * 0.13.2; build/remote.js is still the only importer.
  */
-const ASTRO_READ = '7.4.12';
+const ASTRO_READ = '7.4.13';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {
