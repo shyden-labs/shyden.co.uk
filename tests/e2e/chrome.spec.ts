@@ -51,9 +51,19 @@ test.describe('header + footer', () => {
     // Scroll order, as the title says: each link's section sits below the
     // one before it. Read from the links' own fragments, so a section moved
     // on the page without its link fails here.
-    const hrefs = await nav
-      .locator('a')
-      .evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''));
+    // Contact leaves the page for /support (#1266; its target is checked in
+    // checks/chrome.ts), so the scroll order is read over the three section
+    // links alone, and their list is pinned so an empty one cannot pass.
+    const hrefs = (
+      await nav
+        .locator('a')
+        .evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''))
+    ).filter((href) => href.startsWith('/#'));
+    expect(hrefs, 'the section links, in nav order').toEqual([
+      '/#shytalk',
+      '/#yawelo-idle',
+      '/#tools',
+    ]);
     const tops: number[] = [];
     for (const href of hrefs) {
       const box = await page
