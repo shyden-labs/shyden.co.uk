@@ -23,7 +23,7 @@ import { testedHeadOf, toPull } from './deploy-gate.mjs';
 /**
  * @typedef {{ status: string; metricKey: string; comparator?: string; errorThreshold?: string; actualValue?: string }} Condition
  * @typedef {{ status?: string; conditions?: Condition[] }} ProjectStatus
- * @typedef {{ status: string; analysisId?: string; pullRequest?: string; branch?: string; errorMessage?: string }} Task
+ * @typedef {{ status: string; analysisId?: string; pullRequest?: string; errorMessage?: string }} Task
  */
 
 const STEP_MS = 5000;
@@ -38,7 +38,7 @@ function fail(message) {
 }
 
 /**
- * The scan's task id, server and dashboard, from report-task.txt (`key=value` lines).
+ * The scan's project, task id, server and dashboard, from report-task.txt (`key=value` lines).
  *
  * @param {string} text
  */
@@ -64,6 +64,7 @@ export function parseReportTask(text) {
     );
   }
   return {
+    projectKey: get('projectKey'),
     serverUrl,
     ceTaskId: get('ceTaskId'),
     dashboardUrl: get('dashboardUrl'),
@@ -245,15 +246,26 @@ async function judge(path) {
   // is the gate, so this proves only that the analysis was recorded.
   const branch = process.env.SONAR_BRANCH || '';
   if (branch !== '') {
-    if (task.branch !== branch) {
+    // The newest analysis of the branch, read back by its commit: the task
+    // API's own branch field was never seen on a main-branch task, and the
+    // revision is what the dashboard shows.
+    const commit = String(process.env.GITHUB_SHA);
+    const { analyses } = /** @type {{ analyses: { revision?: string }[] }} */ (
+      await get(
+        `${report.serverUrl}/api/project_analyses/search?project=${report.projectKey}&branch=${branch}&ps=1`,
+        token,
+      )
+    );
+    const revision = analyses[0]?.revision ?? 'none';
+    if (revision !== commit) {
       fail(
-        `task ${report.ceTaskId} analysed branch ${String(task.branch)}, not ${branch}: not this push’s analysis`,
+        `${branch}'s newest analysis is of ${revision}, not ${commit}: this push’s analysis was not recorded`,
       );
     }
     return {
       ok: true,
       lines: [
-        `analysis ${task.analysisId} of ${branch} recorded; a branch scan has no gate, its pull request’s scan is the gate (#851)`,
+        `${branch}'s newest analysis is ${commit}; a branch scan has no gate, its pull request’s scan is the gate (#851)`,
       ],
       dashboardUrl: report.dashboardUrl,
     };
