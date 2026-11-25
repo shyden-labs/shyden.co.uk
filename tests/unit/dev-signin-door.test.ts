@@ -34,6 +34,18 @@ describe('the dev-signin door', () => {
     expect(sent.headers.get(DOOR_SECRET_HEADER)).toBe('door-secret');
   });
 
+  it('sends a path that looks like another host to the sign-in Worker, never to that host', async () => {
+    const forward = vi.fn(async () => new Response('ok'));
+    await forwardToSignin(
+      new Request('https://dev-signin.shyden.co.uk//evil.example/steal?x=1'),
+      env,
+      forward,
+    );
+    expect(forwarded(forward).url).toBe(
+      'https://shyden-dev-signin.example.workers.dev//evil.example/steal?x=1',
+    );
+  });
+
   it("replaces a visitor's own door-secret header", async () => {
     const forward = vi.fn(async () => new Response('ok'));
     const request = new Request('https://dev-signin.shyden.co.uk/pass', {

@@ -16,7 +16,11 @@ export async function forwardToSignin(
   forward: (request: Request) => Promise<Response>,
 ): Promise<Response> {
   const incoming = new URL(request.url);
-  const target = new URL(incoming.pathname + incoming.search, env.SIGNIN_URL);
+  // Built on the fixed origin, never resolved against it: a path such as `//evil.example/x`
+  // would resolve to another host and carry the door secret there.
+  const target = new URL(env.SIGNIN_URL);
+  target.pathname = incoming.pathname;
+  target.search = incoming.search;
   const headers = new Headers(request.headers);
   headers.set(DOOR_SECRET_HEADER, env.DOOR_SECRET);
   // `duplex` is how a streamed body is forwarded; the DOM's RequestInit type does not name it yet.
