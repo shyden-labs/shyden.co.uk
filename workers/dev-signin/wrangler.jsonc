@@ -1,0 +1,21 @@
+// The DEV sign-in Worker (#1262, shyden-labs/repo-template#207). It lives in the
+// TEST+DEV account on workers.dev, which people never open (Indonesia blocks it):
+// only the `dev-signin.shyden.co.uk` door calls it, with the door secret.
+// Secrets, set once with `wrangler secret put`: DOOR_SECRET, DEV_PASS_PRIVATE_JWK.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "shyden-dev-signin",
+  "main": "index.ts",
+  "account_id": "ed8dcf3e1ce9159757f7492bc2d4930d",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  // No id: wrangler creates the namespace on the first deploy and writes its id here.
+  "kv_namespaces": [{ "binding": "CODES" }],
+  "vars": {
+    "DEV_PASS_KID": "2026-11",
+    // Read back from Zero Trust once the Access application exists (docs/dev-pass.md, step 4).
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+  },
+}

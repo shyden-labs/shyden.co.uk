@@ -1,0 +1,17 @@
+// The `dev-signin.shyden.co.uk` door (#1262, shyden-labs/repo-template#207). It lives
+// in the account holding the shyden.co.uk zone, behind Cloudflare Access, and forwards
+// to the sign-in Worker with the door secret. Secret, set once: DOOR_SECRET.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "shyden-dev-signin-door",
+  "main": "index.ts",
+  "account_id": "9315582c39b627dca58dfa83602db385",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "dev-signin.shyden.co.uk", "custom_domain": true }],
+  "vars": {
+    // The sign-in Worker's workers.dev origin, read back after its first deploy.
+    "SIGNIN_URL": "",
+  },
+}
