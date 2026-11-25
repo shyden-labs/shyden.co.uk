@@ -704,7 +704,7 @@ jobs:
       # the gate ran slower and pictured the promo video's loading spinner on
       # the homepage baselines (run 40634186625, and again with a networkState
       # wait in run 40636512082; #968).
-      - run: npx playwright test --project=visual
+      - run: node_modules/.bin/playwright test --project=visual
         env:
           VISUAL: '1'
       # The MEASUREMENT, never a gate (#224). The step above decides the
@@ -729,7 +729,7 @@ jobs:
         env:
           VISUAL_MEASURE: '1'
         run: |
-          npx playwright test --project=visual-measure --reporter=list \
+          node_modules/.bin/playwright test --project=visual-measure --reporter=list \
             > measure.log 2>&1 || true
           {
             echo "### Baseline drift at zero per-pixel tolerance"
