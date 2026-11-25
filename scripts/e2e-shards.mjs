@@ -70,7 +70,7 @@ export function shardOf(argv = []) {
     if (arg.startsWith('--shard=')) {
       value = arg.slice('--shard='.length);
     } else if (arg === '--shard') {
-      value = argv[i + 1];
+      value = argv.at(i + 1);
       if (value === undefined)
         throw new Error('--shard was given no value: expected <index>/<total>');
     } else {

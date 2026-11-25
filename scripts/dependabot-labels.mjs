@@ -93,7 +93,7 @@ export const declaredLabels = (text) => {
     );
 
   const names = labels.filter((label) => typeof label === 'string');
-  return [...new Set(names)].sort();
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 };
 
 /**

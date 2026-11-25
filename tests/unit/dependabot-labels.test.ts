@@ -64,7 +64,17 @@ describe('the labels dependabot.yml asks for', () => {
   it('are deduplicated and sorted, so the refusal reads the same every run', () => {
     const labels = declaredLabels(config());
 
-    expect(labels).toEqual([...new Set(labels)].sort());
+    expect(labels).toEqual(
+      [...new Set(labels)].sort((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it('are sorted alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    expect(
+      declaredLabels(
+        'version: 2\nupdates:\n  - labels: [Zeta, alpha]\n  - labels: [beta]\n',
+      ),
+    ).toEqual(['alpha', 'beta', 'Zeta']);
   });
 
   it('are none at all when the config declares none — the liveness control', () => {

@@ -86,7 +86,7 @@ export const readCommits = ({ base, head, git }) => {
     const [, ...parents] = git(['rev-list', '--parents', '-n', '1', sha])
       .trim()
       .split(' ');
-    const [first] = parents;
+    const first = parents.at(0);
     if (first === undefined || parents.length > 2)
       throw new Error(
         `release-inventory: ${sha} has ${parents.length} parents; a release reads merges (2) and squashes (1), and anything else needs its own rule`,
@@ -140,7 +140,7 @@ export const inventoryOf = (commits) =>
             file.includes('/') ? file.slice(0, file.indexOf('/')) : '(root)',
           ),
         ),
-      ].sort(),
+      ].sort((a, b) => a.localeCompare(b)),
     };
   });
 
@@ -274,6 +274,19 @@ export const releaseTests = (files, read) =>
     capturingLines(file, read(file)).map((line) => `${file}:${line}`),
   );
 
+/**
+ * The e2e spec files git tracks, in a stable order: only those directly under
+ * `tests/e2e/`. The capture runs what is committed, and git's list cannot
+ * disagree with that, where a directory read can.
+ * @param {Git} git
+ * @returns {string[]}
+ */
+export const trackedSpecs = (git) =>
+  git(['ls-files', '-z', '--', 'tests/e2e/*.spec.ts'])
+    .split('\0')
+    .filter((file) => /^tests\/e2e\/[^/]+\.spec\.ts$/.test(file))
+    .sort((a, b) => a.localeCompare(b));
+
 const USAGE =
   'usage: release-inventory.mjs --base <sha> --head <sha> | --tests';
 
@@ -300,12 +313,7 @@ const main = () => {
       maxBuffer: 256 * 1024 * 1024,
     });
   if (values.tests) {
-    // The specs git tracks: the capture runs what is committed, and git's list
-    // cannot disagree with that, where a directory read can.
-    const files = git(['ls-files', '-z', '--', 'tests/e2e/*.spec.ts'])
-      .split('\0')
-      .filter((file) => /^tests\/e2e\/[^/]+\.spec\.ts$/.test(file))
-      .sort();
+    const files = trackedSpecs(git);
     const selection = releaseTests(files, (file) => readFileSync(file, 'utf8'));
     if (selection.length === 0) {
       console.error(
