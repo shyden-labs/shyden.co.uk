@@ -264,25 +264,8 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          # Coverage is measured over what vitest.config.ts measures; the
-          # .astro pages, styles and config files are the e2e suite's, so they
-          # are left out of the coverage figure here too. The copy tables are
-          # parallel by design (every locale has the same keys, only the text
-          # differs), so duplication is not measured there (Shyden's ruling,
-          # 2026-11-20, #1032), nor in the privacy text, whose Indonesian copy
-          # has the English one's shape line for line (his ruling,
-          # 2026-11-22, #1082); every other file keeps the gate's limit.
-          args: >
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=shyden-labs
-            -Dsonar.projectKey=shyden-labs_shyden.co.uk
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.sources=.
-            -Dsonar.tests=tests
-            -Dsonar.exclusions=tests/**,docs/**
-            -Dsonar.cpd.exclusions=src/lib/i18n/en.ts,src/lib/i18n/id.ts,src/lib/i18n/zh.ts,src/lib/i18n/vi.ts,src/lib/i18n/th.ts,src/lib/i18n/site.ts,src/lib/legal/privacy.ts
-            -Dsonar.coverage.exclusions=scripts/test-devices.mjs,**/*.astro,**/*.css,*.config.ts,*.config.mjs,playwright.*.ts,docker/**,public/**
+        # Its settings are sonar-project.properties, which the scan reads,
+        # shared with deploy-dev.yml's develop branch scan (#1281).
       - name: Read the quality gate of this scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

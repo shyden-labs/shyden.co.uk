@@ -30,15 +30,16 @@ const REPORT = [
 ].join('\n');
 
 describe('parseReportTask', () => {
-  it("reads the scan's task id, server and dashboard", () => {
+  it("reads the scan's project, task id, server and dashboard", () => {
     expect(parseReportTask(REPORT)).toEqual({
+      projectKey: 'shyden-labs_app',
       serverUrl: 'https://sonarcloud.io',
       ceTaskId: 'AX1',
       dashboardUrl: 'https://sonarcloud.io/dashboard?id=x&pullRequest=7',
     });
   });
 
-  it.each([['ceTaskId'], ['serverUrl'], ['dashboardUrl']])(
+  it.each([['projectKey'], ['ceTaskId'], ['serverUrl'], ['dashboardUrl']])(
     'refuses a report with no %s',
     (key) => {
       const text = REPORT.split('\n')
@@ -161,6 +162,7 @@ describe('main', () => {
     vi.stubEnv('SONAR_PULL_REQUEST', '7');
     vi.stubEnv('SONAR_CEILING_SECONDS', '');
     vi.stubEnv('GITHUB_STEP_SUMMARY', '');
+    vi.stubEnv('SONAR_BRANCH', '');
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -337,6 +339,65 @@ describe('main', () => {
       await expect(run()).rejects.toThrow(message);
     },
   );
+
+  // A push to develop scans the branch so its dashboard stays current (#1281).
+  // develop's own scan has no gate (NONE, #1221): the pull request's scan is
+  // the gate, so a branch scan proves only that its analysis was recorded.
+  describe('a branch scan proves its analysis was recorded, and reads no gate', () => {
+    beforeEach(() => {
+      vi.stubEnv('SONAR_PULL_REQUEST', '');
+      vi.stubEnv('SONAR_BRANCH', 'develop');
+    });
+
+    const SHA = 'c0ffee0000000000000000000000000000000001';
+    const ANALYSES =
+      'https://sonarcloud.io/api/project_analyses/search?project=shyden-labs_app&branch=develop&ps=1 Bearer tok';
+    const newest = (revision?: string) =>
+      [
+        200,
+        { analyses: revision === undefined ? [] : [{ key: 'K1', revision }] },
+      ] as [number, unknown];
+    beforeEach(() => vi.stubEnv('GITHUB_SHA', SHA));
+
+    it('passes once the newest analysis of that branch is this commit, reading no gate', async () => {
+      answer(
+        task('PENDING', { pullRequest: undefined }),
+        task('SUCCESS', { pullRequest: undefined }),
+        newest(SHA),
+      );
+      expect(await run()).toBe(0);
+      expect(fetched).toEqual([
+        'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
+        'https://sonarcloud.io/api/ce/task?id=AX1 Bearer tok',
+        ANALYSES,
+      ]);
+      expect(out).toEqual([
+        `sonar-verdict: develop's newest analysis is ${SHA}; a branch scan has no gate, its pull request’s scan is the gate (#851)\n`,
+        'sonar-verdict: https://sonarcloud.io/dashboard?id=x&pullRequest=7\n',
+      ]);
+    });
+
+    it('fails closed when the newest analysis of that branch is another commit', async () => {
+      answer(task('SUCCESS', { pullRequest: undefined }), newest('91c1905e'));
+      await expect(run()).rejects.toThrow(
+        `sonar-verdict: develop's newest analysis is of 91c1905e, not ${SHA}: this push’s analysis was not recorded`,
+      );
+    });
+
+    it('fails closed when that branch has no analysis', async () => {
+      answer(task('SUCCESS', { pullRequest: undefined }), newest());
+      await expect(run()).rejects.toThrow(
+        `sonar-verdict: develop's newest analysis is of none, not ${SHA}: this push’s analysis was not recorded`,
+      );
+    });
+
+    it('fails closed on a task that failed, as a pull request scan does', async () => {
+      answer(task('FAILED', { errorMessage: 'boom' }));
+      await expect(run()).rejects.toThrow(
+        'sonar-verdict: task AX1 ended FAILED (boom); no verdict to read',
+      );
+    });
+  });
 
   // SonarCloud's free plan answers 403 to any read of a branch other than the
   // main branch or a pull request ("Organization is not allowed to access data
