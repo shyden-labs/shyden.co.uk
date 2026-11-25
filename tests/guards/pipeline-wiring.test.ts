@@ -1466,3 +1466,31 @@ describe('a workflow calls the installed tools, never npx (SonarCloud S8543, #12
     ).toEqual([]);
   });
 });
+
+describe('a workflow installs with no install scripts (SonarCloud S6505, #987)', () => {
+  it('every npm ci in a workflow runs --ignore-scripts, so no dependency runs code at install', () => {
+    // No package here needs its install script on CI: esbuild's and workerd's
+    // only swap a JavaScript launcher for the binary, which the build, the
+    // tests and the deploys never start (measured on #987), and fsevents is
+    // macOS-only. Shyden ruled on 2026-11-25 that they are denied everywhere.
+    const installs = workflowYamlNames().flatMap((file) =>
+      workflowJobs(workflow(file), file).flatMap((job) =>
+        job.runs.flatMap((run) =>
+          run
+            .split('\n')
+            .filter((line) => /\bnpm (?:ci|install|i)\b/.test(line))
+            .map((line) => ({ where: `${file} ${job.id}`, line: line.trim() })),
+        ),
+      ),
+    );
+    const withScripts = installs
+      .filter(({ line }) => !/(?:^|\s)--ignore-scripts(?:\s|$)/.test(line))
+      .map(({ where, line }) => `${where}: ${line}`);
+    expect(
+      searched(withScripts, {
+        of: installs,
+        what: 'npm installs in workflows',
+      }),
+    ).toEqual([]);
+  });
+});
