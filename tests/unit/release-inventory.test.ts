@@ -127,17 +127,23 @@ describe('what a visitor receives (#390 F60)', () => {
 });
 
 describe('the specs git tracks (#362)', () => {
-  it('keeps only the spec files directly under tests/e2e', () => {
+  it('asks git for the tracked specs, and keeps only those directly under tests/e2e', () => {
+    const asked: string[][] = [];
+    trackedSpecs((args: string[]) => {
+      asked.push(args);
+      return '';
+    });
+    expect(asked).toEqual([['ls-files', '-z', '--', 'tests/e2e/*.spec.ts']]);
     expect(
       trackedSpecs(
-        'tests/e2e/a.spec.ts\0tests/e2e/sub/b.spec.ts\0tests/e2e/c.ts\0',
+        () => 'tests/e2e/a.spec.ts\0tests/e2e/sub/b.spec.ts\0tests/e2e/c.ts\0',
       ),
     ).toEqual(['tests/e2e/a.spec.ts']);
   });
 
   it('lists them alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
     expect(
-      trackedSpecs('tests/e2e/Zeta.spec.ts\0tests/e2e/alpha.spec.ts\0'),
+      trackedSpecs(() => 'tests/e2e/Zeta.spec.ts\0tests/e2e/alpha.spec.ts\0'),
     ).toEqual(['tests/e2e/alpha.spec.ts', 'tests/e2e/Zeta.spec.ts']);
   });
 });

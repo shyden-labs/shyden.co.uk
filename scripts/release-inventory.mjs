@@ -275,13 +275,14 @@ export const releaseTests = (files, read) =>
   );
 
 /**
- * The e2e spec files in `git ls-files -z` output, in a stable order: only
- * those directly under `tests/e2e/`.
- * @param {string} listing
+ * The e2e spec files git tracks, in a stable order: only those directly under
+ * `tests/e2e/`. The capture runs what is committed, and git's list cannot
+ * disagree with that, where a directory read can.
+ * @param {Git} git
  * @returns {string[]}
  */
-export const trackedSpecs = (listing) =>
-  listing
+export const trackedSpecs = (git) =>
+  git(['ls-files', '-z', '--', 'tests/e2e/*.spec.ts'])
     .split('\0')
     .filter((file) => /^tests\/e2e\/[^/]+\.spec\.ts$/.test(file))
     .sort((a, b) => a.localeCompare(b));
@@ -312,11 +313,7 @@ const main = () => {
       maxBuffer: 256 * 1024 * 1024,
     });
   if (values.tests) {
-    // The specs git tracks: the capture runs what is committed, and git's list
-    // cannot disagree with that, where a directory read can.
-    const files = trackedSpecs(
-      git(['ls-files', '-z', '--', 'tests/e2e/*.spec.ts']),
-    );
+    const files = trackedSpecs(git);
     const selection = releaseTests(files, (file) => readFileSync(file, 'utf8'));
     if (selection.length === 0) {
       console.error(
