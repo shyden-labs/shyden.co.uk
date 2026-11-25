@@ -18,6 +18,9 @@ export const BASE_URL = `http://127.0.0.1:${PORT}`;
  */
 export const TEST_PASS_KEYS_ENV = 'FUNCTIONS_TEST_PASS_KEYS';
 
+/** This run's DEV pass, signed by the throwaway key the local server trusts. */
+export const TEST_PASS_ENV = 'FUNCTIONS_TEST_PASS';
+
 export const PERSIST = '.wrangler/functions-test';
 export const CONFIG = 'tests/functions/wrangler.toml';
 export const DATABASE = 'reports-local';

@@ -1,11 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 import { DEV_DOOR_HOST } from './functions/_lib/dev-door.ts';
 import { mintPass } from './scripts/dev-pass/pass.ts';
-import { BASE_URL, TEST_PASS_KEYS_ENV } from './tests/functions/local.mjs';
+import {
+  BASE_URL,
+  TEST_PASS_ENV,
+  TEST_PASS_KEYS_ENV,
+} from './tests/functions/local.mjs';
 import { ENGINES, engineUse } from './tests/engines';
-
-/** This run's DEV pass, signed by the throwaway key the local server trusts. */
-const TEST_PASS_ENV = 'FUNCTIONS_TEST_PASS';
 
 /**
  * The run's key and pass are made once, in the first process to load this
