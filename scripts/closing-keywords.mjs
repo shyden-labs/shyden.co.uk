@@ -35,7 +35,10 @@ import { argv } from 'node:process';
 import { die, messageOf } from './errors.mjs';
 
 /**
- * A closing keyword adjacent to an issue reference.
+ * A closing keyword adjacent to an issue reference, as five patterns, each
+ * simple enough to stay linear (SonarCloud S8786 and S5843, #1278): a full
+ * URL; a bare `#n` or `GH-n`; and an `owner/repo#n` written straight after the
+ * keyword's letters, after a space, or after a colon.
  *
  * No `g` flag, deliberately: a global regex carries `lastIndex` between
  * `.test()` calls, so every second line would be judged from the wrong
@@ -48,8 +51,13 @@ import { die, messageOf } from './errors.mjs';
  * A full issue or pull request URL counts as a reference too. GitHub does not
  * document that form, so the rule does not rely on GitHub ignoring it.
  */
-const CLOSING_KEYWORD =
-  /\b(?:clos|fix|resolv)[a-z]*[ \t]*:?[ \t]*(?:https?:\/{2}github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/|(?:[\w.-]+\/[\w.-]+)?(?:#|GH-))\d+/i;
+const CLOSING_KEYWORDS = [
+  /\b(?:clos|fix|resolv)[a-z]*[ \t]*(?::[ \t]*)?https?:\/{2}github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+/i,
+  /\b(?:clos|fix|resolv)[a-z]*[ \t]*(?::[ \t]*)?(?:#|GH-)\d+/i,
+  /\b(?:clos|fix|resolv)[\w.-]+\/[\w.-]+(?:#|GH-)\d+/i,
+  /\b(?:clos|fix|resolv)[a-z]*[ \t]+(?::[ \t]*)?[\w.-]+\/[\w.-]+(?:#|GH-)\d+/i,
+  /\b(?:clos|fix|resolv)[a-z]*:[ \t]*[\w.-]+\/[\w.-]+(?:#|GH-)\d+/i,
+];
 
 /** @typedef {{ line: number, text: string }} Offence */
 
@@ -63,7 +71,7 @@ export const closingKeywordOffences = (text) =>
   text
     .split('\n')
     .flatMap((line, index) =>
-      CLOSING_KEYWORD.test(line)
+      CLOSING_KEYWORDS.some((keyword) => keyword.test(line))
         ? [{ line: index + 1, text: line.trim() }]
         : [],
     );

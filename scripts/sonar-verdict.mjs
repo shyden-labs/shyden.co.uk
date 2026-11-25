@@ -38,7 +38,7 @@ function fail(message) {
 }
 
 /**
- * The scan's task id, server and dashboard, from report-task.txt (`key=value` lines).
+ * The scan's project, task id, server and dashboard, from report-task.txt (`key=value` lines).
  *
  * @param {string} text
  */
@@ -64,6 +64,7 @@ export function parseReportTask(text) {
     );
   }
   return {
+    projectKey: get('projectKey'),
     serverUrl,
     ceTaskId: get('ceTaskId'),
     dashboardUrl: get('dashboardUrl'),
@@ -197,25 +198,14 @@ async function reusedVerdict() {
 }
 
 /**
- * This scan's verdict, or a throw naming why there is none.
+ * The scan's finished analysis task, waited for within SONAR_CEILING_SECONDS,
+ * or a throw naming why there is none.
  *
- * @param {string} path
- * @returns {Promise<{ ok: boolean; lines: string[]; dashboardUrl: string }>}
+ * @param {{ serverUrl: string; ceTaskId: string }} report
+ * @param {string} token
+ * @returns {Promise<Task & { analysisId: string }>}
  */
-async function judge(path) {
-  const token = process.env.SONAR_TOKEN;
-  if (!token) {
-    return fail(
-      'SONAR_TOKEN is empty; set it as an Actions secret, and as a Dependabot secret for Dependabot pull requests (shyden-labs/repo-template docs/sonarcloud.md)',
-    );
-  }
-  if (!existsSync(path)) {
-    fail(`no report-task.txt at ${path}: the scan did not run`);
-  }
-  const report = parseReportTask(readFileSync(path, 'utf8'));
-  if (process.env.SONAR_REUSE_PULL_REQUEST_SCAN === 'true') {
-    return { ...(await reusedVerdict()), dashboardUrl: report.dashboardUrl };
-  }
+async function finishedTask(report, token) {
   const ceiling = Number(process.env.SONAR_CEILING_SECONDS || 300);
   /** @type {Task} */
   let task;
@@ -237,9 +227,72 @@ async function judge(path) {
       `task ${report.ceTaskId} ended ${task.status}${why}; no verdict to read`,
     );
   }
-  if (task.analysisId === undefined) {
+  const { analysisId } = task;
+  if (analysisId === undefined) {
     fail(`task ${report.ceTaskId} made no analysis; no verdict to read`);
   }
+  return { ...task, analysisId };
+}
+
+/**
+ * A push to develop scans the branch so its dashboard stays current (#1281).
+ * Its own scan has no gate (NONE, #1221): the pull request's scan is the
+ * gate, so this proves only that the analysis was recorded, reading the
+ * branch's newest analysis back by its commit. The task API's own branch
+ * field was never seen on a main-branch task; the revision is what the
+ * dashboard shows.
+ *
+ * @param {{ serverUrl: string; projectKey: string; dashboardUrl: string }} report
+ * @param {string} branch
+ * @param {string} token
+ * @returns {Promise<{ ok: boolean; lines: string[]; dashboardUrl: string }>}
+ */
+async function branchVerdict(report, branch, token) {
+  const commit = String(process.env.GITHUB_SHA);
+  const { analyses } = /** @type {{ analyses: { revision?: string }[] }} */ (
+    await get(
+      `${report.serverUrl}/api/project_analyses/search?project=${report.projectKey}&branch=${branch}&ps=1`,
+      token,
+    )
+  );
+  const revision = analyses[0]?.revision ?? 'none';
+  if (revision !== commit) {
+    fail(
+      `${branch}'s newest analysis is of ${revision}, not ${commit}: this push’s analysis was not recorded`,
+    );
+  }
+  return {
+    ok: true,
+    lines: [
+      `${branch}'s newest analysis is ${commit}; a branch scan has no gate, its pull request’s scan is the gate (#851)`,
+    ],
+    dashboardUrl: report.dashboardUrl,
+  };
+}
+
+/**
+ * This scan's verdict, or a throw naming why there is none.
+ *
+ * @param {string} path
+ * @returns {Promise<{ ok: boolean; lines: string[]; dashboardUrl: string }>}
+ */
+async function judge(path) {
+  const token = process.env.SONAR_TOKEN;
+  if (!token) {
+    return fail(
+      'SONAR_TOKEN is empty; set it as an Actions secret, and as a Dependabot secret for Dependabot pull requests (shyden-labs/repo-template docs/sonarcloud.md)',
+    );
+  }
+  if (!existsSync(path)) {
+    fail(`no report-task.txt at ${path}: the scan did not run`);
+  }
+  const report = parseReportTask(readFileSync(path, 'utf8'));
+  if (process.env.SONAR_REUSE_PULL_REQUEST_SCAN === 'true') {
+    return { ...(await reusedVerdict()), dashboardUrl: report.dashboardUrl };
+  }
+  const task = await finishedTask(report, token);
+  const branch = process.env.SONAR_BRANCH || '';
+  if (branch !== '') return branchVerdict(report, branch, token);
   const pullRequest = process.env.SONAR_PULL_REQUEST || '';
   if (pullRequest !== '' && task.pullRequest !== pullRequest) {
     fail(

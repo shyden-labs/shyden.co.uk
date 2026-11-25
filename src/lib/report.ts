@@ -160,7 +160,7 @@ export const pageLocales = (page: PageId): readonly Locale[] => {
 };
 
 /** A path as the page table writes it: no trailing slash, the root as `/`. */
-const bare = (path: string): string => path.replace(/\/+$/, '') || '/';
+const bare = (path: string): string => path.replace(/(?<!\/)\/+$/, '') || '/';
 
 export const isPageId = (value: unknown): value is PageId =>
   typeof value === 'string' && (PAGE_IDS as readonly string[]).includes(value);
@@ -356,7 +356,8 @@ function hasTwoCharacters(text: string, locale: Locale): boolean {
     }
     units = segmenter.segment(text)[Symbol.iterator]();
   } else units = text[Symbol.iterator]();
-  return !units.next().done && !units.next().done;
+  const first = units.next();
+  return !first.done && !units.next().done;
 }
 
 /** Rule 3 as an anchored literal scan: each slot a non-empty wildcard, no backtracking. */

@@ -147,7 +147,7 @@ jobs:
           id="$(node scripts/pages.mjs live shyden-site-dev)"
           echo "id=${id}" >> "$GITHUB_OUTPUT"
           echo "Dev serves ${id} before this deploy."
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Build (dev — outbound ShyTalk and Yawelo Idle links and Yawelo Idle media → DEV, never prod)
         env:
           PUBLIC_SHYTALK_URL: https://dev.shytalk.app
@@ -182,7 +182,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler pages deploy dist --project-name shyden-site-dev --branch main
+        run: node_modules/.bin/wrangler pages deploy dist --project-name shyden-site-dev --branch main
 
   # ---- Verify the DEPLOYED dev site, then post dev-verified --------------
   # This job is the point of the whole file. Before it existed, "deployed to
@@ -244,7 +244,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Sanity-check the live dev site
         env:
           # The dev site is behind Basic auth; the username half is ignored by
@@ -252,7 +252,7 @@ jobs:
           # httpCredentials from it.
           DEV_BASIC_AUTH_PASSWORD: ${{ secrets.DEV_BASIC_AUTH_PASSWORD }}
           WEB_BASE_URL: https://dev.shyden.co.uk
-        run: npx playwright test --config=playwright.dev.config.ts
+        run: node_modules/.bin/playwright test --config=playwright.dev.config.ts
       - name: Keep the failing check's screenshots
         # A failure in the step above otherwise says only "Test timeout", and
         # the fall-back then replaces the page it failed on (#1233).
@@ -319,9 +319,80 @@ jobs:
           BEFORE: ${{ needs.deploy-dev.outputs.before }}
         run: node scripts/pages.mjs restore shyden-site-dev "${BEFORE}"
 
+  # ---- SonarCloud's develop analysis (#1281) -----------------------------
+  # A push deploys on its pull request's scan (the gate above, #851), so
+  # develop's own analysis was never refreshed: 24 commits stale on
+  # 2026-11-25. These two jobs scan each pushed commit as the develop branch,
+  # in the pull request scan's shape: coverage measured with no secret, then
+  # the scan with no npm. They gate nothing (develop's scan has no gate, NONE,
+  # #1221); a failure is a failed job report-failure names.
+  sonar-coverage:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: npm
+      # No package needs its install script for the unit coverage run
+      # (measured: 4,798 tests green, lcov written; SonarCloud S6505).
+      - run: npm ci --ignore-scripts
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  sonar-branch:
+    needs: [sonar-coverage]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-26.04
+    # The scan, plus up to 5 minutes' wait for the analysis
+    # (SONAR_CEILING_SECONDS' default).
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # SonarCloud reads history to tell new code from old.
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lcov
+          path: coverage
+      - uses: ./.github/actions/setup-node
+      - name: Scan
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # Its settings are sonar-project.properties, shared with ci.yml's scan.
+      - name: Prove the analysis was recorded on develop
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_BRANCH: develop
+        run: node scripts/sonar-verdict.mjs .scannerwork/report-task.txt
+
   report-failure:
     name: Report a failed deploy
-    needs: [gate, test, deploy-dev, verify-dev, fall-back]
+    needs:
+      [
+        gate,
+        test,
+        deploy-dev,
+        verify-dev,
+        fall-back,
+        sonar-coverage,
+        sonar-branch,
+      ]
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 5

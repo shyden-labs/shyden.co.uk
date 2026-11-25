@@ -25,7 +25,8 @@ const links = [
   { href: `${base}/#shytalk`, label: t.nav.shytalk },
   { href: `${base}/#yawelo-idle`, label: t.nav.yaweloIdle },
   { href: `${base}/#tools`, label: t.nav.tools },
-  { href: `${base}/#contact`, label: t.nav.contact },
+  // Contact goes to the support page, the one way to reach a person (#1266).
+  { href: localisePath('/support', lang), label: t.nav.contact },
 ];
 ---
 

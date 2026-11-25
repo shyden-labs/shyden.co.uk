@@ -55,7 +55,7 @@ const SOURCE = /\.(?:astro|cjs|js|mjs|mts|ts|tsx)$/;
  * A relative specifier after `from`, after a bare `import`, or inside
  * `import(...)`, in either quote. A package name never starts with a dot.
  */
-const SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*(['"])(\.\.?\/[^'"\n]+?)\1/g;
+const SPECIFIER = /(?:\bfrom|\bimport)\s*(?:\(\s*)?(['"])(\.\.?\/[^'"\n]+?)\1/g;
 
 /**
  * @typedef {{ status: string, paths: string[] }} Change

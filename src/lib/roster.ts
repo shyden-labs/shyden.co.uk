@@ -90,7 +90,7 @@ export const serialiseForCompare = (roster: Student[]): string =>
       (s) =>
         `${s.number}:${s.sex ?? ''}:${s.absent ? 1 : 0}:${s.together ?? ''}:${s.apart ?? ''}`,
     )
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join('|');
 
 /**

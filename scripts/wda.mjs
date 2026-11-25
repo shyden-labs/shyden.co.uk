@@ -211,7 +211,7 @@ export async function startWda({
     };
     child.stdout?.on('data', onData);
     child.stderr?.on('data', onData);
-    exitedPromise.then(({ code, signal }) =>
+    void exitedPromise.then(({ code, signal }) =>
       finish(() =>
         reject(
           new Error(

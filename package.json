@@ -36,25 +36,25 @@
     "prepare": "node scripts/install-hooks.mjs"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.4",
+    "@astrojs/sitemap": "^3.7.6",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
-    "astro": "^7.4.12",
-    "swagger-ui-dist": "5.35.0"
+    "astro": "^7.4.13",
+    "swagger-ui-dist": "5.35.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@playwright/test": "1.65.1",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "5.1.0",
+    "@vitest/coverage-v8": "5.1.1",
     "ast-v8-to-istanbul": "1.0.8",
     "prettier": "3.10.1",
     "prettier-plugin-astro": "1.1.2",
     "typescript": "^6.0.3",
     "vite": "8.3.8",
-    "vitest": "5.1.0",
-    "wrangler": "4.162.0",
+    "vitest": "5.1.1",
+    "wrangler": "4.166.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
@@ -62,9 +62,9 @@
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": false,
-    "esbuild@0.28.2": true,
+    "esbuild@0.28.2": false,
     "fsevents@2.3.3": true,
-    "workerd@1.20261113.1": true
+    "workerd@1.20261119.1": false
   },
   "scarfSettings": {
     "enabled": false

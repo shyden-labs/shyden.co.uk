@@ -50,9 +50,6 @@ const privacyHref = pagePath('privacy', privacyHere ? lang : 'en');
       </p>
     )}
     {reportPage && <ReportForm lang={lang} page={reportPage} />}
-    <p>
-      <a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a>
-    </p>
     <p class="legal-links">
       <a href={privacyHref}>{t.legal.privacy}</a>
       {!privacyHere && <span data-english-only>{t.legal.englishOnly}</span>}

@@ -129,16 +129,16 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Capture the baselines
         env:
           VISUAL: '1'
           GREP: ${{ inputs.grep }}
         run: |
           if [ -n "$GREP" ]; then
-            npx playwright test --project=visual --update-snapshots=all --grep "$GREP"
+            node_modules/.bin/playwright test --project=visual --update-snapshots=all --grep "$GREP"
           else
-            npx playwright test --project=visual --update-snapshots=all
+            node_modules/.bin/playwright test --project=visual --update-snapshots=all
           fi
       - id: diff
         run: |

@@ -27,7 +27,7 @@ export function previewImageFor(pathname: string): string {
   const locale = LOCALES.find((code) => code === prefix) ?? DEFAULT_LOCALE;
   const rest = pathname
     .replace(new RegExp(`^/${locale}(?=/|$)`), '')
-    .replace(/^\/+|\/+$/g, '');
+    .replace(/^\/+|(?<!\/)\/+$/g, '');
   return `/previews/${locale}/${rest || 'home'}.png`;
 }
 

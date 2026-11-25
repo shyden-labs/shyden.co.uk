@@ -75,7 +75,7 @@ jobs:
           id="$(node scripts/pages.mjs live shyden-site)"
           echo "id=${id}" >> "$GITHUB_OUTPUT"
           echo "Production serves ${id} before this release."
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
         run: npm run build
       - name: Guard — fail if a [[placeholder]] leaked into shipped text
@@ -97,7 +97,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler pages deploy dist --project-name shyden-site --branch main
+        run: node_modules/.bin/wrangler pages deploy dist --project-name shyden-site --branch main
 
   # ---- Post-prod smoke + prod-verified -----------------------------------
   # Smokes the PUBLIC production domain — the host real visitors get.
@@ -157,13 +157,13 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Smoke and verify the live prod site
         env:
           WEB_BASE_URL: https://shyden.co.uk
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: npx playwright test --config=playwright.prod.config.ts
+        run: node_modules/.bin/playwright test --config=playwright.prod.config.ts
       - name: Keep the failing check's screenshots
         # A failure in the step above otherwise says only "Test timeout", and
         # the fall-back then replaces the page it failed on (#1233).

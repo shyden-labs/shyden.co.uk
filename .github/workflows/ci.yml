@@ -150,7 +150,11 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Our own `prepare` (scripts/install-hooks.mjs), which --ignore-scripts
+      # skips with every dependency's: the integration suite checks git
+      # really runs the pre-push hook (tests/integration/git-hooks.test.ts).
+      - run: npm run prepare
       # Every label `.github/dependabot.yml` asks for must exist, or Dependabot
       # drops it and posts a configuration-error comment in its place -- which
       # it did on every pull request from 2026-09-21 until #299. The claim is
@@ -195,7 +199,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -210,9 +214,8 @@ jobs:
   # failed gate is a failed required check.
   #
   # Its own job, because the token must never share one with the branch's
-  # code running: `npm ci` runs every dependency's install script and the
-  # tests run the branch's code, and either could rewrite a later step or the
-  # scan's report and send the token elsewhere (a Dependabot pull request
+  # code running: the tests run the branch's code and its dependencies, and
+  # either could rewrite a later step or the scan's report and send the token elsewhere (a Dependabot pull request
   # gets the Dependabot secret). So this job checks out afresh, runs no npm,
   # takes the lcov file alone from `coverage`, and `scripts/sonar-verdict.mjs`
   # (node built-ins only) sends the token to https://sonarcloud.io and
@@ -264,25 +267,8 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          # Coverage is measured over what vitest.config.ts measures; the
-          # .astro pages, styles and config files are the e2e suite's, so they
-          # are left out of the coverage figure here too. The copy tables are
-          # parallel by design (every locale has the same keys, only the text
-          # differs), so duplication is not measured there (Shyden's ruling,
-          # 2026-11-20, #1032), nor in the privacy text, whose Indonesian copy
-          # has the English one's shape line for line (his ruling,
-          # 2026-11-22, #1082); every other file keeps the gate's limit.
-          args: >
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=shyden-labs
-            -Dsonar.projectKey=shyden-labs_shyden.co.uk
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.sources=.
-            -Dsonar.tests=tests
-            -Dsonar.exclusions=tests/**,docs/**
-            -Dsonar.cpd.exclusions=src/lib/i18n/en.ts,src/lib/i18n/id.ts,src/lib/i18n/zh.ts,src/lib/i18n/vi.ts,src/lib/i18n/th.ts,src/lib/i18n/site.ts,src/lib/legal/privacy.ts
-            -Dsonar.coverage.exclusions=scripts/test-devices.mjs,**/*.astro,**/*.css,*.config.ts,*.config.mjs,playwright.*.ts,docker/**,public/**
+        # Its settings are sonar-project.properties, which the scan reads,
+        # shared with deploy-dev.yml's develop branch scan (#1281).
       - name: Read the quality gate of this scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -356,7 +342,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # No build step, on purpose: the web server builds for the run, and the
       # unfiltered `--list` each shard is held to runs first, on a tree with
       # no `dist/`. That makes every shard prove collection needs no build
@@ -449,7 +435,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # The selection is read into a variable first: an assignment stops the
       # step when the inventory fails, where `$(...)` inside the command would
       # hand Playwright no test ids and run the WHOLE suite under capture.
@@ -535,7 +521,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # Both sanity configs declare one project, chromium.
       - run: npm run test:sanity
       - name: Keep the failing run's Playwright traces
@@ -578,7 +564,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:functions
       - name: Keep the failing run's Playwright traces
         if: failure()
@@ -695,7 +681,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # Every baseline in this repo is captured on a laptop and compared HERE,
       # and until this printed nothing had ever confirmed the two render on the
       # same architecture (#224). The repo's claim that "both sides run the
@@ -721,7 +707,7 @@ jobs:
       # the gate ran slower and pictured the promo video's loading spinner on
       # the homepage baselines (run 40634186625, and again with a networkState
       # wait in run 40636512082; #968).
-      - run: npx playwright test --project=visual
+      - run: node_modules/.bin/playwright test --project=visual
         env:
           VISUAL: '1'
       # The MEASUREMENT, never a gate (#224). The step above decides the
@@ -746,7 +732,7 @@ jobs:
         env:
           VISUAL_MEASURE: '1'
         run: |
-          npx playwright test --project=visual-measure --reporter=list \
+          node_modules/.bin/playwright test --project=visual-measure --reporter=list \
             > measure.log 2>&1 || true
           {
             echo "### Baseline drift at zero per-pixel tolerance"

@@ -1,12 +1,13 @@
 # The back-translation engine (#95): LibreTranslate, reading id, zh, vi and th
-# back into English for .github/workflows/back-translation.yml.
+# back into English for `npm run reports:review` and
+# `scripts/i18n-second-read.mjs`. CI no longer runs it: the advisory workflow
+# was cut on Shyden's ruling of 2026-11-08 (#1071).
 #
-# Pinned here rather than in the workflow because Dependabot reads no image
-# out of a workflow file: this is the one place it can bump the digest, and
-# the tag beside it is what makes that bump reviewable. Both are held by
+# Pinned here because this is the one place Dependabot can bump the digest,
+# and the tag beside it is what makes that bump reviewable. Both are held by
 # tests/guards/supply-chain.test.ts.
 #
-# Run it locally the same way CI does:
+# Run it locally:
 #
 #   docker build -t back-translation-engine docker/libretranslate
 #   docker run -p 5000:5000 back-translation-engine
@@ -20,6 +21,10 @@ FROM libretranslate/libretranslate:v1.9.6@sha256:1de2d7056bb8ad607a412f4563d9abe
 # reads. The engine names Simplified Chinese `zh` here and `zh-Hans` in its
 # API, which is why the script asks for the script, not the code.
 ENV LT_LOAD_ONLY=en,id,zh,vi,th
+# Never root (SonarCloud S6471, #1277). The base image already runs as
+# `libretranslate` (its config's User, read from the registry for both
+# architectures on 2026-11-25); saying so here keeps it that way.
+USER libretranslate
 
 # Every model, installed when the image is BUILT (#666). The image ships with
 # none, and a boot used to fetch them: on 2026-10-10 a boot whose DNS was
