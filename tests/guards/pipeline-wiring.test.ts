@@ -1443,3 +1443,26 @@ describe('a failing Playwright shard keeps its traces', () => {
     },
   );
 });
+
+describe('a workflow calls the installed tools, never npx (SonarCloud S8543, #1276)', () => {
+  it('no workflow step runs npx, so a missing tool fails instead of downloading the newest release', () => {
+    // `npx <tool>` runs the installed binary when there is one and otherwise
+    // fetches whatever version the registry holds today: a broken install
+    // would run an unpinned tool. `node_modules/.bin/<tool>` runs the version
+    // the lockfile pinned, or fails.
+    const runs = workflowYamlNames().flatMap((file) =>
+      workflowJobs(workflow(file), file).flatMap((job) =>
+        job.runs.map((run) => ({ where: `${file} ${job.id}`, run })),
+      ),
+    );
+    const findings = runs.flatMap(({ where, run }) =>
+      run
+        .split('\n')
+        .filter((line) => /\bnpx\b/.test(line))
+        .map((line) => `${where}: ${line.trim()}`),
+    );
+    expect(
+      searched(findings, { of: runs, what: 'workflow run steps' }),
+    ).toEqual([]);
+  });
+});
