@@ -13,6 +13,19 @@ repository hosts the two Workers:
 The host map (`workers/dev-signin/config.ts`) lists every `dev.` host a pass may be
 minted for. A product joins by adding its hosts there.
 
+## Live state (set up 2026-11-25, at Shyden's request)
+
+- Sign-in Worker `shyden-dev-signin` on Shyden Labs Dev, at
+  `https://shyden-dev-signin.shyden-labs-dev.workers.dev`; KV `shyden-dev-signin-codes`.
+- Door `shyden-dev-signin-door` on the PROD account, custom domain `dev-signin.shyden.co.uk`.
+- Signing key `kid` `2026-11`, public `x` `OBLprb_S4Kn2C--HFVaeA3_s6gEsApDiRAWPLc6WsK8`.
+  The private key went straight from the generator into the Worker secret and was never printed or kept.
+- Access (PROD account, team `shyden.cloudflareaccess.com`): application `dev-signin`
+  (Allow: Shyden's Cloudflare login email only, through the account's one login method, Cloudflare),
+  and `dev-signin app exchange` on `/app/exchange` (Bypass: everyone).
+- Not yet: service tokens for machines (added when a door first needs one), and the
+  GitHub and one-time PIN login methods (not set up on the account).
+
 ## One-time setup (Shyden)
 
 Each step says what it needs. Nothing here puts a private key in the repository.

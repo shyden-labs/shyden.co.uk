@@ -10,12 +10,15 @@
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
   "preview_urls": false,
-  // No id: wrangler creates the namespace on the first deploy and writes its id here.
-  "kv_namespaces": [{ "binding": "CODES" }],
+  // shyden-dev-signin-codes, created by the first deploy (2026-11-25).
+  "kv_namespaces": [
+    { "binding": "CODES", "id": "fdbdaa524e9a44d98ecc437921fcd77c" },
+  ],
   "vars": {
     "DEV_PASS_KID": "2026-11",
-    // Read back from Zero Trust once the Access application exists (docs/dev-pass.md, step 4).
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    // Read back from Zero Trust (PROD account): the team domain, and the AUD tag of the
+    // Access application "dev-signin" on dev-signin.shyden.co.uk (2026-11-25).
+    "ACCESS_TEAM_DOMAIN": "https://shyden.cloudflareaccess.com",
+    "ACCESS_AUD": "e5c082bb53e48f667ae95dc8d77d8c11c9afc6c1bfc19a67bd14197ec84359a0",
   },
 }
