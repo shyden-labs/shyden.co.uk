@@ -160,7 +160,7 @@ export const pageLocales = (page: PageId): readonly Locale[] => {
 };
 
 /** A path as the page table writes it: no trailing slash, the root as `/`. */
-const bare = (path: string): string => path.replace(/\/+$/, '') || '/';
+const bare = (path: string): string => path.replace(/(?<!\/)\/+$/, '') || '/';
 
 export const isPageId = (value: unknown): value is PageId =>
   typeof value === 'string' && (PAGE_IDS as readonly string[]).includes(value);

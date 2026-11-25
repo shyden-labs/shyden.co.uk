@@ -53,18 +53,18 @@ const LOOKS_LIKE_A_FORMULA =
  * the separator and the sign count too: `Ana;"=1` splits into a quoted cell.
  */
 const FORMULA_AFTER_A_SEPARATOR =
-  /([;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([;\t\r\n](?:[^\S\t\r\n]|")*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 const ADDED_AFTER_A_SEPARATOR =
-  /([;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([;\t\r\n](?:[^\S\t\r\n]|")*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 
 /**
  * The class name follows `# Class:` on its line, so it is never at the start
  * of a field and its quotes are never honoured: a comma splits it too.
  */
 const CLASS_FORMULA_AFTER_A_SEPARATOR =
-  /([,;\t\r\n][\s"]*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([,;\t\r\n](?:[^\S\t\r\n]|")*)('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 const CLASS_ADDED_AFTER_A_SEPARATOR =
-  /([,;\t\r\n][\s"]*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
+  /([,;\t\r\n](?:[^\S\t\r\n]|")*)'('*[=+\-@\uff1d\uff0b\uff0d\uff20])/g;
 
 /** The class list opens in a spreadsheet: a formula goes in as text. */
 const asText = (name: string): string => {
@@ -223,7 +223,9 @@ export function todayISO(now: Date = new Date()): string {
  * such teacher the same anonymous filename.
  */
 export function safeFilePart(className: string): string {
-  return className.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
+  return className
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|(?<!-)-+$/g, '');
 }
 
 /**

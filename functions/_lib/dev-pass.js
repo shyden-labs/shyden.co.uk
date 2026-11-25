@@ -37,7 +37,7 @@ function base64url(bytes) {
   return btoa(binary)
     .replaceAll('+', '-')
     .replaceAll('/', '_')
-    .replace(/=+$/, '');
+    .replace(/(?<!=)=+$/, '');
 }
 
 /**
