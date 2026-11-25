@@ -9,8 +9,15 @@ import { randomUUID } from 'node:crypto';
 
 export const PORT = 8799;
 export const BASE_URL = `http://127.0.0.1:${PORT}`;
-/** The dev middleware gates every non-prod host and fails closed without a password. */
-export const PASSWORD = 'functions-local';
+/**
+ * The dev middleware gates every non-prod host behind the DEV pass (#1262 AC2).
+ * Each run makes a throwaway key (`playwright.functions.config.ts`) and hands
+ * the local server its public half in this variable, which `serve.mjs` binds
+ * as the gate's `DEV_PASS_KEYS` setting (Shyden's ruling, 2026-11-25). No key
+ * is kept anywhere.
+ */
+export const TEST_PASS_KEYS_ENV = 'FUNCTIONS_TEST_PASS_KEYS';
+
 export const PERSIST = '.wrangler/functions-test';
 export const CONFIG = 'tests/functions/wrangler.toml';
 export const DATABASE = 'reports-local';
