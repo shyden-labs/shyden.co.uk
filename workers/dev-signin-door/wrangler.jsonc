@@ -11,7 +11,7 @@
   "preview_urls": false,
   "routes": [{ "pattern": "dev-signin.shyden.co.uk", "custom_domain": true }],
   "vars": {
-    // The sign-in Worker's workers.dev origin, read back after its first deploy.
-    "SIGNIN_URL": "",
+    // The sign-in Worker's workers.dev origin, from its first deploy (2026-11-25).
+    "SIGNIN_URL": "https://shyden-dev-signin.shyden-labs-dev.workers.dev",
   },
 }
