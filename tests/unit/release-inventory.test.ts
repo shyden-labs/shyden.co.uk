@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { inventoryOf, releaseTests } from '../../scripts/release-inventory.mjs';
+import {
+  inventoryOf,
+  releaseTests,
+  trackedSpecs,
+} from '../../scripts/release-inventory.mjs';
 import { fixtureReader } from '../fixture-texts';
 
 describe('the capture selection (#362)', () => {
@@ -107,10 +111,33 @@ describe('what a visitor receives (#390 F60)', () => {
     },
   );
 
+  it('lists its areas alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    expect(
+      entryFor(['tests/a.ts', 'README.md', '.github/ci.yml', 'Docs/a.md'])
+        ?.areas,
+    ).toEqual(['.github', '(root)', 'Docs', 'tests']);
+  });
+
   it.each(['README.md', 'vitest.config.ts', 'tests/a.ts'])(
     'does not count %s, which no visitor receives',
     (file) => {
       expect(entryFor([file])?.visitorFacing).toBe(false);
     },
   );
+});
+
+describe('the specs git tracks (#362)', () => {
+  it('keeps only the spec files directly under tests/e2e', () => {
+    expect(
+      trackedSpecs(
+        'tests/e2e/a.spec.ts\0tests/e2e/sub/b.spec.ts\0tests/e2e/c.ts\0',
+      ),
+    ).toEqual(['tests/e2e/a.spec.ts']);
+  });
+
+  it('lists them alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    expect(
+      trackedSpecs('tests/e2e/Zeta.spec.ts\0tests/e2e/alpha.spec.ts\0'),
+    ).toEqual(['tests/e2e/alpha.spec.ts', 'tests/e2e/Zeta.spec.ts']);
+  });
 });

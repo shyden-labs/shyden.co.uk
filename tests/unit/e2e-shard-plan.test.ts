@@ -283,6 +283,19 @@ describe('timingsFileText: the committed timings, diffable', () => {
     );
   });
 
+  it('sorts the units alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    expect(
+      Object.keys(
+        readTimings(
+          timingsFileText('42', {
+            '[webkit] › Zeta.spec.ts': 1,
+            '[webkit] › alpha.spec.ts': 2,
+          }),
+        ).seconds,
+      ),
+    ).toEqual(['[webkit] › alpha.spec.ts', '[webkit] › Zeta.spec.ts']);
+  });
+
   it('is a file readTimings reads back', () => {
     expect(
       readTimings(timingsFileText('42', { '[a] › b.spec.ts': 2 })),
