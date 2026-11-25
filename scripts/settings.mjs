@@ -35,7 +35,7 @@ export const endpoint = (name, fallback) => {
   const url = URL.canParse(value) ? new URL(value) : undefined;
   if (url?.protocol !== 'https:' && url?.protocol !== 'http:')
     die(`${name} is not set, or not an http(s) URL`);
-  return value.replace(/\/+$/, '');
+  return value.replace(/(?<!\/)\/+$/, '');
 };
 
 /**

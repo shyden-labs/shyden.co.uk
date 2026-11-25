@@ -100,7 +100,7 @@ export const EVIDENCE_JPEG_QUALITY = jpegQuality(
 export const slug = (s) =>
   s
     .replace(/[^a-z0-9]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+|(?<!-)-+$/g, '')
     .slice(0, 80)
     .toLowerCase();
 

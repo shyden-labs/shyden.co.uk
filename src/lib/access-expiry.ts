@@ -83,7 +83,7 @@ const ISO_TIME =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /** One line holding something besides spaces. */
-const NAME = /^[^\r\n]*\S[^\r\n]*$/;
+const NAME = /^[^\S\r\n]*\S[^\r\n]*$/;
 
 export type WatchedToken = { name: string; expiresAt: Date };
 
