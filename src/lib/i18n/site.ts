@@ -65,7 +65,7 @@ export const siteEn = {
     openCalculators: 'Open the calculators',
     workClassroomTitle: 'Classroom Group Creator',
     workClassroomBody:
-      'Paste a class list and get fair, random groups in seconds. Built for teachers, free forever.',
+      'Type or import a class list and get fair, random groups in seconds. Built for teachers, free forever.',
     openClassroom: 'Open the group creator',
     getInTouch: 'Get in touch',
     pauseMotion: 'Pause motion',
@@ -77,6 +77,25 @@ export const siteEn = {
     heading: 'Page not found',
     body: "That page doesn't exist.",
     backHome: 'Back to the homepage',
+  },
+
+  // The support page (#1032). Copy approved by Shyden, 2026-11-20.
+  support: {
+    title: 'Support — Shyden',
+    description:
+      'Send Shyden Labs a question, a problem or an idea about any product.',
+    heading: 'Support',
+    intro:
+      'Questions, problems or ideas about any Shyden Labs product? Send a message here and the reply comes by email.',
+  },
+
+  // The footer's link to the privacy page (#1080), on every page. The page is
+  // written in English and Indonesian alone (#1082), never in a catalogue;
+  // `englishOnly` is the one line zh, vi and th carry beside the link (the
+  // global legal-pages rule, 2026-11-08). en and id never show it.
+  legal: {
+    privacy: 'Privacy',
+    englishOnly: 'This page is available in English only.',
   },
 
   calculators: {
@@ -231,7 +250,7 @@ export const siteId: SiteStrings = {
     openCalculators: 'Buka kalkulator',
     workClassroomTitle: 'Pembuat Kelompok Kelas',
     workClassroomBody:
-      'Tempelkan daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
+      'Ketik atau impor daftar kelas dan dapatkan kelompok acak yang adil dalam hitungan detik. Dibuat untuk guru, gratis selamanya.',
     openClassroom: 'Buka pembuat kelompok',
     getInTouch: 'Hubungi',
     pauseMotion: 'Jeda gerakan',
@@ -243,6 +262,20 @@ export const siteId: SiteStrings = {
     heading: 'Halaman tidak ditemukan',
     body: 'Halaman itu tidak ada.',
     backHome: 'Kembali ke beranda',
+  },
+
+  support: {
+    title: 'Dukungan — Shyden',
+    description:
+      'Kirim pertanyaan, masalah, atau ide tentang produk apa pun kepada Shyden Labs.',
+    heading: 'Dukungan',
+    intro:
+      'Ada pertanyaan, masalah, atau ide tentang produk Shyden Labs? Kirim pesan di sini dan balasannya dikirim lewat email.',
+  },
+
+  legal: {
+    privacy: 'Privasi',
+    englishOnly: 'Halaman ini hanya tersedia dalam bahasa Inggris.',
   },
 
   calculators: {
@@ -380,7 +413,7 @@ export const siteZh: SiteStrings = {
     openCalculators: '打开计算器',
     workClassroomTitle: '课堂小组创建器',
     workClassroomBody:
-      '粘贴一份班级名单，几秒钟就能得到公平的随机分组。为教师而做，永久免费。',
+      '输入或导入班级名单，几秒钟内即可生成公平、随机的分组。专为教师设计，永久免费。',
     openClassroom: '打开小组创建器',
     getInTouch: '取得联系',
     pauseMotion: '暂停动画',
@@ -391,6 +424,19 @@ export const siteZh: SiteStrings = {
     heading: '页面未找到',
     body: '该页面不存在。',
     backHome: '返回首页',
+  },
+
+  support: {
+    title: '支持 — Shyden',
+    description: '请向 Shyden Labs 提交关于任何产品的疑问、问题或想法。',
+    heading: '支持',
+    intro:
+      '对 Shyden Labs 的任何产品有疑问、问题或建议吗？请在此发送消息，回复将通过电子邮件发送。',
+  },
+
+  legal: {
+    privacy: '隐私',
+    englishOnly: '本页面仅提供英文版本。',
   },
   calculators: {
     title: 'YeeTalk 计算器 — Shyden',
@@ -527,7 +573,7 @@ export const siteVi: SiteStrings = {
     openCalculators: 'Mở các công cụ tính',
     workClassroomTitle: 'Trình tạo nhóm trong lớp học',
     workClassroomBody:
-      'Dán danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
+      'Nhập hoặc tải lên danh sách lớp và nhận các nhóm ngẫu nhiên, công bằng chỉ trong vài giây. Dành cho giáo viên, miễn phí mãi mãi.',
     openClassroom: 'Mở trình tạo nhóm',
     getInTouch: 'Liên hệ',
     pauseMotion: 'Tạm dừng chuyển động',
@@ -538,6 +584,20 @@ export const siteVi: SiteStrings = {
     heading: 'Không tìm thấy trang',
     body: 'Trang đó không tồn tại.',
     backHome: 'Quay lại trang chủ',
+  },
+
+  support: {
+    title: 'Hỗ trợ — Shyden',
+    description:
+      'Hãy gửi cho Shyden Labs một câu hỏi, một vấn đề hoặc một ý tưởng liên quan đến bất kỳ sản phẩm nào.',
+    heading: 'Hỗ trợ',
+    intro:
+      'Bạn có thắc mắc, vấn đề hay ý tưởng nào về bất kỳ sản phẩm nào của Shyden Labs không? Hãy gửi tin nhắn tại đây, câu trả lời sẽ được gửi qua email.',
+  },
+
+  legal: {
+    privacy: 'Quyền riêng tư',
+    englishOnly: 'Trang này chỉ có sẵn bằng tiếng Anh.',
   },
   calculators: {
     title: 'Máy tính YeeTalk — Shyden',
@@ -648,8 +708,7 @@ export const siteTh: SiteStrings = {
     shytalkFeature1: 'ห้องเสียงสดรองรับได้สูงสุดแปดที่นั่ง',
     shytalkFeature2: 'ขอที่นั่ง หรือจะฟังไปก่อนจนกว่าคุณจะพร้อม',
     shytalkFeature3: 'บทเรียนฟรีกับครูตัวจริง',
-    shytalkFeature4:
-      'มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
+    shytalkFeature4: 'มีการควบคุมเนื้อหา แบ่งตามช่วงอายุ และสร้างมาให้เป็นมิตรเสมอ',
     shytalkShotAlt:
       'แอป ShyTalk บนโทรศัพท์ แสดงห้องเสียงสดที่มีผู้คนอยู่บนที่นั่งและแชตของห้องอยู่ด้านล่าง',
     visitShytalk: 'เยี่ยมชมเว็บไซต์ ShyTalk',
@@ -659,18 +718,15 @@ export const siteTh: SiteStrings = {
     yaweloIdleFeature1:
       'เรียนภาษาอินโดนีเซียจากภาษาอังกฤษ หรือเรียนภาษาอังกฤษจากภาษาอินโดนีเซีย',
     yaweloIdleFeature2: 'ทบทวนคำหนึ่ง และคำนั้นจะยิ่งแข็งแกร่งขึ้น',
-    yaweloIdleFeature3:
-      'ไม่มีโฆษณา ไม่มีตัวจับเวลาพลังงาน ไม่มีความคืบหน้าที่ต้องจ่ายเงิน',
-    yaweloIdleFeature4:
-      'พลาดไปหนึ่งวัน ก็ไม่เสียอะไรเลย ไม่มีใครถูกบังคับให้เรียน',
+    yaweloIdleFeature3: 'ไม่มีโฆษณา ไม่มีตัวจับเวลาพลังงาน ไม่มีความคืบหน้าที่ต้องจ่ายเงิน',
+    yaweloIdleFeature4: 'พลาดไปหนึ่งวัน ก็ไม่เสียอะไรเลย ไม่มีใครถูกบังคับให้เรียน',
     visitYaweloIdle: 'เยี่ยมชมเว็บไซต์ Yawelo Idle',
     yaweloIdleVideoName: 'คลิปตัวอย่าง 10 วินาทีของ Yawelo Idle',
     yaweloIdleVideoShows: 'เนื้อหาในวิดีโอ',
     yaweloIdleVideoDescription:
       "คลิปตัวอย่าง 10 วินาที พร้อมเพลงและไม่มีเสียงพูด 'เรียนรู้ผ่านการเล่น' แนะนำเกม Yawelo Idle บนท้องฟ้ายามค่ำคืนที่มีเกาะลอยอยู่ ตามมาด้วยสามจุดสำคัญ: เรียนภาษาอินโดนีเซียและภาษาอังกฤษ ไม่มีโฆษณาหรือระบบจ่ายเพื่อเข้าถึงเนื้อหา และเรียนตามจังหวะของคุณเอง เพราะคำที่คุณเรียนรู้จะขับเคลื่อนเกมไปข้างหน้า วิดีโอจบด้วยข้อความ 'Yawelo Idle, เร็วๆ นี้' และที่อยู่เว็บไซต์ yawelo-idle.shyden.co.uk",
     toolsHeading: 'ระหว่างที่รอ ลองสิ่งเหล่านี้ดู',
-    toolsLead:
-      'เครื่องมือสองตัว พร้อมใช้งาน ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',
+    toolsLead: 'เครื่องมือสองตัว พร้อมใช้งาน ใช้ฟรี ไม่ต้องสมัคร และใช้งานได้ทันที',
     toolBadge: 'พร้อมใช้งาน',
     workCalculatorsTitle: 'เครื่องคำนวณ YeeTalk',
     workCalculatorsBody:
@@ -678,7 +734,7 @@ export const siteTh: SiteStrings = {
     openCalculators: 'เปิดเครื่องคำนวณ',
     workClassroomTitle: 'เครื่องมือสร้างกลุ่มในห้องเรียน',
     workClassroomBody:
-      'วางรายชื่อนักเรียนแล้วได้กลุ่มแบบสุ่มที่ยุติธรรมภายในไม่กี่วินาที สร้างมาเพื่อครู ฟรีตลอดไป',
+      'พิมพ์หรือนำเข้ารายชื่อชั้นเรียน และรับกลุ่มที่ยุติธรรมและสุ่มภายในไม่กี่วินาที ออกแบบมาสำหรับครู ใช้ฟรีตลอดไป',
     openClassroom: 'เปิดเครื่องมือสร้างกลุ่ม',
     getInTouch: 'ติดต่อ',
     pauseMotion: 'หยุดภาพเคลื่อนไหว',
@@ -689,6 +745,19 @@ export const siteTh: SiteStrings = {
     heading: 'ไม่พบหน้า',
     body: 'หน้านั้นไม่มีอยู่',
     backHome: 'กลับสู่หน้าหลัก',
+  },
+
+  support: {
+    title: 'การสนับสนุน — Shyden',
+    description: 'ส่งคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ไปยัง Shyden Labs',
+    heading: 'การสนับสนุน',
+    intro:
+      'มีคำถาม ปัญหา หรือความคิดเห็นเกี่ยวกับผลิตภัณฑ์ใด ๆ ของ Shyden Labs ไหม? ส่งข้อความที่นี่ แล้วคำตอบจะส่งถึงทางอีเมล',
+  },
+
+  legal: {
+    privacy: 'ความเป็นส่วนตัว',
+    englishOnly: 'หน้านี้มีเฉพาะภาษาอังกฤษเท่านั้น',
   },
   calculators: {
     title: 'เครื่องคำนวณ YeeTalk — Shyden',

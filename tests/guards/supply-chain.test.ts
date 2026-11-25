@@ -382,14 +382,14 @@ describe('TypeScript is held at 6 until it can move', () => {
  * major is chosen by hand (#990, shyden-labs/repo-template#143).
  */
 describe("CI's Node arrives as a Dependabot pull request against one pin", () => {
-  it('watches .github/node with docker, into develop, ignoring node majors', () => {
+  it('watches docker/node with docker, into develop, ignoring node majors', () => {
     const config = parseCleanYaml(dependabot(), DEPENDABOT) as {
       updates?: Record<string, unknown>[];
     };
     const entries = (config.updates ?? []).filter(
       (update) =>
         update['package-ecosystem'] === 'docker' &&
-        update.directory === '/.github/node',
+        update.directory === '/docker/node',
     );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.['target-branch']).toBe('develop');
@@ -403,7 +403,7 @@ describe("CI's Node arrives as a Dependabot pull request against one pin", () =>
 });
 
 /**
- * `@types/node` follows the pinned Node (`.github/node/Dockerfile`), not the newest Node (#646, global rule
+ * `@types/node` follows the pinned Node (`docker/node/Dockerfile`), not the newest Node (#646, global rule
  * 2026-10-08). Every Node major ships its types the day it ships, odd and
  * even alike, so without a hold Dependabot would move the types to a Node this
  * repo does not run, and a type check would pass over an API CI never has.

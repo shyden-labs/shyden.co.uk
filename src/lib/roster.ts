@@ -192,9 +192,9 @@ const label = (student: Student, t: Strings): string =>
  * letters lapse with them" -- an absent student's together/apart letters
  * constrain nobody, so a clash that exists only because an absent student
  * shares a letter must not block a shuffle that would, in fact, succeed.
- * Mirrors the engine's own `togetherApartClash`, checked against the POOL
- * (present, unpinned students) rather than the raw roster -- see the call
- * site in `buildGroups`.
+ * Mirrors the engine's own `togetherApartClash`, checked against the
+ * present students rather than the raw roster -- see the call site in
+ * `buildGroups`.
  */
 export function rosterProblems(roster: Student[], t: Strings): Problem[] {
   const problems: Problem[] = [];
@@ -262,7 +262,9 @@ export function rosterProblems(roster: Student[], t: Strings): Problem[] {
   // Absent students are included. They are still students on the list, and a
   // roster half-filled because someone happened to be away is exactly the
   // state this rule exists to stop reaching the shuffle.
-  const noSex = roster.filter((s) => s.sex === null);
+  // Anything but M or F is missing, undefined included: a sex can arrive
+  // undefined from the page (grouping.ts), and this rule fails closed (#390 F9).
+  const noSex = roster.filter((s) => s.sex !== 'M' && s.sex !== 'F');
   if (noSex.length > 0) {
     problems.push({
       kind: 'no-sex',

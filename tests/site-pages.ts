@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { nonEmpty } from './source-files';
 import {
   LOCALES,
+  localeFromPath,
   localisePath,
   getSiteStrings,
   getStrings,
@@ -34,6 +35,48 @@ export const pageNames = (dir: string = PAGES_DIR): string[] =>
 /** The same pages as request paths in the default locale: `index` is `/`. */
 export const sitePaths = (): string[] =>
   pageNames().map((name) => (name === 'index' ? '/' : `/${name}`));
+
+const TICKET_DIR = 'src/pages/support';
+
+/**
+ * The support ticket page (#1032): English only, out of the sitemap and not
+ * indexed, because ShyDesk emails one address per product and the address
+ * carries a private token after `#t=`. Derived from its folder, like
+ * `docsPaths`.
+ */
+export const ticketPaths = (): string[] =>
+  nonEmpty(
+    readdirSync(TICKET_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.astro'))
+      .map((entry) => `/support/${entry.name.replace(/\.astro$/, '')}/`),
+    `routable .astro pages in ${TICKET_DIR}`,
+  );
+
+/**
+ * The English pages that paint no form control of their own: no tool, and no
+ * report form, since English is not a beta language. The support pages' only
+ * form is ShyDesk's, drawn in its own shadow DOM from ShyDesk's host (#1032),
+ * so the site's markup there holds none either, and the privacy page (#1080)
+ * is text alone. Every other page has a tool
+ * or a report form, and a check that finds no control on one fails.
+ */
+export const pagesWithoutOwnControls = (): string[] => [
+  '/',
+  '/support',
+  ...ticketPaths(),
+  // The English privacy page alone: the Indonesian one is a beta locale's
+  // page, so its footer carries the report form's fields (#1082).
+  ...privacyPaths().filter((path) => localeFromPath(path) === 'en'),
+];
+
+/**
+ * The privacy page as request paths: English (#1080) and Indonesian (#1082),
+ * the only languages a legal page is written in, so they are not among
+ * `sitePaths()`, which every locale serves. Named, not read from a folder:
+ * the tests declare the pages they expect, and `privacy-page.test.ts` holds
+ * the route files to exactly these two.
+ */
+export const privacyPaths = (): string[] => ['/privacy/', '/id/privacy/'];
 
 const DOCS_DIR = 'src/pages/api/docs';
 
@@ -72,6 +115,7 @@ export const HEADING_FOR: Record<string, (locale: Locale) => string> = {
   '/yeetalk-calculators': (locale) =>
     getSiteStrings(locale).calculators.heading,
   '/classroom-groups': (locale) => getStrings(locale).heading,
+  '/support': (locale) => getSiteStrings(locale).support.heading,
 };
 
 /**
@@ -104,6 +148,7 @@ export const TITLE_FOR: Record<string, (locale: Locale) => string> = {
   '/': (locale) => getSiteStrings(locale).home.title,
   '/yeetalk-calculators': (locale) => getSiteStrings(locale).calculators.title,
   '/classroom-groups': (locale) => `${getStrings(locale).title} — Shyden`,
+  '/support': (locale) => getSiteStrings(locale).support.title,
 };
 
 /** One route per page per locale, with the heading each should render. */

@@ -10,11 +10,13 @@
  * and it runs on workerd, so no Node API either.
  */
 import { catalogueLeaves } from './catalogue-leaves';
+import { PRIVACY, legalTexts, type LegalDocument } from './legal/privacy';
 import {
   DEFAULT_LOCALE,
   getSiteStrings,
   isBetaLocale,
   isLocale,
+  LOCALES,
   localisePath,
   rawCatalogue,
   type Locale,
@@ -48,6 +50,8 @@ export const FOOTER_PAGE_IDS = [
   'home',
   'yeetalk-calculators',
   'classroom-groups',
+  'support',
+  'privacy',
 ] as const;
 export type FooterPageId = (typeof FOOTER_PAGE_IDS)[number];
 
@@ -91,9 +95,14 @@ interface PageEntry {
   readonly chrome: boolean;
   /** Keys of `siteSection` the page never shows in a report's locale. */
   readonly unshown?: ReadonlySet<string>;
+  /**
+   * A legal page's text, by the locales it is written in (#1082). Such a page
+   * is served in those locales alone, and its lines are reportable there.
+   */
+  readonly legal?: Partial<Record<Locale, LegalDocument>>;
 }
 
-/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, YeetalkCalculatorsPage `.calculators`, ClassroomGroupsPage `getStrings`, 404.astro `.notFound`. */
+/** Spec section 4's table and section 14. The facts: HomePage reads `.home`, YeetalkCalculatorsPage `.calculators`, ClassroomGroupsPage `getStrings`, SupportPage `.support`, 404.astro `.notFound`. */
 const PAGES: Record<PageId, PageEntry> = {
   home: {
     route: '/',
@@ -115,6 +124,24 @@ const PAGES: Record<PageId, PageEntry> = {
     toolCatalogue: true,
     chrome: true,
   },
+  // The support page (#1032): its heading and line are translated copy; the
+  // form below them is ShyDesk's, drawn from ShyDesk's host, not this site's.
+  support: {
+    route: '/support',
+    localised: true,
+    siteSection: 'support',
+    toolCatalogue: false,
+    chrome: true,
+  },
+  // The privacy page (#1080, #1082): English and Indonesian alone, its text
+  // from src/lib/legal, never a catalogue.
+  privacy: {
+    route: '/privacy/',
+    localised: true,
+    toolCatalogue: false,
+    chrome: true,
+    legal: PRIVACY,
+  },
   'not-found': {
     route: '/404',
     localised: false,
@@ -126,14 +153,24 @@ const PAGES: Record<PageId, PageEntry> = {
   },
 };
 
+/** The locales a page is served in: a legal page's own, every other page's all. */
+export const pageLocales = (page: PageId): readonly Locale[] => {
+  const { legal } = PAGES[page];
+  return legal ? LOCALES.filter((locale) => legal[locale]) : LOCALES;
+};
+
+/** A path as the page table writes it: no trailing slash, the root as `/`. */
+const bare = (path: string): string => path.replace(/\/+$/, '') || '/';
+
 export const isPageId = (value: unknown): value is PageId =>
   typeof value === 'string' && (PAGE_IDS as readonly string[]).includes(value);
 
 /** A footer page only: the 404's footer is English and carries no form. */
 export function pageIdFromPath(pathname: string): FooterPageId | null {
-  const route =
-    localisePath(pathname, DEFAULT_LOCALE).replace(/\/+$/, '') || '/';
-  return FOOTER_PAGE_IDS.find((page) => PAGES[page].route === route) ?? null;
+  const route = bare(localisePath(pathname, DEFAULT_LOCALE));
+  return (
+    FOOTER_PAGE_IDS.find((page) => bare(PAGES[page].route) === route) ?? null
+  );
 }
 
 export const pagePath = (page: PageId, locale: Locale): string =>
@@ -221,6 +258,26 @@ function toolStrings(locale: Locale): ReportableString[] {
   );
 }
 
+/** Every line a legal page shows, headings, date and link words included, as plain forms. */
+function legalStrings(page: PageId, doc: LegalDocument): ReportableString[] {
+  const lines = [
+    doc.title,
+    doc.heading,
+    doc.updated,
+    ...doc.sections.map(({ heading }) => heading),
+    ...legalTexts(doc),
+    // A link's words stand alone on the page too, so they can be quoted alone.
+    ...[...doc.lead, ...doc.sections.flatMap(({ blocks }) => blocks)]
+      .flatMap((block) => (block.kind === 'p' ? [block.parts] : block.items))
+      .flat()
+      .flatMap((part) => (typeof part === 'string' ? [] : [part.text])),
+  ];
+  return lines.map((text, at) => ({
+    key: `legal.${page}[${at}]`,
+    forms: formsOf(text, false),
+  }));
+}
+
 const tables = new Map<string, readonly ReportableString[]>();
 
 export function reportableStrings(
@@ -230,12 +287,14 @@ export function reportableStrings(
   const cacheKey = `${page}:${locale}`;
   let table = tables.get(cacheKey);
   if (!table) {
-    const { siteSection, toolCatalogue, chrome, unshown } = PAGES[page];
+    const { siteSection, toolCatalogue, chrome, unshown, legal } = PAGES[page];
     const sections = [
       ...(siteSection ? [siteSection] : []),
       ...(chrome ? chromeSections() : []),
     ];
+    const doc = legal?.[locale];
     table = [
+      ...(doc ? legalStrings(page, doc) : []),
       ...(toolCatalogue ? toolStrings(locale) : []),
       ...siteStrings(locale, sections).filter(({ key }) => !unshown?.has(key)),
     ];

@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { catalogueLeaves, stringLeaves } from '../../src/lib/catalogue-leaves';
 
 /**
- * The walk every catalogue guard reads through (`one-home.test.ts` keeps it
- * the only one), pinned by content: a walk that stopped entering arrays, or
+ * The walk every catalogue guard reads through, pinned by content: a walk that stopped entering arrays, or
  * spelled a path differently, would leave every guard green over less copy
  * than it claims to read.
  */

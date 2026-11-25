@@ -1,4 +1,8 @@
+import { tapOn } from '../real-touch';
+import { PRIVACY_EN, PRIVACY_ID } from '../../src/lib/legal/privacy';
 import { typeInto } from '../real-typing';
+import { chooseOption } from '../real-select';
+import { supportTestAddress } from './support-address';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
 import {
@@ -17,6 +21,9 @@ import { expectTheSwitchPersists } from '../themes';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
 import { robotsDirectives } from '../robots-directives';
 import { expectNotFoundServed } from '../not-found-served';
+import { atLeast44Soft, expectNoScrollSoft } from '../viewport';
+import { contrastRatio } from '../e2e/helpers';
+import { eachWidth } from '../each-width';
 
 // Runs against the REAL deployed dev site behind Basic auth. baseURL +
 // httpCredentials are supplied by playwright.dev.config.ts (env-driven).
@@ -122,7 +129,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'functions/_middleware.js serves the dev robots.txt, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves functions/_middleware.js serves this robots.txt before the merge (#394); only the deployed site proves dev.shyden.co.uk itself serves it',
     },
   },
   async ({ request }) => {
@@ -133,35 +140,205 @@ test(
   },
 );
 
-// The homepage's Yawelo Idle preview plays from the shared media host itself,
-// the real files, not the suite's stand-ins (#835).
+// The homepage's Yawelo Idle preview plays from Yawelo Idle's DEV media host
+// itself, the real files, not the suite's stand-ins (#835, #1193). The host
+// sends `Cross-Origin-Resource-Policy: cross-origin`, so this runs on the
+// pull request's own build too. The dev build points it at the dev host; a
+// poster or video from the production host is the cross-environment leak the
+// product links below are checked for.
+test("the homepage's Yawelo Idle preview plays from Yawelo Idle's dev media host", async ({
+  page,
+  browserName,
+}) => {
+  await page.goto('/');
+  const video = page.locator('#yawelo-idle video');
+  await expect(video).toBeVisible();
+  // Muted, so no engine's autoplay rule refuses a play that is not a tap.
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.muted = true;
+    return v.play();
+  });
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.paused))
+    .toBe(false);
+  // CI's Linux WebKit never advances the clock after play() (measured
+  // 2026-10-20; the e2e suite's ruling, Shyden 2026-11-18, #1048), so the
+  // clock is the engine's and is asserted where the engine moves it.
+  if (browserName !== 'webkit')
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0.5);
+  expect(
+    await video.evaluate((v: HTMLVideoElement) => ({
+      video: new URL(v.currentSrc).origin,
+      poster: new URL(v.poster).origin,
+    })),
+  ).toEqual({
+    video: 'https://dev-media.yaweloidle.com',
+    poster: 'https://dev-media.yaweloidle.com',
+  });
+});
+
+// The support page (#1032) loads ShyDesk's piece from Non-Prod on dev, and
+// only on dev: dev ShyDesk accepts dev.shyden.co.uk alone, and live ShyDesk
+// is the production build's. Checked on the pull request's own dev build
+// too, so a missing build variable is caught before a deploy.
+test("the support page loads ShyDesk's piece from dev ShyDesk", async ({
+  page,
+}) => {
+  await page.goto('/support');
+  await expect(page.locator('shydesk-support')).toHaveAttribute(
+    'product',
+    'shyden-co-uk',
+  );
+  await expect(page.locator('script[src$="/embed.js"]')).toHaveAttribute(
+    'src',
+    'https://shydesk.shydesk-non-prod.workers.dev/embed.js',
+  );
+});
+
+// A real message from the support page reaches dev ShyDesk and shows in its
+// thread (#1032 AC5): typed with real key presses, a photo attached through
+// the file chooser a real press opened, sent with a real press. STAND-IN: the
+// photo is handed to that chooser, because the system file dialog is outside
+// the browser (as `upload` in tests/e2e/helpers.ts). Dev ShyDesk sends no
+// email (its monthly share is 0), so the private link is read off the page.
+// The field names are ShyDesk's (embed.js at shydesk `0a2abc8`).
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
 test(
-  "the homepage's Yawelo Idle preview plays from the media host",
+  'a message typed on /support reaches dev ShyDesk and shows in its thread',
   {
     tag: '@deployed-only',
     annotation: {
       type: 'deployed-only',
       description:
-        'the video host sends Cross-Origin-Resource-Policy: same-site, which admits a page on shyden.co.uk and refuses a preview on localhost',
+        'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot send to it',
+    },
+  },
+  async ({ page }, testInfo) => {
+    // The form, Turnstile and the send used most of the default 30 s on
+    // deploy-dev run 44883439826 (#1032), leaving the ticket page's own 30 s
+    // wait no room. Measured on Chromium in deploy-dev run 44885513312: sent
+    // at 30.4 s, thread shown at 32.9 s. Each stage's time is printed per
+    // engine, so a slower engine names the stage it spent.
+    test.setTimeout(90_000);
+    const started = Date.now();
+    const engine = testInfo.project.name;
+    const stage = (name: string) =>
+      process.stdout.write(
+        `[support journey ${engine}] ${name} at ${((Date.now() - started) / 1000).toFixed(1)} s\n`,
+      );
+    const words = `Support page check ${engine} ${started}`;
+    await page.goto('/support');
+    const form = page.locator('shydesk-support');
+    await typeInto(
+      form.getByLabel('Email'),
+      supportTestAddress(engine, started),
+    );
+    await typeInto(form.getByLabel('Subject'), 'Support page check');
+    await chooseOption(form.getByLabel('Category'), 'question');
+    await typeInto(form.getByLabel('Message'), words);
+    page.on('filechooser', () => {});
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      tapOn(form.getByLabel('Photos and videos')),
+    ]);
+    await chooser.setFiles({
+      name: 'support-photo.png',
+      mimeType: 'image/png',
+      buffer: ONE_PIXEL_PNG,
+    });
+    stage('form filled');
+    await tapOn(form.getByRole('button', { name: 'Send', exact: true }));
+    await expect(
+      form.getByText('Request sent. Keep this private link to follow it:'),
+    ).toBeVisible({ timeout: 30_000 });
+    stage('request sent');
+    // ShyDesk names the link "Private link" (its aria-label), not its URL.
+    const link = await form
+      .getByRole('link', { name: 'Private link', exact: true })
+      .getAttribute('href');
+    expect(link).toMatch(/\/support\/ticket\/?#t=/);
+    await page.goto(new URL(link ?? '', page.url()).toString());
+    await expect(page.locator('shydesk-support').getByText(words)).toBeVisible({
+      timeout: 30_000,
+    });
+    stage('thread shown');
+  },
+);
+
+// AC5's other half (#1032): the support form as dev ShyDesk draws it, in its
+// shadow DOM, takes a 44 px touch on every control, adds no sideways scroll
+// at 320 px and paints its text at AA, in the light theme and the dark. The
+// e2e suite cannot see it: its production build loads live ShyDesk, which
+// does not serve yet. One visit per theme; each width is a step.
+test(
+  'the support form fits 320 px, takes a 44 px touch and reads at AA in both themes',
+  {
+    tag: '@deployed-only',
+    annotation: {
+      type: 'deployed-only',
+      description:
+        'dev ShyDesk accepts https://dev.shyden.co.uk alone as an origin, so a preview of the build cannot draw its form',
     },
   },
   async ({ page }) => {
-    await page.goto('/');
-    const video = page.locator('#yawelo-idle video');
-    await expect(video).toBeVisible();
-    // Muted, so no engine's autoplay rule refuses a play that is not a tap.
-    await video.evaluate((v: HTMLVideoElement) => {
-      v.muted = true;
-      return v.play();
-    });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeGreaterThan(0.5);
-    expect(
-      await video.evaluate(
-        (v: HTMLVideoElement) => new URL(v.currentSrc).origin,
-      ),
-    ).toBe('https://media.shyden.co.uk');
+    test.setTimeout(60_000);
+    const form = page.locator('shydesk-support');
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme });
+      await eachWidth(page, [{ width: 320, height: 900 }], async (took) => {
+        await page.goto('/support');
+        // Measured once Turnstile has passed and Send is live: WCAG's
+        // contrast rule exempts an inactive control, and before then Send
+        // read 2.96:1 (light) and 3.26:1 (dark) on every engine (run
+        // 44975475265).
+        await expect(
+          form.getByRole('button', { name: 'Send', exact: true }),
+        ).toBeEnabled({ timeout: 20_000 });
+        // No saved choice, so the page follows the system's scheme.
+        expect(
+          await page.evaluate(
+            () => matchMedia('(prefers-color-scheme: dark)').matches,
+          ),
+          `the page is showing its ${colorScheme} theme`,
+        ).toBe(colorScheme === 'dark');
+        await expectNoScrollSoft(
+          page,
+          `/support at ${took.width} px, ${colorScheme}`,
+        );
+
+        const controls = await form
+          .locator('input:not([type="hidden"]), select, textarea, button')
+          .filter({ visible: true })
+          .all();
+        expect(controls.length, 'controls drawn in the form').toBeGreaterThan(
+          0,
+        );
+        for (const [i, control] of controls.entries())
+          await atLeast44Soft(
+            control,
+            `${colorScheme}: control ${i} (${await control.evaluate((el) => el.outerHTML.slice(0, 80))})`,
+          );
+
+        const texts = await form
+          .locator('label, legend, button, p, h1, h2, h3, a, span')
+          .filter({ visible: true, hasText: /\S/ })
+          .all();
+        expect(texts.length, 'text drawn in the form').toBeGreaterThan(0);
+        for (const text of texts)
+          expect
+            .soft(
+              await contrastRatio(text),
+              `${colorScheme}: "${(await text.innerText()).slice(0, 40)}" contrast`,
+            )
+            .toBeGreaterThanOrEqual(4.5);
+      });
+    }
   },
 );
 
@@ -172,7 +349,7 @@ test(
     annotation: {
       type: 'deployed-only',
       description:
-        'the Basic-auth gate is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+        'the functions suite proves the Basic-auth gate, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself is gated',
     },
   },
   async () => {
@@ -196,7 +373,7 @@ for (const [from, to] of LEGACY_REDIRECTS)
       annotation: {
         type: 'deployed-only',
         description:
-          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+          'the functions suite proves the redirect, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself answers it',
       },
     },
     async () => {
@@ -229,8 +406,8 @@ for (const product of PRODUCTS)
 test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
   test('Student details builds a roster', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-students-toggle').click();
-    await page.getByRole('button', { name: /Add student/ }).click();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: /Add student/ }));
     await expect(page.locator('.cg-student')).toHaveCount(1);
     // The roster's own controls, not just a row: a partial bundle can render
     // the table and wire nothing.
@@ -241,7 +418,7 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
 
   test('Import / export offers its controls', async ({ page }) => {
     await page.goto('/classroom-groups');
-    await page.locator('#cg-io-toggle').click();
+    await tapOn(page.locator('#cg-io-toggle'));
     await expect(
       page.getByRole('button', { name: 'Export class list' }),
     ).toBeVisible();
@@ -255,14 +432,13 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
     await makeGroups(page, '8', '4');
     await expect(page.locator('#cg-results .group').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Print' }).click();
+    await tapOn(page.getByRole('button', { name: 'Print' }));
     await expect(page.locator('#cg-print-panel')).toBeVisible();
-    await page
-      .locator('#cg-print-panel')
-      .getByRole('button', { name: 'Cancel' })
-      .click();
+    await tapOn(
+      page.locator('#cg-print-panel').getByRole('button', { name: 'Cancel' }),
+    );
 
-    await page.getByRole('button', { name: 'Full screen' }).click();
+    await tapOn(page.getByRole('button', { name: 'Full screen' }));
     await expect(page.locator('#cg-board')).toBeVisible();
     await expect(page.locator('#cg-board #cg-results')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -277,7 +453,7 @@ test.describe('the Classroom Group Creator v2 surfaces reached dev', () => {
   for (const locale of LOCALES.filter((l) => l !== 'en')) {
     test(`the ${locale} tool carries its own copy`, async ({ page }) => {
       await page.goto(localisePath('/classroom-groups', locale));
-      await page.locator('#cg-io-toggle').click();
+      await tapOn(page.locator('#cg-io-toggle'));
       await expect(
         page.getByRole('button', {
           name: getStrings(locale).ioExportClassList,
@@ -326,13 +502,13 @@ test(
     const t = getSiteStrings('vi').report;
     const home = localisePath('/', 'vi');
     await page.goto(home);
-    await page.locator('[data-report] summary').click();
+    await tapOn(page.locator('[data-report] summary'));
     await typeInto(page.getByLabel(t.quoteLabel, { exact: true }), t.open);
     await typeInto(
       page.getByLabel(t.noteLabel, { exact: true }),
       `automated dev check ${process.env.GITHUB_SHA ?? 'local'}`,
     );
-    await page.getByRole('button', { name: t.send }).click();
+    await tapOn(page.getByRole('button', { name: t.send }));
     await expect(page).toHaveURL(
       (url) => url.pathname === home && url.hash === '#report-sent',
     );
@@ -358,12 +534,12 @@ test(
   },
   async ({ page }) => {
     await page.goto('/api/docs/');
-    await page.locator('#swagger .opblock-summary-control').first().click();
-    await page.locator('#swagger .try-out__btn').click();
+    await tapOn(page.locator('#swagger .opblock-summary-control').first());
+    await tapOn(page.locator('#swagger .try-out__btn'));
     await typeInto(page.getByPlaceholder('quote', { exact: true }), 'x');
     // The honeypot: dev answers sent and stores nothing.
     await typeInto(page.getByPlaceholder('website', { exact: true }), 'a bot');
-    await page.locator('#swagger .btn.execute').click();
+    await tapOn(page.locator('#swagger .btn.execute'));
     const live = page.locator('#swagger .live-responses-table .response');
     await expect(live).toHaveCount(1);
     await expect(live.locator('.response-col_status')).toHaveText('200');
@@ -372,3 +548,23 @@ test(
     );
   },
 );
+
+// #1082: the Indonesian privacy page, which governs for residents of Indonesia.
+test('the Indonesian privacy page is served on dev', async ({ page }) => {
+  expect((await page.goto(localisePath('/privacy/', 'id')))?.status()).toBe(
+    200,
+  );
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    PRIVACY_ID.heading,
+  );
+  await expect(page.locator('main')).toContainText(PRIVACY_ID.updated);
+});
+
+// #1080: the English privacy page every footer links to.
+test('the privacy page is served on dev', async ({ page }) => {
+  expect((await page.goto('/privacy/'))?.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    PRIVACY_EN.heading,
+  );
+  await expect(page.locator('main')).toContainText(PRIVACY_EN.updated);
+});

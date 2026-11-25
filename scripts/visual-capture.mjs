@@ -10,7 +10,8 @@
  * byte-identically where nothing moved (#678: run 38122176791 rewrote four
  * pages its change never touched, by 1 to 17 pixels), so each rewrite is
  * judged by `capturedBaselines` against the committed picture at `HEAD`, and
- * only one past `CAPTURE_PIXEL_RULE` is handed back. Anything in the status
+ * only one past `CAPTURE_PIXEL_RULE`, or one the `visual` gate would still
+ * fail, is handed back. Anything in the status
  * that is not a baseline is refused: a capture hands back baselines and
  * nothing else, so committing it carries no other side effect of the
  * branch's code.
@@ -23,6 +24,7 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { argv, env } from 'node:process';
+import coreBundle from 'playwright-core/lib/coreBundle';
 import { die } from './errors.mjs';
 import { decodePng, differingPixels } from './png-pixels.mjs';
 
@@ -114,14 +116,31 @@ export const captureMessage = (original, files) =>
 export const CAPTURE_PIXEL_RULE = 60;
 
 /**
- * @typedef {{ file: string, differing: number | 'new' | 'size' }} Judged
+ * The `visual` gate's own tolerances (`playwright.config.ts`). A rewrite the
+ * pixel rule would keep out is still handed back when Playwright's comparator,
+ * at these, fails it (Shyden 2026-11-10, "Also hand back check fails"): the
+ * capture never keeps out a picture the gate then refuses.
+ */
+const GATE = { threshold: 0.1, maxDiffPixelRatio: 0 };
+const compare = coreBundle.utils.getComparator('image/png');
+
+/**
+ * @param {Uint8Array} before
+ * @param {Uint8Array} after
+ * @returns {boolean}
+ */
+const gateFails = (before, after) =>
+  compare(Buffer.from(after), Buffer.from(before), GATE) !== null;
+
+/**
+ * @typedef {{ file: string, differing: number | 'new' | 'size', failsGate?: true }} Judged
  * @typedef {{ commit: Judged[], kept: Judged[] }} Capture
  */
 
 /**
  * Which of the rewritten `files` a capture commits: a baseline with no
- * committed picture (`'new'`), one whose size changed (`'size'`), or one where
- * more than `CAPTURE_PIXEL_RULE` pixels differ. The rest are kept out, each
+ * committed picture (`'new'`), one whose size changed (`'size'`), one where
+ * more than `CAPTURE_PIXEL_RULE` pixels differ, or one the `visual` gate fails. The rest are kept out, each
  * with its count, so the summary can name them.
  *
  * @param {readonly string[]} files
@@ -137,14 +156,14 @@ export const capturedBaselines = (files, { committed, captured }) => {
       result.commit.push({ file, differing: 'new' });
       continue;
     }
-    const differing = differingPixels(
-      decodePng(before),
-      decodePng(captured(file)),
-    );
+    const after = captured(file);
+    const differing = differingPixels(decodePng(before), decodePng(after));
     if (differing === undefined)
       result.commit.push({ file, differing: 'size' });
     else if (differing > CAPTURE_PIXEL_RULE)
       result.commit.push({ file, differing });
+    else if (gateFails(before, after))
+      result.commit.push({ file, differing, failsGate: true });
     else result.kept.push({ file, differing });
   }
   return result;
@@ -154,14 +173,14 @@ export const capturedBaselines = (files, { committed, captured }) => {
  * @param {Judged} judged
  * @returns {string}
  */
-const judgedLine = ({ file, differing }) =>
+const judgedLine = ({ file, differing, failsGate }) =>
   `- \`${file}\`: ${
     differing === 'new'
       ? 'new'
       : differing === 'size'
         ? 'size changed'
         : plural(differing, 'pixel differs', 'pixels differ')
-  }`;
+  }${failsGate ? ', and the visual gate fails them' : ''}`;
 
 /**
  * `count` beside the word that fits it.
@@ -184,12 +203,12 @@ export const captureSummary = ({ commit, kept }) => {
   if (commit.length === 0 && kept.length === 0)
     return 'No baseline changed: no artifact uploaded, nothing to fold.';
   return [
-    `${plural(commit.length, 'baseline', 'baselines')} committed (more than ${CAPTURE_PIXEL_RULE} pixels differ, new, or a new size; #678):`,
+    `${plural(commit.length, 'baseline', 'baselines')} committed (more than ${CAPTURE_PIXEL_RULE} pixels differ, the visual gate fails it, new, or a new size; #678):`,
     ...commit.map(judgedLine),
     ...(kept.length === 0
       ? []
       : [
-          `${plural(kept.length, 'rewrite', 'rewrites')} kept out (${CAPTURE_PIXEL_RULE} pixels or fewer differ):`,
+          `${plural(kept.length, 'rewrite', 'rewrites')} kept out (${CAPTURE_PIXEL_RULE} pixels or fewer differ, and the visual gate passes):`,
           ...kept.map(judgedLine),
         ]),
   ].join('\n');

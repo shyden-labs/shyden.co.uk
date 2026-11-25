@@ -33,7 +33,7 @@ name: PR body
 # required workflows and reusable calls, and this comment asked for it until
 # #284. Requiring a name nothing reports is not a weak gate: it hangs every
 # pull request on a check its base cannot produce, and only an administrator
-# can undo it. Pinned by pipeline-wiring.test.ts, which derives both sides.
+# can undo it.
 #
 # `workflow_dispatch` TAKES A PULL REQUEST NUMBER (#651). The floor recorder's
 # commit job pushes with the job token, and a push by that token starts no
@@ -68,7 +68,7 @@ jobs:
   closing-keywords:
     runs-on: ubuntu-26.04
     # Seconds of work. A budget so a hung job cannot burn the runner's
-    # 360-minute default; pinned by tests/guards/pipeline-wiring.test.ts.
+    # 360-minute default.
     timeout-minutes: 5
     # `gh pr view` on a dispatched run reads the pull request; nothing writes.
     permissions:

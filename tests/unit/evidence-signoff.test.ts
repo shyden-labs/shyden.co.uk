@@ -28,7 +28,7 @@ const current = (verdict: 'approved' | 'more') => ({
  * A copy frozen all the way down, as the runtime delivers stored documents
  * (#172). JSON.parse hands its reviver each value after that value's
  * children, so freezing there freezes the whole body with no walker of our
- * own, as `db-stand-in.ts` does (one-home.test.ts).
+ * own, as `db-stand-in.ts` does.
  */
 const frozen = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value), (_key, part: unknown) =>

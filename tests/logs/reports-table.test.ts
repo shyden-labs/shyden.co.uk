@@ -38,8 +38,8 @@ describe('the migration', () => {
   });
 
   it('bounds every text column the way check 7 does', () => {
-    // Anchored to each column's own line, so no other text can satisfy them
-    // (`anchored-presence.test.ts`). The literal 1000 is tied to check 7 by
+    // Anchored to each column's own line, so no other text can satisfy
+    // them. The literal 1000 is tied to check 7 by
     // the pin on MAX_FIELD_UNITS.
     expect(MAX_FIELD_UNITS).toBe(1000);
     const text = sql();

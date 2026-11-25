@@ -13,8 +13,6 @@ import { treeReading } from './tree-reading';
  * next guard reached for silently decided its blind spots: exactly how #67's
  * four hand-written `[tests/e2e, tests/device]` lists left the deploy gates
  * unscanned.
- *
- * `tests/guards/one-home.test.ts` fails if a tenth appears.
  */
 
 /**
@@ -96,11 +94,9 @@ export const tsFilesUnder = (dir: string): string[] =>
   filesUnder(dir, (path) => /\.tsx?$/.test(path));
 
 /**
- * Every Playwright spec at or below `dir`.
- *
- * `specDirs()` is built from this rather than from its own recursion: a
- * directory "holds specs" exactly when this returns a file in it, so the two
- * can no longer disagree about what a spec is.
+ * Every Playwright spec at or below `dir`. `specDirs()` (tests/spec-dirs.ts) also counts a
+ * setup project's file, so a directory holding only the Android preflight is still scanned
+ * (#1178).
  */
 export const specFilesUnder = (dir: string): string[] =>
   filesUnder(dir, (path) => path.endsWith('.spec.ts'));
@@ -170,10 +166,6 @@ function isSubstantive(member: unknown): boolean {
  * Prefer handing it the population ITSELF over a count. A count is taken on
  * trust; an array is content-checked by `isSubstantive` above, which is the
  * only form that closes #112.
- *
- * Every search also checks its population's recorded floor in the same test,
- * because one unit still read keeps this green (#515); there is no exemption
- * (#534). `floorless-searches.test.ts` holds that.
  */
 export function searched<T>(
   findings: readonly T[],

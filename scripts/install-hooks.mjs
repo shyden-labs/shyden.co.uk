@@ -79,10 +79,7 @@ export function main() {
   }
   // No list of hook names: one named only the pre-push hook for as long as
   // commit-msg (the closing-keyword refusal) was installed beside it.
-  console.log(
-    `install-hooks: git will run the hooks in ${HOOKS}/. ` +
-      'Bypass one with --no-verify.',
-  );
+  console.log(`install-hooks: git will run the hooks in ${HOOKS}/.`);
 }
 
 if (import.meta.main) main();

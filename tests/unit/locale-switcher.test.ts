@@ -81,7 +81,7 @@ describe('the language switcher labels every alternative (tripwire 1, retired)',
     // bare `toContain` even on stripped source (#98 AC 3). Every locale, in
     // LOCALES order, since #385: it was `otherLocales(lang)` after the current
     // one, which reordered the list on every language.
-    // language-switcher.spec.ts pins the rendered order itself.
+    // tests/e2e/checks/switcher-open.ts pins the rendered order itself.
     expect(
       /\bLOCALES\s*\.\s*map\s*\(/.test(src),
       'the switcher names LOCALES but never maps over it',

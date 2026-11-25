@@ -1,7 +1,12 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { deployedRoutes, docsPaths } from '../site-pages';
+import {
+  deployedRoutes,
+  docsPaths,
+  privacyPaths,
+  ticketPaths,
+} from '../site-pages';
 import {
   LOCALES,
   PREFIXED_LOCALES,
@@ -82,7 +87,6 @@ let corpus: Corpus | undefined;
  * has built anything, so a module-scope walk made listing the suite depend on
  * a build already being there: on a fresh checkout every filtered run passed
  * its tests and then exited 1 on `ENOENT: scandir 'dist'`.
- * `tests/guards/collection-needs-no-build.test.ts` holds every spec to that.
  * Kept once read because five locale tests share one corpus.
  */
 const builtCorpus = (): Corpus => {
@@ -188,6 +192,16 @@ const ABSENCE_RULES: ReadonlyArray<{
       'alternatives in its switcher, and a badge is labelled in the language ' +
       'of the PAGE, so the English label does render. That correction came ' +
       'from this rule failing its own reverse-check, not from review.',
+  },
+  {
+    locales: ['en', 'id'],
+    paths: ['legal.englishOnly'],
+    why:
+      'The footer note "This page is available in English only." goes beside ' +
+      'the privacy link on pages in a language the privacy page is not ' +
+      'written in (#1080). It is written in English and Indonesian (#1082), ' +
+      'so neither needs the note and neither sentence is served; the key ' +
+      'exists only because every catalogue has the same shape.',
   },
 ];
 
@@ -361,6 +375,8 @@ test.describe('no built page names the dissolved company (#370)', () => {
       [
         ...deployedRoutes().map(({ path }) => join('dist', path, 'index.html')),
         ...docsPaths().map((path) => join('dist', path, 'index.html')),
+        ...ticketPaths().map((path) => join('dist', path, 'index.html')),
+        ...privacyPaths().map((path) => join('dist', path, 'index.html')),
         join('dist', '404.html'),
       ].sort(),
     );

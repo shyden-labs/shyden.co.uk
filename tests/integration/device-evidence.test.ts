@@ -176,7 +176,7 @@ describe('the device leg writes the same evidence every other leg does', () => {
     const dir = evidenceDir();
     vi.stubEnv('EVIDENCE_DIR', dir);
 
-    // `sips -Z` resamples to fit a MAXIMUM dimension, so an unguarded call
+    // The resample fits a MAXIMUM dimension, so an unguarded call
     // would blow this 1x1 fixture up to 912x912 -- bigger bytes to say less.
     const file = await shootDevice(fakeDriver(), {
       project: 'ios-safari-real-device',
@@ -190,57 +190,48 @@ describe('the device leg writes the same evidence every other leg does', () => {
     );
   });
 
-  // The leg runs only on a Mac (devicectl, an iPhone on USB), and `sips` is
-  // a macOS built-in, so elsewhere there is nothing here to measure: a Linux
-  // runner has no `sips`, and the resample degrades to a no-op by design.
-  it.runIf(process.platform === 'darwin')(
-    'shrinks a full-size phone capture to CSS scale, read back from its own header',
-    async () => {
-      const dir = evidenceDir();
-      vi.stubEnv('EVIDENCE_DIR', dir);
+  // Runs on every machine (#1069): the resample is done in-process, so CI's
+  // Linux runner measures the same thing a Mac does.
+  it('shrinks a full-size phone capture to CSS scale, read back from its own header', async () => {
+    const dir = evidenceDir();
+    vi.stubEnv('EVIDENCE_DIR', dir);
 
-      // The phone's device-pixel buffer, 1260x2736: thirty of these pushed the
-      // evidence page to 23.48MB against the 16MB one document may carry.
-      const file = await shootDevice(
-        fakeDriver(pngOf(1260, 2736).toString('base64')),
-        {
-          project: 'ios-safari-real-device',
-          title: 'Journey 14 -- the board on a refused grant',
-          label: 'nothing out of reach',
-        },
-      );
+    // The phone's device-pixel buffer, 1260x2736: thirty of these pushed the
+    // evidence page to 23.48MB against the 16MB one document may carry.
+    const file = await shootDevice(
+      fakeDriver(pngOf(1260, 2736).toString('base64')),
+      {
+        project: 'ios-safari-real-device',
+        title: 'Journey 14 -- the board on a refused grant',
+        label: 'nothing out of reach',
+      },
+    );
 
-      // Read from the IHDR bytes rather than asked of `sips`, so the tool
-      // that did the resample is not also the one that vouches for it.
-      expect(pngSize(readFileSync(join(dir, file!)))).toEqual({
-        width: 420,
-        height: 912,
-      });
-    },
-  );
+    // Read from the IHDR bytes rather than asked of the resample, so the
+    // code that did it is not also the code that vouches for it.
+    expect(pngSize(readFileSync(join(dir, file!)))).toEqual({
+      width: 420,
+      height: 912,
+    });
+  });
 
-  // The test above this one never reaches the catch on a Mac: measured,
-  // `sips -g` exits 0 on a file it cannot read (`pixelWidth: <nil>`), so the
-  // size is unknown and the resample is skipped. The catch is reached when the
-  // size reads and the resample itself fails: here a read-only folder, where
-  // `sips -Z` exits 13 and writes nothing.
-  it.runIf(process.platform === 'darwin')(
-    'keeps the capture as it was when the resample itself fails',
-    () => {
-      const dir = join(evidenceDir(), 'read-only');
-      mkdirSync(dir);
-      const capture = join(dir, 'capture.png');
-      const phoneSize = pngOf(1260, 2736);
-      writeFileSync(capture, phoneSize);
-      chmodSync(dir, 0o555);
-      try {
-        expect(shrinkToCssScale(capture)).toBe(false);
-        expect(Buffer.compare(readFileSync(capture), phoneSize)).toBe(0);
-      } finally {
-        chmodSync(dir, 0o755);
-      }
-    },
-  );
+  // The catch is reached when the size reads and the resample itself fails:
+  // here a read-only folder, where the shrunk copy cannot be written beside
+  // the capture, so the capture is left as it was.
+  it('keeps the capture as it was when the resample itself fails', () => {
+    const dir = join(evidenceDir(), 'read-only');
+    mkdirSync(dir);
+    const capture = join(dir, 'capture.png');
+    const phoneSize = pngOf(1260, 2736);
+    writeFileSync(capture, phoneSize);
+    chmodSync(dir, 0o555);
+    try {
+      expect(shrinkToCssScale(capture)).toBe(false);
+      expect(Buffer.compare(readFileSync(capture), phoneSize)).toBe(0);
+    } finally {
+      chmodSync(dir, 0o755);
+    }
+  });
 
   it('numbers repeat captures within one journey, and starts each journey again at one', async () => {
     const dir = evidenceDir();

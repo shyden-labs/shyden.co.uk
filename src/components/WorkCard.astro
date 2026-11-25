@@ -13,13 +13,10 @@ const rel = external ? 'noopener noreferrer' : undefined;
 const target = external ? '_blank' : undefined;
 ---
 
-<a class="work-card" href={href} rel={rel} target={target} aria-label={title}>
-  {/* `logo` slot lets a card render a brand wordmark in place of the text
-      title; falls back to the plain title. aria-label keeps the accessible
-      name = title regardless of the visual treatment. */}
-  <h3>
-    <slot name="logo">{title}</slot>
-  </h3>
+<a class="work-card" href={href} rel={rel} target={target}>
+  {/* No aria-label: the link's name is its whole text, so a screen reader
+      hears the badge and the description with the title (#390 F10). */}
+  <h3>{title}</h3>
   {badge && <StatusBadge label={badge} />}
   <p>
     <slot />

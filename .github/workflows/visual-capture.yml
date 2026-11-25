@@ -51,7 +51,8 @@ name: visual-capture
 #            the commit message, the measured SHA and the ref, and is uploaded
 #            only when a baseline changed.
 #
-# `tests/guards/pipeline-wiring.test.ts` pins all of this.
+# `tests/guards/pipeline-wiring.test.ts` pins that this holds no token and
+# cannot push, commit or amend.
 on:
   workflow_dispatch:
     inputs:

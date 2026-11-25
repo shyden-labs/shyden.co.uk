@@ -72,6 +72,20 @@ export const DEPLOY_BASE = 'develop';
  */
 
 /**
+ * One pull request from the GitHub API, reduced to a `Pull`.
+ *
+ * @param {{ number: number, merged_at: string | null, merge_commit_sha: string | null, head: { sha: string }, base: { ref: string } }} pull
+ * @returns {Pull}
+ */
+export const toPull = (pull) => ({
+  number: pull.number,
+  merged: pull.merged_at !== null,
+  mergeCommitSha: pull.merge_commit_sha,
+  headSha: pull.head.sha,
+  baseRef: pull.base.ref,
+});
+
+/**
  * The head whose checks speak for `sha`, or why there is none. A merge
  * commit's is its second parent. A squash's is the head of the one merged pull
  * request into `DEPLOY_BASE` that landed it as its merge commit (#892).
@@ -79,7 +93,7 @@ export const DEPLOY_BASE = 'develop';
  * @param {{ sha: string, parents: readonly string[], pulls?: readonly Pull[] | string }} input
  * @returns {{ tested: string, as: string } | { refusal: string }}
  */
-const testedHeadOf = ({ sha, parents, pulls }) => {
+export const testedHeadOf = ({ sha, parents, pulls }) => {
   if (parents.length >= 2) return { tested: parents[1] ?? '', as: '' };
   if (parents.length === 0)
     return {
@@ -294,13 +308,7 @@ const pullsFor = async (repo, sha, token) => {
           `pulls for ${short(sha)}`,
         )
       );
-    return body.map((pull) => ({
-      number: pull.number,
-      merged: pull.merged_at !== null,
-      mergeCommitSha: pull.merge_commit_sha,
-      headSha: pull.head.sha,
-      baseRef: pull.base.ref,
-    }));
+    return body.map(toPull);
   } catch (error) {
     return messageOf(error);
   }

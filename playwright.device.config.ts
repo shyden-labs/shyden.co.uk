@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import { VISUAL_PROJECT } from './playwright.config';
 import { CLOCK_TAG } from './tests/device/clock-declaration';
+import { PHONE_RUN_LEAVES_OUT } from './tests/group-tags';
 
 // Set here rather than only in the runner so that a bare `npx playwright test
 // --config=playwright.device.config.ts` behaves identically to the scripted run. Playwright
@@ -13,55 +14,42 @@ process.env.PW_REAL_DEVICE = '1';
  */
 const ANDROID_SUITE = {
   dependencies: ['android-preflight'],
-  // `testDir` is './tests' (not './tests/e2e') so this project can also reach
-  // tests/device/real-device.spec.ts, but that widens the sweep to every other
-  // directory under tests/ too. An allowlist is deliberate, not a style choice: a
+  // The phone runs exactly the engines' e2e files and nothing of its own (#1178): the
+  // harness's own checks run in its fixtures, not as tests, so its total is theirs.
+  // `testDir` is './tests', which reaches every directory under tests/. An allowlist is deliberate, not a style choice: a
   // denylist that only named the preflight file let this project try to collect
   // tests/unit/*.test.ts (Vitest, crashes -- there is no Vitest runtime under
   // Playwright) and tests/dev/dev-sanity.spec.ts (targets the deployed dev site
   // under its own playwright.dev.config.ts; running it here would mix that
   // environment's assertions into a local-build run). Measured by running
   // `--list` against the denylist version, not assumed.
-  testMatch: [
-    /tests\/e2e\/.*\.spec\.ts$/,
-    /tests\/device\/real-device\.spec\.ts$/,
-  ],
+  testMatch: [/tests\/e2e\/.*\.spec\.ts$/],
   // The visual suite stays out, and ONLY the visual suite (#194). A
   // baseline belongs to one project on one platform, so a phone can never
   // hold one CI would read: claimed here, the suite failed eight times by
   // construction and buried the run's one real failure among them. The
   // pattern is the visual project's own, imported rather than restated.
   //
-  // The content-only specs are NOT excluded, although the five engines
+  // The content-only specs are NOT excluded, although the desktop engines
   // ignore them: `rendered-text.spec.ts` reads layout, and this project is
   // the only run that measures it at phone width (#198).
   testIgnore: VISUAL_PROJECT.testMatch,
-  // A real phone has one screen: `page.setViewportSize`/`test.use({ viewport })`
-  // would "succeed" against CDP and report numbers describing nothing physical
-  // (see tests/guards/viewport-tagging.test.ts, which is what keeps every such
-  // test actually carrying this tag). Scoped to this project alone -- the
-  // preflight project runs exactly one setup file that never touches the
-  // viewport, and must not be affected by a grep option meant for the suite.
+  // No test is kept off the phone by tag (#1179): every shared test runs
+  // here, at the phone's own width where it asks for one (tests/viewport-at.ts).
+  // The visual baselines, the one fixed-width suite, stay out through the
+  // testIgnore above (#194).
   //
-  // `@requires-isolated-context` is the second, structurally identical exclusion
-  // (tests/guards/isolated-context-tagging.test.ts is what keeps every such test tagged):
-  // `test.use({ javaScriptEnabled: false })` only takes effect on a context Playwright
-  // itself creates fresh. The real device has exactly ONE adopted context for the whole
-  // run (`browser.newContext()` measured to fail against it -- "Protocol error
-  // (Target.createBrowserContext): Failed to create browser context", tests/e2e/fixtures.ts's
-  // own `context` fixture comment), so the option is silently inert: JavaScript keeps
-  // running. classroom-groups-privacy.spec.ts's "privacy — with JavaScript blocked" tests
-  // are excluded here rather than left to fail (or, worse, pass for the wrong reason --
-  // see docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md) for exactly
-  // the same "physically impossible on one real device" reason @emulated-viewport already
-  // covers for the screen.
-  // Downloads are NOT excluded (#308). The tests that read a download's bytes
-  // were, on the belief that the phone could not give them back: every
+  // `@javascript-blocked` tests run here too (#1047): those tests need JavaScript switched off,
+  // which `test.use({ javaScriptEnabled: false })` cannot do on the phone's one adopted
+  // context. The `context` fixture (tests/e2e/fixtures.ts) blocks it instead through
+  // Chrome's own Site settings, by real taps (tests/device/chrome-javascript-setting.ts), and
+  // puts it back after the test.
+  // Downloads run here too (#308). The tests that read a download's bytes
+  // were once excluded, on the belief that the phone could not give them back: every
   // download read "canceled". The cause was Playwright, which attached over
   // plain CDP and pointed the phone's downloads at a folder on the MAC. The
   // real-device fixture now points them at a folder on the phone
   // (tests/device/device-downloads.ts), and the bytes are read back over adb.
-  grepInvert: /@emulated-viewport|@requires-isolated-context/,
 };
 
 // `installsAClock` is the phone fixtures' worker option (tests/e2e/fixtures.ts, #854).
@@ -88,6 +76,10 @@ export default defineConfig<Record<never, never>, { installsAClock: boolean }>({
   // eight untracked `-android-chrome-darwin` files in the repo. Baselines
   // change one way only, in the pinned container (see playwright.config.ts).
   updateSnapshots: 'none',
+  // The phone group runs every shared test and its own @phone ones; a test
+  // tagged @desktop says, with its reason, that its behaviour differs on a
+  // desktop browser (#1182, tests/group-tags.ts).
+  grepInvert: PHONE_RUN_LEAVES_OUT,
   projects: [
     { name: 'android-preflight', testMatch: /android-preflight\.setup\.ts/ },
     // Listed before `android-chrome`, and so run first: Playwright cannot take a clock back out

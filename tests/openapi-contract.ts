@@ -101,6 +101,18 @@ function leafFindings(
   const found: string[] = [];
   if (Array.isArray(schema.enum) && !schema.enum.includes(value))
     found.push(`${at}: ${JSON.stringify(value)} is not in the enum`);
+  if (typeof value === 'string') {
+    // JSON Schema counts characters (code points), not UTF-16 units.
+    const length = [...value].length;
+    if (typeof schema.maxLength === 'number' && length > schema.maxLength)
+      found.push(
+        `${at}: ${length} characters, the spec allows at most ${schema.maxLength}`,
+      );
+    if (typeof schema.minLength === 'number' && length < schema.minLength)
+      found.push(
+        `${at}: ${length} characters, the spec needs at least ${schema.minLength}`,
+      );
+  }
   if ('const' in schema && schema.const !== value)
     found.push(
       `${at}: ${JSON.stringify(value)} is not ${JSON.stringify(schema.const)}`,

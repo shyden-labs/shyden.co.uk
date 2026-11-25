@@ -118,13 +118,14 @@ describe('the release inventory (#362)', () => {
     ]);
   });
 
-  it('marks what a visitor receives, and names every other area', () => {
+  it('marks what a visitor receives, a dependency bump included, and names every area', () => {
     const entries = inventoryOf(commits());
+    // The last is a Dependabot bump: package.json shapes the bundle (#390 F60).
     expect(entries.map((e) => e.visitorFacing)).toEqual([
       true,
       true,
       true,
-      false,
+      true,
     ]);
     expect(entries[3]?.areas).toEqual(['(root)', 'tests']);
     expect(entries[0]?.areas).toEqual(['src', 'tests']);

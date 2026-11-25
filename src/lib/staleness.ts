@@ -8,8 +8,9 @@ import type { Strings } from './i18n';
  * code path that could undo the change, and the one that forgets is the
  * bug -- "the teacher put the size back to 4" would leave a badge saying
  * the groups are wrong when they are not (see classroom-groups.spec.ts's
- * own "undoing the change clears it" test, which exists to prove exactly
- * that). A comparison against a snapshot taken at shuffle time needs no
+ * own "a changed size or count marks the groups out of date, a class name
+ * does not, shuffling clears it" test, which proves exactly that when it
+ * puts the size back). A comparison against a snapshot taken at shuffle time needs no
  * clearing at all: it is simply re-evaluated, every time, against whatever
  * the form says right now.
  *
@@ -17,13 +18,10 @@ import type { Strings } from './i18n';
  * mode radio (per-group / group count) AND its own number together into
  * one JSON string rather than two separate fields -- see `staleReason`'s
  * own doc comment for why that has to be a single comparison, not two.
- * `roster` is what the class list currently IS: stage 2 has no per-student
- * data yet, so #cg-count -- the page's only population control -- is the
- * whole of it (see classroom-groups.ts's own `readRoster`), the same way a
- * roster of named students would BE the class list once stage 3 gives the
- * page one. Stage 3 extends `readRoster` to fold real per-student fields
- * into the same object; it does not need a second field here or a second
- * machine alongside this one.
+ * `roster` is what the class list currently IS: the serialised roster when
+ * the teacher has entered students, or the Students count when the roster is
+ * empty (see classroom-groups.ts's own `readRoster`). One field covers both,
+ * so no second field or second machine is needed alongside this one.
  *
  * Every field is a STRING on purpose, not because the underlying data
  * naturally is one -- `mode` and `roster` both carry JSON.stringify'd
@@ -82,8 +80,8 @@ const assertComparable = (snapshot: Snapshot): void => {
  * recomputes this on every input -- so undoing the highest-priority
  * mismatch does not clear the notice by itself, it just means the very
  * next recompute reports whichever mismatch is still live (or `null`, if
- * none is). See classroom-groups.spec.ts's own "when two things change,
- * undoing one still names the other" test, which a one-shot "first cause
+ * none is). See classroom-groups.spec.ts's own "the leftovers choice marks the groups
+ * out of date; with two changes, undoing one names the other" test, which a one-shot "first cause
  * wins forever" implementation would fail.
  */
 export function staleReason(

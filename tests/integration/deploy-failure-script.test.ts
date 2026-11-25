@@ -223,14 +223,14 @@ describe('only a failure on develop is reported', () => {
       }),
     });
     expect(code, out).toBe(0);
-    expect(out).toBe('Nothing failed: no notice.\n');
+    expect(out).toBe('Nothing failed and no fall-back ran: no notice.\n');
   });
 
   it("a failure on a dispatched branch is its dispatcher's to read", async () => {
     const { code, out } = await run({ GITHUB_REF_NAME: '725-plant' });
     expect(code, out).toBe(0);
     expect(out).toBe(
-      'Failed: deploy-dev.\nA failure on 725-plant, not develop: no notice.\n',
+      'Failed: deploy-dev.\nFall-back: none.\nA failure on 725-plant, not develop: no notice.\n',
     );
   });
 
@@ -376,5 +376,84 @@ describe('what the script is given', () => {
     const { code, out } = await run({}, ['report']);
     expect(code).toBe(2);
     expect(out).toContain('usage: node scripts/deploy-failure.mjs');
+  });
+});
+
+/**
+ * A production release that fails its live check (#748): the notice opens at
+ * once, naming the fall-back waiting for approval, and the fall-back's outcome
+ * is commented on the same notice when it has run.
+ */
+describe('a production release that fails its live check (#748)', () => {
+  const PROD_TITLE = 'A production release failed';
+  const prodNeeds = (fallBack?: string) =>
+    JSON.stringify({
+      'deploy-prod': { result: 'success', outputs: { before: 'd-prev' } },
+      'smoke-and-verify': { result: 'failure', outputs: {} },
+      ...(fallBack === undefined
+        ? {}
+        : { 'fall-back': { result: fallBack, outputs: {} } }),
+    });
+  const prod = (needs: string, ref = 'main') => ({
+    DEPLOY_PIPELINE: 'prod',
+    GITHUB_REF_NAME: ref,
+    NEEDS: needs,
+  });
+
+  it('opens its own notice at once, then comments the fall-back outcome on it', async () => {
+    const opened = await run(prod(prodNeeds()));
+    expect(opened.code, opened.out).toBe(0);
+    const issue = posted('POST', NEW_ISSUE);
+    expect(issue.title).toBe(PROD_TITLE);
+    expect(issue.assignees).toEqual(['ShydenMcM']);
+    expect(String(issue.body).split('\n')[0]).toBe(
+      'A production release from `main` failed.',
+    );
+    expect(String(issue.body)).toContain(
+      `- Fall-back: waiting for approval in \`prod-rollback\`. Approving it makes production serve deployment \`d-prev\` again, the one live before this release: https://github.com/shyden-labs/shyden.co.uk/actions/runs/${RUN}`,
+    );
+
+    received.length = 0;
+    routes[`POST ${REPO}/issues/900/comments`] = { status: 201, body: {} };
+    routes[`GET ${ISSUES}`] = {
+      status: 200,
+      body: [
+        {
+          number: 900,
+          state: 'open',
+          user: { login: 'github-actions[bot]' },
+          title: PROD_TITLE,
+        },
+        {
+          number: 726,
+          state: 'open',
+          user: { login: 'github-actions[bot]' },
+          title: TITLE,
+        },
+      ],
+    };
+    const outcome = await run(prod(prodNeeds('success')));
+    expect(outcome.code, outcome.out).toBe(0);
+    expect(asked()).not.toContain(`POST ${NEW_ISSUE}`);
+    expect(
+      String(posted('POST', `${REPO}/issues/900/comments`).body),
+    ).toContain(
+      `- Fall-back: done. Production serves deployment \`d-prev\` again, the one live before this release, so \`main\` (commit \`${SHA}\`) and the live site now differ.`,
+    );
+    expect(outcome.out).toContain('Commented on the open notice, #900.');
+  });
+
+  it('a prod failure on any branch but main sends nothing', async () => {
+    const { code, out } = await run(prod(prodNeeds(), 'develop'));
+    expect(code, out).toBe(0);
+    expect(asked()).toEqual([]);
+    expect(out).toContain('A failure on develop, not main: no notice.');
+  });
+
+  it('a pipeline it does not know stops before any request', async () => {
+    const { code, out } = await run({ DEPLOY_PIPELINE: 'staging' });
+    expect(code).toBe(1);
+    expect(asked()).toEqual([]);
+    expect(out).toContain('DEPLOY_PIPELINE is neither dev nor prod');
   });
 });

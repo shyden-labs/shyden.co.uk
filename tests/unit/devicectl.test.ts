@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEVICECTL_TIMEOUT_MS,
+  parseTunnelAddress,
   pickIphone,
   safariLaunchArgs,
 } from '../../scripts/devicectl.mjs';
@@ -118,5 +119,20 @@ describe('safariLaunchArgs: Safari opened on a page of the one chosen iPhone (#8
       'about:blank',
       'com.apple.mobilesafari',
     ]);
+  });
+});
+
+describe('parseTunnelAddress: where WebDriverAgent answers over USB (#838)', () => {
+  it('reads the Tunnel IP Address line', () => {
+    expect(
+      parseTunnelAddress(
+        '  • Name: iPhone\n    • Tunnel IP Address: fd97:eff2:bed2::1\n    • Tunnel Transport Protocol: tcp\n',
+      ),
+    ).toBe('fd97:eff2:bed2::1');
+  });
+  it('names the missing line rather than returning nothing', () => {
+    expect(() => parseTunnelAddress('  • Name: iPhone\n')).toThrow(
+      /no "Tunnel IP Address"/,
+    );
   });
 });

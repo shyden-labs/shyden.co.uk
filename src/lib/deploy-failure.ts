@@ -26,6 +26,107 @@ export const ERROR_LINE_LIMIT = 300;
 /** The job that failed, its failed step if it lists one, and its log's id. */
 export type Failure = { jobId: number; job: string; step: string | undefined };
 
+/** The two pipelines that deploy, each with the branch it deploys from (#748). */
+export type Pipeline = 'dev' | 'prod';
+
+export const PIPELINES = {
+  dev: {
+    ref: 'develop',
+    title: NOTICE_TITLE,
+    deployJob: 'deploy-dev',
+    checkJob: 'verify-dev',
+    site: 'Dev',
+    liveSite: 'dev',
+    change: 'deploy',
+    opening:
+      'A deploy of `develop` to dev failed, so dev.shyden.co.uk is behind `develop`.',
+    closing:
+      "If the cause is outside our code, dispatch `deploy-dev.yml` on develop's head (CLAUDE.md, Releasing). This issue is retired by hand once `dev-verified` is on develop's head.",
+  },
+  prod: {
+    ref: 'main',
+    title: 'A production release failed',
+    deployJob: 'deploy-prod',
+    checkJob: 'smoke-and-verify',
+    site: 'Production',
+    liveSite: 'the live site',
+    change: 'release',
+    opening: 'A production release from `main` failed.',
+    closing:
+      'A check can fail for a reason that is not the release: read the error first. Then fix forward and release again, or revert the release on `main`. This issue is retired by hand once production serves a release that passed its live check.',
+  },
+} as const;
+
+/**
+ * What the fall-back to the deployment live before the change did: still
+ * `waiting` for approval (prod alone holds one), `restored` it, or `failed`
+ * (refused at its approval, failed or cancelled). `none` when there is
+ * nothing to fall back from: the deploy itself did not succeed.
+ */
+export type FallBack =
+  | { state: 'none' }
+  | { state: 'waiting' | 'restored' | 'failed'; to: string | undefined };
+
+const resultOf = (needs: Record<string, unknown>, job: string) => {
+  const need = needs[job];
+  return isRecord(need) && typeof need.result === 'string'
+    ? need.result
+    : undefined;
+};
+
+/** The fall-back's state, read from the run's `needs` (#748). */
+export const fallBackOf = (needs: unknown, pipeline: Pipeline): FallBack => {
+  if (!isRecord(needs)) throw new Error('the needs are not an object of jobs');
+  const { deployJob, checkJob } = PIPELINES[pipeline];
+  const deploy = needs[deployJob];
+  const outputs = isRecord(deploy) ? deploy.outputs : undefined;
+  const before = isRecord(outputs) ? outputs.before : undefined;
+  const to = typeof before === 'string' && before !== '' ? before : undefined;
+  const fallBack = resultOf(needs, 'fall-back');
+  if (fallBack === 'success') return { state: 'restored', to };
+  if (fallBack === 'failure' || fallBack === 'cancelled')
+    return { state: 'failed', to };
+  if (
+    fallBack === undefined &&
+    resultOf(needs, deployJob) === 'success' &&
+    resultOf(needs, checkJob) === 'failure'
+  )
+    return { state: 'waiting', to };
+  return { state: 'none' };
+};
+
+/** A notice is sent when a job failed, or when a fall-back ran at all. */
+export const reportNeeded = (needs: unknown): boolean => {
+  if (failedNeeds(needs).length > 0) return true;
+  const fallBack = resultOf(needs as Record<string, unknown>, 'fall-back');
+  return fallBack !== undefined && fallBack !== 'skipped';
+};
+
+const fallBackLine = (
+  fallBack: FallBack,
+  pipeline: Pipeline,
+  runUrl: string,
+  sha: string,
+): string[] => {
+  if (fallBack.state === 'none') return [];
+  const { site, ref, liveSite, change } = PIPELINES[pipeline];
+  const deployment =
+    fallBack.to === undefined
+      ? 'deployment (id not recorded)'
+      : `deployment \`${fallBack.to}\``;
+  if (fallBack.state === 'waiting')
+    return [
+      `- Fall-back: waiting for approval in \`prod-rollback\`. Approving it makes ${site.toLowerCase()} serve ${deployment} again, the one live before this ${change}: ${runUrl}`,
+    ];
+  if (fallBack.state === 'restored')
+    return [
+      `- Fall-back: done. ${site} serves ${deployment} again, the one live before this ${change}, so \`${ref}\` (commit \`${sha}\`) and ${liveSite} now differ.`,
+    ];
+  return [
+    `- Fall-back: refused or failed, so ${site.toLowerCase()} still serves the failing ${change}.`,
+  ];
+};
+
 /**
  * The jobs a run's `needs` context names as failed, from the
  * `${{ toJSON(needs) }}` the report job is handed. A cancelled need is not
@@ -69,8 +170,13 @@ export const failureOf = (answer: unknown): Failure | undefined => {
   };
 };
 
-/** The runner's own closing line, which names no cause. */
-const EXIT_LINE = /^Process completed with exit code \d+\.$/;
+/**
+ * Lines that name no cause: the runner's own closing line, and Playwright's
+ * pointer to a context file on the runner, printed after the real error
+ * (#1134).
+ */
+const POINTER_LINE =
+  /^(?:Process completed with exit code \d+\.|Error Context: )/;
 
 /** The timestamp the runner puts before every log line. */
 const STAMP = /^\d{4}-\d\d-\d\dT[\d:.]+Z /;
@@ -95,7 +201,7 @@ export const lastErrorLine = (log: string): string | undefined => {
       line.startsWith(ANNOTATION) ? line.slice(ANNOTATION.length) : line,
     );
   const line =
-    naming.findLast((each) => !EXIT_LINE.test(each)) ?? naming.at(-1);
+    naming.findLast((each) => !POINTER_LINE.test(each)) ?? naming.at(-1);
   if (line === undefined) return undefined;
   return line.length > ERROR_LINE_LIMIT
     ? `${line.slice(0, ERROR_LINE_LIMIT - 1)}…`
@@ -113,12 +219,16 @@ export const noticeBody = ({
   failure,
   errorLine,
   unread,
+  pipeline = 'dev',
+  fallBack = { state: 'none' },
 }: {
   runUrl: string;
   sha: string;
   failure: Failure | undefined;
   errorLine: string | undefined;
   unread: string[];
+  pipeline?: Pipeline;
+  fallBack?: FallBack;
 }): string => {
   const failed =
     failure === undefined
@@ -129,25 +239,30 @@ export const noticeBody = ({
       ? 'none read'
       : `\`${errorLine.replaceAll('`', "'")}\``;
   return [
-    'A deploy of `develop` to dev failed, so dev.shyden.co.uk is behind `develop`.',
+    PIPELINES[pipeline].opening,
     '',
     `- Run: ${runUrl}`,
     `- Commit: \`${sha}\``,
     `- Failed: ${failed}`,
     `- Last error line: ${error}`,
     ...unread.map((what) => `- Could not be read: ${what}`),
+    ...fallBackLine(fallBack, pipeline, runUrl, sha),
     '',
-    "If the cause is outside our code, dispatch `deploy-dev.yml` on develop's head (CLAUDE.md, Releasing). This issue is retired by hand once `dev-verified` is on develop's head.",
+    PIPELINES[pipeline].closing,
   ].join('\n');
 };
 
 /**
  * The number of the open notice a failure comments on, from GitHub's list
  * of open issues: an issue, not a pull request, opened by `NOTICE_AUTHOR`,
- * whose title is exactly `NOTICE_TITLE`. The issue tracker is public, so a
+ * whose title is exactly `title` (`NOTICE_TITLE` unless another notice
+ * names its own, #1119). The issue tracker is public, so a
  * stranger's issue under the same title is not the notice.
  */
-export const openNoticeOf = (issues: unknown): number | undefined => {
+export const openNoticeOf = (
+  issues: unknown,
+  title: string = NOTICE_TITLE,
+): number | undefined => {
   if (!Array.isArray(issues)) throw new Error('the open issues are not a list');
   const notice = issues.find(
     (issue) =>
@@ -156,7 +271,7 @@ export const openNoticeOf = (issues: unknown): number | undefined => {
       issue.pull_request === undefined &&
       isRecord(issue.user) &&
       issue.user.login === NOTICE_AUTHOR &&
-      issue.title === NOTICE_TITLE &&
+      issue.title === title &&
       typeof issue.number === 'number',
   );
   return isRecord(notice) ? Number(notice.number) : undefined;

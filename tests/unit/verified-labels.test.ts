@@ -195,17 +195,24 @@ describe('short labels that disagree with their own locale', () => {
 const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
   // #636: the Gift Value Calculator heading is new, drafted by DeepL and read
   // back by LibreTranslate, and awaits the operator's read in every locale.
+  // #1032: the support page's title, read back by Google (agrees, 2026-11-20),
+  // awaits the operator's read in every locale. #1080: the footer's Privacy
+  // link, read back by Google (agrees, 2026-11-22), the same.
   id: [
     'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
+    'site.legal.privacy',
+    'site.support.title',
   ],
   zh: [
     'site.calculators.gift.heading',
     'site.calculators.glory.heading',
     'site.calculators.title',
     'site.home.openCalculators',
+    'site.legal.privacy',
+    'site.support.title',
   ],
   // #635: YeeTalk Calculators and "Open the calculators" are new English the
   // operator has not read in these two locales. Awaiting his read, then pinned.
@@ -213,11 +220,15 @@ const UNWITNESSED: Record<'id' | 'zh' | 'vi' | 'th', readonly string[]> = {
     'site.calculators.gift.heading',
     'site.calculators.title',
     'site.home.openCalculators',
+    'site.legal.privacy',
+    'site.support.title',
   ],
   th: [
     'site.calculators.gift.heading',
     'site.calculators.title',
     'site.home.openCalculators',
+    'site.legal.privacy',
+    'site.support.title',
   ],
 };
 

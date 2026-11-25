@@ -45,7 +45,7 @@ describe('listDevices()', () => {
   it("names the command and devicectl's own words when it fails", () => {
     process.env.XCRUN_STAND_IN = 'fail';
     expect(() => listDevices()).toThrow(
-      /^xcrun devicectl list devices --json-output - failed: [\s\S]*CoreDevice is not running/,
+      /^xcrun devicectl list devices --json-output - failed with exit status 1: stderr "[\s\S]*CoreDevice is not running/,
     );
   });
 });

@@ -1,17 +1,21 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
+import { eachWidth } from '../each-width';
 import { recorded, shoot } from './evidence';
 import { recordErrors } from './recorders';
 import { searched } from '../source-files';
 import { localePaths } from './locale-sampling';
 import { THEMES } from '../palette';
 import { emulateTheme } from '../themes';
+import { contrast, parseColour } from '../wcag';
 import { getStrings, localeFromPath } from '../../src/lib/i18n';
 import {
-  atLeast44,
+  atLeast44Soft,
   expectNoHorizontalScroll,
-  rectAtLeast44,
+  expectNoScrollSoft,
+  rectAtLeast44Soft,
 } from '../viewport';
 import {
   addSeveral,
@@ -23,6 +27,7 @@ import {
   markAbsent,
   openRoster,
 } from './helpers';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -59,7 +64,10 @@ test.describe('the roster table', () => {
   // for every one of the seven, while a sighted teacher never sees a
   // printed "Remove" heading sitting above a column of seven identical
   // "Remove" buttons repeating the same word.
-  test('the table has seven columns, in order — the seventh (Remove) has a real header, visually hidden but present', async ({
+  // The headers, the header/column parity and the unnamed row are one visit
+  // to the page: the header reads come first, before anything is pressed, and
+  // the unnamed row is read last, after Make groups is pressed.
+  test('the table has seven columns, in order — the seventh (Remove) has a real header, visually hidden but present; every column has a header; an unnamed row renders Student N in the results', async ({
     page,
   }) => {
     await openRoster(page);
@@ -76,81 +84,37 @@ test.describe('the roster table', () => {
       'Apart',
       'Remove',
     ];
-    await expect(page.locator('#cg-roster thead th')).toHaveText(columns);
+    await expect.soft(page.locator('#cg-roster thead th')).toHaveText(columns);
     // `toHaveText` reads `textContent`, which a heading hidden with
     // `display: none` still carries, so it cannot say whether a screen reader
     // gets a name for each column. The accessibility tree can. Every heading
     // stays in it whatever hides it from sight: the whole row in the card
     // layout, and Remove's own text in the table layout (#200).
     const headers = page.locator('#cg-roster').getByRole('columnheader');
-    await expect(headers).toHaveCount(columns.length);
+    await expect.soft(headers).toHaveCount(columns.length);
     for (const [index, name] of columns.entries()) {
-      await expect(headers.nth(index)).toHaveAccessibleName(name);
+      await expect.soft(headers.nth(index)).toHaveAccessibleName(name);
     }
     await shoot(
       page,
       'every heading keeps its name; the table draws six, the cards draw none',
       page.locator('#cg-roster'),
     );
-  });
 
-  // The general invariant "the table has seven columns" above pins today.
-  // This is the one that stops it drifting again: derived from the DOM on
-  // BOTH sides (colgroup's own <col> count, thead's own <th> count),
-  // never a hard-coded number, so an eighth column added later without
-  // its own header -- or a header added without its own column -- fails
-  // here regardless of what the actual count turns out to be.
-  test('every column has a header — the header count matches the column count', async ({
-    page,
-  }) => {
-    await openRoster(page);
+    // The general invariant "the table has seven columns" above pins today.
+    // This is the one that stops it drifting again: derived from the DOM on
+    // BOTH sides (colgroup's own <col> count, thead's own <th> count),
+    // never a hard-coded number, so an eighth column added later without
+    // its own header -- or a header added without its own column -- fails
+    // here regardless of what the actual count turns out to be.
     const columnCount = await page.locator('#cg-roster colgroup col').count();
     const headerCount = await page.locator('#cg-roster thead th').count();
-    expect(headerCount).toBe(columnCount);
-  });
+    expect.soft(headerCount).toBe(columnCount);
 
-  test('an unnamed row renders Student N in the results', async ({ page }) => {
-    await openRoster(page);
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Make groups' }));
-    await expect(page.locator('#cg-results')).toContainText('Student 1');
+    await expect.soft(page.locator('#cg-results')).toContainText('Student 1');
   });
-
-  // Every locale (#423): the table's column widths come from its localised
-  // column names.
-  for (const path of localePaths('/classroom-groups'))
-    test(`an empty name box is exactly as wide as a full one -- ${path}`, async ({
-      page,
-    }) => {
-      await openRoster(page, path);
-      const t = getStrings(localeFromPath(path));
-      await tapOn(
-        page.getByRole('button', { name: t.rosterAddStudent, exact: true }),
-      );
-      const nameBox = (row: number) =>
-        page
-          .locator('#cg-roster tbody tr')
-          .nth(row)
-          .getByLabel(t.rosterColName, { exact: true });
-      await typeInto(nameBox(0), 'Sebastianus');
-      const a = (await nameBox(0).boundingBox())!;
-      const b = (await nameBox(1).boundingBox())!;
-      expect(b.width).toBeCloseTo(a.width, 0);
-    });
-
-  test(
-    'a long name does not push the letters out of view',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 900 });
-      await openRoster(page);
-      await typeInto(
-        page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
-        'Maria Anastasia Wijayanti',
-      );
-      await expectNoHorizontalScroll(page);
-    },
-  );
 
   // Run at each project's own default viewport (desktop for
   // chromium/firefox/webkit, a phone's own default for
@@ -162,9 +126,14 @@ test.describe('the roster table', () => {
   // layouts, with ONE exception that is a design decision rather than an
   // omission -- see `#` below.
   //
-  // Every locale (#423): the dropdowns show localised placeholders (#249).
+  // Every locale (#423): the dropdowns show localised placeholders (#249),
+  // the Remove and Clear all buttons carry the page's own copy, and the
+  // table's column widths come from its localised column names. The three
+  // measure the same page at the same width, so each locale walks it once;
+  // the widths are measured first, before a second student and a typed name
+  // change the row.
   for (const path of localePaths('/classroom-groups'))
-    test(`per-row controls meet the 44px touch target -- ${path}`, async ({
+    test(`per-row controls meet the 44px touch target, and so do Remove and Clear all; an empty name box is exactly as wide as a full one -- ${path}`, async ({
       page,
     }) => {
       await openRoster(page, path);
@@ -178,7 +147,7 @@ test.describe('the roster table', () => {
         t.rosterColTogether,
         t.rosterColApart,
       ]) {
-        await atLeast44(row.getByLabel(label, { exact: true }), label);
+        await atLeast44Soft(row.getByLabel(label, { exact: true }), label);
       }
       // `#` is the one control on this page held to the HEIGHT half alone.
       // The card layout gives it 2 of 12 columns on purpose -- "a class
@@ -203,7 +172,9 @@ test.describe('the roster table', () => {
       const number = (await row
         .getByLabel(t.rosterColNumber, { exact: true })
         .boundingBox())!;
-      expect(Math.round(number.height), '# height').toBeGreaterThanOrEqual(44);
+      expect
+        .soft(Math.round(number.height), '# height')
+        .toBeGreaterThanOrEqual(44);
       // The checkbox itself is drawn small on purpose, matching this page's
       // existing `.switch input` convention -- its REAL tap target is the
       // <label> wrapping it. Measuring the bare input here would repeat the
@@ -218,8 +189,43 @@ test.describe('the roster table', () => {
           const { width, height } = target.getBoundingClientRect();
           return { width, height };
         });
-      rectAtLeast44(absent, 'Absent (label)');
+      rectAtLeast44Soft(absent, 'Absent (label)');
+      // The buttons are labelled by the page's own copy.
+      await atLeast44Soft(
+        row.getByRole('button', { name: t.rosterRemove }),
+        t.rosterRemove,
+      );
+      await atLeast44Soft(
+        page.getByRole('button', { name: t.rosterClearAll }),
+        t.rosterClearAll,
+      );
+
+      // Last, because it adds a second student and types into the first.
+      await tapOn(
+        page.getByRole('button', { name: t.rosterAddStudent, exact: true }),
+      );
+      const nameBox = (index: number) =>
+        page
+          .locator('#cg-roster tbody tr')
+          .nth(index)
+          .getByLabel(t.rosterColName, { exact: true });
+      await typeInto(nameBox(0), 'Sebastianus');
+      const a = (await nameBox(0).boundingBox())!;
+      const b = (await nameBox(1).boundingBox())!;
+      expect.soft(b.width).toBeCloseTo(a.width, 0);
     });
+
+  test('a long name does not push the letters out of view', async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 1280, height: 900 });
+    await openRoster(page);
+    await typeInto(
+      page.locator('#cg-roster tbody tr').nth(0).getByLabel('Name'),
+      'Maria Anastasia Wijayanti',
+    );
+    await expectNoHorizontalScroll(page);
+  });
 
   test('no console errors while building a roster', async ({ page }) => {
     const reported = recordErrors(page);
@@ -228,9 +234,9 @@ test.describe('the roster table', () => {
     await addSeveral(page, 3);
     const row = page.locator('.cg-student').first();
     await typeInto(row.getByLabel('Name'), 'Ana');
-    await row.getByLabel('Sex').selectOption('F');
+    await chooseOption(row.getByLabel('Sex'), 'F');
     await setCheckedOn(row.getByLabel('Absent'));
-    await row.getByLabel('Together').selectOption('A');
+    await chooseOption(row.getByLabel('Together'), 'A');
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Make groups' }));
     // The groups arrived (#425): a silence over a press that made nothing
@@ -245,7 +251,9 @@ test.describe('the roster table', () => {
 // coverage is tests/unit/roster.test.ts) and R-02 (the teacher may override
 // a number).
 test.describe('numbers', () => {
-  test('assigned 1, 2, 3… in the order rows are added', async ({ page }) => {
+  test('assigned 1, 2, 3… in the order rows are added; a new student takes one past the highest; the teacher may override a number, and a later add still takes one past the highest', async ({
+    page,
+  }) => {
     await openRoster(page);
     await tapOn(page.getByRole('button', { name: 'Add student' }));
     await tapOn(page.getByRole('button', { name: 'Add student' }));
@@ -254,24 +262,24 @@ test.describe('numbers', () => {
     // single-element (strict-mode) matcher and does not accept an array for
     // a locator resolving to more than one node.
     const rows = page.locator('.cg-student');
-    await expect(rows.nth(0).getByLabel('#')).toHaveValue('1');
-    await expect(rows.nth(1).getByLabel('#')).toHaveValue('2');
-    await expect(rows.nth(2).getByLabel('#')).toHaveValue('3');
-  });
+    await expect.soft(rows.nth(0).getByLabel('#')).toHaveValue('1');
+    await expect.soft(rows.nth(1).getByLabel('#')).toHaveValue('2');
+    await expect.soft(rows.nth(2).getByLabel('#')).toHaveValue('3');
 
-  test('the teacher may override a number, and a later add still takes one past the highest', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    const first = page.locator('.cg-student').first().getByLabel('#');
-    await typeInto(first, '50');
-    await expect(first).toHaveValue('50');
-    // Proves the override reached the actual roster, not just the visible
-    // input: the next student added takes one past 50, not one past 1.
+    // A student takes one past the highest: with the first row at 5, the
+    // next add is 6.
+    const first = rows.first().getByLabel('#');
+    await typeInto(first, '5');
     await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(
-      page.locator('.cg-student').nth(1).getByLabel('#'),
-    ).toHaveValue('51');
+    await expect.soft(rows.nth(3).getByLabel('#')).toHaveValue('6');
+
+    // The teacher may override a number (R-02).
+    await typeInto(first, '50');
+    await expect.soft(first).toHaveValue('50');
+    // Proves the override reached the actual roster, not just the visible
+    // input: the next student added takes one past 50, not one past 6.
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
+    await expect.soft(rows.nth(4).getByLabel('#')).toHaveValue('51');
   });
 });
 
@@ -280,27 +288,22 @@ test.describe('numbers', () => {
 // task's own job (traceability A-05…A-09) -- this proves the functional
 // consequence the column exists for.
 test.describe('absence', () => {
-  test('ticking Absent excludes that student from the results', async ({
+  test('ticking Absent excludes that student from the results; nothing in the row is disabled by ticking it', async ({
     page,
   }) => {
     await openRoster(page);
     await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await setCheckedOn(
-      page.locator('.cg-student').first().getByLabel('Absent'),
-    );
-    await giveEveryoneASex(page);
-    await tapOn(page.getByRole('button', { name: 'Make groups' }));
-    await expect(page.locator('#cg-results')).not.toContainText('Student 1');
-    await expect(page.locator('#cg-results')).toContainText('Student 2');
-  });
-
-  test('nothing in the row is disabled by ticking it', async ({ page }) => {
-    await openRoster(page);
     const row = page.locator('.cg-student').first();
     await setCheckedOn(row.getByLabel('Absent'));
     for (const label of ['Name', 'Sex', 'Together', 'Apart']) {
-      await expect(row.getByLabel(label), label).toBeEnabled();
+      await expect.soft(row.getByLabel(label), label).toBeEnabled();
     }
+    await giveEveryoneASex(page);
+    await tapOn(page.getByRole('button', { name: 'Make groups' }));
+    await expect
+      .soft(page.locator('#cg-results'))
+      .not.toContainText('Student 1');
+    await expect.soft(page.locator('#cg-results')).toContainText('Student 2');
   });
 });
 
@@ -325,12 +328,9 @@ test.describe('absence', () => {
  *  - The count-line test replaces the brief's own three inline clicks with
  *    `addSeveral`, the established correction this file's own Task 3
  *    section already made once for the identical reason.
- *  - Every test that resizes the viewport carries `@emulated-viewport`
- *    (global-constraints.md; tests/guards/viewport-tagging.test.ts is a hard
- *    guard on it), which the brief's own snippet does not carry on any of
- *    its tests -- none of the brief's own six actually resize the
- *    viewport, so none needed it; the tag only appears below on the tests
- *    THIS task adds beyond the brief.
+ *  - Every test that resizes the viewport goes through `atViewport` (#1046),
+ *    which the brief's own snippet does not; none of the brief's own six
+ *    actually resize the viewport.
  *
  * Three tests below are not in the brief at all, added because the parent
  * task explicitly named the risk they cover:
@@ -345,70 +345,112 @@ test.describe('absence', () => {
  *    task adds to the tightest column on the narrowest layout.
  */
 test.describe('an absent student', () => {
-  test('and every field can still be edited', async ({ page }) => {
+  test('and every field can still be edited; is still readable with colour removed', async ({
+    page,
+  }) => {
     await markAbsent(page);
     const row = page.locator('.cg-student').first();
     // All five of the row's other fields (#426): this edited two, so an
     // absent row that locked its number or its letters still passed.
     // Absent itself is the field that made the row absent. Counted off the
     // row, so a seventh field fails here until it is edited below too.
-    await expect(row.locator('input, select')).toHaveCount(6);
+    await expect.soft(row.locator('input, select')).toHaveCount(6);
     await typeInto(row.getByLabel('#', { exact: true }), '7');
     await typeInto(row.getByLabel('Name'), 'Dewi');
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
-    await row.getByLabel('Apart').selectOption('A');
-    await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
-    await expect(row.getByLabel('Name')).toHaveValue('Dewi');
-    await expect(row.getByLabel('Sex')).toHaveValue('F');
-    await expect(row.getByLabel('Together')).toHaveValue('A');
-    await expect(row.getByLabel('Apart')).toHaveValue('A');
-  });
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
+    await chooseOption(row.getByLabel('Apart'), 'A');
+    await expect.soft(row.getByLabel('#', { exact: true })).toHaveValue('7');
+    await expect.soft(row.getByLabel('Name')).toHaveValue('Dewi');
+    await expect.soft(row.getByLabel('Sex')).toHaveValue('F');
+    await expect.soft(row.getByLabel('Together')).toHaveValue('A');
+    await expect.soft(row.getByLabel('Apart')).toHaveValue('A');
 
-  // One test per theme (#418).
-  for (const theme of THEMES)
-    test(`${theme}: is tinted, striped and labelled`, async ({ page }) => {
-      await markAbsent(page);
-      const row = page.locator('.cg-student').first();
-      await emulateTheme(page, theme);
-      await expect(row).toHaveCSS('background-color', 'rgb(255, 246, 227)');
-      await expect(row.locator('.cg-absent-pill')).toHaveText('absent');
-    });
-
-  test('is still readable with colour removed', async ({ page }) => {
-    await markAbsent(page);
+    // Colour removed last, so the edits above are made on the page as it is
+    // drawn.
     await page.addStyleTag({
       content: 'html { filter: grayscale(1) !important }',
     });
-    await expect(
-      page.locator('.cg-student').first().getByLabel('Absent'),
-    ).toBeChecked();
-    await expect(
-      page.locator('.cg-student').first().locator('.cg-absent-pill'),
-    ).toHaveText('absent');
+    await expect.soft(row.getByLabel('Absent')).toBeChecked();
+    await expect.soft(row.locator('.cg-absent-pill')).toHaveText('absent');
   });
 
-  test('the consequence line is there before anyone is marked', async ({
+  // One test per theme (#418). The tint and the pill's contrast are two reads
+  // of the same absent row in the same theme.
+  //
+  // L-09-shaped, mirroring classroom-groups.spec.ts's own "the accent
+  // colour still meets the WCAG AA contrast floor" test: the contrast is the
+  // REAL painted contrast from live computed styles rather than the
+  // #8a6a10/#fff hex pair trusted by eye. "Any tint you add must keep text on
+  // it at AA" (this task's own constraint) applies to the pill's own
+  // background just as much as the row's.
+  for (const theme of THEMES)
+    test(`${theme}: is tinted, striped and labelled; the pill text meets the WCAG AA contrast floor; every select's arrow meets 3:1`, async ({
+      page,
+    }) => {
+      await markAbsent(page);
+      const row = page.locator('.cg-student').first();
+      await emulateTheme(page, theme);
+      await expect
+        .soft(row)
+        .toHaveCSS('background-color', 'rgb(255, 246, 227)');
+      await expect.soft(row.locator('.cg-absent-pill')).toHaveText('absent');
+      const pillContrast = await contrastRatio(
+        page.locator('.cg-absent-pill').first(),
+      );
+      expect.soft(pillContrast).toBeGreaterThanOrEqual(4.5);
+
+      // #390 F21: the arrow drawn on each select (the native one is reset for
+      // WebKit's touch target) is a non-text control part, so WCAG 1.4.11's
+      // 3:1 applies, in this theme. A colour baked into a data-URI cannot
+      // follow the theme and reads as no colour at all here.
+      for (const select of [
+        row.locator('select').first(),
+        page.locator('#cg-speed'),
+      ]) {
+        const { image, ground } = await select.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            image: style.backgroundImage,
+            ground: style.backgroundColor,
+          };
+        });
+        const paint = (image.match(/rgba?\([^)]*\)/g) ?? [])
+          .map(parseColour)
+          .filter((c): c is NonNullable<typeof c> => !!c && c.alpha > 0);
+        const behind = parseColour(ground);
+        expect
+          .soft(paint.length, `a colour the arrow is drawn in: ${image}`)
+          .toBeGreaterThan(0);
+        expect.soft(behind?.alpha, `an opaque ground: ${ground}`).toBe(1);
+        for (const ink of paint)
+          if (behind)
+            expect
+              .soft(contrast(ink.rgb, behind.rgb), `${image} on ${ground}`)
+              .toBeGreaterThanOrEqual(3);
+      }
+    });
+
+  test('the consequence line is there before anyone is marked; the count line reads students, here and absent', async ({
     page,
   }) => {
     await openRoster(page);
-    await expect(
-      page.getByText(
-        'Students marked absent are not included when groups are made.',
-      ),
-    ).toBeVisible();
-  });
-
-  test('the count line reads students, here and absent', async ({ page }) => {
-    await openRoster(page);
+    // Before anyone is marked.
+    await expect
+      .soft(
+        page.getByText(
+          'Students marked absent are not included when groups are made.',
+        ),
+      )
+      .toBeVisible();
     await addSeveral(page, 23);
     await setCheckedOn(
       page.locator('.cg-student').first().getByLabel('Absent'),
     );
     await setCheckedOn(page.locator('.cg-student').nth(1).getByLabel('Absent'));
-    await expect(page.locator('#cg-roster-count')).toHaveText(
-      '24 students · 22 here · 2 absent',
-    );
+    await expect
+      .soft(page.locator('#cg-roster-count'))
+      .toHaveText('24 students · 22 here · 2 absent');
   });
 
   test('the word is never "away", anywhere', async ({ page }) => {
@@ -441,110 +483,25 @@ test.describe('an absent student', () => {
     { name: 'table', width: 1280 },
   ] as const)
     for (const theme of THEMES) {
-      test(
-        `${name}, ${theme}: absence carries the tint, the stripe and the pill -- same element as the table`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
-          await markAbsent(page);
-          const row = page.locator('.cg-student').first();
-          await emulateTheme(page, theme);
-          await expect(row).toHaveCSS('background-color', 'rgb(255, 246, 227)');
-          await expect(row.locator('.cg-absent-pill')).toHaveText('absent');
-          const cards = await page
-            .locator('#cg-roster')
-            .evaluate((el) => getComputedStyle(el).display !== 'table');
-          const stripeTarget = cards ? row : row.locator('td').first();
-          const boxShadow = await stripeTarget.evaluate(
-            (el) => getComputedStyle(el).boxShadow,
-          );
-          expect(boxShadow, `${name} stripe`).not.toBe('none');
-        },
-      );
+      test(`${name}, ${theme}: absence carries the tint, the stripe and the pill -- same element as the table`, async ({
+        page,
+      }) => {
+        await atViewport(page, { width, height: 900 });
+        await markAbsent(page);
+        const row = page.locator('.cg-student').first();
+        await emulateTheme(page, theme);
+        await expect(row).toHaveCSS('background-color', 'rgb(255, 246, 227)');
+        await expect(row.locator('.cg-absent-pill')).toHaveText('absent');
+        const cards = await page
+          .locator('#cg-roster')
+          .evaluate((el) => getComputedStyle(el).display !== 'table');
+        const stripeTarget = cards ? row : row.locator('td').first();
+        const boxShadow = await stripeTarget.evaluate(
+          (el) => getComputedStyle(el).boxShadow,
+        );
+        expect(boxShadow, `${name} stripe`).not.toBe('none');
+      });
     }
-
-  // L-09-shaped, mirroring classroom-groups.spec.ts's own "the accent
-  // colour still meets the WCAG AA contrast floor" test: computes the REAL
-  // painted contrast from live computed styles rather than trusting the
-  // #8a6a10/#fff hex pair by eye. "Any tint you add must keep text on it
-  // at AA" (this task's own constraint) applies to the pill's own
-  // background just as much as the row's.
-  for (const theme of THEMES)
-    test(`${theme}: the pill text meets the WCAG AA contrast floor`, async ({
-      page,
-    }) => {
-      await markAbsent(page);
-      await emulateTheme(page, theme);
-      const contrast = await contrastRatio(
-        page.locator('.cg-absent-pill').first(),
-      );
-      expect(contrast).toBeGreaterThanOrEqual(4.5);
-    });
-
-  // Every locale (#423): the absent state shows the page's own copy.
-  for (const path of localePaths('/classroom-groups'))
-    test(
-      `cards: no horizontal scroll at 320px once a student is marked absent -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 900 });
-        await markAbsent(page, path);
-        await expectNoHorizontalScroll(page);
-      },
-    );
-});
-
-// T-06 -- claimed by no task's own traceability line (checked: it appears
-// only in the plan's stage-level rollup, docs/superpowers/plans/2026-08-06-
-// classroom-groups-v2-stage-3-student-details.md line 13), yet Task 2 is
-// unambiguously the task that first renders the together/apart columns at
-// all. Picked up here rather than left for a task that never claims it.
-test.describe('together/apart letters', () => {
-  // The first entry of every list is the empty option, which since #249
-  // carries the column's own name rather than an em dash -- a teacher could
-  // not see what a collapsed dropdown was for. It is asserted as a member of
-  // the exact set, not skipped: it is still an option and still leads.
-
-  test('the dropdown grows as needed -- B appears once A is used', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    const row0 = page.locator('.cg-student').nth(0);
-    const row1 = page.locator('.cg-student').nth(1);
-
-    await expect(row0.getByLabel('Together').locator('option')).toHaveText([
-      'Together',
-      'A',
-    ]);
-
-    await row0.getByLabel('Together').selectOption('A');
-
-    // Every row's own dropdown grows, not only the one A was just set on.
-    await expect(row0.getByLabel('Together').locator('option')).toHaveText([
-      'Together',
-      'A',
-      'B',
-    ]);
-    await expect(row1.getByLabel('Together').locator('option')).toHaveText([
-      'Together',
-      'A',
-      'B',
-    ]);
-  });
-
-  test('together and apart grow independently', async ({ page }) => {
-    await openRoster(page);
-    const row = page.locator('.cg-student').first();
-    await row.getByLabel('Together').selectOption('A');
-    // Apart has had nothing set on it yet, so it must still offer only A --
-    // a shared counter across both fields would leak Together's own use
-    // into Apart's own list.
-    await expect(row.getByLabel('Apart').locator('option')).toHaveText([
-      'Apart',
-      'A',
-    ]);
-  });
 });
 
 // Global constraint, this stage (design spec section 11): "The roster
@@ -555,15 +512,31 @@ test.describe('together/apart letters', () => {
 // regression here is caught by the task that introduced the risk, not only
 // by the one that audits the whole stage at the end.
 test.describe('the roster is never persisted', () => {
-  test('a typed name never reaches localStorage or sessionStorage', async ({
+  test('a typed name never reaches localStorage or sessionStorage; editing two different rows by text, neither of which re-renders on its own, does not lose either', async ({
     page,
   }) => {
     await openRoster(page);
     await addSeveral(page, 2);
-    await typeInto(
-      page.locator('.cg-student').first().getByLabel('Name'),
-      'PrivacyProbeStudentName',
-    );
+    const rows = page.locator('.cg-student');
+    // A second, related defect found via the SAME investigation as the
+    // layouts loop's "editing every field works" (task-3-brief.md's own
+    // Step 1 test, unmodified): two DIFFERENT rows' own text edits, NEITHER
+    // of which re-renders on its own (`RosterHandlers`' own doc comment,
+    // roster-ui.ts -- "avoiding focus/caret theft"), used to stomp each
+    // other, because every row built in one render shared the identical
+    // stale `roster` snapshot -- the second row's own patch was computed from
+    // a base that did not yet know about the first row's edit, discarding it
+    // the moment the second landed. Not part of the brief's own Step 1
+    // (which only ever edits one row at a time); added because the fix for
+    // the first bug (roster-ui.ts's own `liveRoster`) fixes this one for
+    // free, and an unpinned fix is one that can regress silently.
+    await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
+    await typeInto(rows.nth(1).getByLabel('Name'), 'Budi');
+    await expect.soft(rows.nth(0).getByLabel('Name')).toHaveValue('Ana');
+    await expect.soft(rows.nth(1).getByLabel('Name')).toHaveValue('Budi');
+    // The probe goes into the third row, so the two edits above are not
+    // typed over.
+    await typeInto(rows.nth(2).getByLabel('Name'), 'PrivacyProbeStudentName');
     await expectNothingStored(
       page,
       'after typing a name',
@@ -579,35 +552,34 @@ test.describe('the roster is never persisted', () => {
 // report as worth a deliberate look once Task 2 lands and setRoster gets
 // its first real caller). `openRoster` is exactly that first caller.
 test.describe('headers follow the roster, live', () => {
-  test('the Student details header reports the roster once one exists', async ({
+  // One visit, read in the order the roster changes. Task 1's own Step 3b
+  // tests 2 and 3, deferred there because `openRoster` did not exist yet and
+  // because "Clear all" did not exist until Task 7 built it (design spec
+  // section 4, "Emptying the list"), are picked up here. Test 1 of that same
+  // step ("nothing to save yet" on load) is already covered by Stage 2's
+  // classroom-groups-controls.spec.ts.
+  test('the Student details header reports the roster once one exists; and counts a named student once one is named; a new roster is unsaved; clearing the roster returns it to nothing to save', async ({
     page,
   }) => {
     await openRoster(page);
-    await expect(page.locator('#cg-students-toggle')).toHaveText(
-      'Student details · 1 added',
-    );
-  });
-
-  test('and counts a named student once one is named', async ({ page }) => {
-    await openRoster(page);
+    const toggle = page.locator('#cg-students-toggle');
+    const state = page.locator('#cg-io .state');
+    await expect.soft(toggle).toHaveText('Student details · 1 added');
+    // A new roster is unsaved.
+    await expect
+      .soft(state)
+      .toHaveText('unsaved changes — export to keep them');
     await typeInto(
       page.locator('.cg-student').first().getByLabel('Name'),
       'Ana',
     );
-    await expect(page.locator('#cg-students-toggle')).toHaveText(
-      'Student details · 1 named',
-    );
-  });
-
-  // Task 1's own Step 3b test 2, deferred there because `openRoster` did
-  // not exist yet -- picked up here now that it does. Test 1 of that same
-  // step ("nothing to save yet" on load) is already covered by Stage 2's
-  // classroom-groups-controls.spec.ts.
-  test('a new roster is unsaved', async ({ page }) => {
-    await openRoster(page);
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
+    await expect.soft(toggle).toHaveText('Student details · 1 named');
+    // Still unsaved, with a name in it, until the list is cleared.
+    await expect
+      .soft(state)
+      .toHaveText('unsaved changes — export to keep them');
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
+    await expect.soft(state).toHaveText('nothing to save yet');
   });
 
   // "Any" change, one test per kind (#426). The single test that stood here
@@ -634,11 +606,10 @@ test.describe('headers follow the roster, live', () => {
     [
       'a sex',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Sex')
-          .selectOption('F');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Sex'),
+          'F',
+        );
       },
     ],
     [
@@ -649,21 +620,19 @@ test.describe('headers follow the roster, live', () => {
     [
       'a together letter',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Together')
-          .selectOption('A');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Together'),
+          'A',
+        );
       },
     ],
     [
       'an apart letter',
       async (page) => {
-        await page
-          .locator('.cg-student')
-          .first()
-          .getByLabel('Apart')
-          .selectOption('A');
+        await chooseOption(
+          page.locator('.cg-student').first().getByLabel('Apart'),
+          'A',
+        );
       },
     ],
     [
@@ -692,24 +661,6 @@ test.describe('headers follow the roster, live', () => {
       await make(page);
       await expect(state).toHaveText('unsaved changes — export to keep them');
     });
-
-  // Task 1's own Step 3b test 3, carried forward rather than lost: it
-  // appeared in NEITHER Task 1's nor Task 2's own test list (both read in
-  // full at the time -- see task-1-report.md and progress.md), because
-  // "Clear all" did not exist until this task builds it (design spec
-  // section 4, "Emptying the list"). It lands here now that it does.
-  test('clearing the roster returns it to nothing to save', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'unsaved changes — export to keep them',
-    );
-    await tapOn(page.getByRole('button', { name: 'Clear all' }));
-    await expect(page.locator('#cg-io .state')).toHaveText(
-      'nothing to save yet',
-    );
-  });
 });
 
 /**
@@ -733,54 +684,31 @@ test.describe('headers follow the roster, live', () => {
  * rather than merely renumbering the only row that exists.
  */
 test.describe('validation as it is typed', () => {
-  test('a duplicate number is refused as it is typed', async ({ page }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
-    await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
-    // and before the button is ever pressed
-    await expect(
-      page.getByRole('button', { name: 'Make groups' }),
-    ).toBeDisabled();
-  });
-
-  test('a together-and-apart clash is refused as it is typed', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    const row0 = page.locator('.cg-student').nth(0);
-    const row1 = page.locator('.cg-student').nth(1);
-    await row0.getByLabel('Together').selectOption('A');
-    await row1.getByLabel('Together').selectOption('A');
-    await row0.getByLabel('Apart').selectOption('A');
-    await row1.getByLabel('Apart').selectOption('A');
-    await expect(
-      page.getByText(/are kept together, so they cannot also be kept apart/),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Make groups' }),
-    ).toBeDisabled();
-  });
-
-  test('a gap warns but does not block', async ({ page }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
-    await expect(page.getByText(/looks incomplete/)).toBeVisible();
-    await giveEveryoneASex(page);
-    const go = page.getByRole('button', { name: 'Make groups' });
-    await expect(go).toBeEnabled();
-    // And pressing it makes groups (#425): an enabled button that then
-    // refused would still be a block.
-    await tapOn(go);
-    await expect(page.locator('#cg-results .group').first()).toBeVisible();
-  });
-
-  // R-06 -- "…naming who already holds it" -- proven with a REAL typed
-  // name, not only the "Student N" fallback the first test above exercises
-  // (neither student there is ever named).
-  test('a duplicate names the student who already holds the number, by name', async ({
+  // One duplicate, read every way it is read. Its message comes first and the
+  // focus is read straight after it, with nothing pressed in between.
+  //
+  // R-06 -- "…naming who already holds it" -- is proven with a REAL typed
+  // name, not only the "Student N" fallback.
+  //
+  // This task's own central risk: a re-render mid-keystroke would steal the
+  // focus and the caret out from under whoever is typing (roster-ui.ts's
+  // own RosterHandlers doc comment). Reading the message AFTER the triggering
+  // edit would pass just as well whether or not a re-render happened in
+  // between -- the focus check is the one that actually proves it did not:
+  // the SAME locator handle used to type is asserted still focused, holding
+  // exactly what was typed, once the message is showing.
+  //
+  // Errors must be announced accessibly, not just shown -- the same rule
+  // classroom-groups-announcements.spec.ts already proves for #cg-error.
+  // role="alert" is what makes a screen reader interrupt with this the
+  // moment it appears.
+  //
+  // The block is a COMPARISON, not a one-way latch -- the same "a
+  // dirty/stale flag must be able to clear again" philosophy this page
+  // already applies to `dirty` (classroom-groups.ts) and `staleReason`
+  // (staleness.ts). Fixing the duplicate must re-enable the button, not
+  // leave it disabled forever once a problem has ever existed.
+  test('a duplicate number is refused as it is typed -- by name, without stealing focus or the caret, announced as an alert, and fixing it re-enables Make groups and clears the message', async ({
     page,
   }) => {
     await openRoster(page);
@@ -789,64 +717,77 @@ test.describe('validation as it is typed', () => {
       'Eko',
     );
     await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
-    await expect(
-      page.getByText(
-        'Number 1 is already used by Eko. Every student needs their own.',
-      ),
-    ).toBeVisible();
-  });
-
-  // This task's own central risk: a re-render mid-keystroke would steal the
-  // focus and the caret out from under whoever is typing (roster-ui.ts's
-  // own RosterHandlers doc comment). Every test above reads the message
-  // AFTER the triggering edit, which would pass just as well whether or not
-  // a re-render happened in between -- this is the one that actually proves
-  // it did not: the SAME locator handle used to type is asserted still
-  // focused, holding exactly what was typed, once the message is showing.
-  test('the duplicate message appears without stealing focus or the caret from the field being typed in', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
     await typeInto(secondNumber, '1');
-    await expect(page.getByText(/Number 1 is already used/)).toBeVisible();
-    await expect(secondNumber).toBeFocused();
-    await expect(secondNumber).toHaveValue('1');
-  });
-
-  // Errors must be announced accessibly, not just shown -- the same rule
-  // classroom-groups-announcements.spec.ts already proves for #cg-error.
-  // role="alert" is what makes a screen reader interrupt with this the
-  // moment it appears, matching that established pattern rather than a new
-  // one for this notice.
-  test('the duplicate refusal is announced accessibly, not just shown', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '1');
-    await expect(page.locator('#cg-roster-problem')).toHaveAttribute(
-      'role',
-      'alert',
-    );
-    await expect(page.locator('#cg-roster-problem')).toBeVisible();
+    await expect.soft(page.getByText(/Number 1 is already used/)).toBeVisible();
+    await expect
+      .soft(
+        page.getByText(
+          'Number 1 is already used by Eko. Every student needs their own.',
+        ),
+      )
+      .toBeVisible();
+    // and before the button is ever pressed
+    await expect
+      .soft(page.getByRole('button', { name: 'Make groups' }))
+      .toBeDisabled();
+    await expect
+      .soft(page.locator('#cg-roster-problem'))
+      .toHaveAttribute('role', 'alert');
+    await expect.soft(page.locator('#cg-roster-problem')).toBeVisible();
+    // The message is showing, and the field typed in still has the focus and
+    // exactly what was typed.
+    await expect.soft(page.getByText(/Number 1 is already used/)).toBeVisible();
+    await expect.soft(secondNumber).toBeFocused();
+    await expect.soft(secondNumber).toHaveValue('1');
+    // Still refused, now that the message and the focus have been read.
+    await expect
+      .soft(page.getByRole('button', { name: 'Make groups' }))
+      .toBeDisabled();
+    await typeInto(secondNumber, '2');
+    await expect.soft(page.getByText(/Number 1 is already used/)).toBeHidden();
+    await giveEveryoneASex(page);
+    await expect
+      .soft(page.getByRole('button', { name: 'Make groups' }))
+      .toBeEnabled();
   });
 
   // The gap warning is announced too, but politely (role="status") rather
   // than as an interruption -- it is a non-blocking notice, not a refusal,
-  // and "Make groups" stays enabled while it shows (proven above).
-  test('the gap warning is announced politely, not as an alert', async ({
+  // and "Make groups" stays enabled while it shows. The clash is read on the
+  // same two rows once the groups are made: every student has a sex by then,
+  // so it is the clash alone that keeps "Make groups" disabled.
+  test('a gap warns but does not block, announced politely, not as an alert; a together-and-apart clash is refused as it is typed', async ({
     page,
   }) => {
     await openRoster(page);
     await tapOn(page.getByRole('button', { name: 'Add student' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
-    await expect(page.locator('#cg-roster-warning')).toHaveAttribute(
-      'role',
-      'status',
-    );
+    await expect.soft(page.getByText(/looks incomplete/)).toBeVisible();
+    await expect
+      .soft(page.locator('#cg-roster-warning'))
+      .toHaveAttribute('role', 'status');
+    await giveEveryoneASex(page);
+    const go = page.getByRole('button', { name: 'Make groups' });
+    await expect.soft(go).toBeEnabled();
+    // And pressing it makes groups (#425): an enabled button that then
+    // refused would still be a block.
+    await tapOn(go);
+    await expect.soft(page.locator('#cg-results .group').first()).toBeVisible();
+
+    const row0 = page.locator('.cg-student').nth(0);
+    const row1 = page.locator('.cg-student').nth(1);
+    await chooseOption(row0.getByLabel('Together'), 'A');
+    await chooseOption(row1.getByLabel('Together'), 'A');
+    await chooseOption(row0.getByLabel('Apart'), 'A');
+    await chooseOption(row1.getByLabel('Apart'), 'A');
+    await expect
+      .soft(
+        page.getByText(/are kept together, so they cannot also be kept apart/),
+      )
+      .toBeVisible();
+    // The press above renamed the button, so it is read by its id here.
+    await expect.soft(page.locator('#cg-go')).toBeDisabled();
   });
 
   // #332, the stale notice's twin. The warning paints its own cream ground
@@ -871,29 +812,6 @@ test.describe('validation as it is typed', () => {
         warning,
       );
     });
-
-  // The block is a COMPARISON, not a one-way latch -- the same "a
-  // dirty/stale flag must be able to clear again" philosophy this page
-  // already applies to `dirty` (classroom-groups.ts) and `staleReason`
-  // (staleness.ts). Fixing the duplicate must re-enable the button, not
-  // leave it disabled forever once a problem has ever existed.
-  test('fixing the duplicate re-enables Make groups and clears the message', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    const secondNumber = page.locator('.cg-student').nth(1).getByLabel('#');
-    await typeInto(secondNumber, '1');
-    await expect(
-      page.getByRole('button', { name: 'Make groups' }),
-    ).toBeDisabled();
-    await typeInto(secondNumber, '2');
-    await expect(page.getByText(/Number 1 is already used/)).toBeHidden();
-    await giveEveryoneASex(page);
-    await expect(
-      page.getByRole('button', { name: 'Make groups' }),
-    ).toBeEnabled();
-  });
 });
 
 /**
@@ -925,72 +843,91 @@ test.describe('validation as it is typed', () => {
  *    literally as a second, additional test.
  */
 test.describe('adding, removing, and the two limits', () => {
-  test('Add several is inline — no dialog', async ({ page }) => {
+  // Add several, inline, builds the four rows of "1, 2, 3, 5": no dialog is
+  // opened along the way.
+  //
+  // Not in the brief -- R-08's own literal example (design spec section 4,
+  // "Numbers": "With 1, 2, 3 and 5 on the list the next student is 6, not
+  // 4"), proving a REAL gap is not filled before a fresh highest.
+  test('Add several is inline — no dialog; a new student takes one past the highest even across a real gap — 1, 2, 3, 5 then Add student gives 6', async ({
+    page,
+  }) => {
     await openRoster(page);
     page.on('dialog', () => {
       throw new Error('a dialog was opened');
     });
     await tapOn(page.getByRole('button', { name: 'Add several' }));
-    await expect(page.getByLabel('How many to add?')).toBeVisible();
-  });
-
-  test('a new student takes one past the highest', async ({ page }) => {
-    await openRoster(page);
-    await typeInto(page.locator('.cg-student').first().getByLabel('#'), '5');
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(
-      page.locator('.cg-student').nth(1).getByLabel('#'),
-    ).toHaveValue('6');
-  });
-
-  // Not in the brief -- R-08's own literal example (design spec section 4,
-  // "Numbers": "With 1, 2, 3 and 5 on the list the next student is 6, not
-  // 4"), proving a REAL gap is not filled before a fresh highest.
-  test('a new student takes one past the highest even across a real gap — 1, 2, 3, 5 then Add student gives 6', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await addSeveral(page, 3); // rows #1, 2, 3, 4
+    await expect.soft(page.getByLabel('How many to add?')).toBeVisible();
+    await typeInto(page.getByLabel('How many to add?'), '3');
+    await tapOn(page.getByRole('button', { name: 'Add', exact: true }));
+    // rows #1, 2, 3, 4
     await typeInto(page.locator('.cg-student').nth(3).getByLabel('#'), '5'); // now 1, 2, 3, 5 -- a real gap at 4
     await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(
-      page.locator('.cg-student').nth(4).getByLabel('#'),
-    ).toHaveValue('6');
+    await expect
+      .soft(page.locator('.cg-student').nth(4).getByLabel('#'))
+      .toHaveValue('6');
   });
 
-  test('both add controls disable at 100, stating the limit', async ({
+  // Both add controls disable at 100 and state the limit. Not in the brief --
+  // the OTHER add control must state the limit too, proven independently
+  // rather than assumed from "Add student": both are disabled by the SAME
+  // `rosterAtLimit` check (roster-ui.ts's buildToolbar), but that is an
+  // implementation fact, not something this suite is entitled to take on
+  // faith.
+  //
+  // Not in the brief -- X-08 ("there is no way to type the box past
+  // MAX_ROSTER with a list present") was only HALF closed by Task 6, which
+  // made neither add path able to push the roster past 100; Task 7's own job
+  // is the other half, the box becoming untypeable at all. Proving that
+  // holds AT the ceiling, not merely below it, is what actually closes
+  // X-08 rather than leaving it true only by the accident of every other
+  // test here using a small roster.
+  //
+  // Removing a row re-enables the add controls the moment the roster drops
+  // back under the limit -- the same "comparison, not a one-way latch"
+  // shape design spec section 4's own refusals already keep elsewhere.
+  test('both add controls disable at 100, stating the limit; the Students box is still a read-out at the roster ceiling, never typeable past it; removing a row at the limit re-enables the add controls', async ({
     page,
   }) => {
     await openRoster(page);
-    await addSeveral(page, 99);
-    await expect(
-      page.getByRole('button', { name: 'Add student' }),
-    ).toBeDisabled();
+    await addSeveral(page, 99); // 100 rows -- at the limit
+    await expect
+      .soft(page.getByRole('button', { name: 'Add student' }))
+      .toBeDisabled();
     // Both (#426): this read Add student alone, and Add several could stay
     // live at the limit. Counted off the page, so a third add control fails
     // here until it is read too.
-    await expect(page.locator('.cg-add-student, .cg-add-several')).toHaveCount(
-      2,
+    await expect
+      .soft(page.locator('.cg-add-student, .cg-add-several'))
+      .toHaveCount(2);
+    await expect
+      .soft(page.getByRole('button', { name: 'Add several' }))
+      .toBeDisabled();
+    await expect
+      .soft(page.getByText('Student details holds up to 100 students.'))
+      .toBeVisible();
+    await expect.soft(page.getByLabel('Number of students')).not.toBeEditable();
+    await expect.soft(page.getByLabel('Number of students')).toHaveValue('100');
+    // Read again at the end of the stay at the limit, before the row goes.
+    await expect
+      .soft(page.getByRole('button', { name: 'Add student' }))
+      .toBeDisabled();
+    await expect
+      .soft(page.getByRole('button', { name: 'Add several' }))
+      .toBeDisabled();
+    await tapOn(
+      page
+        .locator('.cg-student')
+        .first()
+        .getByRole('button', { name: 'Remove' }),
     );
-    await expect(
-      page.getByRole('button', { name: 'Add several' }),
-    ).toBeDisabled();
-    await expect(
-      page.getByText('Student details holds up to 100 students.'),
-    ).toBeVisible();
-  });
-
-  // Not in the brief -- the OTHER add control must state the limit too,
-  // proven independently rather than assumed from "Add student" above:
-  // both are disabled by the SAME `rosterAtLimit` check (roster-ui.ts's
-  // buildToolbar), but that is an implementation fact, not something this
-  // suite is entitled to take on faith.
-  test('Add several also disables at 100', async ({ page }) => {
-    await openRoster(page);
-    await addSeveral(page, 99);
-    await expect(
-      page.getByRole('button', { name: 'Add several' }),
-    ).toBeDisabled();
+    await expect.soft(page.locator('.cg-student')).toHaveCount(99);
+    await expect
+      .soft(page.getByRole('button', { name: 'Add student' }))
+      .toBeEnabled();
+    await expect
+      .soft(page.getByText('Student details holds up to 100 students.'))
+      .toBeHidden();
   });
 
   test('Add several refuses a number that would cross the limit, saying how many are free', async ({
@@ -1009,47 +946,42 @@ test.describe('adding, removing, and the two limits', () => {
 
   // Corrected from the brief's own `getByLabel('How many students?')` --
   // see this describe block's own header comment.
-  test('Student details refuses to open above 100, leaving the count alone', async ({
+  //
+  // The refusal is a COMPARISON, not a one-way latch, the same "comparison,
+  // not a flag" shape every other guard on this page already keeps (dirty,
+  // staleReason, updateRosterValidation). Lowering the count and clicking
+  // again must actually open the section, not stay refused over a fact that
+  // is no longer true.
+  test('Student details refuses to open above 100, leaving the count alone; lowering the count and reopening actually opens Student details', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
     await typeInto(page.getByLabel('Number of students'), '300');
     await tapOn(page.locator('#cg-students-toggle'));
-    await expect(
-      page.getByText(
-        'Student details holds up to 100 students. Lower the number to list this class individually.',
-      ),
-    ).toBeVisible();
-    await expect(page.locator('#cg-roster')).toHaveCount(0);
-    await expect(page.getByLabel('Number of students')).toHaveValue('300');
+    await expect
+      .soft(
+        page.getByText(
+          'Student details holds up to 100 students. Lower the number to list this class individually.',
+        ),
+      )
+      .toBeVisible();
+    await expect
+      .soft(page.getByText('Student details holds up to 100 students.'))
+      .toBeVisible();
+    await expect.soft(page.locator('#cg-roster')).toHaveCount(0);
+    await expect.soft(page.getByLabel('Number of students')).toHaveValue('300');
     await giveEveryoneASex(page);
-    await expect(
-      page.getByRole('button', { name: 'Make groups' }),
-    ).toBeEnabled();
-  });
-
-  // Not in the brief -- the refusal is a COMPARISON, not a one-way latch,
-  // the same "comparison, not a flag" shape every other guard on this page
-  // already keeps (dirty, staleReason, updateRosterValidation). Lowering
-  // the count and clicking again must actually open the section, not stay
-  // refused over a fact that is no longer true.
-  test('lowering the count and reopening actually opens Student details', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await typeInto(page.getByLabel('Number of students'), '300');
-    await tapOn(page.locator('#cg-students-toggle'));
-    await expect(
-      page.getByText('Student details holds up to 100 students.'),
-    ).toBeVisible();
+    await expect
+      .soft(page.getByRole('button', { name: 'Make groups' }))
+      .toBeEnabled();
     await typeInto(page.getByLabel('Number of students'), '50');
     await tapOn(page.locator('#cg-students-toggle'));
-    await expect(
-      page.getByRole('button', { name: 'Add student' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Student details holds up to 100 students.'),
-    ).toBeHidden();
+    await expect
+      .soft(page.getByRole('button', { name: 'Add student' }))
+      .toBeVisible();
+    await expect
+      .soft(page.getByText('Student details holds up to 100 students.'))
+      .toBeHidden();
   });
 });
 
@@ -1058,99 +990,36 @@ test.describe('adding, removing, and the two limits', () => {
 // discarded when a row is added or removed elsewhere" (this task's own
 // brief). None of these are in task-6-brief.md's own Step 1 snippet at all.
 test.describe('removing a student', () => {
-  test('removes the row and lowers the roster', async ({ page }) => {
-    await openRoster(page);
-    await addSeveral(page, 2); // three rows: 1, 2, 3
-    await expect(page.locator('.cg-student')).toHaveCount(3);
-    await tapOn(
-      page
-        .locator('.cg-student')
-        .nth(1)
-        .getByRole('button', { name: 'Remove' }),
-    );
-    await expect(page.locator('.cg-student')).toHaveCount(2);
-  });
-
   // Identity is the number (this stage's own global constraint): removing
   // a student must not renumber the others. Removing the MIDDLE student of
   // 1, 2, 3 must leave 1 and 3 — a gap — never silently renumber the
   // survivor down to 2, which would quietly hand student #3's own together/
   // apart letters (or a future pin) to a different child.
-  test('does not renumber the remaining students', async ({ page }) => {
-    await openRoster(page);
-    await addSeveral(page, 2); // three rows: 1, 2, 3
-    await tapOn(
-      page
-        .locator('.cg-student')
-        .nth(1)
-        .getByRole('button', { name: 'Remove' }),
-    );
-    const rows = page.locator('.cg-student');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0).getByLabel('#')).toHaveValue('1');
-    await expect(rows.nth(1).getByLabel('#')).toHaveValue('3');
-  });
-
-  // The exact shape of bug this task's own brief named as a real risk: a
+  //
+  // And the exact shape of bug this task's own brief named as a real risk: a
   // pending, uncommitted text edit on a DIFFERENT row (never itself
   // re-rendered — RosterHandlers.onTextChange's own doc comment,
   // roster-ui.ts) must survive a removal elsewhere in the table, not be
-  // silently discarded by a stale render-time snapshot.
-  test('removing one row does not discard an uncommitted text edit on another', async ({
+  // silently discarded by a stale render-time snapshot. The edit is typed
+  // before the removal, so the one removal is read all three ways.
+  test('removes the row and lowers the roster; does not renumber the remaining students; does not discard an uncommitted text edit on another', async ({
     page,
   }) => {
     await openRoster(page);
     await addSeveral(page, 2); // three rows: 1, 2, 3
+    await expect.soft(page.locator('.cg-student')).toHaveCount(3);
     const rows = page.locator('.cg-student');
     await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
     await tapOn(rows.nth(1).getByRole('button', { name: 'Remove' }));
-    await expect(page.locator('.cg-student')).toHaveCount(2);
-    await expect(
-      page.locator('.cg-student').first().getByLabel('Name'),
-    ).toHaveValue('Ana');
+    await expect.soft(page.locator('.cg-student')).toHaveCount(2);
+    await expect.soft(rows).toHaveCount(2);
+    await expect.soft(rows.nth(0).getByLabel('#')).toHaveValue('1');
+    await expect.soft(rows.nth(1).getByLabel('#')).toHaveValue('3');
+    await expect.soft(page.locator('.cg-student')).toHaveCount(2);
+    await expect
+      .soft(page.locator('.cg-student').first().getByLabel('Name'))
+      .toHaveValue('Ana');
   });
-
-  // Removing a row re-enables the add controls the moment the roster drops
-  // back under the limit — the same "comparison, not a one-way latch"
-  // shape design spec section 4's own refusals already keep elsewhere.
-  test('removing a row at the limit re-enables the add controls', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await addSeveral(page, 99); // 100 rows -- at the limit
-    await expect(
-      page.getByRole('button', { name: 'Add student' }),
-    ).toBeDisabled();
-    await tapOn(
-      page
-        .locator('.cg-student')
-        .first()
-        .getByRole('button', { name: 'Remove' }),
-    );
-    await expect(page.locator('.cg-student')).toHaveCount(99);
-    await expect(
-      page.getByRole('button', { name: 'Add student' }),
-    ).toBeEnabled();
-    await expect(
-      page.getByText('Student details holds up to 100 students.'),
-    ).toBeHidden();
-  });
-
-  // Every locale (#423): the button's label is the page's own copy.
-  for (const path of localePaths('/classroom-groups'))
-    test(`the Remove button meets the 44px touch target -- ${path}`, async ({
-      page,
-    }) => {
-      await openRoster(page, path);
-      const { rosterRemove } = getStrings(localeFromPath(path));
-      await atLeast44(
-        page
-          .locator('.cg-student')
-          .first()
-          .getByRole('button', { name: rosterRemove }),
-        rosterRemove,
-      );
-    });
 });
 
 // Stage 3, Task 7 (design spec section 4, "The Students box -- an input,
@@ -1165,42 +1034,57 @@ test.describe('removing a student', () => {
 // (`studentsLabel` in en.ts). Corrected here the same way, not reproduced
 // verbatim.
 test.describe('the Students box becomes a read-out', () => {
-  test('typeable with no list; a read-out with one', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await expect(page.getByLabel('Number of students')).toBeEditable();
-    await tapOn(page.locator('#cg-students-toggle'));
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(page.getByLabel('Number of students')).not.toBeEditable();
-  });
-
-  // #188, AC14. The list and the three number fields are never both in
-  // charge either -- `studentsBoxLocked` is the one fact behind all four
-  // controls, which is why the fields lock on exactly the same condition
-  // `#cg-count` does, and recover on it too.
-  test('the three number fields lock with the box, and recover with it', async ({
+  // One visit, read around one list: how the page looks before it, with it
+  // and once it is cleared. #188, AC14: the list and the three number fields
+  // are never both in charge either -- `studentsBoxLocked` is the one fact
+  // behind all four controls, which is why the fields lock on exactly the
+  // same condition `#cg-count` does, and recover on it too.
+  //
+  // Not in the brief -- design spec section 4's own example shows exactly
+  // ONE explanatory line under a locked box ("Set by your list..."), and
+  // `studentsHelp` ("Students are anonymous and numbered") stops being true
+  // the moment a roster can hold a real name -- showing both at once would
+  // show a teacher a claim this task's own change makes false.
+  test('typeable with no list; a read-out with one; the three number fields lock with the box, and recover with it; the reason is rendered, not implied; the anonymous-count help text steps aside for the reason, and returns once the list is gone', async ({
     page,
   }) => {
+    const box = page.getByLabel('Number of students');
+    const help = page.getByText('Students are anonymous and numbered');
     const fields = ['absent', 'together', 'apart'].map((name) =>
       page.locator(`#cg-numbers-${name}`),
     );
 
     await page.goto('/classroom-groups');
+    await expect.soft(box).toBeEditable();
+    await expect.soft(help).toBeVisible();
     // Editable BEFORE a roster exists -- without this the assertions below
     // would hold against a page that had disabled them from the start.
-    for (const field of fields) await expect(field).toBeEditable();
+    for (const field of fields) await expect.soft(field).toBeEditable();
     await shoot(
       page,
       'all three fields editable with no list',
       page.locator('.number-fields'),
     );
 
-    await openRoster(page);
-    for (const field of fields) await expect(field).not.toBeEditable();
-    await expect(
-      page.getByText(
-        'Set by your list. Mark absences and pairings in Student details to change them.',
-      ),
-    ).toBeVisible();
+    await tapOn(page.locator('#cg-students-toggle'));
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
+    await expect.soft(box).not.toBeEditable();
+    for (const field of fields) await expect.soft(field).not.toBeEditable();
+    await expect
+      .soft(
+        page.getByText(
+          'Set by your list. Mark absences and pairings in Student details to change them.',
+        ),
+      )
+      .toBeVisible();
+    await expect
+      .soft(
+        page.getByText(
+          'Set by your list. Add or remove students in Student details to change it.',
+        ),
+      )
+      .toBeVisible();
+    await expect.soft(help).toBeHidden();
     await shoot(
       page,
       'locked by the list, with the reason shown',
@@ -1208,7 +1092,8 @@ test.describe('the Students box becomes a read-out', () => {
     );
 
     await tapOn(page.getByRole('button', { name: 'Clear all' }));
-    for (const field of fields) await expect(field).toBeEditable();
+    for (const field of fields) await expect.soft(field).toBeEditable();
+    await expect.soft(help).toBeVisible();
     await shoot(
       page,
       'editable again once the list is cleared',
@@ -1276,19 +1161,8 @@ test.describe('the Students box becomes a read-out', () => {
     );
   });
 
-  test('the reason is rendered, not implied', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await tapOn(page.locator('#cg-students-toggle'));
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(
-      page.getByText(
-        'Set by your list. Add or remove students in Student details to change it.',
-      ),
-    ).toBeVisible();
-  });
-
-  // The count these two build is 29, and it is DERIVED from the rows rather
-  // than written down.
+  // One list of 29, read three ways. The count it builds is 29, and it is
+  // DERIVED from the rows rather than written down.
   //
   // The comment that stood here reasoned that 30 "shares nothing with" the
   // box's build-time default, which it recorded as `value="24"`. That was
@@ -1299,47 +1173,39 @@ test.describe('the Students box becomes a read-out', () => {
   // same way, so `expectStudentsBoxReports` reads the shipped default off the
   // element itself (`.value =` never rewrites the content attribute) and
   // refuses any expectation that cannot tell the two apart.
-  test('emptying the list makes it typeable again, keeping the number', async ({
+  test('emptying the list makes it typeable again, keeping the number; marking a student absent does not move it', async ({
     page,
   }) => {
     await openRoster(page);
     await addSeveral(page, 28);
     const rows = page.locator('.cg-student');
-    await expect(rows).toHaveCount(29);
+    await expect.soft(rows).toHaveCount(29);
     const built = await rows.count();
 
     const box = page.getByLabel('Number of students');
     await expectStudentsBoxReports(box, built);
-    // The locked state is observed HERE, not borrowed from the test above,
+    // The locked state is observed HERE, not borrowed from another test,
     // because it is what makes the re-enable below a transition rather than a
     // state a script-less page satisfies on its own: `disabled` is only ever
     // set by script, so with no implementation the box is trivially editable
     // and `toBeEditable()` alone asserts nothing.
-    await expect(box).not.toBeEditable();
+    await expect.soft(box).not.toBeEditable();
 
-    await tapOn(page.getByRole('button', { name: 'Clear all' }));
-    await expect(box).toBeEditable();
-    await expectStudentsBoxReports(box, built);
-  });
-
-  test('marking a student absent does not move it', async ({ page }) => {
-    await openRoster(page);
-    await addSeveral(page, 28);
-    const rows = page.locator('.cg-student');
-    await expect(rows).toHaveCount(29);
-    const built = await rows.count();
-
-    const box = page.getByLabel('Number of students');
-    // Read before AND after: "does not move it" is a claim about a change,
-    // and one reading after the fact cannot tell an unmoved value from one
-    // that was never right.
+    // Marking a student absent does not move the number. Read before AND
+    // after: "does not move it" is a claim about a change, and one reading
+    // after the fact cannot tell an unmoved value from one that was never
+    // right.
+    await expect.soft(rows).toHaveCount(29);
     await expectStudentsBoxReports(box, built);
     await setCheckedOn(rows.first().getByLabel('Absent'));
     await expectStudentsBoxReports(box, built);
+    await expect
+      .soft(page.locator('#cg-roster-count'))
+      .toHaveText(`${built} students · ${built - 1} here · 1 absent`);
 
-    await expect(page.locator('#cg-roster-count')).toHaveText(
-      `${built} students · ${built - 1} here · 1 absent`,
-    );
+    await tapOn(page.getByRole('button', { name: 'Clear all' }));
+    await expect.soft(box).toBeEditable();
+    await expectStudentsBoxReports(box, built);
   });
 
   test('no sequence of operations makes the box disagree with the list', async ({
@@ -1361,88 +1227,31 @@ test.describe('the Students box becomes a read-out', () => {
       String(rows),
     );
   });
-
-  // Not in the brief -- X-08 ("there is no way to type the box past
-  // MAX_ROSTER with a list present") was only HALF closed by Task 6, which
-  // made neither add path able to push the roster past 100; this task's own
-  // job is the other half, the box becoming untypeable at all. Proving that
-  // holds AT the ceiling, not merely below it, is what actually closes
-  // X-08 rather than leaving it true only by the accident of every other
-  // test here using a small roster.
-  test('even at the roster ceiling, the box is still a read-out, never typeable past it', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    await addSeveral(page, 99); // 100 total -- MAX_ROSTER
-    await expect(page.getByLabel('Number of students')).not.toBeEditable();
-    await expect(page.getByLabel('Number of students')).toHaveValue('100');
-  });
-
-  // Not in the brief -- every other interactive control this table adds
-  // gets its own measured touch-target test (see 'the Remove button meets
-  // the 44px touch target'), so Clear all does too rather than trusting it
-  // by inspection because it shares a CSS class with one that is measured.
-  // Every locale (#423): the button's label is the page's own copy.
-  for (const path of localePaths('/classroom-groups'))
-    test(`the Clear all button meets the 44px touch target -- ${path}`, async ({
-      page,
-    }) => {
-      await openRoster(page, path);
-      const { rosterClearAll } = getStrings(localeFromPath(path));
-      await atLeast44(
-        page.getByRole('button', { name: rosterClearAll }),
-        rosterClearAll,
-      );
-    });
-
-  // Not in the brief -- design spec section 4's own example shows exactly
-  // ONE explanatory line under a locked box ("Set by your list..."), and
-  // `studentsHelp` ("Students are anonymous and numbered") stops being true
-  // the moment a roster can hold a real name -- showing both at once would
-  // show a teacher a claim this task's own change makes false.
-  test('the anonymous-count help text steps aside for the reason, and returns once the list is gone', async ({
-    page,
-  }) => {
-    await page.goto('/classroom-groups');
-    await expect(
-      page.getByText('Students are anonymous and numbered'),
-    ).toBeVisible();
-    await tapOn(page.locator('#cg-students-toggle'));
-    await tapOn(page.getByRole('button', { name: 'Add student' }));
-    await expect(
-      page.getByText('Students are anonymous and numbered'),
-    ).toBeHidden();
-    await tapOn(page.getByRole('button', { name: 'Clear all' }));
-    await expect(
-      page.getByText('Students are anonymous and numbered'),
-    ).toBeVisible();
-  });
 });
 
 test.describe('Indonesian', () => {
   // Mirrors 'the table has seven columns, in order...', above -- the
   // seventh header's own text is 'Hapus' (rosterRemove, id.ts), the exact
-  // word every row's own Remove button already carries.
-  test('the table has seven columns, translated — the seventh (Remove/Hapus) has a real header too', async ({
+  // word every row's own Remove button already carries. The unnamed row is
+  // read last, after Make groups is pressed, as in English.
+  test('the table has seven columns, translated — the seventh (Remove/Hapus) has a real header too; an unnamed row renders Siswa N in the results', async ({
     page,
   }) => {
     await openRoster(page, '/id/classroom-groups');
-    await expect(page.locator('#cg-roster thead th')).toHaveText([
-      'Tidak hadir',
-      '#',
-      'Nama',
-      'Jenis kelamin',
-      'Bersama',
-      'Terpisah',
-      'Hapus',
-    ]);
-  });
-
-  test('an unnamed row renders Siswa N in the results', async ({ page }) => {
-    await openRoster(page, '/id/classroom-groups');
+    await expect
+      .soft(page.locator('#cg-roster thead th'))
+      .toHaveText([
+        'Tidak hadir',
+        '#',
+        'Nama',
+        'Jenis kelamin',
+        'Bersama',
+        'Terpisah',
+        'Hapus',
+      ]);
     await giveEveryoneASex(page);
     await tapOn(page.getByRole('button', { name: 'Buat Kelompok' }));
-    await expect(page.locator('#cg-results')).toContainText('Siswa 1');
+    await expect.soft(page.locator('#cg-results')).toContainText('Siswa 1');
   });
 
   // Mirrors 'the count line reads students, here and absent', above --
@@ -1494,38 +1303,33 @@ test.describe('Indonesian', () => {
     ).toBeDisabled();
   });
 
-  // Mirrors 'a together-and-apart clash is refused as it is typed', above.
-  test('a together-and-apart clash is refused as it is typed, in Indonesian', async ({
+  // Mirrors 'a gap warns but does not block' and 'a together-and-apart clash
+  // is refused as it is typed', above, in one visit as there.
+  test('a gap warns but does not block, in Indonesian; a together-and-apart clash is refused as it is typed, in Indonesian', async ({
     page,
   }) => {
     await openRoster(page, '/id/classroom-groups');
     await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
-    const row0 = page.locator('.cg-student').nth(0);
-    const row1 = page.locator('.cg-student').nth(1);
-    await row0.getByLabel('Bersama').selectOption('A');
-    await row1.getByLabel('Bersama').selectOption('A');
-    await row0.getByLabel('Terpisah').selectOption('A');
-    await row1.getByLabel('Terpisah').selectOption('A');
-    await expect(
-      page.getByText(/sudah ditandai untuk disatukan/),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Buat Kelompok' }),
-    ).toBeDisabled();
-  });
-
-  // Mirrors 'a gap warns but does not block', above.
-  test('a gap warns but does not block, in Indonesian', async ({ page }) => {
-    await openRoster(page, '/id/classroom-groups');
-    await tapOn(page.getByRole('button', { name: 'Tambah siswa' }));
     await typeInto(page.locator('.cg-student').nth(1).getByLabel('#'), '4');
-    await expect(page.getByText(/tampak belum lengkap/)).toBeVisible();
+    await expect.soft(page.getByText(/tampak belum lengkap/)).toBeVisible();
     await giveEveryoneASex(page);
     const go = page.getByRole('button', { name: 'Buat Kelompok' });
-    await expect(go).toBeEnabled();
+    await expect.soft(go).toBeEnabled();
     // And pressing it makes groups, as in English (#425).
     await tapOn(go);
-    await expect(page.locator('#cg-results .group').first()).toBeVisible();
+    await expect.soft(page.locator('#cg-results .group').first()).toBeVisible();
+
+    const row0 = page.locator('.cg-student').nth(0);
+    const row1 = page.locator('.cg-student').nth(1);
+    await chooseOption(row0.getByLabel('Bersama'), 'A');
+    await chooseOption(row1.getByLabel('Bersama'), 'A');
+    await chooseOption(row0.getByLabel('Terpisah'), 'A');
+    await chooseOption(row1.getByLabel('Terpisah'), 'A');
+    await expect
+      .soft(page.getByText(/sudah ditandai untuk disatukan/))
+      .toBeVisible();
+    // The press above renamed the button, so it is read by its id here.
+    await expect.soft(page.locator('#cg-go')).toBeDisabled();
   });
 
   // Stage 3, Task 6's own i18n requirement. Mirrors 'Student details
@@ -1637,13 +1441,9 @@ test.describe('Indonesian', () => {
  *
  * task-3-brief.md's own Step 1 snippet is reproduced below with two
  * corrections, not verbatim:
- *  - Every test that calls `page.setViewportSize` is tagged
- *    `@emulated-viewport`, per this stage's own global-constraints.md
- *    ("Any test that resizes the viewport must be tagged") -- the brief's
- *    literal code has no tag, which `tests/guards/viewport-tagging.test.ts`
- *    (a hard guard, not a style preference) would fail on: a real phone
- *    cannot resize itself, so an untagged resize test would run, and fail
- *    for a false reason, on `android-chrome`/`ios-safari`.
+ *  - Every test that wants a width asks for it through `atViewport`, which a
+ *    real phone (it cannot resize itself) leaves alone, so the test is
+ *    measured at the width the phone really has (#1046).
  *  - The "no horizontal scroll" test calls the existing `addSeveral` helper
  *    (already imported above, already every other test in this file's own
  *    way of driving "+ Add several…") instead of reproducing its three
@@ -1655,111 +1455,73 @@ const LAYOUTS = [
 ] as const;
 
 for (const { name, width } of LAYOUTS) {
-  test(
-    `${name}: every control is present with the same value`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await openRoster(page);
-      const row = page.locator('.cg-student').first();
-      // Read off the row, then compared with the six columns as a set (#390
-      // F133): a hand list of five never named the number field, so either
-      // layout could lose it and pass.
-      const controls = row.locator('input, select');
-      await expect(controls).toHaveCount(6);
-      const names = await controls.evaluateAll((all) =>
-        all.map((c) => c.getAttribute('aria-label')),
-      );
-      expect(names.sort()).toEqual(
-        ['#', 'Name', 'Sex', 'Absent', 'Together', 'Apart'].sort(),
-      );
-      for (const control of await controls.all())
-        await expect(control).toBeVisible();
-    },
-  );
+  // Read first, edited second: the six controls are counted, named and seen
+  // before anything is typed into them.
+  test(`${name}: every control is present with the same value; editing every field works`, async ({
+    page,
+  }) => {
+    await atViewport(page, { width, height: 900 });
+    await openRoster(page);
+    const row = page.locator('.cg-student').first();
+    // Read off the row, then compared with the six columns as a set (#390
+    // F133): a hand list of five never named the number field, so either
+    // layout could lose it and pass.
+    const controls = row.locator('input, select');
+    await expect.soft(controls).toHaveCount(6);
+    const names = await controls.evaluateAll((all) =>
+      all.map((c) => c.getAttribute('aria-label')),
+    );
+    expect
+      .soft(names.sort())
+      .toEqual(['#', 'Name', 'Sex', 'Absent', 'Together', 'Apart'].sort());
+    for (const control of await controls.all())
+      await expect.soft(control).toBeVisible();
 
-  test(
-    `${name}: editing every field works`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await openRoster(page);
-      const row = page.locator('.cg-student').first();
-      // All six (#390 F133): this edited four, never the number or Apart.
-      await typeInto(row.getByLabel('#', { exact: true }), '7');
-      await typeInto(row.getByLabel('Name'), 'Ana');
-      await row.getByLabel('Sex').selectOption('F');
-      await row.getByLabel('Together').selectOption('A');
-      await row.getByLabel('Apart').selectOption('A');
-      await setCheckedOn(row.getByLabel('Absent'));
-      await expect(row.getByLabel('#', { exact: true })).toHaveValue('7');
-      await expect(row.getByLabel('Name')).toHaveValue('Ana');
-      await expect(row.getByLabel('Sex')).toHaveValue('F');
-      await expect(row.getByLabel('Together')).toHaveValue('A');
-      await expect(row.getByLabel('Apart')).toHaveValue('A');
-      await expect(row.getByLabel('Absent')).toBeChecked();
-    },
-  );
+    // All six (#390 F133): this edited four, never the number or Apart.
+    await typeInto(row.getByLabel('#', { exact: true }), '7');
+    await typeInto(row.getByLabel('Name'), 'Ana');
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
+    await chooseOption(row.getByLabel('Apart'), 'A');
+    await setCheckedOn(row.getByLabel('Absent'));
+    await expect.soft(row.getByLabel('#', { exact: true })).toHaveValue('7');
+    await expect.soft(row.getByLabel('Name')).toHaveValue('Ana');
+    await expect.soft(row.getByLabel('Sex')).toHaveValue('F');
+    await expect.soft(row.getByLabel('Together')).toHaveValue('A');
+    await expect.soft(row.getByLabel('Apart')).toHaveValue('A');
+    await expect.soft(row.getByLabel('Absent')).toBeChecked();
+  });
 }
 
-// A second, related defect found via the SAME investigation as the loop
-// above's "editing every field works" (task-3-brief.md's own Step 1 test,
-// unmodified): two DIFFERENT rows' own text edits, NEITHER of which
-// re-renders on its own (`RosterHandlers`' own doc comment, roster-ui.ts --
-// "avoiding focus/caret theft"), used to stomp each other, because every
-// row built in one render shared the identical stale `roster` snapshot --
-// the second row's own patch was computed from a base that did not yet
-// know about the first row's edit, discarding it the moment the second
-// landed. Not part of the brief's own Step 1 (which only ever edits one
-// row at a time); added because the fix for the first bug (roster-ui.ts's
-// own `liveRoster`) fixes this one for free, and an unpinned fix is one
-// that can regress silently.
-test('editing two different rows by text, neither of which re-renders on its own, does not lose either', async ({
-  page,
-}) => {
-  await openRoster(page);
-  await addSeveral(page, 1);
-  const rows = page.locator('.cg-student');
-  await typeInto(rows.nth(0).getByLabel('Name'), 'Ana');
-  await typeInto(rows.nth(1).getByLabel('Name'), 'Budi');
-  await expect(rows.nth(0).getByLabel('Name')).toHaveValue('Ana');
-  await expect(rows.nth(1).getByLabel('Name')).toHaveValue('Budi');
-});
-
 // Every locale (#423): the card's other controls carry localised
-// placeholders, and they share the row with the name field.
+// placeholders, and they share the row with the name field; each row's
+// controls and the count carry the page's own copy. L-06, re-homed from
+// stage 2: that stage could not open Student details because it had no body,
+// so the row was untestable there. The name field is measured on the one
+// student, then that student is marked absent (the pill is the one extra
+// element in the tightest column on the narrowest layout), then the roster
+// grows to 100.
 for (const path of localePaths('/classroom-groups'))
-  test(
-    `cards: the name field takes the full remaining width -- ${path}`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await openRoster(page, path);
-      const { rosterColName } = getStrings(localeFromPath(path));
-      const card = (await page.locator('.cg-student').first().boundingBox())!;
-      const name = (await page
-        .locator('.cg-student')
-        .first()
-        .getByLabel(rosterColName, { exact: true })
-        .boundingBox())!;
-      expect(name.width).toBeGreaterThan(card.width * 0.6);
-    },
-  );
-
-// L-06, re-homed from stage 2: that stage could not open Student details
-// because it had no body, so the row was untestable there. Every locale
-// (#423): each row's controls and the count carry the page's own copy.
-for (const path of localePaths('/classroom-groups'))
-  test(
-    `cards: no horizontal scroll at 320px with 100 students -- ${path}`,
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 900 });
-      await openRoster(page, path);
-      await addSeveral(page, 99);
-      await expectNoHorizontalScroll(page);
-    },
-  );
+  test(`cards: the name field takes the full remaining width; no horizontal scroll at 320px once a student is marked absent, and with 100 students -- ${path}`, async ({
+    page,
+  }) => {
+    await atViewport(page, { width: 320, height: 900 });
+    await openRoster(page, path);
+    const { rosterColName, rosterColAbsent } = getStrings(localeFromPath(path));
+    const card = (await page.locator('.cg-student').first().boundingBox())!;
+    const name = (await page
+      .locator('.cg-student')
+      .first()
+      .getByLabel(rosterColName, { exact: true })
+      .boundingBox())!;
+    expect.soft(name.width).toBeGreaterThan(card.width * 0.6);
+    await setCheckedOn(
+      page.locator('.cg-student').first().getByLabel(rosterColAbsent),
+    );
+    await expectNoScrollSoft(page, 'a student marked absent');
+    await addSeveral(page, 99);
+    await expectNoScrollSoft(page, '100 students');
+  });
 
 /**
  * #249. The three roster dropdowns each carried a correct `aria-label` and
@@ -1783,9 +1545,25 @@ for (const path of localePaths('/classroom-groups'))
 test.describe('an unset roster dropdown says which column it is for', () => {
   const PLACEHOLDER_COLUMNS = ['Sex', 'Together', 'Apart'];
 
-  test('every unset dropdown shows its own column name', async ({ page }) => {
+  // T-06 -- claimed by no task's own traceability line (checked: it appears
+  // only in the plan's stage-level rollup, docs/superpowers/plans/2026-08-06-
+  // classroom-groups-v2-stage-3-student-details.md line 13), yet Task 2 is
+  // unambiguously the task that first renders the together/apart columns at
+  // all. Picked up here rather than left for a task that never claims it.
+  //
+  // One visit: what the dropdowns show while nothing is chosen comes first,
+  // before anything is pressed; then Sex and Together are chosen once, and
+  // what they show, how the lists grow and what the empty option does are
+  // all read from that.
+  test("every unset dropdown shows its own column name; choosing a value replaces the placeholder with the value; the empty option keeps each column's own behaviour; the Together and Apart lists grow", async ({
+    page,
+  }) => {
     await openRoster(page);
+    await tapOn(page.getByRole('button', { name: 'Add student' }));
     const row = page.locator('.cg-student').first();
+    const row1 = page.locator('.cg-student').nth(1);
+    const placeholder = (column: string) =>
+      row.getByLabel(column).locator('option[value=""]');
 
     // Derived from the row, never listed: a fourth dropdown added next year
     // is covered the day it appears. Written as an EQUALITY rather than a
@@ -1798,7 +1576,7 @@ test.describe('an unset roster dropdown says which column it is for', () => {
       ]),
     );
 
-    expect(shown).toEqual([
+    expect.soft(shown).toEqual([
       ['Sex', 'Sex'],
       ['Together', 'Together'],
       ['Apart', 'Apart'],
@@ -1810,35 +1588,64 @@ test.describe('an unset roster dropdown says which column it is for', () => {
     // passes on a control the page forgot to show (#188).
     for (const column of PLACEHOLDER_COLUMNS) {
       const select = row.getByLabel(column);
-      await expect(select).toBeVisible();
-      await expect(select).toHaveValue('');
-      await expect(select.locator('option:checked')).toHaveText(column);
+      await expect.soft(select).toBeVisible();
+      await expect.soft(select).toHaveValue('');
+      await expect.soft(select.locator('option:checked')).toHaveText(column);
     }
 
+    // While nothing is chosen every placeholder can be selected.
+    for (const column of PLACEHOLDER_COLUMNS) {
+      await expect.soft(placeholder(column)).toBeEnabled();
+    }
+
+    // The first entry of every list is the empty option, which since #249
+    // carries the column's own name rather than an em dash -- a teacher could
+    // not see what a collapsed dropdown was for. It is asserted as a member of
+    // the exact set, not skipped: it is still an option and still leads.
+    await expect
+      .soft(row.getByLabel('Together').locator('option'))
+      .toHaveText(['Together', 'A']);
+
     await shoot(page, 'Every unset roster dropdown names its own column', row);
-  });
 
-  test('choosing a value replaces the placeholder with the value', async ({
-    page,
-  }) => {
-    await openRoster(page);
-    const row = page.locator('.cg-student').first();
+    await chooseOption(row.getByLabel('Sex'), 'F');
+    await chooseOption(row.getByLabel('Together'), 'A');
 
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
-
-    await expect(row.getByLabel('Sex').locator('option:checked')).toHaveText(
-      'F',
-    );
-    await expect(
-      row.getByLabel('Together').locator('option:checked'),
-    ).toHaveText('A');
+    await expect
+      .soft(row.getByLabel('Sex').locator('option:checked'))
+      .toHaveText('F');
+    await expect
+      .soft(row.getByLabel('Together').locator('option:checked'))
+      .toHaveText('A');
 
     // Apart was left alone, so it still names its column -- which also shows
     // the placeholder is per-control and not a property of the whole row.
-    await expect(row.getByLabel('Apart').locator('option:checked')).toHaveText(
-      'Apart',
-    );
+    await expect
+      .soft(row.getByLabel('Apart').locator('option:checked'))
+      .toHaveText('Apart');
+
+    // Sex is one-way by design (operator, 2026-08-13): the placeholder says
+    // "not answered yet" and is not itself an answer, so it stops being
+    // selectable once answered. Together and Apart are not one-way -- a
+    // teacher must be able to clear a pairing letter.
+    await expect.soft(placeholder('Sex')).toBeDisabled();
+    await expect.soft(placeholder('Together')).toBeEnabled();
+    await expect.soft(placeholder('Apart')).toBeEnabled();
+
+    // The dropdown grows as needed -- B appears once A is used. Every row's
+    // own dropdown grows, not only the one A was just set on.
+    await expect
+      .soft(row.getByLabel('Together').locator('option'))
+      .toHaveText(['Together', 'A', 'B']);
+    await expect
+      .soft(row1.getByLabel('Together').locator('option'))
+      .toHaveText(['Together', 'A', 'B']);
+    // Together and apart grow independently. Apart has had nothing set on it
+    // yet, so it must still offer only A -- a shared counter across both
+    // fields would leak Together's own use into Apart's own list.
+    await expect
+      .soft(row.getByLabel('Apart').locator('option'))
+      .toHaveText(['Apart', 'A']);
   });
 
   /**
@@ -1860,13 +1667,16 @@ test.describe('an unset roster dropdown says which column it is for', () => {
   // table, so both layouts are measured, and 600px and 430px sit inside the
   // card band that used to be the table's.
   const TRUNCATION_WIDTHS = [320, 375, 390, 430, 600, 768, 1024, 1280];
+  // Its widths inside one test since #1086 (Shyden 2026-11-13): a real phone
+  // keeps its own width (#1046), so it walks this once.
   for (const path of localePaths('/classroom-groups'))
-    for (const width of TRUNCATION_WIDTHS)
-      test(
-        `no dropdown ever truncates its own column name -- ${path} at ${width}px`,
-        { tag: '@emulated-viewport' },
-        async ({ page }) => {
-          await page.setViewportSize({ width, height: 900 });
+    test(`no dropdown ever truncates its own column name -- ${path} at every width`, async ({
+      page,
+    }) => {
+      await eachWidth(
+        page,
+        TRUNCATION_WIDTHS.map((width) => ({ width, height: 900 })),
+        async () => {
           await openRoster(page, path);
           const row = page.locator('.cg-student').first();
           const boxes = await row.evaluate((el) =>
@@ -1908,98 +1718,72 @@ test.describe('an unset roster dropdown says which column it is for', () => {
           ).toEqual([]);
         },
       );
-
-  test("the empty option keeps each column's own behaviour", async ({
-    page,
-  }) => {
-    await openRoster(page);
-    const row = page.locator('.cg-student').first();
-    const placeholder = (column: string) =>
-      row.getByLabel(column).locator('option[value=""]');
-
-    // While nothing is chosen every placeholder can be selected.
-    for (const column of PLACEHOLDER_COLUMNS) {
-      await expect(placeholder(column)).toBeEnabled();
-    }
-
-    await row.getByLabel('Sex').selectOption('F');
-    await row.getByLabel('Together').selectOption('A');
-
-    // Sex is one-way by design (operator, 2026-08-13): the placeholder says
-    // "not answered yet" and is not itself an answer, so it stops being
-    // selectable once answered. Together and Apart are not one-way -- a
-    // teacher must be able to clear a pairing letter.
-    await expect(placeholder('Sex')).toBeDisabled();
-    await expect(placeholder('Together')).toBeEnabled();
-    await expect(placeholder('Apart')).toBeEnabled();
-  });
+    });
 });
 
 test.describe('the roster dropdowns are still reachable by thumb (#249)', () => {
   // Every locale (#423): the placeholders ARE the localised copy, and each
   // language's column names differ in width.
   for (const path of localePaths('/classroom-groups'))
-    test(
-      `every roster control meets the 44px touch target with a placeholder showing -- ${path}`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        // #249 put a WORD where a dash used to be, and a `<select>` sizes
-        // itself to its widest option. The existing 44px sweep
-        // ('every control meets the 44px touch target',
-        // classroom-groups-controls.spec.ts) measures `#cg-form` only, and runs
-        // before any roster exists -- so nothing had ever measured these three.
-        //
-        // Measured with the placeholder SHOWING, which is the state this ticket
-        // created: a chosen value is one or two characters, the placeholder is
-        // a whole column name, and only the wider one can push a row.
-        await page.setViewportSize({ width: 375, height: 900 });
-        await openRoster(page, path);
-        await addSeveral(page, 3);
+    test(`every roster control meets the 44px touch target with a placeholder showing -- ${path}`, async ({
+      page,
+    }) => {
+      // #249 put a WORD where a dash used to be, and a `<select>` sizes
+      // itself to its widest option. The existing 44px sweep
+      // ('every control meets the 44px touch target',
+      // classroom-groups-controls.spec.ts) measures `#cg-form` only, and runs
+      // before any roster exists -- so nothing had ever measured these three.
+      //
+      // Measured with the placeholder SHOWING, which is the state this ticket
+      // created: a chosen value is one or two characters, the placeholder is
+      // a whole column name, and only the wider one can push a row.
+      await atViewport(page, { width: 375, height: 900 });
+      await openRoster(page, path);
+      await addSeveral(page, 3);
 
-        const controls = page.locator(
-          '#cg-roster tbody tr select, #cg-roster tbody tr input',
-        );
-        // Liveness is the controls MEASURED, which is the rendered ones. A
-        // `controls.count()` beside it counted every match, hidden ones too,
-        // so a roster whose controls all stopped rendering measured nothing
-        // and passed (#446). Three rows carry controls, so an empty set here
-        // is a broken selector or a page that hides them.
-        const measured = await controls.evaluateAll((els) =>
-          els
-            // `getClientRects()`, never the element's own computed display: a
-            // `display: none` ANCESTOR leaves a descendant's computed display
-            // untouched, so a per-element check reports hidden content as
-            // rendered.
-            .filter((el) => el.getClientRects().length > 0)
-            .map((el) => {
-              // A checkbox is deliberately small: the LABEL around it is the
-              // tap target, the same convention as `.switch` and every radio
-              // on this page ('the two sex switches meet the 44px touch
-              // target once open', classroom-groups-controls.spec.ts).
-              // Measuring the raw input reports a defect the page does not
-              // have -- it read 20.8px here before this was written.
-              const target =
-                el instanceof HTMLInputElement && el.type === 'checkbox'
-                  ? (el.closest('label') ?? el)
-                  : el;
-              return {
-                what: `${el.tagName.toLowerCase()}[${
-                  el.getAttribute('aria-label') ?? el.id ?? '?'
-                }]`,
-                height:
-                  Math.round(target.getBoundingClientRect().height * 10) / 10,
-              };
-            }),
-        );
-        const small = measured.filter((c) => c.height < 44);
-
-        expect(
-          searched(small, {
-            of: measured,
-            what: 'rendered roster controls',
+      const controls = page.locator(
+        '#cg-roster tbody tr select, #cg-roster tbody tr input',
+      );
+      // Liveness is the controls MEASURED, which is the rendered ones. A
+      // `controls.count()` beside it counted every match, hidden ones too,
+      // so a roster whose controls all stopped rendering measured nothing
+      // and passed (#446). Three rows carry controls, so an empty set here
+      // is a broken selector or a page that hides them.
+      const measured = await controls.evaluateAll((els) =>
+        els
+          // `getClientRects()`, never the element's own computed display: a
+          // `display: none` ANCESTOR leaves a descendant's computed display
+          // untouched, so a per-element check reports hidden content as
+          // rendered.
+          .filter((el) => el.getClientRects().length > 0)
+          .map((el) => {
+            // A checkbox is deliberately small: the LABEL around it is the
+            // tap target, the same convention as `.switch` and every radio
+            // on this page ('the two sex switches meet the 44px touch
+            // target once open', classroom-groups-controls.spec.ts).
+            // Measuring the raw input reports a defect the page does not
+            // have -- it read 20.8px here before this was written.
+            const target =
+              el instanceof HTMLInputElement && el.type === 'checkbox'
+                ? (el.closest('label') ?? el)
+                : el;
+            return {
+              what: `${el.tagName.toLowerCase()}[${
+                el.getAttribute('aria-label') ?? el.id ?? '?'
+              }]`,
+              height:
+                Math.round(target.getBoundingClientRect().height * 10) / 10,
+            };
           }),
-          small.map((c) => `${c.what} is ${c.height}px`).join('\n'),
-        ).toEqual([]);
-      },
-    );
+      );
+      const small = measured.filter((c) => c.height < 44);
+
+      expect(
+        searched(small, {
+          of: measured,
+          what: 'rendered roster controls',
+        }),
+        small.map((c) => `${c.what} is ${c.height}px`).join('\n'),
+      ).toEqual([]);
+    });
 });

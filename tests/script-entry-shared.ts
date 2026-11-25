@@ -23,6 +23,33 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/closing-keywords.mjs',
   },
+  // Without a context and a description it prints its usage and refuses
+  // (#444).
+  'commit-status.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/commit-status.mjs',
+  },
+  // Without a project to set it prints its usage and refuses before any
+  // request reaches Cloudflare (#907, #1258).
+  'pages-runtime.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/pages-runtime.mjs',
+  },
+  // It takes no arguments, and refuses one before it reads the run or asks
+  // GitHub anything (#725, #1258).
+  'deploy-failure.mjs': {
+    args: ['--no-such-flag'],
+    status: 2,
+    says: 'usage: node scripts/deploy-failure.mjs',
+  },
+  // Without a command and a project it prints its usage and refuses (#748).
+  'pages.mjs': {
+    args: [],
+    status: 2,
+    says: 'usage: node scripts/pages.mjs',
+  },
   // Without a directory to scan it prints its usage and refuses (#1040).
   'placeholders.mjs': {
     args: [],
@@ -59,6 +86,12 @@ export const PROBES: Readonly<Record<string, Probe>> = {
   },
   // With nowhere to hand its verdict on, it refuses rather than decide
   // nothing, which would leave the browser jobs to a missing output (#582).
+  // With no report to read there is no verdict, so it refuses (#851).
+  'sonar-verdict.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/sonar-verdict.mjs',
+  },
   'docs-only.mjs': {
     args: [],
     env: { GITHUB_OUTPUT: undefined },
@@ -112,13 +145,6 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: ['--no-such-flag'],
     status: 1,
     says: 'usage: test-devices.mjs [--ios] (got --no-such-flag)',
-  },
-  // With no `docker` on PATH it refuses rather than compare nothing (#202).
-  'visual.mjs': {
-    args: [],
-    env: { PATH: '/nonexistent' },
-    status: 1,
-    says: 'docker is not available',
   },
   // The three that did all their work at module scope until #276. Each refuses
   // on `argv` alone, before it reads the cache or the catalogue, so the probe
@@ -184,13 +210,18 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: node scripts/dependabot-labels.mjs',
   },
-  // Without a token and an account it has nothing to prove, so it refuses
-  // with the usage before any request reaches Cloudflare (#415).
+  // Without a token, its account id and the dev account it has nothing to
+  // prove, so it refuses with the usage before any request reaches
+  // Cloudflare (#415, #501).
   'token-reach.mjs': {
     args: [],
-    env: { CLOUDFLARE_API_TOKEN: undefined, CLOUDFLARE_ACCOUNT_ID: undefined },
+    env: {
+      CLOUDFLARE_API_TOKEN: undefined,
+      CLOUDFLARE_ACCOUNT_ID: undefined,
+      DEV_CLOUDFLARE_ACCOUNT_ID: undefined,
+    },
     status: 1,
-    says: 'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
+    says: 'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… DEV_CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
   },
   // It takes no arguments, and refuses one before it reads the lockfile or
   // asks mcr.microsoft.com anything (#454).
@@ -239,5 +270,19 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     args: [],
     status: 1,
     says: 'usage: visual-capture.mjs',
+  },
+  // It takes no arguments, so any argument is refused with its usage before
+  // it builds anything or starts a server (#1158).
+  'capture-previews.mjs': {
+    args: ['--refuse-me'],
+    status: 2,
+    says: 'usage: node scripts/capture-previews.mjs',
+  },
+  // Without `--inside` it is not the container's entry, so it refuses with
+  // its usage before it installs anything or opens a port (#1027).
+  'desktop-container.mjs': {
+    args: [],
+    status: 1,
+    says: 'usage: node scripts/desktop-container.mjs',
   },
 };

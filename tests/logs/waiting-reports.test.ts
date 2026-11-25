@@ -33,8 +33,8 @@ describe('the statement it reads and the sentence it posts', () => {
     expect(NOT_ON_MAIN_NOTICE).toBe(
       'The waiting-reports count was not started: `main` has no ' +
         '`.github/workflows/waiting-reports.yml`, so the scheduled run could ' +
-        'not start it, and no count was read. Until the first release puts ' +
-        'the file on `main`, this is expected.',
+        'not start it, and no count was read. A release has put it on `main` ' +
+        'before, so this is not expected: check what took it off.',
     );
     expect(NOT_ON_MAIN_NOTICE).not.toMatch(/\d/);
   });

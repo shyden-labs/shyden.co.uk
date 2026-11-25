@@ -37,10 +37,7 @@ describe('install-hooks', () => {
     const { code, out, err } = install();
 
     expect(err).toBe('');
-    expect(out).toBe(
-      'install-hooks: git will run the hooks in .githooks/. ' +
-        'Bypass one with --no-verify.\n',
-    );
+    expect(out).toBe('install-hooks: git will run the hooks in .githooks/.\n');
     expect(git(['config', 'core.hooksPath']).trim()).toBe('.githooks');
     expect(code).toBe(0);
   });

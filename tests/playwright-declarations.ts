@@ -5,10 +5,9 @@ import { withoutTsComments } from './unit/source-text';
 /**
  * Playwright's declarations, read from the parse tree (#218).
  *
- * Five guards read calls from here: viewport-tagging, isolated-context-tagging
+ * Four guards read calls from here: viewport-tagging, isolated-context-tagging
  * and parked-tests, to read what the test a call sits in is tagged or parked
- * as; event-collectors, to read whether a locator list was proved non-empty in
- * the test that loops over it; and download-readers, which replaced
+ * as; and download-readers, which replaced
  * download-tagging in #308, to find every read of a download's bytes. Each
  * used to find `test(` in spec text with a regex, on the
  * premise that no parser was available -- false since #115 made `typescript`

@@ -8,8 +8,9 @@ import {
 import { layoutWidthsFrom } from '../layout-widths';
 import { searched } from '../source-files';
 import { PUBLISHED_ROUTES } from './published-paths';
-import { docsPaths } from '../site-pages';
+import { docsPaths, privacyPaths, ticketPaths } from '../site-pages';
 import { recorded, shoot } from './evidence';
+import { atViewport } from '../viewport-at';
 
 test.use(recorded);
 
@@ -179,14 +180,15 @@ const collisions = (row: Row): string[] => {
  * What one test measures, row by row: the collisions, the rows (by content:
  * the names of the items found), and the rows or pages that measured too
  * little to mean anything. The test owns the loop and every resize, so each
- * resize sits in the body of a test tagged `@emulated-viewport`.
+ * resize goes through `atViewport`, so a phone is measured at its own width.
  */
 const survey = (locale: Locale, localised: boolean) => {
   const findings: string[] = [];
   const rows: string[] = [];
   const thin: string[] = [];
   // Wordmark, menu or nav, theme switch, language switcher; an English-only
-  // page (the API docs, #781) has no switcher by decision, so three.
+  // page (the API docs #781, the ticket page, the privacy page) has no
+  // switcher by decision, so three.
   const least = localised ? 4 : 3;
   // The theme switch by its own name (#142): a row without it has not
   // measured the room AC5 asks for.
@@ -236,30 +238,39 @@ test.describe('the header row has room for everything in it (#329)', () => {
   // measured as an English page.
   for (const path of PUBLISHED_ROUTES) {
     const locale = localeFromPath(path);
-    test(
-      `${path}: no header item overlaps another, at any width`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        const header = survey(locale, !docsPaths().includes(path));
-        // runtime population: the widths this page's own CSS can lay out,
-        // read from the media queries it serves, so only the loaded page
-        // knows them (#422).
-        for (const width of await header.open(page, path)) {
-          await page.setViewportSize({ width, height: 800 });
-          await header.measure(page, `${path} at ${width}px`);
-        }
-        header.expectRoom();
-        // The picture comes after the verdict, so it shows a row that passed.
-        // The release evidence cites every page here, so every page takes it
-        // (#774: a cited case that captured nothing is fixed, never dropped).
-        await header.open(page, path);
-        await page.setViewportSize({ width: 320, height: 800 });
-        await shoot(
-          page,
-          `${path} at 320px: the header row`,
-          page.locator('header'),
-        );
-      },
-    );
+    test(`${path}: no header item overlaps another, at any width`, async ({
+      page,
+    }) => {
+      // The API docs, the support ticket page (#1032) and the privacy page
+      // (#1080) are English only, with no language switcher in their header.
+      const header = survey(
+        locale,
+        ![...docsPaths(), ...ticketPaths(), ...privacyPaths()].includes(path),
+      );
+      // runtime population: the widths this page's own CSS can lay out,
+      // read from the media queries it serves, so only the loaded page
+      // knows them (#422).
+      // A target with one fixed screen cannot take them, so it is measured at
+      // the width it has, once (#1046): the widths asked for collapse to the
+      // widths the page really took.
+      const measured = new Set<number>();
+      for (const width of await header.open(page, path)) {
+        const took = await atViewport(page, { width, height: 800 });
+        if (measured.has(took.width)) continue;
+        measured.add(took.width);
+        await header.measure(page, `${path} at ${took.width}px`);
+      }
+      header.expectRoom();
+      // The picture comes after the verdict, so it shows a row that passed.
+      // The release evidence cites every page here, so every page takes it
+      // (#774: a cited case that captured nothing is fixed, never dropped).
+      await header.open(page, path);
+      const took = await atViewport(page, { width: 320, height: 800 });
+      await shoot(
+        page,
+        `${path} at ${took.width}px: the header row`,
+        page.locator('header'),
+      );
+    });
   }
 });

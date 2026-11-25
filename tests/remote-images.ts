@@ -143,7 +143,7 @@ export function namesModule(source: string, name: string): boolean {
 
 /** Every script under `dir` that names `name` as a module specifier, relative to `dir`, sorted. */
 export function importersIn(dir: string, name: string): string[] {
-  // The one walk home, which also refuses an empty walk (one-home.test.ts).
+  // The one walk home, which also refuses an empty walk.
   return filesUnder(dir, (path) => /\.(m|c)?js$/.test(path))
     .filter((path) => namesModule(readFileSync(path, 'utf8'), name))
     .map((path) => relative(dir, path));

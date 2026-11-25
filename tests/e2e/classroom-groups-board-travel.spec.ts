@@ -16,6 +16,7 @@ import {
   FOLD_MS,
   travelSchedule,
 } from '../../src/lib/travel';
+import { atViewport } from '../viewport-at';
 
 /**
  * The board deals by moving each student from the waiting list into their
@@ -27,6 +28,8 @@ import {
 test.use(recorded);
 
 const COUNT = 12;
+/** The class the mid-deal Shuffle test deals: long enough for a real tap to land mid-deal (#1045). */
+const MID_DEAL_COUNT = 30;
 
 const bar = (page: Page) => page.locator('#cg-board-bar');
 const board = (page: Page) => page.locator('#cg-board');
@@ -71,6 +74,11 @@ type Gap = { ms: number; before: number; after: number };
 type Samples = {
   students: [number, Tally][];
   flights: Flight[];
+  /**
+   * Every student whose row the page set travelling, from a MutationObserver
+   * (#940): the page's own changes, which no frame rate can miss.
+   */
+  took: number[];
   gap: Gap;
   /** The same, counted only from the first student's flight on: the deal itself. */
   flightGap: Gap;
@@ -101,20 +109,6 @@ type Samples = {
 const FRAME_GAP_CEILING_MS = 250;
 
 /**
- * mobile-safari draws the frame test at pixel ratio 1, not its iPhone 13's 3
- * (Shyden, 2026-10-20, #856). CI's WebKit paints in software, so ratio 3 is 9x
- * the pixels per frame, and the gaps follow the pixels: over 80 runs each,
- * ratio 3 gave 58-314 ms in flight (8 over 250), ratio 1 gave 21-62 ms (none),
- * with tracing off (probe runs 39392029935 and 39406394146). The deal runs the
- * same code at any ratio, so a blank we cause is still caught; real-device
- * painting at ratio 3 is the real iPhone's to judge. Every other engine keeps
- * its device's own ratio.
- */
-const FRAME_TEST_PIXEL_RATIO: Readonly<Record<string, number>> = {
-  'mobile-safari': 1,
-};
-
-/**
  * Every animation frame until stopped: for each student, whether their chip
  * (laid out and not `visibility: hidden`) and their row (laid out, computed
  * opacity above 0) can be seen, and for a frame that shows a student nowhere
@@ -128,6 +122,25 @@ const startSampler = (page: Page) =>
     const measure = new Function(measureScript) as () => BoardGeometry;
     const tally = new Map<number, Tally>();
     const flights: Flight[] = [];
+    // Every row the page sets travelling, from its own class changes (#940).
+    // A record's old value still holds the class when the page added and
+    // removed it within one task, before any frame or this callback ran.
+    const took = new Set<number>();
+    const travelling = (el: Element, classes: string | null) =>
+      el.classList.contains('student') &&
+      (el.classList.contains('travelling') ||
+        (classes ?? '').split(/\s+/).includes('travelling'));
+    const observer = new MutationObserver((records) => {
+      for (const r of records)
+        if (r.target instanceof HTMLElement && travelling(r.target, r.oldValue))
+          took.add(Number(r.target.dataset.number));
+    });
+    observer.observe(document.getElementById('cg-board')!, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+      attributeOldValue: true,
+    });
     let on = true;
     let frame = 0;
     const start = performance.now();
@@ -260,9 +273,14 @@ const startSampler = (page: Page) =>
     requestAnimationFrame(tick);
     (window as unknown as { stopSampler: () => Samples }).stopSampler = () => {
       on = false;
+      for (const r of observer.takeRecords())
+        if (r.target instanceof HTMLElement && travelling(r.target, r.oldValue))
+          took.add(Number(r.target.dataset.number));
+      observer.disconnect();
       return {
         students: [...tally],
         flights,
+        took: [...took].sort((a, b) => a - b),
         gap,
         flightGap,
         slowestTick: Math.round(slowestTick),
@@ -298,10 +316,10 @@ const stopSampler = (page: Page): Promise<Samples> =>
   );
 
 /** The deal has ended: the list gone, every row seated, nothing moving. */
-const expectDealt = async (page: Page) => {
+const expectDealt = async (page: Page, count = COUNT) => {
   await expect(board(page).locator('#cg-waiting')).toHaveCount(1);
   await expect(board(page).locator('#cg-waiting')).toBeHidden();
-  await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+  await expect(board(page).locator('.student.dealt')).toHaveCount(count);
   await page.waitForFunction(() => document.getAnimations().length === 0);
 };
 
@@ -358,25 +376,14 @@ const animationsMade = (page: Page): Promise<Made[]> =>
 
 test.describe('the board deals by moving students into their cards', () => {
   test.describe('frame by frame', () => {
-    test.use({
-      deviceScaleFactor: async ({}, use, testInfo) =>
-        use(
-          FRAME_TEST_PIXEL_RATIO[testInfo.project.name] ??
-            testInfo.project.use.deviceScaleFactor,
-        ),
-    });
-
     test('every student is seen exactly once at every frame, chip then row', async ({
       page,
     }) => {
       await openWaitingBoard(page, String(COUNT), '4');
-      // The ratio the page really draws at, so the override cannot stop
-      // applying unseen: its project's own, or the frame test's from above.
-      // A real phone over CDP draws at its own ratio (3.5 on the Android)
-      // and no ratio can be set there, so its project must name none (#908).
-      const project = test.info().project;
-      const set =
-        FRAME_TEST_PIXEL_RATIO[project.name] ?? project.use.deviceScaleFactor;
+      // The ratio the page really draws at is its project's own. A real
+      // phone over CDP draws at its own ratio (3.5 on the Android) and no
+      // ratio can be set there, so its project must name none (#908).
+      const set = test.info().project.use.deviceScaleFactor;
       if (onRealDevice())
         expect(set, 'no ratio can be set on a real phone').toBeUndefined();
       else
@@ -433,40 +440,84 @@ test.describe('the board deals by moving students into their cards', () => {
     });
   });
 
-  test('the list keeps its size while students travel, then folds away', async ({
+  test("a deal holds the list and the cards still, a second Shuffle deals again, and the fit is a fresh board's", async ({
     page,
   }) => {
     await openWaitingBoard(page, String(COUNT), '4');
     await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const { flights } = await stopSampler(page);
-    const first = flights[0]?.listHeight;
-    const { travelled, during } = judgedPerStudent(
-      flights,
-      (f) => f.listHeight !== first,
-    );
-    expect(
-      searched(during, { of: travelled, what: 'students seen travelling' }),
-      'students during whose flight the list changed height',
-    ).toEqual([]);
-  });
+    const { flights, took } = await stopSampler(page);
 
-  test('the cards hold still while students travel', async ({ page }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
+    // Every dealt student travels, counted from the page's own class changes
+    // (#940), never from frames: a flight that starts and lands between two
+    // sampled frames is still counted.
+    expect
+      .soft(took, 'students the page set travelling')
+      .toEqual(Array.from({ length: COUNT }, (_, i) => i + 1));
+    const seen = new Set(flights.flatMap((f) => f.flying));
+    const unsampled = took.filter((n) => !seen.has(n));
+    if (unsampled.length > 0)
+      test.info().annotations.push({
+        type: 'flights no frame caught',
+        description: `${unsampled.join(', ')} of ${took.length}: their in-flight checks below have no frame to judge`,
+      });
+
+    // The list keeps its size while students travel, then folds away.
+    const firstHeight = flights[0]?.listHeight;
+    const list = judgedPerStudent(flights, (f) => f.listHeight !== firstHeight);
+    expect
+      .soft(
+        searched(list.during, {
+          of: list.travelled,
+          what: 'students seen travelling',
+        }),
+        'students during whose flight the list changed height',
+      )
+      .toEqual([]);
+
+    // The cards hold still while students travel.
+    const firstCards = flights[0]?.cards;
+    const cards = judgedPerStudent(flights, (f) => f.cards !== firstCards);
+    expect
+      .soft(
+        searched(cards.during, {
+          of: cards.travelled,
+          what: 'students seen travelling',
+        }),
+        'students during whose flight a card moved or changed size',
+      )
+      .toEqual([]);
+
+    // A second Shuffle returns everyone to the list, then deals again.
     await startSampler(page);
-    await press(page, 'Make Groups');
+    await press(page, 'Shuffle again');
+    await expect.soft(board(page).locator('#cg-waiting')).toBeVisible();
+    await expect
+      .soft(board(page).locator('.waiting-student'))
+      .toHaveCount(COUNT);
     await expectDealt(page);
-    const { flights } = await stopSampler(page);
-    const first = flights[0]?.cards;
-    const { travelled, during } = judgedPerStudent(
-      flights,
-      (f) => f.cards !== first,
-    );
-    expect(
-      searched(during, { of: travelled, what: 'students seen travelling' }),
-      'students during whose flight a card moved or changed size',
-    ).toEqual([]);
+    const { students } = await stopSampler(page);
+    expect
+      .soft(
+        searched(
+          students.filter(([, t]) => t.both > 0 || t.none > 0),
+          { of: students, what: 'students sampled' },
+        ),
+        'students seen twice, or nowhere, in one frame',
+      )
+      .toEqual([]);
+
+    // The fit after the fold is the fit a fresh board gets.
+    const font = async () =>
+      parseFloat((await page.evaluate(measureBoard)).font);
+    const afterFold = await font();
+    await page.keyboard.press('Escape');
+    // Exact: while the board closes, its own "Exit full screen" matches too.
+    await tapOn(page.getByRole('button', { name: 'Full screen', exact: true }));
+    await expect.soft(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+    expect.soft(await font()).toBe(afterFold);
+    expect.soft(afterFold).toBeGreaterThanOrEqual(FLOOR_PX);
   });
 
   test('the schedule is the one travelSchedule states', async ({ page }) => {
@@ -501,27 +552,6 @@ test.describe('the board deals by moving students into their cards', () => {
       description: `${wall} ms against ${schedule.totalMs} ms scheduled`,
     });
     expect(wall).toBeGreaterThanOrEqual(schedule.totalMs);
-  });
-
-  test('a second Shuffle returns everyone to the list, then deals again', async ({
-    page,
-  }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
-    await press(page, 'Make Groups');
-    await expectDealt(page);
-    await startSampler(page);
-    await press(page, 'Shuffle again');
-    await expect(board(page).locator('#cg-waiting')).toBeVisible();
-    await expect(board(page).locator('.waiting-student')).toHaveCount(COUNT);
-    await expectDealt(page);
-    const { students } = await stopSampler(page);
-    expect(
-      searched(
-        students.filter(([, t]) => t.both > 0 || t.none > 0),
-        { of: students, what: 'students sampled' },
-      ),
-      'students seen twice, or nowhere, in one frame',
-    ).toEqual([]);
   });
 
   test('a Shuffle pressed while students travel starts again, and nobody is seen twice', async ({
@@ -559,7 +589,11 @@ test.describe('the board deals by moving students into their cards', () => {
   test('a board Shuffle mid-deal starts from the top, and the abandoned deal lands nobody', async ({
     page,
   }) => {
-    await openWaitingBoard(page, String(COUNT), '4');
+    // A real tap on the phone takes about 1.2 s from call to touch, and a
+    // deal of COUNT lands its last student about 1 s after the third
+    // (measured, #1045): the press came after the deal. A class this size
+    // deals for about 3.3 s, so the press still falls mid-deal.
+    await openWaitingBoard(page, String(MID_DEAL_COUNT), '4');
     await press(page, 'Make Groups');
     await expectThirdLanding(page);
     const shuffle = bar(page).getByRole('button', { name: 'Shuffle again' });
@@ -626,11 +660,14 @@ test.describe('the board deals by moving students into their cards', () => {
           }>,
       );
     // The press fell mid-deal: some of the old deal had yet to land.
-    expect(pressed.unlandedAtPress).toBeGreaterThan(0);
+    expect(
+      pressed.unlandedAtPress,
+      `the press must land mid-deal, but all ${MID_DEAL_COUNT} students had landed before it arrived: the press was slower than the deal`,
+    ).toBeGreaterThan(0);
     // From the top: nobody of the new deal is seated, everyone waits.
     expect(pressed.freshDealt).toBe(0);
-    expect(pressed.chipsWaiting).toBe(COUNT);
-    await expectDealt(page);
+    expect(pressed.chipsWaiting).toBe(MID_DEAL_COUNT);
+    await expectDealt(page, MID_DEAL_COUNT);
     // A row of the abandoned deal that gains `.dealt` after the press was
     // landed by it, and its land sound plays in the same callback
     // (`board-travel.ts`, the flight's `finished` handler).
@@ -737,41 +774,22 @@ test.describe('the board deals by moving students into their cards', () => {
     ).toEqual([]);
   });
 
-  test(
-    'at 320px nothing scrolls sideways while students travel',
-    { tag: '@emulated-viewport' },
-    async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 640 });
-      await openWaitingBoard(page, String(COUNT), '4');
-      await startSampler(page);
-      await press(page, 'Make Groups');
-      await expectDealt(page);
-      const { flights } = await stopSampler(page);
-      const { travelled, during } = judgedPerStudent(
-        flights,
-        (f) => f.overflow > 0,
-      );
-      expect(
-        searched(during, { of: travelled, what: 'students seen travelling' }),
-        'students during whose flight the board scrolled sideways',
-      ).toEqual([]);
-    },
-  );
-
-  test('the fit after the fold is the fit a fresh board gets', async ({
+  test('at 320px nothing scrolls sideways while students travel', async ({
     page,
   }) => {
+    await atViewport(page, { width: 320, height: 640 });
     await openWaitingBoard(page, String(COUNT), '4');
+    await startSampler(page);
     await press(page, 'Make Groups');
     await expectDealt(page);
-    const font = async () =>
-      parseFloat((await page.evaluate(measureBoard)).font);
-    const afterFold = await font();
-    await page.keyboard.press('Escape');
-    // Exact: while the board closes, its own "Exit full screen" matches too.
-    await tapOn(page.getByRole('button', { name: 'Full screen', exact: true }));
-    await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
-    expect(await font()).toBe(afterFold);
-    expect(afterFold).toBeGreaterThanOrEqual(FLOOR_PX);
+    const { flights } = await stopSampler(page);
+    const { travelled, during } = judgedPerStudent(
+      flights,
+      (f) => f.overflow > 0,
+    );
+    expect(
+      searched(during, { of: travelled, what: 'students seen travelling' }),
+      'students during whose flight the board scrolled sideways',
+    ).toEqual([]);
   });
 });

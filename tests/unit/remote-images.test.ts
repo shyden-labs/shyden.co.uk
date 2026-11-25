@@ -193,8 +193,26 @@ describe('the build fetches no remote image while the cache is unfixed (#457)', 
  * build/remote.js, utils/redirectValidation.js, internal.js,
  * services/service.js and the config schema are 7.4.4's, minified on both
  * sides, on the same internal-helpers 0.13.0.
+ * Re-read on 7.4.7 (2026-11-10, Dependabot #1093, #1114): the same five
+ * files and the config schemas (base, refined, refined-validators) are
+ * 7.4.5's, minified on both sides; build/remote.js is still the library's
+ * only importer. internal-helpers moved to 0.13.1: its remote.js
+ * (isRemoteAllowed) is 0.13.0's byte for byte, and only path.js changed (case
+ * folding in the directory-containment check, now on Windows paths alone),
+ * which the remote-image gate does not use.
+ * Re-read on 7.4.11 (2026-11-16, Dependabot #1171): the same five files and
+ * refined/refined-validators differ from 7.4.7's only in import lines (errors
+ * and runtime helpers now come from the new @astrojs/runtime package);
+ * build/remote.js is still the library's only importer. In base.js only
+ * publicDir, site, compressHTML and trailingSlash changed (they now reuse
+ * AstroPluginOptionsSchema); the image domains/remotePatterns schema did not.
+ * internal-helpers moved to 0.13.2: remote.js (isRemoteAllowed) is 0.13.1's
+ * byte for byte; it adds a renderer.js export the gate does not use.
+ * Re-read on 7.4.12 (2026-11-16, #1176): the same five files and the three
+ * config schemas are 7.4.11's byte for byte, on the same internal-helpers
+ * 0.13.2; build/remote.js is still the only importer.
  */
-const ASTRO_READ = '7.4.5';
+const ASTRO_READ = '7.4.12';
 
 describe('the path into http-cache-semantics is the one #457 read', () => {
   it('only astro depends on http-cache-semantics', () => {

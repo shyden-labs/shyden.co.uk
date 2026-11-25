@@ -20,7 +20,7 @@
  */
 
 // Single canonical production hostname. One Functions codebase serves
-// both the (future) prod Pages project and the dev project; the gate
+// both the prod Pages project and the dev project; the gate
 // keys off hostname, so prod passes through and dev is locked.
 export const PROD_HOSTNAME = 'shyden.co.uk';
 
@@ -35,15 +35,6 @@ export const PROD_HOSTNAME = 'shyden.co.uk';
 export function isProdHostname(hostname) {
   if (typeof hostname !== 'string' || hostname.length === 0) return false;
   return hostname.toLowerCase() === PROD_HOSTNAME;
-}
-
-/**
- *  Inverse convenience — any non-prod host (dev, Pages preview, localhost).
- *
- *  @param {string} hostname
- */
-export function shouldServeBlockingRobots(hostname) {
-  return !isProdHostname(hostname);
 }
 
 /** The `www.` variant of the prod host — canonically redirected to the apex. */

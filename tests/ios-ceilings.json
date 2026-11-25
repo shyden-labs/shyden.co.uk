@@ -79,7 +79,7 @@
   },
   "tests/device/ios/journeys.journey.ts": {
     "tests": 15,
-    "assertions": 55,
+    "assertions": 54,
     "indirectChecks": 25,
     "harnessCalls": 261
   },
@@ -90,6 +90,12 @@
     "harnessCalls": 0
   },
   "tests/device/ios/session.ts": {
+    "tests": 0,
+    "assertions": 0,
+    "indirectChecks": 0,
+    "harnessCalls": 0
+  },
+  "tests/device/ios/wda.ts": {
     "tests": 0,
     "assertions": 0,
     "indirectChecks": 0,

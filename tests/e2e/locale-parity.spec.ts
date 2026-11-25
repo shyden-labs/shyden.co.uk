@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { LOCALES, type Locale } from '../../src/lib/i18n/index';
+import { LOCALES } from '../../src/lib/i18n/index';
 import {
   siteEn,
   siteId,
@@ -42,20 +42,6 @@ const SITE: Record<string, SiteStrings> = {
  */
 const PAGES = sitePaths().map((path) => ({ path, title: TITLE_FOR[path] }));
 
-/**
- * Where a page lives in a given locale, derived from the route layout
- * (`src/pages/<locale>/…`) rather than from `localisePath`.
- *
- * Kept as a SECOND, independent derivation rather than deleted now that
- * `localisePath` is general (#21 Stage 1 replaced its hardcoded
- * `/^\/id(?=\/|$)/` with a pattern built from `PREFIXED_LOCALES`). The two
- * are pinned together below: the helper and the route layout must agree for
- * every locale, and a test that used the helper to check the helper would
- * agree with itself no matter what either one said.
- */
-const urlFor = (path: string, locale: Locale) =>
-  locale === 'en' ? path : `/${locale}${path === '/' ? '/' : path}`;
-
 test.describe('every locale, every page', () => {
   test('every shipped locale has site copy', () => {
     // A locale added to LOCALES with no catalogue would otherwise reach the
@@ -91,14 +77,5 @@ test.describe('every locale, every page', () => {
           title('en'),
         );
   });
-
-  for (const locale of LOCALES)
-    for (const { path, title } of PAGES) {
-      const url = urlFor(path, locale);
-      test(`${url} is served in ${locale}`, async ({ page }) => {
-        await page.goto(url);
-        await expect(page.locator('html')).toHaveAttribute('lang', locale);
-        await expect(page).toHaveTitle(title(locale));
-      });
-    }
+  // Each page served in each locale is read on its walk: checks/served-page.ts (#1086).
 });

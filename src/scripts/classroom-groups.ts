@@ -31,6 +31,7 @@ import {
   studentsBoxLocked,
 } from '../lib/roster';
 import {
+  printTexts,
   renderRoster,
   type RosterHandlers,
   type PrintColumn,
@@ -631,8 +632,9 @@ if (form) {
   // roster -- still the only case this stage can actually reach, since
   // nothing yet populates one -- #cg-count remains the sole population
   // control, exactly as stage 2 left it: this branch is that same
-  // behaviour, unchanged, which is what keeps "changing the number of
-  // students marks them out of date" (classroom-groups.spec.ts) passing.
+  // behaviour, unchanged, which is what keeps the count step of "a changed
+  // size or count marks the groups out of date, a class name does not,
+  // shuffling clears it" (classroom-groups.spec.ts) passing.
   // JSON.stringify'd in that branch, the same way `readMode` stringifies
   // its own shape above, so the result is always a primitive `snapshot()`'s
   // comparison can compare by VALUE -- see staleReason's own
@@ -987,19 +989,7 @@ if (form) {
       // own comment in roster-ui.ts for what that printed (#253). A mirror
       // carries the column it belongs to, so reordering the table can no
       // longer re-point them without anyone noticing.
-      const texts: Record<PrintColumn, string> = {
-        number: String(student.number),
-        name: student.name ?? '',
-        sex:
-          student.sex === 'M'
-            ? t.rosterSexMale
-            : student.sex === 'F'
-              ? t.rosterSexFemale
-              : t.rosterUnset,
-        absent: student.absent ? '\u2611' : '\u2610',
-        together: student.together ?? t.rosterUnset,
-        apart: student.apart ?? t.rosterUnset,
-      };
+      const texts = printTexts(student, t);
       row.querySelectorAll<HTMLElement>('.cg-print-value').forEach((el) => {
         const column = el.dataset.col as PrintColumn | undefined;
         const text = column === undefined ? undefined : texts[column];
@@ -2256,10 +2246,7 @@ if (form) {
    * absent ones beside them, marked (#999): the class sees every number.
    */
   const waitingPool = (input: ReturnType<typeof dealInput>): Student[] =>
-    waitingRoll(
-      input.students,
-      new Set(input.pinned.flat().map((s) => s.number)),
-    );
+    waitingRoll(input.students);
 
   /**
    * One student's chip: the number, the name where the roster has one, and
@@ -2415,20 +2402,13 @@ if (form) {
       mode: readMode(),
       leftovers: readLeftovers(),
       sexMode: readSexMode(), // live as of Stage 3, Task 9 -- see that function
-      pinned: [], // a later stage wires the pins
     };
   };
 
   /** The board's travelling deal (#744): order, schedule, then the flights. */
-  const travelDeal = async (
-    groups: Student[][],
-    input: ReturnType<typeof dealInput>,
-  ) => {
+  const travelDeal = async (groups: Student[][]) => {
     ++dealToken; // a page deal still running stops, as a newer deal says
-    const pinned = new Set(input.pinned.flat().map((s) => s.number));
-    for (const row of tables.querySelectorAll<HTMLElement>('.student'))
-      if (pinned.has(Number(row.dataset.number))) row.classList.add('dealt');
-    const order = travelOrder(groups, pinned);
+    const order = travelOrder(groups);
     const schedule = travelSchedule(
       order.length,
       speedSelect.value === 'fast' ? 'fast' : 'normal',
@@ -2622,7 +2602,7 @@ if (form) {
     updateStaleness();
 
     try {
-      if (travels) await travelDeal(groups, input);
+      if (travels) await travelDeal(groups);
       else await animate(speedSelect.value);
     } finally {
       // The deal no longer disables this button at all (see `animate`), so

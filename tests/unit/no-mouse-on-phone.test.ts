@@ -19,6 +19,9 @@ class FakeLocator {
   scrollIntoViewIfNeeded(): string {
     return 'scrolled';
   }
+  selectOption(): string {
+    return 'selected';
+  }
   waitFor(): string {
     return 'waited';
   }
@@ -29,6 +32,7 @@ const fakePage = () => {
   const page = {
     mouse,
     click: () => 'page-click',
+    selectOption: () => 'page-selected',
     goto: () => 'went',
     locator: () => new FakeLocator(),
   };
@@ -54,6 +58,17 @@ describe('refuseMouseOnPhone', () => {
     expect(() => page.mouse.click()).toThrow(/page\.mouse\.click\(\)/);
     expect(() => page.mouse.wheel()).toThrow(/page\.mouse\.wheel\(\)/);
     expect(() => page.mouse.move()).toThrow(/page\.mouse\.move\(\)/);
+  });
+
+  it('refuses selectOption on a locator and on the page, naming chooseOption (#1027)', () => {
+    const page = fakePage();
+    refuseMouseOnPhone(page as unknown as Page);
+    expect(() => new FakeLocator().selectOption()).toThrow(
+      /locator\.selectOption\(\).*chooseOption/,
+    );
+    expect(() => page.selectOption()).toThrow(
+      /page\.selectOption\(\).*chooseOption/,
+    );
   });
 
   it('leaves what a touch helper needs untouched', () => {

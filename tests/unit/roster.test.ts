@@ -509,6 +509,22 @@ describe('rosterProblems', () => {
     ).toEqual([]);
   });
 
+  // #390 F9: a sex that arrives undefined (grouping.ts measured one from the
+  // page) is as missing as null, so the rule fails closed on it.
+  it('refuses a student whose sex is undefined, as it refuses null', () => {
+    const unset = {
+      ...student({ number: 3 }),
+      sex: undefined,
+    } as unknown as Student;
+    const problems = rosterProblems(
+      [student({ sex: 'M', number: 1 }), unset],
+      en,
+    );
+    expect(problems.map((p) => [p.kind, p.students])).toEqual([
+      ['no-sex', [3]],
+    ]);
+  });
+
   it('names an unnamed student as Student N in the message', () => {
     const problems = rosterProblems(
       [student({ sex: 'M', number: 5 }), student({ sex: 'M', number: 5 })],

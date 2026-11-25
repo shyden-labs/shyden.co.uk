@@ -4,8 +4,7 @@ import { isAllowedConsoleError } from '../console-allowance';
 
 /**
  * Browser-event recorders — the only place in the suite that subscribes to a
- * collected event. `tests/guards/event-collectors.test.ts` fails if a spec
- * hand-rolls one.
+ * collected event.
  *
  * WHY A HOME AT ALL. A collected event reaches Node asynchronously over the
  * browser protocol, so reading the array the instant an action returns races

@@ -1,9 +1,8 @@
 /**
  * ShyTalk's brand mark, in ONE place.
  *
- * The two-tone wordmark is matched to the real product at
- * shytalk.shyden.co.uk, so it is a dependency on a brand this repo does not
- * own. Operator, 2026-09-11: *"This will need to be updated when we update
+ * The two-tone wordmark is matched to the real ShyTalk product, so it is a
+ * dependency on a brand this repo does not own. Operator, 2026-09-11: *"This will need to be updated when we update
  * the ShyTalk branding in the future."*
  *
  * That coupling is real and cannot be removed while the mark is shown at all.

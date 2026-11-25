@@ -4,7 +4,6 @@ import {
   wwwRedirectLocation,
   legacyPathRedirectLocation,
   PREFIXED_LOCALE_CODES,
-  shouldServeBlockingRobots,
   blockingRobotsBody,
   noIndexHeaderValue,
   basicAuthOk,
@@ -66,13 +65,6 @@ describe('wwwRedirectLocation — www → apex, 301, before auth', () => {
     'returns null (no throw) for non-URL input %p',
     (bad) => expect(wwwRedirectLocation(bad as unknown as URL)).toBeNull(),
   );
-});
-
-describe('shouldServeBlockingRobots', () => {
-  it('is false on prod, true everywhere else', () => {
-    expect(shouldServeBlockingRobots('shyden.co.uk')).toBe(false);
-    expect(shouldServeBlockingRobots('dev.shyden.co.uk')).toBe(true);
-  });
 });
 
 describe('blockingRobotsBody', () => {

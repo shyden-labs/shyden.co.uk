@@ -1,10 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Locator, Page } from '@playwright/test';
+
+const adbCalls: string[][] = [];
+vi.mock('../../scripts/adb.mjs', () => ({
+  adb: (args: string[]) => {
+    adbCalls.push(args);
+    return '';
+  },
+}));
 import {
+  backOn,
+  landingVerdict,
   mustMove,
   planSwipe,
   type Prepared,
+  scrollOver,
+  scrollToOn,
   SPARE_SWIPES,
+  wheelMustMove,
   swipeCeiling,
+  tapOn,
+  waitUntilMoved,
+  waitUntilStill,
   whyNotTappable,
 } from '../real-touch';
 
@@ -21,9 +38,24 @@ const at = (y: number, extra: Partial<Prepared> = {}): Prepared => ({
   viewHeight: 800,
   viewWidth: 400,
   inView: y >= 0 && y <= 800,
+  boxInView: y >= 20 && y <= 780,
   hit: null,
   keyboard: false,
   ...extra,
+});
+
+describe('wheelMustMove (#1004)', () => {
+  it('leaves a whole, uncovered element inside an edge where it is: a click needs no centring', () => {
+    expect(wheelMustMove(at(30))).toBe(false);
+    expect(wheelMustMove(at(770))).toBe(false);
+  });
+  it('moves an element not wholly in view, which a click would scroll by protocol', () => {
+    expect(wheelMustMove(at(10))).toBe(true);
+    expect(wheelMustMove(at(1200))).toBe(true);
+  });
+  it('moves a covered element, wherever it is', () => {
+    expect(wheelMustMove(at(400, { hit: 'div.bar' }))).toBe(true);
+  });
 });
 
 describe('mustMove', () => {
@@ -98,5 +130,700 @@ describe('whyNotTappable', () => {
     expect(
       whyNotTappable('#go', at(400, { hit: 'span#mutant-cover' }), 0, 6),
     ).toBe('#go is covered: a finger there would touch span#mutant-cover');
+  });
+  it('names the real wheel where the input is a wheel (#1004)', () => {
+    expect(whyNotTappable('#go', at(3000), 11, 11, 'wheel')).toBe(
+      '#go did not come into view after 11 real wheel turns (the point is at y 3000, the view is 800 tall)',
+    );
+    expect(whyNotTappable('#go', at(3000), 2, 11, 'wheel')).toMatch(
+      /^#go did not come into view: a real wheel turn no longer moves it/,
+    );
+  });
+});
+
+describe('the desktop engines scroll with the real wheel (#1004)', () => {
+  const VIEW = { width: 1280, height: 720 };
+
+  /**
+   * A page holding one 40 px tall element at `top` in the document, scrolled
+   * to `startY`. The real wheel moves `scrollY` within the page's length; any
+   * other way of scrolling is recorded, so a test can say it was never taken.
+   */
+  function fakeDesktop(
+    top: number,
+    {
+      startY = 0,
+      length = 4000,
+      wheelMoves = true,
+      landsAfterSamples = 0,
+    } = {},
+  ) {
+    const sent: unknown[] = [];
+    let scrollY = startY;
+    // A turn whose scroll the engine applies only after this many samples
+    // have read the page (CI's WebKit lands a turn late, #1004).
+    let pending: { dy: number; samples: number } | null = null;
+    let shapeSamples = 0;
+    const maxScroll = length - VIEW.height;
+    const rect = () => ({ x: 600, y: top - scrollY, width: 80, height: 40 });
+    const land = () => {
+      if (pending === null || pending.samples > 0) return;
+      scrollY = Math.min(maxScroll, Math.max(0, scrollY + pending.dy));
+      pending = null;
+    };
+    const page = {
+      mouse: {
+        move: async (x: number, y: number) => {
+          sent.push(['move', x, y]);
+        },
+        wheel: async (dx: number, dy: number) => {
+          sent.push(['wheel', dx, dy]);
+          if (wheelMoves) pending = { dy, samples: landsAfterSamples };
+          land();
+        },
+      },
+    };
+    const target = {
+      page: () => page,
+      waitFor: async () => undefined,
+      evaluate: async (
+        _fn: unknown,
+        arg?: { offset?: { x: number; y: number } },
+      ) => {
+        if (arg === undefined) shapeSamples++;
+        if (arg === undefined && pending !== null) {
+          pending.samples--;
+          land();
+        }
+        const r = rect();
+        if (arg === undefined)
+          return [r.x, r.y, r.width, r.height, 0, VIEW.height, 0, scrollY].join(
+            ',',
+          );
+        const point = {
+          x: r.x + (arg.offset ? arg.offset.x : r.width / 2),
+          y: r.y + (arg.offset ? arg.offset.y : r.height / 2),
+        };
+        return {
+          point,
+          viewTop: 0,
+          viewHeight: VIEW.height,
+          viewWidth: VIEW.width,
+          inView: point.y >= 0 && point.y <= VIEW.height,
+          boxInView: r.y >= 0 && r.y + r.height <= VIEW.height,
+          hit: null,
+          keyboard: false,
+        };
+      },
+      click: async (options: unknown) => {
+        sent.push(['click', options]);
+      },
+      hover: async () => {
+        sent.push(['hover']);
+      },
+      scrollIntoViewIfNeeded: async () => {
+        sent.push(['scrollIntoViewIfNeeded']);
+      },
+      toString: () => 'locator(#far)',
+    };
+    return {
+      target: target as unknown as Locator,
+      sent,
+      centreY: () => rect().y + 20,
+      shapeSamples: () => shapeSamples,
+    };
+  }
+
+  const kinds = (sent: unknown[]) => sent.map((s) => (s as unknown[])[0]);
+  const wheelsOf = (sent: unknown[]) =>
+    sent.filter((s) => (s as unknown[])[0] === 'wheel') as [
+      'wheel',
+      number,
+      number,
+    ][];
+
+  /** Runs the helper to its end on the fake clock, keeping a rejection. */
+  const settle = async <T>(work: Promise<T>): Promise<T> => {
+    const settled = work.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await vi.runAllTimersAsync();
+    const outcome = await settled;
+    if ('error' in outcome) throw outcome.error;
+    return outcome.value;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  const setUp = () => {
+    vi.stubEnv('PW_REAL_DEVICE', '');
+    vi.useFakeTimers();
+  };
+
+  const clearOfTheEdges = (y: number) => {
+    expect(y).toBeGreaterThanOrEqual(VIEW.height * 0.1);
+    expect(y).toBeLessThanOrEqual(VIEW.height * 0.9);
+  };
+
+  it('scrollToOn brings an element below the view in with real wheel turns, never by protocol', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(2500);
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(wheelsOf(sent).every(([, dx, dy]) => dx === 0 && dy > 0)).toBe(true);
+    expect(kinds(sent)).not.toContain('scrollIntoViewIfNeeded');
+    clearOfTheEdges(centreY());
+  });
+
+  it('scrollToOn turns the wheel the other way for an element above the view', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(200, { startY: 2000 });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(wheelsOf(sent).every(([, , dy]) => dy < 0)).toBe(true);
+    clearOfTheEdges(centreY());
+  });
+
+  it('scrollToOn sends no input for an element already in view', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(300);
+    await settle(scrollToOn(target));
+    expect(sent).toEqual([]);
+  });
+
+  it('an element already in view is measured once, with no wait for the page to rest', async () => {
+    setUp();
+    const { target, sent, shapeSamples } = fakeDesktop(300);
+    await settle(tapOn(target));
+    expect(shapeSamples()).toBe(0);
+    expect(kinds(sent)).toEqual(['click']);
+  });
+
+  it('clicks an element wholly in view by the top edge (a fixed bar) without turning the wheel', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(10);
+    await settle(tapOn(target));
+    expect(kinds(sent)).toEqual(['click']);
+  });
+
+  it('turns the wheel with the mouse over the view, before each turn', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    const k = kinds(sent);
+    k.forEach((kind, i) => {
+      if (kind === 'wheel') expect(k[i - 1]).toBe('move');
+    });
+    for (const s of sent.filter((s) => (s as unknown[])[0] === 'move')) {
+      const [, x, y] = s as [string, number, number];
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(VIEW.width);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(VIEW.height);
+    }
+  });
+
+  it('tapOn wheels the element in, then clicks it with the real mouse once', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(tapOn(target, { position: { x: 4, y: 4 } }));
+    expect(wheelsOf(sent).length).toBeGreaterThan(0);
+    expect(sent.at(-1)).toEqual(['click', { position: { x: 4, y: 4 } }]);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
+  it('fails naming the element when a real wheel turn no longer moves it', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500, { wheelMoves: false });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /^locator\(#far\) did not come into view: a real wheel turn no longer moves it/,
+    );
+    expect(kinds(sent)).not.toContain('scrollIntoViewIfNeeded');
+    expect(kinds(sent)).not.toContain('click');
+  });
+
+  // #1237: the box runs past the fold of a page already at its end, so the
+  // turn moves nothing, but the point is in view and the tap goes ahead.
+  it('taps an element whose box runs past the fold of a page at its end, after a turn that moves nothing', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(VIEW.height - 30, {
+      length: VIEW.height,
+    });
+    await settle(tapOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
+  // #1235: a turn that has not moved the page by its ceiling fails, and the
+  // failure says whether the scroll began later or never, watched without
+  // another turn, so the next occurrence names its own cause.
+  it('names a wheel turn whose scroll never began, after watching without another turn', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500, { wheelMoves: false });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /: a real wheel turn no longer moves it: nothing moved in the 6000 ms after the turn \(/,
+    );
+    expect(wheelsOf(sent)).toHaveLength(1);
+  });
+
+  // #1235's measured cause: CI's WebKit began a turn's scroll 1,039 ms after
+  // the turn (deploy-dev run 44786623542). The engine is waited for.
+  it('waits for a turn whose scroll the engine begins about 1.04 s later, and taps once', async () => {
+    setUp();
+    // 65 samples 16 ms apart: about 1,040 ms.
+    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 65 });
+    await settle(tapOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
+  it('names how late a wheel turn began moving the page when it missed its ceiling', async () => {
+    setUp();
+    // About 4 s of 16 ms samples: past the 3,000 ms ceiling, inside the watch.
+    const { target, sent } = fakeDesktop(2500, { landsAfterSamples: 250 });
+    await expect(settle(tapOn(target))).rejects.toThrow(
+      /: a real wheel turn did not move it within 3000 ms: it began moving \d+ ms after the turn \(/,
+    );
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent)).not.toContain('click');
+  });
+
+  it('one wheel turn covers the whole distance to an element far down a long page (Shyden, 2026-11-19)', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(20_000, { length: 30_000 });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    clearOfTheEdges(centreY());
+  });
+
+  it('waits for a wheel turn the engine lands late, and turns the wheel once', async () => {
+    setUp();
+    const { target, sent, centreY } = fakeDesktop(2500, {
+      landsAfterSamples: 12,
+    });
+    await settle(scrollToOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    clearOfTheEdges(centreY());
+  });
+
+  it('scrollOver turns the wheel over the centre of an element in view, without hover()', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(300);
+    await settle(scrollOver(target, 240));
+    expect(sent).toEqual([
+      ['move', 640, 320],
+      ['wheel', 0, 240],
+    ]);
+  });
+
+  it('scrollOver returns only once a wheel turn the engine lands late has moved the page', async () => {
+    setUp();
+    const { target, centreY } = fakeDesktop(300, { landsAfterSamples: 12 });
+    await settle(scrollOver(target, 240));
+    expect(centreY()).toBe(320 - 240);
+  });
+
+  it('scrollOver wheels an element below the view in first', async () => {
+    setUp();
+    const { target, sent } = fakeDesktop(2500);
+    await settle(scrollOver(target, 240));
+    expect(kinds(sent)).not.toContain('hover');
+    expect(sent.at(-1)).toEqual(['wheel', 0, 240]);
+    expect(wheelsOf(sent).length).toBeGreaterThan(1);
+  });
+});
+
+/** A clock the test owns: sleep moves it, nothing else does (#1044). */
+const testClock = () => {
+  let t = 0;
+  return {
+    now: () => t,
+    sleep: async (ms: number) => {
+      t += ms;
+    },
+  };
+};
+
+describe('waitUntilMoved', () => {
+  it('returns as soon as a sample differs from the one before the input', async () => {
+    const shapes = ['a', 'a', 'a', 'b'];
+    let read = 0;
+    const result = await waitUntilMoved(async () => shapes[read++]!, 'a', {
+      gapMs: 16,
+      ceilingMs: 1_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: true, waitedMs: 3 * 16 });
+    expect(read).toBe(4);
+  });
+
+  it('reads once and returns at once when the page has already moved', async () => {
+    let read = 0;
+    const result = await waitUntilMoved(async () => (read++, 'b'), 'a', {
+      gapMs: 16,
+      ceilingMs: 1_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: true, waitedMs: 0 });
+    expect(read).toBe(1);
+  });
+
+  it('gives up at the ceiling, on its own clock, when nothing moves', async () => {
+    const result = await waitUntilMoved(async () => 'a', 'a', {
+      gapMs: 16,
+      ceilingMs: 100,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ moved: false, waitedMs: 112 });
+  });
+});
+
+describe('waitUntilStill', () => {
+  it('is still once six samples in a row match the one before', async () => {
+    const shapes = ['a', 'b', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'x'];
+    let read = 0;
+    const result = await waitUntilStill(async () => shapes[read++]!, {
+      gapMs: 16,
+      ceilingMs: 3_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: true, waitedMs: 8 * 16 });
+    expect(read).toBe(9);
+  });
+
+  it('starts the count again when the shape moves', async () => {
+    const shapes = ['a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b'];
+    let read = 0;
+    const result = await waitUntilStill(async () => shapes[read++]!, {
+      gapMs: 10,
+      ceilingMs: 3_000,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: true, waitedMs: 11 * 10 });
+  });
+
+  it('gives up at the ceiling, on its own clock, when the shape never settles', async () => {
+    let read = 0;
+    const result = await waitUntilStill(async () => String(read++), {
+      gapMs: 16,
+      ceilingMs: 100,
+      clock: testClock(),
+    });
+    expect(result).toEqual({ still: false, waitedMs: 112 });
+  });
+});
+
+describe('landingVerdict', () => {
+  it('has landed once a trusted click reached the element', () => {
+    expect(
+      landingVerdict({ at: 'ok', stray: null, clicked: true }, 0, 2_000),
+    ).toBeNull();
+  });
+
+  it('names a stray touch at once', () => {
+    expect(
+      landingVerdict(
+        { at: null, stray: 'div#x (touch, trusted true)', clicked: false },
+        10,
+        2_000,
+      ),
+    ).toBe('the touch reached div#x (touch, trusted true) instead');
+  });
+
+  it('keeps waiting while nothing has arrived inside the ceiling', () => {
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 1_999, 2_000),
+    ).toBe('wait');
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 2_000, 2_000),
+    ).toBe('wait');
+    expect(landingVerdict(undefined, 0, 2_000)).toBe('wait');
+  });
+
+  it('says a touch with no click past the ceiling may have stopped a scroll', () => {
+    expect(
+      landingVerdict({ at: 'ok', stray: null, clicked: false }, 2_001, 2_000),
+    ).toBe(
+      'the touch reached it but no click followed within 2 s (Chrome may have taken it as stopping a scroll)',
+    );
+  });
+
+  it('says nothing reached it past the ceiling', () => {
+    expect(
+      landingVerdict({ at: null, stray: null, clicked: false }, 2_001, 2_000),
+    ).toBe('no touch reached it within 2 s');
+  });
+});
+
+describe('scrollOver', () => {
+  /** A locator whose page records each input it is sent. */
+  function fakeTarget() {
+    const sent: unknown[] = [];
+    const cdp = {
+      send: async (method: string, params: unknown) => {
+        sent.push([method, params]);
+      },
+    };
+    const page = {
+      context: () => ({ newCDPSession: async () => cdp }),
+      mouse: {
+        wheel: async (dx: number, dy: number) => {
+          sent.push(['wheel', dx, dy]);
+        },
+      },
+    };
+    const target = {
+      page: () => page,
+      hover: async () => {
+        sent.push(['hover']);
+      },
+      boundingBox: async () => ({ x: 100, y: 300, width: 80, height: 40 }),
+      toString: () => 'locator(#cg-count)',
+    };
+    return { target: target as unknown as Locator, sent };
+  }
+
+  /**
+   * A phone page 800 px tall holding one 40 px element at `top` in the
+   * document, scrolled to `startY`. Each touch move scrolls the page the
+   * opposite way by what the finger moved, within the page's length, as
+   * Chrome does; every touch point is recorded.
+   */
+  function fakePhone(
+    top: number,
+    { startY = 0, length = 6000, slop = 0 } = {},
+  ) {
+    const VIEW = { width: 412, height: 800 };
+    const sent: [
+      string,
+      { type: string; touchPoints: { x: number; y: number }[] },
+    ][] = [];
+    let scrollY = startY;
+    let last: { x: number; y: number } | null = null;
+    let base = startY;
+    const maxScroll = length - VIEW.height;
+    const cdp = {
+      send: async (
+        method: string,
+        params: { type: string; touchPoints: { x: number; y: number }[] },
+      ) => {
+        sent.push([method, params]);
+        const p = params.touchPoints[0];
+        if (params.type === 'touchStart') {
+          last = p ?? null;
+          base = scrollY;
+        }
+        // Chrome reads the first `slop` px of a finger's travel as not yet a
+        // scroll (measured 7.86 px on the phone, #1243); the rest moves the
+        // page, within its length.
+        if (params.type === 'touchMove' && last && p) {
+          const travel = last.y - p.y;
+          const past = Math.max(0, Math.abs(travel) - slop) * Math.sign(travel);
+          scrollY = Math.min(maxScroll, Math.max(0, base + past));
+        }
+        if (params.type === 'touchEnd') last = null;
+      },
+    };
+    const page = {
+      context: () => ({ newCDPSession: async () => cdp }),
+      evaluate: async () => scrollY,
+    };
+    const rect = () => ({ x: 100, y: top - scrollY, width: 80, height: 40 });
+    const target = {
+      page: () => page,
+      boundingBox: async () => rect(),
+      evaluate: async (_fn: unknown, arg?: { offset?: unknown }) => {
+        const r = rect();
+        if (arg === undefined)
+          return [r.x, r.y, r.width, r.height, 0, VIEW.height, 0, scrollY].join(
+            ',',
+          );
+        const point = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        return {
+          point,
+          viewTop: 0,
+          viewHeight: VIEW.height,
+          viewWidth: VIEW.width,
+          inView: point.y >= 0 && point.y <= VIEW.height,
+          boxInView: r.y >= 0 && r.y + r.height <= VIEW.height,
+          hit: null,
+          keyboard: false,
+        };
+      },
+      toString: () => 'locator(h1)',
+    };
+    return {
+      target: target as unknown as Locator,
+      sent,
+      VIEW,
+      scrollY: () => scrollY,
+    };
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  const onScreen = (
+    sent: [string, { touchPoints: { x: number; y: number }[] }][],
+    height: number,
+  ) =>
+    sent
+      .flatMap(([, p]) => p.touchPoints)
+      .every(({ y }) => y >= 0 && y <= height);
+
+  // #1242/#1243: measured on the phone, a drag's first 7.86 px are Chrome's
+  // touch slop, and the band's one drag ended 24 px above the screen and left
+  // it 5.94 px on screen. Strokes stay on the screen and cover the distance.
+  it('on the phone, carries an element near the top past the top edge with strokes that stay on the screen', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(93, { slop: 8 });
+    const done = scrollOver(target, 93 + 40 + 1);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(93 + 40 - scrollY()).toBeLessThanOrEqual(0);
+  });
+
+  it('on the phone, scrolls the distance asked for, past the slop', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(1400, {
+      startY: 1000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 240);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+    expect(scrollY()).toBe(1240);
+  });
+
+  it('on the phone, stops when the page will move no further', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, scrollY } = fakePhone(5400, {
+      startY: 5000,
+      slop: 8,
+    });
+    const done = scrollOver(target, 600);
+    await vi.runAllTimersAsync();
+    await done;
+    expect(scrollY()).toBe(5200);
+    expect(
+      sent.filter(([, p]) => p.type === 'touchStart').length,
+    ).toBeLessThanOrEqual(3);
+  });
+
+  // #1241: a caller measures the distance from where the element is, so an
+  // element already on screen, even near its edge, is not moved first.
+  // Measured on the phone: moving the band off the top edge left it 5.94 px
+  // on screen after a drag sized from its old place.
+  it('on the phone, does not move an element already on screen near its top edge before scrolling', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(1010, { startY: 1000 });
+    const done = scrollOver(target, 31);
+    await vi.runAllTimersAsync();
+    await done;
+    // Moved first, the element's own distance would be off by that move.
+    expect(scrollY()).toBe(1031);
+    expect(onScreen(sent, VIEW.height)).toBe(true);
+  });
+
+  // #1241: measured on the phone, the drag began at y -3673 (the heading's
+  // centre, far above the screen) and the page stopped 64 px short of its top.
+  it('on the phone, brings an element above the view in first and puts the finger down on the screen', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent, VIEW, scrollY } = fakePhone(100, { startY: 3800 });
+    const done = scrollOver(target, -3803);
+    await vi.runAllTimersAsync();
+    await done;
+    const starts = sent
+      .filter(([, p]) => p.type === 'touchStart')
+      .flatMap(([, p]) => p.touchPoints);
+    expect(starts.length).toBeGreaterThan(0);
+    for (const { y } of starts) {
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(VIEW.height);
+    }
+    expect(scrollY()).toBe(0);
+  });
+
+  it('drags a real finger from the element the opposite way on the phone', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    vi.useFakeTimers();
+    const { target, sent } = fakePhone(300);
+    const done = scrollOver(target, 200);
+    await vi.runAllTimersAsync();
+    await done;
+    const touches = sent as [
+      string,
+      { type: string; touchPoints: { x: number; y: number }[] },
+    ][];
+    expect(
+      touches.every(([method]) => method === 'Input.dispatchTouchEvent'),
+    ).toBe(true);
+    expect(touches[0]![1]).toEqual({
+      type: 'touchStart',
+      touchPoints: [{ x: 140, y: 320 }],
+    });
+    expect(touches.at(-2)![1]).toEqual({
+      type: 'touchMove',
+      touchPoints: [{ x: 140, y: 120 }],
+    });
+    expect(touches.at(-1)![1]).toEqual({ type: 'touchEnd', touchPoints: [] });
+  });
+
+  it('fails naming the element when it has no box to put a finger on', async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    const { target } = fakeTarget();
+    (target as unknown as { boundingBox: () => Promise<null> }).boundingBox =
+      async () => null;
+    await expect(scrollOver(target, 200)).rejects.toThrow(
+      'locator(#cg-count) has no box to put a finger on',
+    );
+  });
+});
+
+describe('backOn', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    adbCalls.length = 0;
+  });
+
+  const fakePage = () => {
+    const sent: unknown[] = [];
+    const page = {
+      goBack: async (options: unknown) => {
+        sent.push(['goBack', options]);
+        return null;
+      },
+    };
+    return { page: page as unknown as Page, sent };
+  };
+
+  it("goes Back through the browser's own history where there is no phone", async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '');
+    const { page, sent } = fakePage();
+    await backOn(page);
+    expect(sent).toEqual([['goBack', { waitUntil: 'commit' }]]);
+    expect(adbCalls).toEqual([]);
+  });
+
+  it("presses the phone's own Back key on the phone", async () => {
+    vi.stubEnv('PW_REAL_DEVICE', '1');
+    const { page, sent } = fakePage();
+    await backOn(page);
+    expect(adbCalls).toEqual([['shell', 'input', 'keyevent', 'KEYCODE_BACK']]);
+    expect(sent).toEqual([]);
   });
 });

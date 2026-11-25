@@ -1,0 +1,46 @@
+# The failed Dependabot update check (#1119; Shyden's ruling 2026-11-10,
+# "Weekly check"). Once a week, after Dependabot's Monday runs, read the
+# update runs of the last week and open one issue for the operator naming
+# each that failed, or comment on the notice still open. GitHub shows a
+# failed update only on the Dependabot page, which is how CI's Node sat a
+# release behind for two weeks (#1117).
+#
+# It holds no secret: the run's own token reads the runs and writes the
+# issue, so it runs on the default branch the schedule fires on. It runs no
+# npm package code, so no `npm ci`.
+name: Dependabot failures
+
+on:
+  # Mondays 09:00 UTC (16:00 WIB): Dependabot's weekly updates start at
+  # 06:00 UTC (dependabot.yml) and were done by 06:40 on 2 and 9 November.
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, so a dispatch during the scheduled run cannot open a
+# second notice beside the first. Queued, never cancelled.
+concurrency:
+  group: dependabot-failures
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Report failed Dependabot updates
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node
+      - name: Report the week's failed updates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/dependabot-failures.mjs

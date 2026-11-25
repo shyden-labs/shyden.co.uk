@@ -7,8 +7,7 @@
  * the suites by #136, and they disagreed: one never entered arrays, another
  * spelled a position `a.0`. Which copy a guard reached for decided what it
  * could see -- #80's failure with directory walks, in a second medium -- so
- * `one-home.test.ts` keeps the walk here, and `catalogue-leaves.test.ts` pins
- * what it reads.
+ * the walk lives here, and `catalogue-leaves.test.ts` pins what it reads.
  *
  * An empty object or array contributes nothing. A caller that asserts absence
  * over the result proves it non-empty first (`nonEmpty`), because a walk that

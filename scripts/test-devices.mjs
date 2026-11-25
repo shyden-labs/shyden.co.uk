@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
  * `npm run test:devices` -- one build, one shared server, three device
- * groups at once: the existing emulated Playwright suite (5 projects), the
+ * groups at once: the desktop Playwright suite (3 engines), the
  * real Android phone over CDP, and the real iPhone over its Web Inspector. See
  * docs/superpowers/specs/2026-08-08-real-device-test-harness-design.md,
  * section 7 ("Parallelism"), for the shape this implements:
  *
- *   build once -> serve dist on 0.0.0.0:4321 -> desktop   (5 projects)   N workers
+ *   build once -> serve dist on 0.0.0.0:4321 -> desktop   (3 engines)    N workers
+ *                                                (in a Linux container, #1027)
  *                                             -> android   (real Chrome)  1 worker
  *                                             -> ios       (real Safari)  1 session
  *
@@ -51,10 +52,12 @@
  *    always runs, via `finally` and a signal handler -- see `cleanup()`.
  */
 import { execFileSync, spawn } from 'node:child_process';
+import { desktopContainerArgv, desktopImage } from './desktop-container.mjs';
 import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
+import { startWda } from './wda.mjs';
 import {
   closeSync,
   copyFileSync,
@@ -66,6 +69,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
 
@@ -253,13 +257,19 @@ function tagOutput(tag, child) {
  * @param {string} tag
  * @param {string} command
  * @param {readonly string[]} args
- * @param {{ env?: NodeJS.ProcessEnv, cwd?: string }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv, cwd?: string, detached?: boolean }} [options]
  */
-function spawnTagged(tag, command, args, { env, cwd = ROOT } = {}) {
+function spawnTagged(
+  tag,
+  command,
+  args,
+  { env, cwd = ROOT, detached = false } = {},
+) {
   const child = spawn(command, args, {
     cwd,
     env: env ?? process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached,
   });
   tagOutput(tag, child);
   return child;
@@ -357,6 +367,80 @@ export function pidsListeningOnPort(port) {
   }
 }
 
+/** How long a run waits for another server to give up its preview port. */
+export const PORT_WAIT_CEILING_MS = 600_000;
+
+/**
+ * Whether the run may take `port` now (#390 F44). It is never taken from
+ * anyone: a holder is named and waited for, and the run fails at the
+ * ceiling naming it. Pure; `waitForPortFree` asks the system who holds it.
+ *
+ * @param {number} port
+ * @param {{ pid: number, command: string }[]} holders
+ * @param {number} waitedMs
+ * @param {number} ceilingMs
+ * @returns {{ free: true } | { free: false, say: string }}
+ */
+export function portWait(port, holders, waitedMs, ceilingMs) {
+  if (holders.length === 0) return { free: true };
+  const named = holders.map((h) => `pid ${h.pid} (${h.command})`).join(', ');
+  const ceiling = `${Math.round(ceilingMs / 1000)} s`;
+  if (waitedMs >= ceilingMs)
+    throw new Error(
+      `port ${port} is still held by ${named} after ${ceiling}; stop that server, or wait for its run to end, then start again`,
+    );
+  return {
+    free: false,
+    say: `port ${port} is held by ${named}; waiting for it to close, up to ${ceiling}`,
+  };
+}
+
+/**
+ * Each process listening on `port`, with its command line, for a message.
+ *
+ * @param {number} port
+ * @returns {{ pid: number, command: string }[]}
+ */
+function portHolders(port) {
+  return pidsListeningOnPort(port).map((pid) => {
+    let command = 'unknown';
+    try {
+      command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+        encoding: 'utf8',
+      }).trim();
+    } catch {
+      // Gone between the two reads: the next poll will not list it.
+    }
+    return { pid, command };
+  });
+}
+
+/**
+ * Waits for `port` to be free, saying who holds it once, and fails at
+ * `PORT_WAIT_CEILING_MS` naming the holder.
+ *
+ * @param {number} port
+ * @returns {Promise<void>}
+ */
+export async function waitForPortFree(port) {
+  const startedAt = Date.now();
+  let said = '';
+  for (;;) {
+    const verdict = portWait(
+      port,
+      portHolders(port),
+      Date.now() - startedAt,
+      PORT_WAIT_CEILING_MS,
+    );
+    if (verdict.free) return;
+    if (verdict.say !== said) {
+      process.stdout.write(`==> ${verdict.say}\n`);
+      said = verdict.say;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+}
+
 /**
  * Kills whatever is LISTENING on `port`, identified only by that -- never
  * `pkill -f` matching a command-line pattern, which would just as easily
@@ -414,6 +498,93 @@ async function waitForHttpOk(url, { timeoutMs, describe }) {
     },
     { timeoutMs, describe },
   );
+}
+
+/** How many of a child's last lines a failure quotes. */
+const RECENT_LINES = 20;
+
+/**
+ * Keeps the last {@link RECENT_LINES} complete lines a child writes, from
+ * stdout and stderr in the order they arrive, so a child that exits early
+ * can be quoted (#1160). A partial line is not kept.
+ *
+ * @param {{ stdout: import('node:stream').Readable | null, stderr: import('node:stream').Readable | null }} child
+ * @returns {string[]} live: it fills as the child writes
+ */
+export function recentLines(child) {
+  /** @type {string[]} */
+  const lines = [];
+  for (const stream of [child.stdout, child.stderr]) {
+    if (!stream) continue;
+    let buffer = '';
+    stream.on('data', (/** @type {Buffer | string} */ data) => {
+      buffer += data.toString('utf8');
+      const parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+      lines.push(...parts);
+      if (lines.length > RECENT_LINES)
+        lines.splice(0, lines.length - RECENT_LINES);
+    });
+  }
+  return lines;
+}
+
+/**
+ * Waits for `ready`, but fails at once when `child` exits first, naming its
+ * exit and quoting its last lines: `astro preview` exits at once when another
+ * preview already runs, printing that server's PID and URL, and a run that
+ * waited for the port instead named only its own timeout (#1160).
+ *
+ * @template T
+ * @param {import('node:events').EventEmitter} child
+ * @param {Promise<T>} ready
+ * @param {readonly string[]} lines from {@link recentLines}
+ * @param {string} describe
+ * @returns {Promise<T>}
+ */
+export async function untilReadyOrExit(child, ready, lines, describe) {
+  /** @type {(code: number | null, signal: string | null) => void} */
+  let onExit = () => {};
+  /** @type {Promise<never>} */
+  const exited = new Promise((_, reject) => {
+    onExit = (code, signal) => {
+      const how = code === null ? `signal ${signal}` : `code ${code}`;
+      const said =
+        lines.length > 0
+          ? `Its last lines:\n${lines.join('\n')}`
+          : 'It printed nothing.';
+      reject(
+        new Error(`${describe} exited (${how}) before it answered. ${said}`),
+      );
+    };
+    child.once('exit', onExit);
+  });
+  try {
+    return await Promise.race([ready, exited]);
+  } finally {
+    child.off('exit', onExit);
+  }
+}
+
+/**
+ * Sends SIGTERM to the child's whole process group (it was started
+ * detached). A group already gone (ESRCH) is the outcome wanted, not a
+ * failure to report (#1160); any other error is passed on.
+ *
+ * @param {{ pid?: number }} child
+ * @param {(pid: number, signal: NodeJS.Signals) => unknown} [kill]
+ * @returns {'stopped' | 'already gone' | 'no pid'}
+ */
+export function stopProcessGroup(child, kill = process.kill.bind(process)) {
+  if (child.pid === undefined) return 'no pid';
+  try {
+    kill(-child.pid, 'SIGTERM');
+    return 'stopped';
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ESRCH')
+      return 'already gone';
+    throw error;
+  }
 }
 
 /**
@@ -614,84 +785,14 @@ function isAndroidPresent() {
  * syntax transform that Node's strip-only mode does not support. The session
  * can import a plain module, so the listing and its parsing live in one.
  */
-function isIosPresent() {
+function findIphone() {
   let raw;
   try {
     raw = listDevices();
   } catch (error) {
-    return messageOf(error);
+    return { absence: messageOf(error) };
   }
-  const picked = pickIphone(raw, process.env.IOS_UDID);
-  return 'absence' in picked ? picked.absence : null;
-}
-
-// ── one-off discovery: how many tests does grepInvert exclude by design? ──
-
-/**
- * The `--grep` pattern that SELECTS what `android-chrome`'s `grepInvert` excludes. Declared
- * once and used for the listing and both messages; tests/guards/excluded-by-design.test.ts holds
- * it to the config's `grepInvert`, character for character. It was once two hand-typed copies,
- * and this one missed `@requires-download-bytes` for as long as that tag existed (#308).
- */
-const EXCLUDED_BY_DESIGN_GREP = '@emulated-viewport|@requires-isolated-context';
-
-/**
- * `android-chrome`'s `grepInvert`
- * (playwright.device.config.ts) excludes tagged tests before Playwright's own JSON
- * reporter ever sees them -- they are not "skipped", they are never collected, so the
- * real run's own report has no number for them at all. This asks separately, freshly,
- * every run: `--list --grep=<the same pattern>` against ANY project sharing
- * android-chrome's `tests/e2e/*.spec.ts` scope directly SELECTS the tagged set
- * (chromium is a convenient, arbitrary choice -- one project, no filtering of its
- * own). `tests/device/real-device.spec.ts`, the one file android-chrome matches that
- * chromium's own testDir does not reach, carries neither tag (checked by hand), so
- * restricting this listing to tests/e2e does not undercount.
- *
- * Two tags, one count, on purpose: both exist for the identical reason (something
- * this suite's tests need is physically impossible to give them on ONE real device --
- * a resizable screen, or a fresh per-test browser context) and both are excluded from
- * the SAME `grepInvert`, so the Android group's own "skipped by design" number must be
- * their sum to stay honestly self-consistent with what actually ran (see
- * printSummaryTable / playwrightVerdict, which add this to Playwright's own
- * `stats.skipped` for the real run). Splitting them into two separately-reported
- * numbers was considered and rejected: nothing downstream (the dashboard, this
- * script's own exit-code logic) currently needs to tell them apart, and a single
- * `--grep` pattern kept in exact lock-step with the config's own `grepInvert` is one
- * fewer place for the two to silently drift apart than two separate queries would be.
- *
- * Never hardcoded: measured live against this exact source tree, every run, so a
- * future test gaining or losing either tag cannot make this number rot. `--list`'s own
- * JSON reporter marks every listed test `skipped` (nothing ran) -- measured directly
- * before being trusted, not assumed.
- */
-async function countExcludedByDesign() {
-  const outFile = path.join(TEST_RESULTS_DIR, 'excluded-by-design-count.json');
-  const { code } = await runTagged(
-    'discover',
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.config.ts',
-      '--project=chromium',
-      '--list',
-      `--grep=${EXCLUDED_BY_DESIGN_GREP}`,
-      '--reporter=json',
-    ],
-    { env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: outFile } },
-  );
-  if (code !== 0) {
-    throw new Error(
-      `expected \`playwright test --list --grep=${EXCLUDED_BY_DESIGN_GREP}\` to exit 0 ` +
-        `(it only lists tests, never runs them) -- got code ${code}. Cannot compute the Android group's ` +
-        'skipped-by-design count.',
-    );
-  }
-  return countAt(
-    readJson(outFile, 'the excluded-by-design discovery listing'),
-    ['stats', 'skipped'],
-    'the excluded-by-design discovery listing',
-  );
+  return pickIphone(raw, process.env.IOS_UDID);
 }
 
 // ── the three groups ────────────────────────────────────────────────────
@@ -801,15 +902,9 @@ function neverWritten(name, code, reportFile) {
  * (`null` when none was written). `reportFile` only names the report.
  *
  * @param {{ name: string, code: number | null, report: unknown,
- *   reportFile: string, extraSkipped?: number }} group
+ *   reportFile: string }} group
  */
-export function playwrightVerdict({
-  name,
-  code,
-  report,
-  reportFile,
-  extraSkipped = 0,
-}) {
+export function playwrightVerdict({ name, code, report, reportFile }) {
   if (report === null) return neverWritten(name, code, reportFile);
   const description = `${name}'s Playwright report`;
   /** @param {string} key */
@@ -825,7 +920,7 @@ export function playwrightVerdict({
     code,
     passed,
     failed: unexpected + retried,
-    skippedByDesign: count('skipped') + extraSkipped,
+    skippedByDesign: count('skipped'),
     reportSaysOk: unexpected === 0,
     reportSays: `${unexpected} failed`,
     failures: `${unexpected} test(s) failed${crashNote}`,
@@ -948,35 +1043,43 @@ async function runDesktopGroup() {
   const name = 'desktop';
   const reportFile = REPORT_FILES.desktop;
   const startedAt = Date.now();
+  // In a Linux container, not on macOS, whose engines hand a <select> to a
+  // native menu no real key press reaches (#1027; scripts/desktop-container.mjs).
+  const image = desktopImage(ROOT);
+  const passed = Object.fromEntries(
+    ['EVIDENCE_DIR', 'NAV_TIMING_FILE'].flatMap((key) =>
+      process.env[key] ? [[key, process.env[key]]] : [],
+    ),
+  );
   const { code } = await runTagged(
     name,
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.config.ts',
-      // list,json: unchanged from before this task -- terminal output and
-      // the JSON summary this script itself reads are exactly as they
-      // were. html + the jsonl reporter are ADDITIONS for the dashboard
-      // only (task brief step 3: "keep the existing --reporter=list,json
-      // behaviour alongside the new one"). Neither playwright.config.ts
-      // nor playwright.device.config.ts needed a change to support this --
-      // Playwright's CLI resolves a non-built-in reporter id via
-      // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
-      // `resolveReporter`), so a relative path on this same flag is enough;
-      // measured directly against this exact invocation shape before being
-      // trusted, not assumed.
-      '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-      // Two workers, not Playwright's default of half the cores (3 on the
-      // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
-      // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
-      // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
-      // by Shyden 2026-11-02).
-      '--workers=2',
-    ],
-    {
+    'docker',
+    desktopContainerArgv({
+      root: ROOT,
+      image,
+      playwrightArgs: [
+        '--config=playwright.config.ts',
+        // list,json: unchanged from before this task -- terminal output and
+        // the JSON summary this script itself reads are exactly as they
+        // were. html + the jsonl reporter are ADDITIONS for the dashboard
+        // only (task brief step 3: "keep the existing --reporter=list,json
+        // behaviour alongside the new one"). Neither playwright.config.ts
+        // nor playwright.device.config.ts needed a change to support this --
+        // Playwright's CLI resolves a non-built-in reporter id via
+        // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
+        // `resolveReporter`), so a relative path on this same flag is enough;
+        // measured directly against this exact invocation shape before being
+        // trusted, not assumed.
+        '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+        // Two workers, not Playwright's default of half the cores (3 on the
+        // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
+        // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
+        // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
+        // by Shyden 2026-11-02).
+        '--workers=2',
+      ],
       env: {
-        ...process.env,
+        ...passed,
         PW_REUSE_SERVER: '1',
         PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
         DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
@@ -992,7 +1095,7 @@ async function runDesktopGroup() {
         PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
         PLAYWRIGHT_HTML_OPEN: 'never',
       },
-    },
+    }),
   );
   return {
     ...playwrightVerdict({
@@ -1005,12 +1108,7 @@ async function runDesktopGroup() {
   };
 }
 
-/**
- * @param {number} excludedByDesign a COUNT, from `countExcludedByDesign()`,
- *   passed on as `extraSkipped` (which defaults to 0). Annotating it as a
- *   list from the name alone was wrong; the call site settled it.
- */
-async function runAndroidGroup(excludedByDesign) {
+async function runAndroidGroup() {
   const name = 'android';
   const startedAt = Date.now();
   const absence = isAndroidPresent();
@@ -1060,7 +1158,6 @@ async function runAndroidGroup(excludedByDesign) {
       code,
       report: reportAt(reportFile, `${name}'s Playwright JSON report`),
       reportFile: path.relative(ROOT, reportFile),
-      extraSkipped: excludedByDesign,
     }),
     durationMs: Date.now() - startedAt,
   };
@@ -1069,8 +1166,9 @@ async function runAndroidGroup(excludedByDesign) {
 async function runIosGroup() {
   const name = 'ios';
   const startedAt = Date.now();
-  const absence = isIosPresent();
-  if (absence !== null) {
+  const found = findIphone();
+  if ('absence' in found) {
+    const { absence } = found;
     process.stdout.write(
       `[${name}] device absent -- not attempting this group: ${absence}\n`,
     );
@@ -1093,37 +1191,64 @@ async function runIosGroup() {
   // leftover mode from an earlier run.
   if (existsSync(IOS_MODE_FILE)) unlinkSync(IOS_MODE_FILE);
 
+  // Real taps and keys come from WebDriverAgent (#838), started here, in
+  // the runner's own process, and stopped whatever the group did. A WDA
+  // that cannot start fails the group, naming why: the iPhone run never
+  // falls back to taps that are not taps.
   const reportFile = REPORT_FILES.ios;
-  const { code } = await runTagged(
-    name,
-    'npx',
-    [
-      'vitest',
-      'run',
-      '--config=vitest.ios.config.ts',
-      '--reporter=verbose',
-      '--reporter=json',
-      `--outputFile.json=${reportFile}`,
-      // Additive, same as the two Playwright groups' jsonl reporter --
-      // verbose+json are unchanged. The leading "./" is load-bearing, not
-      // decorative: vitest's own CLI-to-config resolution
-      // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
-      // starting "// ./reporter.js || ../reporter.js, but not
-      // .reporters/reporter.js") only treats a --reporter value as a file
-      // path when it matches /^\.\.?\//; a bare path is treated as a
-      // reporter NAME and fails to resolve. Measured, not assumed -- see
-      // tests/reporters/jsonl-vitest.ts's own module doc. No change to
-      // vitest.ios.config.ts needed.
-      '--reporter=./tests/reporters/jsonl-vitest.ts',
-    ],
-    {
-      env: {
-        ...process.env,
-        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-        DASHBOARD_GROUP: name,
+  let wda;
+  try {
+    wda = await startWda({ udid: found.device.udid });
+  } catch (error) {
+    const reason = `WebDriverAgent did not start: ${messageOf(error)}`;
+    process.stdout.write(`[${name}] ${reason}\n`);
+    return {
+      name,
+      status: 'failed',
+      passed: null,
+      failed: null,
+      skippedByDesign: null,
+      durationMs: Date.now() - startedAt,
+      reason,
+    };
+  }
+  process.stdout.write(`[${name}] WebDriverAgent ready at ${wda.url}\n`);
+  let code;
+  try {
+    ({ code } = await runTagged(
+      name,
+      'npx',
+      [
+        'vitest',
+        'run',
+        '--config=vitest.ios.config.ts',
+        '--reporter=verbose',
+        '--reporter=json',
+        `--outputFile.json=${reportFile}`,
+        // Additive, same as the two Playwright groups' jsonl reporter --
+        // verbose+json are unchanged. The leading "./" is load-bearing, not
+        // decorative: vitest's own CLI-to-config resolution
+        // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
+        // starting "// ./reporter.js || ../reporter.js, but not
+        // .reporters/reporter.js") only treats a --reporter value as a file
+        // path when it matches /^\.\.?\//; a bare path is treated as a
+        // reporter NAME and fails to resolve. Measured, not assumed -- see
+        // tests/reporters/jsonl-vitest.ts's own module doc. No change to
+        // vitest.ios.config.ts needed.
+        '--reporter=./tests/reporters/jsonl-vitest.ts',
+      ],
+      {
+        env: {
+          ...process.env,
+          DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+          DASHBOARD_GROUP: name,
+          WDA_URL: wda.url,
+        },
       },
-    },
-  );
+    ));
+  } finally {
+    await wda.stop();
+  }
   const durationMs = Date.now() - startedAt;
   // An evidence run leaves the page builder this group's report beside its
   // captures (#354). A report never written is already a failed group below.
@@ -1139,7 +1264,7 @@ async function runIosGroup() {
   // `modeInfo.description` is the FULL sentence session.ts already rendered
   // via its own `describeInteractionMode` call -- read verbatim, not
   // recomputed here, because this script cannot import that function
-  // directly (see `isIosPresent`'s own comment for the measured
+  // directly (see `findIphone`'s own comment for the measured
   // reason) and a hand-copied paraphrase could drift from the source of
   // truth the moment either file is edited.
   const modeNote = modeInfo
@@ -1162,15 +1287,28 @@ async function runIosGroup() {
 
 // ── cleanup: always runs, whatever happened above ───────────────────────
 
-async function cleanupAdbTunnels() {
-  // Measured directly: `adb reverse --remove-all` / `adb forward --remove-all`
-  // both exit 0 against a device with nothing mapped -- safe no-ops, so
-  // these run unconditionally, not gated on whether the Android group
-  // actually attempted anything.
-  for (const args of [
+/**
+ * The `adb` calls the end-of-run cleanup makes: both tunnels removed when the
+ * Android group is in the run, and none at all otherwise. An iOS-only run
+ * (`--ios`, on a simulator) touches no USB device, so it must not remove
+ * another session's Android tunnels (#1163). `adb forward/reverse
+ * --remove-all` exit 0 on a device with nothing mapped, so an Android run
+ * makes them whatever its group did.
+ *
+ * @param {readonly string[]} groupNames
+ * @returns {string[][]}
+ */
+export function adbCleanupCalls(groupNames) {
+  if (!groupNames.includes('android')) return [];
+  return [
     ['forward', '--remove-all'],
     ['reverse', '--remove-all'],
-  ]) {
+  ];
+}
+
+/** @param {readonly string[]} groupNames */
+async function cleanupAdbTunnels(groupNames) {
+  for (const args of adbCleanupCalls(groupNames)) {
     try {
       adb(args);
     } catch (error) {
@@ -1240,10 +1378,42 @@ function printSummaryTable(groups, totalDurationMs) {
   process.stdout.write('\n');
 }
 
+/**
+ * Every target's total, one line each, and whether they are even (#1049): the
+ * same suite ran on every target, so the totals must match and nothing may be
+ * skipped. Reads each group's report only when that group ran this run, so a
+ * report a earlier run left behind is never counted.
+ *
+ * @param {any[]} groups
+ */
+function judgeTotals(groups) {
+  /** @param {string} name */
+  const reportOf = (name) =>
+    groups.some((g) => g.name === name && g.status !== 'not-run')
+      ? /** @type {Record<string, any> | null} */ (
+          reportAt(
+            REPORT_FILES[/** @type {'desktop' | 'android' | 'ios'} */ (name)],
+            `${name}'s report`,
+          )
+        )
+      : null;
+  return evenTotals(
+    deviceTargets({
+      desktop: reportOf('desktop'),
+      android: reportOf('android'),
+      ios: reportOf('ios'),
+    }),
+  );
+}
+
 // ── main ─────────────────────────────────────────────────────────────────
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let previewChild = null;
+
+/** The groups this run launches, set once its arguments are read; cleanup reads it. */
+/** @type {readonly string[]} */
+let runGroupNames = [];
 
 /**
  * Runs `task` on the first call only, and answers every call with that run's
@@ -1276,13 +1446,15 @@ export function exitCodeFor(signal) {
 const cleanup = once(async () => {
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
-    await killByPort(PORT).catch((error) =>
+    try {
+      stopProcessGroup(previewChild);
+    } catch (error) {
       process.stderr.write(
-        `cleanup: failed to free port ${PORT}: ${messageOf(error)}\n`,
-      ),
-    );
+        `cleanup: failed to stop the preview server: ${messageOf(error)}\n`,
+      );
+    }
   }
-  await cleanupAdbTunnels();
+  await cleanupAdbTunnels(runGroupNames);
 });
 
 /**
@@ -1333,6 +1505,7 @@ export function deviceRunGroups(args) {
 async function main() {
   const groupNames = deviceRunGroups(process.argv.slice(2));
   if (typeof groupNames === 'string') die(groupNames);
+  runGroupNames = groupNames;
 
   cleanUpOnSignal();
 
@@ -1358,7 +1531,7 @@ async function main() {
   // AFTER the build, the preview-server start and the
   // @emulated-viewport count -- tens of seconds after the dashboard is
   // already up and rendering. Watched happening on a real run: the iOS
-  // card showed dom-dispatch mode banner while its own badge still read
+  // card showed the old mode banner while its own badge still read
   // "pending", because the file on disk was still the PREVIOUS run's.
   // Harmless in substance on THIS device (the mode has been stable), but
   // exactly the shape of claim design doc s5a exists to forbid --
@@ -1389,10 +1562,9 @@ async function main() {
     // it.
     await startDashboard();
 
-    process.stdout.write(
-      '==> Freeing port 4321 (any stale server from a previous run)...\n',
-    );
-    await killByPort(PORT);
+    // Waited for, never taken: the server on it may be another session's
+    // or worktree's (#390 F44).
+    await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
     const build = await runTagged('build', 'npm', ['run', 'build']);
@@ -1405,17 +1577,23 @@ async function main() {
     process.stdout.write(
       '==> Starting the shared preview server (npm run preview -- --host 0.0.0.0)...\n',
     );
-    previewChild = spawnTagged('preview', 'npm', [
-      'run',
+    // Its own process group: cleanup stops npm AND the server it started,
+    // and nothing else that happens to use the port (#390 F44).
+    previewChild = spawnTagged(
       'preview',
-      '--',
-      '--host',
-      '0.0.0.0',
-    ]);
-    await waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
-      timeoutMs: 30_000,
-      describe: `the shared preview server to answer on :${PORT}`,
-    });
+      'npm',
+      ['run', 'preview', '--', '--host', '0.0.0.0'],
+      { detached: true },
+    );
+    await untilReadyOrExit(
+      previewChild,
+      waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
+        timeoutMs: 30_000,
+        describe: `the shared preview server to answer on :${PORT}`,
+      }),
+      recentLines(previewChild),
+      'the shared preview server',
+    );
 
     // Brief step 2(d): abort the WHOLE run rather than let three groups
     // measure the wrong bytes.
@@ -1427,23 +1605,10 @@ async function main() {
       '==> Confirmed: the shared server serves the page this run just built, byte for byte.\n',
     );
 
-    // The Android group's own count, asked only when that group runs.
-    let excludedByDesign = 0;
-    if (groupNames.includes('android')) {
-      process.stdout.write(
-        '==> Counting excluded-by-design exclusions (static, source-only fact)...\n',
-      );
-      excludedByDesign = await countExcludedByDesign();
-      process.stdout.write(
-        `==> ${excludedByDesign} test(s) excluded by design ` +
-          `(${EXCLUDED_BY_DESIGN_GREP.split('|').join(' or ')}) for the Android group.\n`,
-      );
-    }
-
     /** @type {Record<string, () => Promise<Record<string, unknown>>>} */
     const runners = {
       desktop: runDesktopGroup,
-      android: () => runAndroidGroup(excludedByDesign),
+      android: runAndroidGroup,
       ios: runIosGroup,
     };
     process.stdout.write(
@@ -1465,7 +1630,12 @@ async function main() {
     writeDashboardFinal({ aborted: null, groups });
 
     printSummaryTable(groups, Date.now() - startedAt);
-    const anyBad = groups.some((g) => g.status !== 'passed');
+    const totals = judgeTotals(groups);
+    process.stdout.write(
+      `Totals per target:\n${totals.lines.map((l) => `  ${l}`).join('\n')}\n`,
+    );
+    if (!totals.ok) process.stdout.write(`\nFAILED: ${totals.reason}\n\n`);
+    const anyBad = groups.some((g) => g.status !== 'passed') || !totals.ok;
     process.exitCode = anyBad ? 1 : 0;
   } catch (fatal) {
     process.stderr.write(`\nABORTED: ${messageOf(fatal)}\n\n`);

@@ -44,6 +44,19 @@ export type Stored = 'sent' | 'form-full' | 'connection-full';
 const COLUMNS = REPORT_COLUMNS.join(', ');
 const VALUES = REPORT_COLUMNS.map((_, at) => `?${at + 1}`).join(', ');
 const PRUNE = 'DELETE FROM report_counts WHERE day <> ?1';
+/**
+ * Reports are kept for a year (Shyden, 2026-11-11, #1140): every write also
+ * deletes the reports received before the day 365 days earlier.
+ */
+const RETIRE = 'DELETE FROM reports WHERE received_at < ?1';
+const KEPT_DAYS = 365;
+
+/** The UTC day (`YYYY-MM-DD`) a report received before is deleted on `day`. */
+export const retiredBefore = (day: string): string => {
+  const at = new Date(`${day}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() - KEPT_DAYS);
+  return at.toISOString().slice(0, 10);
+};
 const INSERT = `INSERT INTO reports (${COLUMNS}) VALUES (${VALUES})`;
 const INSERT_WITHIN = `INSERT INTO reports (${COLUMNS}) SELECT ${VALUES}
  WHERE COALESCE((SELECT count FROM report_counts WHERE day = ?9 AND counter = 'all'), 0) < ?10
@@ -62,8 +75,9 @@ export async function storeReport(
   count: { counter: string; limits: ReportLimits } | null,
 ): Promise<Stored> {
   const prune = db.prepare(PRUNE).bind(day);
+  const retire = db.prepare(RETIRE).bind(retiredBefore(day));
   if (!count) {
-    await db.batch([prune, db.prepare(INSERT).bind(...row)]);
+    await db.batch([prune, db.prepare(INSERT).bind(...row), retire]);
     return 'sent';
   }
   const id = row[0];
@@ -76,6 +90,7 @@ export async function storeReport(
     db.prepare(COUNT).bind(day, 'all', id),
     db.prepare(COUNT).bind(day, counter, id),
     db.prepare(READ).bind(day, counter),
+    retire,
   ]);
   if ((results[1]?.results.length ?? 0) === 1) return 'sent';
   const all =

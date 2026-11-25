@@ -412,7 +412,6 @@ describe('the seam -- typed numbers reach the engine unchanged', () => {
     mode: { kind: 'perGroup', size: 5 },
     leftovers: 'spread',
     sexMode: 'off',
-    pinned: [],
     // A fresh generator per call, seeded identically, so two runs of the
     // same arrangement are comparable rather than merely similar.
     random: seeded(1),

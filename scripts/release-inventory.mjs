@@ -29,6 +29,17 @@ export const VISITOR_PREFIXES = Object.freeze([
   'public/',
 ]);
 
+/**
+ * Files at the root that shape what the build ships: the site's packages and
+ * its Astro config (#390 F60). A dependency bump changes the bundle a visitor
+ * downloads, so it is a visitor-facing change.
+ */
+export const VISITOR_ROOT_FILES = Object.freeze([
+  'package.json',
+  'package-lock.json',
+  'astro.config.mjs',
+]);
+
 /** @typedef {(args: string[]) => string} Git */
 
 /**
@@ -118,8 +129,10 @@ export const inventoryOf = (commits) =>
       pr,
       ticket,
       files,
-      visitorFacing: files.some((file) =>
-        VISITOR_PREFIXES.some((prefix) => file.startsWith(prefix)),
+      visitorFacing: files.some(
+        (file) =>
+          VISITOR_PREFIXES.some((prefix) => file.startsWith(prefix)) ||
+          VISITOR_ROOT_FILES.includes(file),
       ),
       areas: [
         ...new Set(

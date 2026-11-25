@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { openBoard } from '../board-settled';
@@ -94,6 +95,12 @@ export const expectVisibleText = async (target: Locator, text: string) => {
   await expect(target).toHaveText(text);
 };
 
+/** The same two checks for a walk making many: one failure hides no other. */
+export const softVisibleText = async (target: Locator, text: string) => {
+  await expect.soft(target).toBeVisible();
+  await expect.soft(target).toHaveText(text);
+};
+
 /**
  * Give every roster row a sex.
  *
@@ -112,7 +119,7 @@ export const giveEveryoneASex = async (page: Page, sex: 'M' | 'F' = 'M') => {
     const select = rows
       .nth(i)
       .getByLabel(stringsOf(page).rosterColSex, { exact: true });
-    if ((await select.inputValue()) === '') await select.selectOption(sex);
+    if ((await select.inputValue()) === '') await chooseOption(select, sex);
   }
 };
 
@@ -184,11 +191,13 @@ export const markAbsent = async (page: Page, path = '/classroom-groups') => {
 };
 
 export const setSex = async (page: Page, row: number, sex: 'M' | 'F') =>
-  page
-    .locator('.cg-student')
-    .nth(row)
-    .getByLabel(stringsOf(page).rosterColSex, { exact: true })
-    .selectOption(sex);
+  chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(row)
+      .getByLabel(stringsOf(page).rosterColSex, { exact: true }),
+    sex,
+  );
 
 /** [sex, name] per student, in order. The one builder every later suite uses. */
 export const buildRoster = async (
@@ -206,9 +215,10 @@ export const buildRoster = async (
         name,
       );
     if (sex)
-      await row
-        .getByLabel(stringsOf(page).rosterColSex, { exact: true })
-        .selectOption(sex);
+      await chooseOption(
+        row.getByLabel(stringsOf(page).rosterColSex, { exact: true }),
+        sex,
+      );
   }
   await expect(page.locator('.cg-student')).toHaveCount(students.length);
 };
@@ -273,8 +283,22 @@ export { todayISO } from '../../src/lib/csv';
  * a tap on the phone, a click elsewhere. STAND-IN: the file is then handed
  * to the chooser that press opened, because the operating system's file
  * dialog is outside the browser and no test can drive it.
+ *
+ * The page keeps one `filechooser` listener for its whole life (#1115).
+ * Playwright intercepts choosers only while something listens, and
+ * `waitForEvent` stops listening the moment it resolves, so each upload
+ * switched interception off and back on. On Firefox 159 (Playwright 1.65)
+ * a press during that switch raised no chooser, and the page never raised
+ * one again: 10 of 32 presses on one page, against 32 of 32 with this
+ * listener (CI runs 42722260664 and 42726833401).
  */
+const keepsChoosersIntercepted = new WeakSet<Page>();
+
 export const upload = async (page: Page, name: string, body: string) => {
+  if (!keepsChoosersIntercepted.has(page)) {
+    page.on('filechooser', () => {});
+    keepsChoosersIntercepted.add(page);
+  }
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     tapOn(page.locator('#cg-import')),
@@ -340,21 +364,24 @@ export const rosterWithAnAbsence = async (page: Page) => {
     ['M', 'Eko'],
     [null],
   ]);
-  await page
-    .locator('.cg-student')
-    .nth(0)
-    .getByLabel(/Together/)
-    .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(1)
-    .getByLabel(/Together/)
-    .selectOption('A');
-  await page
-    .locator('.cg-student')
-    .nth(2)
-    .getByLabel(/Apart/)
-    .selectOption('A');
+  await chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(0)
+      .getByLabel(/Together/),
+    'A',
+  );
+  await chooseOption(
+    page
+      .locator('.cg-student')
+      .nth(1)
+      .getByLabel(/Together/),
+    'A',
+  );
+  await chooseOption(
+    page.locator('.cg-student').nth(2).getByLabel(/Apart/),
+    'A',
+  );
   await setCheckedOn(
     page
       .locator('.cg-student')
@@ -596,9 +623,17 @@ export const contrastRatio = async (target: Locator): Promise<number> => {
     // Every background from the element itself -- it may paint its own --
     // outward, nearest first. Not just the first: a translucent layer is
     // composited over what is behind it, which `paintedGround` does (#390
-    // F127).
+    // F127). A shadow root's top element has no parentElement, so the walk
+    // steps out to its host and on through the page behind it (#1032:
+    // ShyDesk's form draws in a shadow DOM, and stopping there scored its
+    // dark-theme text against the white canvas, at 1.13:1).
     const grounds: string[] = [];
-    for (let at: Element | null = el; at; at = at.parentElement) {
+    const outward = (at: Element): Element | null => {
+      if (at.parentElement) return at.parentElement;
+      const root = at.getRootNode();
+      return root instanceof ShadowRoot ? root.host : null;
+    };
+    for (let at: Element | null = el; at; at = outward(at)) {
       const c = getComputedStyle(at).backgroundColor;
       if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') grounds.push(c);
     }

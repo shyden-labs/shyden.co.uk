@@ -10,7 +10,6 @@ import {
   travelSchedule,
 } from '../../src/lib/travel';
 import { seeded } from './factories';
-import { searched } from '../source-files';
 
 /**
  * The board's deal (spec 2026-10-14): who travels in what order, and when.
@@ -19,61 +18,38 @@ import { searched } from '../source-files';
  */
 const seats = (...groups: number[][]) =>
   groups.map((g) => g.map((number) => ({ number })));
-const none = new Set<number>();
 
 describe('travelOrder', () => {
   it('deals round-robin: the first seat of every group, then the second', () => {
-    expect(travelOrder(seats([1, 2, 3], [4, 5, 6]), none)).toEqual([
+    expect(travelOrder(seats([1, 2, 3], [4, 5, 6]))).toEqual([
       1, 4, 2, 5, 3, 6,
     ]);
   });
   it('passes over a group that is already full', () => {
-    expect(travelOrder(seats([1, 2, 3], [4]), none)).toEqual([1, 4, 2, 3]);
+    expect(travelOrder(seats([1, 2, 3], [4]))).toEqual([1, 4, 2, 3]);
   });
   it('deals a group of one', () => {
-    expect(travelOrder(seats([7]), none)).toEqual([7]);
+    expect(travelOrder(seats([7]))).toEqual([7]);
   });
-  it('never moves a pinned student: they are already seated', () => {
-    expect(travelOrder(seats([1, 2], [3, 4]), new Set([3]))).toEqual([1, 2, 4]);
-  });
-  it('has nobody to move when everyone is pinned', () => {
-    // Empty by design, so the inputs are the population (operator ruling
-    // 2026-10-09, "Count the inputs").
-    const cases = [
-      {
-        case: 'two groups of one, both pinned',
-        groups: seats([1], [2]),
-        pinned: new Set([1, 2]),
-      },
-    ];
-    expect(
-      searched(
-        cases.flatMap(({ groups, pinned }) => travelOrder(groups, pinned)),
-        { of: cases, what: 'deals where everyone is pinned' },
-      ),
-    ).toEqual([]);
-  });
-
   const dealt = (seed: number) => {
     const outcome = buildGroups({
       students: 30,
       mode: { kind: 'perGroup', size: 4 },
       leftovers: 'spread',
       sexMode: 'off',
-      pinned: [],
       random: seeded(seed),
     });
     if (!outcome.ok) throw new Error('the 30-student deal was refused');
     return outcome.result.groups;
   };
   it('moves every student of a real deal exactly once', () => {
-    const order = travelOrder(dealt(7), none);
+    const order = travelOrder(dealt(7));
     expect([...order].sort((a, b) => a - b)).toEqual(
       Array.from({ length: 30 }, (_, i) => i + 1),
     );
   });
   it('gives the same order for the same seeded deal', () => {
-    expect(travelOrder(dealt(7), none)).toEqual(travelOrder(dealt(7), none));
+    expect(travelOrder(dealt(7))).toEqual(travelOrder(dealt(7)));
   });
 });
 
@@ -115,10 +91,10 @@ describe('travelSchedule', () => {
 
 describe('landingsToSound', () => {
   it('sounds a landing the flight made', () => {
-    expect(landingsToSound(3, false)).toBe(true);
+    expect(landingsToSound(false)).toBe(true);
   });
   it('silences a landing a finish-now made, so a skip is not a burst', () => {
-    expect(landingsToSound(3, true)).toBe(false);
+    expect(landingsToSound(true)).toBe(false);
   });
 });
 

@@ -5,7 +5,7 @@ import {
   getSiteStrings,
   isBetaLocale,
 } from '../lib/i18n';
-import { pageIdFromPath } from '../lib/report';
+import { pageIdFromPath, pageLocales, pagePath } from '../lib/report';
 import ReportForm from './ReportForm.astro';
 
 interface Props {
@@ -35,6 +35,11 @@ const betaNotice = isBetaLocale(lang)
 // check in report-presence.spec.ts fails on it rather than letting it go
 // quietly.
 const reportPage = pageIdFromPath(Astro.url.pathname);
+// The privacy page in this page's language where it is written in it, English
+// and Indonesian (#1082); every other language links to the English page and
+// says so beside the link.
+const privacyHere = pageLocales('privacy').includes(lang);
+const privacyHref = pagePath('privacy', privacyHere ? lang : 'en');
 ---
 
 <footer id="contact-legal">
@@ -47,6 +52,10 @@ const reportPage = pageIdFromPath(Astro.url.pathname);
     {reportPage && <ReportForm lang={lang} page={reportPage} />}
     <p>
       <a href="mailto:support@shyden.co.uk">support@shyden.co.uk</a>
+    </p>
+    <p class="legal-links">
+      <a href={privacyHref}>{t.legal.privacy}</a>
+      {!privacyHere && <span data-english-only>{t.legal.englishOnly}</span>}
     </p>
   </div>
 </footer>
@@ -68,5 +77,13 @@ const reportPage = pageIdFromPath(Astro.url.pathname);
     min-width: 44px;
     min-height: 44px;
     color: var(--accent);
+  }
+  /* The gap, never a space in the markup: a flex container drops the
+     whitespace between its items (CLAUDE.md, the display: flex rule). */
+  .legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.75rem;
   }
 </style>

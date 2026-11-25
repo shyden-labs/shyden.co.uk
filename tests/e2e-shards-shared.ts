@@ -35,6 +35,10 @@ export interface Account {
   seconds: number | null;
   listedUnits: Record<string, number> | null;
   ranUnits: Record<string, number> | null;
+  projectCounts?: Record<
+    string,
+    { passed: number; failed: number; skipped: number }
+  >;
 }
 
 export const SUITE = 2210;
@@ -64,12 +68,20 @@ export const account = (
   ...over,
 });
 
+/**
+ * A shard's per-browser counts as a passing run records them: everything it
+ * ran passed, on the one browser its units name (#1056).
+ */
+const passedOnChromium = (executed: number): Partial<Account> => ({
+  projectCounts: { chromium: { passed: executed, failed: 0, skipped: 0 } },
+});
+
 /** Four shards that together ran exactly the suite: 553 + 553 + 552 + 552. */
 export const whole = (): Account[] => [
-  account(1, 553),
-  account(2, 553),
-  account(3, 552),
-  account(4, 552),
+  account(1, 553, passedOnChromium(553)),
+  account(2, 553, passedOnChromium(553)),
+  account(3, 552, passedOnChromium(552)),
+  account(4, 552, passedOnChromium(552)),
 ];
 
 /**
@@ -89,6 +101,7 @@ export const docsOnlyNeeds = (
     scope: { result: 'success', outputs: { docs_only: 'true' } },
     checks: { result: 'success', outputs: {} },
     coverage: { result: 'skipped', outputs: {} },
+    sonarcloud: { result: 'skipped', outputs: {} },
     e2e: { result: 'skipped', outputs: {} },
     'sanity-on-build': { result: 'skipped', outputs: {} },
     functions: { result: 'skipped', outputs: {} },

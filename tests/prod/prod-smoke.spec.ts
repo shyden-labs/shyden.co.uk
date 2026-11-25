@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { deployedRoutes } from '../site-pages';
+import { FETCHED_SCRIPT } from '../fetched-script';
 import { expectNotFoundServed } from '../not-found-served';
 import { PRODUCTS } from '../product-links';
 import { withoutMarkupComments } from '../unit/source-text';
@@ -29,9 +30,6 @@ const served = async (
   const response = await request.get(path);
   return { status: response.status(), body: await response.text() };
 };
-
-/** A `<script>` that fetches a file, as opposed to one carried inline. */
-const FETCHED_SCRIPT = /<script[^>]+src="[^"]*\.js"/;
 
 test.describe('the production smoke', () => {
   for (const { path } of deployedRoutes()) {

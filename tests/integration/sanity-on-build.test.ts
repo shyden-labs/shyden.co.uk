@@ -31,6 +31,7 @@ type SanityConfig = (typeof CONFIGS)[number]['config'];
 
 interface ListedTest {
   config: SanityConfig;
+  project: string;
   file: string;
   title: string;
   tags: string[];
@@ -46,7 +47,7 @@ interface JsonSpec {
   title: string;
   file: string;
   tags: string[];
-  tests: { annotations: ListedTest['annotations'] }[];
+  tests: { projectName: string; annotations: ListedTest['annotations'] }[];
 }
 
 interface JsonSuite {
@@ -66,6 +67,7 @@ function collect(
     for (const test of spec.tests)
       into.push({
         config,
+        project: test.projectName,
         file: spec.file,
         title: [...here, spec.title].join(' › '),
         tags: spec.tags,
@@ -92,8 +94,8 @@ function parsed(stdout: string): JsonListing | undefined {
 const listings = new Map<string, Listing>();
 
 /**
- * The config's test list, with the switch on or off. `PUBLIC_SHYTALK_URL`
- * and `PUBLIC_YAWELO_IDLE_URL` are removed so the answer does not depend on the
+ * The config's test list, with the switch on or off. `PUBLIC_SHYTALK_URL`,
+ * `PUBLIC_YAWELO_IDLE_URL` and `PUBLIC_YAWELO_MEDIA_URL` are removed so the answer does not depend on the
  * shell that runs the unit suite: the prod config refuses either when the
  * switch is on, by design.
  */
@@ -105,6 +107,7 @@ function listing(config: SanityConfig, onBuild: boolean): Listing {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.PUBLIC_SHYTALK_URL;
   delete env.PUBLIC_YAWELO_IDLE_URL;
+  delete env.PUBLIC_YAWELO_MEDIA_URL;
   delete env.SANITY_ON_BUILD;
   if (onBuild) env.SANITY_ON_BUILD = '1';
 
@@ -136,8 +139,10 @@ function listing(config: SanityConfig, onBuild: boolean): Listing {
   return result;
 }
 
+// Each engine's copy of a test is its own test (#1032: the dev config runs
+// three engines).
 const idOf = (test: ListedTest): string =>
-  `${test.config} › ${test.file} › ${test.title}`;
+  `${test.config} › ${test.project} › ${test.file} › ${test.title}`;
 
 /** Every test tagged `@deployed-only`, from the runs a deploy makes. */
 const deployedOnlyTests = (): ListedTest[] =>

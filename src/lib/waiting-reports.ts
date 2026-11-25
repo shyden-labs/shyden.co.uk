@@ -28,15 +28,15 @@ export const FAILURE_NOTICE = 'The waiting-reports count could not be read.';
 export const WORKFLOW_FILE = '.github/workflows/waiting-reports.yml';
 
 /**
- * The notice for a start that failed because `main` lacks the workflow (#882):
- * until the first release puts it there, that is every scheduled run. Holds no
- * digit, as the failure notice does not.
+ * The notice for a start that failed because `main` lacks the workflow (#882).
+ * Releases have put it there, so it says the absence needs looking into. Holds
+ * no digit, as the failure notice does not.
  */
 export const NOT_ON_MAIN_NOTICE =
   'The waiting-reports count was not started: `main` has no ' +
   `\`${WORKFLOW_FILE}\`, so the scheduled run could not start it, and no ` +
-  'count was read. Until the first release puts the file on `main`, this is ' +
-  'expected.';
+  'count was read. A release has put it on `main` before, so this is not ' +
+  'expected: check what took it off.';
 
 /**
  * The failure notice, given the HTTP status GitHub answered when asked for

@@ -9,7 +9,8 @@ import type { Locale } from './locales.ts';
  * #161 checked each short label against its locale's sentences. This turns the
  * check round: every piece of copy whose English names a feature -- a
  * sentence or a label -- must carry one of the words its locale approved for
- * that feature. The pin messages showed why. `warnings.PINNED_MIXED_SEX` told
+ * that feature. The pin messages (removed with the pinned path, #390 F20)
+ * showed why. The pin warning told
  * a teacher "that is what the pin asked for" as "what the tag asked for" in
  * zh, "the request in the post" in vi, and "what the pin's description says"
  * in th, with a transliteration that also means a PIN code. Each was
@@ -19,8 +20,7 @@ import type { Locale } from './locales.ts';
  * The approved words are the ones the feature's labels use, in the forms the
  * language inflects them into (operator decision on #319, 2026-09-23): vi may
  * say `tách biệt` like the roster column or `khác nhóm` like the Keep apart
- * control. A pin has no control yet, so its one word per locale was approved
- * on its own, and a future pin control is held to it.
+ * control.
  *
  * `mix` and `leftovers` joined in #390. Their state labels had been machine
  * translated as bare phrases. zh, vi and th rendered "mixed by sex" as "sorted
@@ -50,7 +50,6 @@ import type { Locale } from './locales.ts';
  * Glory Points page's three currencies (#390).
  */
 export type FeatureTerm =
-  | 'pin'
   | 'together'
   | 'apart'
   | 'absent'
@@ -67,10 +66,9 @@ export type FeatureTerm =
  * How English copy names each feature: as a whole word, in every form the
  * catalogues use. Each is matched against the English with its slots and
  * punctuation removed, so `{absent}` is a placeholder and not a use, and
- * "keeping" is not a pin.
+ * "mixture" is not a mix.
  */
 export const FEATURE_TERMS: Readonly<Record<FeatureTerm, RegExp>> = {
-  pin: /\b(?:un)?pin(?:s|ned|ning)?\b/,
   together: /\btogether\b/,
   apart: /\bapart\b/,
   absent: /\babsen(?:t|ces?)\b/,

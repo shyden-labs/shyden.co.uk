@@ -10,8 +10,8 @@
  * anything interpolated — a file's contents and a class name are a
  * teacher's text, not markup, and this section renders both.
  *
- * PRIVACY (design spec section 9, and the promise the page makes in both
- * languages): a download is a `Blob` and an object URL that is revoked the
+ * PRIVACY (design spec section 9, and the promise the page makes in every
+ * locale): a download is a `Blob` and an object URL that is revoked the
  * moment the click is dispatched. Nothing here writes to `localStorage`,
  * `sessionStorage`, a cookie or the address bar, and
  * classroom-groups-privacy.spec.ts asserts exactly that after each
@@ -622,38 +622,18 @@ export function renderIo(
       window.removeEventListener('message', onOffer);
       const { roster: incoming, className: incomingName } = event.data;
 
-      const applyAndAck = () => {
-        handlers.onImport(incoming, incomingName);
-        say(t.ioImported({ total: incoming.length }));
-        // The acknowledgement the sender waits for. Sent AFTER the roster
-        // is applied, never before: an ack that arrived first would let the
-        // sender report success for a handover that then failed to render.
-        opener.postMessage({ kind: 'cg-ack' }, window.location.origin);
-      };
-
-      // A handover is an import, and an import over existing work warns
-      // first -- design spec section 9's "Never silent, even when the
-      // counts match". This path used to skip that warning entirely and
-      // then mark the result SAVED, so a teacher's typed roster could be
-      // replaced silently and the header would say there was nothing to
-      // save about a class list that no longer existed anywhere.
-      const current = handlers.getRoster();
-      if (current.length === 0) {
-        applyAndAck();
-        return;
-      }
-      askToReplace(current);
-      confirmYes.onclick = () => {
-        clearPanels();
-        applyAndAck();
-      };
-      confirmNo.onclick = () => {
-        clearPanels();
-        // The sender is told, so it stops waiting and says what happened
-        // rather than timing out with a message about a tab that never
-        // asked -- it did ask, and this teacher declined.
-        opener.postMessage({ kind: 'cg-ack' }, window.location.origin);
-      };
+      // No warning before replacing: there is nothing here to replace. This
+      // tab was opened by the handover itself, as a fresh load, and the page
+      // keeps no class list between loads, so its roster is always empty.
+      // A replace warning here could never be seen, and declining it would
+      // still have sent the ack below, telling the sender the list was open
+      // (#390 F17). A second handover opens a tab of its own.
+      handlers.onImport(incoming, incomingName);
+      say(t.ioImported({ total: incoming.length }));
+      // The acknowledgement the sender waits for. Sent AFTER the roster is
+      // applied, never before: an ack that arrived first would let the
+      // sender report success for a handover that then failed to render.
+      opener.postMessage({ kind: 'cg-ack' }, window.location.origin);
     };
     window.addEventListener('message', onOffer);
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   declarationsRead,
@@ -6,7 +7,7 @@ import {
 } from '../unit/spec-scan';
 import ts from 'typescript';
 import { parseSource } from '../unit/ast';
-import { searched } from '../source-files';
+import { searched, specFilesUnder } from '../source-files';
 import {
   callsIn,
   declarationsIn,
@@ -611,5 +612,25 @@ describe('analyze() -- the scanner proven on synthetic input, not just trusted',
     ]);
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('synthetic.spec.ts:6');
+  });
+});
+
+// Shyden's ruling, 2026-11-07 (#1046): every fixed-width test is rewritten
+// to check what its target's width implies, except the visual baselines,
+// which are pixels at fixed widths and never run on a phone (#194). The theme
+// gallery's /classroom-groups picture was the other exception until Shyden
+// ruled on 2026-11-17 that it runs on the phones too (#1179).
+const APPROVED_FIXED_WIDTH = ['tests/e2e/visual.spec.ts'];
+
+describe('only the approved fixed-width tests stay off the phone (#1046)', () => {
+  it('no spec but the visual baselines tags a test @emulated-viewport (#1179)', () => {
+    const tagged = specFilesUnder('tests')
+      .filter((file) =>
+        declarationsIn(parseSource(readFileSync(file, 'utf8'), file)).some(
+          ({ tags }) => tags.includes(EMULATED_VIEWPORT_TAG),
+        ),
+      )
+      .sort();
+    expect(tagged).toEqual(APPROVED_FIXED_WIDTH);
   });
 });

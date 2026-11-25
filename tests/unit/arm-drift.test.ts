@@ -84,23 +84,10 @@ const ALLOWANCE: Readonly<
       'the two arm drops "all" from "not all the same sex" (English 4 apart)',
     arms: { two: { zh: 2, th: 11, id: 9, vi: 16 } },
   },
-  'warnings.PINNED_MIXED_SEX': {
-    reason:
-      'the two arm drops "all" from "not all the same sex" (English 4 apart)',
-    arms: { two: { zh: 2, th: 19, id: 9, vi: 16 } },
-  },
   'warnings.SEX_SPILLOVER': {
     reason:
       'boys and girls change places (English 8 apart); vi and th were rewritten as that swap alone (#754)',
     arms: { M: { zh: 9, th: 8, id: 18, vi: 4 } },
-  },
-  'errors.PINNED_TOO_MANY_GROUPS': {
-    reason:
-      'three situations, three sentences: the English arms are 76 and 48 characters apart',
-    arms: {
-      over: { zh: 92, th: 90, id: 95, vi: 98 },
-      full: { zh: 60, th: 65, id: 59, vi: 80 },
-    },
   },
 };
 

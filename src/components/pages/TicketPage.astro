@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ShydeskPiece from '../ShydeskPiece.astro';
+
+/**
+ * The ticket page ShyDesk's emails link to (#1032): one address for the
+ * product (ShyDesk keeps one per product), so it is English and not
+ * localised, like the API docs. The address carries the visitor's private
+ * token after `#t=`, which the piece reads itself, so the page asks not to be
+ * indexed and stays out of the sitemap.
+ */
+const TITLE = 'Your support conversation — Shyden';
+const HEADING = 'Your support conversation';
+---
+
+<BaseLayout
+  title={TITLE}
+  description={HEADING}
+  lang="en"
+  noIndex
+  localised={false}
+>
+  <section class="wrap">
+    <h1>{HEADING}</h1>
+    <ShydeskPiece view="ticket" lang="en" />
+  </section>
+</BaseLayout>
+
+<style>
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 4rem var(--space);
+  }
+</style>

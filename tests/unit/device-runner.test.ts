@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { serversClosedAfterEach } from '../http-stand-in';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -14,6 +14,7 @@ import {
   vitestVerdict,
   waitUntil,
   deviceRunGroups,
+  adbCleanupCalls,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -46,17 +47,28 @@ async function serving(
 const servers = serversClosedAfterEach();
 
 describe('waitUntil: the timeout bounds the whole wait', () => {
+  // On the test clock (#1205): paid in real time, this waited its whole
+  // deadline inside the 1 s limit.
   it('abandons a predicate that never settles at the deadline', async () => {
-    const started = Date.now();
-    await expect(
-      waitUntil(() => new Promise(() => {}), {
+    vi.useFakeTimers();
+    try {
+      let outcome: unknown = 'still waiting';
+      const waiting = waitUntil(() => new Promise(() => {}), {
         timeoutMs: 50,
         describe: 'a request the server accepted and never answered',
-      }),
-    ).rejects.toThrow(
-      'Timed out after 50ms waiting for: a request the server accepted and never answered',
-    );
-    expect(Date.now() - started).toBeLessThan(1_000);
+      }).catch((error: unknown) => {
+        outcome = error;
+      });
+      await vi.advanceTimersByTimeAsync(49);
+      expect(outcome, 'gave up before its deadline').toBe('still waiting');
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect((outcome as Error).message).toContain(
+        'Timed out after 50ms waiting for: a request the server accepted and never answered',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('answers the predicate’s own value, not a boolean', async () => {
@@ -120,28 +132,23 @@ describe('iosEvidenceReportOf: where the iOS report goes for the evidence page (
 
 describe('playwrightVerdict: what a Playwright group proved', () => {
   const REPORT = '/repo/test-results/desktop-report.json';
-  const judge = (code: number | null, report: unknown, extraSkipped?: number) =>
+  const judge = (code: number | null, report: unknown) =>
     playwrightVerdict({
       name: 'desktop',
       code,
       report,
       reportFile: REPORT,
-      extraSkipped,
     });
 
-  it('passes a clean report from a clean exit', () => {
-    expect(judge(0, stats(), 7)).toEqual({
+  it('passes a clean report from a clean exit, counting its skips as the report does (#1179)', () => {
+    expect(judge(0, stats())).toEqual({
       name: 'desktop',
       status: 'passed',
       passed: 40,
       failed: 0,
-      skippedByDesign: 12,
+      skippedByDesign: 5,
       reason: undefined,
     });
-  });
-
-  it('counts no extra skips when none is given', () => {
-    expect(judge(0, stats()).skippedByDesign).toBe(5);
   });
 
   it('fails a report with failures, saying how many', () => {
@@ -673,5 +680,18 @@ describe('deviceRunGroups: every group, or the iPhone alone (#623)', () => {
     expect(deviceRunGroups(['--ios', '--ios'])).toBe(
       'usage: test-devices.mjs [--ios] (got --ios --ios)',
     );
+  });
+});
+
+describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)', () => {
+  it('makes no adb call for an iOS-only run, so the USB phones stay free for another session', () => {
+    expect(adbCleanupCalls(['ios'])).toEqual([]);
+  });
+
+  it('removes both tunnels when the Android group is in the run', () => {
+    expect(adbCleanupCalls(['desktop', 'android', 'ios'])).toEqual([
+      ['forward', '--remove-all'],
+      ['reverse', '--remove-all'],
+    ]);
   });
 });

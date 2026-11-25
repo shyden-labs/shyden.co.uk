@@ -41,14 +41,14 @@ export const WORKFLOW_FILE = '.github/workflows/access-expiry.yml';
 
 /**
  * Said above the run when a start failed because `main` lacks the workflow
- * (#882): until the first release puts it there, that is every scheduled run.
- * Holds no digit, as the failure title does not.
+ * (#882). Releases have put it there, so it says the absence needs looking
+ * into. Holds no digit, as the failure title does not.
  */
 export const NOT_ON_MAIN_NOTICE =
   'The Access service token expiry check was not started: `main` has no ' +
   `\`${WORKFLOW_FILE}\`, so the scheduled run could not start it, and no ` +
-  'token was read. Until the first release puts the file on `main`, this is ' +
-  'expected.';
+  'token was read. A release has put it on `main` before, so this is not ' +
+  'expected: check what took it off.';
 
 /**
  * The daily job whose not-on-main notice speaks for this one too: while `main`

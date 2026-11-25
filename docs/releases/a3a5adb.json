@@ -558,7 +558,7 @@
     },
     "9af7ecd02018317e3898b5e9a587a94a8a04020a": {
       "kind": "gap",
-      "check": "Read the homepage and its footer in all five languages: the tools line and the contact button speak in one person's voice (\"I\", \"Email me\"), the beta footer notice says \"tell me\" in id, zh, vi and th, and the report form's not-found message reads as reworded."
+      "check": "Read the homepage and its footer in all five languages: the tools line, the contact button (\"Get in touch\") and the beta footer notice (\"please report it\") name no person, with no \"I\", \"me\", \"we\" or \"our\" (the 2026-11-02 rule), and the report form's not-found message reads as reworded."
     },
     "63a583116180680362c7d413eba5285162a07094": {
       "kind": "none",

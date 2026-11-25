@@ -313,8 +313,7 @@ export function blankCommentLines(text: string): string {
  * result asserts against raw prose again and stays green.
  *
  * Lives here rather than beside its caller because comment stripping has
- * exactly one home in this repo — `one-home.test.ts` enforces it, and seven
- * private copies are how that rule came to exist.
+ * one home in this repo; seven private copies are how that came to be.
  */
 export function withoutCssComments(source: string): string {
   return scanCss(source).code;
@@ -325,8 +324,7 @@ export function withoutCssComments(source: string): string {
  * meets them.
  *
  * A guard asking "did a comment survive this read?" has to name the span it
- * is hunting, and naming comment syntax outside this file is exactly what
- * `one-home.test.ts` refuses (#203). So the scanner that removes them hands
+ * is hunting, so the scanner that removes them hands
  * them back, and no caller has to spell the delimiters to find one.
  */
 export function cssComments(source: string): string[] {
@@ -644,9 +642,7 @@ export const stylesheetsIn = (file: string, text: string): string[] =>
  * The CSS a file holds, comment-free: what a stylesheet guard should scan.
  *
  * Callers take this rather than `withoutCssComments` so that reading an
- * `.astro` file the wrong way is not something a call site can express —
- * `one-home.test.ts` asserts the stripper itself has no caller outside this
- * file, which a guard passing a whole `.astro` file would break.
+ * `.astro` file the wrong way is not something a call site can express.
  */
 export const stylesheetCss = (file: string, text: string): string[] =>
   stylesheetsIn(file, text).map(withoutCssComments);

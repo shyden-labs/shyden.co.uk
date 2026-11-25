@@ -7,12 +7,7 @@ import {
   isBetaLocale,
   isLocale,
 } from '../../src/lib/i18n';
-import {
-  FOOTER_PAGE_IDS,
-  pagePath,
-  reportOptions,
-  type Outcome,
-} from '../../src/lib/report';
+import { pagePath, type Outcome } from '../../src/lib/report';
 
 /**
  * The report form's presence and contents, read from what was built (#97,
@@ -52,23 +47,6 @@ test('a built page with a footer carries the form exactly when its locale is bet
   ).toBeGreaterThan(0);
 });
 
-for (const locale of PREFIXED_LOCALES)
-  for (const page of FOOTER_PAGE_IDS)
-    test(`${pagePath(page, locale)}: the type-ahead offers exactly this page's strings`, async ({
-      page: tab,
-    }) => {
-      await tab.goto(pagePath(page, locale));
-      const offered = await tab
-        .locator('footer [data-report-strings] option')
-        .evaluateAll((options) =>
-          options.map((option) => (option as HTMLOptionElement).value),
-        );
-      expect(new Set(offered)).toEqual(new Set(reportOptions(page, locale)));
-      expect(offered.length).toBe(reportOptions(page, locale).length);
-    });
-
-// A Record, so an outcome added to the union without its copy fails to
-// compile; the list is the Record's keys.
 const COPY: Record<
   Outcome,
   'sent' | 'notFound' | 'rejected' | 'failed' | 'formFull' | 'connectionFull'
@@ -101,27 +79,4 @@ for (const locale of PREFIXED_LOCALES)
       }
     });
 
-// One test per locale (#420).
-for (const locale of PREFIXED_LOCALES)
-  test(`${locale}: the disclosure sits right after the BETA notice, and asks for nothing personal`, async ({
-    page,
-  }) => {
-    await page.goto(pagePath('home', locale));
-    // AC2: beside the BETA notice, not merely somewhere in the footer.
-    await expect(
-      page.locator('[data-beta-notice] + details[data-report]'),
-    ).toHaveCount(1);
-    // AC6: no contact fields. Exactly the fields spec 3.2 names, so a field
-    // added later has to be argued for here.
-    const named = await page
-      .locator('[data-report-form] [name]')
-      .evaluateAll((els) => els.map((el) => el.getAttribute('name')));
-    expect(named, locale).toEqual([
-      'locale',
-      'page',
-      'quote',
-      'suggestion',
-      'note',
-      'website',
-    ]);
-  });
+// The type-ahead and the disclosure are read on each page's walk: checks/report-presence.ts (#1086).

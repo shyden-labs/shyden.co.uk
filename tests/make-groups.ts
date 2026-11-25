@@ -1,3 +1,4 @@
+import { chooseOption } from './real-select';
 import { tapOn } from './real-touch';
 import { typeInto } from './real-typing';
 import type { Page } from '@playwright/test';
@@ -56,5 +57,5 @@ export const chooseSpeed = async (
   if (await soundBody.isHidden()) {
     await tapOn(page.locator('#cg-sound-toggle'));
   }
-  await page.selectOption('#cg-speed', speed);
+  await chooseOption(page.locator('#cg-speed'), speed);
 };

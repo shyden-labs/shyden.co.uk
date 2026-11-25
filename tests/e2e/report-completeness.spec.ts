@@ -14,6 +14,7 @@ import {
 } from '../../src/lib/i18n';
 import {
   FOOTER_PAGE_IDS,
+  pageLocales,
   normalise,
   pagePath,
   reportOptions,
@@ -62,7 +63,9 @@ function plainCatalogueTexts(locale: Locale): string[] {
 }
 
 for (const locale of PREFIXED_LOCALES)
-  for (const pageId of FOOTER_PAGE_IDS)
+  for (const pageId of FOOTER_PAGE_IDS.filter((id) =>
+    pageLocales(id).includes(locale),
+  ))
     test(`${pagePath(pageId, locale)}: every catalogue string on the page is reportable there`, async ({
       page,
     }) => {

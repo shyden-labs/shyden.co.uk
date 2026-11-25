@@ -1,13 +1,13 @@
 /**
- * The five engines every browser suite renders on: the e2e suite and, since
- * #350, the Functions suite. One list, so a sixth is added once.
+ * The three desktop engines every browser suite renders on: the e2e suite and,
+ * since #350, the Functions suite. One list, so a fourth is added once. No
+ * desktop browser poses as a phone (#1181): the phone group is the real
+ * Android phone and the real iPhone, never an emulated profile.
  */
 export const ENGINES = [
   { name: 'chromium', device: 'Desktop Chrome' },
   { name: 'firefox', device: 'Desktop Firefox' },
   { name: 'webkit', device: 'Desktop Safari' },
-  { name: 'mobile-chrome', device: 'Pixel 5' },
-  { name: 'mobile-safari', device: 'iPhone 13' },
 ] as const;
 
 /**

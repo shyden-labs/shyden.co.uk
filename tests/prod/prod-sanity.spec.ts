@@ -1,3 +1,6 @@
+import { tapOn } from '../real-touch';
+import { PRIVACY_EN, PRIVACY_ID } from '../../src/lib/legal/privacy';
+import { localisePath } from '../../src/lib/i18n';
 import { typeInto } from '../real-typing';
 import { test, expect } from '@playwright/test';
 import { makeGroups } from '../make-groups';
@@ -9,6 +12,7 @@ import { expectTheSwitchPersists } from '../themes';
 import { expectReportsBound } from '../report-health';
 import { accessServiceHeaders } from '../access-service-token';
 import { LEGACY_REDIRECTS, expectMovedTo } from '../legacy-redirect';
+import { atViewport } from '../viewport-at';
 
 /**
  * Every route the site serves, derived. #49.
@@ -74,7 +78,7 @@ test('the Glory Points calculator computes, not just loads', async ({
   // bundle 404s after a partial deploy, the page still serves 200 and still
   // contains every label — and this is where that shows.
   await typeInto(page.locator('#glory-input'), '1000');
-  await page.click('#glory-submit');
+  await tapOn(page.locator('#glory-submit'));
 
   // The handler fills exactly one of the two boxes. Wait for its answer,
   // whichever it is, so the no-error invariant below runs even when the
@@ -114,15 +118,11 @@ test('the Classroom Group Creator forms groups', async ({ page }) => {
 // 320px because that is the narrowest viewport the working agreement supports.
 test.describe('no page scrolls sideways at 320px', () => {
   for (const { path } of ROUTES) {
-    test(
-      `${path} fits a 320px viewport`,
-      { tag: '@emulated-viewport' },
-      async ({ page }) => {
-        await page.setViewportSize({ width: 320, height: 720 });
-        await page.goto(path);
-        await expectNoHorizontalScroll(page, path);
-      },
-    );
+    test(`${path} fits a 320px viewport`, async ({ page }) => {
+      await atViewport(page, { width: 320, height: 720 });
+      await page.goto(path);
+      await expectNoHorizontalScroll(page, path);
+    });
   }
 });
 
@@ -198,7 +198,7 @@ for (const [from, to] of LEGACY_REDIRECTS)
       annotation: {
         type: 'deployed-only',
         description:
-          'the redirect is functions/_middleware.js, and a preview of dist/ runs no Pages Function',
+          'the functions suite proves the redirect, functions/_middleware.js, before the merge (#394); only the deployed site proves shyden.co.uk itself answers it',
       },
     },
     async ({ request }) => {
@@ -224,7 +224,7 @@ test(
   },
   async ({ page }) => {
     await page.goto('/api/docs/');
-    await page.locator('#swagger .opblock-summary-control').first().click();
+    await tapOn(page.locator('#swagger .opblock-summary-control').first());
     await expect(
       page.locator('#swagger .opblock-post .opblock-body'),
     ).toBeVisible();
@@ -261,3 +261,25 @@ for (const [what, path] of [
       }
     },
   );
+
+// #1082: the Indonesian privacy page, which governs for residents of Indonesia.
+test('the Indonesian privacy page is served on production', async ({
+  page,
+}) => {
+  expect((await page.goto(localisePath('/privacy/', 'id')))?.status()).toBe(
+    200,
+  );
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    PRIVACY_ID.heading,
+  );
+  await expect(page.locator('main')).toContainText(PRIVACY_ID.updated);
+});
+
+// #1080: the English privacy page every footer links to.
+test('the privacy page is served on production', async ({ page }) => {
+  expect((await page.goto('/privacy/'))?.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    PRIVACY_EN.heading,
+  );
+  await expect(page.locator('main')).toContainText(PRIVACY_EN.updated);
+});

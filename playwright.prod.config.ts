@@ -34,11 +34,15 @@ import { onBuild } from './tests/sanity-on-build';
 //
 // With SANITY_ON_BUILD=1 it measures this tree's own production build instead
 // (#335). A build inherits the whole environment, and a config cannot unset a
-// variable for it, so a PUBLIC_SHYTALK_URL or PUBLIC_YAWELO_IDLE_URL left in
-// the shell would build DEV product links into what this run calls
-// production. Either is refused.
+// variable for it, so a PUBLIC_SHYTALK_URL, PUBLIC_YAWELO_IDLE_URL or
+// PUBLIC_YAWELO_MEDIA_URL left in the shell would build DEV product links or
+// media into what this run calls production. Each is refused.
 const build = onBuild(4399, {});
-for (const variable of ['PUBLIC_SHYTALK_URL', 'PUBLIC_YAWELO_IDLE_URL'])
+for (const variable of [
+  'PUBLIC_SHYTALK_URL',
+  'PUBLIC_YAWELO_IDLE_URL',
+  'PUBLIC_YAWELO_MEDIA_URL',
+])
   if (build && process.env[variable] !== undefined)
     throw new Error(
       `SANITY_ON_BUILD: ${variable} is set (${process.env[variable]}), ` +
@@ -63,6 +67,11 @@ export default defineConfig({
     baseURL:
       build?.baseURL ?? process.env.WEB_BASE_URL ?? 'https://shyden.co.uk',
     colorScheme: 'dark',
+    // A failing test leaves its screenshot for the workflow to upload;
+    // never a trace or a video: a trace records every
+    // request's headers, these runs carry credentials, and this repository's
+    // artifacts are public (#1233).
+    screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

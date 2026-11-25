@@ -612,7 +612,7 @@ describe('parseRoster', () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.problems[0].message).toBe(
-      "Row 1 — absent 'maybe' not understood. Use yes, no, or leave blank.",
+      "Row 1 — absent 'maybe' is not understood. Use yes, no, or leave blank.",
     );
   });
 
@@ -621,7 +621,7 @@ describe('parseRoster', () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.problems[0].message).toBe(
-      "Row 1 — sex 'Male' not understood. Use M, F, or leave blank.",
+      "Row 1 — sex 'Male' is not understood. Use M, F, or leave blank.",
     );
   });
 
@@ -635,7 +635,7 @@ describe('parseRoster', () => {
     expect(out.problems[0].message).toContain('L');
     expect(out.problems[0].message).not.toContain('Use M, F');
     expect(out.problems[0].message).not.toBe(
-      "Row 1 — sex 'Male' not understood. Use M, F, or leave blank.",
+      "Row 1 — sex 'Male' is not understood. Use M, F, or leave blank.",
     );
   });
 
@@ -668,6 +668,26 @@ describe('parseRoster', () => {
     expect(out.problems[0].message).toBe(
       "Row 2 — number 'abc' is not a whole number.",
     );
+  });
+
+  it.each(['0', '00'])(
+    'refuses number %s, as the roster does, by name (#1097)',
+    (value) => {
+      const out = parseRoster(`number\n1\n${value}\n2\n`, 'en', en);
+      expect(out.ok).toBe(false);
+      if (out.ok) return;
+      expect(out.problems).toEqual([
+        {
+          row: 2,
+          message: `Row 2 — number '${value}' is too low. Numbers start at 1.`,
+        },
+      ]);
+    },
+  );
+
+  it('still takes number 1, and a 2 written as 02', () => {
+    const out = parseRoster('number\n1\n02\n', 'en', en);
+    expect(out.ok && out.roster.map((s) => s.number)).toEqual([1, 2]);
   });
 
   it('refuses a file with no number column at all', () => {
@@ -1390,5 +1410,151 @@ describe('an unset dropdown exports as nothing, not as its own column name', () 
     expect(searched(leaked, { of: locales, what: 'locales exported' })).toEqual(
       [],
     );
+  });
+});
+
+/**
+ * OWASP CSV injection (#390 F23). The class list is meant to be opened in a
+ * spreadsheet, which runs a cell beginning =, +, - or @ as a formula. A name
+ * like that is written with a leading apostrophe, which a spreadsheet shows as
+ * text, and reading the file back takes the apostrophe off again.
+ */
+describe('a name a spreadsheet would run as a formula', () => {
+  const named = (name: string) => [student({ number: 1, name })];
+
+  it('the class list writes a tab-led formula as text', () => {
+    expect(serialiseRoster(named('\t=1+1'), '', 'en').split('\n')[1]).toBe(
+      `1,'\t'=1+1,,,,`,
+    );
+  });
+
+  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)'])(
+    'the class list writes %s as text',
+    (name) => {
+      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+        `1,'${name},,,,`,
+      );
+    },
+  );
+
+  it.each([
+    ' =1+1',
+    '\u3000=1+1',
+    '\uff1d1+1',
+    '\uff0b1',
+    '\uff0d1',
+    '\uff201',
+  ])(
+    'the class list writes %j, a formula behind a space or in full width, as text',
+    (name) => {
+      expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+        `1,'${name},,,,`,
+      );
+    },
+  );
+
+  // Excel splits on `;` where the region's list separator is `;`, and quoting
+  // cannot help there: the name is not the row's first cell, so its opening
+  // quote sits inside a field and is read as an ordinary character.
+  it.each([
+    ['Ana;=1+1', "Ana;'=1+1"],
+    ['Ana; =1+1', "Ana; '=1+1"],
+    ['Ana\t=1+1', "Ana\t'=1+1"],
+    ['Ana;\uff1d1+1', "Ana;'\uff1d1+1"],
+  ])('the class list writes %j as %j', (name, written) => {
+    expect(serialiseRoster(named(name), '', 'en').split('\n')[1]).toBe(
+      `1,${written},,,,`,
+    );
+  });
+
+  it('a formula after a line break in a name is text too', () => {
+    expect(serialiseRoster(named('Ana\n=1+1'), '', 'en').split('\n')[2]).toBe(
+      `'=1+1",,,,`,
+    );
+  });
+
+  it.each([';', '\t', '\n', ','])(
+    'no cell starts a formula when a spreadsheet splits the file on %j',
+    (separator) => {
+      const names = [
+        'Ana;=1+1',
+        'Ana; @x',
+        'Ana\t+1',
+        'Ana\n-1',
+        '=1',
+        ' =1',
+        'Ana;"=1+1',
+        'Ana;" =1+1',
+      ];
+      const file = serialiseRoster(
+        names.map((name, i) => student({ number: i + 1, name })),
+        'a,=1;"+2\t-3',
+        'en',
+      );
+      const cells = file.split(separator);
+      expect(cells.length).toBeGreaterThan(1);
+      expect(
+        cells.filter((text) =>
+          /^[\s"]*[=+\-@\uff1d\uff0b\uff0d\uff20]/.test(text),
+        ),
+      ).toEqual([]);
+    },
+  );
+
+  it.each([
+    ' =1+1',
+    '\u3000=1+1',
+    '\uff1d1+1',
+    'Ana;=1+1',
+    "Ana;'=1+1",
+    'Ana\t=1+1',
+    'Ana\n=1+1',
+    '\t=1+1',
+    'Ana;"=1+1',
+    'Ana;" =1+1',
+  ])('reads %j back without its added apostrophe', (name) => {
+    const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
+    expect(out.ok && out.roster[0]?.name).toBe(name);
+  });
+
+  it.each(['a,=1', 'a, =1', 'a;"=1', "a,'=1", 'a,"+1', '7B "Blue", =x'])(
+    'reads the class name %j back as it was typed',
+    (className) => {
+      const out = parseRoster(
+        serialiseRoster(named('Ana'), className, 'en'),
+        'en',
+        en,
+      );
+      expect(out.ok && out.className).toBe(className);
+    },
+  );
+
+  it('the groups file writes it as text', () => {
+    expect(
+      serialiseGroups([named('=1+1')], '', '2026-11-09', 'en').split('\n')[2],
+    ).toBe(`1,1,'=1+1`);
+  });
+
+  it.each(['=1+1', '+1+1', '-1+1', '@SUM(A1)', '\t=1+1', "'=1+1", "''=1+1"])(
+    'reads %s back as it was typed',
+    (name) => {
+      const out = parseRoster(serialiseRoster(named(name), '', 'en'), 'en', en);
+      expect(out.ok && out.roster[0]?.name).toBe(name);
+    },
+  );
+
+  it.each(["O'Brien", "'Ana", 'Ana-Maria', 'a=b'])(
+    'leaves %s alone, in the file and on the way back',
+    (name) => {
+      const file = serialiseRoster(named(name), '', 'en');
+      expect(file.split('\n')[1]).toBe(`1,${name},,,,`);
+      const out = parseRoster(file, 'en', en);
+      expect(out.ok && out.roster[0]?.name).toBe(name);
+    },
+  );
+
+  it('takes the apostrophe off a formula a teacher wrote that way by hand', () => {
+    const out = parseRoster("number,name\n1,'=1+1\n", 'en', en);
+    expect(out.ok && out.roster[0]?.name).toBe('=1+1');
   });
 });

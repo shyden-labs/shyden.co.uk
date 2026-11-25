@@ -578,3 +578,15 @@ const slotsFilled = (text: string): string =>
     )
     .sort()
     .join(', ');
+
+/**
+ * The DeepL key: the environment's first, then the `DEEPL_API_KEY=` line of
+ * `.env.local`, else empty. One reading for every script that sends (#390
+ * F26); each passes what it read, so this stays pure.
+ */
+export function deeplKeyFrom(
+  envValue: string | undefined,
+  localFile: string | undefined,
+): string {
+  return envValue ?? /^DEEPL_API_KEY=(.*)$/m.exec(localFile ?? '')?.[1] ?? '';
+}

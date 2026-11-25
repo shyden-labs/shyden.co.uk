@@ -1,4 +1,4 @@
-import { deflateSync } from 'node:zlib';
+import { crc32, deflateSync } from 'node:zlib';
 
 /**
  * A PNG built in the test process (#678): 8-bit RGB or RGBA, each row written
@@ -20,14 +20,12 @@ const paeth = (a: number, b: number, c: number): number => {
 const chunk = (kind: string, data: Buffer): Buffer => {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
-  // The decoder reads no CRC, so a zero one keeps this fixture free of a
-  // CRC table nothing here would test.
-  return Buffer.concat([
-    length,
-    Buffer.from(kind, 'latin1'),
-    data,
-    Buffer.alloc(4),
-  ]);
+  // A real CRC: our own decoder reads none, but Playwright's comparator,
+  // which the capture also judges with (#1116), refuses a wrong one.
+  const typed = Buffer.concat([Buffer.from(kind, 'latin1'), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(typed));
+  return Buffer.concat([length, typed, crc]);
 };
 
 /**

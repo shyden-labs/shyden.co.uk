@@ -375,8 +375,6 @@ const PAGE = `<!doctype html>
   .fail-list li { color: var(--failed); }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .mode-banner { border-radius: 6px; padding: 0.6rem 0.7rem; margin-bottom: 0.6rem; font-size: 0.82rem; line-height: 1.4; }
-  .mode-banner.dom-dispatch { background: #3a2a00; border: 1px solid var(--skipped); color: #ffd876; }
-  @media (prefers-color-scheme: light) { .mode-banner.dom-dispatch { background: #fff6d9; color: #6b4e00; } }
   .mode-banner.native { background: rgba(46,160,67,0.12); border: 1px solid var(--passed); }
   .empty { color: var(--muted); font-style: italic; }
   .report-link { display: inline-block; margin-top: 0.5rem; font-size: 0.8rem; }
@@ -394,7 +392,7 @@ const PAGE = `<!doctype html>
 
 <script>
 (function () {
-  var GROUP_LABEL = { desktop: 'Desktop (emulated, 5 projects)', android: 'Android (real device)', ios: 'iOS (real device)' };
+  var GROUP_LABEL = { desktop: 'Desktop (3 engines)', android: 'Android (real device)', ios: 'iOS (real device)' };
   var grid = document.getElementById('grid');
   var sub = document.getElementById('sub');
   var abortBox = document.getElementById('abort');
@@ -436,7 +434,7 @@ const PAGE = `<!doctype html>
     var html = '<h2>' + esc(label) + ' <span class="badge ' + badgeClass + '">' + esc(badge) + '</span></h2>';
 
     if (g.mode && g.mode.mode) {
-      html += '<div class="mode-banner ' + (g.mode.mode === 'dom-dispatch' ? 'dom-dispatch' : 'native') + '">' + esc(g.mode.description) + '</div>';
+      html += '<div class="mode-banner native">' + esc(g.mode.description) + '</div>';
     }
 
     if (g.notRun) {
@@ -453,10 +451,10 @@ const PAGE = `<!doctype html>
     var skipped = g.final ? g.final.skippedByDesign : g.skipped;
     // g.total (live) counts only what the jsonl 'begin' event saw, i.e.
     // what Playwright/Vitest actually COLLECTED. The authoritative
-    // skippedByDesign in g.final can be larger than that: it also counts
-    // tests excluded by the emulated-viewport tag's grepInvert BEFORE
-    // collection ever happens (android-chrome only), which the live
-    // stream never saw at all. Caught live: without this, a finished
+    // skippedByDesign in g.final can be larger than that: until #1179 it
+    // also counted tests a grepInvert excluded BEFORE collection ever
+    // happened (android-chrome only), which the live stream never saw at
+    // all. Caught live: without this, a finished
     // Android run showed "223 / 176" -- done exceeding total, individually
     // correct numbers read together as nonsense. Once final data exists,
     // the displayed total is recomputed from the SAME three authoritative
@@ -606,7 +604,9 @@ async function main() {
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(PORT, '0.0.0.0', () => resolve(undefined));
+    // Loopback only: the run is readable with no login, and the laptop is
+    // often on a shared network (#390 F43).
+    server.listen(PORT, '127.0.0.1', () => resolve(undefined));
   });
 
   // eslint-disable-next-line no-console

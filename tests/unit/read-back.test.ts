@@ -267,9 +267,7 @@ describe('writerOf: who wrote a line', () => {
   };
 
   it('DeepL, when the line is its draft unchanged', () => {
-    expect(writerOf('th', 'Add a student', 'เพิ่มนักเรียน', drafts)).toBe(
-      'DeepL',
-    );
+    expect(writerOf('th', 'Add a student', 'เพิ่มนักเรียน', drafts)).toBe('DeepL');
   });
 
   it('edited after DeepL, when the line differs from its draft', () => {

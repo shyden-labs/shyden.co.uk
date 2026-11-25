@@ -16,25 +16,27 @@ const t = getSiteStrings(lang).home;
 
 // Env-derived so we never cross environments: the DEV site must link to DEV
 // ShyTalk, prod to prod. Defaults to prod; deploy-dev.yml sets
-// PUBLIC_SHYTALK_URL=https://dev.shytalk.shyden.co.uk before the dev build.
-const shytalkUrl =
-  import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.shyden.co.uk';
+// PUBLIC_SHYTALK_URL=https://dev.shytalk.app before the dev build.
+const shytalkUrl = import.meta.env.PUBLIC_SHYTALK_URL ?? 'https://shytalk.app';
 
 // The same rule for Yawelo Idle (#403): deploy-dev.yml sets
-// PUBLIC_YAWELO_IDLE_URL=https://dev.yawelo-idle.shyden.co.uk before the dev build.
-// The production host had no DNS record when this shipped; the operator chose
-// to link it from release day anyway (2026-10-04).
+// PUBLIC_YAWELO_IDLE_URL=https://dev.yaweloidle.com before the dev build.
+// Neither product's own domain had a DNS record when these moved; the operator
+// chose to link them from the next release anyway (2026-11-08, #1084).
 const yaweloIdleUrl =
-  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yawelo-idle.shyden.co.uk';
+  import.meta.env.PUBLIC_YAWELO_IDLE_URL ?? 'https://yaweloidle.com';
 
-// The preview video (#835) is published by the Yawelo Idle project to the
-// shared media host (Cloudflare R2, yawelo-idle#713), never copied here. One
-// host for every build, unlike the link above: it answers byte ranges, which
-// Safari asks for, and its `same-site` resource policy admits dev.shyden.co.uk
-// as well as shyden.co.uk. MP4 first (Shyden, 2026-10-20): with WebM first
-// the real iPhone stuck on the poster. Each type names its codecs, so an
-// engine that cannot play one moves to the next.
-const yaweloIdlePromo = 'https://media.shyden.co.uk/yawelo-idle-promo';
+// The preview video (#835) is published by the Yawelo Idle project to its own
+// media host (#1193; Cloudflare R2, yawelo-idle#1013), never copied here. Like
+// the link above, the dev build sets PUBLIC_YAWELO_MEDIA_URL to the dev host
+// (https://dev-media.yaweloidle.com) so dev never reaches production. The host
+// answers byte ranges, which Safari asks for, and its `cross-origin` resource
+// policy admits this site. MP4 first (Shyden, 2026-10-20): with WebM first the
+// real iPhone stuck on the poster. Each type names its codecs, so an engine
+// that cannot play one moves to the next.
+const yaweloIdleMedia =
+  import.meta.env.PUBLIC_YAWELO_MEDIA_URL ?? 'https://media.yaweloidle.com';
+const yaweloIdlePromo = `${yaweloIdleMedia}/yawelo-idle-promo`;
 const promoSources = [
   {
     src: `${yaweloIdlePromo}.mp4`,
@@ -138,9 +140,10 @@ const yaweloIdleFeatures = [
         </Button>
       </p>
     </div>
-    {/* Tap to play, poster first, no script (ruled 2026-10-16): nothing of
-        the video downloads until it is played, and the width and height
-        hold its 16:9 box before a byte arrives. */}
+    {/* Tap to play, poster first (ruled 2026-10-16): nothing of the video
+        downloads until it is played, and the width and height hold its 16:9
+        box before a byte arrives. Its one script handles Space and Enter
+        (Shyden, 2026-11-18, #1054), and fetches nothing until a press. */}
     <figure class="promo">
       <video
         controls
@@ -193,6 +196,25 @@ const yaweloIdleFeatures = [
     </p>
   </section>
 </BaseLayout>
+<script>
+  import { onVideoKey, onVideoKeyUp } from '../../lib/videoKeys';
+
+  const video = document.querySelector<HTMLVideoElement>('#yawelo-idle video');
+  // On the window, on the way down: the player inside the video would
+  // otherwise see the key first (src/lib/videoKeys.ts).
+  if (video) {
+    window.addEventListener(
+      'keydown',
+      (event) => event.target === video && onVideoKey(event, video),
+      { capture: true },
+    );
+    window.addEventListener(
+      'keyup',
+      (event) => event.target === video && onVideoKeyUp(event),
+      { capture: true },
+    );
+  }
+</script>
 <style
   define:vars={{
     shytalkShy: SHYTALK_MARK.shy,
@@ -378,7 +400,7 @@ const yaweloIdleFeatures = [
       width: 24rem;
     }
   }
-  /* ShyTalk brand wordmark — the exact two-tone mark from shytalk.shyden.co.uk:
+  /* ShyTalk brand wordmark — the exact two-tone mark from the ShyTalk product:
      light "Shy" + light-purple glowing "Talk", bold with tight tracking.
      Colours taken from the live logo; values live in src/lib/shytalk-brand.ts,
      and the tile's theme token in tokens.css (#142 §3.4). */

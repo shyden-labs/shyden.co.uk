@@ -1,0 +1,21 @@
+---
+import SupportPage from '../../components/pages/SupportPage.astro';
+import { PREFIXED_LOCALES } from '../../lib/i18n';
+
+/**
+ * The support page for every locale that carries a prefix (#1032), on the
+ * same one-route pattern as `classroom-groups.astro` beside it: adding a
+ * locale to LOCALES adds the route, and the default locale keeps its own
+ * unprefixed route at `src/pages/support.astro`.
+ */
+export function getStaticPaths() {
+  return PREFIXED_LOCALES.map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+const { locale } = Astro.props;
+---
+
+<SupportPage lang={locale} />

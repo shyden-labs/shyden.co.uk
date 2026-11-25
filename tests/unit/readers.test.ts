@@ -555,8 +555,6 @@ describe("withGoogleWriters: Google's readings name their writers as the cache s
       writers: ['DeepL'],
     });
     expect(next.readings.th['ไม่มี']?.writers).toEqual(['DeepL']);
-    expect(stale.readings.th['เพิ่มนักเรียน']?.writers).toEqual([
-      'no DeepL draft',
-    ]);
+    expect(stale.readings.th['เพิ่มนักเรียน']?.writers).toEqual(['no DeepL draft']);
   });
 });

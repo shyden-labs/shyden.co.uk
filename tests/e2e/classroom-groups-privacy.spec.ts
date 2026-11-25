@@ -1,3 +1,4 @@
+import { chooseOption } from '../real-select';
 import { setCheckedOn, tapOn } from '../real-touch';
 import { typeInto } from '../real-typing';
 import { test, expect } from './fixtures';
@@ -8,7 +9,6 @@ import { recorded, shoot } from './evidence';
 import { recordErrors } from './recorders';
 import {
   buildRoster,
-  buildRosterAtPath,
   expectNothingStored,
   upload,
   downloadName,
@@ -54,7 +54,7 @@ const NON_PERSONAL_NAMES = ['mode', 'leftovers'];
 // child out of the lesson. The decision was session-only (operator,
 // 2026-09-16), and this is that decision written down.
 test.describe('privacy — the number fields are forgotten on reload', () => {
-  test('nothing a teacher types into the three fields survives a reload', async ({
+  test('nothing typed into the fields is stored or survives a reload', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
@@ -70,32 +70,14 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
     // controls spec calls out for "collapse it, reload, still collapsed".
     // Proving they held the values immediately before the reload is what
     // makes the emptiness afterwards a fact about persistence.
-    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
-    await expect(page.locator('#cg-numbers-together')).toHaveValue('3,9');
-    await expect(page.locator('#cg-numbers-apart')).toHaveValue('2,5');
+    await expect.soft(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
+    await expect.soft(page.locator('#cg-numbers-together')).toHaveValue('3,9');
+    await expect.soft(page.locator('#cg-numbers-apart')).toHaveValue('2,5');
     await shoot(
       page,
       'all three fields hold what was typed',
       page.locator('.number-fields'),
     );
-
-    await page.reload();
-
-    await expect(page.locator('#cg-numbers-absent')).toHaveValue('');
-    await expect(page.locator('#cg-numbers-together')).toHaveValue('');
-    await expect(page.locator('#cg-numbers-apart')).toHaveValue('');
-    await shoot(
-      page,
-      'all three fields empty after a reload',
-      page.locator('.number-fields'),
-    );
-  });
-
-  test('and nothing about them is written to storage', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await typeInto(page.locator('#cg-count'), '25');
-    await typeInto(page.locator('#cg-numbers-absent'), '7, 12');
-    await expect(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
 
     // The positive control has to CREATE something first. This page writes
     // exactly ONE key, and only when the sound toggle changes, so on a fresh
@@ -106,6 +88,8 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
     // comment is not a control.
     await tapOn(page.locator('#cg-sound-toggle'));
     await setCheckedOn(page.locator('#cg-sound-check'), false);
+    // Still held after the storage write: the value was typed, not stored.
+    await expect.soft(page.locator('#cg-numbers-absent')).toHaveValue('7, 12');
 
     // The WHOLE of both stores, not a probe for a key name this test
     // invented: a guessed key would pass against any implementation that
@@ -115,22 +99,30 @@ test.describe('privacy — the number fields are forgotten on reload', () => {
         Object.keys(store).map((key) => `${key}=${store.getItem(key) ?? ''}`);
       return [...dump(localStorage), ...dump(sessionStorage)];
     });
-    expect(
-      stored.filter((entry) => entry.startsWith('cg-sound=')),
-    ).toHaveLength(1);
+    expect
+      .soft(stored.filter((entry) => entry.startsWith('cg-sound=')))
+      .toHaveLength(1);
 
     // The population sits INSIDE the assertion (#118), so an empty `stored`
-    // cannot make this pass by leaving nothing to search. `absence-liveness`
-    // cannot see this site at all -- a value derived from `page.evaluate` is
-    // the blind spot #185 is open about -- so the idiom is here by choice,
-    // not because a guard insisted.
+    // cannot make this pass by leaving nothing to search.
     // `12` on its own rather than the text as typed: a page that parsed the
     // field and stored `[7,12]` leaks exactly what one storing `7, 12` does,
     // and every serialisation of that absence contains it.
     const leaked = stored.filter((entry) => entry.includes('12'));
-    expect(
-      searched(leaked, { of: stored, what: 'browser storage entries' }),
-    ).toEqual([]);
+    expect
+      .soft(searched(leaked, { of: stored, what: 'browser storage entries' }))
+      .toEqual([]);
+
+    await page.reload();
+
+    await expect.soft(page.locator('#cg-numbers-absent')).toHaveValue('');
+    await expect.soft(page.locator('#cg-numbers-together')).toHaveValue('');
+    await expect.soft(page.locator('#cg-numbers-apart')).toHaveValue('');
+    await shoot(
+      page,
+      'all three fields empty after a reload',
+      page.locator('.number-fields'),
+    );
   });
 });
 
@@ -178,20 +170,12 @@ test.describe('privacy — the class list cannot leave the page', () => {
 test.describe('privacy — with JavaScript blocked', () => {
   test.use({ javaScriptEnabled: false });
 
-  for (const [path, notice] of [
-    ['/classroom-groups', 'This tool needs JavaScript enabled.'],
-    ['/id/classroom-groups', 'Alat ini memerlukan JavaScript yang aktif.'],
-  ] as const) {
-    test(
-      `${path}: says so, in its own language`,
-      { tag: '@requires-isolated-context' },
-      async ({ page }) => {
-        await page.goto(path);
-        // Not "a noscript tag exists" — the sentence a visitor actually reads.
-        await expect(page.locator('#cg-noscript')).toHaveText(notice);
-      },
-    );
-  }
+  // The sentence a no-script visitor reads, by locale. Only en and id carried
+  // this check; zh, vi and th are still not asked it.
+  const NOTICES: Partial<Record<(typeof LOCALES)[number], string>> = {
+    en: 'This tool needs JavaScript enabled.',
+    id: 'Alat ini memerlukan JavaScript yang aktif.',
+  };
 
   // Code review on this task (I-3): `#cg-howto-body` used to ship `hidden`
   // in the raw markup, which meant a visitor without JavaScript got the
@@ -209,92 +193,101 @@ test.describe('privacy — with JavaScript blocked', () => {
   // F111). The words come from the catalogue the page renders; the approved
   // wording is pinned where copy is pinned (classroom-groups-controls.spec.ts
   // and classroom-groups-placement.test.ts).
+  //
+  // One test per locale, and so one page load: every read of a page that runs
+  // no script is a read of the same markup, and on a phone each load walks
+  // Chrome's own settings screens (#1086).
   for (const locale of LOCALES) {
     const path = localisePath('/classroom-groups', locale);
     const t = getStrings(locale);
+    const notice = NOTICES[locale];
     test(
-      `${path}: the lead and How to use part 1 are reachable without JavaScript`,
-      { tag: '@requires-isolated-context' },
+      `${path}: what a visitor without JavaScript is shown`,
+      { tag: '@javascript-blocked' },
       async ({ page }) => {
         await page.goto(path);
-        await expect(page.locator('#cg-howto-body')).toBeVisible();
+        if (notice !== undefined) {
+          // Not "a noscript tag exists" — the sentence a visitor actually reads.
+          await expect.soft(page.locator('#cg-noscript')).toHaveText(notice);
+        }
+        await expect.soft(page.locator('#cg-howto-body')).toBeVisible();
         // Since #384 the who-and-why paragraph is the lead, and part 1 of
         // How to use says what the tool does. Both must survive no script,
         // and be SEEN: `toHaveText` reads a hidden element's text too (#188).
         const lead = page.locator('.lead');
-        await expect(lead).toBeVisible();
-        await expect(lead).toHaveText(t.lead);
+        await expect.soft(lead).toBeVisible();
+        await expect.soft(lead).toHaveText(t.lead);
         const whatItDoes = page.locator('#cg-howto-body > p');
-        await expect(whatItDoes).toBeVisible();
-        await expect(whatItDoes).toHaveText(t.howToWhat);
+        await expect.soft(whatItDoes).toBeVisible();
+        await expect.soft(whatItDoes).toHaveText(t.howToWhat);
+
+        if (locale !== 'en') return;
+
+        // M-10 (stage-2 traceability matrix; design spec section 13's own "The
+        // no-JS message is unchanged... the new sections do not each need their
+        // own"). Stage 2, Task 7 folded Sound & animation into the tool's fourth
+        // collapsible section -- proving the SAME single notice still covers it
+        // is what keeps this row honestly ticked, rather than assumed true
+        // because it was true of the first three. What would redden this: a
+        // second `<noscript>` added anywhere on the page, e.g. one guarding the
+        // new section specifically -- exactly the mistake this row exists to
+        // catch, since without script NONE of the four sections can be opened at
+        // all and one notice already says why.
+        await expect.soft(page.locator('noscript')).toHaveCount(1);
+        // Shown only while script is really blocked: with it on, a <noscript>
+        // holds raw text and #cg-noscript is not in the page at all (#1047).
+        await expect.soft(page.locator('#cg-noscript')).toBeVisible();
+
+        // Last, because the submit navigates away from the page read above.
+        // A teacher fills the form in and presses the button before noticing the
+        // notice. With no listener attached, this is a native GET. The
+        // paste-names box that used to carry typed names is gone (it fed
+        // `students: string[]`, an input shape the rewritten engine no longer
+        // accepts -- see grouping.ts's GroupingInput). What remains general on
+        // purpose, rather than naming fields one at a time: the query string a
+        // native submit produces may contain ONLY the allow-list, so a `name`
+        // added to any future data field fails here the moment it is added,
+        // before it carries anything that looks personal.
+        //
+        // Stage 2, Task 5 gave this page its first typed-text control since
+        // that box was removed: #cg-class. It carries no `name` (see that
+        // field's own comment in ClassroomGroupsPage.astro), so the structural
+        // guarantee above already covers it with no change needed -- an unnamed
+        // control cannot be serialised into a form GET at all. Filled here
+        // anyway, with a value distinctive enough to be unmistakable, so the
+        // proof is concrete rather than resting on that guarantee alone.
+        // No script runs on this page, so no tap can report where it landed: each is proved by its
+        // effect, the typed value below and the URL the submit writes (#1047).
+        await typeInto(page.locator('#cg-count'), '24', { byEffect: true });
+        await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B', {
+          byEffect: true,
+        });
+        await expect
+          .soft(page.locator('#cg-class'))
+          .toHaveValue('PrivacyProbeClassName7B');
+        await tapOn(page.locator('#cg-go'), { byEffect: true });
+        // WebKit schedules the form's GET after the click has returned, so the
+        // click's own wait for navigations can end before it starts, and the URL
+        // read next was the old one (#449, run 37026039545). Wait for the
+        // submission's URL itself: no submit at all fails here, by timing out.
+        await page.waitForURL((submitted) => submitted.search !== '');
+
+        // Over the keys the submit actually wrote (#424): with no submit at all
+        // the URL is empty, and an empty URL passed this as a clean one.
+        const url = new URL(page.url());
+        const keys = [...url.searchParams.keys()];
+        expect
+          .soft(
+            searched(
+              keys.filter((key) => !NON_PERSONAL_NAMES.includes(key)),
+              { of: keys, what: 'query keys a native submit wrote' },
+            ),
+          )
+          .toEqual([]);
+        expect.soft(url.search).not.toContain('PrivacyProbeClassName7B');
       },
     );
   }
-
-  // M-10 (stage-2 traceability matrix; design spec section 13's own "The
-  // no-JS message is unchanged... the new sections do not each need their
-  // own"). Stage 2, Task 7 folded Sound & animation into the tool's fourth
-  // collapsible section -- proving the SAME single notice still covers it
-  // is what keeps this row honestly ticked, rather than assumed true
-  // because it was true of the first three. What would redden this: a
-  // second `<noscript>` added anywhere on the page, e.g. one guarding the
-  // new section specifically -- exactly the mistake this row exists to
-  // catch, since without script NONE of the four sections can be opened at
-  // all and one notice already says why.
-  test(
-    'one notice still covers all four sections, not one each',
-    { tag: '@requires-isolated-context' },
-    async ({ page }) => {
-      await page.goto('/classroom-groups');
-      await expect(page.locator('noscript')).toHaveCount(1);
-    },
-  );
-
-  test(
-    'submitting cannot put a class list in the URL',
-    { tag: '@requires-isolated-context' },
-    async ({ page }) => {
-      await page.goto('/classroom-groups');
-
-      // A teacher fills the form in and presses the button before noticing the
-      // notice. With no listener attached, this is a native GET. The
-      // paste-names box that used to carry typed names is gone (it fed
-      // `students: string[]`, an input shape the rewritten engine no longer
-      // accepts -- see grouping.ts's GroupingInput). What remains general on
-      // purpose, rather than naming fields one at a time: the query string a
-      // native submit produces may contain ONLY the allow-list, so a `name`
-      // added to any future data field fails here the moment it is added,
-      // before it carries anything that looks personal.
-      //
-      // Stage 2, Task 5 gave this page its first typed-text control since
-      // that box was removed: #cg-class. It carries no `name` (see that
-      // field's own comment in ClassroomGroupsPage.astro), so the structural
-      // guarantee above already covers it with no change needed -- an unnamed
-      // control cannot be serialised into a form GET at all. Filled here
-      // anyway, with a value distinctive enough to be unmistakable, so the
-      // proof is concrete rather than resting on that guarantee alone.
-      await typeInto(page.locator('#cg-count'), '24');
-      await typeInto(page.locator('#cg-class'), 'PrivacyProbeClassName7B');
-      await tapOn(page.locator('#cg-go'));
-      // WebKit schedules the form's GET after the click has returned, so the
-      // click's own wait for navigations can end before it starts, and the URL
-      // read next was the old one (#449, run 37026039545). Wait for the
-      // submission's URL itself: no submit at all fails here, by timing out.
-      await page.waitForURL((submitted) => submitted.search !== '');
-
-      // Over the keys the submit actually wrote (#424): with no submit at all
-      // the URL is empty, and an empty URL passed this as a clean one.
-      const url = new URL(page.url());
-      const keys = [...url.searchParams.keys()];
-      expect(
-        searched(
-          keys.filter((key) => !NON_PERSONAL_NAMES.includes(key)),
-          { of: keys, what: 'query keys a native submit wrote' },
-        ),
-      ).toEqual([]);
-      expect(url.search).not.toContain('PrivacyProbeClassName7B');
-    },
-  );
 });
 
 test.describe('privacy — when the script dies half-way', () => {
@@ -381,23 +374,21 @@ test.describe('privacy — when storage is unavailable', () => {
     });
   });
 
-  test('the tool still makes groups', async ({ page }) => {
-    await page.goto('/classroom-groups');
-    await makeGroups(page, '8', '4');
-
-    await expect(page.locator('#cg-results .student')).toHaveCount(8);
-  });
-
-  test('and the sound toggle still works, it just cannot remember', async ({
+  // The sound toggle goes first: `makeGroups` opens the sound section itself
+  // when it is hidden, so tapping the toggle after it would shut it again.
+  test('the tool still makes groups and the sound toggle works, it just cannot remember', async ({
     page,
   }) => {
     await page.goto('/classroom-groups');
     await tapOn(page.locator('#cg-sound-toggle'));
-    await expect(page.locator('#cg-sound-check')).toBeChecked();
+    await expect.soft(page.locator('#cg-sound-check')).toBeChecked();
     await setCheckedOn(page.locator('#cg-sound-check'), false);
     // The label still tracks the control — the write failed, silently and
     // correctly, without breaking the widget.
-    await expect(page.locator('#cg-sound-text')).toHaveText('Sound off');
+    await expect.soft(page.locator('#cg-sound-text')).toHaveText('Sound off');
+
+    await makeGroups(page, '8', '4');
+    await expect.soft(page.locator('#cg-results .student')).toHaveCount(8);
   });
 
   // Code review on this task (I-3): the raw markup now ships How to use
@@ -536,16 +527,14 @@ test.describe('privacy — the roster never leaves memory', () => {
     // list grows as letters are taken, so a fresh roster offers exactly
     // "A"). Selecting 'X' waits forever on an option the page has no
     // reason to render. Found by running it.
-    await page
-      .locator('.cg-student')
-      .nth(0)
-      .getByLabel('Apart')
-      .selectOption('A');
-    await page
-      .locator('.cg-student')
-      .nth(2)
-      .getByLabel('Apart')
-      .selectOption('A');
+    await chooseOption(
+      page.locator('.cg-student').nth(0).getByLabel('Apart'),
+      'A',
+    );
+    await chooseOption(
+      page.locator('.cg-student').nth(2).getByLabel('Apart'),
+      'A',
+    );
     await setCheckedOn(page.getByLabel('Number of groups'));
     await typeInto(page.getByLabel('How many groups'), '2');
     await giveEveryoneASex(page);
@@ -600,8 +589,12 @@ test.describe('privacy — the roster still never persists, after the new paths'
     await expectNothingStored(page, 'after an import', ...ROSTER_NAMES);
   });
 
-  test('an export writes nothing, and leaves no object URL behind', async ({
+  // One roster, one open Import and export section, then the export and the
+  // handover in turn (#1086). The export is checked first: the handover opens
+  // a second tab, which the export checks do not want.
+  test('an export and a handover write nothing, and an export leaves no object URL behind', async ({
     page,
+    context,
   }) => {
     await buildRoster(page, [
       ['F', 'Ana'],
@@ -613,22 +606,14 @@ test.describe('privacy — the roster still never persists, after the new paths'
     // The blob URL is revoked the moment the click is dispatched, so no
     // <a> holding the file's bytes is left in the document -- see
     // io-ui.ts's own `download` for why that matters here.
-    expect(
-      await page.evaluate(
-        () => document.querySelectorAll('a[href^="blob:"]').length,
-      ),
-    ).toBe(0);
-  });
+    expect
+      .soft(
+        await page.evaluate(
+          () => document.querySelectorAll('a[href^="blob:"]').length,
+        ),
+      )
+      .toBe(0);
 
-  test('the handover writes nothing in either tab', async ({
-    page,
-    context,
-  }) => {
-    await buildRosterAtPath(page, '/classroom-groups', [
-      ['F', 'Ana'],
-      ['M', 'Budi'],
-    ]);
-    await tapOn(page.locator('#cg-io-toggle'));
     const [, newPage] = await Promise.all([
       page.waitForEvent('download'),
       context.waitForEvent('page'),
@@ -636,7 +621,7 @@ test.describe('privacy — the roster still never persists, after the new paths'
     ]);
     await newPage.waitForLoadState();
     await tapOn(newPage.locator('#cg-students-toggle'));
-    await expect(newPage.locator('.cg-student')).toHaveCount(2);
+    await expect.soft(newPage.locator('.cg-student')).toHaveCount(2);
     await expectNothingStored(
       page,
       'source tab after the handover',

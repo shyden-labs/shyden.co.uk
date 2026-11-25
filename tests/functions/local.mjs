@@ -15,6 +15,12 @@ export const PERSIST = '.wrangler/functions-test';
 export const CONFIG = 'tests/functions/wrangler.toml';
 export const DATABASE = 'reports-local';
 export const DATABASE_ID = '00000000-0000-4000-8000-000000000097';
+/**
+ * The dev-pass secret the local server holds for Yawelo Idle (#1192), a test
+ * value only. ShyTalk's is left unset on purpose, so the suite sees a
+ * project without its secret fail closed on workerd.
+ */
+export const DEV_PASS_SECRET_YAWELO = 'functions-local-dev-pass';
 /** The counter secret the local server is given (#872): 64 hex, a test value only. */
 export const SECRET =
   '6b1f0e0c5d4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0';
