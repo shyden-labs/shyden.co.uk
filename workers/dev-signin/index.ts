@@ -7,7 +7,12 @@ import {
   type CodeStore,
 } from '../../scripts/dev-pass/signin.ts';
 import type { SigningKey } from '../../scripts/dev-pass/pass.ts';
-import { DOOR_SECRET_HEADER, HOSTS } from './config.ts';
+import {
+  DOOR_SECRET_HEADER,
+  EMBED_AUDIENCES,
+  HOSTS,
+  PUBLIC_KEYS,
+} from './config.ts';
 
 export interface SigninEnv {
   /** Secret: the value the door adds in `DOOR_SECRET_HEADER`. */
@@ -81,6 +86,7 @@ export function createSignin(deps: SigninDeps) {
         audience: env.ACCESS_AUD,
         fetchCerts: () => fetchCerts(env),
         hosts: HOSTS,
+        embeds: { keys: PUBLIC_KEYS, audiences: EMBED_AUDIENCES },
         signing: await signingKey(env),
         codes: env.CODES,
         now: deps.nowSeconds(),
