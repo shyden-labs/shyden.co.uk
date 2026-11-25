@@ -21,6 +21,10 @@ FROM libretranslate/libretranslate:v1.9.6@sha256:1de2d7056bb8ad607a412f4563d9abe
 # reads. The engine names Simplified Chinese `zh` here and `zh-Hans` in its
 # API, which is why the script asks for the script, not the code.
 ENV LT_LOAD_ONLY=en,id,zh,vi,th
+# Never root (SonarCloud S6471, #1277). The base image already runs as
+# `libretranslate` (its config's User, read from the registry for both
+# architectures on 2026-11-25); saying so here keeps it that way.
+USER libretranslate
 
 # Every model, installed when the image is BUILT (#666). The image ships with
 # none, and a boot used to fetch them: on 2026-10-10 a boot whose DNS was
