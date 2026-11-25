@@ -92,13 +92,13 @@ export function androidAbsence(raw, serial) {
  * @returns {{ width: number, density: number }}
  */
 export function renderedScreen(sizeOutput, densityOutput) {
-  const size = /(\d+)x\d+\s*$/.exec(sizeOutput.trim());
+  const size = /(?<!\d)(\d+)x\d+\s*$/.exec(sizeOutput.trim());
   if (size === null) {
     throw new Error(
       `\`adb shell wm size\` printed no WxH size: ${JSON.stringify(sizeOutput)}`,
     );
   }
-  const density = /(\d+)\s*$/.exec(densityOutput.trim());
+  const density = /(?<!\d)(\d+)\s*$/.exec(densityOutput.trim());
   if (density === null) {
     throw new Error(
       `\`adb shell wm density\` printed no density: ${JSON.stringify(densityOutput)}`,

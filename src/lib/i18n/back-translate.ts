@@ -450,7 +450,7 @@ export function engineConfig(
       `BACK_TRANSLATE_URL must be the engine's http(s) address, e.g. http://localhost:5000; got ${JSON.stringify(raw)}`,
     );
   const apiKey = env.BACK_TRANSLATE_API_KEY;
-  return { url: raw.replace(/\/+$/, ''), ...(apiKey ? { apiKey } : {}) };
+  return { url: raw.replace(/(?<!\/)\/+$/, ''), ...(apiKey ? { apiKey } : {}) };
 }
 
 /**
@@ -506,7 +506,7 @@ export const cell = (text: string): string =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\|/g, '\\|')
-    .replace(/\s*\n\s*/g, ' ');
+    .replace(/\s+/g, (run) => (run.includes('\n') ? ' ' : run));
 
 /** Rows as a review table, in the order given. */
 const table = (rows: readonly Comparison[]): string[] => [
