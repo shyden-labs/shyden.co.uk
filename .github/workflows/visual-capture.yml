@@ -129,7 +129,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Capture the baselines
         env:
           VISUAL: '1'

@@ -147,7 +147,7 @@ jobs:
           id="$(node scripts/pages.mjs live shyden-site-dev)"
           echo "id=${id}" >> "$GITHUB_OUTPUT"
           echo "Dev serves ${id} before this deploy."
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Build (dev — outbound ShyTalk and Yawelo Idle links and Yawelo Idle media → DEV, never prod)
         env:
           PUBLIC_SHYTALK_URL: https://dev.shytalk.app
@@ -244,7 +244,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Sanity-check the live dev site
         env:
           # The dev site is behind Basic auth; the username half is ignored by
