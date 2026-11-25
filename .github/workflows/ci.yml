@@ -150,7 +150,11 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Our own `prepare` (scripts/install-hooks.mjs), which --ignore-scripts
+      # skips with every dependency's: the integration suite checks git
+      # really runs the pre-push hook (tests/integration/git-hooks.test.ts).
+      - run: npm run prepare
       # Every label `.github/dependabot.yml` asks for must exist, or Dependabot
       # drops it and posts a configuration-error comment in its place -- which
       # it did on every pull request from 2026-09-21 until #299. The claim is
@@ -195,7 +199,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -210,9 +214,8 @@ jobs:
   # failed gate is a failed required check.
   #
   # Its own job, because the token must never share one with the branch's
-  # code running: `npm ci` runs every dependency's install script and the
-  # tests run the branch's code, and either could rewrite a later step or the
-  # scan's report and send the token elsewhere (a Dependabot pull request
+  # code running: the tests run the branch's code and its dependencies, and
+  # either could rewrite a later step or the scan's report and send the token elsewhere (a Dependabot pull request
   # gets the Dependabot secret). So this job checks out afresh, runs no npm,
   # takes the lcov file alone from `coverage`, and `scripts/sonar-verdict.mjs`
   # (node built-ins only) sends the token to https://sonarcloud.io and
@@ -339,7 +342,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # No build step, on purpose: the web server builds for the run, and the
       # unfiltered `--list` each shard is held to runs first, on a tree with
       # no `dist/`. That makes every shard prove collection needs no build
@@ -432,7 +435,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # The selection is read into a variable first: an assignment stops the
       # step when the inventory fails, where `$(...)` inside the command would
       # hand Playwright no test ids and run the WHOLE suite under capture.
@@ -518,7 +521,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # Both sanity configs declare one project, chromium.
       - run: npm run test:sanity
       - name: Keep the failing run's Playwright traces
@@ -561,7 +564,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:functions
       - name: Keep the failing run's Playwright traces
         if: failure()
@@ -678,7 +681,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # Every baseline in this repo is captured on a laptop and compared HERE,
       # and until this printed nothing had ever confirmed the two render on the
       # same architecture (#224). The repo's claim that "both sides run the

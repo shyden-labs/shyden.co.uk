@@ -62,9 +62,9 @@
   },
   "allowScripts": {
     "@scarf/scarf@1.4.0": false,
-    "esbuild@0.28.2": true,
+    "esbuild@0.28.2": false,
     "fsevents@2.3.3": true,
-    "workerd@1.20261119.1": true
+    "workerd@1.20261119.1": false
   },
   "scarfSettings": {
     "enabled": false

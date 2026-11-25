@@ -93,6 +93,16 @@ const DENIED: Readonly<Record<string, string>> = {
     'install telemetry: its postinstall reports each install to Scarf. ' +
     'swagger-ui-dist depends on it; denied by the operator 2026-10-15, ' +
     'with scarfSettings.enabled false in package.json as well.',
+  // Issue 987: Shyden ruled 2026-11-25 to skip both, on the laptop as on CI.
+  esbuild:
+    'its postinstall only swaps the JavaScript launcher for the platform ' +
+    'binary; Astro and Vite call the binary through its JS API, so the ' +
+    'launcher is never started (measured: a hand-typed `esbuild --version` ' +
+    'takes 234 ms instead of 43 ms; the build is unchanged).',
+  workerd:
+    'its postinstall only swaps the JavaScript launcher for the runtime ' +
+    "binary; wrangler and miniflare start the binary `require('workerd')` " +
+    'names, so the launcher is never started (measured on #987).',
 };
 
 describe('the install-script allowlist', () => {

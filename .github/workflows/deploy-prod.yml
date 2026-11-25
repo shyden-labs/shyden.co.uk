@@ -75,7 +75,7 @@ jobs:
           id="$(node scripts/pages.mjs live shyden-site)"
           echo "id=${id}" >> "$GITHUB_OUTPUT"
           echo "Production serves ${id} before this release."
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Build (prod defaults — outbound ShyTalk and Yawelo Idle links → PROD)
         run: npm run build
       - name: Guard — fail if a [[placeholder]] leaked into shipped text
@@ -157,7 +157,7 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Smoke and verify the live prod site
         env:
           WEB_BASE_URL: https://shyden.co.uk
