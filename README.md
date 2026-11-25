@@ -44,20 +44,29 @@ fetches one.
 
 npm runs a dependency's own `install`/`postinstall` scripts during `npm ci`, as
 you, with your environment — in CI, that means with the repo's secrets in reach.
-`allowScripts` in `package.json` is the list of packages permitted to do it.
-Three are, and each genuinely needs it:
+`allowScripts` in `package.json` lists every package that has one, approved
+(`true`) or denied (`false`). One is approved, because it needs it:
 
-| Package    | Script        | Why it needs one                                                                                                                |
-| ---------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `esbuild`  | `postinstall` | Downloads the prebuilt binary for your platform. Astro's build cannot run without it.                                           |
-| `fsevents` | `install`     | Compiles the native macOS file-watching binding Vitest and the dev server use for fast reloads. Darwin-only; a no-op elsewhere. |
-| `workerd`  | `postinstall` | Installs the Cloudflare Workers runtime `wrangler` runs Pages Functions in, locally and in the `functions` tests.               |
+| Package    | Script    | Why it needs one                                                                                                                |
+| ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `fsevents` | `install` | Compiles the native macOS file-watching binding Vitest and the dev server use for fast reloads. Darwin-only; a no-op elsewhere. |
+
+Three are denied, each for a stated reason (`DENIED` in `tests/unit/install-scripts.test.ts`):
+
+| Package        | Script        | Why it is denied                                                                                                                                                                                                               |
+| -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `esbuild`      | `postinstall` | It only swaps the JavaScript launcher for the platform binary. Astro and Vite call the binary through esbuild's JS API, so nothing starts the launcher; a hand-typed `esbuild --version` takes 234 ms instead of 43 ms (#987). |
+| `workerd`      | `postinstall` | The same swap for the Workers runtime: `wrangler` and miniflare start the binary `require('workerd')` names, never the launcher (#987).                                                                                        |
+| `@scarf/scarf` | `postinstall` | Install telemetry: it reports each install to Scarf (#781).                                                                                                                                                                    |
+
+CI goes further: every workflow runs `npm ci --ignore-scripts`, so no
+dependency's script runs there at all (SonarCloud S6505, #987).
 
 Entries are pinned to a version (`esbuild@0.28.1`, not `esbuild`) for the same
 reason actions are pinned to a SHA rather than a tag: a grant to a _name_ is a
 grant to every future release of that package, approved by nobody. A Dependabot
 bump therefore fails `tests/unit/install-scripts.test.ts` until someone
-re-approves — that failure is the review, and it is the point.
+re-approves or re-denies — that failure is the review, and it is the point.
 
     npm install-scripts approve esbuild    # then read the diff
 
