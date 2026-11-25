@@ -389,7 +389,10 @@ export function describeMessage(template: string): MessageDescription {
   walk(parseMessage(template));
   return {
     slots: Object.fromEntries(
-      [...slots].map(([name, kinds]) => [name, [...kinds].sort()]),
+      [...slots].map(([name, kinds]) => [
+        name,
+        [...kinds].sort((a, b) => a.localeCompare(b)),
+      ]),
     ),
     plurals,
     selects,

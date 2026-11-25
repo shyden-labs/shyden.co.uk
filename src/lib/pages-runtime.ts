@@ -117,7 +117,7 @@ export const changedApartFromRuntime = (
   [...new Set([...Object.keys(before), ...Object.keys(after)])]
     .filter((key) => !RUNTIME_KEYS.has(key))
     .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 
 /** The two calls `syncRuntime` makes, each answering as the API does. */
 export type PagesApi = {

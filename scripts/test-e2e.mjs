@@ -289,9 +289,10 @@ const ONE_ATTEMPT = { '--retries': '0', '--repeat-each': '1' };
 export function oneAttemptEach(argv, env) {
   if (!env.EVIDENCE_DIR) return 'not an evidence run';
   for (let i = 0; i < argv.length; i += 1) {
-    const [name, inline] = argv[i].split('=');
+    const parts = argv[i].split('=');
+    const name = parts[0];
     if (!Object.hasOwn(ONE_ATTEMPT, name)) continue;
-    const value = inline ?? argv[i + 1];
+    const value = parts.at(1) ?? argv.at(i + 1);
     if (value === undefined) throw new Error(`${name} was given no value`);
     if (value !== ONE_ATTEMPT[name])
       throw new Error(

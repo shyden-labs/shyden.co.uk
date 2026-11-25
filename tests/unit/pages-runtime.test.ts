@@ -181,6 +181,16 @@ describe('changedApartFromRuntime finds anything the update touched besides the 
     ).toEqual([]);
   });
 
+  it('names the keys alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    expect(
+      changedApartFromRuntime(before, {
+        ...before,
+        Zeta: 1,
+        alpha: 2,
+      } as typeof before),
+    ).toEqual(['alpha', 'Zeta']);
+  });
+
   it('names a binding the update dropped', () => {
     const { d1_databases: _dropped, ...after } = before;
     expect(changedApartFromRuntime(before, after)).toEqual(['d1_databases']);

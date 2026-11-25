@@ -386,7 +386,7 @@ export function assembleMessage(
     pluralCategories.join() !== 'other'
   )
     throw new Error(
-      `${JSON.stringify(template)}: the language has the plural forms ${[...pluralCategories].sort().join(', ')}, and a draft cut from "other" alone would be wrong for the rest`,
+      `${JSON.stringify(template)}: the language has the plural forms ${[...pluralCategories].sort((a, b) => a.localeCompare(b)).join(', ')}, and a draft cut from "other" alone would be wrong for the rest`,
     );
   const { choice, sentences } = draft(template);
   const translated = sentences.map((sentence) => {
@@ -576,7 +576,7 @@ const slotsFilled = (text: string): string =>
         ? []
         : [part.kind === 'value' ? part.name : `(${part.kind})`],
     )
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join(', ');
 
 /**

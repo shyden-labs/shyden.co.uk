@@ -113,7 +113,8 @@ export const testedHeadOf = ({ sha, parents, pulls }) => {
       pull.baseRef === DEPLOY_BASE &&
       pull.mergeCommitSha === sha,
   );
-  const [pull, ...others] = landing;
+  const pull = landing.at(0);
+  const others = landing.slice(1);
   if (pull === undefined)
     return {
       refusal: `${short(sha)} has one parent and no merged pull request into ${DEPLOY_BASE} landed it as its merge commit: a direct push, so the suite has to run here.`,
@@ -207,8 +208,9 @@ export const decideDeploy = ({
           `not a pass — that equivalence is the defect this gate exists to avoid.`,
       };
     }
-    const current = runs.reduce((a, b) =>
-      finishedAt(b) >= finishedAt(a) ? b : a,
+    const current = runs.reduce(
+      (a, b) => (finishedAt(b) >= finishedAt(a) ? b : a),
+      runs[0],
     );
     if (current.conclusion !== 'success') {
       return {

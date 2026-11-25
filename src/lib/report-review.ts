@@ -148,7 +148,7 @@ export function reportRows(output: unknown): ReportRow[] {
       `the SELECT did not succeed: ${String(JSON.stringify(statement)).slice(0, 200)}`,
     );
   return answer.results
-    .map(checkedRow)
+    .map((row, at) => checkedRow(row, at))
     .sort(
       (a, b) =>
         a.received_at.localeCompare(b.received_at) || a.id.localeCompare(b.id),

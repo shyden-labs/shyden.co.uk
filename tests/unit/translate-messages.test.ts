@@ -233,6 +233,17 @@ describe('a translated message is rebuilt, and checked', () => {
     },
   );
 
+  it('names the slots alphabetically, not by character code (SonarCloud S2871, #1274)', () => {
+    const unit = '{Total} of {names}.';
+    expect(() =>
+      assembleMessage(
+        unit,
+        translator({ [unit]: '{Total} 的 {name}。' }),
+        OTHER_ONLY,
+      ),
+    ).toThrow('which fills the slots {name, Total} instead of {names, Total}');
+  });
+
   it('refuses a translation that is not a template', () => {
     expect(() =>
       assembleMessage(

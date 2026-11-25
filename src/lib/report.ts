@@ -356,7 +356,8 @@ function hasTwoCharacters(text: string, locale: Locale): boolean {
     }
     units = segmenter.segment(text)[Symbol.iterator]();
   } else units = text[Symbol.iterator]();
-  return !units.next().done && !units.next().done;
+  const first = units.next();
+  return !first.done && !units.next().done;
 }
 
 /** Rule 3 as an anchored literal scan: each slot a non-empty wildcard, no backtracking. */
