@@ -35,7 +35,7 @@ export const TIMINGS_FILE = 'tests/e2e-shard-timings.json';
 export function timingsFileText(source, seconds) {
   const sorted = Object.fromEntries(
     Object.keys(seconds)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .map((key) => [key, Math.round(seconds[key] * 10) / 10]),
   );
   return `${JSON.stringify({ source, seconds: sorted }, null, 2)}\n`;

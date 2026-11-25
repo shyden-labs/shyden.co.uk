@@ -85,17 +85,17 @@ export function isDocsOnlyPath(path) {
 }
 
 /** git's statuses, and how many paths each one carries. */
-const PATHS_PER_STATUS = Object.freeze({
-  A: 1,
-  B: 1,
-  C: 2,
-  D: 1,
-  M: 1,
-  R: 2,
-  T: 1,
-  U: 1,
-  X: 1,
-});
+const PATHS_PER_STATUS = new Map([
+  ['A', 1],
+  ['B', 1],
+  ['C', 2],
+  ['D', 1],
+  ['M', 1],
+  ['R', 2],
+  ['T', 1],
+  ['U', 1],
+  ['X', 1],
+]);
 
 /** The statuses that leave a docs-only diff docs-only, when every path is. */
 const DOCS_STATUSES = Object.freeze(['A', 'D', 'M', 'R']);
@@ -118,8 +118,7 @@ export function parseNameStatus(output) {
   while (fields.length > 0) {
     const token = /** @type {string} */ (fields.shift());
     const status = /^([A-Z])\d*$/.exec(token)?.[1] ?? token;
-    const count =
-      PATHS_PER_STATUS[/** @type {keyof typeof PATHS_PER_STATUS} */ (status)];
+    const count = PATHS_PER_STATUS.get(status);
     if (count === undefined) throw new Error(`unknown status "${token}"`);
     if (fields.length < count)
       throw new Error(

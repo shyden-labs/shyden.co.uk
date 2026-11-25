@@ -86,7 +86,7 @@ export const readCommits = ({ base, head, git }) => {
     const [, ...parents] = git(['rev-list', '--parents', '-n', '1', sha])
       .trim()
       .split(' ');
-    const [first] = parents;
+    const first = parents.at(0);
     if (first === undefined || parents.length > 2)
       throw new Error(
         `release-inventory: ${sha} has ${parents.length} parents; a release reads merges (2) and squashes (1), and anything else needs its own rule`,
@@ -140,7 +140,7 @@ export const inventoryOf = (commits) =>
             file.includes('/') ? file.slice(0, file.indexOf('/')) : '(root)',
           ),
         ),
-      ].sort(),
+      ].sort((a, b) => a.localeCompare(b)),
     };
   });
 
@@ -284,7 +284,7 @@ export const trackedSpecs = (listing) =>
   listing
     .split('\0')
     .filter((file) => /^tests\/e2e\/[^/]+\.spec\.ts$/.test(file))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 
 const USAGE =
   'usage: release-inventory.mjs --base <sha> --head <sha> | --tests';

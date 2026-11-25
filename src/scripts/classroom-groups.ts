@@ -496,7 +496,7 @@ if (form) {
    * the toggle-on one inside soundToggle's own `change` listener).
    */
   const prefetchSoundAssets = (): void => {
-    for (const url of allSfxAssetUrls) ensureBytesLoading(url);
+    for (const url of allSfxAssetUrls) void ensureBytesLoading(url);
   };
 
   // ── settings ────────────────────────────────────────────────────────────
