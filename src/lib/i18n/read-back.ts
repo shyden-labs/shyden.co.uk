@@ -535,7 +535,11 @@ export function batches(
 }
 
 /** Code-unit order: the same on every machine, unlike `localeCompare`. */
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byText = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 
 /**
  * A run's review: a section per locale, each line beside its writer and

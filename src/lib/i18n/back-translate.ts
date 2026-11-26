@@ -288,7 +288,11 @@ export function chrF(reference: string, hypothesis: string): number {
 }
 
 /** Code-unit order: the same on every machine, unlike `localeCompare`. */
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byText = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 
 /** The review's order: lowest score first, then locale, then key. */
 export const worstFirst = (comparisons: readonly Comparison[]): Comparison[] =>
