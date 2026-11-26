@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { LOCALES, localisePath } from '../../src/lib/i18n';
+import { privacyPaths, sitePaths } from '../site-pages';
 import {
   PREVIEW_HEIGHT,
+  PREVIEW_IMAGES,
   PREVIEW_PAGES,
   PREVIEW_WIDTH,
   linkPreviewFor,
@@ -45,6 +48,7 @@ describe('previewImageFor', () => {
     expect(PREVIEW_PAGES).toEqual([
       '/',
       '/classroom-groups/',
+      '/support/',
       '/yeetalk-calculators/',
     ]);
   });
@@ -66,5 +70,20 @@ describe('linkPreviewFor', () => {
 
   it('gives the API docs the English homepage preview', () => {
     expect(linkPreviewFor('/api/docs/', 'en')).toBe('/previews/en/home.png');
+  });
+});
+
+// AC1: every published page shows itself, not its homepage. Support and
+// privacy went live after the first captures and fell back to the homepage.
+describe('every published page has its own preview (#1158)', () => {
+  const published = [
+    ...LOCALES.flatMap((locale) =>
+      sitePaths().map((path) => localisePath(path, locale)),
+    ),
+    ...privacyPaths(),
+  ];
+
+  it.each(published)('%s names a preview of its own', (path) => {
+    expect(PREVIEW_IMAGES).toContain(previewImageFor(path));
   });
 });

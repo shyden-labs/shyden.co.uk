@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { refuseMouseOnPhone } from '../device/no-mouse-on-phone';
 import {
   test as base,
@@ -244,7 +245,7 @@ const realDeviceTest = base.extend<
 >({
   installsAClock: [false, { scope: 'worker', option: true }],
   browser: [
-    async ({ installsAClock }, use) => {
+    async ({ installsAClock }, use, workerInfo) => {
       const browser = await chromium.connectOverCDP(CDP_URL);
       // Attached over plain CDP, Playwright points the phone's downloads at a folder on the
       // Mac, and every one of them ends `canceled` (#308). This points them at the phone's
@@ -259,7 +260,11 @@ const realDeviceTest = base.extend<
       emptyDeviceDownloads();
       // A run that crashed with JavaScript blocked left it off in Chrome's own settings
       // (#1047): every worker puts it back before the first test.
-      await setChromeJavaScript(true);
+      // A walk that fails keeps the screen it met in the project's results (#1272).
+      mkdirSync(workerInfo.project.outputDir, { recursive: true });
+      await setChromeJavaScript(true, {
+        evidenceDir: workerInfo.project.outputDir,
+      });
       await use(browser);
       // The clock worker's tests installed a clock on the phone's one context, so a new page
       // must show it: that proves the probe, and so every other worker's "no clock" (#854).
@@ -382,11 +387,14 @@ const realDeviceTest = base.extend<
     const blocked = testInfo.tags.includes(JAVASCRIPT_BLOCKED_TAG);
     // Two walks through Chrome's settings, one each way, take longer than a test's own budget.
     if (blocked) testInfo.setTimeout(testInfo.timeout + SETTINGS_WALKS_MS);
-    if (blocked) await setChromeJavaScript(false);
+    // A walk that fails keeps the screen it met in this test's results (#1272).
+    const walk = { evidenceDir: testInfo.outputDir };
+    if (blocked) mkdirSync(testInfo.outputDir, { recursive: true });
+    if (blocked) await setChromeJavaScript(false, walk);
     try {
       await servingYaweloMedia(context, () => use(context));
     } finally {
-      if (blocked) await setChromeJavaScript(true);
+      if (blocked) await setChromeJavaScript(true, walk);
     }
 
     // A clock this test paused would stay paused for the next test on the shared context: that

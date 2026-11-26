@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { adb } from '../../scripts/adb.mjs';
 import { CHROME_PACKAGE } from './chrome-foreground';
 import {
@@ -58,13 +59,18 @@ function wroteBeforeKilled(error: unknown): boolean {
   );
 }
 
-/** What the phone's screen shows now, read by `uiautomator dump`. */
-export function dump(): UiNode[] {
+/** Writes the phone's screen to DUMP_FILE on the phone with `uiautomator dump`. */
+function writeDump(): void {
   try {
     adb(['shell', 'uiautomator', 'dump', DUMP_FILE]);
   } catch (error) {
     if (!wroteBeforeKilled(error)) throw error;
   }
+}
+
+/** What the phone's screen shows now, read by `uiautomator dump`. */
+export function dump(): UiNode[] {
+  writeDump();
   return parseUiDump(adb(['shell', 'cat', DUMP_FILE]));
 }
 
@@ -154,11 +160,51 @@ async function openBrowserMenu(): Promise<void> {
   );
 }
 
+const SCREENSHOT_FILE = '/sdcard/chrome-settings-walk.png';
+/** How many walks have failed in this worker, so each keeps its own files. */
+let failures = 0;
+
+/**
+ * Keeps what the phone's screen shows (a screenshot and a uiautomator dump) in `dir`, and
+ * says where, or why it could not (#1272: a walk that kept nothing left its cause unknown).
+ */
+function keepTheScreen(dir: string): string {
+  failures += 1;
+  const png = join(dir, `chrome-settings-walk-${failures}.png`);
+  const xml = join(dir, `chrome-settings-walk-${failures}.xml`);
+  try {
+    adb(['shell', 'screencap', '-p', SCREENSHOT_FILE]);
+    adb(['pull', SCREENSHOT_FILE, png]);
+    writeDump();
+    adb(['pull', DUMP_FILE, xml]);
+    return `the screen it met: ${png} and ${xml}`;
+  } catch (error) {
+    return `the screen could not be captured: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 /**
  * Puts Chrome's JavaScript setting to `allowed`, then returns to the page. Reads the setting
- * back from the screen and throws, naming it, when it is not what was asked for.
+ * back from the screen and throws, naming it, when it is not what was asked for. When the
+ * walk fails and `evidenceDir` is given, the error names a screenshot and a UI dump of the
+ * screen it failed on, kept there (#1272).
  */
-export async function setChromeJavaScript(allowed: boolean): Promise<void> {
+export async function setChromeJavaScript(
+  allowed: boolean,
+  { evidenceDir }: { evidenceDir?: string } = {},
+): Promise<void> {
+  try {
+    await walkToJavaScript(allowed);
+  } catch (error) {
+    if (!evidenceDir) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message}; ${keepTheScreen(evidenceDir)}`, {
+      cause: error,
+    });
+  }
+}
+
+async function walkToJavaScript(allowed: boolean): Promise<void> {
   adb([
     'shell',
     'am',

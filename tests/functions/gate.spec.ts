@@ -2,6 +2,8 @@ import { createHmac } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import { LEGACY_REDIRECTS } from '../legacy-redirect';
 import { robotsDirectives } from '../robots-directives';
+import { SIGNIN_ORIGIN } from '../../scripts/dev-pass/door.ts';
+import { mintPass } from '../../scripts/dev-pass/pass.ts';
 import { BASE_URL, DEV_PASS_SECRET_YAWELO } from './local.mjs';
 
 // The non-prod gate, `functions/_middleware.js`, proven before the merge
@@ -11,21 +13,46 @@ import { BASE_URL, DEV_PASS_SECRET_YAWELO } from './local.mjs';
 
 const NO_INDEX = 'noindex, nofollow, noarchive';
 
-test('a visitor without the password meets the gate', async () => {
-  // Raw fetch, NOT the `request` fixture: that inherits the config's
-  // httpCredentials and would authenticate, so a missing gate would pass.
-  const anonymous = await fetch(`${BASE_URL}/`, { redirect: 'manual' });
-  expect.soft(anonymous.status).toBe(401);
-  expect
-    .soft(anonymous.headers.get('www-authenticate'))
-    .toMatch(/^Basic realm=/);
+test('a visitor without a DEV pass meets the gate', async () => {
+  // Raw fetch, NOT the `request` fixture: that carries the config's pass, so
+  // a missing gate would pass.
+  const anonymous = await fetch(`${BASE_URL}/`, {
+    redirect: 'manual',
+    headers: { Accept: 'text/html' },
+  });
+  expect.soft(anonymous.status).toBe(302);
+  const signin = new URL(anonymous.headers.get('location') ?? '', BASE_URL);
+  expect.soft(signin.origin + signin.pathname).toBe(`${SIGNIN_ORIGIN}/pass`);
+  expect.soft(signin.searchParams.get('for')).toBe('dev.shyden.co.uk');
+  expect.soft(anonymous.headers.get('www-authenticate')).toBeNull();
   expect.soft(anonymous.headers.get('x-robots-tag')).toBe(NO_INDEX);
 
-  const wrong = await fetch(`${BASE_URL}/`, {
+  // Not a page: refused outright, never redirected.
+  const api = await fetch(`${BASE_URL}/`, { redirect: 'manual' });
+  expect.soft(api.status).toBe(401);
+
+  // The old shared password opens nothing any more (#1262 AC2).
+  const basic = await fetch(`${BASE_URL}/`, {
     redirect: 'manual',
-    headers: { Authorization: `Basic ${btoa('dev:not-the-password')}` },
+    headers: { Authorization: `Basic ${btoa('dev:functions-local')}` },
   });
-  expect.soft(wrong.status).toBe(401);
+  expect.soft(basic.status).toBe(401);
+
+  // A well-formed pass signed by a key the server does not trust.
+  const pair = (await crypto.subtle.generateKey('Ed25519', true, [
+    'sign',
+    'verify',
+  ])) as CryptoKeyPair;
+  const forged = await mintPass(
+    { aud: 'dev.shyden.co.uk', sub: 'forger', kind: 'machine' },
+    { kid: 'functions-local', privateKey: pair.privateKey },
+    Math.floor(Date.now() / 1000),
+  );
+  const refused = await fetch(`${BASE_URL}/`, {
+    redirect: 'manual',
+    headers: { 'X-Dev-Pass': forged },
+  });
+  expect.soft(refused.status).toBe(401);
 
   // robots.txt answers before the gate, so a crawler is told to stay away
   // rather than handed a 401.
@@ -45,13 +72,13 @@ test('a visitor without the password meets the gate', async () => {
     expect.soft(target.pathname + target.hash, from).toBe(to);
   }
 
-  // The dev pass (#1192) is minted behind the gate, never before it.
+  // The hand-off link (#1192) is minted behind the gate, never before it.
   const pass = await fetch(`${BASE_URL}/go/yawelo`, { redirect: 'manual' });
   expect.soft(pass.status).toBe(401);
   expect.soft(pass.headers.get('location')).toBeNull();
 });
 
-test('a visitor with the password is let through, marked noindex', async ({
+test('a visitor with a DEV pass is let through, marked noindex', async ({
   request,
 }) => {
   const page = await request.get('/', { maxRedirects: 0 });

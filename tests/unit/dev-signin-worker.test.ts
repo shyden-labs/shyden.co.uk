@@ -73,11 +73,18 @@ describe('the host map', () => {
         'dev-api.yaweloidle.com',
         'dev-holding.yaweloidle.com',
         'dev.shyden.co.uk',
+        // ShyTalk's dev door (#1299; test.shytalk.app is ungated).
+        'dev.shytalk.app',
         'dev.yaweloidle.com',
         // ShyDesk's dev staff pages and demo page (#1263 AC1).
         SHYDESK,
       ].sort(),
     );
+  });
+
+  it('holds every embed door, so its own pass can be minted (#1299)', () => {
+    for (const door of Object.keys(EMBED_AUDIENCES))
+      expect(Object.keys(HOSTS), door).toContain(door);
   });
 
   it('gives no host an app link yet', () => {
