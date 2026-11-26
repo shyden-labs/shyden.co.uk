@@ -320,7 +320,7 @@ export const trackedSpecs = (git) =>
 const USAGE =
   'usage: release-inventory.mjs --base <sha> --head <sha> | --tests';
 
-const main = () => {
+export const main = () => {
   /** @type {{ base?: string, head?: string, tests?: boolean }} */
   let values;
   try {

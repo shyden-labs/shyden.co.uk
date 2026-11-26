@@ -89,22 +89,55 @@ function decodeJson(part: string): Record<string, unknown> | undefined {
 const nonEmpty = (value: unknown): value is string =>
   typeof value === 'string' && value !== '';
 
-/** Who Access let in: a person (email) or a service token (common name); undefined for anything else. */
+/** The check a refused Access token failed, named in its 401 (#1307); never the token or a claim. */
+type Refusal =
+  | 'no-token'
+  | 'malformed-token'
+  | 'algorithm'
+  | 'unknown-kid'
+  | 'signature'
+  | 'audience'
+  | 'issuer'
+  | 'expired'
+  | 'not-yet-valid'
+  | 'no-identity'
+  | 'certs';
+
+/** The response header naming the check a 401 failed (#1307). */
+export const REFUSAL_HEADER = 'x-dev-pass-refused';
+
+const refuse = (reason: Refusal | 'door-secret'): Response =>
+  reply(401, { [REFUSAL_HEADER]: reason });
+
+/** Who Access let in: a person (email) or a service token (common name); otherwise the check that failed. */
 async function accessIdentity(
   token: string | null,
   config: SigninConfig,
-): Promise<Identity | undefined> {
-  const parts = (token ?? '').split('.');
-  if (parts.length !== 3) return undefined;
+): Promise<Identity | { readonly refused: Refusal }> {
+  if (token === null || token === '') return { refused: 'no-token' };
+  const parts = token.split('.');
+  if (parts.length !== 3) return { refused: 'malformed-token' };
   const [header, body, sig] = parts as [string, string, string];
+  let head: Record<string, unknown> | undefined;
+  let claims: Record<string, unknown> | undefined;
   try {
-    const head = decodeJson(header);
-    const claims = decodeJson(body);
-    if (head?.['alg'] !== 'RS256' || claims === undefined) return undefined;
-    const cert = (await config.fetchCerts()).find(
-      (candidate) => candidate.kid === head['kid'],
-    );
-    if (cert === undefined) return undefined;
+    head = decodeJson(header);
+    claims = decodeJson(body);
+  } catch {
+    return { refused: 'malformed-token' };
+  }
+  if (head === undefined || claims === undefined)
+    return { refused: 'malformed-token' };
+  if (head['alg'] !== 'RS256') return { refused: 'algorithm' };
+  let certs: readonly AccessCert[];
+  try {
+    certs = await config.fetchCerts();
+  } catch {
+    return { refused: 'certs' };
+  }
+  const cert = certs.find((candidate) => candidate.kid === head['kid']);
+  if (cert === undefined) return { refused: 'unknown-kid' };
+  try {
     const key = await crypto.subtle.importKey('jwk', cert, RS256, false, [
       'verify',
     ]);
@@ -116,26 +149,24 @@ async function accessIdentity(
         encoder.encode(`${header}.${body}`),
       ))
     )
-      return undefined;
-    const { aud, iss, exp, nbf, email, common_name: commonName } = claims;
-    if (
-      !Array.isArray(aud) ||
-      !aud.includes(config.audience) ||
-      iss !== config.issuer
-    )
-      return undefined;
-    if (typeof exp !== 'number' || exp <= config.now) return undefined;
-    if (
-      nbf !== undefined &&
-      (typeof nbf !== 'number' || nbf > config.now + CLOCK_SKEW_SECONDS)
-    )
-      return undefined;
-    if (nonEmpty(email)) return { person: true, sub: email };
-    if (nonEmpty(commonName)) return { person: false, sub: commonName };
-    return undefined;
+      return { refused: 'signature' };
   } catch {
-    return undefined;
+    return { refused: 'signature' };
   }
+  const { aud, iss, exp, nbf, email, common_name: commonName } = claims;
+  if (!Array.isArray(aud) || !aud.includes(config.audience))
+    return { refused: 'audience' };
+  if (iss !== config.issuer) return { refused: 'issuer' };
+  if (typeof exp !== 'number' || exp <= config.now)
+    return { refused: 'expired' };
+  if (
+    nbf !== undefined &&
+    (typeof nbf !== 'number' || nbf > config.now + CLOCK_SKEW_SECONDS)
+  )
+    return { refused: 'not-yet-valid' };
+  if (nonEmpty(email)) return { person: true, sub: email };
+  if (nonEmpty(commonName)) return { person: false, sub: commonName };
+  return { refused: 'no-identity' };
 }
 
 const knownHost = (config: SigninConfig, host: string | null): host is string =>
@@ -311,7 +342,7 @@ export async function handleSignin(
   config: SigninConfig,
 ): Promise<Response> {
   if (request.headers.get(config.secretHeader) !== config.secret)
-    return reply(401);
+    return refuse('door-secret');
   const url = new URL(request.url);
   // The app holds no Access cookie, so Access bypasses this one path; PKCE guards it.
   if (url.pathname === '/app/exchange')
@@ -329,7 +360,7 @@ export async function handleSignin(
     request.headers.get(JWT_HEADER),
     config,
   );
-  if (identity === undefined) return reply(401);
+  if ('refused' in identity) return refuse(identity.refused);
   // A pathname starts with `/`, so it never names an inherited property.
   const route = ROUTES[url.pathname];
   if (route === undefined) return reply(404);

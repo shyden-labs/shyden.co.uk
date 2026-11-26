@@ -198,7 +198,7 @@ const required = (name) => {
   return value;
 };
 
-async function main() {
+export async function main() {
   /** @type {Git} */
   const git = (args) =>
     execFileSync(GIT, args, {

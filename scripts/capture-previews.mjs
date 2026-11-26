@@ -21,12 +21,9 @@ const START_CEILING_MS = 30_000;
 
 /** The paths to capture, read from the site's own list. */
 async function previewPaths() {
-  const { LOCALES } = await import('../src/lib/i18n/locales.ts');
-  const { PREVIEW_PAGES, previewImageFor, PREVIEW_WIDTH, PREVIEW_HEIGHT } =
+  const { PREVIEW_PATHS, previewImageFor, PREVIEW_WIDTH, PREVIEW_HEIGHT } =
     await import('../src/lib/preview-image.ts');
-  const pages = LOCALES.flatMap((locale) =>
-    PREVIEW_PAGES.map((page) => (locale === 'en' ? page : `/${locale}${page}`)),
-  );
+  const pages = PREVIEW_PATHS;
   return {
     shots: pages.map((path) => ({ path, image: previewImageFor(path) })),
     viewport: { width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT },

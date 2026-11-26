@@ -125,10 +125,15 @@ export function forwardPort({ listenPort, targetHost, targetPort }) {
 }
 
 /**
- * Runs inside the container; exits with Playwright's own code.
+ * Runs inside the container; exits with Playwright's own code. `forward` is a
+ * parameter so a unit test can reach the runs without opening a port.
  * @param {string[]} playwrightArgs
+ * @param {{ forward?: typeof forwardPort }} [options]
  */
-async function inside(playwrightArgs) {
+export async function inside(
+  playwrightArgs,
+  { forward: forwardWith = forwardPort } = {},
+) {
   const install = spawnSync(NODE, [NPM_CLI, 'ci', '--no-audit', '--no-fund'], {
     stdio: 'inherit',
   });
@@ -136,7 +141,7 @@ async function inside(playwrightArgs) {
     console.error(`npm ci exited ${install.status} inside the container`);
     exit(1);
   }
-  const forward = await forwardPort({
+  const forward = await forwardWith({
     listenPort: PREVIEW_PORT,
     targetHost: MAC_HOST,
     targetPort: PREVIEW_PORT,

@@ -223,7 +223,7 @@ export const captureSummary = ({ commit, kept }) => {
  * @param {string} file
  * @returns {Uint8Array | undefined}
  */
-const committedAtHead = (file) => {
+export const committedAtHead = (file) => {
   const exists = spawnSync(GIT, ['cat-file', '-e', `HEAD:${file}`]);
   if (exists.error !== undefined)
     die(`visual-capture: git did not start: ${exists.error.message}`);
@@ -236,7 +236,7 @@ const committedAtHead = (file) => {
   return shown.stdout;
 };
 
-const main = () => {
+export const main = () => {
   const [statusPath, headMessagePath, messagePath, listPath, ...rest] =
     argv.slice(2);
   if (
