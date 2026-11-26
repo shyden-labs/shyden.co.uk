@@ -72,7 +72,7 @@ import path from 'node:path';
 import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
-import { LSOF, NODE, PS } from './programs.mjs';
+import { DOCKER, LSOF, NODE, PS } from './programs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -1054,7 +1054,7 @@ async function runDesktopGroup() {
   );
   const { code } = await runTagged(
     name,
-    'docker',
+    DOCKER,
     desktopContainerArgv({
       root: ROOT,
       image,

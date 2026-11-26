@@ -30,6 +30,7 @@ import {
   installedPlaywright,
   pinnedImage,
 } from './playwright-image.mjs';
+import { DOCKER, NODE, NPM_CLI, PLAYWRIGHT_CLI } from './programs.mjs';
 
 /** Where the container's Linux `npm ci` lives, kept between runs. */
 export const NODE_MODULES_VOLUME = 'shyden-site-desktop-node-modules';
@@ -128,7 +129,7 @@ export function forwardPort({ listenPort, targetHost, targetPort }) {
  * @param {string[]} playwrightArgs
  */
 async function inside(playwrightArgs) {
-  const install = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], {
+  const install = spawnSync(NODE, [NPM_CLI, 'ci', '--no-audit', '--no-fund'], {
     stdio: 'inherit',
   });
   if (install.status !== 0) {
@@ -140,7 +141,7 @@ async function inside(playwrightArgs) {
     targetHost: MAC_HOST,
     targetPort: PREVIEW_PORT,
   });
-  const run = spawn('npx', ['playwright', 'test', ...playwrightArgs], {
+  const run = spawn(NODE, [PLAYWRIGHT_CLI, 'test', ...playwrightArgs], {
     stdio: 'inherit',
   });
   run.on('close', (code, signal) => {
@@ -157,7 +158,7 @@ async function inside(playwrightArgs) {
  */
 export function desktopImage(root) {
   const answer = spawnSync(
-    'docker',
+    DOCKER,
     ['version', '--format', '{{.Server.Version}}'],
     { encoding: 'utf8', timeout: 30_000 },
   );
