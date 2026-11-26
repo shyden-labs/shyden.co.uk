@@ -96,6 +96,7 @@ type Refusal =
   | 'algorithm'
   | 'unknown-kid'
   | 'signature'
+  | 'audience-shape'
   | 'audience'
   | 'issuer'
   | 'expired'
@@ -154,8 +155,10 @@ async function accessIdentity(
     return { refused: 'signature' };
   }
   const { aud, iss, exp, nbf, email, common_name: commonName } = claims;
-  if (!Array.isArray(aud) || !aud.includes(config.audience))
-    return { refused: 'audience' };
+  // RFC 7519 lets aud be one string; Access sends a service token's that way (#1307).
+  const audiences = typeof aud === 'string' ? [aud] : aud;
+  if (!Array.isArray(audiences)) return { refused: 'audience-shape' };
+  if (!audiences.includes(config.audience)) return { refused: 'audience' };
   if (iss !== config.issuer) return { refused: 'issuer' };
   if (typeof exp !== 'number' || exp <= config.now)
     return { refused: 'expired' };

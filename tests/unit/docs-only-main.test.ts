@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GIT } from '../../scripts/programs.mjs';
+import { main } from '../../scripts/docs-only.mjs';
 
 /**
  * docs-only's main() reads the diff through git named by its absolute path,
@@ -42,8 +43,6 @@ vi.mock('node:process', async (original) => ({
 
 describe('docs-only reads git by its full path (#1275)', () => {
   it('asks git for the diff, its output read as text', async () => {
-    const { main } = await import('../../scripts/docs-only.mjs');
-
     // docs-only reads a refusing git as "not docs-only" and still hands on a
     // verdict, so every job runs.
     vi.spyOn(console, 'log').mockImplementation(() => {});
