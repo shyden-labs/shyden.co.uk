@@ -1,47 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
-import { DEV_DOOR_HOST } from './functions/_lib/dev-door.ts';
-import { mintPass } from './scripts/dev-pass/pass.ts';
-import {
-  BASE_URL,
-  TEST_PASS_ENV,
-  TEST_PASS_KEYS_ENV,
-} from './tests/functions/local.mjs';
+import { BASE_URL, PASSWORD } from './tests/functions/local.mjs';
 import { ENGINES, engineUse } from './tests/engines';
-
-/**
- * The run's key and pass are made once, in the first process to load this
- * config, and carried in the environment: the server and every worker inherit
- * it, so all of them agree on one key (#1262 AC2). A machine pass lasts an hour.
- */
-async function runPass(): Promise<string> {
-  const made = process.env[TEST_PASS_ENV];
-  if (made) return made;
-  const pair = (await crypto.subtle.generateKey('Ed25519', true, [
-    'sign',
-    'verify',
-  ])) as CryptoKeyPair;
-  const { x } = await crypto.subtle.exportKey('jwk', pair.publicKey);
-  process.env[TEST_PASS_KEYS_ENV] = JSON.stringify({ 'functions-local': x });
-  const pass = await mintPass(
-    { aud: DEV_DOOR_HOST, sub: 'functions-suite', kind: 'machine' },
-    { kid: 'functions-local', privateKey: pair.privateKey },
-    Math.floor(Date.now() / 1000),
-  );
-  process.env[TEST_PASS_ENV] = pass;
-  return pass;
-}
-
-const pass = await runPass();
-
-/**
- * The environment a browser is launched with: everything but the run's key and
- * pass, which belong to the server and the request headers, never a browser.
- */
-const launchEnv = Object.fromEntries(
-  Object.entries(process.env).filter(
-    ([name]) => name !== TEST_PASS_ENV && name !== TEST_PASS_KEYS_ENV,
-  ),
-);
 
 /**
  * The Functions-runtime suite (#97, spec 10): real submissions to the real
@@ -58,8 +17,8 @@ export default defineConfig({
     // Measured, unlike every other web server: the script clears the
     // measurement for everything it starts (#913).
     command: 'node tests/functions/serve.mjs',
-    // webServer sends no pass, and the dev gate answers 401 without one,
-    // which Playwright counts as up. So readiness only means "serving";
+    // webServer takes no credentials, and the dev gate answers 401 without
+    // them, which Playwright counts as up. So readiness only means "serving";
     // the health test, first in the file with one worker, is what proves the
     // binding and the migration.
     url: `${BASE_URL}/`,
@@ -75,10 +34,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     colorScheme: 'dark',
-    extraHTTPHeaders: { 'X-Dev-Pass': pass },
+    httpCredentials: { username: 'dev', password: PASSWORD, send: 'always' },
   },
   projects: ENGINES.map(({ name, device }) => ({
     name,
-    use: engineUse(devices[device], launchEnv),
+    use: engineUse(devices[device], process.env),
   })),
 });

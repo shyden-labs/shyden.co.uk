@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
 import { messageOf } from './errors.mjs';
+import { GIT } from './programs.mjs';
 
 /** The directories whose files a visitor receives. */
 export const VISITOR_PREFIXES = Object.freeze([
@@ -319,7 +320,7 @@ export const trackedSpecs = (git) =>
 const USAGE =
   'usage: release-inventory.mjs --base <sha> --head <sha> | --tests';
 
-const main = () => {
+export const main = () => {
   /** @type {{ base?: string, head?: string, tests?: boolean }} */
   let values;
   try {
@@ -337,7 +338,7 @@ const main = () => {
   }
   /** @type {Git} */
   const git = (args) =>
-    execFileSync('git', args, {
+    execFileSync(GIT, args, {
       encoding: 'utf8',
       maxBuffer: 256 * 1024 * 1024,
     });
