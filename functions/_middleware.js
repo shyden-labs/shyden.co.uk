@@ -7,11 +7,11 @@
  *   1. Serves `/robots.txt` with `Disallow: /` BEFORE the auth gate, so
  *      crawlers (which never send Authorization) see the block rather
  *      than a 401.
- *   2. Gates every other request behind the DEV pass (#1262 AC2,
- *      `_lib/dev-door.ts`): a page visitor without one is sent to sign in,
- *      anything else gets 401. No password exists any more.
- *   3. Injects `X-Robots-Tag: noindex, nofollow, noarchive` on every
- *      response so the dev deploy never lands in search.
+ *   2. Gates every other request behind HTTP Basic Auth — the shared
+ *      password is `env.DEV_PASSWORD` (Cloudflare Pages → Settings →
+ *      Variables and Secrets). Unset ⇒ fails closed (always challenges).
+ *   3. Injects `X-Robots-Tag: noindex, nofollow, noarchive` on the
+ *      authorised response so the dev deploy never lands in search.
  *
  * Pure logic lives in `_lib/lockdown.js` so it is unit-testable from
  * Vitest without workerd / miniflare. This file is just the plumbing.
@@ -26,20 +26,21 @@ import {
   legacyPathRedirectLocation,
   blockingRobotsBody,
   noIndexHeaderValue,
+  basicAuthOk,
+  basicAuthChallenge,
 } from './_lib/lockdown.js';
-import { devGate, passKeys } from './_lib/dev-door.ts';
 import { accessOk, privatePath } from './_lib/access.js';
 
 /**
- * @param {{ request: Request, env: Record<string, string | undefined>, next: (request?: Request) => Promise<Response> }} context
+ * @param {{ request: Request, env: Record<string, string | undefined>, next: () => Promise<Response> }} context
  */
 export const onRequest = async ({ request, env, next }) => {
   const url = new URL(request.url);
   const hostname = url.hostname;
 
-  // Canonical host: www.shyden.co.uk → apex, 301, BEFORE the DEV pass gate so
-  // the redirect is public (www is not the prod host, so it would otherwise
-  // meet the gate on the prod project).
+  // Canonical host: www.shyden.co.uk → apex, 301, BEFORE the auth gate so the
+  // redirect is public (www is not the prod host, so it would otherwise be
+  // Basic-auth challenged on the prod project).
   const wwwTarget = wwwRedirectLocation(url);
   if (wwwTarget) {
     return new Response(null, {
@@ -84,14 +85,16 @@ export const onRequest = async ({ request, env, next }) => {
     });
   }
 
-  // The DEV pass gate. Every answer, refusals too, is marked noindex.
+  // Auth gate — fails closed when DEV_PASSWORD is unset.
+  const auth = request.headers.get('Authorization');
+  if (!basicAuthOk(auth, env.DEV_PASSWORD)) {
+    return basicAuthChallenge();
+  }
+
+  // Authorised → fetch the asset, then graft the noindex header on.
   // response.body is a single-consumption stream; clone() defends
   // against any future handler reading it first (.text()/.json()).
-  const response = await devGate(
-    request,
-    passKeys(env.DEV_PASS_KEYS),
-    (forwarded) => next(forwarded),
-  );
+  const response = await next();
   const cloned = response.clone();
   const newHeaders = new Headers(cloned.headers);
   newHeaders.set('X-Robots-Tag', noIndexHeaderValue());

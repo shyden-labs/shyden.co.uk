@@ -6,10 +6,17 @@ import {
   PREFIXED_LOCALE_CODES,
   blockingRobotsBody,
   noIndexHeaderValue,
+  basicAuthOk,
+  basicAuthChallenge,
 } from '../../functions/_lib/lockdown.js';
 import { onRequest } from '../../functions/_middleware.js';
 import { PREFIXED_LOCALES } from '../../src/lib/i18n';
 import { robotsDirectives } from '../robots-directives';
+
+// Base64 a "user:password" credential the way a browser's Basic-auth
+// header does — Node's Buffer here, atob/btoa at the Cloudflare edge.
+const cred = (user: string, pass: string) =>
+  `Basic ${Buffer.from(`${user}:${pass}`).toString('base64')}`;
 
 describe('isProdHostname — exact, case-insensitive, fail-safe', () => {
   it.each(['shyden.co.uk', 'SHYDEN.CO.UK', 'Shyden.Co.Uk'])(
@@ -73,6 +80,54 @@ describe('blockingRobotsBody', () => {
 describe('noIndexHeaderValue', () => {
   it('is the full noindex directive', () => {
     expect(noIndexHeaderValue()).toBe('noindex, nofollow, noarchive');
+  });
+});
+
+describe('basicAuthOk — FAILS CLOSED', () => {
+  it.each<[string | null | undefined, string]>([
+    ['', 'empty password (env var unset) must never open the gate'],
+    [undefined, 'undefined password fails closed'],
+    [null, 'null password fails closed'],
+  ])('rejects when expectedPassword is %j — %s', (pw) =>
+    expect(basicAuthOk(cred('u', 'anything'), pw as unknown as string)).toBe(
+      false,
+    ),
+  );
+  it.each<[string | null | undefined, string]>([
+    [null, 'null header'],
+    [undefined, 'undefined header'],
+    ['', 'empty header'],
+    ['Bearer abc', 'wrong scheme'],
+    ['Basic ', 'empty credential'],
+    ['Basic ' + Buffer.from('nocolon').toString('base64'), 'no colon'],
+    [
+      'Basic @@@not-valid-base64@@@',
+      'undecodable base64 (atob throws → catch)',
+    ],
+  ])('rejects %s', (header) =>
+    expect(basicAuthOk(header as unknown as string, 'secret')).toBe(false),
+  );
+  it('rejects a wrong password', () => {
+    expect(basicAuthOk(cred('user', 'wrong'), 'secret')).toBe(false);
+  });
+  it('accepts the correct password', () => {
+    expect(basicAuthOk(cred('user', 'secret'), 'secret')).toBe(true);
+  });
+  it('ignores the username half (any user, empty user)', () => {
+    expect(basicAuthOk(cred('anyone', 'secret'), 'secret')).toBe(true);
+    expect(basicAuthOk(cred('', 'secret'), 'secret')).toBe(true);
+  });
+  it('accepts a password that itself contains a colon', () => {
+    expect(basicAuthOk(cred('user', 'a:b:c'), 'a:b:c')).toBe(true);
+  });
+});
+
+describe('basicAuthChallenge', () => {
+  it('is a 401 that prompts the browser and stays unindexed', () => {
+    const res = basicAuthChallenge();
+    expect(res.status).toBe(401);
+    expect(res.headers.get('WWW-Authenticate')).toMatch(/^Basic realm=/);
+    expect(res.headers.get('X-Robots-Tag')).toBe(noIndexHeaderValue());
   });
 });
 
@@ -140,7 +195,7 @@ describe('legacyPathRedirectLocation: /glory-points to /yeetalk-calculators', ()
   });
 });
 
-describe('the middleware answers the legacy path before the DEV pass gate', () => {
+describe('the middleware answers the legacy path before the auth gate', () => {
   const never = () => {
     throw new Error('next() must not be reached for a redirected path');
   };
@@ -154,19 +209,19 @@ describe('the middleware answers the legacy path before the DEV pass gate', () =
       'https://dev.shyden.co.uk/th/glory-points/?x=1',
       '/th/yeetalk-calculators?x=1#glory-points',
     ],
-  ])('%s answers 301 with no pass', async (href, location) => {
+  ])('%s answers 301 with no credentials', async (href, location) => {
     const res = await onRequest({
       request: new Request(href),
-      env: {},
+      env: { DEV_PASSWORD: 'secret' },
       next: never as () => Promise<Response>,
     });
     expect(res.status).toBe(301);
     expect(res.headers.get('Location')).toBe(location);
   });
-  it('still refuses a dev path that is not legacy', async () => {
+  it('still challenges a dev path that is not legacy', async () => {
     const res = await onRequest({
       request: new Request('https://dev.shyden.co.uk/classroom-groups'),
-      env: {},
+      env: { DEV_PASSWORD: 'secret' },
       next: never as () => Promise<Response>,
     });
     expect(res.status).toBe(401);
