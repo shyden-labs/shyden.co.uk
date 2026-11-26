@@ -46,10 +46,10 @@ import { signOffOf, standingOf } from './evidence-signoff.mjs';
  */
 export const esc = (s) =>
   String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 
 /**
  * Every spec result in the report, flattened, each carrying its FULL title

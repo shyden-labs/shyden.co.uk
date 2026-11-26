@@ -57,7 +57,7 @@ export const BASELINE_DIR = 'tests/e2e/__screenshots__/';
 
 const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
   /[.*+?^${}()|[\]\\]/g,
-  '\\$&',
+  String.raw`\$&`,
 );
 
 /**
@@ -65,7 +65,7 @@ const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
  * quote starts with `"`, so it misses the folder and is refused as `other`.
  */
 const BASELINE = new RegExp(
-  `^( M|M |MM|\\?\\?) (${BASELINE_DIR_PATTERN}[^/\\s]+\\.png)$`,
+  String.raw`^( M|M |MM|\?\?) (${BASELINE_DIR_PATTERN}[^/\s]+\.png)$`,
 );
 
 /**
