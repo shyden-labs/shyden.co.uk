@@ -2,6 +2,7 @@ import { join, sep } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../../scripts/build-release-content.mjs';
 import { CHECKOUT } from '../../scripts/checkout-path.mjs';
+import { EVIDENCE_MANIFEST } from '../../scripts/evidence-files.mjs';
 
 /**
  * #1275: every path build-release-content takes on its command line is
@@ -37,13 +38,13 @@ describe('build-release-content refuses a path outside the checkout', () => {
         'abc',
         '--check',
         '--manifest',
-        join(INSIDE, 'manifest.jsonl'),
+        join(INSIDE, EVIDENCE_MANIFEST),
       ]),
     ).toContain(`${release} is outside this checkout`);
   });
 
   it('refuses a manifest outside it, naming it', () => {
-    const manifest = join(OUTSIDE, 'manifest.jsonl');
+    const manifest = join(OUTSIDE, EVIDENCE_MANIFEST);
     expect(
       refusalOf([
         '--release',
