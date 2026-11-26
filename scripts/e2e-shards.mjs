@@ -931,6 +931,6 @@ export function runningAtTimeout(report) {
       `no test was in progress when the ${seconds} s timeout fired during the ${timeout[2]}`,
     ];
   return running
-    .sort((a, b) => a.worker - b.worker || a.start - b.start)
+    .toSorted((a, b) => a.worker - b.worker || a.start - b.start)
     .map(({ line }) => line);
 }

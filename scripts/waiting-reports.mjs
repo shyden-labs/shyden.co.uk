@@ -138,7 +138,9 @@ if (import.meta.main) {
     console.error('usage: node scripts/waiting-reports.mjs [report-failure]');
     process.exit(2);
   }
-  await (mode === 'report-failure' ? reportFailure() : count()).catch((error) =>
-    die(messageOf(error)),
-  );
+  try {
+    await (mode === 'report-failure' ? reportFailure() : count());
+  } catch (error) {
+    die(messageOf(error));
+  }
 }
