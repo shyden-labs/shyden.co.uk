@@ -73,3 +73,29 @@ Each step says what it needs. Nothing here puts a private key in the repository.
 The session then measures, on the deployed site, that `/app/exchange` with no Access
 cookie reaches the Worker and `/pass` with none gets the Access login, before any
 door relies on it.
+
+## dev.shyden.co.uk's own door (#1262 AC2)
+
+`functions/_middleware.js` runs the shared door (`functions/_lib/dev-door.ts`) on every
+non-prod host before anything is served: a page visitor with no pass is sent to sign
+in, anything else gets `401`. The shared Basic Auth password is gone. The gate trusts
+the live public key in `DEV_PASS_KEYS` (the constant) unless the Pages setting
+`DEV_PASS_KEYS` names others as JSON (Shyden's ruling, 2026-11-25); the functions suite
+uses that setting for a throwaway key made at each run. A setting that is not a JSON
+object of strings trusts nothing.
+
+CI's dev sanity suite (`deploy-dev.yml`, job `verify`) asks the sign-in for a one-hour
+machine pass with a Cloudflare Access service token, and sends it as `X-Dev-Pass`.
+
+**Before this lands (Shyden, Cloudflare dashboard and GitHub):**
+
+1. Zero Trust → Access → Service Auth → **Create service token**, named `shyden-site CI`
+   (no expiry, or a year). Copy its Client ID and Client Secret: the secret is shown once.
+2. Zero Trust → Access → Applications → `dev-signin` → Policies → **Add a policy**:
+   action **Service Auth**, include **Service Token** `shyden-site CI`.
+3. GitHub → shyden-labs/shyden.co.uk → Settings → Environments → `dev` → add two
+   secrets: `DEV_SIGNIN_CLIENT_ID` and `DEV_SIGNIN_CLIENT_SECRET`, the values from step 1.
+
+**After it lands and dev is verified:** delete the `dev` environment's
+`DEV_BASIC_AUTH_PASSWORD` secret, and the Pages project's `DEV_PASSWORD` variable
+(Workers & Pages → the dev project → Settings → Variables and Secrets). Nothing reads either.
