@@ -355,12 +355,11 @@ describe('the builder builds its page from any checkout path (#221)', () => {
   let dir = '';
   beforeAll(() => {
     checkout = scriptCheckout();
-    dir = checkoutScratch('evidence-entry');
+    // Inside the copied checkout: the builder run from there accepts a path
+    // only inside its own checkout (#1275), and removing the copy removes it.
+    dir = mkdtempSync(join(dirname(checkout.spaced), 'evidence-entry-'));
   });
-  afterAll(() => {
-    checkout.remove();
-    rmSync(dir, { recursive: true, force: true });
-  });
+  afterAll(() => checkout.remove());
 
   it('builds it when run from a checkout whose path holds a space', () => {
     const row = manifestRow(
