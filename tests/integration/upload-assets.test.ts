@@ -1,14 +1,14 @@
 import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { checkoutScratch } from '../checkout-scratch';
 
 describe('what a refusal looks like from the command line', () => {
   let dir = '';
   beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), 'upload-cli-'));
+    dir = checkoutScratch('upload-cli');
     writeFileSync(join(dir, 'a.webm'), 'a recording nobody uploaded');
     writeFileSync(
       join(dir, 'plan.json'),
@@ -67,7 +67,7 @@ describe('upload-evidence-assets.mjs as a command (#390)', () => {
   };
 
   beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), 'upload-command-'));
+    dir = checkoutScratch('upload-command');
     writeFileSync(at('a.webm'), 'first recording');
     writeFileSync(at('b.webm'), 'second recording');
     writeFileSync(
