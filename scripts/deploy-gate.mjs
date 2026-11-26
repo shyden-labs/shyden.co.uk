@@ -42,7 +42,10 @@ import { GIT } from './programs.mjs';
  * absent result must never be indistinguishable from a passing one (#146).
  */
 
-/** A pull request's number as GitHub writes it. */
+/**
+ * A pull request's number as GitHub writes it.
+ * @param {number} number
+ */
 const pullRef = (number) => `#${number}`;
 
 /**

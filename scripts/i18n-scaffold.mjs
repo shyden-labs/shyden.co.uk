@@ -59,7 +59,12 @@ const USAGE = `usage: npm run i18n:scaffold -- <locale> [${OPTIONS.join(' | ')}]
  */
 const plainKey = (key) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
 
-/** A key's path under its parent's: `parent.key`, `key` at the root, or `parent["odd key"]`. */
+/**
+ * A key's path under its parent's: `parent.key`, `key` at the root, or `parent["odd key"]`.
+ * @param {string} path
+ * @param {string} key
+ * @returns {string}
+ */
 const childPath = (path, key) => {
   if (!plainKey(key)) return `${path}[${JSON.stringify(key)}]`;
   return path ? `${path}.${key}` : key;

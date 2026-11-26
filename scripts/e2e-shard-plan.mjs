@@ -39,7 +39,12 @@
 const LIST_LINE = /^ {2}\[([^\]]+)\] › (.+?):\d+:\d+ › /;
 const LIST_FOOTER = /^Total: (\d+) tests? in \d+ files?$/m;
 
-/** Orders two keys by code unit, as `<` does: the tie-break of a plan. */
+/**
+ * Orders two keys by code unit, as `<` does: the tie-break of a plan.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
 const byKey = (a, b) => {
   if (a < b) return -1;
   if (a > b) return 1;

@@ -53,9 +53,15 @@ import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
 
 const SHARD_VALUE = /^(\d+)\/(\d+)$/;
 
-/** One total, as a Markdown list item. */
-const totalLine = (line) => `- ${line}`;
-/** One finding, indented under the refusal. */
+/**
+ * One total, as a Markdown list item.
+ * @param {string} line
+ */
+const totalItem = (line) => `- ${line}`;
+/**
+ * One finding, indented under the refusal.
+ * @param {string} finding
+ */
 const findingLine = (finding) => `  - ${finding}`;
 
 /**
@@ -808,7 +814,7 @@ function main() {
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY,
-        `\n### e2e totals per browser\n\n${totals.map(totalLine).join('\n')}\n`,
+        `\n### e2e totals per browser\n\n${totals.map(totalItem).join('\n')}\n`,
       );
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(

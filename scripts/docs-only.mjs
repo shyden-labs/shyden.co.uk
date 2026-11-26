@@ -28,7 +28,10 @@ import { env, exit } from 'node:process';
 import { captureFromDiff } from './capture-scope.mjs';
 import { GIT } from './programs.mjs';
 
-/** One reason, indented under its verdict. */
+/**
+ * One reason, indented under its verdict.
+ * @param {string} reason
+ */
 const reasonLine = (reason) => `  - ${reason}`;
 
 /** The files outside `docs/` that are documentation and nothing reads. */

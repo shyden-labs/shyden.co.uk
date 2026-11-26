@@ -727,21 +727,37 @@ export const checksOf = (checks, journeyIds) => {
 const dot = (r) =>
   `<span class="dot ${r?.status === 'passed' ? 'ok' : 'bad'}" title="${esc(r?.status ?? 'not run')}"></span>`;
 
-/** The key a journey's recording is kept under, per engine. */
+/**
+ * The key a journey's recording is kept under, per engine.
+ * @param {string} id
+ * @param {string} engine
+ */
 const videoKey = (id, engine) => `${id}|${engine}`;
 
-/** An image's width and height attributes, when its size is known. */
+/**
+ * An image's width and height attributes, when its size is known.
+ * @param {{ w: number, h: number } | undefined} d
+ */
 const sizeAttrs = (d) => (d ? ` width="${d.w}" height="${d.h}"` : '');
 
-/** One engine's cell in the engine matrix. */
+/**
+ * One engine's cell in the engine matrix.
+ * @param {{ status?: string, duration?: number } | undefined} r
+ */
 const matrixCell = (r) =>
   `<td>${dot(r)} <span class="mono dim">${r ? r.duration + 'ms' : '&mdash;'}</span></td>`;
 
-/** One journey's row in the engine matrix. */
+/**
+ * One journey's row in the engine matrix.
+ * @param {{ title: string, results: Array<{ status?: string, duration?: number } | undefined> }} j
+ */
 const matrixRow = (j) =>
   `<tr><td class="j">${esc(j.title)}</td>${j.results.map(matrixCell).join('')}</tr>`;
 
-/** One engine's heading in the engine matrix. */
+/**
+ * One engine's heading in the engine matrix.
+ * @param {string} e
+ */
 const matrixHead = (e) => `<th>${esc(e)}</th>`;
 
 /**

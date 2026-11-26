@@ -186,10 +186,17 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
   };
 };
 
-/** A journey's link in the map's list of what a change shows. */
+/**
+ * A journey's link in the map's list of what a change shows.
+ * @param {string} t
+ */
 const journeyLink = (t) => `<a href="#j-${esc(slugOf(t))}">${esc(t)}</a>`;
 
-/** What a commit's classification says it shows a visitor, as HTML. */
+/**
+ * What a commit's classification says it shows a visitor, as HTML.
+ * @param {Classification} classification
+ * @returns {string}
+ */
 const whatItShows = (classification) => {
   if (classification.kind === 'visible')
     return classification.journeys.map(journeyLink).join('<br>');
@@ -198,7 +205,10 @@ const whatItShows = (classification) => {
   return `No intended visible change: ${esc(classification.reason)}`;
 };
 
-/** One area and its commit count, for the map's footnote. */
+/**
+ * One area and its commit count, for the map's footnote.
+ * @param {[string, number]} param0
+ */
 const areaCount = ([area, n]) => `${esc(area)} <span class="mono">${n}</span>`;
 
 /**
