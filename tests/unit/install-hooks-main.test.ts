@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GIT } from '../../scripts/programs.mjs';
+import { main } from '../../scripts/install-hooks.mjs';
 
 /**
  * install-hooks' main() points git at the repository's hooks with git named
@@ -35,7 +36,6 @@ afterEach(() => {
 describe('install-hooks sets the hooks path through git by its full path (#1275)', () => {
   it('runs git config core.hooksPath .githooks, and says so', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { main } = await import('../../scripts/install-hooks.mjs');
 
     main();
 
