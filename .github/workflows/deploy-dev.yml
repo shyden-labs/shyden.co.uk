@@ -226,8 +226,8 @@ jobs:
     container:
       image: ${{ needs.image.outputs.ref }}
       options: --user 1001 --ipc=host
-    # It reads the dev sign-in's service token, so it names `dev`, the
-    # environment holding it: the repository holds no secrets (read 2026-10-04, #390
+    # It reads DEV_BASIC_AUTH_PASSWORD, so it names `dev`, the environment
+    # holding it: the repository holds no secrets (read 2026-10-04, #390
     # F163), and a repository secret would reach a workflow on any branch
     # (#241). The url repeats deploy-dev's, because the environment links to
     # its latest deployment, and that is this job's.
@@ -245,33 +245,12 @@ jobs:
         with:
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Get a one-hour machine DEV pass
-        # The dev site opens to a DEV pass alone (#1262 AC2). The sign-in hands
-        # one to this job's Cloudflare Access service token; the pass is
-        # masked in the log and lives only in this job's environment.
-        env:
-          ACCESS_CLIENT_ID: ${{ secrets.DEV_SIGNIN_CLIENT_ID }}
-          ACCESS_CLIENT_SECRET: ${{ secrets.DEV_SIGNIN_CLIENT_SECRET }}
-        run: |
-          node --input-type=module -e "
-          import { appendFileSync } from 'node:fs';
-          const res = await fetch('https://dev-signin.shyden.co.uk/machine?for=dev.shyden.co.uk', {
-            method: 'POST',
-            headers: {
-              'CF-Access-Client-Id': process.env.ACCESS_CLIENT_ID,
-              'CF-Access-Client-Secret': process.env.ACCESS_CLIENT_SECRET,
-            },
-            redirect: 'manual',
-          });
-          if (res.status !== 200) throw new Error('the dev sign-in refused this job a machine pass: HTTP ' + res.status + ', refused: ' + res.headers.get('x-dev-pass-refused'));
-          const { pass } = await res.json();
-          console.log('::add-mask::' + pass);
-          appendFileSync(process.env.GITHUB_ENV, 'DEV_PASS=' + pass + '\n');
-          "
       - name: Sanity-check the live dev site
         env:
-          # playwright.dev.config.ts sends DEV_PASS, from the step above, as the
-          # dev host's own cookie, to that host alone.
+          # The dev site is behind Basic auth; the username half is ignored by
+          # the gate. playwright.dev.config.ts reads this and sets
+          # httpCredentials from it.
+          DEV_BASIC_AUTH_PASSWORD: ${{ secrets.DEV_BASIC_AUTH_PASSWORD }}
           WEB_BASE_URL: https://dev.shyden.co.uk
         run: node_modules/.bin/playwright test --config=playwright.dev.config.ts
       - name: Keep the failing check's screenshots

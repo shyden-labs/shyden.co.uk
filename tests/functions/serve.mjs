@@ -12,7 +12,7 @@ import { testedCompatibilityDate } from '../../scripts/pages-runtime.mjs';
 import {
   DATABASE_ID,
   DEV_PASS_SECRET_YAWELO,
-  TEST_PASS_KEYS_ENV,
+  PASSWORD,
   PERSIST,
   PORT,
   SECRET,
@@ -25,16 +25,6 @@ import {
 // which inherit this environment, lose it. First, before any process starts
 // (`web-server-coverage.ts` holds it there).
 delete process.env.NODE_V8_COVERAGE;
-
-/** The public half of this run's throwaway DEV pass key, set by the config (#1262 AC2). */
-function testPassKeys() {
-  const keys = process.env[TEST_PASS_KEYS_ENV];
-  if (!keys)
-    throw new Error(
-      `${TEST_PASS_KEYS_ENV} is not set: run this through playwright.functions.config.ts, which makes the run's key`,
-    );
-  return keys;
-}
 
 /**
  * @param {string} command
@@ -80,7 +70,7 @@ const server = spawn(
     '--persist-to',
     PERSIST,
     '--binding',
-    `DEV_PASS_KEYS=${testPassKeys()}`,
+    `DEV_PASSWORD=${PASSWORD}`,
     // #872: the limits on, at their defaults, so every report below runs
     // the counting batch on real D1.
     '--binding',
@@ -96,7 +86,7 @@ const server = spawn(
     // `pages dev` otherwise loads .env.local unasked, which on a developer's
     // machine hands its secrets (the DeepL key) to the code under test.
     // Naming an --env-file does not stop that; this switch does (measured,
-    // #97 Task 10: the startup banner then listed the gate's setting alone).
+    // #97 Task 10: the startup banner then lists DEV_PASSWORD alone).
     //
     // The tests reach D1 through this server's own D1 object, on miniflare's
     // local explorer (`query` in local.mjs, #737). wrangler turns it on by
