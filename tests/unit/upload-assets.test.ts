@@ -4,13 +4,15 @@ import {
   parseAssetListing,
   pendingUploads,
   planOf,
+  run,
   UPLOAD_BATCH,
 } from '../../scripts/upload-evidence-assets.mjs';
 import { searched } from '../source-files';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
+import { CHECKOUT } from '../../scripts/checkout-path.mjs';
 
 /**
  * A real listing, copied verbatim from `Artifact action:"list" scope:"assets"`
@@ -261,5 +263,40 @@ describe('uploading each recording once (#390)', () => {
     expect(pendingUploads({ plan, stored: [] })).toEqual([
       [join(dir, 'a.webm'), join(dir, 'b.webm')],
     ]);
+  });
+});
+
+describe('a path given on the command line (#1275)', () => {
+  const outside = join(sep, 'tmp', 'evidence');
+  const inside = join(CHECKOUT, '.superpowers', 'no-such-folder');
+
+  it('refuses a plan outside this checkout, naming it', () => {
+    expect(() =>
+      run({
+        planPath: join(outside, 'plan.json'),
+        listingPath: join(inside, 'listing.txt'),
+        out: undefined,
+      }),
+    ).toThrow(`${join(outside, 'plan.json')} is outside this checkout`);
+  });
+
+  it('refuses a listing outside this checkout, naming it', () => {
+    expect(() =>
+      run({
+        planPath: join(inside, 'plan.json'),
+        listingPath: join(outside, 'listing.txt'),
+        out: undefined,
+      }),
+    ).toThrow(`${join(outside, 'listing.txt')} is outside this checkout`);
+  });
+
+  it('refuses a map to write outside this checkout, naming it', () => {
+    expect(() =>
+      run({
+        planPath: join(inside, 'plan.json'),
+        listingPath: join(inside, 'listing.txt'),
+        out: join(outside, 'assets.json'),
+      }),
+    ).toThrow(`${join(outside, 'assets.json')} is outside this checkout`);
   });
 });
