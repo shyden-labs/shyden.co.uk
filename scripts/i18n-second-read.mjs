@@ -43,6 +43,7 @@ import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 import prettier from 'prettier';
 import { call, readBack } from './back-translate-client.mjs';
+import { checkoutPath } from './checkout-path.mjs';
 import { die, messageOf } from './errors.mjs';
 import {
   engineConfig,
@@ -177,10 +178,12 @@ const isLocale = (value) =>
   /** @type {readonly string[]} */ (READ_ORDER).includes(value);
 
 /** @param {string | undefined} path */
-function keysFrom(path) {
+export function keysFrom(path) {
   if (!path) return undefined;
+  // Read only from inside the checkout (#1275).
+  const file = checkoutPath(path);
   return new Set(
-    readFileSync(path, 'utf8')
+    readFileSync(file, 'utf8')
       .split('\n')
       .filter((line) => line.trim() !== '')
       .map((line) => {

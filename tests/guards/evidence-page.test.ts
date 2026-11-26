@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { checkoutScratch } from '../checkout-scratch';
 import { fileURLToPath } from 'node:url';
 import { withoutTsComments } from '../unit/source-text';
 import { filesUnder, tsFilesUnder, searched } from '../source-files';
@@ -388,7 +388,7 @@ describe('a captured journey the report never ran says which kind of missing it 
 describe('a recording the report names is on disk, or the build refuses', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-recordings-'));
+    scratch = checkoutScratch('evidence-recordings');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -476,7 +476,7 @@ describe('a recording the report names is on disk, or the build refuses', () => 
 describe('an earlier run in the same evidence directory stays off the page', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-runs-'));
+    scratch = checkoutScratch('evidence-runs');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 

@@ -100,6 +100,16 @@ export function reachVerdict(body, devAccountId, storedAccountId) {
 }
 
 /**
+ * `text` on one line. Cloudflare's words and a fetch error reach the log, and
+ * a line break in them would start a line GitHub reads as a workflow command
+ * (SonarCloud's S5145, #1275).
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+const oneLine = (text) => text.replace(/[\r\n]+/g, ' ');
+
+/**
  * Runs the check from the environment and answers the exit code: 0 when the
  * dev token's reach is proven, 1 for anything else.
  *
@@ -124,16 +134,18 @@ export async function main() {
     body = await response.json();
   } catch (error) {
     console.error(
-      `::error::the account listing did not arrive: ${/** @type {Error} */ (error).message}`,
+      `::error::the account listing did not arrive: ${oneLine(/** @type {Error} */ (error).message)}`,
     );
     return 1;
   }
   const { ok, reason } = reachVerdict(body, dev, stored);
   if (!ok) {
-    console.error(`::error::the dev token's reach is not proven: ${reason}`);
+    console.error(
+      `::error::the dev token's reach is not proven: ${oneLine(reason)}`,
+    );
     return 1;
   }
-  console.log(`dev token reach: ${reason}`);
+  console.log(`dev token reach: ${oneLine(reason)}`);
   return 0;
 }
 

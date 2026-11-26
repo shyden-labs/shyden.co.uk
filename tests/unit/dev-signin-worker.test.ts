@@ -2,15 +2,23 @@
 // shyden-labs/repo-template#207's `handleSignin`, tested in dev-pass-signin.test.ts).
 // Every outside call is a stub handed in: no test here reaches Cloudflare.
 import { describe, expect, it, vi } from 'vitest';
-import { DOOR_SECRET_HEADER, HOSTS } from '../../workers/dev-signin/config.ts';
+import {
+  DOOR_SECRET_HEADER,
+  EMBED_AUDIENCES,
+  HOSTS,
+  PUBLIC_KEYS,
+} from '../../workers/dev-signin/config.ts';
 import {
   CERTS_TTL_SECONDS,
   createSignin,
   type SigninEnv,
 } from '../../workers/dev-signin/index.ts';
-import type { CodeStore } from '../../scripts/dev-pass/signin.ts';
+import { handleSignin, type CodeStore } from '../../scripts/dev-pass/signin.ts';
+import { mintPass, verifyPass } from '../../scripts/dev-pass/pass.ts';
 
 const TEAM = 'https://shyden.cloudflareaccess.com';
+/** ShyDesk's dev API and staff pages (shydesk-4b, measured 2026-11-26). */
+const SHYDESK = 'shydesk.shydesk-non-prod.workers.dev';
 
 async function privateJwk(): Promise<string> {
   const pair = (await crypto.subtle.generateKey('Ed25519', true, [
@@ -65,9 +73,18 @@ describe('the host map', () => {
         'dev-api.yaweloidle.com',
         'dev-holding.yaweloidle.com',
         'dev.shyden.co.uk',
+        // ShyTalk's dev door (#1299; test.shytalk.app is ungated).
+        'dev.shytalk.app',
         'dev.yaweloidle.com',
+        // ShyDesk's dev staff pages and demo page (#1263 AC1).
+        SHYDESK,
       ].sort(),
     );
+  });
+
+  it('holds every embed door, so its own pass can be minted (#1299)', () => {
+    for (const door of Object.keys(EMBED_AUDIENCES))
+      expect(Object.keys(HOSTS), door).toContain(door);
   });
 
   it('gives no host an app link yet', () => {
@@ -76,7 +93,107 @@ describe('the host map', () => {
   });
 });
 
+describe('the embed audiences (#1263 AC2)', () => {
+  it('lets each product dev page get a pass for ShyDesk, and nothing else', () => {
+    expect(EMBED_AUDIENCES).toEqual({
+      'dev.yaweloidle.com': [SHYDESK],
+      'dev.shytalk.app': [SHYDESK],
+      'dev.shyden.co.uk': [SHYDESK],
+    });
+  });
+
+  it("checks the doors' passes with the sign-in's own public key", () => {
+    expect(PUBLIC_KEYS).toEqual({
+      '2026-11': 'OBLprb_S4Kn2C--HFVaeA3_s6gEsApDiRAWPLc6WsK8',
+    });
+  });
+
+  async function swap(
+    door: string,
+    audience: string,
+  ): Promise<{ answer: Response; keys: Record<string, string> }> {
+    const pair = (await crypto.subtle.generateKey('Ed25519', true, [
+      'sign',
+      'verify',
+    ])) as CryptoKeyPair;
+    const { x } = await crypto.subtle.exportKey('jwk', pair.publicKey);
+    const signing = { kid: 'test', privateKey: pair.privateKey };
+    const now = 1_800_000_000;
+    const pass = await mintPass(
+      { aud: door, sub: 'person@example.com', kind: 'browser' },
+      signing,
+      now,
+    );
+    const keys = { test: x ?? '' };
+    const answer = await handleSignin(
+      new Request('https://signin.example/embed', {
+        method: 'POST',
+        headers: {
+          [DOOR_SECRET_HEADER]: 'door-secret',
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ pass, for: audience }).toString(),
+      }),
+      {
+        secretHeader: DOOR_SECRET_HEADER,
+        secret: 'door-secret',
+        issuer: TEAM,
+        audience: 'aud-tag',
+        fetchCerts: async () => [],
+        hosts: HOSTS,
+        signing,
+        codes,
+        embeds: { keys, audiences: EMBED_AUDIENCES },
+        now,
+      },
+    );
+    return { answer, keys };
+  }
+
+  it('swaps a dev.shyden.co.uk pass for a ShyDesk embed pass', async () => {
+    const { answer, keys } = await swap('dev.shyden.co.uk', SHYDESK);
+    expect(answer.status).toBe(200);
+    const { pass } = (await answer.json()) as { pass: string };
+    expect(
+      await verifyPass(pass, { host: SHYDESK, keys, now: 1_800_000_000 }),
+    ).toMatchObject({ ok: true, kind: 'embed', sub: 'person@example.com' });
+  });
+
+  it('refuses a pair the map does not list', async () => {
+    const otherAudience = await swap(
+      'dev.shyden.co.uk',
+      'dev-api.yaweloidle.com',
+    );
+    expect(otherAudience.answer.status).toBe(401);
+    const otherDoor = await swap('dev-api.yaweloidle.com', SHYDESK);
+    expect(otherDoor.answer.status).toBe(401);
+  });
+});
+
 describe('the sign-in entry', () => {
+  it('serves the embed swap, refusing a pass no door key signed (#1263)', async () => {
+    const signin = createSignin({
+      fetch: vi.fn(async () => certsAnswer()),
+      nowSeconds: () => 1_800_000_000,
+    });
+    const answer = await signin.fetch(
+      new Request('https://signin.example/embed', {
+        method: 'POST',
+        headers: {
+          [DOOR_SECRET_HEADER]: 'door-secret',
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          pass: 'not-a-pass',
+          for: SHYDESK,
+        }).toString(),
+      }),
+      await env(),
+    );
+    // 404 is the answer of a sign-in with no embeds wired.
+    expect(answer.status).toBe(401);
+  });
+
   it('refuses a request without the door secret before reading anything else', async () => {
     const fetchCerts = vi.fn(async () => certsAnswer());
     const signin = createSignin({

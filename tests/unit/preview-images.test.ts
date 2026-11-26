@@ -28,8 +28,8 @@ const distinctColours = (image: ReturnType<typeof decodePng>): number => {
 };
 
 describe('every page has a link preview that shows it (#1158)', () => {
-  it('lists fifteen previews: three pages in each of five languages', () => {
-    expect(PREVIEW_IMAGES).toHaveLength(15);
+  it('lists twenty-two previews: four pages in each of five languages, and privacy in two', () => {
+    expect(PREVIEW_IMAGES).toHaveLength(22);
   });
 
   it.each(PREVIEW_IMAGES)('%s is a 1200x630 picture of the page', (image) => {

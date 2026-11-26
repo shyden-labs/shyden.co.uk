@@ -145,15 +145,44 @@ export const inventoryOf = (commits) =>
   });
 
 /**
+ * What a commit name given on the command line may be spelled with: a SHA, a
+ * branch or tag (`release/2026-11-26`), `HEAD`, and the `~`/`^` that walk back
+ * from one. It must not start with `-`, which git would read as an option
+ * (SonarCloud's S8705, #1275).
+ */
+const COMMIT_NAME = /^[A-Za-z0-9][\w./~^-]*$/;
+
+/**
+ * `ref` when it is spelled as a commit name; otherwise a refusal naming it.
+ *
+ * @param {string} ref
+ * @returns {string}
+ */
+const commitName = (ref) => {
+  if (!COMMIT_NAME.test(ref)) {
+    throw new Error(
+      `release-inventory: ${JSON.stringify(ref)} is not a commit name: pass a SHA, a branch or HEAD`,
+    );
+  }
+  return ref;
+};
+
+/**
  * @param {{ base: string, head: string, git: Git }} input
  * @returns {{ base: string, head: string, entries: Entry[] }}
  */
 export const inventoryFor = ({ base, head, git }) => {
+  // Both are checked before git runs at all (#1275).
+  const names = [commitName(base), commitName(head)];
   /** @param {string} ref */
   const full = (ref) =>
-    git(['rev-parse', '--verify', `${ref}^{commit}`]).trim();
-  const from = full(base);
-  const to = full(head);
+    git([
+      'rev-parse',
+      '--verify',
+      '--end-of-options',
+      `${ref}^{commit}`,
+    ]).trim();
+  const [from = '', to = ''] = names.map(full);
   return {
     base: from,
     head: to,

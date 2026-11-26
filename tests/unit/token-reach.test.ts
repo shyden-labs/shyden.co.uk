@@ -198,4 +198,26 @@ describe('the dev deploy step that runs the check (#501)', () => {
       '::error::the account listing did not arrive: The operation was aborted due to timeout',
     ]);
   });
+
+  // #1275, SonarCloud's S5145: Cloudflare's words reach the log. A line
+  // break in them would start a line of its own, which GitHub reads as a
+  // workflow command, so each is printed on the one line it belongs to.
+  it("keeps Cloudflare's refusal on one line, so it cannot start a workflow command", async () => {
+    answers({
+      success: false,
+      errors: [{ code: 10000, message: 'denied\r\n::add-mask::a-dev-token' }],
+    });
+    expect(await main()).toBe(1);
+    expect(errors).toEqual([
+      "::error::the dev token's reach is not proven: Cloudflare refused the listing: 10000 denied ::add-mask::a-dev-token",
+    ]);
+  });
+
+  it('keeps a failed fetch on one line too', async () => {
+    fetch.mockRejectedValue(new Error('reset\n::warning::x'));
+    expect(await main()).toBe(1);
+    expect(errors).toEqual([
+      '::error::the account listing did not arrive: reset ::warning::x',
+    ]);
+  });
 });

@@ -18,8 +18,25 @@ export const PREVIEW_HEIGHT = 630;
 export const PREVIEW_PAGES = [
   '/',
   '/classroom-groups/',
+  '/support/',
   '/yeetalk-calculators/',
 ] as const;
+
+/**
+ * The privacy page exists in English and Indonesian only (legal pages,
+ * Shyden 2026-11-08); other languages link to the English one.
+ */
+export const PRIVACY_PREVIEW_LOCALES: readonly Locale[] = ['en', 'id'];
+
+/** Every page path that has its own preview, in every language it exists in. */
+export const PREVIEW_PATHS: readonly string[] = [
+  ...LOCALES.flatMap((locale) =>
+    PREVIEW_PAGES.map((page) => (locale === 'en' ? page : `/${locale}${page}`)),
+  ),
+  ...PRIVACY_PREVIEW_LOCALES.map((locale) =>
+    locale === 'en' ? '/privacy/' : `/${locale}/privacy/`,
+  ),
+];
 
 /** Where a page's preview lives, from the page's own path. */
 export function previewImageFor(pathname: string): string {
@@ -32,11 +49,8 @@ export function previewImageFor(pathname: string): string {
 }
 
 /** Every preview file the site serves, one per page per locale. */
-export const PREVIEW_IMAGES: readonly string[] = LOCALES.flatMap((locale) =>
-  PREVIEW_PAGES.map((page) =>
-    previewImageFor(locale === 'en' ? page : `/${locale}${page}`),
-  ),
-);
+export const PREVIEW_IMAGES: readonly string[] =
+  PREVIEW_PATHS.map(previewImageFor);
 
 /**
  * The preview a page's <head> names: its own when it has one, otherwise its
