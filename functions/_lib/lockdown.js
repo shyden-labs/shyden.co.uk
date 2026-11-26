@@ -105,3 +105,62 @@ export function blockingRobotsBody() {
 export function noIndexHeaderValue() {
   return 'noindex, nofollow, noarchive';
 }
+
+/**
+ * Validates a Basic-auth `Authorization` header against the shared
+ * password. Username half is ignored (single shared secret).
+ *
+ * FAILS CLOSED: a missing header or empty/null `expectedPassword` always
+ * returns false — a misconfigured deploy (DEV_PASSWORD unset) stays
+ * locked, never wide open.
+ *
+ * @param {string | null} authorizationHeader
+ * @param {string | undefined} expectedPassword
+ */
+export function basicAuthOk(authorizationHeader, expectedPassword) {
+  if (!expectedPassword) return false;
+  if (typeof authorizationHeader !== 'string') return false;
+  if (!authorizationHeader.startsWith('Basic ')) return false;
+  const encoded = authorizationHeader.slice('Basic '.length).trim();
+  if (encoded.length === 0) return false;
+  let decoded;
+  try {
+    // atob at the Cloudflare edge + modern Node; Buffer fallback keeps
+    // Vitest happy without a polyfill.
+    decoded =
+      typeof atob === 'function'
+        ? atob(encoded)
+        : Buffer.from(encoded, 'base64').toString('utf-8');
+  } catch {
+    return false;
+  }
+  const colon = decoded.indexOf(':');
+  if (colon < 0) return false;
+  // Only the password (everything after the FIRST colon) matters, so a
+  // password containing ':' is compared intact. Constant-time compare
+  // isn't available in the Workers std lib; the risk surface (one shared
+  // dev password) doesn't warrant the complexity.
+  const password = decoded.slice(colon + 1);
+  return password === expectedPassword;
+}
+
+/**
+ * The 401 challenge shown to a non-prod request without valid creds.
+ * The `WWW-Authenticate` header makes browsers show their native prompt.
+ * Carries `X-Robots-Tag: noindex` so even the challenge page can't be
+ * indexed.
+ */
+export function basicAuthChallenge() {
+  const body =
+    'This is a non-prod shyden.co.uk environment, restricted to authorised ' +
+    'testers. If you arrived here by mistake, visit https://shyden.co.uk for ' +
+    'the public site.';
+  return new Response(body, {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="shyden.co.uk Non-Prod"',
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Robots-Tag': noIndexHeaderValue(),
+    },
+  });
+}
