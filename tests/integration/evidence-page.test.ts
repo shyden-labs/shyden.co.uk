@@ -8,8 +8,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { checkoutScratch } from '../checkout-scratch';
 import { withoutMarkupComments } from '../unit/source-text';
 import {
   EVIDENCE_MANIFEST,
@@ -124,7 +124,7 @@ const runBuilder = (
 describe('a recording the report names is on disk, or the build refuses', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-recordings-'));
+    scratch = checkoutScratch('evidence-recordings');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -193,7 +193,7 @@ describe('a recording the report names is on disk, or the build refuses', () => 
 describe('an earlier run in the same evidence directory stays off the page', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-runs-'));
+    scratch = checkoutScratch('evidence-runs');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -355,12 +355,11 @@ describe('the builder builds its page from any checkout path (#221)', () => {
   let dir = '';
   beforeAll(() => {
     checkout = scriptCheckout();
-    dir = mkdtempSync(join(tmpdir(), 'evidence-entry-'));
+    // Inside the copied checkout: the builder run from there accepts a path
+    // only inside its own checkout (#1275), and removing the copy removes it.
+    dir = mkdtempSync(join(dirname(checkout.spaced), 'evidence-entry-'));
   });
-  afterAll(() => {
-    checkout.remove();
-    rmSync(dir, { recursive: true, force: true });
-  });
+  afterAll(() => checkout.remove());
 
   it('builds it when run from a checkout whose path holds a space', () => {
     const row = manifestRow(
@@ -417,7 +416,7 @@ describe('the builder builds its page from any checkout path (#221)', () => {
 describe('recordings travel in the asset store (#268)', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-assets-'));
+    scratch = checkoutScratch('evidence-assets');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -633,7 +632,7 @@ describe('recordings travel in the asset store (#268)', () => {
     );
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the evidence report at ${join(dir, EVIDENCE_REPORT)} is not JSON:`,
+      `✗ build-evidence-page: the evidence report at ${join(dir, EVIDENCE_REPORT)} is not JSON`,
     );
   });
 
@@ -653,7 +652,7 @@ describe('recordings travel in the asset store (#268)', () => {
     );
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the evidence manifest at ${manifest} line 3 is not JSON:`,
+      `✗ build-evidence-page: the evidence manifest at ${manifest} line 3 is not JSON`,
     );
   });
 
@@ -690,9 +689,13 @@ describe('recordings travel in the asset store (#268)', () => {
   });
 
   it.each([
-    ['a list holding an object', [{ path: 'evidence/old.webm' }]],
-    ['an object, not a list', { files: ['evidence/old.webm'] }],
-  ])('refuses a published listing that is %s, naming it', (_, shape) => {
+    [
+      'a list holding an object',
+      [{ path: 'evidence/old.webm' }],
+      'a list whose item 1 is an object',
+    ],
+    ['an object, not a list', { files: ['evidence/old.webm'] }, 'an object'],
+  ])('refuses a published listing that is %s, naming it', (_, shape, got) => {
     const dir = runDirectory('listing-shape-');
     const listing = join(dir, 'listing.json');
     writeFileSync(listing, JSON.stringify(shape));
@@ -700,7 +703,7 @@ describe('recordings travel in the asset store (#268)', () => {
     const refused = runBuilder(dir, page, undefined, ['--published', listing]);
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the published file listing at ${listing} is not a list of paths -- got ${JSON.stringify(shape)}`,
+      `✗ build-evidence-page: the published file listing at ${listing} is not a list of paths -- got ${got}`,
     );
     expect(existsSync(page), 'a page was written').toBe(false);
   });
@@ -716,7 +719,7 @@ describe('recordings travel in the asset store (#268)', () => {
 describe('screenshots travel in the asset store (#368)', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-shots-'));
+    scratch = checkoutScratch('evidence-shots');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 

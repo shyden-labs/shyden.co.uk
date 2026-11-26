@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { uncaptured } from '../../scripts/capture-coverage.mjs';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { main, uncaptured } from '../../scripts/capture-coverage.mjs';
 import { manifestRow } from '../../scripts/evidence-files.mjs';
 import { searched } from '../source-files';
 
@@ -144,5 +145,23 @@ describe('uncaptured: the cited cases that took no picture', () => {
     ).toThrow(
       'capture-coverage: no case passed in this run, so nothing was judged',
     );
+  });
+});
+
+describe('capture-coverage main (#1275)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  it('refuses an evidence folder outside this checkout, reading nothing', () => {
+    const outside = path.join(path.sep, 'tmp', 'capture-evidence');
+    vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'cc', outside]);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => main()).not.toThrow();
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining(`${outside} is outside this checkout`),
+    );
+    expect(process.exitCode).toBe(2);
   });
 });

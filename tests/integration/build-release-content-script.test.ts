@@ -2,15 +2,14 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LISTING_CAVEAT } from '../../scripts/build-release-content.mjs';
+import { checkoutScratch } from '../checkout-scratch';
 import {
   EVIDENCE_MANIFEST,
   EVIDENCE_REPORT,
@@ -88,7 +87,7 @@ const writeRelease = (change: Record<string, unknown> = {}) =>
   );
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'release-content-'));
+  dir = checkoutScratch('release-content');
   mkdirSync(at('bin'));
   writeFileSync(at('bin', 'gh'), GH_STAND_IN);
   chmodSync(at('bin', 'gh'), 0o755);
