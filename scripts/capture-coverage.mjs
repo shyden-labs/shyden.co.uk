@@ -21,7 +21,9 @@
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { capturesOfThisRun, flattenReport } from './build-evidence-page.mjs';
+import { checkoutPath } from './checkout-path.mjs';
 import { EVIDENCE_MANIFEST, EVIDENCE_REPORT } from './evidence-files.mjs';
+import { messageOf } from './errors.mjs';
 
 /**
  * @param {{ report: any, manifest: any[] }} run
@@ -47,15 +49,26 @@ export const uncaptured = ({ report, manifest }) => {
   return { judged, missing };
 };
 
-const main = () => {
+export const main = () => {
   const dir = process.argv[2];
   if (!dir) {
     console.error('usage: node scripts/capture-coverage.mjs <evidence-dir>');
     process.exitCode = 2;
     return;
   }
-  const report = JSON.parse(readFileSync(join(dir, EVIDENCE_REPORT), 'utf8'));
-  const manifest = readFileSync(join(dir, EVIDENCE_MANIFEST), 'utf8')
+  // A folder outside the checkout is refused before anything is read (#1275).
+  let inside;
+  try {
+    inside = checkoutPath(dir);
+  } catch (error) {
+    console.error(`capture-coverage: ${messageOf(error)}`);
+    process.exitCode = 2;
+    return;
+  }
+  const report = JSON.parse(
+    readFileSync(join(inside, EVIDENCE_REPORT), 'utf8'),
+  );
+  const manifest = readFileSync(join(inside, EVIDENCE_MANIFEST), 'utf8')
     .split('\n')
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line));
