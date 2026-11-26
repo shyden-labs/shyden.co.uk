@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GIT } from '../../scripts/programs.mjs';
+import { main } from '../../scripts/release-cut.mjs';
 
 /**
  * release-cut's main() fetches the refs it judges through git named by its
@@ -51,7 +52,6 @@ describe('release-cut fetches through git by its full path (#1275)', () => {
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`exit ${code}`);
     });
-    const { main } = await import('../../scripts/release-cut.mjs');
 
     await expect(main()).rejects.toThrow('exit 1');
     expect(calls[0]).toEqual({

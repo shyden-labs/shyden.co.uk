@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GIT, NODE, NPM_CLI, PLAYWRIGHT_CLI } from '../../scripts/programs.mjs';
+import { inside } from '../../scripts/desktop-container.mjs';
+import { committedAtHead } from '../../scripts/visual-capture.mjs';
 
 /**
  * The desktop container's run and the visual capture's read of HEAD start
@@ -38,7 +40,6 @@ afterEach(() => {
 
 describe('the desktop container runs npm and Playwright by path (#1275)', () => {
   it('installs with npm, then runs Playwright with the arguments it was given', async () => {
-    const { inside } = await import('../../scripts/desktop-container.mjs');
     const closed: string[] = [];
 
     await inside(['--project=chromium'], {
@@ -61,8 +62,6 @@ describe("the visual capture reads HEAD's picture through git by path (#1275)", 
   it('asks git whether HEAD has the file, then reads it', async () => {
     const bytes = new Uint8Array([1, 2, 3]);
     answers = [{ status: 0 }, { status: 0, stdout: bytes }];
-    const { committedAtHead } =
-      await import('../../scripts/visual-capture.mjs');
 
     expect(committedAtHead('a.png')).toBe(bytes);
     expect(calls).toEqual([
@@ -73,8 +72,6 @@ describe("the visual capture reads HEAD's picture through git by path (#1275)", 
 
   it('is undefined for a picture HEAD does not have', async () => {
     answers = [{ status: 128 }];
-    const { committedAtHead } =
-      await import('../../scripts/visual-capture.mjs');
 
     expect(committedAtHead('new.png')).toBeUndefined();
     expect(calls).toHaveLength(1);
