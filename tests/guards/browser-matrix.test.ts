@@ -680,15 +680,19 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
   });
 
   it("gives no browser the Functions run's DEV pass or its key (#1262)", () => {
-    const all = [...webkit, ...others];
+    // Only the Functions config runs beside its pass. A config this file loads
+    // after it copies the pass from this process, which no real run does.
+    const functions = [...webkit, ...others].filter(({ id }) =>
+      id.startsWith('playwright.functions.config.ts › '),
+    );
     expect(
       searched(
-        all.flatMap(({ id, env }) =>
+        functions.flatMap(({ id, env }) =>
           RUN_SECRETS.filter((name) => env?.[name] !== undefined).map(
             (name) => `${id}: ${name}`,
           ),
         ),
-        { of: all, what: 'projects' },
+        { of: functions, what: 'Functions projects' },
       ),
     ).toEqual([]);
   });
