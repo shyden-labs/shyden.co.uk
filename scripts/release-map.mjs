@@ -190,6 +190,9 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
  * @param {ChangeMap} map
  * @returns {{ changeMap: string, others: string }}
  */
+/** One area and its commit count, for the map's footnote. */
+const areaCount = ([area, n]) => `${esc(area)} <span class="mono">${n}</span>`;
+
 export const renderChangeMap = ({ rows, totals, otherCommits, otherAreas }) => {
   const body = rows
     .map(({ entry, classification, flagged }) => {
@@ -221,6 +224,6 @@ export const renderChangeMap = ({ rows, totals, otherCommits, otherAreas }) => {
       `<div class="mtx"><table><thead><tr><th>Commit</th><th>Refs</th><th>Subject</th><th>What shows it</th></tr></thead><tbody>${body}</tbody></table></div>`,
     others:
       `<p class="sub"><span class="mono">${otherCommits}</span> more commits change nothing a visitor receives. By area: ` +
-      `${otherAreas.map(([area, n]) => `${esc(area)} <span class="mono">${n}</span>`).join(' · ')}</p>`,
+      `${otherAreas.map(areaCount).join(' · ')}</p>`,
   };
 };

@@ -63,6 +63,11 @@ const SHARD_VALUE = /^(\d+)\/(\d+)$/;
  * @param {readonly string[]} argv
  * @returns {Shard | null}
  */
+/** One total, as a Markdown list item. */
+const totalLine = (line) => `- ${line}`;
+/** One finding, indented under the refusal. */
+const findingLine = (finding) => `  - ${finding}`;
+
 export function shardOf(argv = []) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -803,7 +808,7 @@ function main() {
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY,
-        `\n### e2e totals per browser\n\n${totals.map((line) => `- ${line}`).join('\n')}\n`,
+        `\n### e2e totals per browser\n\n${totals.map(totalLine).join('\n')}\n`,
       );
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
@@ -814,7 +819,7 @@ function main() {
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +
-        `${findings.map((finding) => `  - ${finding}`).join('\n')}\n${RULE}\n`,
+        `${findings.map(findingLine).join('\n')}\n${RULE}\n`,
     );
     process.exit(1);
   }
