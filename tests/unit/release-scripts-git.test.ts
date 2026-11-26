@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GIT } from '../../scripts/programs.mjs';
+import { main as releaseInventory } from '../../scripts/release-inventory.mjs';
+import { main as buildReleaseContent } from '../../scripts/build-release-content.mjs';
 
 /**
  * release-inventory's and build-release-content's main() read git named by
@@ -41,9 +43,7 @@ afterEach(() => {
 describe('the release scripts read git by its full path (#1275)', () => {
   it("release-inventory --tests lists git's tracked specs", async () => {
     runAs('release-inventory.mjs', '--tests');
-    const { main } = await import('../../scripts/release-inventory.mjs');
-
-    expect(() => main()).toThrow('the stand-in git stops here');
+    expect(() => releaseInventory()).toThrow('the stand-in git stops here');
     expect(calls[0]).toEqual({
       command: GIT,
       args: ['ls-files', '-z', '--', 'tests/e2e/*.spec.ts'],
@@ -62,11 +62,10 @@ describe('the release scripts read git by its full path (#1275)', () => {
       '--manifest',
       'package.json',
     );
-    const { main } = await import('../../scripts/build-release-content.mjs');
 
     // The release file is read before git, so this names a real one; the
     // stand-in git's refusal is reported and the script exits 1.
-    expect(() => main()).toThrow('exit 1');
+    await expect(async () => buildReleaseContent()).rejects.toThrow('exit 1');
     expect(calls[0]).toMatchObject({
       command: GIT,
       options: READS_LARGE_OUTPUT,
