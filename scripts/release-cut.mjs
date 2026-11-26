@@ -28,6 +28,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { messageOf } from './errors.mjs';
+import { GIT } from './programs.mjs';
 
 /** The branch every release comes from. */
 export const CUT_PREFIX = 'release/';
@@ -200,7 +201,7 @@ const required = (name) => {
 async function main() {
   /** @type {Git} */
   const git = (args) =>
-    execFileSync('git', args, {
+    execFileSync(GIT, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });

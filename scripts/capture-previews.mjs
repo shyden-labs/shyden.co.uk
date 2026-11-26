@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium } from '@playwright/test';
+import { ASTRO_CLI, NODE } from './programs.mjs';
 
 const PORT = 4329;
 const ORIGIN = `http://localhost:${PORT}`;
@@ -57,8 +58,8 @@ async function main() {
   }
   const { shots, viewport } = await previewPaths();
   const server = spawn(
-    'npx',
-    ['astro', 'preview', '--port', String(PORT), '--host', 'localhost'],
+    NODE,
+    [ASTRO_CLI, 'preview', '--port', String(PORT), '--host', 'localhost'],
     { stdio: 'ignore' },
   );
   try {

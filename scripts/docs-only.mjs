@@ -26,6 +26,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { env, exit } from 'node:process';
 import { captureFromDiff } from './capture-scope.mjs';
+import { GIT } from './programs.mjs';
 
 /** The files outside `docs/` that are documentation and nothing reads. */
 export const DOCS_ONLY_FILES = Object.freeze(['HANDOVER.md']);
@@ -252,7 +253,7 @@ export function main() {
   }
   /** @param {readonly string[]} args */
   const git = (args) =>
-    execFileSync('git', args, {
+    execFileSync(GIT, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });

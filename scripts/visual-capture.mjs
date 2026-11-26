@@ -27,6 +27,7 @@ import { argv, env } from 'node:process';
 import coreBundle from 'playwright-core/lib/coreBundle';
 import { die } from './errors.mjs';
 import { decodePng, differingPixels } from './png-pixels.mjs';
+import { GIT } from './programs.mjs';
 
 /** A git trailer line: `Co-Authored-By: ...`. */
 const TRAILER = /^[A-Za-z][A-Za-z0-9-]*: \S/;
@@ -223,11 +224,11 @@ export const captureSummary = ({ commit, kept }) => {
  * @returns {Uint8Array | undefined}
  */
 const committedAtHead = (file) => {
-  const exists = spawnSync('git', ['cat-file', '-e', `HEAD:${file}`]);
+  const exists = spawnSync(GIT, ['cat-file', '-e', `HEAD:${file}`]);
   if (exists.error !== undefined)
     die(`visual-capture: git did not start: ${exists.error.message}`);
   if (exists.status !== 0) return undefined;
-  const shown = spawnSync('git', ['show', `HEAD:${file}`], {
+  const shown = spawnSync(GIT, ['show', `HEAD:${file}`], {
     maxBuffer: 1 << 28,
   });
   if (shown.error !== undefined || shown.status !== 0)

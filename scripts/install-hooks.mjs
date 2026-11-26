@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { argv, exit } from 'node:process';
 import { die } from './errors.mjs';
+import { GIT } from './programs.mjs';
 
 const HOOKS = '.githooks';
 
@@ -62,7 +63,7 @@ export function main() {
   // A hook installer must never fail an install. Not installing a convenience
   // is not an error; claiming to have installed one would be.
   try {
-    execFileSync('git', ['config', 'core.hooksPath', HOOKS], {
+    execFileSync(GIT, ['config', 'core.hooksPath', HOOKS], {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
   } catch (error) {

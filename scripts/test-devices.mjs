@@ -72,6 +72,7 @@ import path from 'node:path';
 import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
+import { LSOF, NODE, PS } from './programs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -345,7 +346,7 @@ function readJson(file, description) {
 export function pidsListeningOnPort(port) {
   try {
     const out = execFileSync(
-      'lsof',
+      LSOF,
       ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'],
       { encoding: 'utf8' },
     );
@@ -405,7 +406,7 @@ function portHolders(port) {
   return pidsListeningOnPort(port).map((pid) => {
     let command = 'unknown';
     try {
-      command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+      command = execFileSync(PS, ['-o', 'command=', '-p', String(pid)], {
         encoding: 'utf8',
       }).trim();
     } catch {
@@ -666,7 +667,7 @@ async function startDashboard() {
 
   let child;
   try {
-    child = spawn('node', ['scripts/dashboard.mjs'], {
+    child = spawn(NODE, ['scripts/dashboard.mjs'], {
       cwd: ROOT,
       env: process.env,
       detached: true,

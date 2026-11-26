@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseTunnelAddress } from './devicectl.mjs';
 import { messageOf, nonEmpty } from './errors.mjs';
+import { PGREP } from './programs.mjs';
 
 /** appium/WebDriverAgent v16.14.0 (BSD), tag dated 2026-10-04. */
 export const WDA_PIN = 'd17782422d55ff1e5e0ceb74eb1fd509cc0c35b6';
@@ -85,7 +86,7 @@ function findXctestrun(productsDir) {
 function alive(udid) {
   return new Promise((resolve) => {
     execFile(
-      'pgrep',
+      PGREP,
       ['-f', `xcodebuild test-without-building.*${udid}`],
       { encoding: 'utf8' },
       // pgrep exits 1 when nothing matches: that is the answer, not a failure.

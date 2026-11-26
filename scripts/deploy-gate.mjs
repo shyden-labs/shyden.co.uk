@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
 import { die, messageOf } from './errors.mjs';
+import { GIT } from './programs.mjs';
 
 /**
  * May this commit be deployed to dev without re-running the whole suite?
@@ -231,7 +232,7 @@ export const decideDeploy = ({
 };
 
 /** @param {...string} args */
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+const git = (...args) => execFileSync(GIT, args, { encoding: 'utf8' }).trim();
 
 /**
  * One GET against the API the runner names in GITHUB_API_URL (Actions sets it
