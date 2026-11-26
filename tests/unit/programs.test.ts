@@ -11,6 +11,7 @@ import {
   PGREP,
   PLAYWRIGHT_CLI,
   PS,
+  VITEST_CLI,
   lsofFor,
 } from '../../scripts/programs.mjs';
 
@@ -55,6 +56,10 @@ describe('the programs the scripts run, each by its absolute path', () => {
     );
     expect(ASTRO_CLI).toBe(
       path.join(ROOT, 'node_modules', 'astro', 'bin', 'astro.mjs'),
+    );
+    // Vitest's own `bin` entry, which `npx vitest` runs (#1295).
+    expect(VITEST_CLI).toBe(
+      path.join(ROOT, 'node_modules', 'vitest', 'vitest.mjs'),
     );
   });
 

@@ -72,7 +72,14 @@ import path from 'node:path';
 import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
-import { DOCKER, LSOF, NODE, PS } from './programs.mjs';
+import {
+  DOCKER,
+  LSOF,
+  NODE,
+  PLAYWRIGHT_CLI,
+  PS,
+  VITEST_CLI,
+} from './programs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -1109,6 +1116,54 @@ async function runDesktopGroup() {
   };
 }
 
+/**
+ * The Android group's suite: Playwright's own entry file under node, never
+ * `npx` found on PATH (SonarCloud S4036, #1295). See runDesktopGroup's
+ * comment on the reporters: html + jsonl-reporter are additive, list+json are
+ * unchanged, no config file needed a change.
+ *
+ * @returns {{ command: string, args: string[] }}
+ */
+export const androidGroupCommand = () => ({
+  command: NODE,
+  args: [
+    PLAYWRIGHT_CLI,
+    'test',
+    '--config=playwright.device.config.ts',
+    '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+  ],
+});
+
+/**
+ * The iPhone group's suite: Vitest's own entry file under node, never `npx`
+ * (#1295), writing its JSON report to `reportFile`.
+ *
+ * @param {string} reportFile
+ * @returns {{ command: string, args: string[] }}
+ */
+export const iosGroupCommand = (reportFile) => ({
+  command: NODE,
+  args: [
+    VITEST_CLI,
+    'run',
+    '--config=vitest.ios.config.ts',
+    '--reporter=verbose',
+    '--reporter=json',
+    `--outputFile.json=${reportFile}`,
+    // Additive, same as the two Playwright groups' jsonl reporter --
+    // verbose+json are unchanged. The leading "./" is load-bearing, not
+    // decorative: vitest's own CLI-to-config resolution
+    // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
+    // starting "// ./reporter.js || ../reporter.js, but not
+    // .reporters/reporter.js") only treats a --reporter value as a file
+    // path when it matches /^\.\.?\//; a bare path is treated as a
+    // reporter NAME and fails to resolve. Measured, not assumed -- see
+    // tests/reporters/jsonl-vitest.ts's own module doc. No change to
+    // vitest.ios.config.ts needed.
+    '--reporter=./tests/reporters/jsonl-vitest.ts',
+  ],
+});
+
 async function runAndroidGroup() {
   const name = 'android';
   const startedAt = Date.now();
@@ -1130,29 +1185,18 @@ async function runAndroidGroup() {
   }
 
   const reportFile = REPORT_FILES.android;
-  const { code } = await runTagged(
-    name,
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.device.config.ts',
-      // See runDesktopGroup's identical comment: html + jsonl-reporter are
-      // additive, list+json are unchanged, no config file needed a change.
-      '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-    ],
-    {
-      env: {
-        ...process.env,
-        PW_REUSE_SERVER: '1',
-        PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
-        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-        DASHBOARD_GROUP: name,
-        PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
-        PLAYWRIGHT_HTML_OPEN: 'never',
-      },
+  const android = androidGroupCommand();
+  const { code } = await runTagged(name, android.command, android.args, {
+    env: {
+      ...process.env,
+      PW_REUSE_SERVER: '1',
+      PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
+      DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+      DASHBOARD_GROUP: name,
+      PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
+      PLAYWRIGHT_HTML_OPEN: 'never',
     },
-  );
+  });
   return {
     ...playwrightVerdict({
       name,
@@ -1214,39 +1258,17 @@ async function runIosGroup() {
     };
   }
   process.stdout.write(`[${name}] WebDriverAgent ready at ${wda.url}\n`);
+  const ios = iosGroupCommand(reportFile);
   let code;
   try {
-    ({ code } = await runTagged(
-      name,
-      'npx',
-      [
-        'vitest',
-        'run',
-        '--config=vitest.ios.config.ts',
-        '--reporter=verbose',
-        '--reporter=json',
-        `--outputFile.json=${reportFile}`,
-        // Additive, same as the two Playwright groups' jsonl reporter --
-        // verbose+json are unchanged. The leading "./" is load-bearing, not
-        // decorative: vitest's own CLI-to-config resolution
-        // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
-        // starting "// ./reporter.js || ../reporter.js, but not
-        // .reporters/reporter.js") only treats a --reporter value as a file
-        // path when it matches /^\.\.?\//; a bare path is treated as a
-        // reporter NAME and fails to resolve. Measured, not assumed -- see
-        // tests/reporters/jsonl-vitest.ts's own module doc. No change to
-        // vitest.ios.config.ts needed.
-        '--reporter=./tests/reporters/jsonl-vitest.ts',
-      ],
-      {
-        env: {
-          ...process.env,
-          DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-          DASHBOARD_GROUP: name,
-          WDA_URL: wda.url,
-        },
+    ({ code } = await runTagged(name, ios.command, ios.args, {
+      env: {
+        ...process.env,
+        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+        DASHBOARD_GROUP: name,
+        WDA_URL: wda.url,
       },
-    ));
+    }));
   } finally {
     await wda.stop();
   }
