@@ -14,6 +14,7 @@ import { NEW_BASELINE, STRAY_SNAPSHOT } from '../git-questions';
 import { ENGINES } from '../engines';
 import { withoutCommentLines, withoutTsComments } from '../unit/source-text';
 import { workflowJobs } from '../workflow-jobs';
+import { TEST_PASS_ENV, TEST_PASS_KEYS_ENV } from '../functions/local.mjs';
 
 type PlaywrightConfigModule = typeof import('../../playwright.config');
 
@@ -598,6 +599,7 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
     engine: string;
     env: Record<string, unknown> | undefined;
   };
+  const RUN_SECRETS = [TEST_PASS_ENV, TEST_PASS_KEYS_ENV];
   const webkit: Reading[] = [];
   const others: Reading[] = [];
 
@@ -649,7 +651,11 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
     const inherited = nonEmpty(
       Object.entries(process.env).filter(
         ([name, value]) =>
-          value !== undefined && name !== 'GST_PLUGIN_FEATURE_RANK',
+          value !== undefined &&
+          name !== 'GST_PLUGIN_FEATURE_RANK' &&
+          // The Functions run's pass and key, which loading its config puts
+          // in this process and no browser is ever given (next test).
+          !RUN_SECRETS.includes(name),
       ),
       'variables in the environment a browser would inherit',
     );
@@ -669,6 +675,24 @@ describe('WebKit plays its sound into a silent sink (#919)', () => {
               ];
         }),
         { of: webkit, what: 'WebKit projects' },
+      ),
+    ).toEqual([]);
+  });
+
+  it("gives no browser the Functions run's DEV pass or its key (#1262)", () => {
+    // Only the Functions config runs beside its pass. A config this file loads
+    // after it copies the pass from this process, which no real run does.
+    const functions = [...webkit, ...others].filter(({ id }) =>
+      id.startsWith('playwright.functions.config.ts › '),
+    );
+    expect(
+      searched(
+        functions.flatMap(({ id, env }) =>
+          RUN_SECRETS.filter((name) => env?.[name] !== undefined).map(
+            (name) => `${id}: ${name}`,
+          ),
+        ),
+        { of: functions, what: 'Functions projects' },
       ),
     ).toEqual([]);
   });
