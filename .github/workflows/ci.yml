@@ -494,7 +494,7 @@ jobs:
   # 35948503612). `npm run test:sanity` builds this tree and previews it for
   # each config in turn, and leaves out the tests tagged @deployed-only, which
   # the deploy's own run still covers. It needs no credentials: nothing it
-  # reaches is behind the dev site's Basic auth.
+  # reaches is behind the dev site's DEV pass gate.
   sanity-on-build:
     needs: [image, scope]
     # Skipped on a docs-only pull request (#582).
