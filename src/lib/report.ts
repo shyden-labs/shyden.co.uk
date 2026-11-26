@@ -511,7 +511,7 @@ const within = (text: string, min: number): boolean =>
 
 /** A textarea's maxlength counts a line break as one unit; submission sends CRLF (spec 6.1). */
 const field = (fields: URLSearchParams, name: string): string =>
-  (fields.get(name) ?? '').replace(/\r\n/g, '\n');
+  (fields.get(name) ?? '').replaceAll('\r\n', '\n');
 
 /**
  * Why a call to the database failed, as a kind from a closed list (#829). A

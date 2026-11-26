@@ -502,10 +502,10 @@ const LABEL_CAVEAT =
 /** A value inside one Markdown table cell, whatever characters it carries. */
 export const cell = (text: string): string =>
   text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\|/g, '\\|')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('|', '\\|')
     .replace(/\s+/g, (run) => (run.includes('\n') ? ' ' : run));
 
 /** Rows as a review table, in the order given. */

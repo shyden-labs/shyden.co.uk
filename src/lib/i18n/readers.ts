@@ -399,9 +399,9 @@ export const azureUrl = (locale: ReadLocale): string =>
 export const azureBody = (texts: readonly string[]): { Text: string }[] =>
   texts.map((text) => ({
     Text: text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
       .replace(SLOT, (slot) => `<span class="notranslate">${slot}</span>`),
   }));
 

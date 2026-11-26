@@ -34,7 +34,9 @@ export const SHYTALK_MARK = {
 export const asComputedRgb = (hex: string): string => {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  const [r, g, b] = [0, 2, 4].map((i) =>
+    Number.parseInt(full.slice(i, i + 2), 16),
+  );
   return `rgb(${r}, ${g}, ${b})`;
 };
 

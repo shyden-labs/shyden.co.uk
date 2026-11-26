@@ -152,10 +152,10 @@ export const escapeForRegExp = (text: string): string =>
  * own output (`&lt;` -> `&amp;lt;`) and the round trip stops being one.
  */
 export const escapeXml = (text: string): string =>
-  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 export const unescapeXml = (text: string): string =>
-  text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
 
 /**
  * Wrap every protected term so DeepL returns it untouched.

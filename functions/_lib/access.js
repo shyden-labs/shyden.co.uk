@@ -48,7 +48,7 @@ export function privatePath(pathname) {
 function base64urlBytes(text) {
   if (!BASE64URL.test(text)) throw new Error('not base64url');
   const padded =
-    text.replace(/-/g, '+').replace(/_/g, '/') +
+    text.replaceAll('-', '+').replaceAll('_', '/') +
     '==='.slice((text.length + 3) % 4);
   return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
 }

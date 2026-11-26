@@ -250,9 +250,9 @@ const SLOT = /\{[^{}]*\}/g;
  */
 export const googleHtml = (line: string): string =>
   line
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
     .replace(SLOT, (slot) => `<span translate="no">${slot}</span>`);
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
