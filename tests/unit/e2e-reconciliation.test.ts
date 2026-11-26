@@ -9,8 +9,10 @@ import {
   enumerationArgs,
   enumerationMode,
   listSuite,
+  runSuite,
 } from '../../scripts/test-e2e.mjs';
 import { searched } from '../source-files';
+import { NODE, PLAYWRIGHT_CLI } from '../../scripts/programs.mjs';
 
 /**
  * A green e2e run must mean the whole suite ran, not that some of it did.
@@ -265,8 +267,10 @@ describe('the listing fails before anything reads its output (#1053)', () => {
     const listing = listSuite([], spawn);
 
     expect(listing.stdout).toBe('Total: 3 tests in 1 file\n');
+    // Playwright's own entry file under the running node, never `npx` found
+    // on PATH (SonarCloud S4036, #1295).
     expect(calls).toEqual([
-      { command: 'npx', args: ['playwright', 'test', '--list'] },
+      { command: NODE, args: [PLAYWRIGHT_CLI, 'test', '--list'] },
     ]);
   });
 });
@@ -450,5 +454,35 @@ describe('flags that change the count without narrowing it', () => {
     // the enumeration. Enforcing there fails a valid command, and the natural
     // fix for that false alarm would be to weaken the guard.
     expect(isFilteredRun(['--repeat-each=2'])).toBe(true);
+  });
+});
+
+describe('the suite runs through the runner it is handed (#1295)', () => {
+  it("runs Playwright's own entry file under node, with the run's arguments and env", () => {
+    // SonarCloud S4036: `npx` found on PATH is whichever comes first there.
+    const calls: {
+      command: string;
+      args: readonly string[];
+      options: unknown;
+    }[] = [];
+    const spawn = ((
+      command: string,
+      args: readonly string[],
+      options: unknown,
+    ) => {
+      calls.push({ command, args, options });
+      return { status: 0 };
+    }) as unknown as Parameters<typeof runSuite>[2];
+
+    const run = runSuite(['test', '--reporter=line'], { A: '1' }, spawn);
+
+    expect(run).toEqual({ status: 0 });
+    expect(calls).toEqual([
+      {
+        command: NODE,
+        args: [PLAYWRIGHT_CLI, 'test', '--reporter=line'],
+        options: { stdio: 'inherit', env: { A: '1' } },
+      },
+    ]);
   });
 });

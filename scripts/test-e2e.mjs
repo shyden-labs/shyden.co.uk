@@ -35,6 +35,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { messageOf } from './errors.mjs';
+import { NODE, PLAYWRIGHT_CLI } from './programs.mjs';
 import { countByProject } from './even-totals.mjs';
 import {
   appendFileSync,
@@ -179,6 +180,19 @@ export const LIST_MAX_BUFFER = 256 * 1024 * 1024;
 const RULE = '='.repeat(72);
 
 /**
+ * Runs Playwright with `args`, its output on this terminal: Playwright's own
+ * entry file under the running node, never `npx` found on PATH (SonarCloud
+ * S4036, #1295). `spawn` is the runner, handed in so a test can stand it in.
+ *
+ * @param {readonly string[]} args
+ * @param {NodeJS.ProcessEnv} env
+ * @param {Spawn} spawn
+ */
+export function runSuite(args, env, spawn = spawnSync) {
+  return spawn(NODE, [PLAYWRIGHT_CLI, ...args], { stdio: 'inherit', env });
+}
+
+/**
  * The unfiltered `playwright test --list` this run is reconciled against, or,
  * for a capture shard, the list of the selection it was handed (#774).
  * Throws, naming the exit and quoting Playwright's stderr, when the listing
@@ -190,8 +204,8 @@ const RULE = '='.repeat(72);
  */
 export function listSuite(argv = [], spawn = spawnSync, options = {}) {
   const listing = spawn(
-    'npx',
-    ['playwright', 'test', '--list', ...enumerationArgs(argv, options)],
+    NODE,
+    [PLAYWRIGHT_CLI, 'test', '--list', ...enumerationArgs(argv, options)],
     { encoding: 'utf8', maxBuffer: LIST_MAX_BUFFER },
   );
   // THE LISTING'S OWN FAILURE, before anything derived from it is trusted.
@@ -550,22 +564,17 @@ function main() {
       Math.floor(Date.now() / 1000),
     );
     const started = performance.now();
-    const run = spawnSync(
-      'npx',
+    const run = runSuite(
       [
-        'playwright',
         'test',
         `--reporter=${reporter}`,
         ...(deadlineMs === null ? [] : [`--global-timeout=${deadlineMs}`]),
         ...(planned ? planned.args : passthrough),
       ],
       {
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
-          NAV_TIMING_FILE: navPath,
-        },
+        ...process.env,
+        PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
+        NAV_TIMING_FILE: navPath,
       },
     );
     // The run's wall time, for build-and-test's table of shard times (#607).
