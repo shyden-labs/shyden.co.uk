@@ -36,7 +36,7 @@ async function run(
   {
     config = CONFIG,
     env = { GITHUB_TOKEN: 't', GITHUB_REPOSITORY: 'o/r' },
-  } = {},
+  }: { config?: string; env?: NodeJS.ProcessEnv } = {},
 ) {
   const urls: string[] = [];
   const fetch = (async (url: string) => {

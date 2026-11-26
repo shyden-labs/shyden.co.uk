@@ -161,9 +161,17 @@ const originUrl = () =>
   execFileSync(GIT, ['remote', 'get-url', 'origin'], { encoding: 'utf8' });
 
 /**
- * Refuse a config naming a label the repository does not have.
+ * Refuse a config naming a label the repository does not have. Each input is
+ * a parameter so a unit test can stand it in (#1295).
  *
- * @returns {void}
+ * @param {{
+ *   args?: string[],
+ *   readConfig?: () => string,
+ *   env?: NodeJS.ProcessEnv,
+ *   fetch?: typeof globalThis.fetch,
+ *   readOrigin?: () => string,
+ * }} [inputs]
+ * @returns {Promise<void>}
  */
 export const main = async ({
   args = argv.slice(2),

@@ -10,7 +10,9 @@ import {
   enumerationMode,
   listSuite,
   runSuite,
+  main,
 } from '../../scripts/test-e2e.mjs';
+import { PROBES } from '../script-entry-shared';
 import { searched } from '../source-files';
 import { NODE, PLAYWRIGHT_CLI } from '../../scripts/programs.mjs';
 
@@ -484,5 +486,25 @@ describe('the suite runs through the runner it is handed (#1295)', () => {
         options: { stdio: 'inherit', env: { A: '1' } },
       },
     ]);
+  });
+});
+
+describe("test-e2e's entry probe refuses before it runs anything (#572, #1295)", () => {
+  it('never hands Playwright a run it is about to refuse', () => {
+    // The probe once got its refusal from Playwright, starting its CLI twice
+    // per probe, and timed out at 32-34 s under load (#572). A `npx` that
+    // killed its caller guarded that while the script ran `npx`; it now runs
+    // the runner it is handed, so the runner here records every call.
+    const probe = PROBES['test-e2e.mjs'];
+    const calls: unknown[] = [];
+    const spawn = ((...args: unknown[]) => {
+      calls.push(args);
+      return { status: 0, stdout: '', stderr: '' };
+    }) as unknown as NonNullable<Parameters<typeof main>[0]>['spawn'];
+
+    expect(() =>
+      main({ argv: [...probe.args], env: {}, spawn, pid: 1, tmp: '/nowhere' }),
+    ).toThrow(probe.says);
+    expect(calls).toEqual([]);
   });
 });

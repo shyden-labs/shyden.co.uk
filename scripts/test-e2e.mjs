@@ -186,7 +186,7 @@ const RULE = '='.repeat(72);
  *
  * @param {readonly string[]} args
  * @param {NodeJS.ProcessEnv} env
- * @param {Spawn} spawn
+ * @param {typeof spawnSync} spawn
  */
 export function runSuite(args, env, spawn = spawnSync) {
   return spawn(NODE, [PLAYWRIGHT_CLI, ...args], { stdio: 'inherit', env });
@@ -497,34 +497,56 @@ export function reconcile({
  * PURE, so `tests/guards/evidence-page.test.ts` can assert the seam without
  * running Playwright: the caller creates the directory.
  */
-export function reportLocation(env = process.env) {
+export function reportLocation(
+  env = process.env,
+  { pid = process.pid, tmp = tmpdir() } = {},
+) {
   // A CI shard names a directory too, so a shard that fails or ends itself
   // keeps the report its failing-shard step uploads (#938).
   const kept = env.EVIDENCE_DIR || env.E2E_REPORT_DIR;
-  const dir = kept || join(tmpdir(), `e2e-reconcile-${process.pid}`);
+  const dir = kept || join(tmp, `e2e-reconcile-${pid}`);
   return { dir, path: join(dir, EVIDENCE_REPORT), ephemeral: !kept };
 }
 
-function main() {
-  const argv = process.argv.slice(2);
+/**
+ * Lists the suite, runs it, and reconciles the run against the listing. Each
+ * input is a parameter so a unit test can hand in its own (#1295): `spawn`
+ * is the runner every Playwright call goes through, and `pid` and `tmp` name
+ * the report folder a run without `EVIDENCE_DIR` keeps for itself.
+ *
+ * @param {{
+ *   argv?: string[],
+ *   env?: NodeJS.ProcessEnv,
+ *   spawn?: typeof spawnSync,
+ *   pid?: number,
+ *   tmp?: string,
+ * }} [inputs]
+ */
+export function main({
+  argv = process.argv.slice(2),
+  env = process.env,
+  spawn = spawnSync,
+  pid = process.pid,
+  tmp = tmpdir(),
+} = {}) {
   // Refuses a shard it could not account for BEFORE spending a run on it:
   // the account written below needs to say which shard this was (#163).
   shardOf(argv);
-  oneAttemptEach(argv, process.env);
+  oneAttemptEach(argv, env);
   const filtered = isFilteredRun(argv);
   const { passthrough, reporter } = mergeReporters(argv);
 
   // Same suite, no filters: this is the number the run has to answer to. A
   // capture shard answers to its selection instead, summed in build-and-test.
-  const selection = enumerationMode(argv, process.env) === 'selection';
-  const listing = listSuite(argv, spawnSync, { selection });
+  const selection = enumerationMode(argv, env) === 'selection';
+  const listing = listSuite(argv, spawn, { selection });
   const enumerated = parseListTotal(listing.stdout);
 
   const {
     dir: reportDir,
     path: reportPath,
     ephemeral,
-  } = reportLocation(process.env);
+  } = reportLocation(env, { pid, tmp });
   const navPath = join(reportDir, 'nav-timings.json');
   mkdirSync(reportDir, { recursive: true });
   // A report left by an earlier run reads exactly like one this run produced,
@@ -538,7 +560,7 @@ function main() {
     // files planned for it rather than Playwright's equal count of tests
     // (scripts/e2e-shard-plan.mjs, #607). Planned from the unfiltered listing
     // above, so every shard of one run computes the same plan.
-    const planFile = process.env.E2E_SHARD_PLAN;
+    const planFile = env.E2E_SHARD_PLAN;
     const listPath = join(reportDir, 'shard-test-list.txt');
     const planned = plannedRun({
       planFile,
@@ -560,7 +582,7 @@ function main() {
     // log away (#938): Playwright's global timeout, from the job's clock.
     const deadlineMs = shardDeadlineMs(
       argv,
-      process.env,
+      env,
       Math.floor(Date.now() / 1000),
     );
     const started = performance.now();
@@ -572,10 +594,11 @@ function main() {
         ...(planned ? planned.args : passthrough),
       ],
       {
-        ...process.env,
+        ...env,
         PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
         NAV_TIMING_FILE: navPath,
       },
+      spawn,
     );
     // The run's wall time, for build-and-test's table of shard times (#607).
     const seconds = Math.round((performance.now() - started) / 100) / 10;
@@ -612,7 +635,7 @@ function main() {
       ranUnits,
       projectCounts,
     });
-    const accountDir = process.env.E2E_ACCOUNT_DIR;
+    const accountDir = env.E2E_ACCOUNT_DIR;
     if (recorded && accountDir) {
       mkdirSync(accountDir, { recursive: true });
       writeFileSync(
@@ -649,9 +672,9 @@ function main() {
       console.error(
         `\n${RULE}\n  E2E DURATIONS BY PROJECT\n${RULE}\n${table}\n`,
       );
-      if (process.env.GITHUB_STEP_SUMMARY)
+      if (env.GITHUB_STEP_SUMMARY)
         appendFileSync(
-          process.env.GITHUB_STEP_SUMMARY,
+          env.GITHUB_STEP_SUMMARY,
           `\n### e2e durations by project\n\n${table}\n`,
         );
     }
@@ -672,9 +695,9 @@ function main() {
     console.error(
       `\n${RULE}\n  NAVIGATION DURATIONS BY PROJECT\n${RULE}\n${navTable}\n`,
     );
-    if (process.env.GITHUB_STEP_SUMMARY)
+    if (env.GITHUB_STEP_SUMMARY)
       appendFileSync(
-        process.env.GITHUB_STEP_SUMMARY,
+        env.GITHUB_STEP_SUMMARY,
         `\n### navigation durations by project\n\n${navTable}\n`,
       );
 
