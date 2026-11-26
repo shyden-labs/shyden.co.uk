@@ -1489,13 +1489,13 @@ const textAt = (file, what) => {
  * @param {string} where
  * @returns {any}
  */
-const jsonFrom = (text, where) => {
+export const jsonFrom = (text, where) => {
   try {
     return JSON.parse(text);
-  } catch (error) {
-    throw new Error(
-      `build-evidence-page: ${where} is not JSON: ${messageOf(error)}`,
-    );
+  } catch {
+    // Not the parser's message: Node's repeats the text it could not read,
+    // and that text is the file's own (#1275).
+    throw new Error(`build-evidence-page: ${where} is not JSON`);
   }
 };
 
@@ -1505,6 +1505,33 @@ const jsonFrom = (text, where) => {
  */
 const jsonAt = (file, what) =>
   jsonFrom(textAt(file, what), `${what} at ${file}`);
+
+/**
+ * What kind of JSON value `value` is, in words.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+const kindOf = (value) => {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'a list';
+  if (typeof value === 'boolean') return 'true or false';
+  return typeof value === 'object' ? 'an object' : `a ${typeof value}`;
+};
+
+/**
+ * A listing that is not a list of paths, described by its shape alone. The
+ * refusal it goes into is printed to the log, so it never repeats what the
+ * file holds (SonarCloud's S8689, #1275).
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export const listingShape = (value) => {
+  if (!Array.isArray(value)) return kindOf(value);
+  const at = value.findIndex((item) => typeof item !== 'string');
+  return `a list whose item ${at + 1} is ${kindOf(value[at])}`;
+};
 
 /**
  * The paths an artifact already serves, from a saved file listing, refused
@@ -1522,7 +1549,7 @@ const listingAt = (file) => {
   ) {
     throw new Error(
       `build-evidence-page: the published file listing at ${file} is not a list of paths -- ` +
-        `got ${JSON.stringify(listing).slice(0, 200)}`,
+        `got ${listingShape(listing)}`,
     );
   }
   return listing;

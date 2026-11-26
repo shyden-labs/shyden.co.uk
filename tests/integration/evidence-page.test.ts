@@ -633,7 +633,7 @@ describe('recordings travel in the asset store (#268)', () => {
     );
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the evidence report at ${join(dir, EVIDENCE_REPORT)} is not JSON:`,
+      `✗ build-evidence-page: the evidence report at ${join(dir, EVIDENCE_REPORT)} is not JSON`,
     );
   });
 
@@ -653,7 +653,7 @@ describe('recordings travel in the asset store (#268)', () => {
     );
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the evidence manifest at ${manifest} line 3 is not JSON:`,
+      `✗ build-evidence-page: the evidence manifest at ${manifest} line 3 is not JSON`,
     );
   });
 
@@ -690,9 +690,13 @@ describe('recordings travel in the asset store (#268)', () => {
   });
 
   it.each([
-    ['a list holding an object', [{ path: 'evidence/old.webm' }]],
-    ['an object, not a list', { files: ['evidence/old.webm'] }],
-  ])('refuses a published listing that is %s, naming it', (_, shape) => {
+    [
+      'a list holding an object',
+      [{ path: 'evidence/old.webm' }],
+      'a list whose item 1 is an object',
+    ],
+    ['an object, not a list', { files: ['evidence/old.webm'] }, 'an object'],
+  ])('refuses a published listing that is %s, naming it', (_, shape, got) => {
     const dir = runDirectory('listing-shape-');
     const listing = join(dir, 'listing.json');
     writeFileSync(listing, JSON.stringify(shape));
@@ -700,7 +704,7 @@ describe('recordings travel in the asset store (#268)', () => {
     const refused = runBuilder(dir, page, undefined, ['--published', listing]);
     expect(refused.status, refused.stderr).toBe(1);
     expect(refused.stderr).toContain(
-      `✗ build-evidence-page: the published file listing at ${listing} is not a list of paths -- got ${JSON.stringify(shape)}`,
+      `✗ build-evidence-page: the published file listing at ${listing} is not a list of paths -- got ${got}`,
     );
     expect(existsSync(page), 'a page was written').toBe(false);
   });
