@@ -29,6 +29,7 @@ import { EVIDENCE_MANIFEST, EVIDENCE_REPORT } from './evidence-files.mjs';
 import { inventoryFor } from './release-inventory.mjs';
 import { changeMapOf, releaseOf, renderChangeMap } from './release-map.mjs';
 import { messageOf } from './errors.mjs';
+import { GIT } from './programs.mjs';
 
 /**
  * Every test title a listing holds, as the builder writes a journey's title
@@ -253,7 +254,7 @@ export const main = () => {
       base: release.base,
       head,
       git: (args) =>
-        execFileSync('git', args, {
+        execFileSync(GIT, args, {
           encoding: 'utf8',
           maxBuffer: 256 * 1024 * 1024,
         }),
