@@ -3,7 +3,7 @@
  * without writing a row (#97, spec 6.2). 200 {"ok":true} or 503 {"ok":false}.
  *
  * Plumbing only, like `index.js`: the handler answers any other method with
- * 405 itself, where a unit test can see it. Behind the dev DEV pass gate
+ * 405 itself, where a unit test can see it. Behind the dev Basic Auth gate
  * like every other path; on prod, private (#782): the middleware answers 403
  * unless Cloudflare Access signed the request (`functions/_lib/access.js`).
  */

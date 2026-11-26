@@ -25,14 +25,14 @@ import { atLeast44Soft, expectNoScrollSoft } from '../viewport';
 import { contrastRatio } from '../e2e/helpers';
 import { eachWidth } from '../each-width';
 
-// Runs against the REAL deployed dev site behind the DEV pass (#1262 AC2).
-// baseURL + the pass header are supplied by playwright.dev.config.ts (env-driven).
+// Runs against the REAL deployed dev site behind Basic auth. baseURL +
+// httpCredentials are supplied by playwright.dev.config.ts (env-driven).
 // A pull request also runs it against a preview of its own build (#335),
 // leaving out the tests tagged @deployed-only; BASE is read only by one of
 // those, the raw fetch that must reach the deployed gate.
 const BASE = process.env.WEB_BASE_URL ?? 'https://dev.shyden.co.uk';
 
-test('dev homepage loads behind the DEV pass', async ({ page }) => {
+test('dev homepage loads behind Basic auth', async ({ page }) => {
   const res = await page.goto('/');
   expect(res?.status()).toBe(200);
   await expect(page.locator('h1')).toBeVisible();
@@ -343,32 +343,23 @@ test(
 );
 
 test(
-  'a request without a DEV pass is refused, and a page is sent to sign in',
+  'an unauthenticated request is challenged with 401',
   {
     tag: '@deployed-only',
     annotation: {
       type: 'deployed-only',
       description:
-        'the functions suite proves the DEV pass gate, functions/_middleware.js, before the merge (#394, #1262); only the deployed site proves dev.shyden.co.uk itself is gated',
+        'the functions suite proves the Basic-auth gate, functions/_middleware.js, before the merge (#394); only the deployed site proves dev.shyden.co.uk itself is gated',
     },
   },
   async () => {
-    // Raw fetch — NOT a Playwright request context, which would carry the
-    // config's pass and get through (making this pass a 200 as if ungated).
-    const page = await fetch(`${BASE}/`, {
-      redirect: 'manual',
-      headers: { Accept: 'text/html' },
-    });
-    expect.soft(page.status).toBe(302);
-    const signin = new URL(page.headers.get('location') ?? '');
-    expect
-      .soft(signin.origin + signin.pathname)
-      .toBe('https://dev-signin.shyden.co.uk/pass');
-    expect.soft(signin.searchParams.get('for')).toBe('dev.shyden.co.uk');
-    expect.soft(page.headers.get('www-authenticate')).toBeNull();
-
-    const api = await fetch(`${BASE}/`, { redirect: 'manual' });
-    expect.soft(api.status).toBe(401);
+    // Raw fetch — NOT a Playwright request context, which would inherit the
+    // config's httpCredentials and silently authenticate (making this pass a
+    // 200 as if unchallenged). fetch sends no Authorization header, so this
+    // genuinely exercises the no-credentials path.
+    const res = await fetch(`${BASE}/`, { redirect: 'manual' });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toMatch(/^Basic realm=/);
   },
 );
 
