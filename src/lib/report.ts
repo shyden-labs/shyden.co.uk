@@ -363,7 +363,7 @@ function hasTwoCharacters(text: string, locale: Locale): boolean {
 /** Rule 3 as an anchored literal scan: each slot a non-empty wildcard, no backtracking. */
 function wholeMessage(quote: string, runs: readonly string[]): boolean {
   const first = runs[0];
-  const last = runs[runs.length - 1];
+  const last = runs.at(-1);
   if (!quote.startsWith(first) || !quote.endsWith(last)) return false;
   let at = first.length;
   for (const run of runs.slice(1, -1)) {

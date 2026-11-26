@@ -505,7 +505,7 @@ export const cell = (text: string): string =>
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
-    .replaceAll('|', '\\|')
+    .replaceAll('|', String.raw`\|`)
     .replace(/\s+/g, (run) => (run.includes('\n') ? ' ' : run));
 
 /** Rows as a review table, in the order given. */

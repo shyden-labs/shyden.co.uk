@@ -271,8 +271,8 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
 export const fromGoogleHtml = (reading: string): string =>
   reading
     .replace(/<\/?span\b[^>]*>/g, '')
-    .replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (entity, name: string) => {
-      if (name[0] === '#')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
+      if (name.startsWith('#'))
         return String.fromCodePoint(
           name[1] === 'x' || name[1] === 'X'
             ? Number.parseInt(name.slice(2), 16)
@@ -296,7 +296,7 @@ export function googleTexts(response: unknown, expected: number): string[] {
   const texts = Array.isArray(translations)
     ? translations.map((entry) => record(entry).translatedText)
     : undefined;
-  if (!texts || !texts.every((text) => typeof text === 'string'))
+  if (!texts?.every((text) => typeof text === 'string'))
     throw new Error(
       `expected data.translations to be a list of ${expected} { translatedText }, got ${String(
         JSON.stringify(translations),
