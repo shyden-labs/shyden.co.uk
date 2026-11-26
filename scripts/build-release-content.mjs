@@ -21,6 +21,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { checkoutPath } from './checkout-path.mjs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { capturesOfThisRun, flattenReport } from './build-evidence-page.mjs';
@@ -201,7 +202,7 @@ const devVerifiedOf = (sha) => {
   return state === '' ? null : state;
 };
 
-const main = () => {
+export const main = () => {
   /** @type {Options} */
   let values;
   try {
@@ -238,7 +239,16 @@ const main = () => {
     process.exit(2);
   }
   try {
-    const release = releaseOf(JSON.parse(readFileSync(releaseFile, 'utf8')));
+    // Every path is checked before anything is read or written (#1275).
+    const releasePath = checkoutPath(releaseFile);
+    const listingPath =
+      mode === 'listing' ? checkoutPath(values.listing ?? '') : '';
+    const manifestPath =
+      mode === 'manifest' ? checkoutPath(values.manifest ?? '') : '';
+    const evidenceDir =
+      mode === 'build' ? checkoutPath(values.evidence ?? '') : '';
+    const outPath = mode === 'build' ? checkoutPath(values.out ?? '') : '';
+    const release = releaseOf(JSON.parse(readFileSync(releasePath, 'utf8')));
     const inventory = inventoryFor({
       base: release.base,
       head,
@@ -252,7 +262,7 @@ const main = () => {
       releaseContentOf({
         release,
         inventory,
-        report: JSON.parse(readFileSync(values.listing ?? '', 'utf8')),
+        report: JSON.parse(readFileSync(listingPath, 'utf8')),
         manifest: null,
         devVerified: null,
         check: true,
@@ -265,12 +275,12 @@ const main = () => {
     if (mode === 'manifest') {
       // The report beside the manifest tells this run's rows from an earlier
       // run's, as building does: a capture directory gains rows run by run.
-      const dir = dirname(values.manifest ?? '');
+      const dir = dirname(manifestPath);
       releaseContentOf({
         release,
         inventory,
         report: JSON.parse(readFileSync(join(dir, EVIDENCE_REPORT), 'utf8')),
-        manifest: manifestRows(values.manifest ?? ''),
+        manifest: manifestRows(manifestPath),
         devVerified: null,
         check: true,
       });
@@ -279,7 +289,7 @@ const main = () => {
       );
       return;
     }
-    const dir = values.evidence ?? '';
+    const dir = evidenceDir;
     const content = releaseContentOf({
       release,
       inventory,
@@ -287,7 +297,7 @@ const main = () => {
       manifest: manifestRows(join(dir, EVIDENCE_MANIFEST)),
       devVerified: devVerifiedOf(inventory.head),
     });
-    writeFileSync(values.out ?? '', `${JSON.stringify(content, null, 2)}\n`);
+    writeFileSync(outPath, `${JSON.stringify(content, null, 2)}\n`);
     console.log(`build-release-content: wrote ${values.out}`);
   } catch (error) {
     console.error(messageOf(error));
