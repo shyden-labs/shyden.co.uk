@@ -28,10 +28,10 @@ import { env, exit } from 'node:process';
 import { captureFromDiff } from './capture-scope.mjs';
 import { GIT } from './programs.mjs';
 
-/** The files outside `docs/` that are documentation and nothing reads. */
 /** One reason, indented under its verdict. */
 const reasonLine = (reason) => `  - ${reason}`;
 
+/** The files outside `docs/` that are documentation and nothing reads. */
 export const DOCS_ONLY_FILES = Object.freeze(['HANDOVER.md']);
 
 /** The tree that is documentation, less what code reads (below). */

@@ -53,6 +53,11 @@ import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
 
 const SHARD_VALUE = /^(\d+)\/(\d+)$/;
 
+/** One total, as a Markdown list item. */
+const totalLine = (line) => `- ${line}`;
+/** One finding, indented under the refusal. */
+const findingLine = (finding) => `  - ${finding}`;
+
 /**
  * The shard a run was asked for, or `null` when it was asked for none.
  *
@@ -63,11 +68,6 @@ const SHARD_VALUE = /^(\d+)\/(\d+)$/;
  * @param {readonly string[]} argv
  * @returns {Shard | null}
  */
-/** One total, as a Markdown list item. */
-const totalLine = (line) => `- ${line}`;
-/** One finding, indented under the refusal. */
-const findingLine = (finding) => `  - ${finding}`;
-
 export function shardOf(argv = []) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];

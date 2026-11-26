@@ -59,6 +59,12 @@ const USAGE = `usage: npm run i18n:scaffold -- <locale> [${OPTIONS.join(' | ')}]
  */
 const plainKey = (key) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key);
 
+/** A key's path under its parent's: `parent.key`, `key` at the root, or `parent["odd key"]`. */
+const childPath = (path, key) => {
+  if (!plainKey(key)) return `${path}[${JSON.stringify(key)}]`;
+  return path ? `${path}.${key}` : key;
+};
+
 /**
  * The cached draft of `sentence`, read from the cache itself. The cache is
  * parsed JSON, so a plain index also reaches `Object.prototype`: the English
@@ -104,11 +110,7 @@ function render(value, path, indent, locale) {
       /** @returns {string} */ ([key, v]) => {
         const name = plainKey(key) ? key : JSON.stringify(key);
         // No leading dot at the root, or a key comes out as `..errors.X`.
-        const child = plainKey(key)
-          ? path
-            ? `${path}.${key}`
-            : key
-          : `${path}[${JSON.stringify(key)}]`;
+        const child = childPath(path, key);
         return `${inner}${name}: ${render(v, child, indent + 1, locale)}`;
       },
     );

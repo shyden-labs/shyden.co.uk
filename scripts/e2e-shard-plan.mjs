@@ -39,6 +39,13 @@
 const LIST_LINE = /^ {2}\[([^\]]+)\] › (.+?):\d+:\d+ › /;
 const LIST_FOOTER = /^Total: (\d+) tests? in \d+ files?$/m;
 
+/** Orders two keys by code unit, as `<` does: the tie-break of a plan. */
+const byKey = (a, b) => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
+
 /**
  * Every unit `playwright test --list` printed, with its test count, in
  * listing order.
@@ -116,10 +123,7 @@ export function planShards(units, timings, total) {
     key,
     seconds: Object.hasOwn(timings, key) ? timings[key] : estimate,
   }));
-  weighed.sort(
-    (a, b) =>
-      b.seconds - a.seconds || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
-  );
+  weighed.sort((a, b) => b.seconds - a.seconds || byKey(a.key, b.key));
 
   /** @type {PlannedShard[]} */
   const shards = Array.from({ length: total }, () => ({

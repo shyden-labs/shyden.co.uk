@@ -42,6 +42,9 @@ import { GIT } from './programs.mjs';
  * absent result must never be indistinguishable from a passing one (#146).
  */
 
+/** A pull request's number as GitHub writes it. */
+const pullRef = (number) => `#${number}`;
+
 /**
  * The checks that gate a merge into `develop`.
  *
@@ -51,9 +54,6 @@ import { GIT } from './programs.mjs';
  * regressions were never judged, and #33 exists because a suite that detects
  * but does not block is decoration.
  */
-/** A pull request's number as GitHub writes it. */
-const pullRef = (number) => `#${number}`;
-
 export const REQUIRED_CHECKS = ['build-and-test', 'visual'];
 
 /** @param {unknown} sha */
