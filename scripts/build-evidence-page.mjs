@@ -31,6 +31,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isAbsolute, join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { checkoutPath } from './checkout-path.mjs';
 import { die, messageOf } from './errors.mjs';
 import {
   EVIDENCE_MANIFEST,
@@ -1594,14 +1595,20 @@ const main = () => {
  *   publishedPath: string | undefined, planning: boolean,
  *   assetsPath: string | undefined }} command
  */
-const build = ({
-  dir,
-  out,
-  contentPath,
-  publishedPath,
-  planning,
-  assetsPath,
-}) => {
+export const build = (command) => {
+  // Every path is checked before anything is read or written (#1275).
+  const { planning } = command;
+  const dir = checkoutPath(command.dir);
+  const out = checkoutPath(command.out);
+  const contentPath = command.contentPath
+    ? checkoutPath(command.contentPath)
+    : undefined;
+  const publishedPath = command.publishedPath
+    ? checkoutPath(command.publishedPath)
+    : undefined;
+  const assetsPath = command.assetsPath
+    ? checkoutPath(command.assetsPath)
+    : undefined;
   const report = evidenceReportOf({
     dir,
     // The repository, as this script sits in it: a Vitest report names its

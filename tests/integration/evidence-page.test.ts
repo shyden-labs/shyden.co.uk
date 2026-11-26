@@ -8,8 +8,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { checkoutScratch } from '../checkout-scratch';
 import { withoutMarkupComments } from '../unit/source-text';
 import {
   EVIDENCE_MANIFEST,
@@ -124,7 +124,7 @@ const runBuilder = (
 describe('a recording the report names is on disk, or the build refuses', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-recordings-'));
+    scratch = checkoutScratch('evidence-recordings');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -193,7 +193,7 @@ describe('a recording the report names is on disk, or the build refuses', () => 
 describe('an earlier run in the same evidence directory stays off the page', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-runs-'));
+    scratch = checkoutScratch('evidence-runs');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -355,7 +355,7 @@ describe('the builder builds its page from any checkout path (#221)', () => {
   let dir = '';
   beforeAll(() => {
     checkout = scriptCheckout();
-    dir = mkdtempSync(join(tmpdir(), 'evidence-entry-'));
+    dir = checkoutScratch('evidence-entry');
   });
   afterAll(() => {
     checkout.remove();
@@ -417,7 +417,7 @@ describe('the builder builds its page from any checkout path (#221)', () => {
 describe('recordings travel in the asset store (#268)', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-assets-'));
+    scratch = checkoutScratch('evidence-assets');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -716,7 +716,7 @@ describe('recordings travel in the asset store (#268)', () => {
 describe('screenshots travel in the asset store (#368)', () => {
   let scratch = '';
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'evidence-shots-'));
+    scratch = checkoutScratch('evidence-shots');
   });
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
