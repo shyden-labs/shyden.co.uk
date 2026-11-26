@@ -301,8 +301,14 @@ describe('the Access JWT', () => {
     );
   });
 
-  it('refuses an audience given as a string, not an array', async () => {
-    expectStatus(await pass(await jwt(claims({ aud: AUDIENCE }))), 401);
+  // Access sends a service token's aud as one string (measured 2026-11-27,
+  // #1307), which RFC 7519 allows; it is held to the same exact tag.
+  it('accepts an audience given as the AUD tag alone, as a string', async () => {
+    expectStatus(await pass(await jwt(claims({ aud: AUDIENCE }))), 200);
+  });
+
+  it('refuses an audience string that is not the AUD tag', async () => {
+    expectStatus(await pass(await jwt(claims({ aud: 'another-app' }))), 401);
   });
 
   it('refuses an audience array without the AUD tag', async () => {
@@ -933,10 +939,14 @@ describe('every refusal names the check it failed (#1307)', () => {
     );
   });
 
-  it('names an audience that is not an array apart from a missing tag', async () => {
+  it('names an audience that is neither a string nor an array apart from a missing tag', async () => {
+    await refused(await pass(await jwt(claims({ aud: 42 }))), 'audience-shape');
+  });
+
+  it('names an audience string without the AUD tag as a missing tag', async () => {
     await refused(
-      await pass(await jwt(claims({ aud: AUDIENCE }))),
-      'audience-shape',
+      await pass(await jwt(claims({ aud: 'another-app' }))),
+      'audience',
     );
   });
 
