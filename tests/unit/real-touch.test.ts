@@ -156,16 +156,25 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
       length = 4000,
       wheelMoves = true,
       landsAfterSamples = 0,
+      restyleOnWheel = 0,
     } = {},
   ) {
     const sent: unknown[] = [];
     let scrollY = startY;
+    // A restyle the turn meets (a theme switch's 1 px shift, #1296): the
+    // element moves this far at once, while its scroll is still pending.
+    let shift = 0;
     // A turn whose scroll the engine applies only after this many samples
     // have read the page (CI's WebKit lands a turn late, #1004).
     let pending: { dy: number; samples: number } | null = null;
     let shapeSamples = 0;
     const maxScroll = length - VIEW.height;
-    const rect = () => ({ x: 600, y: top - scrollY, width: 80, height: 40 });
+    const rect = () => ({
+      x: 600,
+      y: top - scrollY + shift,
+      width: 80,
+      height: 40,
+    });
     const land = () => {
       if (pending === null || pending.samples > 0) return;
       scrollY = Math.min(maxScroll, Math.max(0, scrollY + pending.dy));
@@ -178,6 +187,7 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
         },
         wheel: async (dx: number, dy: number) => {
           sent.push(['wheel', dx, dy]);
+          shift += restyleOnWheel;
           if (wheelMoves) pending = { dy, samples: landsAfterSamples };
           land();
         },
@@ -382,6 +392,18 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
   });
 
+  it('a 1 px restyle as the turn is sent is not its scroll beginning: it waits for the scroll and taps once (#1296)', async () => {
+    setUp();
+    // 30 samples: about 480 ms, later than the restyle's rest is read.
+    const { target, sent } = fakeDesktop(2500, {
+      landsAfterSamples: 30,
+      restyleOnWheel: 1,
+    });
+    await settle(tapOn(target));
+    expect(wheelsOf(sent)).toHaveLength(1);
+    expect(kinds(sent).filter((k) => k === 'click')).toHaveLength(1);
+  });
+
   it('names how late a wheel turn began moving the page when it missed its ceiling', async () => {
     setUp();
     // About 4 s of 16 ms samples: past the 3,000 ms ceiling, inside the watch.
@@ -428,6 +450,16 @@ describe('the desktop engines scroll with the real wheel (#1004)', () => {
     expect(centreY()).toBe(320 - 240);
   });
 
+  it('scrollOver reads where a late scroll landed, not a 1 px restyle as the wheel turned (#1296)', async () => {
+    setUp();
+    const { target, centreY } = fakeDesktop(300, {
+      landsAfterSamples: 30,
+      restyleOnWheel: 1,
+    });
+    await settle(scrollOver(target, 240));
+    expect(centreY()).toBe(320 + 1 - 240);
+  });
+
   it('scrollOver wheels an element below the view in first', async () => {
     setUp();
     const { target, sent } = fakeDesktop(2500);
@@ -471,6 +503,21 @@ describe('waitUntilMoved', () => {
     });
     expect(result).toEqual({ moved: true, waitedMs: 0 });
     expect(read).toBe(1);
+  });
+
+  it('keeps waiting through a change too small to be the move it waits for (#1296)', async () => {
+    // A theme switch restyled the page by 1 px while a wheel turn's scroll
+    // had not begun; that change once ended the wait as if it had.
+    const tops = [-762, -761, -761, -400];
+    let read = 0;
+    const result = await waitUntilMoved(async () => tops[read++]!, -762, {
+      gapMs: 16,
+      ceilingMs: 1_000,
+      clock: testClock(),
+      differs: (a, b) => Math.abs(a - b) >= 4,
+    });
+    expect(result).toEqual({ moved: true, waitedMs: 3 * 16 });
+    expect(read).toBe(4);
   });
 
   it('gives up at the ceiling, on its own clock, when nothing moves', async () => {
