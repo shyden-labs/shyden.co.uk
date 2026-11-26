@@ -12,6 +12,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { checkoutPath } from './checkout-path.mjs';
 import { parseArgs } from 'node:util';
 import { die, messageOf } from './errors.mjs';
 
@@ -251,10 +252,14 @@ const main = () => {
  * @param {{ planPath: string, listingPath: string, out: string | undefined }} input
  * @returns {void}
  */
-const run = ({ planPath, listingPath, out }) => {
-  const plan = planOf(JSON.parse(readFileSync(planPath, 'utf8')));
-  const stored = parseAssetListing(readFileSync(listingPath, 'utf8'));
-  if (!out) {
+export const run = ({ planPath, listingPath, out }) => {
+  // Every path is checked before anything is read or written (#1275).
+  const planFile = checkoutPath(planPath);
+  const listingFile = checkoutPath(listingPath);
+  const outFile = out ? checkoutPath(out) : undefined;
+  const plan = planOf(JSON.parse(readFileSync(planFile, 'utf8')));
+  const stored = parseAssetListing(readFileSync(listingFile, 'utf8'));
+  if (!outFile) {
     const batches = pendingUploads({ plan, stored });
     if (!batches.length) {
       console.log(
@@ -271,7 +276,7 @@ const run = ({ planPath, listingPath, out }) => {
     return;
   }
   const map = assetsMap({ plan, stored });
-  writeFileSync(out, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
+  writeFileSync(outFile, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
   console.log(
     `upload-evidence-assets: wrote ${Object.keys(map).length} pairing(s) to ${out}`,
   );

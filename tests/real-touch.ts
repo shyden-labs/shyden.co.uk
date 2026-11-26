@@ -213,21 +213,28 @@ export const LATE_WATCH_MS = 3_000;
 
 /**
  * Samples a shape until it differs from `from`, the shape before an input, or
- * the ceiling passes on the given clock.
+ * the ceiling passes on the given clock. `differs` says what counts as moved:
+ * any change, unless given.
  */
-export async function waitUntilMoved(
-  sample: () => Promise<string>,
-  from: string,
+export async function waitUntilMoved<T>(
+  sample: () => Promise<T>,
+  from: T,
   {
     gapMs,
     ceilingMs,
     clock,
-  }: { gapMs: number; ceilingMs: number; clock: WaitClock },
+    differs = (now, before) => now !== before,
+  }: {
+    gapMs: number;
+    ceilingMs: number;
+    clock: WaitClock;
+    differs?: (now: T, before: T) => boolean;
+  },
 ): Promise<{ moved: boolean; waitedMs: number }> {
   const started = clock.now();
   for (;;) {
     const waitedMs = clock.now() - started;
-    if ((await sample()) !== from) return { moved: true, waitedMs };
+    if (differs(await sample(), from)) return { moved: true, waitedMs };
     if (waitedMs >= ceilingMs) return { moved: false, waitedMs };
     await clock.sleep(gapMs);
   }
@@ -249,6 +256,19 @@ const shapeOf = (target: Locator): Promise<string> =>
       window.scrollY,
     ].join(',');
   });
+
+/**
+ * True once a wheel turn's scroll has begun: the element or the page has
+ * travelled at least STILL_PX between two shapes. A smaller change is a
+ * restyle, not a scroll: a theme switch shifted the page by 1 px while
+ * WebKit had not yet begun a turn's scroll, and ended the wait (#1296).
+ */
+export function scrolled(now: string, before: string): boolean {
+  const a = now.split(',').map(Number);
+  const b = before.split(',').map(Number);
+  // The element's y, then the page's scrollX and scrollY.
+  return [1, 6, 7].some((i) => Math.abs(a[i]! - b[i]!) >= STILL_PX);
+}
 
 /**
  * Waits for the element AND the page to come to rest (a sticky element holds
@@ -417,6 +437,7 @@ async function wheelTurn(
       gapMs: STILL_GAP_MS,
       ceilingMs,
       clock: ownClock,
+      differs: scrolled,
     });
   await page.mouse.move(
     Math.round(p.viewWidth * 0.9),
@@ -742,6 +763,7 @@ export async function scrollOver(target: Locator, dy: number): Promise<void> {
       gapMs: STILL_GAP_MS,
       ceilingMs: MOVE_CEILING_MS,
       clock: ownClock,
+      differs: scrolled,
     });
     await prepare(target, undefined);
     return;
