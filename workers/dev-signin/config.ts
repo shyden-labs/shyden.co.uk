@@ -16,6 +16,8 @@ export const HOSTS: Readonly<
   'dev.yaweloidle.com': { appRedirects: [] },
   'dev-api.yaweloidle.com': { appRedirects: [] },
   'dev-holding.yaweloidle.com': { appRedirects: [] },
+  // ShyTalk's dev door (#1299); test.shytalk.app is ungated (Shyden's ruling).
+  'dev.shytalk.app': { appRedirects: [] },
   // ShyDesk's dev staff pages (desk and admin) and its demo page (#1263).
   [SHYDESK_DEV_HOST]: { appRedirects: [] },
 };
