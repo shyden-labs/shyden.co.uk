@@ -874,3 +874,103 @@ describe('the embed pass', () => {
     expectStatus(await handleSignin(request, plain), 404);
   });
 });
+
+/**
+ * #1307: CI's machine pass was refused with a bare 401 although Access let its
+ * service token in, and nothing said which check failed. Every 401 now names
+ * its check in a response header, and never echoes the token or a claim.
+ */
+describe('every refusal names the check it failed (#1307)', () => {
+  const REASON = 'x-dev-pass-refused';
+  const pass = (token: string | null) =>
+    call(`/pass${query({ for: HOST })}`, { token });
+
+  const refused = async (response: Response, reason: string) => {
+    expectStatus(response, 401);
+    expect(response.headers.get(REASON)).toBe(reason);
+  };
+
+  it('names a missing or wrong door secret', async () => {
+    await refused(
+      await call(`/pass${query({ for: HOST })}`, { secret: null }),
+      'door-secret',
+    );
+  });
+
+  it('names a request with no Access token', async () => {
+    await refused(await pass(null), 'no-token');
+  });
+
+  it('names a token that is not a JWT', async () => {
+    await refused(await pass('a.b'), 'malformed-token');
+  });
+
+  it('names a token signed with another algorithm', async () => {
+    await refused(
+      await pass(await jwt(claims(), { header: { alg: 'HS256' } })),
+      'algorithm',
+    );
+  });
+
+  it('names a kid the certs do not hold', async () => {
+    await refused(
+      await pass(await jwt(claims(), { header: { kid: 'nobody' } })),
+      'unknown-kid',
+    );
+  });
+
+  it('names a bad signature', async () => {
+    await refused(
+      await pass(await jwt(claims(), { signer: strangerKey })),
+      'signature',
+    );
+  });
+
+  it('names an audience without the AUD tag, string or array', async () => {
+    await refused(
+      await pass(await jwt(claims({ aud: ['another-app'] }))),
+      'audience',
+    );
+    await refused(await pass(await jwt(claims({ aud: AUDIENCE }))), 'audience');
+  });
+
+  it('names another issuer', async () => {
+    await refused(
+      await pass(
+        await jwt(claims({ iss: 'https://evil.cloudflareaccess.com' })),
+      ),
+      'issuer',
+    );
+  });
+
+  it('names an expired token', async () => {
+    await refused(await pass(await jwt(claims({ exp: NOW }))), 'expired');
+  });
+
+  it('names a token not yet valid', async () => {
+    await refused(
+      await pass(await jwt(claims({ nbf: NOW + 61 }))),
+      'not-yet-valid',
+    );
+  });
+
+  it('names a token with neither an email nor a service token name', async () => {
+    await refused(
+      await pass(await jwt(claims({ email: '', common_name: '' }))),
+      'no-identity',
+    );
+  });
+
+  it('names certs that cannot be fetched', async () => {
+    fetchCerts.mockRejectedValue(new Error('certs endpoint down'));
+    await refused(await pass(await jwt()), 'certs');
+  });
+
+  it('never echoes the token in its refusal', async () => {
+    const token = await jwt(claims({ exp: NOW }));
+    const response = await pass(token);
+    const headers = [...response.headers.values()].join(' ');
+    expect(headers).not.toContain(token.split('.')[1]);
+    expect(await response.text()).not.toContain(token.split('.')[1]);
+  });
+});
