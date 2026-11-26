@@ -96,6 +96,7 @@ type Refusal =
   | 'algorithm'
   | 'unknown-kid'
   | 'signature'
+  | 'audience-shape'
   | 'audience'
   | 'issuer'
   | 'expired'
@@ -154,8 +155,8 @@ async function accessIdentity(
     return { refused: 'signature' };
   }
   const { aud, iss, exp, nbf, email, common_name: commonName } = claims;
-  if (!Array.isArray(aud) || !aud.includes(config.audience))
-    return { refused: 'audience' };
+  if (!Array.isArray(aud)) return { refused: 'audience-shape' };
+  if (!aud.includes(config.audience)) return { refused: 'audience' };
   if (iss !== config.issuer) return { refused: 'issuer' };
   if (typeof exp !== 'number' || exp <= config.now)
     return { refused: 'expired' };

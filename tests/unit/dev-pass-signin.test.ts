@@ -926,12 +926,18 @@ describe('every refusal names the check it failed (#1307)', () => {
     );
   });
 
-  it('names an audience without the AUD tag, string or array', async () => {
+  it('names an audience array without the AUD tag', async () => {
     await refused(
       await pass(await jwt(claims({ aud: ['another-app'] }))),
       'audience',
     );
-    await refused(await pass(await jwt(claims({ aud: AUDIENCE }))), 'audience');
+  });
+
+  it('names an audience that is not an array apart from a missing tag', async () => {
+    await refused(
+      await pass(await jwt(claims({ aud: AUDIENCE }))),
+      'audience-shape',
+    );
   });
 
   it('names another issuer', async () => {
