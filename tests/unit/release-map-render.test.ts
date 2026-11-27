@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { renderChangeMap } from '../../scripts/release-map.mjs';
+import type { Classification } from '../../scripts/release-map.mjs';
 
 /**
  * The change map's "What shows it" cell, one row per classification. The
  * guards read the map a release builds; this is the cell's wording alone.
  */
 describe('renderChangeMap says what shows each commit', () => {
-  const mapOf = (classification: unknown) =>
+  const mapOf = (classification: Classification) =>
     renderChangeMap({
       rows: [
         {
@@ -15,6 +16,9 @@ describe('renderChangeMap says what shows each commit', () => {
             pr: 12,
             ticket: 34,
             subject: 'A subject',
+            files: [],
+            visitorFacing: true,
+            areas: [],
           },
           classification,
           flagged: false,
