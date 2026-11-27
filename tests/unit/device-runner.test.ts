@@ -712,26 +712,55 @@ describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)
 });
 
 describe('tabsOpenedByRun: only the Chrome tabs this run opened are closed (#1326)', () => {
-  const tab = (id: string, type = 'page') => ({ id, type, url: 'https://x' });
-
-  it('names each page tab that was not open when the run started', () => {
-    expect(
-      tabsOpenedByRun(['a', 'b'], [tab('a'), tab('c'), tab('b'), tab('d')]),
-    ).toEqual(['c', 'd']);
+  const RUN = 'http://localhost:4321';
+  const tab = (id: string, url = `${RUN}/x`, type = 'page') => ({
+    id,
+    type,
+    url,
   });
 
-  it("leaves every tab that was open before the run: those are the phone owner's", () => {
-    expect(tabsOpenedByRun(['a', 'b'], [tab('a'), tab('b')])).toEqual([]);
+  it("names each new page tab on the run's own origin, and the run's blank keeper", () => {
+    expect(
+      tabsOpenedByRun(
+        ['a'],
+        [tab('a'), tab('b'), tab('c', 'about:blank'), tab('d', `${RUN}/id/`)],
+        RUN,
+      ),
+    ).toEqual(['b', 'c', 'd']);
+  });
+
+  it("leaves a tab of the phone owner's that came back with a new id: it is not on the run's origin", () => {
+    // 2026-11-28 proof run: 50 tabs before, 49 after, one "closed" by id.
+    expect(
+      tabsOpenedByRun(
+        ['a'],
+        [
+          tab('x', 'https://www.example.com/'),
+          tab('y', 'http://localhost:4322/'),
+        ],
+        RUN,
+      ),
+    ).toEqual([]);
+  });
+
+  it('leaves every tab that was open before the run, on any origin', () => {
+    expect(
+      tabsOpenedByRun(['a', 'b'], [tab('a'), tab('b', 'about:blank')], RUN),
+    ).toEqual([]);
   });
 
   it('closes no target that is not a page (service workers, the browser itself)', () => {
-    expect(tabsOpenedByRun([], [tab('w', 'service_worker'), tab('p')])).toEqual(
-      ['p'],
-    );
+    expect(
+      tabsOpenedByRun(
+        [],
+        [tab('w', `${RUN}/sw.js`, 'service_worker'), tab('p')],
+        RUN,
+      ),
+    ).toEqual(['p']);
   });
 
   it('throws on a listing that is not a list of targets, rather than closing nothing silently', () => {
-    expect(() => tabsOpenedByRun([], { error: 'x' })).toThrow(
+    expect(() => tabsOpenedByRun([], { error: 'x' }, RUN)).toThrow(
       /DevTools target list/,
     );
   });

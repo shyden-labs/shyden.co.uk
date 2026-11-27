@@ -1344,14 +1344,19 @@ export function adbCleanupCalls(groupNames) {
  * The Chrome tabs this run opened, from the DevTools target list read at
  * the end of the run and the tab ids read at its start (#1326). A tab open
  * before the run is the phone owner's and stays; only page targets count.
+ * A tab is the run's only when it is also on the run's own origin, or the
+ * run's blank keeper: a tab of the owner's that came back with a new id
+ * (reloaded or restored) is on some other site, and stays (2026-11-28 proof
+ * run: 50 tabs before, 49 after).
  * A listing that is not a list of targets throws, so a misread never
  * passes for "nothing to close".
  *
  * @param {readonly string[]} beforeIds
  * @param {unknown} listing
+ * @param {string} runOrigin the origin the run's pages are served from
  * @returns {string[]}
  */
-export function tabsOpenedByRun(beforeIds, listing) {
+export function tabsOpenedByRun(beforeIds, listing, runOrigin) {
   if (!Array.isArray(listing))
     throw new Error(
       `expected the DevTools target list to be a list -- got ${JSON.stringify(listing)}`,
@@ -1362,11 +1367,25 @@ export function tabsOpenedByRun(beforeIds, listing) {
     typeof target === 'object' &&
     target.type === 'page' &&
     typeof target.id === 'string' &&
-    !before.has(target.id)
+    !before.has(target.id) &&
+    typeof target.url === 'string' &&
+    (target.url === 'about:blank' || originOf(target.url) === runOrigin)
       ? [target.id]
       : [],
   );
 }
+
+/** @param {string} url */
+const originOf = (url) => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The origin the device run's pages are served from. */
+const RUN_ORIGIN = `http://localhost:${PORT}`;
 
 const DEVTOOLS = 'http://127.0.0.1:9222';
 
@@ -1379,13 +1398,30 @@ async function chromeTargets() {
   return response.json();
 }
 
+/**
+ * Every page tab's id in a DevTools target list, whatever its origin.
+ * @param {unknown} listing
+ * @returns {string[]}
+ */
+const pageIds = (listing) => {
+  if (!Array.isArray(listing))
+    throw new Error(
+      `expected the DevTools target list to be a list -- got ${JSON.stringify(listing)}`,
+    );
+  return listing.flatMap((target) =>
+    target && target.type === 'page' && typeof target.id === 'string'
+      ? [target.id]
+      : [],
+  );
+};
+
 /** @type {string[] | undefined} The tab ids open before this run. */
 let tabsBeforeRun;
 
 /** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
 async function readTabsBeforeRun() {
   try {
-    tabsBeforeRun = tabsOpenedByRun([], await chromeTargets());
+    tabsBeforeRun = pageIds(await chromeTargets());
   } catch (error) {
     process.stderr.write(
       `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
@@ -1403,7 +1439,7 @@ async function closeRunTabs() {
   }
   let opened;
   try {
-    opened = tabsOpenedByRun(tabsBeforeRun, await chromeTargets());
+    opened = tabsOpenedByRun(tabsBeforeRun, await chromeTargets(), RUN_ORIGIN);
   } catch (error) {
     process.stderr.write(
       `cleanup: could not list Chrome's tabs, so the run's tabs stay open: ${messageOf(error)}\n`,
