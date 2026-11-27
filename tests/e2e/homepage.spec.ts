@@ -1091,12 +1091,29 @@ test.describe('the language band sits under the header (#599)', () => {
           .toBe(true);
         let ticked = false;
         for (const edge of at.edges) {
+          // What the click will land on, read just before it, so a click
+          // that toggles nothing names what took it (#1321).
+          const under = await page.evaluate(
+            ({ x, y }) => {
+              const hit = document.elementFromPoint(x, y);
+              if (!hit) return 'nothing';
+              const classes = String(hit.className).trim().split(/\s+/);
+              const name = [hit.tagName.toLowerCase(), ...classes]
+                .filter(Boolean)
+                .join('.');
+              const inside = document
+                .querySelector('.band-pause')
+                ?.contains(hit);
+              return `${name} ${inside ? 'inside' : 'OUTSIDE'} the target, scrollY ${window.scrollY}`;
+            },
+            { x: edge.x, y: edge.y },
+          );
           await tapAt(page, edge.x, edge.y);
           ticked = !ticked;
           await expect
             .soft(
               control,
-              `a click at the target's ${edge.name} edge toggles the control`,
+              `a click at the target's ${edge.name} edge (${edge.x.toFixed(1)}, ${edge.y.toFixed(1)}; under it: ${under}) toggles the control`,
             )
             .toBeChecked({ checked: ticked });
         }
