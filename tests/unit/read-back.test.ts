@@ -751,6 +751,19 @@ describe('readBackReview: what a run read, for a person to judge', () => {
   it('says so when a run read nothing', () => {
     expect(readBackReview([])).toBe('Nothing was read in this run.');
   });
+
+  it('orders lines of one score by key, a repeated key kept beside itself', () => {
+    const keys = readBackReview([
+      row({ key: 'zeta', reading: 'z' }),
+      row({ key: 'alpha', reading: 'first' }),
+      row({ key: 'beta' }),
+      row({ key: 'alpha', reading: 'second' }),
+    ])
+      .split('\n')
+      .filter((line) => line.startsWith('| 100 '))
+      .map((line) => line.split(' | ')[2]);
+    expect(keys).toEqual(['`alpha`', '`alpha`', '`beta`', '`zeta`']);
+  });
 });
 
 describe('the daily ledger: the client never sends past 16,000 characters', () => {
