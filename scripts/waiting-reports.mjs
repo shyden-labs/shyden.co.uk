@@ -133,6 +133,9 @@ const reportFailure = async () => {
   console.log('Posted the failure notice.');
 };
 
+/** The jobs `main` runs when none are handed in. */
+const JOBS = Object.freeze({ count, reportFailure });
+
 /**
  * Runs the job an argument list names: the count with none, the failure
  * report with `report-failure`. Answers the exit code: 2 for a usage it
@@ -141,7 +144,7 @@ const reportFailure = async () => {
  * @param {{ count: () => Promise<void>, reportFailure: () => Promise<void> }} [jobs]
  * @returns {Promise<number>}
  */
-export async function main(argv, jobs = { count, reportFailure }) {
+export async function main(argv, jobs = JOBS) {
   const reportsFailure = argv.length === 1 && argv[0] === 'report-failure';
   if (argv.length > 0 && !reportsFailure) {
     console.error('usage: node scripts/waiting-reports.mjs [report-failure]');
