@@ -8,7 +8,7 @@ import { asComputedRgb } from '../../src/lib/shytalk-brand';
  */
 describe('asComputedRgb: a hex as a browser reports it', () => {
   it.each([
-    ['six digits', '#e8e0f0', 'rgb(232, 224, 240)'],
+    ['six digits', '#1a2b3c', 'rgb(26, 43, 60)'],
     ['each channel apart', '#010203', 'rgb(1, 2, 3)'],
     ['three digits, doubled', '#0f8', 'rgb(0, 255, 136)'],
     ['upper case, no hash', 'FF0080', 'rgb(255, 0, 128)'],
