@@ -79,7 +79,7 @@ export function connectionOf(address: string | null): string | null {
   if (halves.length === 2 ? missing < 1 : missing !== 0) return null;
   const full = [
     ...head,
-    ...Array<string>(halves.length === 2 ? missing : 0).fill('0'),
+    ...new Array<string>(halves.length === 2 ? missing : 0).fill('0'),
     ...tail,
   ];
   if (!full.every((group) => GROUP.test(group))) return null;

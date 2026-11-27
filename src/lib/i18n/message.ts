@@ -90,7 +90,7 @@ const PLURAL_CATEGORIES: ReadonlySet<string> = new Set([
   'many',
   'other',
 ]);
-const NAME = /[A-Za-z_][A-Za-z0-9_]*/y;
+const NAME = /[A-Za-z_]\w*/y;
 const EXACT_KEY = /=\d+/y;
 const SELECT_KEY = /[A-Za-z0-9_-]+/y;
 
@@ -279,7 +279,7 @@ const isList = (
 ): value is readonly string[] | readonly number[] => Array.isArray(value);
 
 function valueOf(params: MessageParams, name: string): MessageValue {
-  if (!Object.prototype.hasOwnProperty.call(params, name))
+  if (!Object.hasOwn(params, name))
     throw new Error(`no value was given for {${name}}`);
   return params[name];
 }

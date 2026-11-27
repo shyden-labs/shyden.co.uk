@@ -38,8 +38,8 @@ const contentSpan = (el: HTMLElement): Span => {
   const style = getComputedStyle(el);
   const inner = box.left + el.clientLeft;
   return {
-    left: inner + parseFloat(style.paddingLeft),
-    right: inner + el.clientWidth - parseFloat(style.paddingRight),
+    left: inner + Number.parseFloat(style.paddingLeft),
+    right: inner + el.clientWidth - Number.parseFloat(style.paddingRight),
   };
 };
 
@@ -163,11 +163,12 @@ export async function travel(
 function fold(o: TravelOptions, animated: boolean): Animation[] {
   const cards = Array.from(o.tables.querySelectorAll<HTMLElement>('.group'));
   const before = cards.map((c) => c.getBoundingClientRect());
-  const fontBefore = parseFloat(getComputedStyle(o.tables).fontSize);
+  const fontBefore = Number.parseFloat(getComputedStyle(o.tables).fontSize);
   o.hideList();
   o.refit();
   if (!animated) return [];
-  const ratio = fontBefore / parseFloat(getComputedStyle(o.tables).fontSize);
+  const ratio =
+    fontBefore / Number.parseFloat(getComputedStyle(o.tables).fontSize);
   return cards.map((card, i) => {
     const after = card.getBoundingClientRect();
     return card.animate(

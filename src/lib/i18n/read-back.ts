@@ -250,9 +250,9 @@ const SLOT = /\{[^{}]*\}/g;
  */
 export const googleHtml = (line: string): string =>
   line
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
     .replace(SLOT, (slot) => `<span translate="no">${slot}</span>`);
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
@@ -271,8 +271,8 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
 export const fromGoogleHtml = (reading: string): string =>
   reading
     .replace(/<\/?span\b[^>]*>/g, '')
-    .replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (entity, name: string) => {
-      if (name[0] === '#')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
+      if (name.startsWith('#'))
         return String.fromCodePoint(
           name[1] === 'x' || name[1] === 'X'
             ? Number.parseInt(name.slice(2), 16)
@@ -296,7 +296,7 @@ export function googleTexts(response: unknown, expected: number): string[] {
   const texts = Array.isArray(translations)
     ? translations.map((entry) => record(entry).translatedText)
     : undefined;
-  if (!texts || !texts.every((text) => typeof text === 'string'))
+  if (!texts?.every((text) => typeof text === 'string'))
     throw new Error(
       `expected data.translations to be a list of ${expected} { translatedText }, got ${String(
         JSON.stringify(translations),
@@ -535,7 +535,11 @@ export function batches(
 }
 
 /** Code-unit order: the same on every machine, unlike `localeCompare`. */
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byText = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 
 /**
  * A run's review: a section per locale, each line beside its writer and
