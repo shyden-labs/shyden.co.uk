@@ -1,3 +1,4 @@
+import { ANDROID_RUN_FILES } from '../../scripts/phone-files.mjs';
 import { join } from 'node:path';
 import { adb } from '../../scripts/adb.mjs';
 import { CHROME_PACKAGE } from './chrome-foreground';
@@ -33,7 +34,7 @@ const BLOCK_LABEL = "Don't allow sites to use JavaScript";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const DUMP_FILE = '/sdcard/ui.xml';
+export const DUMP_FILE = ANDROID_RUN_FILES.uiDump;
 /** Killed by a signal (128 + SIGKILL's 9), as `uiautomator` is after it has written the file. */
 const KILLED = 137;
 
@@ -160,7 +161,7 @@ async function openBrowserMenu(): Promise<void> {
   );
 }
 
-const SCREENSHOT_FILE = '/sdcard/chrome-settings-walk.png';
+export const SCREENSHOT_FILE = ANDROID_RUN_FILES.walkScreenshot;
 /** How many walks have failed in this worker, so each keeps its own files. */
 let failures = 0;
 

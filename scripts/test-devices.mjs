@@ -56,6 +56,7 @@ import { desktopContainerArgv, desktopImage } from './desktop-container.mjs';
 import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
+import { ANDROID_RUN_FILES } from './phone-files.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
 import { startWda } from './wda.mjs';
 import {
@@ -1289,8 +1290,8 @@ async function runIosGroup() {
 // ── cleanup: always runs, whatever happened above ───────────────────────
 
 /**
- * The `adb` calls the end-of-run cleanup makes: both tunnels removed when the
- * Android group is in the run, and none at all otherwise. An iOS-only run
+ * The `adb` calls the end-of-run cleanup makes: both tunnels and every file
+ * the run wrote on the phone removed when the Android group is in the run, and none at all otherwise. An iOS-only run
  * (`--ios`, on a simulator) touches no USB device, so it must not remove
  * another session's Android tunnels (#1163). `adb forward/reverse
  * --remove-all` exit 0 on a device with nothing mapped, so an Android run
@@ -1304,6 +1305,16 @@ export function adbCleanupCalls(groupNames) {
   return [
     ['forward', '--remove-all'],
     ['reverse', '--remove-all'],
+    // What the run wrote on the phone, gone with it (#1326): `rm -f` and
+    // `rm -rf` exit 0 when a path is already absent.
+    [
+      'shell',
+      'rm',
+      '-f',
+      ANDROID_RUN_FILES.uiDump,
+      ANDROID_RUN_FILES.walkScreenshot,
+    ],
+    ['shell', 'rm', '-rf', ANDROID_RUN_FILES.downloads],
   ];
 }
 

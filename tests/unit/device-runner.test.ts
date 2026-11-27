@@ -1,3 +1,9 @@
+import { ANDROID_RUN_FILES } from '../../scripts/phone-files.mjs';
+import { DEVICE_DOWNLOADS } from '../device/device-downloads';
+import {
+  DUMP_FILE,
+  SCREENSHOT_FILE,
+} from '../device/chrome-javascript-setting';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { serversClosedAfterEach } from '../http-stand-in';
 import { createServer, type Server } from 'node:http';
@@ -688,10 +694,34 @@ describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)
     expect(adbCleanupCalls(['ios'])).toEqual([]);
   });
 
-  it('removes both tunnels when the Android group is in the run', () => {
+  it('removes both tunnels and every file the run wrote on the phone when the Android group is in the run (#1326)', () => {
     expect(adbCleanupCalls(['desktop', 'android', 'ios'])).toEqual([
       ['forward', '--remove-all'],
       ['reverse', '--remove-all'],
+      [
+        'shell',
+        'rm',
+        '-f',
+        ANDROID_RUN_FILES.uiDump,
+        ANDROID_RUN_FILES.walkScreenshot,
+      ],
+      ['shell', 'rm', '-rf', ANDROID_RUN_FILES.downloads],
     ]);
+  });
+});
+
+describe('the files a run writes on the Android phone are the ones its cleanup removes (#1326)', () => {
+  it('names the three paths the harness writes', () => {
+    expect(ANDROID_RUN_FILES).toEqual({
+      uiDump: '/sdcard/ui.xml',
+      walkScreenshot: '/sdcard/chrome-settings-walk.png',
+      downloads: '/sdcard/Download/shyden-gauntlet',
+    });
+  });
+
+  it('the harness writes to exactly those paths', () => {
+    expect(DEVICE_DOWNLOADS).toBe(ANDROID_RUN_FILES.downloads);
+    expect(DUMP_FILE).toBe(ANDROID_RUN_FILES.uiDump);
+    expect(SCREENSHOT_FILE).toBe(ANDROID_RUN_FILES.walkScreenshot);
   });
 });
