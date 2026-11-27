@@ -34,7 +34,7 @@ import { LOCALES } from './i18n/locales';
  * two rows on the way back in.
  */
 const cell = (value: string): string =>
-  /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 
 /**
  * A name a spreadsheet would run as a formula (OWASP CSV injection), with any

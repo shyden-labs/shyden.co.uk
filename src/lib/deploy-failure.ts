@@ -130,42 +130,55 @@ const fallBackLine = (
 /**
  * The jobs a run's `needs` context names as failed, from the
  * `${{ toJSON(needs) }}` the report job is handed. A cancelled need is not
- * one: a run someone stopped is not an outage. Anything this cannot read
- * throws, so an unreadable context is never "nothing failed".
+ * one: a run someone stopped is not an outage. The exception is a site's
+ * check cancelled after its deploy succeeded, a timed-out check included:
+ * the site then serves a change nothing verified (#1324). Anything this
+ * cannot read throws, so an unreadable context is never "nothing failed".
  */
 export const failedNeeds = (needs: unknown): string[] => {
   if (!isRecord(needs)) throw new Error('the needs are not an object of jobs');
+  const unverified = new Set<string>(
+    Object.values(PIPELINES)
+      .filter(({ deployJob }) => resultOf(needs, deployJob) === 'success')
+      .map(({ checkJob }) => checkJob),
+  );
   return Object.entries(needs).flatMap(([id, need]) => {
     const result = isRecord(need) ? need.result : undefined;
     if (typeof result !== 'string')
       throw new Error(`need '${id}' has no result`);
-    return result === 'failure' ? [id] : [];
+    if (result === 'failure') return [id];
+    return result === 'cancelled' && unverified.has(id) ? [id] : [];
   });
 };
 
 /**
  * The first failed job of a run, and its first failed step, from GitHub's
- * `GET /repos/{repo}/actions/runs/{id}/jobs` answer; `undefined` when no
- * job failed. A job's log is read by its id, so a failed job without a
+ * `GET /repos/{repo}/actions/runs/{id}/jobs` answer; with none, the first
+ * cancelled job and the step it stopped in; `undefined` when neither. A job's log is read by its id, so a failed job without a
  * whole-number one throws.
  */
 export const failureOf = (answer: unknown): Failure | undefined => {
   const jobs = isRecord(answer) ? answer.jobs : undefined;
   if (!Array.isArray(jobs))
     throw new Error("the run's jobs answer holds no list of jobs");
-  const failed = jobs.find(
-    (job) => isRecord(job) && job.conclusion === 'failure',
-  );
+  // A failed job first; else a cancelled one, which a timeout also leaves
+  // (#1324): GitHub reports a job that ran out of time as cancelled.
+  const byConclusion = (conclusion: string) =>
+    jobs.find((job) => isRecord(job) && job.conclusion === conclusion);
+  const failedJob = byConclusion('failure');
+  const conclusion = isRecord(failedJob) ? 'failure' : 'cancelled';
+  const failed = isRecord(failedJob) ? failedJob : byConclusion('cancelled');
   if (!isRecord(failed)) return undefined;
   if (typeof failed.id !== 'number' || !Number.isSafeInteger(failed.id))
     throw new Error('the failed job has no numeric id');
   const steps = Array.isArray(failed.steps) ? failed.steps : [];
   const step = steps.find(
-    (each) => isRecord(each) && each.conclusion === 'failure',
+    (each) => isRecord(each) && each.conclusion === conclusion,
   );
+  const name = String(failed.name);
   return {
     jobId: failed.id,
-    job: String(failed.name),
+    job: conclusion === 'failure' ? name : `${name} (cancelled or timed out)`,
     step: isRecord(step) ? String(step.name) : undefined,
   };
 };

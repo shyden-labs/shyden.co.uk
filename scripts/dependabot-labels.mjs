@@ -21,19 +21,21 @@
  * not be a gate until that list named it or `build-and-test` needed it, and
  * that list is repository administration (#33, #163).
  *
- * The API call goes through `gh`, never a token this process handles: on a
- * developer's machine `gh` is routed to the `shyden-agent` App, and on a
- * runner it reads `GH_TOKEN` from the step. Either way no credential is
- * read, passed or logged here.
+ * It asks GitHub's API directly (`github-api.mjs`, #1295), never `gh` found
+ * on PATH (SonarCloud S4036): on a runner with the step's `GH_TOKEN`, on a
+ * developer's machine with the `shyden-agent` App's token in `GH_TOKEN`. The
+ * token goes to GitHub alone and is never printed.
  */
 
 import { readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { argv } from 'node:process';
 
 import { parse } from 'yaml';
 
 import { die, messageOf } from './errors.mjs';
+import { githubGet, repositoryOf } from './github-api.mjs';
+import { GIT } from './programs.mjs';
 
 /**
  * A parsed YAML mapping, and not a scalar, a sequence or nothing.
@@ -137,46 +139,54 @@ export const labelRefusal = (missing, existing) =>
   ].join('\n');
 
 /**
- * Every label on the repository `gh` resolves from the checkout.
+ * Every label on this repository, read from GitHub's API to its last page, so
+ * a repository with more labels than one page never reports some as missing.
  *
- * `--paginate` because a repository may hold more labels than one page, and a
- * truncated list reports labels that exist as missing.
- *
- * @returns {string[]} The label names.
+ * @param {import('./github-api.mjs').GitHubOptions & { readOrigin: () => string }} options
+ * @returns {Promise<string[]>} The label names.
  */
-export const repositoryLabels = () => {
-  const run = spawnSync(
-    'gh',
-    ['api', '--paginate', '/repos/{owner}/{repo}/labels', '--jq', '.[].name'],
-    { encoding: 'utf8' },
-  );
-
-  if (run.error) die(`cannot run gh: ${messageOf(run.error)}`);
-  if (run.status !== 0)
-    die(
-      `gh api exited ${run.status} reading this repository's labels.\n` +
-        `${(run.stderr ?? '').trim()}`,
-    );
-
-  return (run.stdout ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
+export const repositoryLabels = async ({
+  env = process.env,
+  fetch,
+  readOrigin,
+}) => {
+  const repo = repositoryOf(env, readOrigin);
+  /** @type {{ name: string }[]} */
+  const labels = await githubGet(`/repos/${repo}/labels`, { env, fetch });
+  return labels.map((label) => label.name);
 };
 
+/** The checkout's origin remote, the repository the check is about. */
+const originUrl = () =>
+  execFileSync(GIT, ['remote', 'get-url', 'origin'], { encoding: 'utf8' });
+
 /**
- * Refuse a config naming a label the repository does not have.
+ * Refuse a config naming a label the repository does not have. Each input is
+ * a parameter so a unit test can stand it in (#1295).
  *
- * @returns {void}
+ * @param {{
+ *   args?: string[],
+ *   readConfig?: () => string,
+ *   env?: NodeJS.ProcessEnv,
+ *   fetch?: typeof globalThis.fetch,
+ *   readOrigin?: () => string,
+ * }} [inputs]
+ * @returns {Promise<void>}
  */
-const main = () => {
-  if (argv.slice(2).length > 0)
+export const main = async ({
+  args = argv.slice(2),
+  readConfig = () => readFileSync(DEPENDABOT, 'utf8'),
+  env = process.env,
+  fetch = globalThis.fetch,
+  readOrigin = originUrl,
+} = {}) => {
+  if (args.length > 0)
     die('usage: node scripts/dependabot-labels.mjs   (no arguments)');
 
   /** @type {string} */
   let text;
   try {
-    text = readFileSync(DEPENDABOT, 'utf8');
+    text = readConfig();
   } catch (error) {
     die(`cannot read ${DEPENDABOT}: ${messageOf(error)}`);
   }
@@ -198,9 +208,17 @@ const main = () => {
         'Either it lost its `labels:` entries, or this check is reading the wrong file.',
     );
 
-  const existing = repositoryLabels();
+  /** @type {string[]} */
+  let existing;
+  try {
+    existing = await repositoryLabels({ env, fetch, readOrigin });
+  } catch (error) {
+    die(`cannot read this repository's labels: ${messageOf(error)}`);
+  }
   if (existing.length === 0)
-    die('gh returned no labels for this repository, which cannot be right.');
+    die(
+      'GitHub returned no labels for this repository, which cannot be right.',
+    );
 
   const missing = missingLabels(declared, existing);
   if (missing.length > 0) die(labelRefusal(missing, existing));
@@ -211,4 +229,4 @@ const main = () => {
 };
 
 // Only when run, never when imported: the unit suite imports the derivation.
-if (import.meta.main) main();
+if (import.meta.main) await main();

@@ -52,6 +52,13 @@ export const ASTRO_CLI = path.join(
   'bin',
   'astro.mjs',
 );
+/** The entry file `npx vitest` runs from this checkout (#1295). */
+export const VITEST_CLI = path.join(
+  CHECKOUT,
+  'node_modules',
+  'vitest',
+  'vitest.mjs',
+);
 
 /**
  * Where `platform` keeps lsof: macOS in /usr/sbin, Linux in /usr/bin.

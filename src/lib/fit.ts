@@ -94,7 +94,7 @@ export function fontThatFits(
 
   const rise = atBase.height - atApplied.height;
   const run = atBase.font - atApplied.font;
-  const slope = run === 0 ? NaN : rise / run;
+  const slope = run === 0 ? Number.NaN : rise / run;
   const solved =
     Number.isFinite(slope) && slope > 0
       ? (room - (atBase.height - slope * atBase.font)) / slope

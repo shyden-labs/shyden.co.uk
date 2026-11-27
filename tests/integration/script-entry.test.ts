@@ -1,45 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scriptCheckout, type ScriptCheckout } from '../unit/script-checkout';
 import { type Probe, PROBES } from '../script-entry-shared';
 
-/**
- * A directory holding a stand-in `npx` that kills the process which called it.
- *
- * A probe shows that a script's entry point ran through a refusal the script
- * makes before it does any work. `test-e2e.mjs`'s probe once got its refusal
- * from Playwright instead, starting the Playwright CLI twice per probe, and
- * timed out at 32-34 s under load (#572). Put first on every probe's PATH,
- * this stand-in makes a probe that spawns `npx` fail outright rather than run
- * slowly: the probed process dies with no exit status and none of its words.
- * Leaving `npx` off PATH would not do that, because a failed spawn is quick
- * and quiet, and `test-e2e.mjs` reads a failed listing as "no total" and
- * carries on.
- */
-const npxThatKillsItsCaller = () => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'probe-bin-')));
-  const npx = join(dir, 'npx');
-  writeFileSync(npx, '#!/bin/sh\nkill -KILL "$PPID"\n');
-  chmodSync(npx, 0o755);
-  return { dir, remove: () => rmSync(dir, { recursive: true, force: true }) };
-};
-
-const runAsScript = (script: string, probe: Probe, bin: string) => {
-  // A probe that sets PATH itself replaces this one whole, stand-in included.
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
-  };
+const runAsScript = (script: string, probe: Probe) => {
+  const env: NodeJS.ProcessEnv = { ...process.env };
   for (const [name, value] of Object.entries(probe.env ?? {}))
     if (value === undefined) delete env[name];
     else env[name] = value;
@@ -51,14 +18,11 @@ const runAsScript = (script: string, probe: Probe, bin: string) => {
 
 describe('every script that decides still acts when run as one (#221)', () => {
   let checkout: ScriptCheckout;
-  let bin: ReturnType<typeof npxThatKillsItsCaller>;
   beforeAll(() => {
     checkout = scriptCheckout();
-    bin = npxThatKillsItsCaller();
   });
   afterAll(() => {
     checkout.remove();
-    bin.remove();
   });
 
   const places: Readonly<Record<string, () => string>> = {
@@ -70,7 +34,7 @@ describe('every script that decides still acts when run as one (#221)', () => {
   for (const [script, probe] of Object.entries(PROBES))
     for (const [place, dir] of Object.entries(places))
       it(`${script} refuses from ${place}`, () => {
-        const run = runAsScript(join(dir(), script), probe, bin.dir);
+        const run = runAsScript(join(dir(), script), probe);
         expect(`${run.stdout}${run.stderr}`).toContain(probe.says);
         expect(run.status).toBe(probe.status);
       });

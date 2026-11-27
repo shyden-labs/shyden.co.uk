@@ -136,7 +136,7 @@ const PROTECT_TAG = 'x';
 
 /** `text` as a regular expression that matches it literally. */
 export const escapeForRegExp = (text: string): string =>
-  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 /**
  * XML escaping, because the request asks for `tag_handling: 'xml'`.
@@ -152,10 +152,10 @@ export const escapeForRegExp = (text: string): string =>
  * own output (`&lt;` -> `&amp;lt;`) and the round trip stops being one.
  */
 export const escapeXml = (text: string): string =>
-  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 export const unescapeXml = (text: string): string =>
-  text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
 
 /**
  * Wrap every protected term so DeepL returns it untouched.
@@ -240,7 +240,7 @@ export function deeplDrafts(response: unknown, expected: number): string[] {
 }
 
 /** A slot in a sentence: `{names}`, `{n}`. */
-const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/g;
+const SLOT = /\{[A-Za-z_]\w*\}/g;
 
 /** Every slot wrapped in the tag DeepL ignores, for a retry (`betterDraft`). */
 const tagEverySlot = (text: string): string =>

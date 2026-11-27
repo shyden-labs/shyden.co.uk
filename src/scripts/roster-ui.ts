@@ -152,6 +152,13 @@ const printMirror = (value: string, column: PrintColumn): HTMLSpanElement => {
   return span;
 };
 
+/** A student's sex as the printed sheet spells it: M, F, or the unset dash. */
+const sexLabel = (sex: Student['sex'], t: Strings): string => {
+  if (sex === 'M') return t.rosterSexMale;
+  if (sex === 'F') return t.rosterSexFemale;
+  return t.rosterUnset;
+};
+
 /**
  * What each cell of a student's row prints, in one place: the row builder
  * here and `refreshPrintMirrors` (classroom-groups.ts) both read it, so the
@@ -165,12 +172,7 @@ export const printTexts = (
 ): Record<PrintColumn, string> => ({
   number: String(student.number),
   name: student.name ?? '',
-  sex:
-    student.sex === 'M'
-      ? t.rosterSexMale
-      : student.sex === 'F'
-        ? t.rosterSexFemale
-        : t.rosterUnset,
+  sex: sexLabel(student.sex, t),
   absent: student.absent ? '\u2611' : '\u2610',
   together: student.together ?? t.rosterUnset,
   apart: student.apart ?? t.rosterUnset,

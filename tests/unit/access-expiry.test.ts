@@ -6,6 +6,7 @@ import {
   REQUEST_TIMEOUT_MS,
   WARN_DAYS,
   assigned,
+  bodyFor,
   dueSoon,
   failureBodyFor,
   missingTitles,
@@ -220,5 +221,43 @@ describe('assigned reads who an opened issue went to', () => {
     ['no assignees field', {}],
   ])('is false with %s', (_, answer) => {
     expect(assigned(answer)).toBe(false);
+  });
+});
+
+describe('bodyFor says how long a token has left', () => {
+  // A stand-in for the logs suite's sentences (#822): which clause each
+  // distance from the expiry picks, read by its own words.
+  const token: WatchedToken = { name: 'ci-dev', expiresAt: EXPIRES };
+  const before = (ms: number) => new Date(EXPIRES.getTime() - ms);
+  const HOUR = 3_600_000;
+
+  it.each([
+    [
+      'after the expiry',
+      before(-HOUR),
+      'expired at 2027-10-15 23:55 UTC, before this check',
+    ],
+    [
+      'at the expiry itself',
+      before(0),
+      'expired at 2027-10-15 23:55 UTC, before this check',
+    ],
+    [
+      '5 hours ahead',
+      before(5 * HOUR),
+      'expires at 2027-10-15 23:55 UTC, within a day of this check',
+    ],
+    [
+      '25 hours ahead',
+      before(25 * HOUR),
+      'expires at 2027-10-15 23:55 UTC, 1 day after this check',
+    ],
+    [
+      '3 days ahead',
+      before(72 * HOUR),
+      'expires at 2027-10-15 23:55 UTC, 3 days after this check',
+    ],
+  ])('%s', (_, now, clause) => {
+    expect(bodyFor(token, now)).toContain(`\`ci-dev\` ${clause}.`);
   });
 });

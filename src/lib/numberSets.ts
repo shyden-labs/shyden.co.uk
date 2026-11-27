@@ -85,7 +85,7 @@ const pieces = (text: string, separator: string): string[] =>
  * `''` as 0, `' 7 '` as 7 and `0x10` as 16, so testing the TEXT is what
  * keeps `-3` and `2.5` refusals rather than silent conversions.
  */
-const WHOLE_NUMBER = /^[0-9]+$/;
+const WHOLE_NUMBER = /^\d+$/;
 
 /**
  * One field's text, read left to right, stopping at the FIRST thing wrong.

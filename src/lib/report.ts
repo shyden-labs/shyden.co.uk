@@ -363,7 +363,7 @@ function hasTwoCharacters(text: string, locale: Locale): boolean {
 /** Rule 3 as an anchored literal scan: each slot a non-empty wildcard, no backtracking. */
 function wholeMessage(quote: string, runs: readonly string[]): boolean {
   const first = runs[0];
-  const last = runs[runs.length - 1];
+  const last = runs.at(-1) ?? first;
   if (!quote.startsWith(first) || !quote.endsWith(last)) return false;
   let at = first.length;
   for (const run of runs.slice(1, -1)) {
@@ -511,7 +511,7 @@ const within = (text: string, min: number): boolean =>
 
 /** A textarea's maxlength counts a line break as one unit; submission sends CRLF (spec 6.1). */
 const field = (fields: URLSearchParams, name: string): string =>
-  (fields.get(name) ?? '').replace(/\r\n/g, '\n');
+  (fields.get(name) ?? '').replaceAll('\r\n', '\n');
 
 /**
  * Why a call to the database failed, as a kind from a closed list (#829). A

@@ -1,3 +1,4 @@
+import { ANDROID_RUN_FILES } from '../../scripts/phone-files.mjs';
 import { adb } from '../../scripts/adb.mjs';
 import type { Download } from '@playwright/test';
 
@@ -24,7 +25,7 @@ export const onRealDevice = (): boolean => process.env.PW_REAL_DEVICE === '1';
  * The one folder the suite writes to on the phone, a folder of its own under Downloads, so a
  * run never touches anything else a person keeps there.
  */
-export const DEVICE_DOWNLOADS = '/sdcard/Download/shyden-gauntlet';
+export const DEVICE_DOWNLOADS = ANDROID_RUN_FILES.downloads;
 
 /**
  * What the real-device fixture tells Chrome after attaching, replacing Playwright's host path.

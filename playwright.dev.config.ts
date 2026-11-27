@@ -21,9 +21,6 @@ const build = onBuild(4398, {
   PUBLIC_SHYDESK_URL: 'https://shydesk.shydesk-non-prod.workers.dev',
 });
 
-const baseURL =
-  build?.baseURL ?? process.env.WEB_BASE_URL ?? 'https://dev.shyden.co.uk';
-
 export default defineConfig({
   testDir: './tests/dev',
   // A stray `test.only` fails the run in CI rather than narrowing it (#390).
@@ -31,19 +28,16 @@ export default defineConfig({
   webServer: build?.webServer,
   grepInvert: build?.grepInvert,
   use: {
-    baseURL,
+    baseURL:
+      build?.baseURL ?? process.env.WEB_BASE_URL ?? 'https://dev.shyden.co.uk',
     colorScheme: 'dark',
     // A failing test leaves its screenshot for the workflow to upload;
     // never a trace or a video: a trace records every
     // request's headers, these runs carry credentials, and this repository's
     // artifacts are public (#1233).
     screenshot: 'only-on-failure',
-    // Username half is ignored by the gate; only the password matters. The
-    // origin keeps it to the dev site: Playwright offers httpCredentials to
-    // any origin that challenges, and this suite loads others (ShyDesk's embed).
-    httpCredentials: password
-      ? { username: 'dev', password, origin: new URL(baseURL).origin }
-      : undefined,
+    // Username half is ignored by the gate; only the password matters.
+    httpCredentials: password ? { username: 'dev', password } : undefined,
   },
   // Every engine on every dev deploy (#1032 AC5, Shyden 2026-11-22).
   // The e2e suite's own three, WebKit into the silent audio sink (#919).
