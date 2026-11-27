@@ -41,9 +41,7 @@ export default defineConfig({
     // Username half is ignored by the gate; only the password matters. The
     // origin keeps it to the dev site: Playwright offers httpCredentials to
     // any origin that challenges, and this suite loads others (ShyDesk's embed).
-    httpCredentials: password
-      ? { username: 'dev', password, origin: new URL(baseURL).origin }
-      : undefined,
+    httpCredentials: password ? { username: 'dev', password } : undefined,
   },
   // Every engine on every dev deploy (#1032 AC5, Shyden 2026-11-22).
   // The e2e suite's own three, WebKit into the silent audio sink (#919).
