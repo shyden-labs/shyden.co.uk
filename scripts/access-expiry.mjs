@@ -177,6 +177,9 @@ const reportFailure = async () => {
   console.log('Reported the failure.');
 };
 
+/** The jobs `main` runs when none are handed in. */
+const JOBS = Object.freeze({ check, reportFailure });
+
 /**
  * Runs the job an argument list names: the check with none, the failure
  * report with `report-failure`. Answers the exit code: 2 for a usage it
@@ -185,7 +188,7 @@ const reportFailure = async () => {
  * @param {{ check: () => Promise<void>, reportFailure: () => Promise<void> }} [jobs]
  * @returns {Promise<number>}
  */
-export async function main(argv, jobs = { check, reportFailure }) {
+export async function main(argv, jobs = JOBS) {
   const reportsFailure = argv.length === 1 && argv[0] === 'report-failure';
   if (argv.length > 0 && !reportsFailure) {
     console.error('usage: node scripts/access-expiry.mjs [report-failure]');

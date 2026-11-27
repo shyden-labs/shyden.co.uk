@@ -1006,7 +1006,7 @@ export function vitestVerdict({ name, code, report, reportFile }) {
   const skippedByDesign = count('numPendingTests') + count('numTodoTests');
   const success = /** @type {Record<string, unknown>} */ (report).success;
   if (typeof success !== 'boolean') {
-    throw new Error(
+    throw new TypeError(
       `expected ${description} to say true or false at success -- got ${JSON.stringify(success)}`,
     );
   }
@@ -1585,7 +1585,10 @@ let runGroupNames = [];
 export function once(task) {
   /** @type {{ value: T } | undefined} */
   let ran;
-  return () => (ran ??= { value: task() }).value;
+  return () => {
+    ran ??= { value: task() };
+    return ran.value;
+  };
 }
 
 /**
@@ -1796,10 +1799,10 @@ async function main() {
     if (!totals.ok) process.stdout.write(`\nFAILED: ${totals.reason}\n\n`);
     const anyBad = groups.some((g) => g.status !== 'passed') || !totals.ok;
     process.exitCode = anyBad ? 1 : 0;
-  } catch (fatal) {
-    process.stderr.write(`\nABORTED: ${messageOf(fatal)}\n\n`);
+  } catch (error_) {
+    process.stderr.write(`\nABORTED: ${messageOf(error_)}\n\n`);
     process.exitCode = 1;
-    writeDashboardFinal({ aborted: messageOf(fatal), groups: null });
+    writeDashboardFinal({ aborted: messageOf(error_), groups: null });
     await cleanup();
   }
 }
