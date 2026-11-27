@@ -23,7 +23,8 @@
  * Imports nothing from `node_modules`: the job holding the token runs no
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
-import { die, messageOf } from './errors.mjs';
+import { exit } from 'node:process';
+import { messageOf } from './errors.mjs';
 import { endpoint, setting, timeoutSetting } from './settings.mjs';
 import { answerOf, githubJson, statusOnMain } from './json-answer.mjs';
 import {
@@ -176,15 +177,27 @@ const reportFailure = async () => {
   console.log('Reported the failure.');
 };
 
-if (import.meta.main) {
-  const [mode, ...rest] = process.argv.slice(2);
+/**
+ * Runs the job an argument list names: the check with none, the failure
+ * report with `report-failure`. Answers the exit code: 2 for a usage it
+ * refuses, 1 for a job that failed (its message printed), 0 otherwise.
+ * @param {readonly string[]} argv
+ * @param {{ check: () => Promise<void>, reportFailure: () => Promise<void> }} [jobs]
+ * @returns {Promise<number>}
+ */
+export async function main(argv, jobs = { check, reportFailure }) {
+  const [mode, ...rest] = argv;
   if (rest.length > 0 || (mode !== undefined && mode !== 'report-failure')) {
     console.error('usage: node scripts/access-expiry.mjs [report-failure]');
-    process.exit(2);
+    return 2;
   }
   try {
-    await (mode === 'report-failure' ? reportFailure() : check());
+    await (mode === 'report-failure' ? jobs.reportFailure() : jobs.check());
+    return 0;
   } catch (error) {
-    die(messageOf(error));
+    console.error(`✗ ${messageOf(error)}`);
+    return 1;
   }
 }
+
+if (import.meta.main) exit(await main(process.argv.slice(2)));
