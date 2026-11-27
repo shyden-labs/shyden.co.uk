@@ -6,6 +6,7 @@ import {
   startWda,
   WDA_PIN,
   WDA_READY_CEILING_MS,
+  WDA_RUNNER_BUNDLE,
 } from '../../scripts/wda.mjs';
 
 /**
@@ -273,6 +274,65 @@ describe('startWda', () => {
     const wda = await started;
     h.setAlive('5151');
     await expect(wda.stop()).rejects.toThrow(/still running .*pid 5151/);
+  });
+
+  const UNINSTALL = [
+    'xcrun',
+    'devicectl',
+    'device',
+    'uninstall',
+    'app',
+    '--device',
+    UDID,
+    WDA_RUNNER_BUNDLE,
+  ];
+
+  it('names the runner app it installs on the iPhone (#1326)', () => {
+    expect(WDA_RUNNER_BUNDLE).toBe('uk.co.shyden.wda.xctrunner');
+  });
+
+  it('stop removes the runner app from the iPhone once the runner has exited (#1326)', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    const wda = await started;
+    await wda.stop();
+    expect(h.runs.at(-1)).toEqual(UNINSTALL);
+  });
+
+  it('stop still removes the runner app when a runner outlives it, then says so (#1326)', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    const wda = await started;
+    h.setAlive('5151');
+    await expect(wda.stop()).rejects.toThrow(/still running .*pid 5151/);
+    expect(h.runs).toContainEqual(UNINSTALL);
+  });
+
+  it('removes the runner app when WDA exits before it is ready, keeping the start error (#1326)', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.emit('exit', 65, null);
+    await expect(started).rejects.toThrow(/exited \(code 65/);
+    expect(h.runs).toContainEqual(UNINSTALL);
+  });
+
+  it('stop fails naming the app when it cannot be removed (#1326)', async () => {
+    const h = harness();
+    const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
+    await flush();
+    h.child.print(READY);
+    const wda = await started;
+    h.deps.run.mockImplementationOnce(async () => {
+      throw new Error('devicectl: the device is locked');
+    });
+    await expect(wda.stop()).rejects.toThrow(
+      /could not remove uk\.co\.shyden\.wda\.xctrunner from the iPhone.*the device is locked/,
+    );
   });
 
   // Measured 2026-11-02 on the iPhone Air: the tunnel address read before
