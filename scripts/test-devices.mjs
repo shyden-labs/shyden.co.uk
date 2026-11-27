@@ -56,6 +56,7 @@ import { desktopContainerArgv, desktopImage } from './desktop-container.mjs';
 import { constants } from 'node:os';
 import { die, messageOf } from './errors.mjs';
 import { adb, androidAbsence } from './adb.mjs';
+import { ANDROID_RUN_FILES } from './phone-files.mjs';
 import { listDevices, pickIphone } from './devicectl.mjs';
 import { startWda } from './wda.mjs';
 import {
@@ -72,7 +73,14 @@ import path from 'node:path';
 import { deviceTargets, evenTotals } from './even-totals.mjs';
 import { fileURLToPath } from 'node:url';
 import { VITEST_EVIDENCE_REPORT } from './evidence-files.mjs';
-import { DOCKER, LSOF, NODE, PS } from './programs.mjs';
+import {
+  DOCKER,
+  LSOF,
+  NODE,
+  PLAYWRIGHT_CLI,
+  PS,
+  VITEST_CLI,
+} from './programs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = 4321;
@@ -1109,6 +1117,54 @@ async function runDesktopGroup() {
   };
 }
 
+/**
+ * The Android group's suite: Playwright's own entry file under node, never
+ * `npx` found on PATH (SonarCloud S4036, #1295). See runDesktopGroup's
+ * comment on the reporters: html + jsonl-reporter are additive, list+json are
+ * unchanged, no config file needed a change.
+ *
+ * @returns {{ command: string, args: string[] }}
+ */
+export const androidGroupCommand = () => ({
+  command: NODE,
+  args: [
+    PLAYWRIGHT_CLI,
+    'test',
+    '--config=playwright.device.config.ts',
+    '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+  ],
+});
+
+/**
+ * The iPhone group's suite: Vitest's own entry file under node, never `npx`
+ * (#1295), writing its JSON report to `reportFile`.
+ *
+ * @param {string} reportFile
+ * @returns {{ command: string, args: string[] }}
+ */
+export const iosGroupCommand = (reportFile) => ({
+  command: NODE,
+  args: [
+    VITEST_CLI,
+    'run',
+    '--config=vitest.ios.config.ts',
+    '--reporter=verbose',
+    '--reporter=json',
+    `--outputFile.json=${reportFile}`,
+    // Additive, same as the two Playwright groups' jsonl reporter --
+    // verbose+json are unchanged. The leading "./" is load-bearing, not
+    // decorative: vitest's own CLI-to-config resolution
+    // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
+    // starting "// ./reporter.js || ../reporter.js, but not
+    // .reporters/reporter.js") only treats a --reporter value as a file
+    // path when it matches /^\.\.?\//; a bare path is treated as a
+    // reporter NAME and fails to resolve. Measured, not assumed -- see
+    // tests/reporters/jsonl-vitest.ts's own module doc. No change to
+    // vitest.ios.config.ts needed.
+    '--reporter=./tests/reporters/jsonl-vitest.ts',
+  ],
+});
+
 async function runAndroidGroup() {
   const name = 'android';
   const startedAt = Date.now();
@@ -1130,29 +1186,18 @@ async function runAndroidGroup() {
   }
 
   const reportFile = REPORT_FILES.android;
-  const { code } = await runTagged(
-    name,
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config=playwright.device.config.ts',
-      // See runDesktopGroup's identical comment: html + jsonl-reporter are
-      // additive, list+json are unchanged, no config file needed a change.
-      '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-    ],
-    {
-      env: {
-        ...process.env,
-        PW_REUSE_SERVER: '1',
-        PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
-        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-        DASHBOARD_GROUP: name,
-        PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
-        PLAYWRIGHT_HTML_OPEN: 'never',
-      },
+  const android = androidGroupCommand();
+  const { code } = await runTagged(name, android.command, android.args, {
+    env: {
+      ...process.env,
+      PW_REUSE_SERVER: '1',
+      PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
+      DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+      DASHBOARD_GROUP: name,
+      PLAYWRIGHT_HTML_OUTPUT_DIR: REPORT_DIR[name],
+      PLAYWRIGHT_HTML_OPEN: 'never',
     },
-  );
+  });
   return {
     ...playwrightVerdict({
       name,
@@ -1214,39 +1259,17 @@ async function runIosGroup() {
     };
   }
   process.stdout.write(`[${name}] WebDriverAgent ready at ${wda.url}\n`);
+  const ios = iosGroupCommand(reportFile);
   let code;
   try {
-    ({ code } = await runTagged(
-      name,
-      'npx',
-      [
-        'vitest',
-        'run',
-        '--config=vitest.ios.config.ts',
-        '--reporter=verbose',
-        '--reporter=json',
-        `--outputFile.json=${reportFile}`,
-        // Additive, same as the two Playwright groups' jsonl reporter --
-        // verbose+json are unchanged. The leading "./" is load-bearing, not
-        // decorative: vitest's own CLI-to-config resolution
-        // (node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js, the block
-        // starting "// ./reporter.js || ../reporter.js, but not
-        // .reporters/reporter.js") only treats a --reporter value as a file
-        // path when it matches /^\.\.?\//; a bare path is treated as a
-        // reporter NAME and fails to resolve. Measured, not assumed -- see
-        // tests/reporters/jsonl-vitest.ts's own module doc. No change to
-        // vitest.ios.config.ts needed.
-        '--reporter=./tests/reporters/jsonl-vitest.ts',
-      ],
-      {
-        env: {
-          ...process.env,
-          DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
-          DASHBOARD_GROUP: name,
-          WDA_URL: wda.url,
-        },
+    ({ code } = await runTagged(name, ios.command, ios.args, {
+      env: {
+        ...process.env,
+        DASHBOARD_JSONL_FILE: DASHBOARD_JSONL_FILE[name],
+        DASHBOARD_GROUP: name,
+        WDA_URL: wda.url,
       },
-    ));
+    }));
   } finally {
     await wda.stop();
   }
@@ -1289,8 +1312,8 @@ async function runIosGroup() {
 // ── cleanup: always runs, whatever happened above ───────────────────────
 
 /**
- * The `adb` calls the end-of-run cleanup makes: both tunnels removed when the
- * Android group is in the run, and none at all otherwise. An iOS-only run
+ * The `adb` calls the end-of-run cleanup makes: both tunnels and every file
+ * the run wrote on the phone removed when the Android group is in the run, and none at all otherwise. An iOS-only run
  * (`--ios`, on a simulator) touches no USB device, so it must not remove
  * another session's Android tunnels (#1163). `adb forward/reverse
  * --remove-all` exit 0 on a device with nothing mapped, so an Android run
@@ -1304,7 +1327,104 @@ export function adbCleanupCalls(groupNames) {
   return [
     ['forward', '--remove-all'],
     ['reverse', '--remove-all'],
+    // What the run wrote on the phone, gone with it (#1326): `rm -f` and
+    // `rm -rf` exit 0 when a path is already absent.
+    [
+      'shell',
+      'rm',
+      '-f',
+      ANDROID_RUN_FILES.uiDump,
+      ANDROID_RUN_FILES.walkScreenshot,
+    ],
+    ['shell', 'rm', '-rf', ANDROID_RUN_FILES.downloads],
   ];
+}
+
+/**
+ * The Chrome tabs this run opened, from the DevTools target list read at
+ * the end of the run and the tab ids read at its start (#1326). A tab open
+ * before the run is the phone owner's and stays; only page targets count.
+ * A listing that is not a list of targets throws, so a misread never
+ * passes for "nothing to close".
+ *
+ * @param {readonly string[]} beforeIds
+ * @param {unknown} listing
+ * @returns {string[]}
+ */
+export function tabsOpenedByRun(beforeIds, listing) {
+  if (!Array.isArray(listing))
+    throw new Error(
+      `expected the DevTools target list to be a list -- got ${JSON.stringify(listing)}`,
+    );
+  const before = new Set(beforeIds);
+  return listing.flatMap((target) =>
+    target &&
+    typeof target === 'object' &&
+    target.type === 'page' &&
+    typeof target.id === 'string' &&
+    !before.has(target.id)
+      ? [target.id]
+      : [],
+  );
+}
+
+const DEVTOOLS = 'http://127.0.0.1:9222';
+
+/** The phone's Chrome DevTools target list, over the run's own tunnel. */
+async function chromeTargets() {
+  adb(['forward', 'tcp:9222', 'localabstract:chrome_devtools_remote']);
+  const response = await fetch(`${DEVTOOLS}/json/list`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  return response.json();
+}
+
+/** @type {string[] | undefined} The tab ids open before this run. */
+let tabsBeforeRun;
+
+/** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
+async function readTabsBeforeRun() {
+  try {
+    tabsBeforeRun = tabsOpenedByRun([], await chromeTargets());
+  } catch (error) {
+    process.stderr.write(
+      `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
+    );
+  }
+}
+
+/** Closes the tabs this run opened, and no other (#1326). */
+async function closeRunTabs() {
+  if (tabsBeforeRun === undefined) {
+    process.stderr.write(
+      "cleanup: Chrome's tabs before the run were not read, so no tab is closed\n",
+    );
+    return;
+  }
+  let opened;
+  try {
+    opened = tabsOpenedByRun(tabsBeforeRun, await chromeTargets());
+  } catch (error) {
+    process.stderr.write(
+      `cleanup: could not list Chrome's tabs, so the run's tabs stay open: ${messageOf(error)}\n`,
+    );
+    return;
+  }
+  for (const id of opened) {
+    try {
+      const response = await fetch(`${DEVTOOLS}/json/close/${id}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      process.stderr.write(
+        `cleanup: could not close the run's Chrome tab ${id}: ${messageOf(error)}\n`,
+      );
+    }
+  }
+  process.stdout.write(
+    `cleanup: closed ${opened.length} Chrome tab(s) the run opened\n`,
+  );
 }
 
 /** @param {readonly string[]} groupNames */
@@ -1455,6 +1575,7 @@ const cleanup = once(async () => {
       );
     }
   }
+  if (runGroupNames.includes('android')) await closeRunTabs();
   await cleanupAdbTunnels(runGroupNames);
 });
 
@@ -1509,6 +1630,7 @@ async function main() {
   runGroupNames = groupNames;
 
   cleanUpOnSignal();
+  if (groupNames.includes('android')) await readTabsBeforeRun();
 
   mkdirSync(TEST_RESULTS_DIR, { recursive: true });
   mkdirSync(DASHBOARD_STATE_DIR, { recursive: true });

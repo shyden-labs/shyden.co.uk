@@ -14,24 +14,24 @@ const OUTSIDE = join(sep, 'tmp', 'release');
 const INSIDE = join(CHECKOUT, '.superpowers', 'no-such-folder');
 
 /** Run main() with these arguments; hand back what it printed as an error. */
-const refusalOf = (args: string[]): string => {
+const refusalOf = async (args: string[]): Promise<string> => {
   vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'brc', ...args]);
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(process, 'exit').mockImplementation((code) => {
     throw new Error(`exit ${code}`);
   });
-  expect(() => main()).toThrow('exit 1');
+  await expect(async () => main()).rejects.toThrow('exit 1');
   return error.mock.calls.map((call) => String(call[0])).join('\n');
 };
 
 describe('build-release-content refuses a path outside the checkout', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('refuses a release file outside it, naming it', () => {
+  it('refuses a release file outside it, naming it', async () => {
     const release = join(OUTSIDE, 'release.json');
     expect(
-      refusalOf([
+      await refusalOf([
         '--release',
         release,
         '--head',
@@ -43,10 +43,10 @@ describe('build-release-content refuses a path outside the checkout', () => {
     ).toContain(`${release} is outside this checkout`);
   });
 
-  it('refuses a manifest outside it, naming it', () => {
+  it('refuses a manifest outside it, naming it', async () => {
     const manifest = join(OUTSIDE, EVIDENCE_MANIFEST);
     expect(
-      refusalOf([
+      await refusalOf([
         '--release',
         join(INSIDE, 'release.json'),
         '--head',
@@ -58,10 +58,10 @@ describe('build-release-content refuses a path outside the checkout', () => {
     ).toContain(`${manifest} is outside this checkout`);
   });
 
-  it('refuses a listing outside it, naming it', () => {
+  it('refuses a listing outside it, naming it', async () => {
     const listing = join(OUTSIDE, 'listing.json');
     expect(
-      refusalOf([
+      await refusalOf([
         '--release',
         join(INSIDE, 'release.json'),
         '--head',
@@ -74,9 +74,9 @@ describe('build-release-content refuses a path outside the checkout', () => {
     ).toContain(`${listing} is outside this checkout`);
   });
 
-  it('refuses an evidence folder outside it, naming it', () => {
+  it('refuses an evidence folder outside it, naming it', async () => {
     expect(
-      refusalOf([
+      await refusalOf([
         '--release',
         join(INSIDE, 'release.json'),
         '--head',
@@ -89,10 +89,10 @@ describe('build-release-content refuses a path outside the checkout', () => {
     ).toContain(`${OUTSIDE} is outside this checkout`);
   });
 
-  it('refuses a content file to write outside it, naming it', () => {
+  it('refuses a content file to write outside it, naming it', async () => {
     const out = join(OUTSIDE, 'content.json');
     expect(
-      refusalOf([
+      await refusalOf([
         '--release',
         join(INSIDE, 'release.json'),
         '--head',
