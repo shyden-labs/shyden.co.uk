@@ -82,9 +82,15 @@ export const CHROME_CHECKS: readonly PageCheck[] = [
       const support = localisePath('/support', locale);
       await expect
         .soft(
-          page
-            .locator('header nav')
-            .getByRole('link', { name: t.nav.contact, exact: true }),
+          // Read-only: where the link goes, not whether it shows. On a phone the
+          // nav is folded behind the menu button, so the link is hidden there
+          // and a visible-only lookup finds nothing (#1310, measured on the
+          // OPPO); the menu's opening is the header journeys' to test.
+          page.locator('header nav').getByRole('link', {
+            name: t.nav.contact,
+            exact: true,
+            includeHidden: true,
+          }),
           `${route} header Contact`,
         )
         .toHaveAttribute('href', support);
