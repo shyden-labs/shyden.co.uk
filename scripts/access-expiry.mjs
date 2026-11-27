@@ -186,13 +186,13 @@ const reportFailure = async () => {
  * @returns {Promise<number>}
  */
 export async function main(argv, jobs = { check, reportFailure }) {
-  const [mode, ...rest] = argv;
-  if (rest.length > 0 || (mode !== undefined && mode !== 'report-failure')) {
+  const reportsFailure = argv.length === 1 && argv[0] === 'report-failure';
+  if (argv.length > 0 && !reportsFailure) {
     console.error('usage: node scripts/access-expiry.mjs [report-failure]');
     return 2;
   }
   try {
-    await (mode === 'report-failure' ? jobs.reportFailure() : jobs.check());
+    await (reportsFailure ? jobs.reportFailure() : jobs.check());
     return 0;
   } catch (error) {
     console.error(`✗ ${messageOf(error)}`);
