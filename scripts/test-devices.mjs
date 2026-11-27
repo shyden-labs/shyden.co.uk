@@ -1318,6 +1318,93 @@ export function adbCleanupCalls(groupNames) {
   ];
 }
 
+/**
+ * The Chrome tabs this run opened, from the DevTools target list read at
+ * the end of the run and the tab ids read at its start (#1326). A tab open
+ * before the run is the phone owner's and stays; only page targets count.
+ * A listing that is not a list of targets throws, so a misread never
+ * passes for "nothing to close".
+ *
+ * @param {readonly string[]} beforeIds
+ * @param {unknown} listing
+ * @returns {string[]}
+ */
+export function tabsOpenedByRun(beforeIds, listing) {
+  if (!Array.isArray(listing))
+    throw new Error(
+      `expected the DevTools target list to be a list -- got ${JSON.stringify(listing)}`,
+    );
+  const before = new Set(beforeIds);
+  return listing.flatMap((target) =>
+    target &&
+    typeof target === 'object' &&
+    target.type === 'page' &&
+    typeof target.id === 'string' &&
+    !before.has(target.id)
+      ? [target.id]
+      : [],
+  );
+}
+
+const DEVTOOLS = 'http://127.0.0.1:9222';
+
+/** The phone's Chrome DevTools target list, over the run's own tunnel. */
+async function chromeTargets() {
+  adb(['forward', 'tcp:9222', 'localabstract:chrome_devtools_remote']);
+  const response = await fetch(`${DEVTOOLS}/json/list`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  return response.json();
+}
+
+/** @type {string[] | undefined} The tab ids open before this run. */
+let tabsBeforeRun;
+
+/** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
+async function readTabsBeforeRun() {
+  try {
+    tabsBeforeRun = tabsOpenedByRun([], await chromeTargets());
+  } catch (error) {
+    process.stderr.write(
+      `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
+    );
+  }
+}
+
+/** Closes the tabs this run opened, and no other (#1326). */
+async function closeRunTabs() {
+  if (tabsBeforeRun === undefined) {
+    process.stderr.write(
+      "cleanup: Chrome's tabs before the run were not read, so no tab is closed\n",
+    );
+    return;
+  }
+  let opened;
+  try {
+    opened = tabsOpenedByRun(tabsBeforeRun, await chromeTargets());
+  } catch (error) {
+    process.stderr.write(
+      `cleanup: could not list Chrome's tabs, so the run's tabs stay open: ${messageOf(error)}\n`,
+    );
+    return;
+  }
+  for (const id of opened) {
+    try {
+      const response = await fetch(`${DEVTOOLS}/json/close/${id}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      process.stderr.write(
+        `cleanup: could not close the run's Chrome tab ${id}: ${messageOf(error)}\n`,
+      );
+    }
+  }
+  process.stdout.write(
+    `cleanup: closed ${opened.length} Chrome tab(s) the run opened\n`,
+  );
+}
+
 /** @param {readonly string[]} groupNames */
 async function cleanupAdbTunnels(groupNames) {
   for (const args of adbCleanupCalls(groupNames)) {
@@ -1466,6 +1553,7 @@ const cleanup = once(async () => {
       );
     }
   }
+  if (runGroupNames.includes('android')) await closeRunTabs();
   await cleanupAdbTunnels(runGroupNames);
 });
 
@@ -1520,6 +1608,7 @@ async function main() {
   runGroupNames = groupNames;
 
   cleanUpOnSignal();
+  if (groupNames.includes('android')) await readTabsBeforeRun();
 
   mkdirSync(TEST_RESULTS_DIR, { recursive: true });
   mkdirSync(DASHBOARD_STATE_DIR, { recursive: true });

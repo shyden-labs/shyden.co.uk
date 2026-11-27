@@ -21,6 +21,7 @@ import {
   waitUntil,
   deviceRunGroups,
   adbCleanupCalls,
+  tabsOpenedByRun,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -707,6 +708,32 @@ describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)
       ],
       ['shell', 'rm', '-rf', ANDROID_RUN_FILES.downloads],
     ]);
+  });
+});
+
+describe('tabsOpenedByRun: only the Chrome tabs this run opened are closed (#1326)', () => {
+  const tab = (id: string, type = 'page') => ({ id, type, url: 'https://x' });
+
+  it('names each page tab that was not open when the run started', () => {
+    expect(
+      tabsOpenedByRun(['a', 'b'], [tab('a'), tab('c'), tab('b'), tab('d')]),
+    ).toEqual(['c', 'd']);
+  });
+
+  it("leaves every tab that was open before the run: those are the phone owner's", () => {
+    expect(tabsOpenedByRun(['a', 'b'], [tab('a'), tab('b')])).toEqual([]);
+  });
+
+  it('closes no target that is not a page (service workers, the browser itself)', () => {
+    expect(tabsOpenedByRun([], [tab('w', 'service_worker'), tab('p')])).toEqual(
+      ['p'],
+    );
+  });
+
+  it('throws on a listing that is not a list of targets, rather than closing nothing silently', () => {
+    expect(() => tabsOpenedByRun([], { error: 'x' })).toThrow(
+      /DevTools target list/,
+    );
   });
 });
 
