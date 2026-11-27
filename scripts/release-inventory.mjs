@@ -121,7 +121,7 @@ export const inventoryOf = (commits) =>
       const lead = /^(\d+)-/.exec(merge[2] ?? '');
       ticket = lead ? Number(lead[1]) : null;
     } else if (refs.length > 0) {
-      pr = refs[refs.length - 1] ?? null;
+      pr = refs.at(-1) ?? null;
       ticket = refs.length > 1 ? (refs[0] ?? null) : null;
     }
     return {

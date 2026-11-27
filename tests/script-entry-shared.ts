@@ -223,6 +223,18 @@ export const PROBES: Readonly<Record<string, Probe>> = {
     status: 1,
     says: 'usage: CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… DEV_CLOUDFLARE_ACCOUNT_ID=… node scripts/token-reach.mjs',
   },
+  // An unknown mode is refused with the usage before any token is read or
+  // any request leaves (#1280).
+  'access-expiry.mjs': {
+    args: ['--no-such-mode'],
+    status: 2,
+    says: 'usage: node scripts/access-expiry.mjs [report-failure]',
+  },
+  'waiting-reports.mjs': {
+    args: ['--no-such-mode'],
+    status: 2,
+    says: 'usage: node scripts/waiting-reports.mjs [report-failure]',
+  },
   // It takes no arguments, and refuses one before it reads the lockfile or
   // asks mcr.microsoft.com anything (#454).
   'playwright-image.mjs': {

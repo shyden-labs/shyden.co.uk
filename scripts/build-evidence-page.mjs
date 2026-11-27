@@ -46,10 +46,10 @@ import { signOffOf, standingOf } from './evidence-signoff.mjs';
  */
 export const esc = (s) =>
   String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 
 /**
  * Every spec result in the report, flattened, each carrying its FULL title
@@ -723,6 +723,43 @@ export const checksOf = (checks, journeyIds) => {
   };
 };
 
+/** @param {{ status?: string } | undefined} r */
+const dot = (r) =>
+  `<span class="dot ${r?.status === 'passed' ? 'ok' : 'bad'}" title="${esc(r?.status ?? 'not run')}"></span>`;
+
+/**
+ * The key a journey's recording is kept under, per engine.
+ * @param {string} id
+ * @param {string} engine
+ */
+const videoKey = (id, engine) => `${id}|${engine}`;
+
+/**
+ * An image's width and height attributes, when its size is known.
+ * @param {{ w: number, h: number } | undefined} d
+ */
+const sizeAttrs = (d) => (d ? ` width="${d.w}" height="${d.h}"` : '');
+
+/**
+ * One engine's cell in the engine matrix.
+ * @param {{ status?: string, duration?: number } | undefined} r
+ */
+const matrixCell = (r) =>
+  `<td>${dot(r)} <span class="mono dim">${r ? r.duration + 'ms' : '&mdash;'}</span></td>`;
+
+/**
+ * One journey's row in the engine matrix.
+ * @param {{ title: string, results: Array<{ status?: string, duration?: number } | undefined> }} j
+ */
+const matrixRow = (j) =>
+  `<tr><td class="j">${esc(j.title)}</td>${j.results.map(matrixCell).join('')}</tr>`;
+
+/**
+ * One engine's heading in the engine matrix.
+ * @param {string} e
+ */
+const matrixHead = (e) => `<th>${esc(e)}</th>`;
+
 /**
  * The page, as a string. Pure: every input is passed in, nothing is read here.
  *
@@ -831,9 +868,6 @@ export const renderEvidencePage = ({
   const signoff = content.signoff ?? {};
 
   const stats = report.stats || {};
-  /** @param {{ status?: string } | undefined} r */
-  const dot = (r) =>
-    `<span class="dot ${r?.status === 'passed' ? 'ok' : 'bad'}" title="${esc(r?.status ?? 'not run')}"></span>`;
 
   const journeyHtml = journeys
     .map(
@@ -862,7 +896,7 @@ export const renderEvidencePage = ({
       ${a.shots
         .map((s, k) =>
           s
-            ? `<figure class="shot"><img loading="lazy"${dims.get(s.file) ? ` width="${dims.get(s.file).w}" height="${dims.get(s.file).h}"` : ''} src="${shots.get(s.file)}" alt="${esc(s.label)} &mdash; ${esc(s.project)}"><figcaption class="mono">${esc(s.project)}</figcaption></figure>`
+            ? `<figure class="shot"><img loading="lazy"${sizeAttrs(dims.get(s.file))} src="${shots.get(s.file)}" alt="${esc(s.label)} &mdash; ${esc(s.project)}"><figcaption class="mono">${esc(s.project)}</figcaption></figure>`
             : `<figure class="shot absent"><div class="novid mono">not captured</div><figcaption class="mono">${esc(engines[k])}</figcaption></figure>`,
         )
         .join('')}
@@ -871,12 +905,12 @@ export const renderEvidencePage = ({
     )
     .join('')}
   <details class="videos">
-    <summary>Journey recordings (${engines.filter((e) => videos.has(`${j.id}|${e}`)).length} of ${engines.length} engines embedded)</summary>
+    <summary>Journey recordings (${engines.filter((e) => videos.has(videoKey(j.id, e))).length} of ${engines.length} engines embedded)</summary>
     <div class="vgrid">
       ${engines
         .map((e) =>
-          videos.has(`${j.id}|${e}`)
-            ? `<figure><video controls preload="none" src="${videos.get(`${j.id}|${e}`)}"></video><figcaption class="mono">${esc(e)}</figcaption></figure>`
+          videos.has(videoKey(j.id, e))
+            ? `<figure><video controls preload="none" src="${videos.get(videoKey(j.id, e))}"></video><figcaption class="mono">${esc(e)}</figcaption></figure>`
             : `<figure class="absent"><div class="novid mono">${esc(noteFor(j.title, e))}</div><figcaption class="mono">${esc(e)}</figcaption></figure>`,
         )
         .join('')}
@@ -1070,8 +1104,8 @@ ${
 
 <h2>Engine matrix</h2>
 <div class="mtx"><table>
-<thead><tr><th>Journey</th>${engines.map((e) => `<th>${esc(e)}</th>`).join('')}</tr></thead>
-<tbody>${journeys.map((j) => `<tr><td class="j">${esc(j.title)}</td>${j.results.map((r) => `<td>${dot(r)} <span class="mono dim">${r ? r.duration + 'ms' : '&mdash;'}</span></td>`).join('')}</tr>`).join('')}</tbody>
+<thead><tr><th>Journey</th>${engines.map(matrixHead).join('')}</tr></thead>
+<tbody>${journeys.map(matrixRow).join('')}</tbody>
 </table></div>
 
 <h2>Every assertion, as it ran</h2>

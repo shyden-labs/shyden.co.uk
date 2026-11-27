@@ -345,8 +345,9 @@ async function wdaAnswers(url) {
     });
   } catch (error) {
     const cause = /** @type {{ cause?: { code?: string } }} */ (error).cause;
+    const code = cause?.code ? ` ${cause.code}` : '';
     throw new Error(
-      `GET /status: ${messageOf(error)}${cause?.code ? ` ${cause.code}` : ''} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
+      `GET /status: ${messageOf(error)}${code} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
     );
   }
   if (!response.ok) throw new Error(`GET /status answered ${response.status}`);

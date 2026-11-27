@@ -54,6 +54,17 @@ import { RUN_WHEN_DOCS_ONLY, SKIPPED_WHEN_DOCS_ONLY } from './docs-only.mjs';
 const SHARD_VALUE = /^(\d+)\/(\d+)$/;
 
 /**
+ * One total, as a Markdown list item.
+ * @param {string} line
+ */
+const totalItem = (line) => `- ${line}`;
+/**
+ * One finding, indented under the refusal.
+ * @param {string} finding
+ */
+const findingLine = (finding) => `  - ${finding}`;
+
+/**
  * The shard a run was asked for, or `null` when it was asked for none.
  *
  * A value this module cannot place is refused by name. Playwright refuses it
@@ -803,7 +814,7 @@ function main() {
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY,
-        `\n### e2e totals per browser\n\n${totals.map((line) => `- ${line}`).join('\n')}\n`,
+        `\n### e2e totals per browser\n\n${totals.map(totalItem).join('\n')}\n`,
       );
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(
@@ -814,7 +825,7 @@ function main() {
   if (findings.length > 0) {
     console.error(
       `\n${RULE}\n  build-and-test REFUSED — the jobs it stands for do not add up to a pass\n\n` +
-        `${findings.map((finding) => `  - ${finding}`).join('\n')}\n${RULE}\n`,
+        `${findings.map(findingLine).join('\n')}\n${RULE}\n`,
     );
     process.exit(1);
   }
@@ -931,6 +942,6 @@ export function runningAtTimeout(report) {
       `no test was in progress when the ${seconds} s timeout fired during the ${timeout[2]}`,
     ];
   return running
-    .sort((a, b) => a.worker - b.worker || a.start - b.start)
+    .toSorted((a, b) => a.worker - b.worker || a.start - b.start)
     .map(({ line }) => line);
 }

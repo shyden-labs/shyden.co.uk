@@ -187,6 +187,31 @@ export const changeMapOf = ({ inventory, release, journeys, statuses }) => {
 };
 
 /**
+ * A journey's link in the map's list of what a change shows.
+ * @param {string} t
+ */
+const journeyLink = (t) => `<a href="#j-${esc(slugOf(t))}">${esc(t)}</a>`;
+
+/**
+ * What a commit's classification says it shows a visitor, as HTML.
+ * @param {Classification} classification
+ * @returns {string}
+ */
+const whatItShows = (classification) => {
+  if (classification.kind === 'visible')
+    return classification.journeys.map(journeyLink).join('<br>');
+  if (classification.kind === 'gap')
+    return `<strong style="color:var(--alert)">Shown by no journey.</strong> ${esc(classification.check)}`;
+  return `No intended visible change: ${esc(classification.reason)}`;
+};
+
+/**
+ * One area and its commit count, for the map's footnote.
+ * @param {[string, number]} param0
+ */
+const areaCount = ([area, n]) => `${esc(area)} <span class="mono">${n}</span>`;
+
+/**
  * @param {ChangeMap} map
  * @returns {{ changeMap: string, others: string }}
  */
@@ -199,14 +224,7 @@ export const renderChangeMap = ({ rows, totals, otherCommits, otherAreas }) => {
       ]
         .filter(Boolean)
         .join(' · ');
-      const what =
-        classification.kind === 'visible'
-          ? classification.journeys
-              .map((t) => `<a href="#j-${esc(slugOf(t))}">${esc(t)}</a>`)
-              .join('<br>')
-          : classification.kind === 'gap'
-            ? `<strong style="color:var(--alert)">Shown by no journey.</strong> ${esc(classification.check)}`
-            : `No intended visible change: ${esc(classification.reason)}`;
+      const what = whatItShows(classification);
       return (
         `<tr><td class="mono">${esc(entry.sha.slice(0, 7))}</td><td>${esc(refs)}</td>` +
         `<td>${esc(entry.subject)}</td><td>${flagged ? '<strong style="color:var(--alert)">Flagged: a journey below did not pass.</strong><br>' : ''}${what}</td></tr>`
@@ -221,6 +239,6 @@ export const renderChangeMap = ({ rows, totals, otherCommits, otherAreas }) => {
       `<div class="mtx"><table><thead><tr><th>Commit</th><th>Refs</th><th>Subject</th><th>What shows it</th></tr></thead><tbody>${body}</tbody></table></div>`,
     others:
       `<p class="sub"><span class="mono">${otherCommits}</span> more commits change nothing a visitor receives. By area: ` +
-      `${otherAreas.map(([area, n]) => `${esc(area)} <span class="mono">${n}</span>`).join(' · ')}</p>`,
+      `${otherAreas.map(areaCount).join(' · ')}</p>`,
   };
 };

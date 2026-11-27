@@ -234,7 +234,7 @@ export async function main() {
   /** @type {string[]} */
   let findings = [];
   try {
-    if (!/^[1-9][0-9]*$/.test(number))
+    if (!/^[1-9]\d*$/.test(number))
       throw new Error(`PR_NUMBER is '${number}', not a pull request number`);
     // As data: nothing fetched here is run.
     git([
