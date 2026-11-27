@@ -30,6 +30,14 @@ export const WDA_READY_CEILING_MS = 180_000;
 /** A build from nothing: measured ~2 min on 2026-10-18 and 2026-10-31. */
 export const WDA_BUILD_CEILING_MS = 900_000;
 export const WDA_STOP_CEILING_MS = 10_000;
+/** How long removing the runner app may take before the run names it (#1326). */
+export const WDA_UNINSTALL_CEILING_MS = 60_000;
+/**
+ * The runner app `xcodebuild test-without-building` installs on the iPhone:
+ * the build's `PRODUCT_BUNDLE_IDENTIFIER` and Xcode's `.xctrunner` suffix.
+ * `stop` removes it, so a run leaves nothing installed (#1326).
+ */
+export const WDA_RUNNER_BUNDLE = 'uk.co.shyden.wda.xctrunner';
 /** /status answered in 5-90 ms over the tunnel on 2026-11-02. */
 const WDA_ANSWER_CEILING_MS = 10_000;
 const DEVICECTL_CEILING_MS = 15_000;
@@ -193,7 +201,29 @@ export async function startWda({
   });
   const lastLines = () => lines.slice(-5).join('\n');
 
-  await new Promise((resolve, reject) => {
+  /** Removes the runner app; answers why it could not, or `undefined`. */
+  const uninstallRunner = async () => {
+    try {
+      await runCommand(
+        'xcrun',
+        [
+          'devicectl',
+          'device',
+          'uninstall',
+          'app',
+          '--device',
+          udid,
+          WDA_RUNNER_BUNDLE,
+        ],
+        { timeoutMs: WDA_UNINSTALL_CEILING_MS },
+      );
+      return undefined;
+    } catch (error) {
+      return `could not remove ${WDA_RUNNER_BUNDLE} from the iPhone: ${messageOf(error)}`;
+    }
+  };
+
+  const ready = new Promise((resolve, reject) => {
     let settled = false;
     const finish = (/** @type {() => void} */ action) => {
       if (settled) return;
@@ -238,6 +268,14 @@ export async function startWda({
       ceilingMs,
     );
   });
+  try {
+    await ready;
+  } catch (error) {
+    // xcodebuild may have installed the runner before it stopped (#1326).
+    const removal = await uninstallRunner();
+    if (removal && error instanceof Error) error.message += `; also ${removal}`;
+    throw error;
+  }
 
   const handle = {
     url: '',
@@ -259,10 +297,15 @@ export async function startWda({
         }
       }
       const outlived = await isAlive(udid);
+      // The runner app goes whatever else happened, so a run leaves nothing
+      // installed on the iPhone (#1326); a failure to remove it is named.
+      const removal = await uninstallRunner();
       if (outlived !== null)
         throw new Error(
-          `a WebDriverAgent runner is still running for this iPhone after the run stopped it (pid ${outlived}); kill ${outlived}`,
+          `a WebDriverAgent runner is still running for this iPhone after the run stopped it (pid ${outlived}); kill ${outlived}` +
+            (removal ? `; also ${removal}` : ''),
         );
+      if (removal) throw new Error(removal);
     },
   };
 
@@ -302,8 +345,9 @@ async function wdaAnswers(url) {
     });
   } catch (error) {
     const cause = /** @type {{ cause?: { code?: string } }} */ (error).cause;
+    const code = cause?.code ? ` ${cause.code}` : '';
     throw new Error(
-      `GET /status: ${messageOf(error)}${cause?.code ? ` ${cause.code}` : ''} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
+      `GET /status: ${messageOf(error)}${code} (ceiling ${WDA_ANSWER_CEILING_MS / 1000} s)`,
     );
   }
   if (!response.ok) throw new Error(`GET /status answered ${response.status}`);

@@ -96,6 +96,34 @@ describe('failedNeeds', () => {
     ).toEqual([]);
   });
 
+  it.each([
+    ['dev', 'deploy-dev', 'verify-dev'],
+    ['prod', 'deploy-prod', 'smoke-and-verify'],
+  ])(
+    'a %s check cancelled after its deploy succeeded is a failure: the site serves an unverified change (#1324)',
+    (_, deploy, check) => {
+      expect(
+        failedNeeds({
+          [deploy]: { result: 'success', outputs: {} },
+          [check]: { result: 'cancelled', outputs: {} },
+        }),
+      ).toEqual([check]);
+    },
+  );
+
+  it('a check cancelled with no successful deploy before it is still no failure', () => {
+    const needs = {
+      'deploy-dev': { result: 'skipped', outputs: {} },
+      'verify-dev': { result: 'cancelled', outputs: {} },
+    };
+    expect(
+      searched(failedNeeds(needs), {
+        of: Object.keys(needs),
+        what: 'needs of a run cancelled before it deployed',
+      }),
+    ).toEqual([]);
+  });
+
   it('needs that are not an object throw, rather than read as nothing failed', () => {
     expect(() => failedNeeds([])).toThrow(
       'the needs are not an object of jobs',
@@ -138,6 +166,44 @@ describe('failureOf', () => {
     });
   });
 
+  it('with no failed job, names a cancelled one as cancelled or timed out, and the step it stopped in (#1324)', () => {
+    const answer = {
+      total_count: 3,
+      jobs: [
+        job(1, 'Deploy to Dev', 'success', [
+          {
+            name: 'Deploy dist/ to Cloudflare Pages (dev project)',
+            conclusion: 'success',
+          },
+        ]),
+        job(2, 'Verify dev + dev-verified', 'cancelled', [
+          { name: 'npm ci --ignore-scripts', conclusion: 'success' },
+          { name: 'Run the dev suite', conclusion: 'cancelled' },
+          {
+            name: 'Post dev-verified status on the deployed commit',
+            conclusion: 'skipped',
+          },
+        ]),
+        job(3, 'Report a failed deploy', null, []),
+      ],
+    };
+    expect(failureOf(answer)).toEqual({
+      jobId: 2,
+      job: 'Verify dev + dev-verified (cancelled or timed out)',
+      step: 'Run the dev suite',
+    });
+  });
+
+  it('a failed job is named before a cancelled one', () => {
+    const answer = {
+      jobs: [
+        job(1, 'Verify dev + dev-verified', 'cancelled', []),
+        job(2, 'Deploy to Dev', 'failure', []),
+      ],
+    };
+    expect(failureOf(answer)?.job).toBe('Deploy to Dev');
+  });
+
   it('a failed job listing no failed step names the job, and no step', () => {
     const answer = {
       jobs: [job(7, 'Comprehensive web tests / checks', 'failure', [])],
@@ -149,8 +215,13 @@ describe('failureOf', () => {
     });
   });
 
-  it('a run listing no failed job answers undefined', () => {
-    const answer = { jobs: [job(1, 'Deploy to Dev', 'cancelled', [])] };
+  it('a run listing no failed or cancelled job answers undefined', () => {
+    const answer = {
+      jobs: [
+        job(1, 'Deploy to Dev', 'success', []),
+        job(2, 'Fall back to the deployment before this deploy', 'skipped', []),
+      ],
+    };
     expect(failureOf(answer)).toBeUndefined();
   });
 

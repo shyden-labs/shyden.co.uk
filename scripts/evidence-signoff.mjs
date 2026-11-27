@@ -95,7 +95,7 @@ export function standingOf(signOff, journeys) {
    */
   function lacking(these, those) {
     return these.filter(function (id, at) {
-      return those.indexOf(id) < 0 && these.indexOf(id) === at;
+      return !those.includes(id) && these.indexOf(id) === at;
     });
   }
   var verdict = signOff.verdict;

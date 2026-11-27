@@ -296,12 +296,16 @@ jobs:
   # ---- A deploy that fails its live check falls back (#748) ---------------
   # The same fall-back as production's, without an approval (Shyden's ruling,
   # 2026-10-14): dev serves the deployment recorded before this deploy again.
+  # A verify that ran out of time counts too (#1324): GitHub reports a
+  # timed-out job as cancelled and the run as cancelled, so `!cancelled()`
+  # and a `failure`-only test both skipped this on run 46052758644 and left
+  # dev serving a change nothing verified.
   fall-back:
     name: Fall back to the deployment before this deploy
     needs: [deploy-dev, verify-dev]
     if: >-
-      !cancelled() && needs.deploy-dev.result == 'success' &&
-      needs.verify-dev.result == 'failure'
+      always() && needs.deploy-dev.result == 'success' &&
+      (needs.verify-dev.result == 'failure' || needs.verify-dev.result == 'cancelled')
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment:

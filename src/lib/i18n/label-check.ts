@@ -102,6 +102,23 @@ const boundaryAt = (text: string, index: number): boolean =>
   !WORD_CHARACTER.test(codePointAt(text, index));
 
 /**
+ * How long the match of a needle ending at `end` is, counting an `es` or `s`
+ * plural when `plural`; -1 when the match does not end on a word boundary.
+ */
+const matchLength = (
+  text: string,
+  end: number,
+  needleLength: number,
+  plural: boolean,
+): number => {
+  if (plural && text.startsWith('es', end) && boundaryAt(text, end + 2))
+    return needleLength + 2;
+  if (plural && text.startsWith('s', end) && boundaryAt(text, end + 1))
+    return needleLength + 1;
+  return boundaryAt(text, end) ? needleLength : -1;
+};
+
+/**
  * Every index where `needle` stands in `text` as whole words: no letter or
  * digit, in any script, touches it on either side. `sex` is in "both sex"
  * and not in "Essex". With `plural`, an `s` or `es` may follow it ("both
@@ -125,15 +142,9 @@ export function wholeWordIndexes(
     const index = text.indexOf(needle, from);
     if (index === -1) break;
     const end = index + needle.length;
-    const length = !boundaryBefore(text, index)
-      ? -1
-      : plural && text.startsWith('es', end) && boundaryAt(text, end + 2)
-        ? needle.length + 2
-        : plural && text.startsWith('s', end) && boundaryAt(text, end + 1)
-          ? needle.length + 1
-          : boundaryAt(text, end)
-            ? needle.length
-            : -1;
+    const length = boundaryBefore(text, index)
+      ? matchLength(text, end, needle.length, plural)
+      : -1;
     if (length === -1) {
       from = index + Math.max(1, codePointAt(text, index).length);
       continue;
@@ -195,12 +206,10 @@ export function checkLabels(
           (other) =>
             !holds(label, other, locale) && !holds(other, label, locale),
         );
-      const status: LabelStatus =
-        witnesses.length === 0
-          ? 'unchecked'
-          : witnesses.some((witness) => holds(witness, label, locale))
-            ? 'agrees'
-            : 'disagrees';
+      let status: LabelStatus = 'disagrees';
+      if (witnesses.length === 0) status = 'unchecked';
+      else if (witnesses.some((witness) => holds(witness, label, locale)))
+        status = 'agrees';
       return { ...label, status, witnesses, variants };
     });
 }

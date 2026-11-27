@@ -164,12 +164,9 @@ export const bodyFor = (token: WatchedToken, now: Date): string => {
   const days = Math.floor(left / DAY_MS);
   const at = `${minuteOf(token.expiresAt)} UTC`;
   const ahead = days === 1 ? '1 day' : `${days} days`;
-  const when =
-    left <= 0
-      ? `expired at ${at}, before this check`
-      : days === 0
-        ? `expires at ${at}, within a day of this check`
-        : `expires at ${at}, ${ahead} after this check`;
+  let when = `expires at ${at}, ${ahead} after this check`;
+  if (left <= 0) when = `expired at ${at}, before this check`;
+  else if (days === 0) when = `expires at ${at}, within a day of this check`;
   return (
     `The Cloudflare Access service token \`${token.name}\` ${when}.\n\n` +
     'Rotate it as docs/runbooks/cloudflare-access.md says under ' +

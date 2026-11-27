@@ -17,7 +17,7 @@ const PLACEHOLDER = /\[\[[^\]]{1,60}\]\]/g;
 // Vendored code nobody here writes text into. Swagger UI's minified bundle
 // (the API docs, #781) holds nested arrays such as `[[e,r]]`, which have the
 // placeholder's shape; it stopped the 2026-11-05 release (#1040).
-const VENDORED = /^swagger-ui-/;
+const VENDORED_PREFIX = 'swagger-ui-';
 
 // Text the site ships. Fonts, images and media are binary: a woff2 holds the
 // bytes `[[` and is not text.
@@ -30,7 +30,7 @@ const TEXT = /\.(html|js|mjs|css|xml|json|txt|webmanifest|svg)$/;
  */
 export const placeholderFindings = (files) =>
   files
-    .filter(({ path }) => !VENDORED.test(basename(path)))
+    .filter(({ path }) => !basename(path).startsWith(VENDORED_PREFIX))
     .flatMap(({ path, text }) =>
       [...text.matchAll(PLACEHOLDER)].map((m) => `${path}: ${m[0]}`),
     );

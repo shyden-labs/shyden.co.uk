@@ -24,7 +24,8 @@
  * Imports nothing from `node_modules`: the job holding the token runs no
  * third-party package code. Exits 2 on a wrong argument, 1 on any failure.
  */
-import { die, messageOf } from './errors.mjs';
+import { exit } from 'node:process';
+import { messageOf } from './errors.mjs';
 import { endpoint, setting, timeoutSetting } from './settings.mjs';
 import { answerOf, githubJson, statusOnMain } from './json-answer.mjs';
 import {
@@ -132,13 +133,27 @@ const reportFailure = async () => {
   console.log('Posted the failure notice.');
 };
 
-if (import.meta.main) {
-  const [mode, ...rest] = process.argv.slice(2);
-  if (rest.length > 0 || (mode !== undefined && mode !== 'report-failure')) {
+/**
+ * Runs the job an argument list names: the count with none, the failure
+ * report with `report-failure`. Answers the exit code: 2 for a usage it
+ * refuses, 1 for a job that failed (its message printed), 0 otherwise.
+ * @param {readonly string[]} argv
+ * @param {{ count: () => Promise<void>, reportFailure: () => Promise<void> }} [jobs]
+ * @returns {Promise<number>}
+ */
+export async function main(argv, jobs = { count, reportFailure }) {
+  const reportsFailure = argv.length === 1 && argv[0] === 'report-failure';
+  if (argv.length > 0 && !reportsFailure) {
     console.error('usage: node scripts/waiting-reports.mjs [report-failure]');
-    process.exit(2);
+    return 2;
   }
-  await (mode === 'report-failure' ? reportFailure() : count()).catch((error) =>
-    die(messageOf(error)),
-  );
+  try {
+    await (reportsFailure ? jobs.reportFailure() : jobs.count());
+    return 0;
+  } catch (error) {
+    console.error(`✗ ${messageOf(error)}`);
+    return 1;
+  }
 }
+
+if (import.meta.main) exit(await main(process.argv.slice(2)));

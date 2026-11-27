@@ -102,11 +102,9 @@ const predict = (filter, left, up, corner) => {
     const toLeft = Math.abs(guess - left);
     const toUp = Math.abs(guess - up);
     const toCorner = Math.abs(guess - corner);
-    return toLeft <= toUp && toLeft <= toCorner
-      ? left
-      : toUp <= toCorner
-        ? up
-        : corner;
+    if (toLeft <= toUp && toLeft <= toCorner) return left;
+    if (toUp <= toCorner) return up;
+    return corner;
   }
   throw new Error(`unknown PNG row filter ${filter}`);
 };

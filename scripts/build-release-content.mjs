@@ -30,6 +30,7 @@ import { inventoryFor } from './release-inventory.mjs';
 import { changeMapOf, releaseOf, renderChangeMap } from './release-map.mjs';
 import { messageOf } from './errors.mjs';
 import { GIT } from './programs.mjs';
+import { githubGet, repositoryOf } from './github-api.mjs';
 
 /**
  * Every test title a listing holds, as the builder writes a journey's title
@@ -188,22 +189,33 @@ const manifestRows = (file) =>
     .filter(Boolean)
     .map((line) => JSON.parse(line));
 
-/** @param {string} sha */
-const devVerifiedOf = (sha) => {
-  const state = execFileSync(
-    'gh',
-    [
-      'api',
-      `repos/{owner}/{repo}/commits/${sha}/statuses`,
-      '--jq',
-      '[.[] | select(.context == "dev-verified")][0].state // ""',
-    ],
-    { encoding: 'utf8' },
-  ).trim();
-  return state === '' ? null : state;
+/** The checkout's origin remote, the repository the release is of. */
+const originUrl = () =>
+  execFileSync(GIT, ['remote', 'get-url', 'origin'], { encoding: 'utf8' });
+
+/**
+ * The newest `dev-verified` state on `sha`, or null when it has none, read
+ * from GitHub's API directly, never `gh` on PATH (SonarCloud S4036, #1295).
+ * GitHub lists a commit's statuses newest first.
+ *
+ * @param {string} sha
+ * @param {import('./github-api.mjs').GitHubOptions & { readOrigin?: () => string }} [options]
+ * @returns {Promise<string | null>}
+ */
+export const devVerifiedOf = async (sha, options = {}) => {
+  const env = options.env ?? process.env;
+  const repo = repositoryOf(env, options.readOrigin ?? originUrl);
+  /** @type {{ context: string, state: string }[]} */
+  const statuses = await githubGet(`/repos/${repo}/commits/${sha}/statuses`, {
+    env,
+    fetch: options.fetch,
+  });
+  return (
+    statuses.find((status) => status.context === 'dev-verified')?.state ?? null
+  );
 };
 
-export const main = () => {
+export const main = async () => {
   /** @type {Options} */
   let values;
   try {
@@ -296,7 +308,7 @@ export const main = () => {
       inventory,
       report: JSON.parse(readFileSync(join(dir, EVIDENCE_REPORT), 'utf8')),
       manifest: manifestRows(join(dir, EVIDENCE_MANIFEST)),
-      devVerified: devVerifiedOf(inventory.head),
+      devVerified: await devVerifiedOf(inventory.head),
     });
     writeFileSync(outPath, `${JSON.stringify(content, null, 2)}\n`);
     console.log(`build-release-content: wrote ${values.out}`);
@@ -306,4 +318,4 @@ export const main = () => {
   }
 };
 
-if (import.meta.main) main();
+if (import.meta.main) await main();

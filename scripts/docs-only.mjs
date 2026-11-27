@@ -28,6 +28,12 @@ import { env, exit } from 'node:process';
 import { captureFromDiff } from './capture-scope.mjs';
 import { GIT } from './programs.mjs';
 
+/**
+ * One reason, indented under its verdict.
+ * @param {string} reason
+ */
+const reasonLine = (reason) => `  - ${reason}`;
+
 /** The files outside `docs/` that are documentation and nothing reads. */
 export const DOCS_ONLY_FILES = Object.freeze(['HANDOVER.md']);
 
@@ -275,11 +281,11 @@ export function main() {
   console.log(
     verdict.docsOnly
       ? 'docs-only: every change is documentation that nothing reads, so the browser jobs are skipped.'
-      : `not docs-only, so every job runs:\n${verdict.reasons.map((reason) => `  - ${reason}`).join('\n')}`,
+      : `not docs-only, so every job runs:\n${verdict.reasons.map(reasonLine).join('\n')}`,
   );
   console.log(
     capture.capture
-      ? `the capture runs:\n${capture.reasons.map((reason) => `  - ${reason}`).join('\n')}`
+      ? `the capture runs:\n${capture.reasons.map(reasonLine).join('\n')}`
       : 'the capture is skipped: no change reaches a file it reads.',
   );
   console.log(

@@ -17,7 +17,7 @@ import { nonEmpty, searched } from '../source-files';
  * The half a unit test CAN reach is the derivation — which labels the config
  * asks for — and whether anything in CI goes on to check them. The other half
  * needs a token and lives in `scripts/dependabot-labels.mjs`, run by
- * `ci.yml`'s `checks` job (dependabot-labels-script.test.ts drives it).
+ * `ci.yml`'s `checks` job (dependabot-labels-main.test.ts drives it, #1295).
  *
  * Why the file exists at all: Dependabot creates a label only when no
  * `labels:` key names one. This repo set that key, so `npm` and

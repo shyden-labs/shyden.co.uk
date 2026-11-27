@@ -1289,6 +1289,17 @@ describe('every push to develop leaves a SonarCloud analysis of that commit (#12
     ).jobs;
   const PUSH = "github.event_name == 'push'";
 
+  it('dev falls back when its verify job failed, was cancelled or timed out after a deploy (#1324)', () => {
+    // GitHub reports a job that ran out of time as cancelled, and a run
+    // with one counts as cancelled, so `!cancelled()` and a `failure`-only
+    // test both skipped the fall-back on run 46052758644 and left dev
+    // serving a change nothing verified.
+    expect(jobs()['fall-back'].if).toBe(
+      "always() && needs.deploy-dev.result == 'success' && " +
+        "(needs.verify-dev.result == 'failure' || needs.verify-dev.result == 'cancelled')",
+    );
+  });
+
   it('a push-only coverage job holds no secret and hands over the lcov file alone', () => {
     const job = jobs()['sonar-coverage'];
     expect(job, 'a sonar-coverage job in deploy-dev.yml').toBeDefined();

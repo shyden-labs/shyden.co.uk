@@ -1,11 +1,10 @@
 import { metadataFor, type MvpLocale } from './i18n/metadata';
 import {
   COINS_PER_BEAN,
-  ERRORS,
   GIFT_BEAN_RATE,
   parseWholeAmount,
 } from './yeetalkRates';
-export { ERRORS };
+export { ERRORS } from './yeetalkRates';
 
 export interface GloryResult {
   gloryPoints: number;

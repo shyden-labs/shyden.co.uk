@@ -1670,8 +1670,7 @@ if (form) {
    *  call, exactly the way `buildGroups` above is handed `random:
    *  Math.random` rather than reading it internally. */
   const ensureVariationRng = (): (() => number) => {
-    if (!variationRng)
-      variationRng = createPrng(Math.floor(Math.random() * 0xffffffff));
+    variationRng ??= createPrng(Math.floor(Math.random() * 0xffffffff));
     return variationRng;
   };
 

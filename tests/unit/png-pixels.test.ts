@@ -40,6 +40,15 @@ describe('decodePng reads the pixels an encoder wrote', () => {
     },
   );
 
+  it('undoes filter 4 where the corner above-left is the nearest guess', () => {
+    // The second row's second pixel: left 10, up 0, corner 5. The Paeth guess
+    // 10 + 0 - 5 = 5 is the corner exactly, 5 from each of the other two.
+    const pixels = Uint8Array.from([5, 5, 5, 0, 0, 0, 10, 10, 10, 7, 7, 7]);
+    expect(
+      decodePng(pngOf({ width: 2, height: 2, pixels, filters: [0, 4] })).pixels,
+    ).toEqual(Buffer.from(pixels));
+  });
+
   it('undoes a different filter on each row, each predicting from the row above', () => {
     expect(
       decodePng(pngOf({ width, height, pixels, filters: [4, 3, 2, 1] })).pixels,

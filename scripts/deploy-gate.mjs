@@ -43,6 +43,12 @@ import { GIT } from './programs.mjs';
  */
 
 /**
+ * A pull request's number as GitHub writes it.
+ * @param {number} number
+ */
+const pullRef = (number) => `#${number}`;
+
+/**
  * The checks that gate a merge into `develop`.
  *
  * A literal pin against the branch-protection contexts
@@ -122,7 +128,7 @@ export const testedHeadOf = ({ sha, parents, pulls }) => {
     };
   if (others.length > 0)
     return {
-      refusal: `${short(sha)} is the merge commit of pull requests ${landing.map(({ number }) => `#${number}`).join(' and ')}: refusing rather than choosing which head was tested.`,
+      refusal: `${short(sha)} is the merge commit of pull requests ${landing.map(({ number }) => pullRef(number)).join(' and ')}: refusing rather than choosing which head was tested.`,
     };
   return {
     tested: pull.headSha,

@@ -147,3 +147,30 @@ describe('the specs git tracks (#362)', () => {
     ).toEqual(['tests/e2e/alpha.spec.ts', 'tests/e2e/Zeta.spec.ts']);
   });
 });
+
+describe('the pull request and ticket a commit names', () => {
+  const refsOf = (subject: string) => {
+    const entry = inventoryOf([
+      { sha: 'x', parents: ['p'], subject, files: [] },
+    ])[0];
+    return { pr: entry?.pr, ticket: entry?.ticket };
+  };
+
+  it('reads a merge commit: the pull request, and the ticket its branch leads with', () => {
+    expect(
+      refsOf('Merge pull request #12 from shyden-labs/34-a-branch'),
+    ).toEqual({ pr: 12, ticket: 34 });
+  });
+
+  it('reads a squash with one ref as the pull request alone', () => {
+    expect(refsOf('A change (#56)')).toEqual({ pr: 56, ticket: null });
+  });
+
+  it('reads a squash with two refs: the last the pull request, the first the ticket', () => {
+    expect(refsOf('A change (#78) (#90)')).toEqual({ pr: 90, ticket: 78 });
+  });
+
+  it('reads a subject naming nothing as neither', () => {
+    expect(refsOf('A change')).toEqual({ pr: null, ticket: null });
+  });
+});

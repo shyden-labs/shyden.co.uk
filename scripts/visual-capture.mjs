@@ -57,7 +57,7 @@ export const BASELINE_DIR = 'tests/e2e/__screenshots__/';
 
 const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
   /[.*+?^${}()|[\]\\]/g,
-  '\\$&',
+  String.raw`\$&`,
 );
 
 /**
@@ -65,7 +65,7 @@ const BASELINE_DIR_PATTERN = BASELINE_DIR.replace(
  * quote starts with `"`, so it misses the folder and is refused as `other`.
  */
 const BASELINE = new RegExp(
-  `^( M|M |MM|\\?\\?) (${BASELINE_DIR_PATTERN}[^/\\s]+\\.png)$`,
+  String.raw`^( M|M |MM|\?\?) (${BASELINE_DIR_PATTERN}[^/\s]+\.png)$`,
 );
 
 /**
@@ -171,17 +171,23 @@ export const capturedBaselines = (files, { committed, captured }) => {
 };
 
 /**
+ * What changed in one baseline, in words.
+ *
+ * @param {Judged['differing']} differing
+ * @returns {string}
+ */
+const changeOf = (differing) => {
+  if (differing === 'new') return 'new';
+  if (differing === 'size') return 'size changed';
+  return plural(differing, 'pixel differs', 'pixels differ');
+};
+
+/**
  * @param {Judged} judged
  * @returns {string}
  */
 const judgedLine = ({ file, differing, failsGate }) =>
-  `- \`${file}\`: ${
-    differing === 'new'
-      ? 'new'
-      : differing === 'size'
-        ? 'size changed'
-        : plural(differing, 'pixel differs', 'pixels differ')
-  }${failsGate ? ', and the visual gate fails them' : ''}`;
+  `- \`${file}\`: ${changeOf(differing)}${failsGate ? ', and the visual gate fails them' : ''}`;
 
 /**
  * `count` beside the word that fits it.

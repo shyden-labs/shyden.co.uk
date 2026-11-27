@@ -161,10 +161,10 @@ export function renderPrintPanel(
    */
   const apply = () => {
     const root = doc.documentElement;
-    root.setAttribute('data-print-what', readWhat());
-    root.setAttribute('data-print-absent', absent.checked ? 'on' : 'off');
-    root.setAttribute('data-print-letters', letters.checked ? 'on' : 'off');
-    root.setAttribute('data-print-avatars', avatars.checked ? 'on' : 'off');
+    root.dataset.printWhat = readWhat();
+    root.dataset.printAbsent = absent.checked ? 'on' : 'off';
+    root.dataset.printLetters = letters.checked ? 'on' : 'off';
+    root.dataset.printAvatars = avatars.checked ? 'on' : 'off';
   };
 
   for (const control of [...whatRadios, absent, letters, avatars]) {
