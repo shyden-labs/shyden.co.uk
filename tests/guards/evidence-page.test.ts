@@ -719,10 +719,13 @@ describe('an evidence run leaves the builder exactly what it reads', () => {
     const runner = withoutTsComments(
       readFileSync('scripts/test-e2e.mjs', 'utf8'),
     );
-    const main = runner.slice(runner.indexOf('function main()'));
-    const asked = main.indexOf('oneAttemptEach(argv, process.env)');
+    const start = runner.indexOf('export function main(');
+    expect(start, 'the runner no longer declares main()').toBeGreaterThan(0);
+    const main = runner.slice(start);
+    // main() is handed its environment and its spawn (#1295).
+    const asked = main.indexOf('oneAttemptEach(argv, env)');
     // `listSuite` holds the `--list` itself (#438); main() calls it.
-    const listed = main.indexOf('listSuite(argv, spawnSync, { selection })');
+    const listed = main.indexOf('listSuite(argv, spawn, { selection })');
     expect(listed, 'main() no longer lists the suite').toBeGreaterThan(0);
     expect(asked, 'main() never asks oneAttemptEach').toBeGreaterThan(0);
     expect(asked, 'main() lists the suite before it asks').toBeLessThan(listed);
