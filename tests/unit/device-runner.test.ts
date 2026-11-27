@@ -1,3 +1,9 @@
+import { ANDROID_RUN_FILES } from '../../scripts/phone-files.mjs';
+import { DEVICE_DOWNLOADS } from '../device/device-downloads';
+import {
+  DUMP_FILE,
+  SCREENSHOT_FILE,
+} from '../device/chrome-javascript-setting';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { serversClosedAfterEach } from '../http-stand-in';
 import { createServer, type Server } from 'node:http';
@@ -15,6 +21,7 @@ import {
   waitUntil,
   deviceRunGroups,
   adbCleanupCalls,
+  tabsOpenedByRun,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -688,10 +695,60 @@ describe('adbCleanupCalls: only a run with the Android group touches adb (#1163)
     expect(adbCleanupCalls(['ios'])).toEqual([]);
   });
 
-  it('removes both tunnels when the Android group is in the run', () => {
+  it('removes both tunnels and every file the run wrote on the phone when the Android group is in the run (#1326)', () => {
     expect(adbCleanupCalls(['desktop', 'android', 'ios'])).toEqual([
       ['forward', '--remove-all'],
       ['reverse', '--remove-all'],
+      [
+        'shell',
+        'rm',
+        '-f',
+        ANDROID_RUN_FILES.uiDump,
+        ANDROID_RUN_FILES.walkScreenshot,
+      ],
+      ['shell', 'rm', '-rf', ANDROID_RUN_FILES.downloads],
     ]);
+  });
+});
+
+describe('tabsOpenedByRun: only the Chrome tabs this run opened are closed (#1326)', () => {
+  const tab = (id: string, type = 'page') => ({ id, type, url: 'https://x' });
+
+  it('names each page tab that was not open when the run started', () => {
+    expect(
+      tabsOpenedByRun(['a', 'b'], [tab('a'), tab('c'), tab('b'), tab('d')]),
+    ).toEqual(['c', 'd']);
+  });
+
+  it("leaves every tab that was open before the run: those are the phone owner's", () => {
+    expect(tabsOpenedByRun(['a', 'b'], [tab('a'), tab('b')])).toEqual([]);
+  });
+
+  it('closes no target that is not a page (service workers, the browser itself)', () => {
+    expect(tabsOpenedByRun([], [tab('w', 'service_worker'), tab('p')])).toEqual(
+      ['p'],
+    );
+  });
+
+  it('throws on a listing that is not a list of targets, rather than closing nothing silently', () => {
+    expect(() => tabsOpenedByRun([], { error: 'x' })).toThrow(
+      /DevTools target list/,
+    );
+  });
+});
+
+describe('the files a run writes on the Android phone are the ones its cleanup removes (#1326)', () => {
+  it('names the three paths the harness writes', () => {
+    expect(ANDROID_RUN_FILES).toEqual({
+      uiDump: '/sdcard/ui.xml',
+      walkScreenshot: '/sdcard/chrome-settings-walk.png',
+      downloads: '/sdcard/Download/shyden-gauntlet',
+    });
+  });
+
+  it('the harness writes to exactly those paths', () => {
+    expect(DEVICE_DOWNLOADS).toBe(ANDROID_RUN_FILES.downloads);
+    expect(DUMP_FILE).toBe(ANDROID_RUN_FILES.uiDump);
+    expect(SCREENSHOT_FILE).toBe(ANDROID_RUN_FILES.walkScreenshot);
   });
 });
