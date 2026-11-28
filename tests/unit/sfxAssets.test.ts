@@ -1,90 +1,65 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 
 /*
  * SWEPT FOR #24 AND IMMUNE BY CONSTRUCTION, recorded rather than assumed.
  *
  * The source-text guards in this repo can be satisfied by a file's own
  * documentation -- three have been (#23, #21 Stage 4, #35) -- so every suite
- * that reads a file was swept. This one reads BINARY: `readFileSync` here
- * takes no encoding and returns a Buffer of an .m4a, parsed for its container
- * duration. Everything else it asserts against comes from importing
- * `src/lib/sfxAssets` as a VALUE. There is no text for a comment to live in,
- * so there is nothing to strip.
+ * that reads a file was swept. This one reads BINARY for the durations:
+ * `readFileSync` takes no encoding and returns a Buffer of an .m4a, parsed
+ * for its container duration. The one text it reads is CREDITS.md, whose
+ * whole job is to be read by people, so a name there is the claim itself.
  */
 import { join } from 'node:path';
 import { nonEmpty } from '../source-files';
 import * as sfxAssets from '../../src/lib/sfxAssets';
-import {
-  SFX_MANIFEST,
-  landAssetIndex,
-  SFX_ASSET_GAIN,
-  SFX_MAX_DURATION_S,
-  type SfxRole,
-} from '../../src/lib/sfxAssets';
-
-// Every export here is pure -- no AudioContext, no window, no document, no
-// fetch anywhere in the module (see its own doc comment) -- so every test
-// below exercises the real module directly, no browser or build step
-// involved. The duration tests below are the one place this file reaches
-// past the module and reads the REAL committed binaries at
-// src/assets/sfx/ -- see readM4aContainerDurationS's own doc comment for why.
+import { SFX_MANIFEST, SFX_MAX_DURATION_S } from '../../src/lib/sfxAssets';
+import { DEAL_INSTRUMENTS, SHIPPED_NOTES } from '../../src/lib/dealSound';
 
 const SFX_DIR = join('src', 'assets', 'sfx');
-/**
- * Derived from the manifest, never written out. Every one of these records is
- * `Readonly<Record<SfxRole, …>>`, so the roles enumerate themselves.
- *
- * They were hand-written until #70, and the four loops below iterate this
- * list: a role added with a real asset file, a gain of 9 and a declared
- * maximum duration of 0.001s passed all 21 tests, because none of those loops
- * ever reached it.
- */
-const ROLES = Object.keys(SFX_MANIFEST) as readonly SfxRole[];
+
+/** Every recording the deal's player asks for (src/scripts/deal-audio.ts):
+ *  one per shipped note, and the ending's own layers. */
+const EXPECTED_NAMES = [
+  ...DEAL_INSTRUMENTS.flatMap((instrument) =>
+    SHIPPED_NOTES[instrument].map((midi) => `${instrument}-${midi}`),
+  ),
+  'timpani-hit',
+  'timpani-roll',
+  'whoosh',
+  'impact',
+  'drop',
+  'bell',
+  'sparkle',
+].sort();
+
+/** The five Freesound recordings the ending is layered from, by page. */
+const FREESOUND_PAGES = [
+  'https://freesound.org/people/sgossner/sounds/375598/',
+  'https://freesound.org/people/AudioPapkin/sounds/648538/',
+  'https://freesound.org/people/deleted_user_3277771/sounds/177242/',
+  'https://freesound.org/people/Stereo%20Surgeon/sounds/261205/',
+  'https://freesound.org/people/opticaillusions/sounds/554312/',
+];
 
 describe('the module surface', () => {
   it('exports nothing that nothing uses', () => {
-    // SfxRole (type-only) is erased at build time and never appears in
-    // Object.keys, so it is correctly absent here by construction, not by
-    // omission.
     expect(Object.keys(sfxAssets).sort()).toEqual(
-      [
-        'SFX_MANIFEST',
-        'landAssetIndex',
-        'SFX_ASSET_GAIN',
-        'SFX_MAX_DURATION_S',
-      ].sort(),
+      ['SFX_MANIFEST', 'SFX_MAX_DURATION_S'].sort(),
     );
   });
 });
 
-describe('the role list the assertions iterate', () => {
-  it('is derived from the manifest, and the three records agree on it', () => {
-    // Anti-vacuity: an empty derivation would make every loop below a no-op
-    // that reports success. The cross-checks are the seam — a role added to
-    // one record and forgotten in another is what this catches at runtime.
-    expect(ROLES.length).toBeGreaterThan(0);
-    expect(Object.keys(SFX_ASSET_GAIN).sort()).toEqual([...ROLES].sort());
-    expect(Object.keys(SFX_MAX_DURATION_S).sort()).toEqual([...ROLES].sort());
-  });
-});
-
 describe('SFX_MANIFEST', () => {
-  it('every role names at least one file, and every filename ends .m4a', () => {
-    for (const role of ROLES) {
-      expect(SFX_MANIFEST[role].length).toBeGreaterThan(0);
-      for (const file of SFX_MANIFEST[role]) expect(file).toMatch(/\.m4a$/);
+  it('names exactly the recordings the deal plays', () => {
+    expect(Object.keys(SFX_MANIFEST).sort()).toEqual(EXPECTED_NAMES);
+  });
+
+  it('ships each recording under its own name, as .m4a', () => {
+    for (const [name, file] of Object.entries(SFX_MANIFEST)) {
+      expect(file).toBe(`${name}.m4a`);
     }
-  });
-
-  it('land names exactly four distinct files -- the whole reason round-robin exists', () => {
-    expect(SFX_MANIFEST.land.length).toBe(4);
-    expect(new Set(SFX_MANIFEST.land).size).toBe(4);
-  });
-
-  it('shuffle and done each name exactly one file', () => {
-    expect(SFX_MANIFEST.shuffle.length).toBe(1);
-    expect(SFX_MANIFEST.done.length).toBe(1);
   });
 
   it('matches the real files committed at src/assets/sfx/ exactly -- no drift in either direction', () => {
@@ -94,69 +69,54 @@ describe('SFX_MANIFEST', () => {
         .sort(),
       `.m4a files in ${SFX_DIR}`,
     );
-    const declared = Object.values(SFX_MANIFEST).flat().sort();
-    expect(declared).toEqual(onDisk);
-  });
-});
-
-describe('landAssetIndex (round-robin over SFX_MANIFEST.land)', () => {
-  it('starts at index 0', () => {
-    expect(landAssetIndex(0)).toBe(0);
+    expect(Object.values(SFX_MANIFEST).sort()).toEqual(onDisk);
   });
 
-  it('cycles through all four indices, in order, before repeating', () => {
-    expect([0, 1, 2, 3].map(landAssetIndex)).toEqual([0, 1, 2, 3]);
-  });
-
-  it('wraps back to 0 at index 4 -- round-robin, not clamped and not thrown', () => {
-    expect(landAssetIndex(4)).toBe(0);
-    expect(landAssetIndex(5)).toBe(1);
-  });
-
-  it('never returns the same index for two consecutive group indices, across many cycles', () => {
-    for (let i = 0; i < 200; i++) {
-      expect(landAssetIndex(i)).not.toBe(landAssetIndex(i + 1));
-    }
-  });
-
-  it('every index it can ever return is a valid position in SFX_MANIFEST.land', () => {
-    for (let i = 0; i < 50; i++) {
-      const idx = landAssetIndex(i);
-      expect(idx).toBeGreaterThanOrEqual(0);
-      expect(idx).toBeLessThan(SFX_MANIFEST.land.length);
-    }
-  });
-
-  it('is a pure function -- the same index always gives the same answer', () => {
-    expect(landAssetIndex(37)).toBe(landAssetIndex(37));
-  });
-
-  it('defensively floors negative and fractional input, the same as landFrequency/landPan (sfx.ts)', () => {
-    expect(landAssetIndex(-5)).toBe(landAssetIndex(0));
-    expect(landAssetIndex(2.9)).toBe(landAssetIndex(2));
-  });
-});
-
-describe('SFX_ASSET_GAIN', () => {
-  it('every role has a strictly positive gain at or under unity', () => {
-    for (const role of ROLES) {
-      expect(SFX_ASSET_GAIN[role]).toBeGreaterThan(0);
-      expect(SFX_ASSET_GAIN[role]).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it('land -- the role triggered repeatedly, with real overlap risk -- carries the lowest gain of the three', () => {
-    expect(SFX_ASSET_GAIN.land).toBeLessThan(SFX_ASSET_GAIN.shuffle);
-    expect(SFX_ASSET_GAIN.land).toBeLessThan(SFX_ASSET_GAIN.done);
+  it('weighs under 600 KB in all', () => {
+    const bytes = Object.values(SFX_MANIFEST).reduce(
+      (sum, file) => sum + statSync(join(SFX_DIR, file)).size,
+      0,
+    );
+    expect(bytes).toBeLessThan(600 * 1024);
   });
 });
 
 describe('SFX_MAX_DURATION_S', () => {
-  it('every role has a positive, finite ceiling', () => {
-    for (const role of ROLES) {
-      expect(SFX_MAX_DURATION_S[role]).toBeGreaterThan(0);
-      expect(Number.isFinite(SFX_MAX_DURATION_S[role])).toBe(true);
+  it('gives every recording a positive, finite ceiling', () => {
+    expect(Object.keys(SFX_MAX_DURATION_S).sort()).toEqual(EXPECTED_NAMES);
+    for (const ceiling of Object.values(SFX_MAX_DURATION_S)) {
+      expect(ceiling).toBeGreaterThan(0);
+      expect(Number.isFinite(ceiling)).toBe(true);
     }
+  });
+});
+
+describe('CREDITS.md', () => {
+  const credits = readFileSync(join(SFX_DIR, 'CREDITS.md'), 'utf8');
+
+  it('credits VSCO 2 CE, CC0, by its repository', () => {
+    expect(credits).toContain('VSCO 2 CE');
+    expect(credits).toContain('https://github.com/sgossner/VSCO-2-CE');
+  });
+
+  for (const page of FREESOUND_PAGES) {
+    it(`credits ${page}`, () => {
+      expect(credits).toContain(page);
+    });
+  }
+
+  it('names the licence, Creative Commons 0', () => {
+    expect(credits).toContain('Creative Commons 0');
+  });
+
+  it('lists every file that ships', () => {
+    for (const file of Object.values(SFX_MANIFEST)) {
+      expect(credits, file).toContain(`\`${file}\``);
+    }
+  });
+
+  it('no longer credits the Kenney files it replaced', () => {
+    expect(credits).not.toContain('Kenney');
   });
 });
 
@@ -172,7 +132,7 @@ describe('SFX_MAX_DURATION_S', () => {
  * `decodeAudioData` does real decoding -- this exists solely so this test
  * measures the REAL committed bytes rather than trusting a hand-typed
  * duration that could go stale the moment a file is swapped. Version 0
- * `mvhd` (32-bit fields) only, because that is what every one of the six
+ * `mvhd` (32-bit fields) only, because that is what every one of the
  * committed files actually uses (verified by hand against `afinfo` before
  * this was written); anything else throws rather than silently
  * mis-measuring -- a parse failure must never read as "0 seconds, ceiling
@@ -232,17 +192,13 @@ function readM4aContainerDurationS(bytes: Buffer): number {
 }
 
 describe('the stated length ceiling holds against the REAL committed files', () => {
-  // Data-driven over the manifest (not hand-listed), so this automatically
-  // covers whatever SFX_MANIFEST actually declares -- the "matches the real
-  // files" test above is what keeps that declaration honest against disk.
-  for (const role of ROLES) {
-    for (const file of SFX_MANIFEST[role]) {
-      it(`${file} (role: ${role}) parses under its ${SFX_MAX_DURATION_S[role]}s ceiling`, () => {
-        const bytes = readFileSync(join(SFX_DIR, file));
-        const durationS = readM4aContainerDurationS(bytes);
-        expect(durationS).toBeGreaterThan(0);
-        expect(durationS).toBeLessThanOrEqual(SFX_MAX_DURATION_S[role]);
-      });
-    }
+  for (const [name, file] of Object.entries(SFX_MANIFEST)) {
+    it(`${file} parses under its ${SFX_MAX_DURATION_S[name]}s ceiling`, () => {
+      const durationS = readM4aContainerDurationS(
+        readFileSync(join(SFX_DIR, file)),
+      );
+      expect(durationS).toBeGreaterThan(0);
+      expect(durationS).toBeLessThanOrEqual(SFX_MAX_DURATION_S[name]);
+    });
   }
 });
