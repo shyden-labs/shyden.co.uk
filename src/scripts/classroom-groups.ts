@@ -102,10 +102,9 @@ import land4AssetUrl from '../assets/sfx/land-4.m4a';
 import doneAssetUrl from '../assets/sfx/done.m4a';
 import { enhanceReportForm } from './report-form';
 import { absentNumbers, waitingRoll } from '../lib/absence';
-import { groupMark } from '../lib/boardMarks';
 import {
-  groupMarkElement,
-  markNumbersOnly as markTablesNumbersOnly,
+  dressGroupCard,
+  markNumbersOnly,
   studentNumberElement,
 } from './board-dom';
 
@@ -1025,11 +1024,9 @@ if (form) {
    * after it finishes -- and re-deriving position from the roster would be
    * wrong anyway, since the roster's order is not the groups' order.
    */
-  /** #1338: numbers first on the board when no dealt student has a name. */
-  const markNumbersOnly = () => markTablesNumbersOnly(tables, rosterNames);
 
   const relabelResults = () => {
-    markNumbersOnly();
+    markNumbersOnly(tables, rosterNames);
     for (const el of tables.querySelectorAll<HTMLElement>('.student')) {
       const number = Number(el.dataset.number);
       const who = el.querySelector<HTMLElement>('.who');
@@ -2200,11 +2197,8 @@ if (form) {
       // and shows a shape beside the number, so a student finds their group
       // from their seat by more than colour. The mark is decorative; the
       // localised "Group n" stays the heading's accessible name.
-      const mark = groupMark(i);
-      card.dataset.tone = String(mark.tone);
       const h = document.createElement('h3');
-      h.className = 'group-label';
-      const markEl = groupMarkElement(document, i);
+      const markEl = dressGroupCard(document, card, h, i);
       // Stage 3, Task 8: groups are always numbered now -- the themed
       // branch groupName() used to have, and the naming radio that chose
       // it, are both gone (design spec section 5). The heading's text is
@@ -2232,7 +2226,7 @@ if (form) {
       card.append(markEl, h, ul);
       tables.appendChild(card);
     });
-    markNumbersOnly();
+    markNumbersOnly(tables, rosterNames);
   };
 
   // The deal is interruptible (operator, 2026-08-13). Two ways out, and they

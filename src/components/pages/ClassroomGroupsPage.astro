@@ -2116,6 +2116,10 @@ const sexWhyText = sexWhy(roster, t);
      resort, not the first move. */
   .cg-board #cg-results .who {
     overflow-wrap: break-word;
+    /* A flex item never shrinks below its longest word unless told to: with
+       the student's number beside it (#1338), "Wetherington-" pushed its
+       row 3.6-5.5px past the card's right edge in WebKit and Firefox. */
+    min-width: 0;
   }
   /* #1338: each group under a coloured header bar holding a shape and its
      number, read from the back of a classroom (Shyden's design A). The mark

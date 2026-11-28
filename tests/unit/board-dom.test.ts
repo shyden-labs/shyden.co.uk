@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dressGroupCard,
   groupMarkElement,
   markNumbersOnly,
   studentNumberElement,
@@ -104,5 +105,22 @@ describe('the board shows numbers first only when no dealt student has a name (#
     const { tables, toggled } = tablesOf([]);
     markNumbersOnly(tables, new Map());
     expect(toggled).toEqual([['data-numbers-only', false]]);
+  });
+});
+
+describe('a group card is dressed for the board (#1338)', () => {
+  it('takes its tone, labels its heading, and gets its mark', () => {
+    const card = { dataset: {} as Record<string, string> };
+    const heading = { className: '' };
+    const mark = dressGroupCard(
+      fakeDocument as unknown as Document,
+      card as unknown as HTMLElement,
+      heading as unknown as HTMLElement,
+      7,
+    ) as unknown as FakeElement;
+    expect(card.dataset.tone).toBe('2');
+    expect(heading.className).toBe('group-label');
+    expect(mark.className).toBe('group-mark');
+    expect(mark.children.map((child) => child.textContent)).toEqual(['▲', '8']);
   });
 });

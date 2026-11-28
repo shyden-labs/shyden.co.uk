@@ -25,6 +25,7 @@ import { coverGaps } from '../device-pixels';
 import { recorded, shoot } from './evidence';
 import { atViewport, measuredViewport } from '../viewport-at';
 import { eachWidth } from '../each-width';
+import { rectAtLeast44Soft } from '../viewport';
 
 test.use(recorded);
 
@@ -1565,8 +1566,8 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
     await test.step('the switch is on the board, a real target, reached by Tab', async () => {
       await expect.soft(toggle).toBeVisible();
       const box = await toggle.boundingBox();
-      expect.soft(box?.width ?? 0).toBeGreaterThanOrEqual(44);
-      expect.soft(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect.soft(box).not.toBeNull();
+      if (box) rectAtLeast44Soft(box, 'the board theme switch');
       await tabTo(toggle);
       await expect.soft(toggle).toBeFocused();
     });
@@ -1604,13 +1605,18 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
     test(`${locale}: every group's number reads from the back, in light and dark, at every projector size`, async ({
       page,
     }) => {
+      // One class per projector size, both themes read from the board's own
+      // switch: a fresh page per theme as well doubled the setup, and WebKit
+      // ran past the 30s test budget (31.1s on CI, run 46130040267).
       for (const size of PROJECTORS) {
+        await test.step(`${size.width}x${size.height}: the class is built`, async () => {
+          await atViewport(page, size);
+          await page.goto(path);
+          await makeGroups(page, '40', '4');
+          await openBoard(page, page.locator('#cg-board-open'));
+        });
         for (const theme of ['light', 'dark'] as const) {
           await test.step(`${size.width}x${size.height}, ${theme}`, async () => {
-            await atViewport(page, size);
-            await page.goto(path);
-            await makeGroups(page, '40', '4');
-            await openBoard(page, page.locator('#cg-board-open'));
             const html = page.locator('html');
             if ((await html.getAttribute('data-theme')) !== theme)
               await tapOn(boardSwitch(page));
@@ -1669,16 +1675,18 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
                 ),
               )
               .toBeLessThanOrEqual(0);
-            await page.keyboard.press('Escape');
-            await expect.soft(page.locator('#cg-board')).toBeHidden();
-            await expect
-              .soft(page.locator('#cg-results .group-mark').first())
-              .toBeHidden();
-            await expect
-              .soft(page.locator('#cg-results .group-label').first())
-              .toBeVisible();
           });
         }
+        await test.step(`${size.width}x${size.height}: the page keeps its own look`, async () => {
+          await page.keyboard.press('Escape');
+          await expect.soft(page.locator('#cg-board')).toBeHidden();
+          await expect
+            .soft(page.locator('#cg-results .group-mark').first())
+            .toBeHidden();
+          await expect
+            .soft(page.locator('#cg-results .group-label').first())
+            .toBeVisible();
+        });
       }
     });
   }

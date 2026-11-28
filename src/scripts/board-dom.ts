@@ -25,6 +25,22 @@ export function groupMarkElement(doc: Document, index: number): HTMLElement {
 }
 
 /**
+ * Dresses a group's card for the board: its tone on the card, the heading
+ * marked as the label the board hides visually, and the mark returned for
+ * the card's bar.
+ */
+export function dressGroupCard(
+  doc: Document,
+  card: HTMLElement,
+  heading: HTMLElement,
+  index: number,
+): HTMLElement {
+  card.dataset.tone = String(groupMark(index).tone);
+  heading.className = 'group-label';
+  return groupMarkElement(doc, index);
+}
+
+/**
  * A student's number: beside a name on the board, or alone and large when
  * no dealt student has a name. Decorative: the name, or "Student n", beside
  * it is what a screen reader reads.
