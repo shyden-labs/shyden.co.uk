@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { adb } from '../../scripts/adb.mjs';
-import { standInOnPath } from '../path-stand-in';
+import { standInProgram } from '../path-stand-in';
 
 /**
  * Every `adb` call the device leg makes goes through `scripts/adb.mjs` (#390).
@@ -19,17 +19,19 @@ echo "answered: $*"
 `;
 
 describe('adb()', () => {
-  standInOnPath('adb', STAND_IN);
+  const stand = standInProgram('adb', STAND_IN);
 
   it('returns what adb printed', () => {
-    expect(adb(['shell', 'dumpsys', 'window'])).toBe(
+    expect(adb(['shell', 'dumpsys', 'window'], { program: stand() })).toBe(
       'answered: shell dumpsys window\n',
     );
   });
 
   it('names the command and the cause when adb gives no answer in time', () => {
     const started = Date.now();
-    expect(() => adb(['hang', 'now'], { timeoutMs: 300 })).toThrow(
+    expect(() =>
+      adb(['hang', 'now'], { timeoutMs: 300, program: stand() }),
+    ).toThrow(
       /^adb hang now gave no answer within 300 ms: is the phone still connected and unlocked\?$/,
     );
     // Stopped at its deadline, not when the stand-in's 30 s ran out.
@@ -37,7 +39,7 @@ describe('adb()', () => {
   });
 
   it("names the command and adb's own words when adb fails", () => {
-    expect(() => adb(['fail'])).toThrow(
+    expect(() => adb(['fail'], { program: stand() })).toThrow(
       /^adb fail failed with exit status 1: stderr "[\s\S]*no devices\/emulators found/,
     );
   });

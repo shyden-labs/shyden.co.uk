@@ -22,6 +22,16 @@
   --bg: #eef1f4;
   --surface: #ffffff;
   --ink: #111821;
+  /* #1338: the projected board's group bars, one tone per group (repeating
+     from group 7), each with --group-ink on it. No yellow or amber: amber is
+     the "absent" marking. Ratios are scored by tests/guards/contrast.test.ts. */
+  --group-1: #c62828;
+  --group-2: #00695c;
+  --group-3: #1565c0;
+  --group-4: #6a1b9a;
+  --group-5: #ad1457;
+  --group-6: #2e7d32;
+  --group-ink: #ffffff;
   --ink-soft: #4d5866;
 
   /* A control that cannot be used right now (#250): an opaque fill, so the
@@ -116,6 +126,13 @@
     --bg: #04070d;
     --surface: #070d16;
     --ink: #eaf2ff;
+    --group-1: #ff8a80;
+    --group-2: #4dd8b4;
+    --group-3: #82b8ff;
+    --group-4: #d6a2ff;
+    --group-5: #ff8fc2;
+    --group-6: #8be08f;
+    --group-ink: #04070d;
     --ink-soft: #8fa6c6;
 
     /* A control that cannot be used right now (#250). An opaque FILL, never
@@ -210,6 +227,13 @@
     --bg: #04070d;
     --surface: #070d16;
     --ink: #eaf2ff;
+    --group-1: #ff8a80;
+    --group-2: #4dd8b4;
+    --group-3: #82b8ff;
+    --group-4: #d6a2ff;
+    --group-5: #ff8fc2;
+    --group-6: #8be08f;
+    --group-ink: #04070d;
     --ink-soft: #8fa6c6;
     --disabled-fill: #2a323f;
     --accent: #38f5c8;
@@ -461,7 +485,11 @@ main:focus {
    (`position: relative` on a parent): against the initial containing block it
    can land anywhere, and at 320px anywhere means sideways scroll, as
    BetaBadge once produced. `clip-path`, never the deprecated `clip` (#200). */
-.visually-hidden {
+/* The projected board's group headings (#1338) share the one recipe: the
+   localised "Group n" stays their accessible name while the bar shows the
+   shape and the digits. The selector is global because script renders them. */
+.visually-hidden,
+.cg-board #cg-results .group-label {
   position: absolute;
   width: 1px;
   height: 1px;

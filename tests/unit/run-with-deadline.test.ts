@@ -59,3 +59,27 @@ describe('runWithDeadline names why a command failed', () => {
     );
   });
 });
+
+describe('runWithDeadline runs a tool by its absolute path (#1294)', () => {
+  it('hands the absolute path to execFileSync and names the tool by its own name', async () => {
+    vi.resetModules();
+    const calls: string[] = [];
+    vi.doMock('node:child_process', () => ({
+      execFileSync: (file: string) => {
+        calls.push(file);
+        throw failure({ code: 'ETIMEDOUT' });
+      },
+    }));
+    const { runWithDeadline } =
+      await import('../../scripts/run-with-deadline.mjs');
+    expect(() =>
+      runWithDeadline('/opt/homebrew/bin/adb', ['devices'], {
+        timeoutMs: 1000,
+        whenSilent: 'is the phone awake?',
+      }),
+    ).toThrow(
+      /^adb devices gave no answer within 1000 ms: is the phone awake\?$/,
+    );
+    expect(calls).toEqual(['/opt/homebrew/bin/adb']);
+  });
+});

@@ -407,8 +407,23 @@ export const rosterForSpillover = async (page: Page) => {
   await typeInto(page.getByLabel(/Students in each group/), '4');
 };
 
-export const namesIn = (text: string): string[] =>
-  text.split(/\s+/).filter((w) => /^[A-Z][a-z]+$/.test(w));
+/**
+ * Each dealt group's names, in order, read from the names themselves
+ * (`.who`): the projected board shows a shape, a group number and each
+ * student's number beside them (#1338), so whole text cannot compare the
+ * board with the page.
+ */
+export const namesByGroup = (root: Locator): Promise<string[][]> =>
+  root
+    .locator('.group')
+    .evaluateAll((cards) =>
+      cards.map((card) =>
+        Array.from(
+          card.querySelectorAll('.who'),
+          (who) => who.textContent ?? '',
+        ),
+      ),
+    );
 
 /** Open the print panel from the results section. */
 export const openPrintPanel = async (page: Page) => {
