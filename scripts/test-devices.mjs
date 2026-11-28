@@ -77,6 +77,7 @@ import {
   DOCKER,
   LSOF,
   NODE,
+  NPM_CLI,
   PLAYWRIGHT_CLI,
   PS,
   VITEST_CLI,
@@ -323,7 +324,69 @@ function waitForClose(child, command, args) {
  */
 async function runTagged(tag, command, args, opts) {
   const child = spawnTagged(tag, command, args, opts);
-  return waitForClose(child, command, args);
+  const closed = waitForClose(child, command, args);
+  // #1340: registered until it closes, so an interrupted run can stop it.
+  const handle = {
+    pid: child.pid ?? -1,
+    kill: (/** @type {NodeJS.Signals} */ signal) => child.kill(signal),
+    exited: closed.then(
+      () => undefined,
+      () => undefined,
+    ),
+  };
+  runningGroups.add(handle);
+  try {
+    return await closed;
+  } finally {
+    runningGroups.delete(handle);
+  }
+}
+
+/**
+ * @typedef {{ pid: number, kill: (signal: NodeJS.Signals) => boolean, exited: Promise<void> }} GroupRun
+ */
+
+/** @type {Set<GroupRun>} Every test run this script started and is still waiting for (#1340). */
+const runningGroups = new Set();
+
+/** How long a group run has after SIGINT before it is killed (#1340). */
+export const GROUP_STOP_CEILING_MS = 10_000;
+
+/**
+ * Stops every group test run still running: SIGINT, then a wait for it to
+ * exit; one that outlives `ceilingMs` is named and sent SIGKILL (#1340). On
+ * 2026-11-28 a SIGINT to this script left the Android group's Playwright
+ * running, re-parented to pid 1, still driving the phone.
+ *
+ * @param {Set<GroupRun>} running
+ * @param {{ ceilingMs?: number, write?: (line: string) => void }} [options]
+ */
+export async function stopGroupRuns(
+  running,
+  {
+    ceilingMs = GROUP_STOP_CEILING_MS,
+    write = (line) => process.stderr.write(line),
+  } = {},
+) {
+  await Promise.all(
+    [...running].map(async (run) => {
+      running.delete(run);
+      run.kill('SIGINT');
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let timer;
+      const timedOut = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(true), ceilingMs);
+      });
+      const late = await Promise.race([run.exited.then(() => false), timedOut]);
+      clearTimeout(timer);
+      if (late) {
+        write(
+          `cleanup: group test run pid ${run.pid} did not exit within ${ceilingMs} ms of SIGINT; sent SIGKILL\n`,
+        );
+        run.kill('SIGKILL');
+      }
+    }),
+  );
 }
 
 /**
@@ -1048,6 +1111,33 @@ export async function contained(name, run) {
   }
 }
 
+/** Playwright's arguments for the desktop group, inside its container. */
+export function desktopPlaywrightArgs() {
+  return [
+    '--config=playwright.config.ts',
+    // list,json: unchanged from before this task -- terminal output and
+    // the JSON summary this script itself reads are exactly as they
+    // were. html + the jsonl reporter are ADDITIONS for the dashboard
+    // only (task brief step 3: "keep the existing --reporter=list,json
+    // behaviour alongside the new one"). Neither playwright.config.ts
+    // nor playwright.device.config.ts needed a change to support this --
+    // Playwright's CLI resolves a non-built-in reporter id via
+    // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
+    // `resolveReporter`), so a relative path on this same flag is enough;
+    // measured directly against this exact invocation shape before being
+    // trusted, not assumed.
+    '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+    // One worker. The group runs in Colima's 2 GB machine, and at two
+    // workers a WebKit page of 0.5-0.6 GB each beside Playwright and the
+    // preview server ran it out of memory: the kernel killed 12 WebKit
+    // pages, one Firefox and finally Playwright itself
+    // (shyden-labs/shyden.co.uk#1341, one worker ruled by Shyden
+    // 2026-11-28). Earlier, three workers pushed the laptop into swap
+    // (shyden-labs/shyden.co.uk#1021).
+    '--workers=1',
+  ];
+}
+
 async function runDesktopGroup() {
   const name = 'desktop';
   const reportFile = REPORT_FILES.desktop;
@@ -1066,27 +1156,7 @@ async function runDesktopGroup() {
     desktopContainerArgv({
       root: ROOT,
       image,
-      playwrightArgs: [
-        '--config=playwright.config.ts',
-        // list,json: unchanged from before this task -- terminal output and
-        // the JSON summary this script itself reads are exactly as they
-        // were. html + the jsonl reporter are ADDITIONS for the dashboard
-        // only (task brief step 3: "keep the existing --reporter=list,json
-        // behaviour alongside the new one"). Neither playwright.config.ts
-        // nor playwright.device.config.ts needed a change to support this --
-        // Playwright's CLI resolves a non-built-in reporter id via
-        // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
-        // `resolveReporter`), so a relative path on this same flag is enough;
-        // measured directly against this exact invocation shape before being
-        // trusted, not assumed.
-        '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-        // Two workers, not Playwright's default of half the cores (3 on the
-        // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
-        // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
-        // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
-        // by Shyden 2026-11-02).
-        '--workers=2',
-      ],
+      playwrightArgs: desktopPlaywrightArgs(),
       env: {
         ...passed,
         PW_REUSE_SERVER: '1',
@@ -1125,6 +1195,18 @@ async function runDesktopGroup() {
  *
  * @returns {{ command: string, args: string[] }}
  */
+/**
+ * `npm run <args>` as npm's own entry file under node, never `npm` found on
+ * PATH (#1294): the run's build and its preview server.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ command: string, args: string[] }}
+ */
+export const npmRunCommand = (args) => ({
+  command: NODE,
+  args: [NPM_CLI, 'run', ...args],
+});
+
 export const androidGroupCommand = () => ({
   command: NODE,
   args: [
@@ -1417,18 +1499,71 @@ const pageIds = (listing) => {
   );
 };
 
+/**
+ * Whether Chrome runs on the phone, read from
+ * `adb shell 'pidof com.android.chrome; echo exit=$?'`: a pid means running,
+ * pidof's exit 1 with nothing printed means stopped, and anything else is
+ * refused, quoted, rather than guessed (#1337).
+ *
+ * @param {string} output
+ * @returns {'running' | 'stopped'}
+ */
+export function chromeProcessState(output) {
+  const lines = output
+    .trim()
+    .split('\n')
+    .map((line) => line.trim());
+  const exit = lines.at(-1);
+  const printed = lines.slice(0, -1).filter((line) => line !== '');
+  if (
+    exit === 'exit=0' &&
+    printed.length > 0 &&
+    printed.every((l) => /^\d+( \d+)*$/.test(l))
+  )
+    return 'running';
+  if (exit === 'exit=1' && printed.length === 0) return 'stopped';
+  throw new Error(
+    `could not tell whether Chrome runs from pidof: ${JSON.stringify(output)}`,
+  );
+}
+
+/**
+ * The tabs to leave after the run (#1326, #1337). With Chrome stopped there
+ * are none, so DevTools is not asked: its socket exists only while Chrome
+ * runs. When either read fails the tabs stay unknown, and the cleanup closes
+ * nothing.
+ *
+ * @param {{ chromeState: () => 'running' | 'stopped', list: () => Promise<unknown> }} reads
+ * @returns {Promise<{ ids: string[] } | { unknown: string }>}
+ */
+export async function readTabsBefore({ chromeState, list }) {
+  try {
+    if (chromeState() === 'stopped') return { ids: [] };
+    return { ids: pageIds(await list()) };
+  } catch (error) {
+    return { unknown: messageOf(error) };
+  }
+}
+
 /** @type {string[] | undefined} The tab ids open before this run. */
 let tabsBeforeRun;
 
 /** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
 async function readTabsBeforeRun() {
-  try {
-    tabsBeforeRun = pageIds(await chromeTargets());
-  } catch (error) {
-    process.stderr.write(
-      `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
-    );
+  const before = await readTabsBefore({
+    chromeState: () =>
+      chromeProcessState(
+        adb(['shell', 'pidof com.android.chrome; echo exit=$?']),
+      ),
+    list: chromeTargets,
+  });
+  if ('ids' in before) {
+    tabsBeforeRun = before.ids;
+    return;
   }
+  process.stderr.write(
+    `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${before.unknown}\n`,
+  );
 }
 
 /** Closes the tabs this run opened, and no other (#1326). */
@@ -1638,6 +1773,7 @@ export async function stopStarted(
 }
 
 const cleanup = once(async () => {
+  await stopGroupRuns(runningGroups);
   await stopStarted(runningWda);
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
@@ -1764,7 +1900,8 @@ async function main() {
     await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
-    const build = await runTagged('build', 'npm', ['run', 'build']);
+    const buildCmd = npmRunCommand(['build']);
+    const build = await runTagged('build', buildCmd.command, buildCmd.args);
     if (build.code !== 0) {
       throw new Error(
         `\`npm run build\` exited with code ${build.code} -- aborting the whole run.`,
@@ -1776,12 +1913,10 @@ async function main() {
     );
     // Its own process group: cleanup stops npm AND the server it started,
     // and nothing else that happens to use the port (#390 F44).
-    previewChild = spawnTagged(
-      'preview',
-      'npm',
-      ['run', 'preview', '--', '--host', '0.0.0.0'],
-      { detached: true },
-    );
+    const previewCmd = npmRunCommand(['preview', '--', '--host', '0.0.0.0']);
+    previewChild = spawnTagged('preview', previewCmd.command, previewCmd.args, {
+      detached: true,
+    });
     await untilReadyOrExit(
       previewChild,
       waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {

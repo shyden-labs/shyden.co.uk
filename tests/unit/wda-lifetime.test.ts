@@ -1,6 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GIT, XCODEBUILD, XCRUN } from '../../scripts/programs.mjs';
 import {
   parseReadyLine,
   startWda,
@@ -50,7 +51,7 @@ function harness({
   const deps = {
     run: vi.fn(async (file: string, args: string[]): Promise<string> => {
       runs.push([file, ...args]);
-      if (file === 'xcrun') return DETAILS;
+      if (file === XCRUN) return DETAILS;
       return '';
     }),
     spawn: vi.fn((file: string, args: string[]) => {
@@ -95,7 +96,7 @@ describe('startWda', () => {
     const wda = await started;
     expect(wda.url).toBe('http://[fd97:eff2:bed2::1]:8100');
     expect(h.runs).toContainEqual([
-      'xcrun',
+      XCRUN,
       'devicectl',
       'device',
       'info',
@@ -114,7 +115,7 @@ describe('startWda', () => {
     expect(h.runs.some((r) => r.includes('build-for-testing'))).toBe(false);
     expect(h.spawns).toEqual([
       [
-        'xcodebuild',
+        XCODEBUILD,
         'test-without-building',
         '-xctestrun',
         XCTESTRUN,
@@ -133,7 +134,7 @@ describe('startWda', () => {
     await started;
     const build = h.runs.find((r) => r.includes('build-for-testing'));
     expect(build).toEqual([
-      'xcodebuild',
+      XCODEBUILD,
       'build-for-testing',
       '-project',
       `${CACHE}/${WDA_PIN}/src/WebDriverAgent.xcodeproj`,
@@ -158,14 +159,14 @@ describe('startWda', () => {
     h.child.print(READY);
     await started;
     expect(h.runs).toContainEqual([
-      'git',
+      GIT,
       'clone',
       '--filter=blob:none',
       'https://github.com/appium/WebDriverAgent.git',
       `${CACHE}/${WDA_PIN}/src`,
     ]);
     expect(h.runs).toContainEqual([
-      'git',
+      GIT,
       '-C',
       `${CACHE}/${WDA_PIN}/src`,
       'checkout',
@@ -237,7 +238,7 @@ describe('startWda', () => {
       expect.stringMatching(
         /^announce .*if the iPhone asks for its passcode to allow UI automation, enter it now/,
       ),
-      'spawn xcodebuild',
+      `spawn ${XCODEBUILD}`,
     ]);
   });
 
@@ -277,7 +278,7 @@ describe('startWda', () => {
   });
 
   const UNINSTALL = [
-    'xcrun',
+    XCRUN,
     'devicectl',
     'device',
     'uninstall',
@@ -343,10 +344,10 @@ describe('startWda', () => {
     const h = harness();
     const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });
     await flush();
-    expect(h.runs.some((r) => r[0] === 'xcrun')).toBe(false);
+    expect(h.runs.some((r) => r[0] === XCRUN)).toBe(false);
     h.child.print(READY);
     await started;
-    expect(h.runs.filter((r) => r[0] === 'xcrun')).toHaveLength(1);
+    expect(h.runs.filter((r) => r[0] === XCRUN)).toHaveLength(1);
   });
 
   it('hands WDA on only once its tunnel URL answers', async () => {
@@ -375,7 +376,7 @@ describe('startWda', () => {
   it('stops WDA when the tunnel cannot be read after the ready line', async () => {
     const h = harness();
     h.deps.run.mockImplementation(async (file: string) => {
-      if (file === 'xcrun') throw new Error('devicectl: device not found');
+      if (file === XCRUN) throw new Error('devicectl: device not found');
       return '';
     });
     const started = startWda({ udid: UDID, cacheDir: CACHE, ...h.deps });

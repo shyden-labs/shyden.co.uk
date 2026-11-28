@@ -21,6 +21,15 @@ const CHECKOUT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 export const GIT = '/usr/bin/git';
 export const PS = '/bin/ps';
+
+/**
+ * The device tools, which run only on the operator's Mac (#1294). Measured
+ * there with `which -a` on 2026-11-28, one of each: adb from Homebrew's
+ * android-platform-tools cask, xcrun and xcodebuild from the system.
+ */
+export const ADB = '/opt/homebrew/bin/adb';
+export const XCRUN = '/usr/bin/xcrun';
+export const XCODEBUILD = '/usr/bin/xcodebuild';
 export const PGREP = '/usr/bin/pgrep';
 
 /** The node running this script. */

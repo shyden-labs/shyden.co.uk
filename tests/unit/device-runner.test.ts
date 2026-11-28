@@ -22,7 +22,11 @@ import {
   deviceRunGroups,
   adbCleanupCalls,
   tabsOpenedByRun,
+  chromeProcessState,
+  readTabsBefore,
   stopStarted,
+  stopGroupRuns,
+  desktopPlaywrightArgs,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -767,6 +771,67 @@ describe('tabsOpenedByRun: only the Chrome tabs this run opened are closed (#132
   });
 });
 
+describe('chromeProcessState: whether Chrome runs on the phone, read from pidof (#1337)', () => {
+  it('reads a pid as running', () => {
+    expect(chromeProcessState('12345\nexit=0\n')).toBe('running');
+  });
+
+  it("reads pidof's exit 1 with nothing printed as stopped", () => {
+    expect(chromeProcessState('exit=1\n')).toBe('stopped');
+  });
+
+  it('throws on anything else, quoting it, rather than guessing', () => {
+    expect(() => chromeProcessState('pidof: not found\nexit=127\n')).toThrow(
+      /pidof: not found/,
+    );
+  });
+});
+
+describe('readTabsBefore: the tabs to leave after the run (#1337)', () => {
+  const page = (id: string) => ({ id, type: 'page', url: 'about:blank' });
+
+  it('records no tab when Chrome is not running, without asking DevTools', async () => {
+    const list = vi.fn(async () => {
+      throw new Error('fetch failed');
+    });
+    expect(
+      await readTabsBefore({ chromeState: () => 'stopped', list }),
+    ).toEqual({ ids: [] });
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("records each page tab's id when Chrome is running", async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => 'running',
+        list: async () => [page('a'), page('b')],
+      }),
+    ).toEqual({ ids: ['a', 'b'] });
+  });
+
+  it('leaves the tabs unknown, naming why, when Chrome runs but its list cannot be read', async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => 'running',
+        list: async () => {
+          throw new Error('fetch failed');
+        },
+      }),
+    ).toEqual({ unknown: 'fetch failed' });
+  });
+
+  it("leaves the tabs unknown, naming why, when Chrome's process cannot be read", async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => {
+          throw new Error('adb shell gave no answer');
+        },
+        list: async () => [],
+      }),
+    ).toEqual({ unknown: 'adb shell gave no answer' });
+  });
+});
+
 describe('the files a run writes on the Android phone are the ones its cleanup removes (#1326)', () => {
   it('names the three paths the harness writes', () => {
     expect(ANDROID_RUN_FILES).toEqual({
@@ -812,5 +877,77 @@ describe('stopStarted: an interrupted run still stops what it started (#1326)', 
     const written: string[] = [];
     await stopStarted(new Set(), (line) => written.push(line));
     expect(written).toEqual([]);
+  });
+});
+
+/**
+ * #1340: a device run stopped by SIGINT on 2026-11-28 exited 130, but the
+ * Android group's Playwright (pid 22740) kept running, re-parented to pid 1,
+ * still driving the phone. Every group test run the runner starts is now
+ * signalled on cleanup, and awaited.
+ */
+describe('stopGroupRuns: an interrupted run stops every group test run it started (#1340)', () => {
+  const child = (pid: number, exits: boolean) => {
+    const signals: string[] = [];
+    let resolve: () => void = () => {};
+    const exited = new Promise<void>((r) => (resolve = r));
+    return {
+      pid,
+      signals,
+      kill: (signal: string) => {
+        signals.push(signal);
+        if (exits) resolve();
+        return true;
+      },
+      exited,
+    };
+  };
+
+  it('sends SIGINT to each running group and waits for it to exit', async () => {
+    const a = child(101, true);
+    const b = child(102, true);
+    const running = new Set([a, b]);
+    const written: string[] = [];
+    await stopGroupRuns(running, {
+      ceilingMs: 200,
+      write: (l) => written.push(l),
+    });
+    expect(a.signals).toEqual(['SIGINT']);
+    expect(b.signals).toEqual(['SIGINT']);
+    expect(running.size).toBe(0);
+    expect(written).toEqual([]);
+  });
+
+  it('names the pid, then sends SIGKILL, when a group outlives the ceiling', async () => {
+    const stuck = child(22740, false);
+    const written: string[] = [];
+    const started = Date.now();
+    await stopGroupRuns(new Set([stuck]), {
+      ceilingMs: 100,
+      write: (l) => written.push(l),
+    });
+    expect(Date.now() - started).toBeLessThan(900);
+    expect(stuck.signals).toEqual(['SIGINT', 'SIGKILL']);
+    expect(written).toEqual([
+      'cleanup: group test run pid 22740 did not exit within 100 ms of SIGINT; sent SIGKILL\n',
+    ]);
+  });
+
+  it('does nothing when no group is running', async () => {
+    const written: string[] = [];
+    await stopGroupRuns(new Set(), {
+      ceilingMs: 100,
+      write: (l) => written.push(l),
+    });
+    expect(written).toEqual([]);
+  });
+});
+
+describe('the desktop group in its 2 GB Colima machine (#1341)', () => {
+  it('runs one worker, so two browsers never share the memory at once', () => {
+    const workers = desktopPlaywrightArgs().filter((arg) =>
+      arg.startsWith('--workers'),
+    );
+    expect(workers).toEqual(['--workers=1']);
   });
 });
