@@ -9,7 +9,7 @@ import {
   withGroups,
   rosterForSpillover,
   rosterOf,
-  namesIn,
+  namesByGroup,
   buildRoster,
   giveEveryoneASex,
   refuseFullscreen,
@@ -474,13 +474,15 @@ test.describe('the projector view', () => {
     expect.soft(names).toHaveLength(12);
     // The deal has finished and the button is still usable.
     await expect.soft(page.locator('#cg-go')).toBeEnabled();
-    // `#cg-board #cg-results`, not the whole board: `namesIn` matches any
-    // Capitalised word, and the bar's own "Exit full screen" contributes
-    // "Exit". Reading the results element compares like with like.
-    const onBoard = await page.locator('#cg-board #cg-results').innerText();
+    // Each group's names, read from the names themselves: the board shows
+    // more than the page (#1338: a shape, a group number, each student's
+    // number), so the two pages' whole text no longer compares like with like.
+    const onBoard = await namesByGroup(page.locator('#cg-board #cg-results'));
     await page.keyboard.press('Escape');
     const after = await page.locator('#cg-results').innerText();
-    expect.soft(namesIn(after).sort()).toEqual(namesIn(onBoard).sort());
+    expect
+      .soft((await namesByGroup(page.locator('#cg-results'))).flat().sort())
+      .toEqual(onBoard.flat().sort());
     // The shuffle actually happened -- otherwise the equality above holds
     // trivially by nothing having changed at all.
     expect.soft(after).not.toBe(before);
@@ -624,10 +626,14 @@ test.describe('the board before a shuffle (#743)', () => {
     await expect
       .soft(bar(page).getByRole('button', { name: 'Shuffle again' }))
       .toBeVisible();
-    const onBoard = await board(page).innerText();
+    // The same arrangement, group by group (#1338: the board also shows
+    // shapes and numbers the page does not, so whole text cannot compare).
+    const onBoard = await namesByGroup(board(page));
     await page.keyboard.press('Escape');
     await expect.soft(page.locator('#cg-results')).toBeVisible();
-    expect.soft(await page.locator('#cg-results').innerText()).toBe(onBoard);
+    expect
+      .soft(await namesByGroup(page.locator('#cg-results')))
+      .toEqual(onBoard);
   });
 
   test('a refused deal keeps the waiting board up and says why on it', async ({
@@ -1531,12 +1537,20 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
         return Array.from(card.querySelectorAll('*')).flatMap((el) => {
           const r = el.getBoundingClientRect();
           if (r.width === 0 && r.height === 0) return [];
-          const out =
-            r.left < box.left - 0.5 ||
-            r.right > box.right + 0.5 ||
-            r.top < box.top - 0.5 ||
-            r.bottom > box.bottom + 0.5;
-          return out ? [`group ${i + 1}: ${el.className || el.tagName}`] : [];
+          // Each side it crosses, and by how far, so a failure says where.
+          const sides = [
+            ['left', box.left - r.left],
+            ['right', r.right - box.right],
+            ['top', box.top - r.top],
+            ['bottom', r.bottom - box.bottom],
+          ].filter(([, by]) => (by as number) > 0.5);
+          return sides.length
+            ? [
+                `group ${i + 1}: ${el.className || el.tagName} (${sides
+                  .map(([side, by]) => `${side} ${(by as number).toFixed(1)}px`)
+                  .join(', ')})`,
+              ]
+            : [];
         });
       }),
     );
@@ -1638,7 +1652,11 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
               expect
                 .soft(await contrastRatio(student))
                 .toBeGreaterThanOrEqual(4.5);
-              await expect.soft(card.locator('.group-label')).toBeHidden();
+              // Visually hidden, not removed: Playwright counts its 1px
+              // box as visible, so the box itself is what is measured.
+              const labelBox = await card.locator('.group-label').boundingBox();
+              expect.soft(labelBox?.width ?? 0).toBeLessThanOrEqual(1);
+              expect.soft(labelBox?.height ?? 0).toBeLessThanOrEqual(1);
               await expect
                 .soft(card.getByRole('heading', { level: 3 }))
                 .toHaveAccessibleName(/\d/);

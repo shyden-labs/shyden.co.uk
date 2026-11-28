@@ -485,7 +485,11 @@ main:focus {
    (`position: relative` on a parent): against the initial containing block it
    can land anywhere, and at 320px anywhere means sideways scroll, as
    BetaBadge once produced. `clip-path`, never the deprecated `clip` (#200). */
-.visually-hidden {
+/* The projected board's group headings (#1338) share the one recipe: the
+   localised "Group n" stays their accessible name while the bar shows the
+   shape and the digits. The selector is global because script renders them. */
+.visually-hidden,
+.cg-board #cg-results .group-label {
   position: absolute;
   width: 1px;
   height: 1px;

@@ -2163,19 +2163,9 @@ const sexWhyText = sexWhy(roster, t);
   .cg-board #cg-results .group-shape {
     font-size: 0.72em;
   }
-  /* The localised "Group n" stays the heading's accessible name; the bar
-     shows the shape and the digits. */
-  .cg-board #cg-results .group-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
+  /* The localised "Group n" stays the heading's accessible name on the
+     board, hidden by the global visually-hidden rule in tokens.css (#767:
+     the recipe is written once); the bar shows the shape and the digits. */
   .cg-board #cg-results .group ul {
     padding: 0.4em 0.6em 0.6em;
   }
