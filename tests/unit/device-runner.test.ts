@@ -22,6 +22,7 @@ import {
   deviceRunGroups,
   adbCleanupCalls,
   tabsOpenedByRun,
+  stopStarted,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -779,5 +780,37 @@ describe('the files a run writes on the Android phone are the ones its cleanup r
     expect(DEVICE_DOWNLOADS).toBe(ANDROID_RUN_FILES.downloads);
     expect(DUMP_FILE).toBe(ANDROID_RUN_FILES.uiDump);
     expect(SCREENSHOT_FILE).toBe(ANDROID_RUN_FILES.walkScreenshot);
+  });
+});
+
+describe('stopStarted: an interrupted run still stops what it started (#1326)', () => {
+  it('stops every WebDriverAgent still registered, even after one stop fails, and names the failure', async () => {
+    const stopped: string[] = [];
+    const written: string[] = [];
+    const running = new Set([
+      {
+        stop: async () => {
+          stopped.push('first');
+          throw new Error('xcodebuild would not exit');
+        },
+      },
+      {
+        stop: async () => {
+          stopped.push('second');
+        },
+      },
+    ]);
+    await stopStarted(running, (line) => written.push(line));
+    expect(stopped).toEqual(['first', 'second']);
+    expect(running.size).toBe(0);
+    expect(written).toEqual([
+      'cleanup: failed to stop WebDriverAgent: xcodebuild would not exit\n',
+    ]);
+  });
+
+  it('does nothing when no WebDriverAgent is running', async () => {
+    const written: string[] = [];
+    await stopStarted(new Set(), (line) => written.push(line));
+    expect(written).toEqual([]);
   });
 });
