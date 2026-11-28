@@ -58,6 +58,42 @@ describe('findNode', () => {
   it('returns undefined when nothing matches', () => {
     expect(findNode(nodes, { text: 'Nope' })).toBeUndefined();
   });
+  it("reads each node's resource id (#1272)", () => {
+    expect(nodes.map((n) => n.resourceId)).toEqual([
+      'android:id/title',
+      'android:id/switch_widget',
+      'x',
+    ]);
+  });
+  it('finds a node by its resource id (#1272)', () => {
+    expect(
+      findNode(nodes, { resourceId: 'android:id/switch_widget' })?.checked,
+    ).toBe(true);
+  });
+});
+
+/**
+ * #1272: after a factory reset the OPPO ran English (UK), and Chrome 158 named
+ * its menu button "Customise and control Google Chrome": the walk, which
+ * looked for the US spelling, failed every Android test of the 2026-11-28
+ * run. The menu is found by its resource id, which no language changes.
+ */
+describe("the walk finds Chrome's menu button in any language", () => {
+  const toolbar = (desc: string) =>
+    parseUiDump(`<hierarchy rotation="0">
+  <node text="" resource-id="com.android.chrome:id/toolbar" class="android.widget.FrameLayout" content-desc="" checked="false" bounds="[0,96][1080,264]" />
+  <node text="" resource-id="com.android.chrome:id/menu_button" class="android.widget.ImageButton" content-desc="${desc}" checked="false" bounds="[978,138][1056,222]" />
+</hierarchy>`);
+  for (const desc of [
+    'Customize and control Google Chrome',
+    'Customise and control Google Chrome',
+    'Sesuaikan dan kontrol Google Chrome',
+  ])
+    it(`finds it labelled "${desc}"`, async () => {
+      const { MENU_BUTTON } =
+        await import('../device/chrome-javascript-setting');
+      expect(findNode(toolbar(desc), MENU_BUTTON)?.bounds.left).toBe(978);
+    });
 });
 
 describe('centreOf and switchIsOn', () => {
