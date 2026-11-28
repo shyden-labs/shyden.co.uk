@@ -323,7 +323,69 @@ function waitForClose(child, command, args) {
  */
 async function runTagged(tag, command, args, opts) {
   const child = spawnTagged(tag, command, args, opts);
-  return waitForClose(child, command, args);
+  const closed = waitForClose(child, command, args);
+  // #1340: registered until it closes, so an interrupted run can stop it.
+  const handle = {
+    pid: child.pid ?? -1,
+    kill: (/** @type {NodeJS.Signals} */ signal) => child.kill(signal),
+    exited: closed.then(
+      () => undefined,
+      () => undefined,
+    ),
+  };
+  runningGroups.add(handle);
+  try {
+    return await closed;
+  } finally {
+    runningGroups.delete(handle);
+  }
+}
+
+/**
+ * @typedef {{ pid: number, kill: (signal: NodeJS.Signals) => boolean, exited: Promise<void> }} GroupRun
+ */
+
+/** @type {Set<GroupRun>} Every test run this script started and is still waiting for (#1340). */
+const runningGroups = new Set();
+
+/** How long a group run has after SIGINT before it is killed (#1340). */
+export const GROUP_STOP_CEILING_MS = 10_000;
+
+/**
+ * Stops every group test run still running: SIGINT, then a wait for it to
+ * exit; one that outlives `ceilingMs` is named and sent SIGKILL (#1340). On
+ * 2026-11-28 a SIGINT to this script left the Android group's Playwright
+ * running, re-parented to pid 1, still driving the phone.
+ *
+ * @param {Set<GroupRun>} running
+ * @param {{ ceilingMs?: number, write?: (line: string) => void }} [options]
+ */
+export async function stopGroupRuns(
+  running,
+  {
+    ceilingMs = GROUP_STOP_CEILING_MS,
+    write = (line) => process.stderr.write(line),
+  } = {},
+) {
+  await Promise.all(
+    [...running].map(async (run) => {
+      running.delete(run);
+      run.kill('SIGINT');
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let timer;
+      const timedOut = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(true), ceilingMs);
+      });
+      const late = await Promise.race([run.exited.then(() => false), timedOut]);
+      clearTimeout(timer);
+      if (late) {
+        write(
+          `cleanup: group test run pid ${run.pid} did not exit within ${ceilingMs} ms of SIGINT; sent SIGKILL\n`,
+        );
+        run.kill('SIGKILL');
+      }
+    }),
+  );
 }
 
 /**
@@ -1691,6 +1753,7 @@ export async function stopStarted(
 }
 
 const cleanup = once(async () => {
+  await stopGroupRuns(runningGroups);
   await stopStarted(runningWda);
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
