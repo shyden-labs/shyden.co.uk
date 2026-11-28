@@ -1,3 +1,4 @@
+import { recordDealTimes, dealSpread } from './deal-times';
 import { tapOn } from '../real-touch';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -744,14 +745,22 @@ test.describe('the board deals by moving students into their cards', () => {
     ).toEqual([]);
   });
 
-  test('with reduced motion nothing moves: everyone is in their card at once', async ({
+  test('with reduced motion nothing moves: each student appears in their card, one by one', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openWaitingBoard(page, String(COUNT), '4');
     await recordAnimations(page);
+    await recordDealTimes(page);
     await press(page, 'Make Groups');
     await expect(board(page).locator('.student.dealt')).toHaveCount(COUNT);
+    // Shyden, 2026-11-28 (#1339): the full deal, at its pace, each name
+    // simply appearing -- so the cards are dealt over time, not at once.
+    const spread = await dealSpread(page);
+    expect.soft(spread.dealt, 'cards dealt one at a time').toBe(COUNT);
+    expect
+      .soft(spread.spanMs, 'ms from the first card to the last')
+      .toBeGreaterThan(100);
     await expect(board(page).locator('#cg-waiting')).toBeHidden();
     // Two frames on, past the one a travelling deal waits before it flies.
     await page.evaluate(

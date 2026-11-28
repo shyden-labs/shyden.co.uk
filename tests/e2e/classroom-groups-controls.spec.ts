@@ -231,15 +231,16 @@ test.describe('the controls that had no tests', () => {
       .toHaveText(['Normal', 'Cepat', 'Lewati animasi']);
   });
 
-  test('a device asking for less motion gets the answer without the show', async ({
+  test('a device asking for less motion keeps the normal pace', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/classroom-groups');
     // #cg-speed sits inside #cg-sound-body since Stage 2, Task 7.
     await tapOn(page.locator('#cg-sound-toggle'));
-    // A default, not a lock — the teacher can still turn it back on.
-    await expect(page.locator('#cg-speed')).toHaveValue('skip');
+    // Shyden, 2026-11-28 (#1339): reduced motion gets the full deal with
+    // nothing moving, so the pace is not forced to skip.
+    await expect(page.locator('#cg-speed')).toHaveValue('normal');
   });
 });
 

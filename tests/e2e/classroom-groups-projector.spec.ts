@@ -26,6 +26,13 @@ import { recorded, shoot } from './evidence';
 import { atViewport, measuredViewport } from '../viewport-at';
 import { eachWidth } from '../each-width';
 import { rectAtLeast44Soft } from '../viewport';
+import { THEMES } from '../palette';
+import { emulateTheme } from '../themes';
+import {
+  installSourceRecorder,
+  markSources,
+  markedStillSounding,
+} from './audio-sources';
 
 test.use(recorded);
 
@@ -1789,4 +1796,153 @@ test.describe('the projected board reads from the back of the room (#1338)', () 
       });
     }
   });
+});
+
+// #1339: the "All together" celebration, timed to the Jackpot ending's three
+// fanfare stages. `#cg-results` carries `data-celebrating` while it runs and
+// `data-celebration-stage` (1-3) as each stage fires; it moves to the board
+// with the results, so the board's results are what is read here.
+test.describe('the celebration when the results land', () => {
+  const results = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board #cg-results');
+  /** Shuffle again from the bar, waking it first with a tap on the board
+   *  when it has faded, as a teacher would. */
+  const shuffleOnBoard = async (page: import('@playwright/test').Page) => {
+    if (/\bfaded\b/.test((await bar(page).getAttribute('class')) ?? '')) {
+      await tapOn(page.locator('#cg-board'), { position: { x: 50, y: 300 } });
+      await expect(bar(page)).not.toHaveClass(/faded/);
+    }
+    await tapOn(bar(page).getByRole('button', { name: 'Shuffle again' }));
+  };
+  const celebrating = (page: import('@playwright/test').Page) =>
+    expect(results(page)).toHaveAttribute('data-celebrating', '', {
+      timeout: 20000,
+    });
+
+  // One board, three endings: one watched to its third stage, one cut short
+  // by Shuffle again, one cut short by Escape. Each cut is checked against a
+  // celebration and a sound proved running first.
+  test('confetti, a wave, a shine and fireworks play, and Shuffle again or Escape stops them and the sound at once', async ({
+    page,
+  }) => {
+    await installSourceRecorder(page);
+    await withGroups(page);
+    await openBoard(page);
+    await shuffleOnBoard(page);
+    await celebrating(page);
+    await expect
+      .soft(results(page))
+      .toHaveAttribute('data-celebration-stage', '3', { timeout: 5000 });
+    await expect.soft(results(page).locator('canvas.cel')).toBeVisible();
+    await expect
+      .soft(results(page).locator('.group.cel-wave'))
+      .not.toHaveCount(0);
+    await expect
+      .soft(results(page).locator('.group-mark.cel-shine'))
+      .not.toHaveCount(0);
+    await expect
+      .soft(results(page).locator('.group.cel-glow'))
+      .not.toHaveCount(0);
+    await shoot(
+      page,
+      'the board celebrating its results',
+      page.locator('#cg-board'),
+    );
+    // The canvas never takes a tap: Shuffle again, under it, still works.
+    await expect
+      .soft(results(page).locator('canvas.cel'))
+      .toHaveCSS('pointer-events', 'none');
+
+    await markSources(page);
+    expect(await markedStillSounding(page)).toBeGreaterThan(0);
+    await shuffleOnBoard(page);
+    await expect
+      .soft(results(page))
+      .not.toHaveAttribute('data-celebrating', { timeout: 1000 });
+    await expect
+      .soft(results(page).locator('.cel-wave, .cel-shine, .cel-glow'))
+      .toHaveCount(0);
+    await expect
+      .poll(() => markedStillSounding(page), { timeout: 1000 })
+      .toBe(0);
+
+    await celebrating(page);
+    await markSources(page);
+    expect(await markedStillSounding(page)).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await expect.soft(page.locator('#cg-board')).toBeHidden();
+    await expect
+      .soft(page.locator('#cg-results'))
+      .not.toHaveAttribute('data-celebrating', { timeout: 1000 });
+    await expect
+      .soft(page.locator('.cel-wave, .cel-shine, .cel-glow, canvas.cel'))
+      .toHaveCount(0);
+    await expect
+      .poll(() => markedStillSounding(page), { timeout: 1000 })
+      .toBe(0);
+  });
+
+  test('with reduced motion, only the glow shows and the canvas draws nothing', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await withGroups(page);
+    await openBoard(page);
+    await shuffleOnBoard(page);
+    await celebrating(page);
+    await expect
+      .soft(results(page))
+      .toHaveAttribute('data-celebration-stage', '3', { timeout: 5000 });
+    await expect
+      .soft(results(page).locator('.group.cel-glow'))
+      .not.toHaveCount(0);
+    await expect
+      .soft(results(page).locator('.cel-wave, .cel-shine'))
+      .toHaveCount(0);
+    const canvas = results(page).locator('canvas.cel');
+    await expect.soft(canvas).toHaveCount(1);
+    expect
+      .soft(
+        await canvas.evaluate((el) => {
+          const c = el as HTMLCanvasElement;
+          const ctx = c.getContext('2d');
+          if (!ctx || c.width === 0 || c.height === 0) return -1;
+          const { data } = ctx.getImageData(0, 0, c.width, c.height);
+          let painted = 0;
+          for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) painted++;
+          return painted;
+        }),
+        'painted pixels on the canvas (-1: no canvas to read)',
+      )
+      .toBe(0);
+  });
+
+  for (const theme of THEMES) {
+    test(`every name stays readable while the cards glow and after, in ${theme}`, async ({
+      page,
+    }) => {
+      await withGroups(page);
+      await emulateTheme(page, theme);
+      await openBoard(page);
+      await shuffleOnBoard(page);
+      await celebrating(page);
+      await expect
+        .soft(results(page))
+        .toHaveAttribute('data-celebration-stage', '3', { timeout: 5000 });
+      const names = results(page).locator('.student');
+      for (const target of await names.all()) {
+        expect
+          .soft(await contrastRatio(target), 'while glowing')
+          .toBeGreaterThanOrEqual(4.5);
+      }
+      await expect(results(page)).not.toHaveAttribute('data-celebrating', {
+        timeout: 15000,
+      });
+      for (const target of await names.all()) {
+        expect
+          .soft(await contrastRatio(target), 'after')
+          .toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
 });

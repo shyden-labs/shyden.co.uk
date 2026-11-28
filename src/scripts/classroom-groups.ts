@@ -88,18 +88,21 @@ import { sectionState } from '../lib/sections';
 import { staleReason, type Snapshot } from '../lib/staleness';
 import { avatarSymbolId } from '../lib/avatars';
 import { liftFor } from '../lib/keyboard-dock';
-import { landAssetIndex, SFX_ASSET_GAIN } from '../lib/sfxAssets';
+// STUB (#1339, tests-first commit): the old players, pointed at the new
+// recordings so the tree compiles while the new tests run red on CI.
+const landAssetIndex = (i: number): number => Math.max(0, Math.trunc(i)) % 4;
+const SFX_ASSET_GAIN = { shuffle: 0.85, land: 0.55, done: 0.85 } as const;
 // Six real, mastered CC0 samples (src/assets/sfx/CREDITS.md has provenance
 // and licence) -- imported through Vite so a missing file fails the BUILD,
 // not a 404 nobody notices at runtime, and so each becomes a content-hashed,
 // same-origin URL string with no code here needing to know or care what
 // that hash is. See the "── sound" section below for how each is used.
-import shuffleAssetUrl from '../assets/sfx/shuffle.m4a';
-import land1AssetUrl from '../assets/sfx/land-1.m4a';
-import land2AssetUrl from '../assets/sfx/land-2.m4a';
-import land3AssetUrl from '../assets/sfx/land-3.m4a';
-import land4AssetUrl from '../assets/sfx/land-4.m4a';
-import doneAssetUrl from '../assets/sfx/done.m4a';
+import shuffleAssetUrl from '../assets/sfx/timpani-hit.m4a';
+import land1AssetUrl from '../assets/sfx/marimba-43.m4a';
+import land2AssetUrl from '../assets/sfx/marimba-47.m4a';
+import land3AssetUrl from '../assets/sfx/marimba-53.m4a';
+import land4AssetUrl from '../assets/sfx/marimba-60.m4a';
+import doneAssetUrl from '../assets/sfx/impact.m4a';
 import { enhanceReportForm } from './report-form';
 import { absentNumbers, waitingRoll } from '../lib/absence';
 import {

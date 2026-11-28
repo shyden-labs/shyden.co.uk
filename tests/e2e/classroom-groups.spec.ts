@@ -21,6 +21,13 @@ import {
   localisePath,
 } from '../../src/lib/i18n';
 import { recorded, shoot } from './evidence';
+import { recordDealTimes, dealSpread } from './deal-times';
+import { SFX_MANIFEST } from '../../src/lib/sfxAssets';
+import {
+  installSourceRecorder,
+  markSources,
+  markedStillSounding,
+} from './audio-sources';
 import { THEMES } from '../palette';
 import { THEME_SCRIPT_SOURCE, emulateTheme } from '../themes';
 import { atLeast44, expectNoHorizontalScroll } from '../viewport';
@@ -451,9 +458,9 @@ test.describe('classroom group creator', () => {
   // The defaults are read first, before anything is pressed, and the page's
   // own load is what the audio requests are measured against: Sound stays ON
   // (the default) and speed stays 'normal' (not 'skip') -- the on-load
-  // prefetch trigger fires for all six purely from loading the page, with no
+  // prefetch trigger fires for every sound purely from loading the page, with no
   // form interaction at all. The animation runs last.
-  test('on load the page fetches only its own six sounds, then a fast shuffle deals every card and settles', async ({
+  test('on load the page fetches only its own sounds, then a fast shuffle deals every card and settles', async ({
     page,
   }) => {
     const seen = recordRequests(page);
@@ -468,19 +475,19 @@ test.describe('classroom group creator', () => {
         'Students are anonymous and numbered — Student 1, Student 2, and so on.',
       );
 
-    // Polled, not read once. The six `fetch` calls are issued during module
+    // Polled, not read once. The `fetch` calls are issued during module
     // evaluation, but their request events reach Node asynchronously over the
     // browser protocol -- reading the array the instant `goto` resolved is
-    // exactly what CI caught returning `[]` (run 34391533802). Polling to an
-    // exact 6 still fails on five or seven: it waits for the count, it does
-    // not accept whatever count has arrived.
+    // exactly what CI caught returning `[]` (run 34391533802). Polling to the
+    // exact count still fails on one fewer or one more: it waits for the
+    // count, it does not accept whatever count has arrived.
     await expect
       .poll(() => seen.matching(urlMatching(AUDIO_URL_PATTERN)).length)
-      .toBe(6);
+      .toBe(Object.keys(SFX_MANIFEST).length);
     const pageOrigin = new URL(page.url()).origin;
     for (const url of seen.matching(urlMatching(AUDIO_URL_PATTERN))) {
       // The CLAUDE.md/no-third-party-requests promise, asserted directly --
-      // the origin, not just that six requests happened to fire.
+      // the origin, not just that the requests happened to fire.
       expect.soft(new URL(url).origin).toBe(pageOrigin);
     }
 
@@ -546,24 +553,18 @@ test.describe('classroom group creator', () => {
   // describe outright -- "it forces a new worker" -- and no source-text
   // guard can see that, so a green suite hid it until the spec was run.
   test.describe('the sound assets on disk', () => {
-    test('all six sound assets are reachable from the built site and appear in dist/', async ({
+    test('every sound asset is reachable from the built site and appears in dist/', async ({
       request,
     }) => {
       const files = listM4aFiles(join('dist'));
+      expect(files).toHaveLength(Object.keys(SFX_MANIFEST).length);
 
-      for (const role of [
-        'shuffle',
-        'land-1',
-        'land-2',
-        'land-3',
-        'land-4',
-        'done',
-      ]) {
-        const pattern = new RegExp(`^${role}\\.[\\w-]+\\.m4a$`);
+      for (const name of Object.keys(SFX_MANIFEST)) {
+        const pattern = new RegExp(`^${name}\\.[\\w-]+\\.m4a$`);
         const matches = files.filter((f) => pattern.test(basename(f)));
         expect(
           matches,
-          `expected exactly one built asset for "${role}" in dist/, found: [${matches.join(', ')}]`,
+          `expected exactly one built asset for "${name}" in dist/, found: [${matches.join(', ')}]`,
         ).toHaveLength(1);
 
         const urlPath = distPathToUrlPath(matches[0]);
@@ -635,7 +636,7 @@ test.describe('classroom group creator', () => {
         }),
       );
 
-    test('downloads no audio and sees every dealt card at rest, with nothing left to move', async ({
+    test('hears the full deal at the normal pace and sees every dealt card at rest, with nothing left to move', async ({
       page,
     }) => {
       const seen = recordRequests(page);
@@ -648,21 +649,20 @@ test.describe('classroom group creator', () => {
       // precede the navigation whose script reads it -- does.
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto('/classroom-groups');
-      // Sound stays ON (untouched, the default) -- speed is forced to
-      // 'skip' by classroom-groups.ts's own reduceMotion handling, which
-      // predates this task. What is new here: that now also has to mean
-      // zero downloads, not just zero sound -- a real bandwidth promise on
-      // a phone (see classroom-groups.ts's own "sound asset network
-      // prefetch" section).
-      await expect.soft(page.locator('#cg-speed')).toHaveValue('skip');
+      // Sound stays ON (untouched, the default). Shyden's ruling of
+      // 2026-11-28 (#1339): reduced motion gets the full deal with no
+      // motion -- the normal pace, every note, each name simply appearing
+      // -- so speed is no longer forced to 'skip' and the sounds download.
+      await expect.soft(page.locator('#cg-speed')).toHaveValue('normal');
       await typeInto(page.locator('#cg-count'), '6');
+      await recordDealTimes(page);
       await tapOn(page.locator('#cg-go'));
       const cards = page.locator('#cg-results .student');
       await expect.soft(cards).toHaveCount(6);
 
       // The mechanism that works, asserted as itself (#331): tokens.css's
-      // reset cuts every transition to 0.01ms, and the script's forced `skip`
-      // deals every card at once. The page's scoped <style> once carried a
+      // reset cuts every transition to 0.01ms, so each card the deal places
+      // is at rest the moment it lands. The page's scoped <style> once carried a
       // reduced-motion rule for the cards that matched none of them, because
       // the script builds every card and none carries the component's scope.
       await expect
@@ -697,6 +697,11 @@ test.describe('classroom group creator', () => {
           })),
         )
         .toEqual(Array.from({ length: 6 }, () => atRest));
+      const spread = await dealSpread(page);
+      expect.soft(spread.dealt, 'cards dealt one at a time').toBe(6);
+      expect
+        .soft(spread.spanMs, 'ms from the first card to the last')
+        .toBeGreaterThan(100);
       await shoot(
         page,
         'every dealt card at rest for a reduced-motion visitor',
@@ -704,17 +709,51 @@ test.describe('classroom group creator', () => {
       );
       await expect.soft(cards).toHaveCount(6);
 
-      const heard = requestsEveryEngineMakes(seen.all);
       expect
         .soft(
-          searched(seen.matching(urlMatching(AUDIO_URL_PATTERN)), {
-            of: heard,
-            what: 'requests the page made',
-          }),
-          'a reduced-motion visitor downloads no audio at all',
+          seen.matching(urlMatching(AUDIO_URL_PATTERN)),
+          'a reduced-motion visitor with sound on downloads every sound',
         )
-        .toEqual([]);
+        .toHaveLength(Object.keys(SFX_MANIFEST).length);
     });
+  });
+
+  // #1339: the ending rings out for 7.5 s, so everything that should end it
+  // has to: a new shuffle, and the sound switch turned off. One journey, two
+  // endings; each mark is taken while the ending is sounding, and checked
+  // sounding first, so a silent page cannot pass.
+  test('the ending stops at once on a new shuffle, and when the sound is switched off', async ({
+    page,
+  }) => {
+    await installSourceRecorder(page);
+    await page.goto('/classroom-groups');
+    await fill(page, { count: '6', size: '3', speed: 'fast' });
+    const results = page.locator('#cg-results');
+
+    await tapOn(page.locator('#cg-go'));
+    await expect(results).toHaveAttribute('data-celebrating', '', {
+      timeout: 15000,
+    });
+    await markSources(page);
+    expect(await markedStillSounding(page)).toBeGreaterThan(0);
+    await tapOn(page.locator('#cg-go'));
+    await expect.soft(results).not.toHaveAttribute('data-celebrating', {
+      timeout: 1000,
+    });
+    await expect
+      .poll(() => markedStillSounding(page), { timeout: 1000 })
+      .toBe(0);
+
+    await expect(results).toHaveAttribute('data-celebrating', '', {
+      timeout: 15000,
+    });
+    await markSources(page);
+    expect(await markedStillSounding(page)).toBeGreaterThan(0);
+    await tapOn(page.locator('#cg-sound-toggle'));
+    await setCheckedOn(page.locator('#cg-sound-check'), false);
+    await expect
+      .poll(() => markedStillSounding(page), { timeout: 1000 })
+      .toBe(0);
   });
 
   test('the fallback plays through a full shuffle when every audio request is blocked', async ({
