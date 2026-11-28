@@ -45,15 +45,17 @@ test.describe('android device preflight', () => {
         'asleep; wake it and keep it awake before running the device suite',
     ).toContain('mWakefulness=Awake');
 
-    // KeyguardStateMonitor.mIsShowing is Android's own signal for "the lock screen is
-    // currently showing". Confirmed present exactly once in `dumpsys window policy` on this
-    // device, so a plain substring match is unambiguous.
+    // `KeyguardServiceDelegate` is the window manager's own record of the lock
+    // screen, dumped on every device with a keyguard, as `showing=true|false`.
+    // KeyguardStateMonitor.mIsShowing, read here before, is dumped only while a
+    // secure lock is set: measured 2026-11-28 on the OPPO after its factory reset
+    // (no lock), the line was absent and an unlocked phone was reported locked.
     const policy = adb(['shell', 'dumpsys', 'window', 'policy']);
     expect(
       policy,
-      'expected KeyguardStateMonitor.mIsShowing=false in `dumpsys window policy` -- the ' +
+      'expected KeyguardServiceDelegate showing=false in `dumpsys window policy` -- the ' +
         'phone is locked; unlock it before running the device suite',
-    ).toContain('mIsShowing=false');
+    ).toMatch(/KeyguardServiceDelegate\s+showing=false\b/);
   });
 
   test('3. Chrome is launched and is the foreground app', async () => {
