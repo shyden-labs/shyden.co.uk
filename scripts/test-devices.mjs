@@ -1245,6 +1245,7 @@ async function runIosGroup() {
   let wda;
   try {
     wda = await startWda({ udid: found.device.udid });
+    runningWda.add(wda);
   } catch (error) {
     const reason = `WebDriverAgent did not start: ${messageOf(error)}`;
     process.stdout.write(`[${name}] ${reason}\n`);
@@ -1271,6 +1272,7 @@ async function runIosGroup() {
       },
     }));
   } finally {
+    runningWda.delete(wda);
     await wda.stop();
   }
   const durationMs = Date.now() - startedAt;
@@ -1603,7 +1605,40 @@ export function exitCodeFor(signal) {
   return 128 + constants.signals[signal];
 }
 
+/**
+ * Every WebDriverAgent this run has started and not yet stopped. The iOS
+ * group's `finally` stops its own, but a signal ends the process with
+ * `process.exit`, which runs no `finally`: measured 2026-11-28, a Ctrl-C left
+ * xcodebuild running and the runner installed on the iPhone (#1326).
+ *
+ * @type {Set<{ stop(): Promise<void> }>}
+ */
+const runningWda = new Set();
+
+/**
+ * Stops each handle in `running` and forgets it, writing a failure for any
+ * that would not stop and carrying on with the rest.
+ *
+ * @param {Set<{ stop(): Promise<void> }>} running
+ * @param {(line: string) => void} [write]
+ * @returns {Promise<void>}
+ */
+export async function stopStarted(
+  running,
+  write = (line) => process.stderr.write(line),
+) {
+  for (const handle of [...running]) {
+    running.delete(handle);
+    try {
+      await handle.stop();
+    } catch (error) {
+      write(`cleanup: failed to stop WebDriverAgent: ${messageOf(error)}\n`);
+    }
+  }
+}
+
 const cleanup = once(async () => {
+  await stopStarted(runningWda);
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
     try {
