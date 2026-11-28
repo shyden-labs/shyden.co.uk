@@ -1417,18 +1417,71 @@ const pageIds = (listing) => {
   );
 };
 
+/**
+ * Whether Chrome runs on the phone, read from
+ * `adb shell 'pidof com.android.chrome; echo exit=$?'`: a pid means running,
+ * pidof's exit 1 with nothing printed means stopped, and anything else is
+ * refused, quoted, rather than guessed (#1337).
+ *
+ * @param {string} output
+ * @returns {'running' | 'stopped'}
+ */
+export function chromeProcessState(output) {
+  const lines = output
+    .trim()
+    .split('\n')
+    .map((line) => line.trim());
+  const exit = lines.at(-1);
+  const printed = lines.slice(0, -1).filter((line) => line !== '');
+  if (
+    exit === 'exit=0' &&
+    printed.length > 0 &&
+    printed.every((l) => /^\d+( \d+)*$/.test(l))
+  )
+    return 'running';
+  if (exit === 'exit=1' && printed.length === 0) return 'stopped';
+  throw new Error(
+    `could not tell whether Chrome runs from pidof: ${JSON.stringify(output)}`,
+  );
+}
+
+/**
+ * The tabs to leave after the run (#1326, #1337). With Chrome stopped there
+ * are none, so DevTools is not asked: its socket exists only while Chrome
+ * runs. When either read fails the tabs stay unknown, and the cleanup closes
+ * nothing.
+ *
+ * @param {{ chromeState: () => 'running' | 'stopped', list: () => Promise<unknown> }} reads
+ * @returns {Promise<{ ids: string[] } | { unknown: string }>}
+ */
+export async function readTabsBefore({ chromeState, list }) {
+  try {
+    if (chromeState() === 'stopped') return { ids: [] };
+    return { ids: pageIds(await list()) };
+  } catch (error) {
+    return { unknown: messageOf(error) };
+  }
+}
+
 /** @type {string[] | undefined} The tab ids open before this run. */
 let tabsBeforeRun;
 
 /** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
 async function readTabsBeforeRun() {
-  try {
-    tabsBeforeRun = pageIds(await chromeTargets());
-  } catch (error) {
-    process.stderr.write(
-      `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
-    );
+  const before = await readTabsBefore({
+    chromeState: () =>
+      chromeProcessState(
+        adb(['shell', 'pidof com.android.chrome; echo exit=$?']),
+      ),
+    list: chromeTargets,
+  });
+  if ('ids' in before) {
+    tabsBeforeRun = before.ids;
+    return;
   }
+  process.stderr.write(
+    `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${before.unknown}\n`,
+  );
 }
 
 /** Closes the tabs this run opened, and no other (#1326). */
