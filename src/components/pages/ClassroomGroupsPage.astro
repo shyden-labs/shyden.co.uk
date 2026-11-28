@@ -2106,9 +2106,12 @@ const sexWhyText = sexWhy(roster, t);
      did exactly what it was told and broke a name mid-word, "Christoph / er /
      Wethering / ton- / Smythe". Unreadable at the back of a classroom, and
      invisible to every earlier check because they all used "Student 1".
-     `em` is the unit that scales with the board. */
+     `em` is the unit that scales with the board. 9em held the longest word
+     beside its avatar; each student's number beside the name (#1338) took
+     another 5.5px and pushed group 1's rows out of their card, so the
+     column also holds a three-digit number (a class goes up to 100). */
   .cg-board #cg-tables {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9em), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10.5em), 1fr));
   }
   /* …and once the column can hold a name, prefer a word boundary. `anywhere`
      is the page's defence against a long name pushing the layout sideways; on
@@ -2116,9 +2119,9 @@ const sexWhyText = sexWhy(roster, t);
      resort, not the first move. */
   .cg-board #cg-results .who {
     overflow-wrap: break-word;
-    /* A flex item never shrinks below its longest word unless told to: with
-       the student's number beside it (#1338), "Wetherington-" pushed its
-       row 3.6-5.5px past the card's right edge in WebKit and Firefox. */
+    /* Should a name still not fit, it breaks inside its card rather than
+       pushing its row out of it: a flex item never shrinks below its
+       longest word unless told to. */
     min-width: 0;
   }
   /* #1338: each group under a coloured header bar holding a shape and its
