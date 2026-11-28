@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ADB,
   ASTRO_CLI,
   DOCKER,
   dockerFor,
@@ -12,6 +13,8 @@ import {
   PLAYWRIGHT_CLI,
   PS,
   VITEST_CLI,
+  XCODEBUILD,
+  XCRUN,
   lsofFor,
 } from '../../scripts/programs.mjs';
 
@@ -29,6 +32,17 @@ describe('the programs the scripts run, each by its absolute path', () => {
       '/usr/bin/git',
       '/bin/ps',
       '/usr/bin/pgrep',
+    ]);
+  });
+
+  // The device tools run only on the Mac (#1294). Measured there with
+  // `which -a` on 2026-11-28: one of each, adb from Homebrew's
+  // android-platform-tools cask, xcrun and xcodebuild from the system.
+  it('runs the device tools from where the Mac keeps them', () => {
+    expect([ADB, XCRUN, XCODEBUILD]).toEqual([
+      '/opt/homebrew/bin/adb',
+      '/usr/bin/xcrun',
+      '/usr/bin/xcodebuild',
     ]);
   });
 

@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseTunnelAddress } from './devicectl.mjs';
 import { messageOf, nonEmpty } from './errors.mjs';
-import { PGREP } from './programs.mjs';
+import { GIT, PGREP, XCODEBUILD, XCRUN } from './programs.mjs';
 
 /** appium/WebDriverAgent v16.14.0 (BSD), tag dated 2026-10-04. */
 export const WDA_PIN = 'd17782422d55ff1e5e0ceb74eb1fd509cc0c35b6';
@@ -144,10 +144,10 @@ export async function startWda({
   const products = path.join(derivedData, 'Build', 'Products');
 
   if (!hasSource(srcDir)) {
-    await runCommand('git', ['clone', '--filter=blob:none', WDA_REPO, srcDir], {
+    await runCommand(GIT, ['clone', '--filter=blob:none', WDA_REPO, srcDir], {
       timeoutMs: WDA_BUILD_CEILING_MS,
     });
-    await runCommand('git', ['-C', srcDir, 'checkout', WDA_PIN], {
+    await runCommand(GIT, ['-C', srcDir, 'checkout', WDA_PIN], {
       timeoutMs: DEVICECTL_CEILING_MS,
     });
   }
@@ -155,7 +155,7 @@ export async function startWda({
   let xctestrun = find(products);
   if (xctestrun === null) {
     await runCommand(
-      'xcodebuild',
+      XCODEBUILD,
       [
         'build-for-testing',
         '-project',
@@ -183,7 +183,7 @@ export async function startWda({
   announce(
     'starting WebDriverAgent: if the iPhone asks for its passcode to allow UI automation, enter it now (iOS asks again once an earlier permission has lapsed, #1248)',
   );
-  const child = spawn('xcodebuild', [
+  const child = spawn(XCODEBUILD, [
     'test-without-building',
     '-xctestrun',
     xctestrun,
@@ -205,7 +205,7 @@ export async function startWda({
   const uninstallRunner = async () => {
     try {
       await runCommand(
-        'xcrun',
+        XCRUN,
         [
           'devicectl',
           'device',
@@ -316,7 +316,7 @@ export async function startWda({
   try {
     const tunnel = parseTunnelAddress(
       await runCommand(
-        'xcrun',
+        XCRUN,
         ['devicectl', 'device', 'info', 'details', '--device', udid],
         { timeoutMs: DEVICECTL_CEILING_MS },
       ),

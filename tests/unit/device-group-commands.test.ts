@@ -2,8 +2,30 @@ import { describe, expect, it } from 'vitest';
 import {
   androidGroupCommand,
   iosGroupCommand,
+  npmRunCommand,
 } from '../../scripts/test-devices.mjs';
-import { NODE, PLAYWRIGHT_CLI, VITEST_CLI } from '../../scripts/programs.mjs';
+import {
+  NODE,
+  NPM_CLI,
+  PLAYWRIGHT_CLI,
+  VITEST_CLI,
+} from '../../scripts/programs.mjs';
+
+describe('the device run builds and previews through npm by path (#1294)', () => {
+  it("runs `npm run build` as npm's own entry file under node", () => {
+    expect(npmRunCommand(['build'])).toEqual({
+      command: NODE,
+      args: [NPM_CLI, 'run', 'build'],
+    });
+  });
+
+  it('runs the preview server the same way, its arguments unchanged', () => {
+    expect(npmRunCommand(['preview', '--', '--host', '0.0.0.0'])).toEqual({
+      command: NODE,
+      args: [NPM_CLI, 'run', 'preview', '--', '--host', '0.0.0.0'],
+    });
+  });
+});
 
 /**
  * The device run's two suites start Playwright's and Vitest's own entry files

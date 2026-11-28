@@ -77,6 +77,7 @@ import {
   DOCKER,
   LSOF,
   NODE,
+  NPM_CLI,
   PLAYWRIGHT_CLI,
   PS,
   VITEST_CLI,
@@ -1125,6 +1126,18 @@ async function runDesktopGroup() {
  *
  * @returns {{ command: string, args: string[] }}
  */
+/**
+ * `npm run <args>` as npm's own entry file under node, never `npm` found on
+ * PATH (#1294): the run's build and its preview server.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ command: string, args: string[] }}
+ */
+export const npmRunCommand = (args) => ({
+  command: NODE,
+  args: [NPM_CLI, 'run', ...args],
+});
+
 export const androidGroupCommand = () => ({
   command: NODE,
   args: [
@@ -1417,18 +1430,71 @@ const pageIds = (listing) => {
   );
 };
 
+/**
+ * Whether Chrome runs on the phone, read from
+ * `adb shell 'pidof com.android.chrome; echo exit=$?'`: a pid means running,
+ * pidof's exit 1 with nothing printed means stopped, and anything else is
+ * refused, quoted, rather than guessed (#1337).
+ *
+ * @param {string} output
+ * @returns {'running' | 'stopped'}
+ */
+export function chromeProcessState(output) {
+  const lines = output
+    .trim()
+    .split('\n')
+    .map((line) => line.trim());
+  const exit = lines.at(-1);
+  const printed = lines.slice(0, -1).filter((line) => line !== '');
+  if (
+    exit === 'exit=0' &&
+    printed.length > 0 &&
+    printed.every((l) => /^\d+( \d+)*$/.test(l))
+  )
+    return 'running';
+  if (exit === 'exit=1' && printed.length === 0) return 'stopped';
+  throw new Error(
+    `could not tell whether Chrome runs from pidof: ${JSON.stringify(output)}`,
+  );
+}
+
+/**
+ * The tabs to leave after the run (#1326, #1337). With Chrome stopped there
+ * are none, so DevTools is not asked: its socket exists only while Chrome
+ * runs. When either read fails the tabs stay unknown, and the cleanup closes
+ * nothing.
+ *
+ * @param {{ chromeState: () => 'running' | 'stopped', list: () => Promise<unknown> }} reads
+ * @returns {Promise<{ ids: string[] } | { unknown: string }>}
+ */
+export async function readTabsBefore({ chromeState, list }) {
+  try {
+    if (chromeState() === 'stopped') return { ids: [] };
+    return { ids: pageIds(await list()) };
+  } catch (error) {
+    return { unknown: messageOf(error) };
+  }
+}
+
 /** @type {string[] | undefined} The tab ids open before this run. */
 let tabsBeforeRun;
 
 /** Reads the tabs open before the run, so the cleanup can leave them (#1326). */
 async function readTabsBeforeRun() {
-  try {
-    tabsBeforeRun = pageIds(await chromeTargets());
-  } catch (error) {
-    process.stderr.write(
-      `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${messageOf(error)}\n`,
-    );
+  const before = await readTabsBefore({
+    chromeState: () =>
+      chromeProcessState(
+        adb(['shell', 'pidof com.android.chrome; echo exit=$?']),
+      ),
+    list: chromeTargets,
+  });
+  if ('ids' in before) {
+    tabsBeforeRun = before.ids;
+    return;
   }
+  process.stderr.write(
+    `tabs: could not read Chrome's open tabs before the run, so none will be closed after it: ${before.unknown}\n`,
+  );
 }
 
 /** Closes the tabs this run opened, and no other (#1326). */
@@ -1764,7 +1830,8 @@ async function main() {
     await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
-    const build = await runTagged('build', 'npm', ['run', 'build']);
+    const buildCmd = npmRunCommand(['build']);
+    const build = await runTagged('build', buildCmd.command, buildCmd.args);
     if (build.code !== 0) {
       throw new Error(
         `\`npm run build\` exited with code ${build.code} -- aborting the whole run.`,
@@ -1776,12 +1843,10 @@ async function main() {
     );
     // Its own process group: cleanup stops npm AND the server it started,
     // and nothing else that happens to use the port (#390 F44).
-    previewChild = spawnTagged(
-      'preview',
-      'npm',
-      ['run', 'preview', '--', '--host', '0.0.0.0'],
-      { detached: true },
-    );
+    const previewCmd = npmRunCommand(['preview', '--', '--host', '0.0.0.0']);
+    previewChild = spawnTagged('preview', previewCmd.command, previewCmd.args, {
+      detached: true,
+    });
     await untilReadyOrExit(
       previewChild,
       waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {
