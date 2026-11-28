@@ -102,6 +102,7 @@ import land4AssetUrl from '../assets/sfx/land-4.m4a';
 import doneAssetUrl from '../assets/sfx/done.m4a';
 import { enhanceReportForm } from './report-form';
 import { absentNumbers, waitingRoll } from '../lib/absence';
+import { groupMark, numbersOnly } from '../lib/boardMarks';
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T | null;
@@ -1019,7 +1020,24 @@ if (form) {
    * after it finishes -- and re-deriving position from the roster would be
    * wrong anyway, since the roster's order is not the groups' order.
    */
+  /**
+   * #1338: the board shows numbers first when no dealt student has a name.
+   * Read from the dealt rows, so a name typed after the shuffle switches the
+   * board back to names.
+   */
+  const markNumbersOnly = () => {
+    const numbers = Array.from(
+      tables.querySelectorAll<HTMLElement>('.student'),
+      (el) => Number(el.dataset.number),
+    );
+    tables.toggleAttribute(
+      'data-numbers-only',
+      numbers.length > 0 && numbersOnly(numbers, rosterNames),
+    );
+  };
+
   const relabelResults = () => {
+    markNumbersOnly();
     for (const el of tables.querySelectorAll<HTMLElement>('.student')) {
       const number = Number(el.dataset.number);
       const who = el.querySelector<HTMLElement>('.who');
@@ -2186,10 +2204,28 @@ if (form) {
     groups.forEach((group, i) => {
       const card = document.createElement('section');
       card.className = 'group';
+      // #1338: the projected board paints each group's bar in its own tone
+      // and shows a shape beside the number, so a student finds their group
+      // from their seat by more than colour. The mark is decorative; the
+      // localised "Group n" stays the heading's accessible name.
+      const mark = groupMark(i);
+      card.dataset.tone = String(mark.tone);
       const h = document.createElement('h3');
+      h.className = 'group-label';
+      const markEl = document.createElement('div');
+      markEl.className = 'group-mark';
+      markEl.setAttribute('aria-hidden', 'true');
+      const shapeEl = document.createElement('span');
+      shapeEl.className = 'group-shape';
+      shapeEl.textContent = mark.shape;
+      const noEl = document.createElement('span');
+      noEl.className = 'group-no';
+      noEl.textContent = String(mark.number);
+      markEl.append(shapeEl, noEl);
       // Stage 3, Task 8: groups are always numbered now -- the themed
       // branch groupName() used to have, and the naming radio that chose
-      // it, are both gone (design spec section 5).
+      // it, are both gone (design spec section 5). The heading's text is
+      // unchanged by #1338: the bar beside it is decoration.
       h.textContent = groupName(i, t);
       const ul = document.createElement('ul');
       group.forEach((student) => {
@@ -2205,12 +2241,19 @@ if (form) {
         const who = document.createElement('span');
         who.className = 'who';
         who.textContent = label(student); // the untrusted value, set as TEXT
-        li.appendChild(who);
+        // #1338: the number alone, shown large on the board when no
+        // student in the deal has a name.
+        const no = document.createElement('span');
+        no.className = 'student-no';
+        no.setAttribute('aria-hidden', 'true');
+        no.textContent = String(student.number);
+        li.append(who, no);
         ul.appendChild(li);
       });
-      card.append(h, ul);
+      card.append(markEl, h, ul);
       tables.appendChild(card);
     });
+    markNumbersOnly();
   };
 
   // The deal is interruptible (operator, 2026-08-13). Two ways out, and they

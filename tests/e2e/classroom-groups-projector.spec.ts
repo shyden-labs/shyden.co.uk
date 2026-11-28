@@ -1496,3 +1496,271 @@ test.describe('absent students on the board (#999)', () => {
     });
   }
 });
+
+/**
+ * #1338: students read their group from their seats. Each group card on the
+ * board carries a coloured header bar with a shape and the group's number,
+ * the board switches light and dark from its own bar, and a roster with no
+ * names shows the students' numbers first. Measured at three projector sizes,
+ * in both themes, in every language, with ten groups.
+ */
+test.describe('the projected board reads from the back of the room (#1338)', () => {
+  const PROJECTORS = [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+    { width: 1920, height: 1080 },
+  ] as const;
+  const SHAPES = ['●', '▲', '■', '◆', '★', '✚'];
+  const PATHS = {
+    en: '/classroom-groups',
+    id: '/id/classroom-groups',
+    zh: '/zh/classroom-groups',
+    vi: '/vi/classroom-groups',
+    th: '/th/classroom-groups',
+  } as const;
+  const boardSwitch = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board-bar [data-theme-toggle]');
+  const px = (loc: import('@playwright/test').Locator) =>
+    loc.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+
+  /** Every part of each card stays inside the card's own box. */
+  const escapes = (page: import('@playwright/test').Page) =>
+    page.locator('#cg-board .group').evaluateAll((cards) =>
+      cards.flatMap((card, i) => {
+        const box = card.getBoundingClientRect();
+        return Array.from(card.querySelectorAll('*')).flatMap((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 && r.height === 0) return [];
+          const out =
+            r.left < box.left - 0.5 ||
+            r.right > box.right + 0.5 ||
+            r.top < box.top - 0.5 ||
+            r.bottom > box.bottom + 0.5;
+          return out ? [`group ${i + 1}: ${el.className || el.tagName}`] : [];
+        });
+      }),
+    );
+
+  test('the board switches light and dark from its own bar, and the page keeps the choice', async ({
+    page,
+  }) => {
+    await withGroups(page, 12);
+    await openBoard(page);
+    const toggle = boardSwitch(page);
+    const html = page.locator('html');
+    await test.step('the switch is on the board, a real target, reached by Tab', async () => {
+      await expect.soft(toggle).toBeVisible();
+      const box = await toggle.boundingBox();
+      expect.soft(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect.soft(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await tabTo(toggle);
+      await expect.soft(toggle).toBeFocused();
+    });
+    const ground = () =>
+      page
+        .locator('#cg-board')
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+    const startTheme = await html.getAttribute('data-theme');
+    const startGround = await ground();
+    await test.step('a real click switches the board at once', async () => {
+      await tapOn(toggle);
+      await expect
+        .soft(html)
+        .not.toHaveAttribute('data-theme', startTheme ?? '');
+      expect.soft(await ground()).not.toBe(startGround);
+    });
+    await test.step('a real Space switches it back', async () => {
+      await tabTo(toggle);
+      await page.keyboard.press('Space');
+      expect.soft(await ground()).toBe(startGround);
+    });
+    await test.step('dark chosen on the board stays after closing it, and after a reload', async () => {
+      if ((await html.getAttribute('data-theme')) !== 'dark')
+        await tapOn(toggle);
+      await expect.soft(html).toHaveAttribute('data-theme', 'dark');
+      await page.keyboard.press('Escape');
+      await expect.soft(page.locator('#cg-board')).toBeHidden();
+      await expect.soft(html).toHaveAttribute('data-theme', 'dark');
+      await page.reload();
+      await expect.soft(html).toHaveAttribute('data-theme', 'dark');
+    });
+  });
+
+  for (const [locale, path] of Object.entries(PATHS)) {
+    test(`${locale}: every group's number reads from the back, in light and dark, at every projector size`, async ({
+      page,
+    }) => {
+      for (const size of PROJECTORS) {
+        for (const theme of ['light', 'dark'] as const) {
+          await test.step(`${size.width}x${size.height}, ${theme}`, async () => {
+            await atViewport(page, size);
+            await page.goto(path);
+            await makeGroups(page, '40', '4');
+            await openBoard(page, page.locator('#cg-board-open'));
+            const html = page.locator('html');
+            if ((await html.getAttribute('data-theme')) !== theme)
+              await tapOn(boardSwitch(page));
+            await expect.soft(html).toHaveAttribute('data-theme', theme);
+
+            const cards = page.locator('#cg-board .group');
+            await expect.soft(cards).toHaveCount(10);
+            await expect
+              .soft(page.locator('#cg-tables'))
+              .toHaveAttribute('data-numbers-only', '');
+            for (const i of [0, 6, 9]) {
+              const card = cards.nth(i);
+              await expect
+                .soft(card)
+                .toHaveAttribute('data-tone', String((i % 6) + 1));
+              await expect
+                .soft(card.locator('.group-shape'))
+                .toHaveText(SHAPES[i % 6]);
+              await expect
+                .soft(card.locator('.group-no'))
+                .toHaveText(String(i + 1));
+            }
+            for (const i of [0, 1, 2, 3, 4, 5]) {
+              const card = cards.nth(i);
+              const no = card.locator('.group-no');
+              const student = card.locator('.student-no').first();
+              await expect.soft(no).toBeVisible();
+              await expect.soft(student).toBeVisible();
+              await expect.soft(card.locator('.who').first()).toBeHidden();
+              const noPx = await px(no);
+              if (size.width === 1024)
+                expect.soft(noPx).toBeGreaterThanOrEqual(48);
+              expect
+                .soft(noPx)
+                .toBeGreaterThanOrEqual(
+                  2 * (await px(card.locator('.who').first())),
+                );
+              expect.soft(await contrastRatio(no)).toBeGreaterThanOrEqual(4.5);
+              expect
+                .soft(await contrastRatio(student))
+                .toBeGreaterThanOrEqual(4.5);
+              await expect.soft(card.locator('.group-label')).toBeHidden();
+              await expect
+                .soft(card.getByRole('heading', { level: 3 }))
+                .toHaveAccessibleName(/\d/);
+            }
+            expect.soft(await escapes(page)).toEqual([]);
+            expect
+              .soft(
+                await page.evaluate(
+                  () => document.documentElement.scrollWidth - innerWidth,
+                ),
+              )
+              .toBeLessThanOrEqual(0);
+            await page.keyboard.press('Escape');
+            await expect.soft(page.locator('#cg-board')).toBeHidden();
+            await expect
+              .soft(page.locator('#cg-results .group-mark').first())
+              .toBeHidden();
+            await expect
+              .soft(page.locator('#cg-results .group-label').first())
+              .toBeVisible();
+          });
+        }
+      }
+    });
+  }
+
+  test('a named class shows names under the bar, the long one inside its card, the number twice their size', async ({
+    page,
+  }) => {
+    await atViewport(page, PROJECTORS[0]);
+    await buildRoster(page, [
+      ['M', 'Christopher Wetherington-Smythe'],
+      ['F', 'Ayu Lestari'],
+      ['M', 'Budi Santoso'],
+      ['F', 'Citra Dewi'],
+      ['M', 'Dimas Pratama'],
+      ['F', 'Eka Putri'],
+      ['M'],
+      ['F'],
+    ]);
+    await tapOn(page.getByRole('button', { name: 'Make Groups', exact: true }));
+    await openBoard(page);
+    await expect
+      .soft(page.locator('#cg-tables'))
+      .not.toHaveAttribute('data-numbers-only');
+    const cards = page.locator('#cg-board .group');
+    for (const i of [0, 1]) {
+      const card = cards.nth(i);
+      const who = card.locator('.who').first();
+      await expect.soft(who).toBeVisible();
+      // Shyden, 2026-11-28: a named student's number shows beside the name,
+      // smaller than it.
+      const studentNo = card.locator('.student-no').first();
+      await expect.soft(studentNo).toBeVisible();
+      await expect
+        .soft(studentNo)
+        .toHaveText(
+          (await card
+            .locator('.student')
+            .first()
+            .getAttribute('data-number')) ?? '',
+        );
+      expect.soft(await px(studentNo)).toBeLessThan(await px(who));
+      const noBox = await studentNo.boundingBox();
+      const whoBox = await who.boundingBox();
+      expect.soft((noBox?.x ?? 0) < (whoBox?.x ?? 0)).toBe(true);
+      const noPx = await px(card.locator('.group-no'));
+      expect.soft(noPx).toBeGreaterThanOrEqual(48);
+      expect.soft(noPx).toBeGreaterThanOrEqual(2 * (await px(who)));
+      expect.soft(await px(who)).toBeGreaterThanOrEqual(FLOOR_PX);
+    }
+    await expect
+      .soft(
+        page.locator('#cg-board .who', {
+          hasText: 'Christopher Wetherington-Smythe',
+        }),
+      )
+      .toBeVisible();
+    expect.soft(await escapes(page)).toEqual([]);
+  });
+
+  // Shyden, 2026-11-28: "i still need to keep the other design pieces.
+  // things like absent students, class name, student numbers etc."
+  test('the new board keeps the class name, the absent note and every avatar, in light and dark', async ({
+    page,
+  }) => {
+    await page.goto('/classroom-groups');
+    await typeInto(page.locator('#cg-class'), 'Year 7 Blue');
+    await typeInto(page.locator('#cg-numbers-absent'), '3, 7');
+    await makeGroups(page, '24', '4');
+    await openBoard(page);
+    const html = page.locator('html');
+    for (const theme of ['light', 'dark'] as const) {
+      await test.step(theme, async () => {
+        if ((await html.getAttribute('data-theme')) !== theme)
+          await tapOn(boardSwitch(page));
+        await expect
+          .soft(page.locator('#cg-board #cg-results-h'))
+          .toContainText('Year 7 Blue');
+        await expect
+          .soft(page.locator('#cg-board #cg-grouped-note'))
+          .toBeVisible();
+        await expect
+          .soft(page.locator('#cg-board #cg-grouped-note'))
+          .toContainText('3');
+        await expect
+          .soft(page.locator('#cg-board #cg-grouped-note'))
+          .toContainText('7');
+        const students = page.locator('#cg-board .student');
+        await expect.soft(students).toHaveCount(22);
+        await expect
+          .soft(page.locator('#cg-board .student .avatar'))
+          .toHaveCount(22);
+        await expect
+          .soft(page.locator('#cg-board .student .avatar').first())
+          .toBeVisible();
+        for (const target of [
+          page.locator('#cg-board #cg-results-h'),
+          page.locator('#cg-board #cg-grouped-note'),
+        ])
+          expect.soft(await contrastRatio(target)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  });
+});

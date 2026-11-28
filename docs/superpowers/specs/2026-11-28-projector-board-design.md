@@ -44,6 +44,8 @@ Each group card has a full-width coloured **header bar** holding the group's **s
 - **Six group colours and six shapes** (● ▲ ■ ◆ ★ ✚), one pair per group, repeating from group 7 (the number stays unique). Each colour has a light-theme and a dark-theme value. **My call:** no yellow or amber in the set, so #999's amber "absent" stays unmistakable; the mockup's dark-mode yellow is replaced.
 - **Numbers-first** (Shyden: it varies by class): when no student in the roster has a name, each student's number is the card's content at a larger size; with names, names as today. **My call:** decided per board render from the roster, no setting.
 - **The board's light/dark control** is a button in the board's control bar carrying `data-theme-toggle`, so the page's existing theme script (`src/scripts/theme.inline.js`) handles it: same saved choice, same `aria-pressed`, the page and the board switch together. At least 44px, reachable by Tab, labelled in all five languages.
+- **Everything already on the board stays** (Shyden, 2026-11-28: _"i still need to keep the other design pieces. things like absent students, class name, student numbers etc."_): the class name heading, the "numbers … are absent" note and absent list (and #999's amber marking), every avatar and name.
+- **A named student's number shows beside the name**, smaller than the name (Shyden's answer, 2026-11-28); with no names, the numbers alone, large.
 - **Size**: the header bar's number is at least twice the names' size. **My call:** the type floor (`fitScale`, 24px) applies to names; the bar's number never goes below 48px at 1024x768.
 
 ## Constraints

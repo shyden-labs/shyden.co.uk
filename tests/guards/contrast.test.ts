@@ -77,6 +77,14 @@ const PAIRS: Pair[] = [
     level: 'body',
     where: 'body copy on the page ground',
   },
+  // #1338: each group's shape and number on its header bar, on the projected
+  // board, read from the back of a classroom.
+  ...([1, 2, 3, 4, 5, 6] as const).map((n): Pair => ({
+    fg: ['--group-ink'],
+    bg: [`--group-${n}`],
+    level: 'body',
+    where: `group ${n}'s shape and number on its bar (projected board)`,
+  })),
   {
     fg: ['--ink'],
     bg: ['--surface'],
