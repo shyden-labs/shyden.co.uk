@@ -13,6 +13,8 @@ export interface Bounds {
 
 export interface UiNode {
   text: string;
+  /** The Android view id, such as `com.android.chrome:id/menu_button`: the same in every language (#1272). */
+  resourceId: string;
   description: string;
   className: string;
   checked: boolean;
@@ -43,6 +45,7 @@ export function parseUiDump(xml: string): UiNode[] {
     if (!box) continue;
     nodes.push({
       text: attribute(tag, 'text'),
+      resourceId: attribute(tag, 'resource-id'),
       description: attribute(tag, 'content-desc'),
       className: attribute(tag, 'class'),
       checked: attribute(tag, 'checked') === 'true',
@@ -61,6 +64,7 @@ export function parseUiDump(xml: string): UiNode[] {
 
 export interface NodeQuery {
   text?: string;
+  resourceId?: string;
   description?: string;
   className?: string;
 }
@@ -73,6 +77,8 @@ export function findNode(
   return nodes.find(
     (node) =>
       (query.text === undefined || node.text === query.text) &&
+      (query.resourceId === undefined ||
+        node.resourceId === query.resourceId) &&
       (query.description === undefined ||
         node.description === query.description) &&
       (query.className === undefined || node.className === query.className),
