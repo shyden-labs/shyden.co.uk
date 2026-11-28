@@ -77,6 +77,7 @@ import {
   DOCKER,
   LSOF,
   NODE,
+  NPM_CLI,
   PLAYWRIGHT_CLI,
   PS,
   VITEST_CLI,
@@ -1125,6 +1126,18 @@ async function runDesktopGroup() {
  *
  * @returns {{ command: string, args: string[] }}
  */
+/**
+ * `npm run <args>` as npm's own entry file under node, never `npm` found on
+ * PATH (#1294): the run's build and its preview server.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ command: string, args: string[] }}
+ */
+export const npmRunCommand = (args) => ({
+  command: NODE,
+  args: [NPM_CLI, 'run', ...args],
+});
+
 export const androidGroupCommand = () => ({
   command: NODE,
   args: [
@@ -1764,7 +1777,8 @@ async function main() {
     await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
-    const build = await runTagged('build', 'npm', ['run', 'build']);
+    const buildCmd = npmRunCommand(['build']);
+    const build = await runTagged('build', buildCmd.command, buildCmd.args);
     if (build.code !== 0) {
       throw new Error(
         `\`npm run build\` exited with code ${build.code} -- aborting the whole run.`,
@@ -1776,12 +1790,10 @@ async function main() {
     );
     // Its own process group: cleanup stops npm AND the server it started,
     // and nothing else that happens to use the port (#390 F44).
-    previewChild = spawnTagged(
-      'preview',
-      'npm',
-      ['run', 'preview', '--', '--host', '0.0.0.0'],
-      { detached: true },
-    );
+    const previewCmd = npmRunCommand(['preview', '--', '--host', '0.0.0.0']);
+    previewChild = spawnTagged('preview', previewCmd.command, previewCmd.args, {
+      detached: true,
+    });
     await untilReadyOrExit(
       previewChild,
       waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {

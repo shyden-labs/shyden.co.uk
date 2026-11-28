@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { listDevices } from '../../scripts/devicectl.mjs';
-import { standInOnPath } from '../path-stand-in';
+import { standInProgram } from '../path-stand-in';
 
 /**
  * Every `xcrun devicectl` read the iOS leg makes, and the one reading of what
@@ -21,13 +21,13 @@ echo "args: $*"
 `;
 
 describe('listDevices()', () => {
-  standInOnPath('xcrun', STAND_IN);
+  const xcrun = standInProgram('xcrun', STAND_IN);
   afterEach(() => {
     delete process.env.XCRUN_STAND_IN;
   });
 
   it('asks devicectl for its JSON listing on stdout, and returns it', () => {
-    expect(listDevices()).toBe(
+    expect(listDevices({ program: xcrun() })).toBe(
       'args: devicectl list devices --json-output -\n',
     );
   });
@@ -35,7 +35,7 @@ describe('listDevices()', () => {
   it('names the command and the cause when devicectl gives no answer in time', () => {
     process.env.XCRUN_STAND_IN = 'hang';
     const started = Date.now();
-    expect(() => listDevices({ timeoutMs: 300 })).toThrow(
+    expect(() => listDevices({ timeoutMs: 300, program: xcrun() })).toThrow(
       /^xcrun devicectl list devices --json-output - gave no answer within 300 ms: is the iPhone still connected and trusted\?$/,
     );
     // Stopped at its deadline, not when the stand-in's 30 s ran out.
@@ -44,7 +44,7 @@ describe('listDevices()', () => {
 
   it("names the command and devicectl's own words when it fails", () => {
     process.env.XCRUN_STAND_IN = 'fail';
-    expect(() => listDevices()).toThrow(
+    expect(() => listDevices({ program: xcrun() })).toThrow(
       /^xcrun devicectl list devices --json-output - failed with exit status 1: stderr "[\s\S]*CoreDevice is not running/,
     );
   });
