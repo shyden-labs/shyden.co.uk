@@ -80,6 +80,21 @@ export function signOffOf(body) {
 }
 
 /**
+ * The ids in `these` that `those` lacks, each once, in the order of `these`.
+ * Embedded in the evidence page beside `standingOf`, which calls it, so it
+ * keeps to the same plain-script subset.
+ *
+ * @param {readonly string[]} these
+ * @param {readonly string[]} those
+ * @returns {string[]}
+ */
+export function lacking(these, those) {
+  return these.filter(function (id, at) {
+    return !those.includes(id) && these.indexOf(id) === at;
+  });
+}
+
+/**
  * Where a sign-off's verdict stands against the journeys a page shows.
  *
  * @param {SignOff} signOff as `signOffOf` returns it
@@ -87,17 +102,6 @@ export function signOffOf(body) {
  * @returns {Standing}
  */
 export function standingOf(signOff, journeys) {
-  /**
-   * The ids in `these` that `those` lacks, each once, in the order of `these`.
-   *
-   * @param {readonly string[]} these
-   * @param {readonly string[]} those
-   */
-  function lacking(these, those) {
-    return these.filter(function (id, at) {
-      return !those.includes(id) && these.indexOf(id) === at;
-    });
-  }
   var verdict = signOff.verdict;
   var covers = signOff.verdictCovers;
   if (verdict === null) {

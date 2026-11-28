@@ -39,7 +39,7 @@ import {
   VITEST_EVIDENCE_REPORT,
 } from './evidence-files.mjs';
 import { playwrightShapeOfVitest } from './vitest-evidence.mjs';
-import { signOffOf, standingOf } from './evidence-signoff.mjs';
+import { lacking, signOffOf, standingOf } from './evidence-signoff.mjs';
 
 /**
  * @param {unknown} s
@@ -1137,6 +1137,7 @@ ${checks.html}
   // The stored sign-off's shape, and where its verdict stands against this
   // page's journeys, embedded by their own source text: the unit tests and the
   // pre-merge check run these same functions (evidence-signoff.mjs, #197).
+  ${lacking.toString()}
   ${signOffOf.toString()}
   ${standingOf.toString()}
   var JOURNEYS = ${JSON.stringify([...journeys.map((j) => j.id), ...checks.ids])};
