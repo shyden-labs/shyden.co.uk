@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ThemeSwitch from '../ThemeSwitch.astro';
 import { getStrings, LOCALES, type Locale } from '../../lib/i18n';
 // The engine owns the ceiling. Hard-coding a second number here is how the
 // field comes to advertise one limit while the tool enforces another.
@@ -996,7 +997,14 @@ const sexWhyText = sexWhy(roster, t);
        for the same reason as the print panel: a mid-module failure leaves an
        inert overlay rather than a broken one. */}
   <div id="cg-board" class="cg-board" hidden>
-    <div id="cg-board-bar" class="cg-board-bar"></div>
+    {/* #1338: the board switches light and dark from its own bar, because a
+         projected room is sometimes bright and sometimes dimmed. The site's
+         own switch, so the theme script drives it unchanged and the page and
+         the board always agree. projector.ts appends Shuffle and Exit after
+         it. */}
+    <div id="cg-board-bar" class="cg-board-bar">
+      <ThemeSwitch lang={lang} />
+    </div>
   </div>
 
   <dialog id="cg-print-panel" class="cg-print-panel">
@@ -2098,9 +2106,12 @@ const sexWhyText = sexWhy(roster, t);
      did exactly what it was told and broke a name mid-word, "Christoph / er /
      Wethering / ton- / Smythe". Unreadable at the back of a classroom, and
      invisible to every earlier check because they all used "Student 1".
-     `em` is the unit that scales with the board. */
+     `em` is the unit that scales with the board. 9em held the longest word
+     beside its avatar; each student's number beside the name (#1338) took
+     another 5.5px and pushed group 1's rows out of their card, so the
+     column also holds a three-digit number (a class goes up to 100). */
   .cg-board #cg-tables {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9em), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10.5em), 1fr));
   }
   /* …and once the column can hold a name, prefer a word boundary. `anywhere`
      is the page's defence against a long name pushing the layout sideways; on
@@ -2108,6 +2119,85 @@ const sexWhyText = sexWhy(roster, t);
      resort, not the first move. */
   .cg-board #cg-results .who {
     overflow-wrap: break-word;
+    /* Should a name still not fit, it breaks inside its card rather than
+       pushing its row out of it: a flex item never shrinks below its
+       longest word unless told to. */
+    min-width: 0;
+  }
+  /* #1338: each group under a coloured header bar holding a shape and its
+     number, read from the back of a classroom (Shyden's design A). The mark
+     and the students' own numbers are the board's alone; the page keeps the
+     card it always had. Tones and their ink are tokens, so a theme moves
+     them and tests/guards/contrast.test.ts scores every pair. */
+  #cg-results .group-mark,
+  #cg-results .student-no {
+    display: none;
+  }
+  .cg-board #cg-results .group[data-tone='1'] {
+    --group-tone: var(--group-1);
+  }
+  .cg-board #cg-results .group[data-tone='2'] {
+    --group-tone: var(--group-2);
+  }
+  .cg-board #cg-results .group[data-tone='3'] {
+    --group-tone: var(--group-3);
+  }
+  .cg-board #cg-results .group[data-tone='4'] {
+    --group-tone: var(--group-4);
+  }
+  .cg-board #cg-results .group[data-tone='5'] {
+    --group-tone: var(--group-5);
+  }
+  .cg-board #cg-results .group[data-tone='6'] {
+    --group-tone: var(--group-6);
+  }
+  .cg-board #cg-results .group {
+    padding: 0;
+    overflow: hidden;
+    border: 2px solid var(--group-tone);
+  }
+  .cg-board #cg-results .group-mark {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0.05em 0.18em;
+    background: var(--group-tone);
+    color: var(--group-ink);
+    font-size: 2.2em;
+    font-weight: 850;
+    line-height: 1.1;
+  }
+  .cg-board #cg-results .group-shape {
+    font-size: 0.72em;
+  }
+  /* The localised "Group n" stays the heading's accessible name on the
+     board, hidden by the global visually-hidden rule in tokens.css (#767:
+     the recipe is written once); the bar shows the shape and the digits. */
+  .cg-board #cg-results .group ul {
+    padding: 0.4em 0.6em 0.6em;
+  }
+  /* A named student's number sits beside the name, before it and smaller
+     (Shyden, 2026-11-28). `order` moves the name after it, so the row's
+     text, and every test reading it, keeps its order; the row's `gap`
+     spaces them, never a space in the markup (flex drops it). */
+  .cg-board #cg-results .student-no {
+    display: inline;
+    font-size: 0.75em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .cg-board #cg-results .student .who {
+    order: 1;
+  }
+  /* No names in the deal: the numbers alone, large. */
+  .cg-board #cg-tables[data-numbers-only] .who {
+    display: none;
+  }
+  .cg-board #cg-tables[data-numbers-only] .student-no {
+    display: inline;
+    font-size: 1.6em;
+    font-weight: 800;
+    line-height: 1.1;
   }
   .cg-board-bar {
     display: flex;

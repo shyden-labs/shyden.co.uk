@@ -420,7 +420,9 @@ test.describe('classroom group creator', () => {
     await typeInto(page.locator('#cg-count'), '4');
     await typeInto(page.locator('#cg-size'), '2');
     await tapOn(page.locator('#cg-go'));
-    const labels = await page.locator('#cg-results .student').allTextContents();
+    const labels = await page
+      .locator('#cg-results .student .who')
+      .allTextContents();
     expect
       .soft(labels.sort())
       .toEqual(['Student 1', 'Student 2', 'Student 3', 'Student 4']);
@@ -984,7 +986,9 @@ test.describe('classroom group creator — Bahasa Indonesia', () => {
     // also pass for a malformed "Siswa NaN".
     await fill(page, { count: '4', size: '2' });
     await tapOn(page.locator('#cg-go'));
-    const labels = await page.locator('#cg-results .student').allTextContents();
+    const labels = await page
+      .locator('#cg-results .student .who')
+      .allTextContents();
     expect
       .soft(labels.sort())
       .toEqual(['Siswa 1', 'Siswa 2', 'Siswa 3', 'Siswa 4']);
@@ -2121,7 +2125,7 @@ test.describe('every language renders its own messages', () => {
       await fill(page, { count: '4', size: '2' });
       await tapOn(page.locator('#cg-go'));
       const labels = await page
-        .locator('#cg-results .student')
+        .locator('#cg-results .student .who')
         .allTextContents();
       expect(labels.sort()).toEqual(
         [1, 2, 3, 4].map((n) => t.studentNumber({ n })).sort(),
