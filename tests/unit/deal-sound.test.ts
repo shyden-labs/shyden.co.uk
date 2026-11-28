@@ -7,7 +7,15 @@ import {
   dealLoudness,
   timpaniOnStep,
   nearestNote,
+  CONFETTI_MIDI,
+  ROLL_S,
+  REVEAL_AT_S,
+  FANFARE_STAGES_S,
+  RING_OUT_S,
+  endingPlan,
+  type EndingEvent,
 } from '../../src/lib/dealSound';
+import { createPrng } from '../../src/lib/sfx';
 
 describe('the deal climbs a major-pentatonic scale', () => {
   it('starts on its base note', () => {
@@ -61,13 +69,14 @@ describe('every note of a class of 100 plays from a real recording', () => {
     });
 
     it(`every shipped ${instrument} recording is played by some note`, () => {
-      const used = new Set(
-        Array.from(
-          { length: 10 },
-          (_, i) =>
-            nearestNote(instrument, dealStepMidi(DEAL_BASES[instrument], i))
-              .sample,
+      const played = [
+        ...Array.from({ length: 10 }, (_, i) =>
+          dealStepMidi(DEAL_BASES[instrument], i),
         ),
+        ...(instrument === 'glock' ? CONFETTI_MIDI : []),
+      ];
+      const used = new Set(
+        played.map((midi) => nearestNote(instrument, midi).sample),
       );
       expect(SHIPPED_NOTES[instrument].filter((n) => !used.has(n))).toEqual([]);
     });
@@ -131,5 +140,109 @@ describe('a timpani hit marks every fourth student', () => {
 
   it('not on the fourth', () => {
     expect(timpaniOnStep(3)).toBe(false);
+  });
+});
+
+const plan = (): EndingEvent[] => endingPlan(createPrng(1339));
+const ofKind = (kind: EndingEvent['kind']): EndingEvent[] =>
+  plan().filter((event) => event.kind === kind);
+
+describe('the ending, timed from the last landing', () => {
+  it('rolls the timpani for 1.6 s first', () => {
+    expect(ROLL_S).toBe(1.6);
+    expect(ofKind('roll').map(({ at, durationS }) => [at, durationS])).toEqual([
+      [0, 1.6],
+    ]);
+  });
+
+  it('reveals at 1.7 s, the fanfare stages half a second apart', () => {
+    expect(REVEAL_AT_S).toBe(1.7);
+    expect(FANFARE_STAGES_S).toEqual([0, 0.5, 1.0]);
+  });
+
+  it('plays three fanfare stages on C, F and G major', () => {
+    expect(
+      ofKind('fanfare').map(({ at, rootHz }) => [
+        Number(at.toFixed(3)),
+        Number(rootHz?.toFixed(2)),
+      ]),
+    ).toEqual([
+      [1.7, 261.63],
+      [2.2, 349.23],
+      [2.7, 392.0],
+    ]);
+  });
+
+  it('hits the timpani on the reveal and on the third stage', () => {
+    expect(ofKind('timpaniHit').map(({ at }) => at)).toEqual([1.7, 2.7]);
+  });
+
+  it('brings the whoosh in half a second before the reveal', () => {
+    expect(ofKind('whoosh').map(({ at }) => at)).toEqual([1.2]);
+  });
+
+  it('lands the impact, the low drop and the bell shimmer on the reveal', () => {
+    for (const kind of ['impact', 'drop', 'bellShimmer'] as const) {
+      expect(ofKind(kind).length, kind).toBeGreaterThan(0);
+      for (const { at } of ofKind(kind)) {
+        expect(at, kind).toBeGreaterThanOrEqual(1.7);
+        expect(at, kind).toBeLessThan(1.8);
+      }
+    }
+  });
+
+  it('holds a final chord and the sparkle from just after the reveal', () => {
+    expect(ofKind('finalChord').map(({ at }) => at)).toEqual([1.8]);
+    expect(ofKind('sparkle').map(({ at }) => at)).toEqual([1.8]);
+  });
+
+  it('rings out for 7.5 s after the reveal, and no longer', () => {
+    expect(RING_OUT_S).toBe(7.5);
+    const ends = plan().map(({ at, durationS }) => at + durationS);
+    expect(Math.max(...ends)).toBeLessThanOrEqual(1.7 + 7.5 + 1e-9);
+    expect(Math.max(...ends)).toBeGreaterThanOrEqual(1.7 + 6);
+  });
+
+  it('scatters 66 glockenspiel confetti notes from 1.8 s to 6.6 s', () => {
+    const confetti = ofKind('confettiNote');
+    expect(confetti).toHaveLength(66);
+    for (const { at } of confetti) {
+      expect(at).toBeGreaterThanOrEqual(1.8);
+      expect(at).toBeLessThanOrEqual(6.6);
+    }
+  });
+
+  it('plays every confetti note from a glockenspiel recording, nudged at most three semitones', () => {
+    for (const { midi } of ofKind('confettiNote')) {
+      expect(CONFETTI_MIDI).toContain(midi);
+      expect(
+        Math.abs(nearestNote('glock', midi ?? Number.NaN).semitones),
+      ).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('lets the confetti fade as it goes', () => {
+    const byTime = [...ofKind('confettiNote')].sort((a, b) => a.at - b.at);
+    expect(byTime[0].gain).toBeGreaterThan(byTime.at(-1)?.gain ?? 1);
+  });
+
+  it('gives every event a positive length and a gain', () => {
+    for (const { kind, durationS, gain } of plan()) {
+      expect(durationS, kind).toBeGreaterThan(0);
+      expect(gain, kind).toBeGreaterThan(0);
+    }
+  });
+
+  it('is the same plan from the same seed', () => {
+    expect(plan()).toEqual(plan());
+  });
+
+  it('differs from another seed only in the confetti', () => {
+    const other = endingPlan(createPrng(7)).filter(
+      (event) => event.kind !== 'confettiNote',
+    );
+    expect(other).toEqual(
+      plan().filter((event) => event.kind !== 'confettiNote'),
+    );
   });
 });
