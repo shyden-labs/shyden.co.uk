@@ -136,7 +136,12 @@ async function scrollToAndTap(query: NodeQuery, why: string): Promise<void> {
   );
 }
 
-const MENU_BUTTON = { description: 'Customize and control Google Chrome' };
+/**
+ * Chrome's menu button, found by its view id: its label changes with the
+ * phone's language, and the 2026-11-28 run failed every Android test when an
+ * en-GB phone said "Customise" (#1272).
+ */
+export const MENU_BUTTON = { resourceId: 'com.android.chrome:id/menu_button' };
 
 /**
  * Taps the browser's menu button. With no tab open Chrome shows its tab switcher instead, which

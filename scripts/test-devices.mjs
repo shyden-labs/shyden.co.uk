@@ -77,6 +77,7 @@ import {
   DOCKER,
   LSOF,
   NODE,
+  NPM_CLI,
   PLAYWRIGHT_CLI,
   PS,
   VITEST_CLI,
@@ -323,7 +324,69 @@ function waitForClose(child, command, args) {
  */
 async function runTagged(tag, command, args, opts) {
   const child = spawnTagged(tag, command, args, opts);
-  return waitForClose(child, command, args);
+  const closed = waitForClose(child, command, args);
+  // #1340: registered until it closes, so an interrupted run can stop it.
+  const handle = {
+    pid: child.pid ?? -1,
+    kill: (/** @type {NodeJS.Signals} */ signal) => child.kill(signal),
+    exited: closed.then(
+      () => undefined,
+      () => undefined,
+    ),
+  };
+  runningGroups.add(handle);
+  try {
+    return await closed;
+  } finally {
+    runningGroups.delete(handle);
+  }
+}
+
+/**
+ * @typedef {{ pid: number, kill: (signal: NodeJS.Signals) => boolean, exited: Promise<void> }} GroupRun
+ */
+
+/** @type {Set<GroupRun>} Every test run this script started and is still waiting for (#1340). */
+const runningGroups = new Set();
+
+/** How long a group run has after SIGINT before it is killed (#1340). */
+export const GROUP_STOP_CEILING_MS = 10_000;
+
+/**
+ * Stops every group test run still running: SIGINT, then a wait for it to
+ * exit; one that outlives `ceilingMs` is named and sent SIGKILL (#1340). On
+ * 2026-11-28 a SIGINT to this script left the Android group's Playwright
+ * running, re-parented to pid 1, still driving the phone.
+ *
+ * @param {Set<GroupRun>} running
+ * @param {{ ceilingMs?: number, write?: (line: string) => void }} [options]
+ */
+export async function stopGroupRuns(
+  running,
+  {
+    ceilingMs = GROUP_STOP_CEILING_MS,
+    write = (line) => process.stderr.write(line),
+  } = {},
+) {
+  await Promise.all(
+    [...running].map(async (run) => {
+      running.delete(run);
+      run.kill('SIGINT');
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let timer;
+      const timedOut = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(true), ceilingMs);
+      });
+      const late = await Promise.race([run.exited.then(() => false), timedOut]);
+      clearTimeout(timer);
+      if (late) {
+        write(
+          `cleanup: group test run pid ${run.pid} did not exit within ${ceilingMs} ms of SIGINT; sent SIGKILL\n`,
+        );
+        run.kill('SIGKILL');
+      }
+    }),
+  );
 }
 
 /**
@@ -1132,6 +1195,18 @@ async function runDesktopGroup() {
  *
  * @returns {{ command: string, args: string[] }}
  */
+/**
+ * `npm run <args>` as npm's own entry file under node, never `npm` found on
+ * PATH (#1294): the run's build and its preview server.
+ *
+ * @param {readonly string[]} args
+ * @returns {{ command: string, args: string[] }}
+ */
+export const npmRunCommand = (args) => ({
+  command: NODE,
+  args: [NPM_CLI, 'run', ...args],
+});
+
 export const androidGroupCommand = () => ({
   command: NODE,
   args: [
@@ -1698,6 +1773,7 @@ export async function stopStarted(
 }
 
 const cleanup = once(async () => {
+  await stopGroupRuns(runningGroups);
   await stopStarted(runningWda);
   if (previewChild) {
     process.stdout.write('==> Stopping the shared preview server...\n');
@@ -1824,7 +1900,8 @@ async function main() {
     await waitForPortFree(PORT);
 
     process.stdout.write('==> Building (npm run build)...\n');
-    const build = await runTagged('build', 'npm', ['run', 'build']);
+    const buildCmd = npmRunCommand(['build']);
+    const build = await runTagged('build', buildCmd.command, buildCmd.args);
     if (build.code !== 0) {
       throw new Error(
         `\`npm run build\` exited with code ${build.code} -- aborting the whole run.`,
@@ -1836,12 +1913,10 @@ async function main() {
     );
     // Its own process group: cleanup stops npm AND the server it started,
     // and nothing else that happens to use the port (#390 F44).
-    previewChild = spawnTagged(
-      'preview',
-      'npm',
-      ['run', 'preview', '--', '--host', '0.0.0.0'],
-      { detached: true },
-    );
+    const previewCmd = npmRunCommand(['preview', '--', '--host', '0.0.0.0']);
+    previewChild = spawnTagged('preview', previewCmd.command, previewCmd.args, {
+      detached: true,
+    });
     await untilReadyOrExit(
       previewChild,
       waitForHttpOk(`http://localhost:${PORT}/classroom-groups`, {

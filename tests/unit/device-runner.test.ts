@@ -25,6 +25,7 @@ import {
   chromeProcessState,
   readTabsBefore,
   stopStarted,
+  stopGroupRuns,
   desktopPlaywrightArgs,
 } from '../../scripts/test-devices.mjs';
 
@@ -875,6 +876,69 @@ describe('stopStarted: an interrupted run still stops what it started (#1326)', 
   it('does nothing when no WebDriverAgent is running', async () => {
     const written: string[] = [];
     await stopStarted(new Set(), (line) => written.push(line));
+    expect(written).toEqual([]);
+  });
+});
+
+/**
+ * #1340: a device run stopped by SIGINT on 2026-11-28 exited 130, but the
+ * Android group's Playwright (pid 22740) kept running, re-parented to pid 1,
+ * still driving the phone. Every group test run the runner starts is now
+ * signalled on cleanup, and awaited.
+ */
+describe('stopGroupRuns: an interrupted run stops every group test run it started (#1340)', () => {
+  const child = (pid: number, exits: boolean) => {
+    const signals: string[] = [];
+    let resolve: () => void = () => {};
+    const exited = new Promise<void>((r) => (resolve = r));
+    return {
+      pid,
+      signals,
+      kill: (signal: string) => {
+        signals.push(signal);
+        if (exits) resolve();
+        return true;
+      },
+      exited,
+    };
+  };
+
+  it('sends SIGINT to each running group and waits for it to exit', async () => {
+    const a = child(101, true);
+    const b = child(102, true);
+    const running = new Set([a, b]);
+    const written: string[] = [];
+    await stopGroupRuns(running, {
+      ceilingMs: 200,
+      write: (l) => written.push(l),
+    });
+    expect(a.signals).toEqual(['SIGINT']);
+    expect(b.signals).toEqual(['SIGINT']);
+    expect(running.size).toBe(0);
+    expect(written).toEqual([]);
+  });
+
+  it('names the pid, then sends SIGKILL, when a group outlives the ceiling', async () => {
+    const stuck = child(22740, false);
+    const written: string[] = [];
+    const started = Date.now();
+    await stopGroupRuns(new Set([stuck]), {
+      ceilingMs: 100,
+      write: (l) => written.push(l),
+    });
+    expect(Date.now() - started).toBeLessThan(900);
+    expect(stuck.signals).toEqual(['SIGINT', 'SIGKILL']);
+    expect(written).toEqual([
+      'cleanup: group test run pid 22740 did not exit within 100 ms of SIGINT; sent SIGKILL\n',
+    ]);
+  });
+
+  it('does nothing when no group is running', async () => {
+    const written: string[] = [];
+    await stopGroupRuns(new Set(), {
+      ceilingMs: 100,
+      write: (l) => written.push(l),
+    });
     expect(written).toEqual([]);
   });
 });

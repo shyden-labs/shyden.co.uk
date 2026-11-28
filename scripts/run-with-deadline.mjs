@@ -8,6 +8,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import { messageOf } from './errors.mjs';
 
 /**
@@ -21,7 +22,9 @@ import { messageOf } from './errors.mjs';
  * @returns {string}
  */
 export function runWithDeadline(file, args, { timeoutMs, whenSilent }) {
-  const command = `${file} ${args.join(' ')}`;
+  // Named by the tool's own name: the path says where it was found, not
+  // which command failed (#1294).
+  const command = `${path.basename(file)} ${args.join(' ')}`;
   try {
     return execFileSync(file, [...args], {
       encoding: 'utf8',
