@@ -26,6 +26,7 @@ import {
   readTabsBefore,
   stopStarted,
   stopGroupRuns,
+  desktopPlaywrightArgs,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -939,5 +940,14 @@ describe('stopGroupRuns: an interrupted run stops every group test run it starte
       write: (l) => written.push(l),
     });
     expect(written).toEqual([]);
+  });
+});
+
+describe('the desktop group in its 2 GB Colima machine (#1341)', () => {
+  it('runs one worker, so two browsers never share the memory at once', () => {
+    const workers = desktopPlaywrightArgs().filter((arg) =>
+      arg.startsWith('--workers'),
+    );
+    expect(workers).toEqual(['--workers=1']);
   });
 });
