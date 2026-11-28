@@ -13,6 +13,7 @@
  * `scripts/run-with-deadline.mjs`, shared with `devicectl`.
  */
 
+import { ADB } from './programs.mjs';
 import { runWithDeadline } from './run-with-deadline.mjs';
 
 /**
@@ -24,14 +25,16 @@ export const ADB_TIMEOUT_MS = 15_000;
 
 /**
  * Runs `adb` with `args` and returns what it printed. Throws, naming the
- * command, when adb fails or gives no answer within `timeoutMs`.
+ * command, when adb fails or gives no answer within `timeoutMs`. `program` is
+ * adb's absolute path, never a bare name PATH could stand in for (#1294); a
+ * test hands in a stand-in's path.
  *
  * @param {readonly string[]} args
- * @param {{ timeoutMs?: number }} [options]
+ * @param {{ timeoutMs?: number, program?: string }} [options]
  * @returns {string}
  */
-export function adb(args, { timeoutMs = ADB_TIMEOUT_MS } = {}) {
-  return runWithDeadline('adb', args, {
+export function adb(args, { timeoutMs = ADB_TIMEOUT_MS, program = ADB } = {}) {
+  return runWithDeadline(program, args, {
     timeoutMs,
     whenSilent: 'is the phone still connected and unlocked?',
   });

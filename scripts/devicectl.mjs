@@ -14,6 +14,7 @@
  * Held by `tests/unit/devicectl.test.ts`.
  */
 
+import { XCRUN } from './programs.mjs';
 import { runWithDeadline } from './run-with-deadline.mjs';
 
 /**
@@ -33,11 +34,14 @@ const LIST_ARGS = ['devicectl', 'list', 'devices', '--json-output', '-'];
  * The devices `xcrun devicectl` lists, as the JSON text it printed. Throws,
  * naming the command, when it fails or gives no answer within `timeoutMs`.
  *
- * @param {{ timeoutMs?: number }} [options]
+ * @param {{ timeoutMs?: number, program?: string }} [options]
  * @returns {string}
  */
-export function listDevices({ timeoutMs = DEVICECTL_TIMEOUT_MS } = {}) {
-  return runWithDeadline('xcrun', LIST_ARGS, {
+export function listDevices({
+  timeoutMs = DEVICECTL_TIMEOUT_MS,
+  program = XCRUN,
+} = {}) {
+  return runWithDeadline(program, LIST_ARGS, {
     timeoutMs,
     whenSilent: 'is the iPhone still connected and trusted?',
   });
@@ -74,15 +78,15 @@ export function safariLaunchArgs(udid, url) {
  *
  * @param {string} udid
  * @param {string} url
- * @param {{ timeoutMs?: number }} [options]
+ * @param {{ timeoutMs?: number, program?: string }} [options]
  * @returns {string}
  */
 export function launchSafari(
   udid,
   url,
-  { timeoutMs = DEVICECTL_TIMEOUT_MS } = {},
+  { timeoutMs = DEVICECTL_TIMEOUT_MS, program = XCRUN } = {},
 ) {
-  return runWithDeadline('xcrun', safariLaunchArgs(udid, url), {
+  return runWithDeadline(program, safariLaunchArgs(udid, url), {
     timeoutMs,
     whenSilent: 'is the iPhone still connected, trusted and unlocked?',
   });
