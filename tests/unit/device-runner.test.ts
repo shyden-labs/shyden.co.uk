@@ -22,6 +22,8 @@ import {
   deviceRunGroups,
   adbCleanupCalls,
   tabsOpenedByRun,
+  chromeProcessState,
+  readTabsBefore,
   stopStarted,
 } from '../../scripts/test-devices.mjs';
 
@@ -764,6 +766,67 @@ describe('tabsOpenedByRun: only the Chrome tabs this run opened are closed (#132
     expect(() => tabsOpenedByRun([], { error: 'x' }, RUN)).toThrow(
       /DevTools target list/,
     );
+  });
+});
+
+describe('chromeProcessState: whether Chrome runs on the phone, read from pidof (#1337)', () => {
+  it('reads a pid as running', () => {
+    expect(chromeProcessState('12345\nexit=0\n')).toBe('running');
+  });
+
+  it("reads pidof's exit 1 with nothing printed as stopped", () => {
+    expect(chromeProcessState('exit=1\n')).toBe('stopped');
+  });
+
+  it('throws on anything else, quoting it, rather than guessing', () => {
+    expect(() => chromeProcessState('pidof: not found\nexit=127\n')).toThrow(
+      /pidof: not found/,
+    );
+  });
+});
+
+describe('readTabsBefore: the tabs to leave after the run (#1337)', () => {
+  const page = (id: string) => ({ id, type: 'page', url: 'about:blank' });
+
+  it('records no tab when Chrome is not running, without asking DevTools', async () => {
+    const list = vi.fn(async () => {
+      throw new Error('fetch failed');
+    });
+    expect(
+      await readTabsBefore({ chromeState: () => 'stopped', list }),
+    ).toEqual({ ids: [] });
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("records each page tab's id when Chrome is running", async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => 'running',
+        list: async () => [page('a'), page('b')],
+      }),
+    ).toEqual({ ids: ['a', 'b'] });
+  });
+
+  it('leaves the tabs unknown, naming why, when Chrome runs but its list cannot be read', async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => 'running',
+        list: async () => {
+          throw new Error('fetch failed');
+        },
+      }),
+    ).toEqual({ unknown: 'fetch failed' });
+  });
+
+  it("leaves the tabs unknown, naming why, when Chrome's process cannot be read", async () => {
+    expect(
+      await readTabsBefore({
+        chromeState: () => {
+          throw new Error('adb shell gave no answer');
+        },
+        list: async () => [],
+      }),
+    ).toEqual({ unknown: 'adb shell gave no answer' });
   });
 });
 
