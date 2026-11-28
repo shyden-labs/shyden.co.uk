@@ -1,6 +1,10 @@
 import { runInNewContext } from 'node:vm';
 import { describe, it, expect } from 'vitest';
-import { signOffOf, standingOf } from '../../scripts/evidence-signoff.mjs';
+import {
+  lacking,
+  signOffOf,
+  standingOf,
+} from '../../scripts/evidence-signoff.mjs';
 import { evidencePageOf } from '../evidence-fixture';
 
 /**
@@ -212,7 +216,7 @@ describe('the page runs these functions, not a copy of them', () => {
       ['the first journey', 'the second journey'],
       'ticket-197-fixture',
     );
-    for (const fn of [signOffOf, standingOf]) {
+    for (const fn of [lacking, signOffOf, standingOf]) {
       expect(html, fn.name).toContain(fn.toString());
     }
   });
@@ -222,7 +226,7 @@ describe('the page runs these functions, not a copy of them', () => {
     // has: a reference to anything else in the module, or to a Node global,
     // fails here rather than in a browser.
     const standalone = runInNewContext(
-      `(function () {\n${signOffOf.toString()}\n${standingOf.toString()}\n` +
+      `(function () {\n${lacking.toString()}\n${signOffOf.toString()}\n${standingOf.toString()}\n` +
         'return { signOffOf: signOffOf, standingOf: standingOf };\n})()',
       {},
     ) as { signOffOf: typeof signOffOf; standingOf: typeof standingOf };
