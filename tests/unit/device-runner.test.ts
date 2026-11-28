@@ -25,6 +25,7 @@ import {
   chromeProcessState,
   readTabsBefore,
   stopStarted,
+  desktopPlaywrightArgs,
 } from '../../scripts/test-devices.mjs';
 
 /**
@@ -875,5 +876,14 @@ describe('stopStarted: an interrupted run still stops what it started (#1326)', 
     const written: string[] = [];
     await stopStarted(new Set(), (line) => written.push(line));
     expect(written).toEqual([]);
+  });
+});
+
+describe('the desktop group in its 2 GB Colima machine (#1341)', () => {
+  it('runs one worker, so two browsers never share the memory at once', () => {
+    const workers = desktopPlaywrightArgs().filter((arg) =>
+      arg.startsWith('--workers'),
+    );
+    expect(workers).toEqual(['--workers=1']);
   });
 });

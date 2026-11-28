@@ -1048,6 +1048,33 @@ export async function contained(name, run) {
   }
 }
 
+/** Playwright's arguments for the desktop group, inside its container. */
+export function desktopPlaywrightArgs() {
+  return [
+    '--config=playwright.config.ts',
+    // list,json: unchanged from before this task -- terminal output and
+    // the JSON summary this script itself reads are exactly as they
+    // were. html + the jsonl reporter are ADDITIONS for the dashboard
+    // only (task brief step 3: "keep the existing --reporter=list,json
+    // behaviour alongside the new one"). Neither playwright.config.ts
+    // nor playwright.device.config.ts needed a change to support this --
+    // Playwright's CLI resolves a non-built-in reporter id via
+    // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
+    // `resolveReporter`), so a relative path on this same flag is enough;
+    // measured directly against this exact invocation shape before being
+    // trusted, not assumed.
+    '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
+    // One worker. The group runs in Colima's 2 GB machine, and at two
+    // workers a WebKit page of 0.5-0.6 GB each beside Playwright and the
+    // preview server ran it out of memory: the kernel killed 12 WebKit
+    // pages, one Firefox and finally Playwright itself
+    // (shyden-labs/shyden.co.uk#1341, one worker ruled by Shyden
+    // 2026-11-28). Earlier, three workers pushed the laptop into swap
+    // (shyden-labs/shyden.co.uk#1021).
+    '--workers=1',
+  ];
+}
+
 async function runDesktopGroup() {
   const name = 'desktop';
   const reportFile = REPORT_FILES.desktop;
@@ -1066,27 +1093,7 @@ async function runDesktopGroup() {
     desktopContainerArgv({
       root: ROOT,
       image,
-      playwrightArgs: [
-        '--config=playwright.config.ts',
-        // list,json: unchanged from before this task -- terminal output and
-        // the JSON summary this script itself reads are exactly as they
-        // were. html + the jsonl reporter are ADDITIONS for the dashboard
-        // only (task brief step 3: "keep the existing --reporter=list,json
-        // behaviour alongside the new one"). Neither playwright.config.ts
-        // nor playwright.device.config.ts needed a change to support this --
-        // Playwright's CLI resolves a non-built-in reporter id via
-        // `path.resolve(process.cwd(), id)` (node_modules/playwright/lib/cli/testActions.js,
-        // `resolveReporter`), so a relative path on this same flag is enough;
-        // measured directly against this exact invocation shape before being
-        // trusted, not assumed.
-        '--reporter=list,json,html,./tests/reporters/jsonl-reporter.ts',
-        // Two workers, not Playwright's default of half the cores (3 on the
-        // 6-core, 8 GB laptop): at 3, five engines pushed it into swap, local
-        // file serving slowed from 8 ms to 490 ms, and a chromium page stopped
-        // answering for 28 s (shyden-labs/shyden.co.uk#1021, ruled laptop load
-        // by Shyden 2026-11-02).
-        '--workers=2',
-      ],
+      playwrightArgs: desktopPlaywrightArgs(),
       env: {
         ...passed,
         PW_REUSE_SERVER: '1',
